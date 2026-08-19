@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationUse } from './entities/result-innovation-use.entity';
 import {
@@ -13,16 +17,34 @@ import { ResultInstitutionTypesService } from '../result-institution-types/resul
 import { InstitutionTypeRoleEnum } from '../institution-type-roles/enum/institution-type-role.enum';
 import { ResultQuantificationsService } from '../result-quantifications/result-quantifications.service';
 import { QuantificationRolesEnum } from '../quantification-roles/enum/quantification-roles.enum';
+import { UpdateDataUtil } from '../../shared/utils/update-data.util';
+import { ClarisaInnovationUseLevel } from '../../tools/clarisa/entities/clarisa-innovation-use-levels/entities/clarisa-innovation-use-level.entity';
+import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
+import {
+  CreateResultInnovationUseDto,
+  InnovationUseActorDto,
+} from './dto/create-result-innovation-use.dto';
 
 /**
- * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4).
+ * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
+ * T-06 (R-IUA-003, R-IUA-005, R-IUA-006, R-IUA-008 AC.1/AC.2/AC.5,
+ * R-IUA-012 AC.2).
  *
- * Read half only. `create` mirrors `ResultInnovationDevService.create`
+ * Read half: `create` mirrors `ResultInnovationDevService.create`
  * (`result-innovation-dev.service.ts:217-228`) verbatim in shape. `findOne`
  * mirrors that same file's `findOne` (`:456-528`) assembly pattern: load the
  * detail row, fetch each child collection through its own service with the
- * role argument, return one flat object. `update` (the write transaction) is
- * T-06's — deliberately absent here.
+ * role argument, return one flat object.
+ *
+ * Write half: `update` follows `design.md` §5.1 steps 2–12 exactly.
+ * Validation (steps 3–4) runs entirely before `BEGIN` (step 5) — that is
+ * what makes "a failure persists nothing" a property of ordering rather
+ * than of rollback correctness (DD-3). The existence check (step 2) and its
+ * `NotFoundException` happen before the transaction too, mirroring
+ * `ResultInnovationDevService.update`'s ordering discipline
+ * (`result-innovation-dev.service.ts:234-240`) — never inside `findOne`,
+ * which T-06 re-reads through *after* commit (step 12) and which must never
+ * throw on a missing row.
  */
 @Injectable()
 export class ResultInnovationUseService {
@@ -33,6 +55,7 @@ export class ResultInnovationUseService {
     private readonly _resultActorsService: ResultActorsService,
     private readonly _resultInstitutionTypesService: ResultInstitutionTypesService,
     private readonly _resultQuantificationsService: ResultQuantificationsService,
+    private readonly _updateDataUtil: UpdateDataUtil,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationUse);
   }
@@ -50,16 +73,235 @@ export class ResultInnovationUseService {
     });
   }
 
+  /**
+   * `design.md` §5.1 — the write transaction, steps 2–12.
+   *
+   * Steps 2 (existence check), 3 (level resolution) and 4 (cross-field
+   * validation) run before step 5 (`BEGIN`). Any failure in 2–4 throws
+   * before a single write happens — no child service is called, nothing is
+   * persisted. Steps 6–10 run inside `dataSource.transaction`, each child
+   * call threaded with the transaction's `manager` (DD-10, so
+   * `upsertByCompositeKeys`'s writes cannot land outside the transaction the
+   * way OICR's do). Step 12's re-read happens *after* the transaction
+   * promise resolves (i.e. after `COMMIT`), through `findOne` — never inside
+   * the callback, and never the request body (R-IUA-003 AC.4).
+   *
+   * **DD-14 (user ruling, 2026-08-19, T-06 attempt 1 review, Lens C).** Step
+   * 3's level and step 4a's explanation are each resolved against the
+   * *effective post-write row* — the payload's value when the key is
+   * present (even an explicit `null`), the stored row's value otherwise —
+   * before the level ≥ 6 justification rule runs. Validating the payload
+   * alone let `PATCH {"innovation_use_level_explanation": null}` against a
+   * stored level 6 slip past the rule while step 6's partial-merge write
+   * (TypeORM skips `undefined` properties) left `level_id = 7` in place:
+   * level 6, no justification, `200`. DD-14 does not change step 6 itself —
+   * "an omitted key preserves a scalar" still holds for what gets
+   * *persisted*; it only changes what the *validator* sees.
+   */
+  async update(
+    resultId: number,
+    createResultInnovationUseDto: CreateResultInnovationUseDto,
+  ) {
+    // Step 2 — 404 before anything else.
+    const existingResult = await this.mainRepo.findOne({
+      where: { result_id: resultId, is_active: true },
+    });
+
+    if (!existingResult) {
+      throw new NotFoundException(`Result with ID ${resultId} not found`);
+    }
+
+    // Step 3 — resolve the *effective* level id and explanation (DD-14):
+    // `!== undefined`, never `??`. An omitted key (`undefined`) preserves
+    // the stored value; an explicit `null` (or, for the explanation, `''`)
+    // must reach the validator as the clearing it actually is. `??` cannot
+    // tell those two apart — it would let an explicit `null` fall through
+    // to the stored value exactly like an omitted key, reopening the
+    // bypass DD-14 exists to close.
+    const effectiveLevelId =
+      createResultInnovationUseDto?.innovation_use_level_id !== undefined
+        ? createResultInnovationUseDto.innovation_use_level_id
+        : existingResult.innovation_use_level_id;
+    const effectiveExplanation =
+      createResultInnovationUseDto?.innovation_use_level_explanation !==
+      undefined
+        ? createResultInnovationUseDto.innovation_use_level_explanation
+        : existingResult.innovation_use_level_explanation;
+
+    // Step 3 (cont'd) — resolve the catalog's `level` scalar (trap 2),
+    // against the effective level id, not the raw payload.
+    const level = await this.resolveInnovationUseLevel(effectiveLevelId);
+
+    // Step 4 — a) level rule against the effective row, then b)
+    // duplicate-actor rule over the incoming payload. Any throw here
+    // happens before `BEGIN`; no child service below has been invoked yet.
+    this.validateLevelExplanation(level, effectiveExplanation);
+    this.validateNoDuplicateActorTypes(
+      createResultInnovationUseDto?.actors ?? [],
+    );
+
+    await this.dataSource.transaction(async (manager) => {
+      // Step 6 — "omitted = preserve" still governs the *write*: TypeORM's
+      // `UpdateQueryBuilder` skips `undefined` properties outright, so an
+      // omitted key here leaves the stored column untouched. DD-14 only
+      // changed what step 4's validator sees, not this statement.
+      await manager.getRepository(this.mainRepo.target).update(resultId, {
+        innovation_use_level_id:
+          createResultInnovationUseDto?.innovation_use_level_id,
+        innovation_use_level_explanation:
+          createResultInnovationUseDto?.innovation_use_level_explanation,
+        ...this._currentUser.audit(SetAuditEnum.UPDATE),
+      });
+
+      // Step 7.
+      await this._resultActorsService.customSaveInnovationUse(
+        resultId,
+        createResultInnovationUseDto?.actors ?? [],
+        manager,
+      );
+
+      // Step 8.
+      await this._resultInstitutionTypesService.customSaveInnovationUse(
+        resultId,
+        createResultInnovationUseDto?.organizations ?? [],
+        manager,
+      );
+
+      // Step 9 — `manager` is positional argument five (DD-10).
+      await this._resultQuantificationsService.upsertByCompositeKeys(
+        resultId,
+        createResultInnovationUseDto?.quantifications ?? [],
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.INNOVATION_USE,
+        manager,
+      );
+
+      // Step 10.
+      await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
+      // Step 11 (`COMMIT`) happens implicitly once this callback resolves.
+    });
+
+    // Step 12 — post-commit re-read, through the same assembly the GET uses.
+    return this.findOne(resultId);
+  }
+
+  /**
+   * `design.md` §5.1 step 3 (R-IUA-006 AC.6, trap 2). Resolves the catalog's
+   * `level` scalar by looking the row up on its own primary key — never
+   * through `ClarisaInnovationUseLevelsService.findAll(relations, where)`,
+   * whose inherited base drops its `is_active: true` default the instant a
+   * caller supplies a `where` (T-01), and never by `name` (catalog names
+   * repeat in pairs across adjacent levels — R-IUA-010 AC.6). No level id
+   * supplied → `undefined`, so the explanation rule never fires
+   * (R-IUA-006 AC.5, draft-save).
+   *
+   * **No `is_active` filter here, deliberately (fold-in, T-06 attempt 2).**
+   * A stored FK's level is a fact about the row, not about catalog
+   * currency, and `findOne`'s relation join applies no such filter either
+   * — filtering only here would let a soft-deleted level ≥ 6 row silently
+   * skip the justification rule (fail-open) while the GET still reports
+   * that level, two halves disagreeing about the same row.
+   *
+   * **A level id that resolves to no catalog row at all is a client error,
+   * not an FK constraint's problem.** Rejecting it here, before `BEGIN`,
+   * returns a `400` naming the field; left to the FK constraint it would
+   * surface as a `500` carrying TypeORM's raw SQL and constraint name,
+   * because `GlobalExceptions` has no `QueryFailedError` branch.
+   *
+   * `level` is a `bigint` column, which the MySQL driver returns as a
+   * `string` at runtime. `Number(...)` keeps the resolved scalar a real
+   * `number` so a later refactor of the threshold check (e.g. to `===` or
+   * `Number.isInteger`) cannot silently break against real rows while
+   * every mocked test — which supplies `level` as a JS number literal —
+   * stays green.
+   */
+  private async resolveInnovationUseLevel(
+    levelId?: number,
+  ): Promise<number | undefined> {
+    if (levelId === null || levelId === undefined) {
+      return undefined;
+    }
+
+    const row = await this.dataSource
+      .getRepository(ClarisaInnovationUseLevel)
+      .findOne({ where: { id: levelId } });
+
+    if (!row) {
+      throw new BadRequestException([
+        'innovation_use_level_id: unknown innovation use level',
+      ]);
+    }
+
+    return Number(row.level);
+  }
+
+  /**
+   * R-IUA-006 — compares the resolved `level` scalar (`level`, already
+   * joined through the catalog by `resolveInnovationUseLevel`), never the FK
+   * `innovation_use_level_id`. `clarisa_innovation_use_levels.id = level + 1`
+   * — a rule written against the FK demands the justification a full level
+   * early and passes a naive test on the discriminating pair (catalog
+   * `id 6` / `level 5` vs. `id 7` / `level 6`).
+   */
+  private validateLevelExplanation(
+    level: number | undefined,
+    explanation?: string,
+  ): void {
+    if (level === undefined || level === null || level < 6) {
+      return;
+    }
+
+    if (!explanation || explanation.trim().length === 0) {
+      throw new BadRequestException([
+        'innovation_use_level_explanation: required when the innovation use level is 6 or above',
+      ]);
+    }
+  }
+
+  /**
+   * R-IUA-005 — identity is `actor_type_id`, except for `OTHER`
+   * (`ClarisaActorTypesEnum.OTHER`), where identity is
+   * `(OTHER, actor_type_custom_name)`. Two `OTHER` rows with different
+   * custom names are distinct, never a duplicate (AC.2); two rows sharing a
+   * non-OTHER `actor_type_id`, or two `OTHER` rows sharing the same custom
+   * name, are rejected (AC.1, AC.3). Runs over the incoming payload only —
+   * a previously-saved row of type X re-sent once is never a duplicate of
+   * itself (AC.5).
+   */
+  private validateNoDuplicateActorTypes(actors: InnovationUseActorDto[]): void {
+    const seenIdentities = new Set<string>();
+
+    for (const actor of actors) {
+      const identity =
+        actor?.actor_type_id === ClarisaActorTypesEnum.OTHER
+          ? `OTHER:${actor?.actor_type_custom_name}`
+          : `TYPE:${actor?.actor_type_id}`;
+
+      if (seenIdentities.has(identity)) {
+        throw new BadRequestException([
+          `actor_type_id: duplicate actor type in payload — ${actor?.actor_type_id}`,
+        ]);
+      }
+      seenIdentities.add(identity);
+    }
+  }
+
   async findOne(resultId: number) {
     /**
      * DD-9 — the resolved `level` scalar is read off a relation join on the
      * detail row (`innovation_use_level_id → clarisa_innovation_use_levels`),
-     * not via `ClarisaInnovationUseLevelsService.findAll(relations, where)`.
-     * T-01 established that `ControlListBaseService`'s inherited base drops
-     * its `is_active: true` default the instant a caller supplies a `where`,
-     * so that path can read a soft-deleted catalog row. The relation join
-     * costs nothing extra — the row is already being fetched — and only the
-     * scalar `level` is exposed below, never the whole catalog object.
+     * not via `ClarisaInnovationUseLevelsService.findAll(relations, where)`,
+     * whose inherited base drops its `is_active: true` default the instant a
+     * caller supplies a `where` (T-01) — that is the hazard the relation
+     * join avoids. **It does not avoid reading a soft-deleted catalog row**
+     * (corrected, T-06 attempt 2 — the original wording overstated this): a
+     * relation join applies no `is_active` filter of its own and returns
+     * whatever row the FK points at, active or not, exactly like the
+     * write-side lookup in `resolveInnovationUseLevel` — a stored FK's
+     * level is a fact about the row, not about catalog currency. The
+     * relation join costs nothing extra — the row is already being fetched
+     * — and only the scalar `level` is exposed below, never the whole
+     * catalog object.
      */
     const detail = await this.mainRepo.findOne({
       where: { result_id: resultId, is_active: true },

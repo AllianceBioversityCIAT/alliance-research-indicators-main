@@ -22,7 +22,7 @@
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
 
-**Review-round tally:** **8 of ~24 consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1) at 5 of 13 tasks. T-05 additionally cost two Reviewer spawns that died on `529 Overloaded` without returning a verdict — wall-clock, not rounds. Budget re-baselined 2026-08-19 by user ruling — see § *Budget Escalation* and its resolution.
+**Review-round tally:** **11 of ~24 consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3) at 6 of 13 tasks. T-05 additionally cost two Reviewer spawns that died on `529 Overloaded` without returning a verdict — wall-clock, not rounds. Budget re-baselined 2026-08-19 by user ruling — see § *Budget Escalation* and its resolution.
 
 ---
 
@@ -872,5 +872,122 @@ Mocked repositories. This proves the assembly shape, the role arguments and the 
 | T-13 | NFR-IUA-001 measured at **4 queries** for one result with no per-row pattern — the ≤5 target holds by construction, but T-13 must confirm it at 50 actor rows |
 
 **Budget status:** 5 of 13 tasks complete. **8 of ~24 review rounds consumed.**
+
+---
+
+### T-06 — attempt 1: **FAIL** (2 of 3 lenses), and a blocking spec gap
+
+- **Date:** 2026-08-19 · **Review round:** 9 of ~24 · **Effort:** `xhigh` · **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging` (task defaults, unchanged)
+- **Lens A (conformance): PASS** — all seventeen Done criteria met, `design.md` §5.1 steps 2–12 each implemented in position, both `errors` payload strings byte-identical to §4's table (em-dash included), greps for FK comparison / name lookup / `GreenChecksRepository` all zero.
+- **Lens B (test fidelity): FAIL** — three issues.
+- **Lens C (transactional integrity): FAIL** — one blocking issue requiring a spec ruling.
+
+The production code is largely right. Ordering (DD-3), manager threading (DD-10) and role-scoped reconciliation were independently confirmed correct by two lenses. What failed is a **validation-scope gap** and **three tests that cannot fail**.
+
+#### Lens C issue — the API can be made to persist a state R-IUA-006 forbids
+
+Validation reads the **payload alone**; step 6 performs a **partial merge** (TypeORM skips `undefined` — verified at source, `UpdateQueryBuilder.js:292-298`). Given a stored row at catalog `id 7` (level 6) with a valid justification:
+
+```
+PATCH {"innovation_use_level_explanation": null}
+```
+
+`resolveInnovationUseLevel(undefined)` → `undefined` → the rule never fires → the UPDATE nulls the explanation and leaves `level_id = 7` untouched. **Level 6 with no justification, accepted with `200`.** The same holds for `{"innovation_use_level_explanation": ""}` — the exact input R-IUA-006 AC.4 exists to reject.
+
+R-IUA-006's user story: *"**So that** the requirement cannot be bypassed by calling the API directly."* This is that bypass.
+
+**Neither T-09 (F-A) nor T-11 (F-C) would catch it** — every fixture drives an explicit level id; none sends a partial payload against a pre-existing level.
+
+**The asymmetry underneath it.** `?? []` on all three collections means an *omitted* `actors` key **deactivates every Innovation Use actor row**, while an omitted `innovation_use_level_id` **preserves** the stored level. `PATCH {"organizations":[…]}` clears all actors and quantifications while preserving level and explanation — two opposite readings of "absent" inside one method, where §5.1 steps 6–9 treat them symmetrically. **The `undefined`/`null` contract for PATCH is written nowhere in the spec.** That is the gap.
+
+#### Lens B issues — three tests that cannot fail
+
+1. **The post-commit ordering is claimed but not verified.** The `transaction` double resolves its callback inline and never models `COMMIT`, so the ordering assertion compares the re-read against when `transaction()` was *called*, not when it *resolved*. Surviving mutation (M12): move the re-read **inside** the callback — every assertion still passes, yet `findOne` uses `this.mainRepo`, not `manager`, so against real MySQL it would read **pre-commit state on a separate connection**. The in-file comment claims the test proves "never inside the callback, never before it"; it proves only the second half. KZ-001 exactly — a double that does not evaluate what it stands in for, plus a comment that reads as verification.
+2. **M4 is misrecorded, so N4's exclusive falsifier was never run.** "Duplicate check ignores custom name" collapses both `OTHER` rows onto one key and therefore still **rejects** them — N4 stays green. M3 and M4 as written are the same mutation reported with two contradictory outcomes. The mutation that actually reds N4 (exempt `OTHER` from the dedup set entirely) was not run; N4's green rests on an incidental `transaction` assertion shared with M2.
+3. **N6 is vacuous.** Its payload has exactly **one** actor row, so every payload-scoped dedup rule — correct or broken — accepts it. The defect AC.5 exists to exclude (dedup against *persisted* rows) passes this test, because the persisted fixture is `[]`. No mutation in M1–M11 reds it.
+
+**Sweep coverage correction: 9 of 11 mutations produced real test evidence, not 11 of 11.** M5 and M8 turned red by **compile error** — ill-formed mutations, not test evidence. Lens B independently confirmed both properties *are* asserted elsewhere (three tests pin `manager` by identity against the injected `fakeManager`; the re-read is pinned on values the DTO cannot produce), and showed the mechanism works where the type system is silent via M6, where `upsertByCompositeKeys`'s `manager` is genuinely optional. No finding on those properties — but the sweep count must not be inflated.
+
+#### Lens B's settlements on the two questions the Leader raised
+
+- **T-05's shared mocks were reshaped but not weakened.** `getRepository` now dispatches by entity; every T-05 path still resolves to `mainRepo`, and no T-05 assertion referenced it. The `audit` double was **strengthened** — it now discriminates `NEW` from not-`NEW`, partially fixing the flag T-05's Reviewer raised. Verified against `package.json`: no `resetMocks`/`clearMocks`, so declaration-site implementations survive `clearAllMocks()`.
+- **The disclosed test-isolation fix is correctly diagnosed and holds.** `clearAllMocks()` calls `mockClear()`, which does not drain a `mockResolvedValueOnce` queue; only `mockReset()` does. **No prior test passed for the wrong reason** — all 26 queued values are consumed by their own test, and a leak would *override* a later default and produce a loud red, not a silent green. T-05's file contained no `...Once()` at all. *Residual:* the fix covers 2 of the 5 mocks that receive `...Once()` values.
+
+#### Advisories converging from two lenses
+
+- **`level` is a `bigint`, which the MySQL driver returns as a *string*** (Lens A). `level < 6` is safe today — relational operators coerce — but the helper's signature claims `number`, and a refactor to `level === 6` or `Number.isInteger(level)` would break against the real database while every mocked test stayed green. `Number(level)` at the resolver boundary removes the trap.
+- **The `is_active: true` filter on the validation resolver diverges from the read** — flagged by Lens A **and** Lens C independently. Added to close T-01's soft-deleted-row hazard: right instinct, wrong site. A soft-deleted catalog row now yields `undefined`, so the justification rule **silently does not fire** (fail-open), while `findOne`'s relation join applies no such filter and would still report that level on the GET. The two halves disagree about the same row. Lens C notes this also makes T-05's docblock overstated — a relation join *does* return a soft-deleted catalog row; what it avoids is the `findAll(where)` default-drop, a different hazard.
+- **An unresolvable `innovation_use_level_id` surfaces as a `500` carrying raw SQL** (Lens C). The FK constraint stops it and the transaction rolls back — no dangling FK — but `GlobalExceptions` has no `QueryFailedError` branch, so TypeORM's message (query text + constraint name) reaches the client in `errors`. §4's error table has no row for this.
+- **TOCTOU between the step-2 existence check and `BEGIN`** (Lens C). Recorded, not actioned — §5.1 prescribes exactly this ordering.
+- **A Lens C advisory was checked and dismissed by the Leader:** it reported malformed `//` comments in T-03's committed `result-actors.service.ts`. The lines are well-formed and `npx tsc --noEmit` exits 0. Misread; no action.
+
+**Status: attempt 2 blocked on a user ruling** — the two safe fixes for the Lens C issue trade against different acceptance-criteria text, and the Implementer cannot choose correctly without it.
+
+---
+
+### T-06 — FINAL: `ResultInnovationUseService` write transaction + cross-field validation
+
+- **Final status:** `[x]` **DONE 2026-08-19** — PASS on **attempt 3 of 3**. The ceiling was reached, not breached.
+- **Attempts run:** 3 · **Review rounds consumed:** 3 (rounds 9–11 of ~24)
+- **Requirements covered:** R-IUA-003 (all ACs + both scenarios) · R-IUA-005 (all ACs + scenario) · R-IUA-006 (all ACs + scenario, AC.5 **as narrowed by DD-14**) · R-IUA-008 AC.1, AC.2, AC.5 · R-IUA-012 AC.2
+- **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging` (attempts 1–2); narrowed to `nestjs-expert`, `tdd` for attempt 3, whose scope was two test assertions · **Effort:** `xhigh` throughout
+
+#### Attempt 2 — PASS on production, FAIL on two tests
+
+Lens 1 (conformance + integrity) **PASSED** the production change outright, tracing every DD-14 case including the ones it must not break, and verifying at source that the FK is `RESTRICT` so the new `400` guard cannot fire on a stored id.
+
+Lens 2 (test fidelity) **FAILED** it on two issues:
+
+1. **Attempt 1's Issue 3 survived.** The AC.5 self-duplicate test still shipped a one-row payload against an empty persisted-actor fixture, so a dedup rule consulting *persisted* rows would still pass it. The remediation reported for it had addressed the **DD-14** gap instead — a different requirement.
+2. **A more faithful double silently weakened an untouched test.** Attempt 1's `audit` mock collapsed `SetAuditEnum.BOTH` to `{ updated_by: 1 }`, so a `create` regression to `audit(BOTH)` failed T-05's `objectContaining({ result_id: 42, created_by: 1 })`. Attempt 2's **correct** three-branch switch returns both keys, satisfying that matcher — so the mutation began shipping green. The double improved; the test got weaker.
+
+> **This is the inverse of the usual KZ-001 failure and it generalises: any `objectContaining` assertion implicitly relying on a lossy double loses its teeth the moment the double improves.** Carried to `/akili-archive`'s Kaizen step.
+
+#### A Leader error, caught by review
+
+Lens 1 flagged that `design.md` §5.1 steps 3–4 and `tasks.md` T-06's implementation note both wrote the merge as **`payload ?? stored`** — while the Implementer had been told, correctly, to use `!== undefined` *because `??` reopens the bypass*. The Leader wrote a shorthand into the amendment that contradicted the ruling the amendment existed to record.
+
+> *"Taken literally that is the operator DD-14's own worked example proves wrong — a maintainer 'correcting' the code to match the pseudocode would silently restore the bypass."*
+
+Corrected at **four** sites, including inside DD-14's own binding text, and swept: `grep` for `payload ?? stored` and its variants returns zero. The wording is now `key present ? payload : stored`, with the reason stated inline. **`design.md` §4's error table also gained a row** for the new `400 innovation_use_level_id: unknown innovation use level`, which was client-visible and unlisted — T-07's controller work needs it.
+
+#### Attempt 3 — two one-line test fixes
+
+1. The AC.5 test now seeds `mockResultActors.find` with `[{ result_actors_id: 11, actor_type_id: 3 }]`, the same type as its single-row payload.
+2. The `create` test gained `expect(mockCurrentUser.audit).toHaveBeenCalledWith(SetAuditEnum.NEW)`.
+
+Plus two advisory fold-ins: the test misleadingly named *"coerces a bigint level … to a real number"* renamed to what it actually proves, with the M15-is-undefended note moved from the transient report **into an in-file comment**; and the `audit` double's comment corrected where it claimed branch-for-branch fidelity its `default:` arm does not have.
+
+> **The attempt-3 process stalled on a harness watchdog** after making its edits, mid-verification (`"tsc clean. Now eslint"`). Per the runtime-failure rule this is **not a work FAIL and did not consume the attempt.** The Leader verified the tree inline: no mutation left applied, the payload-only `seenIdentities` intact, both fixes landed, and **331 suites / 2214 tests / `tsc` clean / `eslint` clean**. The missing piece was the M16/M17 mutation evidence, which was put to the **Reviewer** to determine statically rather than spending a fresh Implementer round — the same technique a sibling lens had already used successfully on this file.
+
+#### Reviewer verdict — attempt 3 — `STATUS: PASS`
+
+**M16 (fold persisted rows into `seenIdentities`) — KILLED** on the AC.5 test's **own** `.resolves.toBeDefined()` assertion (`:380`), not an incidental shared one. The correct payload-only validator still passes; the mutant collides `TYPE:3` against itself and throws.
+
+> **The subtle part, and why the fix is robust:** the fixture is seeded with **`mockResolvedValue`, not `mockResolvedValueOnce`**. A `...Once` seed would have been consumed by the mutant's own pre-validation call, leaving `findOne` with `[]` and making the kill **order-dependent**. It is not.
+
+**M17 (`create` calls `audit(BOTH)`) — KILLED** at `:214`. `NEW === 0`, `BOTH === 2`, `create` invokes `audit` exactly once, and `clearAllMocks()` clears history — so nothing else can satisfy the matcher. The pin also kills a bare no-argument `audit()`. Meanwhile `:207-209`'s `objectContaining` stays green, which is precisely the leak attempt 2 opened.
+
+**Count verified honest:** exactly 30 `it(` blocks, zero `xit`/`skip`/`only`/`todo`; both fixes strictly additive; the rename changes a title only. **Nothing was dropped to make a number work.**
+
+#### Final verification
+
+`npm test -- --silent` → **331 suites, 2214/2214** · `npx tsc --noEmit` clean · `npx eslint --no-fix` clean — **all re-run independently by the Leader**, not relayed.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+Mocked repositories throughout. This proves the **call sequence and the constructed predicates**, not that MySQL rolled back. R-IUA-003 AC.3's soft-delete behaviour and the level rule against real seeded catalog rows are **T-09 (F-A)** and **T-11 (F-C)**, and are not discharged here.
+
+#### Forward pointers created by T-06
+
+| → Task | Pointer |
+| --- | --- |
+| **T-09 (F-A), T-11 (F-C)** | **DD-14 changes fixture expectations.** Any fixture seeding a stored level ≥ 6 with a blank or absent justification and then issuing a **partial** PATCH will now correctly receive `400`. Fixtures must either seed a justification alongside a stored level ≥ 6, or assert the `400` |
+| **Rollout / `design.md` §13** | The same applies to **real rows**: any existing indicator-6 result at level ≥ 6 with a blank justification becomes uneditable through this endpoint until one is supplied. That is DD-14's intended consequence, not a regression — but it is a deployment note, not a testing surprise |
+| T-07 | `design.md` §4's error table now carries the `400 innovation_use_level_id: unknown innovation use level` row. The controller's Swagger and any client contract reader need it |
+| T-13 | `Number(row.level)` maps a `NULL` catalog level onto `0` — a **real point** on the 0–9 scale — so "unresolvable" and "level 0" are no longer distinguishable in that return value. Inert today (one consumer, both take the same early return; every seeded row has an explicit level). `row.level == null ? undefined : Number(row.level)` would restore the distinction |
+| Kaizen (archive) | Two lessons: **(a)** improving a test double can weaken tests that leaned on its lossiness; **(b)** a mutation that fails to **compile** is not test evidence — it proves the mutation was ill-formed. Both surfaced here for the first time |
+
+**Budget status:** 6 of 13 tasks complete. **11 of ~24 review rounds consumed.**
 
 ---

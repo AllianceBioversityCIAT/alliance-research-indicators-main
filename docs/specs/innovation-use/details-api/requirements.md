@@ -381,7 +381,7 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 - [ ] AC.2 — A payload selecting **level 5** (catalog `id = 6`) with no explanation is **accepted**.
 - [ ] AC.3 — A payload selecting level ≥ 6 with a whitespace-only explanation is rejected `400`.
 - [ ] AC.4 — A payload selecting level ≥ 6 with an empty-string explanation is rejected `400`.
-- [ ] AC.5 — A payload with no level at all is accepted (draft-save); the explanation rule does not fire.
+- [ ] AC.5 — A payload with no level at all is accepted (draft-save) **when the stored row also carries no level**; the explanation rule does not fire. When a level **is** already stored, the rule is evaluated against the **effective post-write row** — the merge of payload over stored state — so an omitted level cannot be used to bypass the justification requirement. *(Narrowed 2026-08-19 by user ruling at T-06's review; see `design.md` **DD-14**. The original unqualified wording permitted `PATCH {"innovation_use_level_explanation": null}` against a stored level 6 to succeed, which the requirement's own user story forbids.)*
 - [ ] AC.6 — The rule resolves the level by joining the catalog on `id`, never by comparing the FK, and never by name.
 
 #### Scenario: The off-by-one boundary holds

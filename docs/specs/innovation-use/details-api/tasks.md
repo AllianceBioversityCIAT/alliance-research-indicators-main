@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-05 `[x]` done (2026-08-19); T-06 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **8 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19); T-07 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **11 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -283,7 +283,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-003 (all ACs + both scenarios) · R-IUA-005 (all ACs + scenario) · R-IUA-006 (all ACs + scenario) · R-IUA-008 AC.1, AC.2, AC.5 · R-IUA-012 AC.2
 - **Depends on:** T-01, T-03, T-04, T-05
 - **Size:** L (~350 LOC incl. spec) · **Effort:** `xhigh` — transactional, ordering-sensitive, carries the off-by-one trap
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — PASS on **attempt 3 of 3**; 3 review rounds. Attempt 1's review found a **spec gap**, not merely a code defect: payload-only validation plus partial-merge writes let `PATCH {"…_explanation": null}` strip the justification from a stored level 6 and return `200`. User ruled → **DD-14**; R-IUA-006 AC.5 narrowed. Attempt 2 passed conformance and failed test fidelity twice over; attempt 3 closed both. Suite 331 suites / 2214 tests. Behavioural gates remain **T-09 (F-A)** and **T-11 (F-C)**. Evidence: [`./execution.md`](./execution.md) → *T-06*
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging`
 
 **Files touched**
@@ -299,7 +299,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 - **Validation runs entirely before `BEGIN`.** That is what makes "a failure persists nothing" a property of ordering rather than of rollback.
 - **Level resolution (trap 2):** join `clarisa_innovation_use_levels ON id = innovation_use_level_id`, read `level`, test `level >= 6`. Never compare the FK. Never resolve by name.
-- No level supplied → the explanation rule does not fire (draft-save).
+- No level supplied **and none stored** → the explanation rule does not fire (draft-save). If a level **is** stored, resolve the effective row first — **`key present ? payload : stored`**, implemented as `payload.field !== undefined ? payload.field : stored.field`, **never `??`** (an explicit `null` is a *present* key and must reach the validator as the clearing it is; `??` cannot tell it from an omitted key and would reopen the bypass). Likewise for the explanation (**DD-14**, user ruling 2026-08-19). Validating the payload alone lets `PATCH {"innovation_use_level_explanation": null}` against a stored level 6 return `200` with the justification nulled — the bypass R-IUA-006's user story forbids.
 - **Duplicate identity:** `actor_type_id`, except for `OTHER` where identity is `(OTHER, actor_type_custom_name)`. Two `OTHER` rows with different custom names are distinct.
 - Errors are `BadRequestException` with an `errors` array naming the field — never a raw `Error`.
 - Pass `manager` to all three child calls, `upsertByCompositeKeys` included (DD-10).
@@ -321,7 +321,8 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - [ ] A saved row of type X re-sent once is not a self-duplicate *(AC.5)*
 - [ ] **Level 5 (catalog `id 6`) without explanation → accepted; level 6 (catalog `id 7`) without explanation → `400`** — both cases in the same spec *(R-IUA-006 AC.1, AC.2, and the scenario's `AND IT MUST fail the pair discriminatingly`)*
 - [ ] Whitespace-only and empty-string explanations at level ≥ 6 → `400` *(AC.3, AC.4)*
-- [ ] No level at all → accepted *(AC.5)*
+- [ ] No level in the payload **and none stored** → accepted *(AC.5, as narrowed by DD-14)*
+- [ ] **A stored level ≥ 6 cannot be stripped of its justification by a partial payload** — `PATCH {"innovation_use_level_explanation": null}` and `{"…": ""}` against a stored catalog `id 7` both → `400` *(R-IUA-006 AC.3/AC.4 via the effective-row rule, **DD-14**)*
 - [ ] The level is obtained through the catalog join, and `grep` over the file shows **no** comparison against `innovation_use_level_id` and **no** name-based lookup *(AC.6, and the scenario's `BUT it must NOT resolve the level by name`)*
 - [ ] Every thrown error is a Nest HTTP exception *(R-IUA-003 scenario's `AND IT MUST report the rejection through GlobalExceptions … never as a raw Error`)*
 - [ ] `grep` over the file returns **zero** references to `GreenChecksRepository` / `calculateGreenChecks` *(R-IUA-012 AC.2)*

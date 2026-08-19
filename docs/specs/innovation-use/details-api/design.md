@@ -199,6 +199,7 @@ No `@OpenSearchProperty` decoration is added — family D-8, and ADR-6's amendme
 | `400` | class-validator failure (negative/fractional count, mode conflict, missing `actor_type_id`) | class-validator's array, with nested index paths |
 | `400` | duplicate actor type | `['actor_type_id: duplicate actor type in payload — <type>']` |
 | `400` | missing justification at `level >= 6` | `['innovation_use_level_explanation: required when the innovation use level is 6 or above']` |
+| `400` | `innovation_use_level_id` resolves to no catalog row | `['innovation_use_level_id: unknown innovation use level']` — added T-06 attempt 2. Raised **before `BEGIN`** (DD-3); without it an unknown id reached the FK constraint and surfaced as a `500` carrying TypeORM's raw SQL and constraint name, since `GlobalExceptions` has no `QueryFailedError` branch |
 | `400` | `ResultStatusGuard` rejection | the guard's fixed status-list message |
 | `404` | no `result_innovation_use` row | `Result with ID <id> not found` |
 
@@ -222,8 +223,13 @@ Order is load-bearing. Validation runs **entirely before** any write, so R-IUA-0
 ```
 1  ValidationPipe            per-field + per-row rules (DD-8)
 2  service: load detail row  404 if absent
-3  service: resolve level    JOIN clarisa_innovation_use_levels ON id = :level_id → level
-4  service: validate         a) level >= 6 ⇒ explanation non-blank      (R-IUA-006)
+3  service: resolve level    effective_level_id = KEY PRESENT ? payload.level_id : stored.level_id   (DD-14)
+                             — NOT `??`: an explicit null is a *present* key and must clear,
+                                not fall through to the stored value
+                             JOIN clarisa_innovation_use_levels ON id = :effective_level_id → level
+4  service: validate         a) level >= 6 ⇒ effective explanation non-blank, where
+                                effective_explanation = KEY PRESENT ? payload.explanation
+                                                                    : stored.explanation   (R-IUA-006, DD-14)
                              b) no duplicate actor identity              (R-IUA-005)
    ── any failure above throws BadRequestException. Nothing has been written. ──
 5  BEGIN TRANSACTION
@@ -436,6 +442,7 @@ Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions
 | **DD-10** | Pass `manager` to `upsertByCompositeKeys` | OICR omits it, leaving its quantification writes outside its transaction. Not inherited, not fixed here |
 | **DD-11** | Leave `upsertQuantificationsByRole` (zero callers) in place | Deleting dead code in a shared service is out of scope and would widen the blast radius of an API chunk |
 | **DD-12** | C-4 cleanup is scoped to the sites that are **structurally** dead — not to every occurrence of the identifier | See §11.1. The follow-up as logged is over-broad |
+| **DD-14** | **The PATCH contract: an omitted key preserves a scalar but clears a collection — and validation runs against the *effective post-write row*, not the payload** | TypeORM's `UpdateQueryBuilder` skips `undefined` properties (`UpdateQueryBuilder.js:292-298`), so an omitted scalar leaves its column untouched, while `?? []` on the three collections makes an omitted collection deactivate every row for that role. Those are opposite readings of "absent" and the spec had written down neither. Left unreconciled they combine into a **bypass**: validating the payload alone lets `PATCH {"innovation_use_level_explanation": null}` against a stored catalog `id 7` (level 6) null the justification and return `200` — the exact state R-IUA-006 exists to prevent, reached by "calling the API directly" as its user story warns. **Ruled 2026-08-19 at execution time (T-06 attempt 1 review, Lens C):** keep `omitted = preserve` for scalars, and resolve both the level and the explanation as **`key present ? payload : stored`** — in code, `payload.field !== undefined ? payload.field : stored.field` — **before** the rule runs. **The operator is not `??`.** `??` treats an explicit `null` as absent, so it would fall back to the stored explanation while step 6 still writes the `NULL` — reopening the very bypass this decision closes. `!== undefined` is the only operator that models the post-write row, because TypeORM skips exactly and only `undefined`. The stored row is already in hand from §5.1 step 2, so this costs nothing. *(Rejected: coercing the scalars with `?? null` so an omitted key clears them, restoring symmetry with the collections — it leaves R-IUA-006 AC.5 literally intact but makes a genuinely partial PATCH destructive for the scalars, a behaviour change chunk 3's client would have to be told about before shipping.)* Consequence recorded honestly: **R-IUA-006 AC.5 is narrowed** to apply only when no level is stored either | 
 | **DD-13** | Exempt `@ApiOperation` on handlers **inherited unchanged from `BaseController`** — no override on the catalog controller | `@ApiOperation` is built by `createMethodDecorator`, which dereferences `descriptor.value` unconditionally; applied at class level Nest supplies no descriptor and it throws at class-definition time. The original instruction ("`@ApiOperation` goes on the subclass, not on an override") named a placement that does not exist — a Pivot at T-01 attempt 1's review. Ruled at execution time, 2026-08-19 (`requirements.md` **D-IUA-10**). *(Rejected: authorize a `find()` override re-declaring `@Get()` to hang the annotation — the only `super.find()` in the whole `src` tree, breaking a pattern held by all 19 sibling `BaseController` subclasses, for one Swagger summary line. Also rejected: add `@ApiOperation` support to `BaseController` itself — out of scope for an API chunk, and widens the blast radius to 19 controllers.)* The exemption binds only to handlers a subclass inherits without overriding; T-07's own-declared `GET`/`PATCH` keep `@ApiOperation` and `@ApiBody` fully required |
 
 ### 11.1 Reversion challenge (Step 2.3) — DD-12
@@ -521,4 +528,5 @@ Each PR description follows `cognitive-doc-design` review-empathy: what to read 
 | Date | Change |
 | --- | --- |
 | 2026-08-19 | Created. Reversion challenge run on DD-12 → design narrowed (§11.1). **`requirements.md` R-IUA-003 AC.5 corrected `403` → `400`** to match `ResultStatusGuard`'s actual `BadRequestException`; swept forward across both documents in the same edit |
+| 2026-08-19 | **DD-14 added** — the PATCH `undefined`/`null` contract, previously unwritten. T-06 attempt 1's review (Lens C) found that payload-only validation plus partial-merge writes let an accepted request persist a level ≥ 6 row with no justification. User ruled: validate the **effective post-write row**. §5.1 steps 3–4 amended; **`requirements.md` R-IUA-006 AC.5 narrowed** to apply only when no level is stored either; swept across both documents in the same edit |
 | 2026-08-19 | T-01 attempt 1 Pivot resolved (T-01 attempt 2): `@ApiOperation` exempted on handlers inherited unchanged from `BaseController` — no override on the catalog controller (**DD-13**). §4's catalog entry corrected; `requirements.md` R-IUA-013 AC.3 and §5.3, and `tasks.md` T-01's Implementation notes and T-13's done criterion, amended to match; swept forward across all three documents in the same edit |
