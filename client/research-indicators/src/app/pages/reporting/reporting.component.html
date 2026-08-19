@@ -1,190 +1,267 @@
 <div class="flex min-h-screen flex-col">
-  <header class="bg-[var(--ac-primary-blue-500)] text-[color:var(--ac-white-1)]">
-    <div class="flex h-14 w-full items-center gap-3.5 px-8">
-      <span class="text-[14px] font-medium tracking-[0.01em]">Alliance of Bioversity International &amp; CIAT</span>
-      <span aria-hidden="true" class="h-[18px] w-px bg-[var(--ac-primary-blue-300)]"></span>
-      <span class="text-[12px] uppercase tracking-[0.05em] text-[color:var(--ac-primary-blue-100)]">Reporting pathway</span>
+  <header class="bg-[#12564B] text-white">
+    <div class="mx-auto flex h-[60px] w-full max-w-[900px] items-center gap-3.5 px-7">
+      <span class="text-[15.5px] font-semibold tracking-[0.01em]">Alliance of Bioversity International &amp; CIAT</span>
+      <span aria-hidden="true" class="h-[18px] w-px bg-white/30"></span>
+      <span class="text-[13px] uppercase tracking-[0.05em] text-[#BFE3C6]">Research performance reporting</span>
+      <a href="#platforms" class="ml-auto text-sm font-medium text-[#DDEEDF] hover:underline">Platforms</a>
     </div>
   </header>
 
-  <main class="mx-auto w-full max-w-[940px] flex-1 px-7 pt-10">
-    <h1 class="mb-1.5 text-[21px] font-bold leading-[1.15] tracking-[-0.015em] text-[color:var(--ac-primary-blue-500)] [text-wrap:balance]">
-      Which reporting pathway should I follow?
-    </h1>
-    <p class="mb-6 text-[15px] leading-normal text-[color:var(--ac-grey-700)]">Select the result type to identify the correct reporting platform.</p>
+  <div aria-hidden="true" class="h-[5px] bg-[linear-gradient(90deg,#5AA046_0%,#5AA046_34%,#A9D8F2_34%,#A9D8F2_67%,#D9E021_67%)]"></div>
 
+  <main class="mx-auto w-full max-w-[900px] flex-1 px-7">
+    <section class="relative overflow-hidden pb-10 pt-[60px]">
+      <svg aria-hidden="true" viewBox="0 0 320 240" width="300" height="230" class="pointer-events-none absolute right-[-30px] top-[14px] opacity-50">
+        <path d="M310 8C210 8 130 60 130 150c0 40 26 74 66 82" fill="none" stroke="#D9E021" stroke-width="3"></path>
+        <path d="M262 60c-70 6-118 52-118 118" fill="none" stroke="#A9D8F2" stroke-width="3"></path>
+        <circle cx="130" cy="232" r="7" fill="#5AA046"></circle>
+      </svg>
+      <p class="mb-3 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5AA046]">Indicator guidance</p>
+      <h1 class="mb-3 max-w-[18ch] text-[40px] font-bold leading-[1.1] tracking-[-0.02em] text-[#12564B] [text-wrap:balance]">Which reporting pathway should I follow?</h1>
+      <p class="max-w-[52ch] text-[18px] leading-normal text-[#4C6159]">Select the result type to identify the correct reporting platform.</p>
+    </section>
 
-    <section aria-label="Reporting pathway selector" class="rounded-lg border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)]">
-      
     @if (showTrail()) {
-      <nav aria-label="Breadcrumb" class="px-6 pt-4 flex items-center text-[13px] text-[color:var(--ac-grey-700)]">
-        @for (chip of chips(); track chip.label; let i = $index) {
-          @if (i > 0) {
-            <i class="pi pi-chevron-right mx-2 !text-[9px] text-[color:var(--ac-grey-700)]"></i>
-          }
-          @if (i < chips().length - 1) {
-            <button
-              type="button"
-              class="cursor-pointer border-0 bg-transparent p-0 text-[color:var(--ac-grey-700)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)]"
-              (click)="chip.edit()"
-              [attr.aria-label]="chip.aria">
-              {{ chip.label }}
-            </button>
-          } @else {
-            <span class="text-[color:var(--ac-light-blue-400)]" aria-current="page">{{ chip.label }}</span>
-          }
+      <nav aria-label="Breadcrumb" class="mb-3.5 flex flex-wrap items-center gap-2.5">
+        @for (chip of chips(); track chip.label) {
+          <button
+            type="button"
+            class="cursor-pointer border-0 border-b border-dashed border-[#A9CBB8] bg-transparent p-0 text-[14px] font-semibold text-[#2F7D5C] hover:text-[#12564B] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]"
+            (click)="chip.edit()"
+            [attr.aria-label]="chip.aria">
+            {{ chip.label }}
+          </button>
         }
+        <span class="ml-auto text-[13px] text-[#8A9790]">{{ stepLabel() }}</span>
       </nav>
     }
-    @if (showQ1()) {
-        <div class="px-6 py-5">
-          <h2 class="mb-5 text-[18px] font-semibold text-[color:var(--ac-primary-blue-500)]">What are you reporting?</h2>
-          <div role="group" aria-label="Indicator" class="flex flex-col gap-2">
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('kp')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Knowledge Product</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('oicr')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Outcome Impact Case Report</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('cap')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Capacity Sharing for Development</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('innovDev')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Innovation Development</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('innovUse')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Innovation Use</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setIndicator('policy')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Policy Change &amp; Investment Contribution</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
-            </button>
+
+    <section aria-label="Reporting pathway selector" class="rounded-[10px] border border-[#E4E2D8] bg-white">
+      @if (showQ1()) {
+        <div class="p-7">
+          <div class="mb-[22px] flex flex-wrap items-baseline gap-3">
+            <h2 class="text-[20px] font-semibold text-[#12564B]">What are you reporting?</h2>
+            <span class="text-[13.5px] text-[#8A9790]">Hover a card for when to report, evidence and pitfalls</span>
+          </div>
+
+          <div class="mb-2.5 flex items-baseline gap-2.5">
+            <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#5AA046]">Outputs</h3>
+            <span class="text-[14px] text-[#7C8B84]">what we produce</span>
+          </div>
+          <div role="group" aria-label="Output indicators" class="mb-6 grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('kp')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"></path><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Knowledge Product</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">Publications, datasets, tools and other research products</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> Once the product is published or publicly available.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> DOI, repository or publisher link.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Registering the same product twice.</p>
+              </div>
+            </div>
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('cap')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4L3 8.5 12 13l9-4.5z"></path><path d="M7 10.8V15c0 1.4 2.2 2.6 5 2.6s5-1.2 5-2.6v-4.2"></path><path d="M21 8.5V14"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Capacity Sharing for Development</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">Delivered training, coaching or other structured learning</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> After delivery; multi-session programmes count as one.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Participant list, agenda, materials, workshop report.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Meetings or awareness events with no learning component.</p>
+              </div>
+            </div>
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('innovDev')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 18h5"></path><path d="M10 21h4"></path><path d="M12 3a6 6 0 0 1 3.4 10.9V15h-6.8v-1.1A6 6 0 0 1 12 3z"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Innovation Development</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">Maturity of an innovation on the 0–9 Readiness scale</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> The current readiness level can be justified by evidence.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Technical docs, prototypes, testing or validation results.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Reporting planned work or overstating the level.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2.5 flex items-baseline gap-2.5">
+            <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#5AA046]">Outcomes</h3>
+            <span class="text-[14px] text-[#7C8B84]">the change that follows when others use it</span>
+          </div>
+          <div role="group" aria-label="Outcome indicators" class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-2">
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('innovUse')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"></circle><circle cx="12" cy="12" r="3.2"></circle><path d="M12 3.8V6M12 18v2.2M3.8 12H6M18 12h2.2"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Innovation Use</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">Evidence that identified users are applying an innovation</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> Identified users have applied, or are applying, the innovation.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Adoption surveys, monitoring data, analytics, user confirmations.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Treating training, availability or awareness as use.</p>
+              </div>
+            </div>
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('policy')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"></path><path d="M12 4v16M5.5 7.5L12 5l6.5 2.5"></path><path d="M6.6 8l-2 4.6a2.6 2.6 0 0 0 4 0zM17.4 8l2 4.6a2.6 2.6 0 0 1-4 0z"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Policy Change &amp; Investment Contribution</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">A policy, law, program, budget or investment we informed</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> Stage 1 uptake, Stage 2 enactment or Stage 3 impact.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Drafts or approved instruments, budgets, minutes, evaluations.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Advocacy or consultations with no documented change.</p>
+              </div>
+            </div>
+            <div class="group relative">
+              <button type="button" (click)="setIndicator('oicr')" class="flex h-full w-full cursor-pointer flex-col gap-1 rounded-[10px] border border-[#E4E2D8] bg-white px-4 pb-4 pt-[18px] text-left transition-all duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+                <span aria-hidden="true" class="mb-2 flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#EAF4E7] text-[#2F7D5C]">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5a3 3 0 0 1-3 3H9.5L5 20V7a3 3 0 0 1 3-3h9a3 3 0 0 1 3 3z"></path><path d="M9 9.5h7M9 12.8h4.5"></path></svg>
+                </span>
+                <span class="text-[16.5px] font-semibold leading-tight text-[#1E3932]">Outcome Impact Case Report</span>
+                <span class="text-[14px] leading-snug text-[#6B7A73]">A significant, evidenced outcome or impact of our research</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#12564B] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#CFE6D4] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> There is credible evidence of measurable change.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Policy documents, monitoring data, evaluations, adoption stats.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Describing activities instead of the change.</p>
+              </div>
+            </div>
           </div>
         </div>
       }
 
       @if (showQ2()) {
-        <div class="px-6 py-5">
-          <h2 class="mb-5 text-[18px] font-semibold text-[color:var(--ac-primary-blue-500)]">What was the primary funding source?</h2>
-          <div role="group" aria-label="Primary funding source" class="flex flex-col gap-2 mb-6">
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setFunding('w3')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">W3 or bilateral project</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+        <div class="p-7">
+          <h2 class="mb-1.5 text-[20px] font-semibold text-[#12564B]">What was the primary funding source?</h2>
+          <p class="mb-[18px] text-[15px] text-[#6B7A73]">The stream that financed most of the activities, resources and staff time behind the result.</p>
+          <div role="group" aria-label="Primary funding source" class="flex flex-col gap-2">
+            <button type="button" (click)="setFunding('w3')" class="flex cursor-pointer items-center gap-4 rounded-lg border border-[#E4E2D8] bg-white px-4 py-3.5 text-left transition-colors duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+              <span class="block">
+                <span class="block text-[16.5px] font-semibold text-[#1E3932]">W3 or bilateral project</span>
+                <span class="mt-0.5 block text-[14px] text-[#6B7A73]">Non-pooled, Center-managed project funding</span>
+              </span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[#5AA046]">&rarr;</span>
             </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
-              (click)="setFunding('program')">
-              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">CGIAR Program or Accelerator</span>
-              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            <button type="button" (click)="setFunding('program')" class="flex cursor-pointer items-center gap-4 rounded-lg border border-[#E4E2D8] bg-white px-4 py-3.5 text-left transition-colors duration-150 hover:border-[#5AA046] hover:bg-[#F4FAF2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">
+              <span class="block">
+                <span class="block text-[16.5px] font-semibold text-[#1E3932]">CGIAR Program or Accelerator</span>
+                <span class="mt-0.5 block text-[14px] text-[#6B7A73]">W1 / W2 pooled funding</span>
+              </span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[#5AA046]">&rarr;</span>
             </button>
           </div>
-          <button
-            type="button"
-            class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
-            (click)="goBack()">
-            <i class="pi pi-arrow-left !text-[12px]"></i> Back
-          </button>
+
+          <details class="group mt-4 border-t border-[#EFEDE4] pt-3.5">
+            <summary class="flex cursor-pointer list-none items-center justify-between text-[15px] font-semibold text-[#2F7D5C] [&::-webkit-details-marker]:hidden">
+              Not sure which one? Follow the money
+              <i class="pi pi-chevron-down !text-[12px] text-[#5AA046] transition-transform group-open:rotate-180"></i>
+            </summary>
+            <div class="pt-2.5 text-[15px] leading-relaxed text-[#4C6159]">
+              <p class="mb-2">Pick the stream that covered most of:</p>
+              <ul class="mb-2.5 flex list-disc flex-col gap-1 pl-5">
+                <li>staff time dedicated to the result;</li>
+                <li>research, implementation or partnership activities;</li>
+                <li>travel, workshops, training and field costs;</li>
+                <li>the technical inputs most critical to the result.</li>
+              </ul>
+              <p class="m-0">Several funders? Choose the largest contributor — STAR and PRMS both let you record the other contributing projects.</p>
+            </div>
+          </details>
+
+          <button type="button" (click)="goBack()" class="mt-[18px] cursor-pointer border-0 bg-transparent p-1 pl-0 text-[14.5px] font-semibold text-[#2F7D5C] hover:text-[#12564B] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">&larr; Back</button>
         </div>
       }
 
       @if (showResult()) {
-        <div aria-live="polite" class="px-6 py-5">
-          <div class="flex items-center gap-4">
-            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[color:var(--ac-grey-200)] bg-[var(--ac-grey-100)]">
-              <img class="h-9 w-9 object-contain" [src]="resultLogo() | s3ImageUrl" [alt]="resultName()" />
-            </span>
-            <div>
-              <div class="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--ac-grey-600)]">Report this result in</div>
-              <h2 class="text-[26px] font-bold leading-tight tracking-[-0.01em] text-[color:var(--ac-primary-blue-500)]">{{ resultName() }}</h2>
-            </div>
+        <div aria-live="polite" class="rounded-[10px] border-t-4 px-7 pb-[26px] pt-[30px]" [ngClass]="resultTopBorder()">
+          <div class="text-[12.5px] font-semibold uppercase tracking-[0.1em] text-[#7C8B84]">Report this result in</div>
+          <div class="my-2 flex items-center gap-3">
+            <img class="h-[34px] w-[34px] object-contain" [src]="resultLogo() | s3ImageUrl" [alt]="resultName()" />
+            <h2 class="text-[42px] font-bold leading-none tracking-[-0.015em]" [ngClass]="resultInk()">{{ resultName() }}</h2>
           </div>
+          <p class="mb-[22px] max-w-[58ch] text-[17px] leading-normal text-[#4C6159]">{{ resultWhy() }}</p>
 
-          <p class="mt-4 max-w-[58ch] text-[15px] leading-normal text-[color:var(--ac-grey-700)]">{{ resultWhy() }}</p>
-
-          <div class="mt-5 flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-[18px]">
             <a
               [href]="resultUrl()"
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center rounded-[13px] bg-[var(--ac-light-blue-300)] px-5 py-2.5 text-[15px] font-semibold text-[color:var(--ac-white-1)] no-underline transition-colors hover:bg-[var(--ac-light-blue-400)] hover:text-[color:var(--ac-white-1)] hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none">
+              class="inline-flex items-center gap-[9px] rounded-lg px-[22px] py-[13px] text-[16px] font-semibold text-white no-underline transition-colors hover:text-white hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046] motion-reduce:transition-none"
+              [ngClass]="resultBtn()">
               Open {{ resultName() }}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 4h6v6"></path>
+                <path d="M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path>
+              </svg>
             </a>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
-              (click)="goBack()">
-              <i class="pi pi-arrow-left !text-[12px]"></i> Back
-            </button>
-            <button
-              type="button"
-              class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
-              (click)="startOver()">
-              <i class="pi pi-refresh !text-[12px]"></i> Start over
-            </button>
+            <button type="button" (click)="goBack()" class="cursor-pointer border-0 bg-transparent p-1 text-[15px] font-semibold text-[#2F7D5C] hover:text-[#12564B] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">&larr; Back</button>
+            <button type="button" (click)="startOver()" class="cursor-pointer border-0 bg-transparent p-1 text-[15px] font-semibold text-[#2F7D5C] hover:text-[#12564B] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5AA046]">Start over</button>
           </div>
 
-          <p class="mt-5 border-t border-[color:var(--ac-grey-200)] pt-4 text-[14px] text-[color:var(--ac-grey-600)]">Technical support: {{ resultSupport() }}</p>
+          <div class="mt-[22px] flex flex-col gap-2 border-t border-[#EFEDE4] pt-4">
+            <p class="m-0 text-[15px] leading-relaxed text-[#4C6159]"><strong class="font-semibold text-[#1E3932]">Have ready:</strong> {{ resultEvidence() }}</p>
+            <p class="m-0 text-[15px] leading-relaxed text-[#4C6159]"><strong class="font-semibold text-[#1E3932]">Watch out for:</strong> {{ resultPitfall() }}</p>
+            <p class="m-0 text-[14px] text-[#7C8B84]">Technical support: {{ resultSupport() }} · Reporting responsibility stays with the PI and research team.</p>
+          </div>
         </div>
       }
     </section>
 
-    <section id="platforms" class="mt-7 scroll-mt-[70px] border-t border-[color:var(--ac-grey-200)] pt-6">
-      <h2 class="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-[color:var(--ac-grey-600)]">Already know where to report?</h2>
-      <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+    <section id="platforms" class="mt-11 scroll-mt-[70px] border-t border-[#E4E2D8] pt-6">
+      <h2 class="mb-3.5 text-[13.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8B84]">Already know where to report?</h2>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-2.5">
         @for (platform of quickAccess; track platform.name) {
-          <div
-            class="flex flex-col gap-2 rounded-lg border-y border-r border-l-4 border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4"
-            [ngClass]="platform.accent">
-            <div class="flex items-center gap-2.5">
-              <img class="h-8 w-8 shrink-0 object-contain" [src]="platform.logo | s3ImageUrl" [alt]="platform.name" />
-              <span class="text-[15px] font-bold text-[color:var(--ac-grey-900)]">{{ platform.name }}</span>
-            </div>
-            <p class="m-0 text-sm text-[color:var(--ac-grey-800)]">{{ platform.desc }}</p>
-            <p class="m-0 text-[13px] leading-4 text-[color:var(--ac-grey-600)]">Technical support: {{ platform.support }}</p>
-            <a
-              [href]="platform.url"
-              target="_blank"
-              rel="noopener"
-              class="mt-1.5 inline-flex items-center self-start rounded-md bg-[var(--ac-green-500)] px-4 py-2 text-sm font-semibold text-[color:var(--ac-white-1)] no-underline hover:bg-[var(--ac-green-600)] hover:text-[color:var(--ac-white-1)] hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)]">
-              Open {{ platform.name }}
-            </a>
-          </div>
+          <a
+            [href]="platform.url"
+            target="_blank"
+            rel="noopener"
+            class="block rounded-lg border border-[#E4E2D8] border-l-4 bg-white px-[15px] py-[13px] no-underline hover:border-[#5AA046]"
+            [ngClass]="platform.accentBorder">
+            <span class="flex items-center gap-2 text-[16px] font-bold text-[#12564B]">
+              <img class="h-5 w-5 object-contain" [src]="platform.logo | s3ImageUrl" [alt]="platform.name" />
+              {{ platform.name }}
+            </span>
+            <span class="mt-0.5 block text-[14px] text-[#4C6159]">{{ platform.desc }}</span>
+          </a>
+        }
+      </div>
+    </section>
+
+    <section id="faqs" class="mt-11 scroll-mt-[70px] border-t border-[#E4E2D8] pt-6">
+      <h2 class="mb-3.5 text-[13.5px] font-semibold uppercase tracking-[0.08em] text-[#7C8B84]">Common questions</h2>
+      <div class="flex flex-col gap-2">
+        @for (faq of faqs; track faq.q) {
+          <details class="group rounded-lg border border-[#E4E2D8] bg-white px-4 py-3.5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[15.5px] font-semibold text-[#1E3932] [&::-webkit-details-marker]:hidden">
+              {{ faq.q }}
+              <i class="pi pi-chevron-down !text-[12px] text-[#5AA046] transition-transform group-open:rotate-180"></i>
+            </summary>
+            <p class="mt-2.5 text-[15px] leading-relaxed text-[#4C6159]">{{ faq.a }}</p>
+          </details>
         }
       </div>
     </section>
   </main>
 
-  <footer class="mt-6 border-t border-[color:var(--ac-grey-200)] px-8 py-[18px]">
-    <div class="flex w-full flex-wrap gap-4 text-[13px] text-[color:var(--ac-grey-600)]">
+  <footer class="mt-14 bg-[#12564B] px-7 py-5 text-[#CFE6D4]">
+    <div class="mx-auto flex max-w-[900px] flex-wrap gap-4 text-[13.5px]">
       <span>Reporting responsibility remains with the PI and research team.</span>
-      <a href="mailto:melp@alliance.cgiar.org" class="ml-auto text-[color:var(--ac-light-blue-400)] hover:underline">Contact MELP</a>
+      <a href="mailto:melp@alliance.cgiar.org" class="ml-auto font-medium text-white hover:underline">Contact MELP</a>
     </div>
   </footer>
 </div>
