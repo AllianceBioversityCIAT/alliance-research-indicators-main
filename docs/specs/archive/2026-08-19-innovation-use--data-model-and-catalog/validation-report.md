@@ -11,7 +11,7 @@
 | Field | Value |
 | --- | --- |
 | Spec path | `docs/specs/innovation-use/data-model-and-catalog/` |
-| Parent spec | [`../family.md`](../family.md) — chunk 1 of 3 |
+| Parent spec | [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 1 of 3 |
 | Validated | 2026-08-19 |
 | Auditor tier | T3 · **author ≠ auditor satisfied** — implementation authored by `sonnet` Implementers; this audit run on `opus`, which wrote no production code in this spec |
 | Method | Direct source verification. Test names extracted from the fixture and migration-spec files themselves; `tsc`, suite, coverage, lint and a cold DB cycle re-run by the auditor |

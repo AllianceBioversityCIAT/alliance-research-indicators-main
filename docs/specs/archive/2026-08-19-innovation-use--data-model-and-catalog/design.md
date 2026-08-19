@@ -7,7 +7,7 @@
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
 - **Linked TRD:** [`../../../trd/trd.md`](../../../trd/trd.md) §2.4 (ADR-5, ADR-6), §5.1, §5.2, §7.1, §12
-- **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
+- **Parent spec:** [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 1 of 3
 - **Last updated:** 2026-08-18 (§6.5.1 piece 4 corrected, §6.7 and §10 inbound notices filed — by `bugfix/sp-versioning-roles-id` T-03; each correction carries its own dated provenance inline)
 
 ---

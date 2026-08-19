@@ -7,7 +7,7 @@
 - **Linked PRD section:** [`docs/prd.md` §5.1 Server responsibilities](../../../prd.md), AC-Results-Lifecycle, AC-Controlled-Lists, AC-Testing
 - **Linked TRD sections:** [`docs/trd/trd.md`](../../../trd/trd.md) §2.4 (ADR-5 append-only migrations, ADR-6 OpenSearch decorators), §5.1 Server persistence, §5.2 Result aggregate, §7.1 Result lifecycle, §12 Testing strategy
 - **Linked proposal:** [`./proposal.md`](./proposal.md)
-- **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
+- **Parent spec:** [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 1 of 3
 - **Linked tickets:** AC-1679 (branch `AC-1679-Create-the-innovation-use-section`)
 - **Depth:** Full (data + migration work against a shared, non-disposable database)
 - **Last updated:** 2026-08-18 (§4.3 DC-13 substitute-gate row corrected — by `bugfix/sp-versioning-roles-id` T-03; R-IU-011 AC.8/AC.9 deliberately untouched)

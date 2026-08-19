@@ -187,6 +187,11 @@ The second rule is the one that gets broken, because measuring feels passive. It
 
 ---
 
+### 🧭 Bounding a worker's search space (KZ-007, KZ-002 — added 2026-08-19)
+
+- **Bound every axis, not just the one that last failed.** A brief that names the *token* but not the *file set*, or the file set but not the *exemption criterion*, leaves the next axis unbounded and the defect simply moves down a level. Require a **per-unit completeness line** (`<unit>: N found · M actionable · all handled`) that includes units with **zero** findings, and require every claimed exemption to **quote the clause that grants it** — citing a retained item confers no exemption on text that merely references it.
+- **Grep-falsify any aggregate before you flip it.** Before marking a done-definition item that asserts a total (*"all X are done"*, *"every AC is checked"*), run the check that could disprove it. The Leader's finalize write is the one claim in the pipeline no Reviewer audits.
+
 ## 🔁 Orchestration Sequence (per task)
 
 1. Load spec and constitution context.

@@ -9,15 +9,52 @@ Continuous-improvement record across AKILI-SPECS specs. One entry per archived s
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | **High** | 4 | Product | proposed |
-| KZ-002 | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives*. **Recurred 2026-08-18** at a new layer: deriving the live schema's table list from source code found **3 of 64** (95% miss) because the `sec_*` tables predate migration control. Same root cause — a convenient proxy substituted for the real thing. | **High** | 4 | Product | proposed |
+| KZ-002 | Enumerating scope by a convenient proxy misses what the proxy stands in for. Enumerate by **the real thing**. **Recurred 2026-08-18** (live schema table list derived from source code: 3 of 64). **Recurred 2026-08-19** at the orchestration layer — the Leader's own finalize write marked a spec-wide *"every AC is checked"* item `[x]` while all 59 checkboxes were unflipped; "the tasks are done" was substituted for "the checkboxes are checked". | **High** | 5 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved): grep-falsify any aggregate before flipping it. Methodology upstream pending |
 | KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | Medium | 1 | Product | proposed |
 | KZ-004 | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands. **Recurred 2026-08-18** (`bugfix/sp-versioning-roles-id` T-01): the named verification script did not exist and the "TEST" datasource was unreachable from any script. | **High** | 2 | Product + Methodology | proposed |
-| **KZ-005** | A correction sweep must enumerate the superseded **claim in every phrasing**, not only the string that was edited — and must re-grep for any *new* value the correction itself introduces. Cousin of KZ-002 at the document layer. | **High** | 1 | Product + Methodology | **applied** → `.agents/leader.md` §Spec Drift / Pivot Protocol (2026-08-18, user-approved). Methodology upstream pending |
+| **KZ-005** | A correction sweep must bound its search space on **every axis** — phrasing, token, **file set**, and exemption criterion — not only the axis that last failed; and must re-grep any *new* value the correction introduces. **Recurred 4× in `innovation-use/data-model-and-catalog` alone** (phrasing → token → file set → exemption-by-citation). **Root cause of the recurrence identified 2026-08-19: the lesson had been standardized into `.agents/leader.md` only, while every recurrence occurred in a *worker* executing a Leader-mandated sweep.** A lesson applied to the orchestrator does not reach the agent that performs the action. | **High** | 5 | Product + Methodology | **applied** → `.agents/leader.md` (2026-08-18) **+ `.agents/implementer.md` §Correction sweeps (2026-08-19, user-approved) — the edit that closes the role gap.** Methodology upstream pending |
 | **KZ-006** | A task delivering a harness, fixture, or verification mechanism needs **one end-to-end criterion**. Every per-piece check can pass while the mechanism cannot run at all. | **High** | 1 | Product + Methodology | **applied** → `docs/specs/general-setup/task.md` §*A task is NOT done until* (2026-08-18, user-approved). Methodology upstream pending |
+| **KZ-007** | A brief that is locally correct in every bullet can still leave the worker's search space unbounded on the next axis down. Require a **per-unit completeness line that includes units with zero findings**, and require every claimed exemption to **quote the clause granting it**. | **High** | 1 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved). Methodology upstream pending |
 
 ---
 
 ## Entries
+
+### 2026-08-19 — innovation-use/data-model-and-catalog
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 13 (T-03 extracted to its own spec) | `tasks.md` |
+| Reviewer FAIL rework attempts | **6** — T-12 ×2, T-13 ×2, T-14 ×2 | `execution.md` |
+| Escalations resolved by user ruling | 2 (T-12, T-13) | `execution.md` |
+| HALTs / FATAL_FAILs / Pivots | **0** | `execution.md` |
+| Judgment-day findings | **44** across 3 rounds, all ESCALATED, lineage exhausted | `design.md` §0 |
+| Validation FAIL / WARN | **0 / 7** | `validation-report.md` |
+| Review rounds vs budget | **13 vs 4–5 — 2.6×**, authorized, never silent | `design.md` §12, `execution.md` |
+
+**MUDA identified:** the review-round overrun is almost entirely *defect waste* concentrated in three tasks, and all six rework attempts trace to two root causes already in this log. **Jidoka held throughout** — every FAIL stopped the line, no defect was waived, and the one attempt that ran out of road (T-14 attempt 3) passed rather than HALTing.
+
+**Lessons**
+
+- **KZ-005 — recurrence 4→5, and the recurrence itself is the finding.** (Product + Methodology, High)
+  - Root cause: the lesson was standardized into `.agents/leader.md`, but **every one of the four recurrences happened inside a worker** carrying out a Leader-mandated sweep. The orchestrator knew the rule; the agent doing the work never saw it.
+  - Evidence: `execution.md` — T-14 attempts 1–3; the Leader adjudication table under *attempt 2*.
+  - Standardization: append §Correction sweeps to `.agents/implementer.md`. → **Applied 2026-08-19 (user-approved)**
+
+- **KZ-002 — recurrence 4→5, new layer: the orchestrator's own finalize write.** (Product + Methodology, High)
+  - Root cause: the Leader marked a spec-wide *"every AC is checked"* done-definition item `[x]` while all 59 checkboxes were unflipped — substituting the proxy ("the tasks are done") for the real thing. **The finalize write is the only claim in the pipeline no Reviewer audits.**
+  - Evidence: commit `1753e786` (defect), `d1e57ead` (retraction), `39dd8f6c` (discharged on evidence); `execution.md` — *Leader self-correction*.
+  - Standardization: grep-falsify clause in `.agents/leader.md`. → **Applied 2026-08-19 (user-approved)**
+
+- **KZ-007 — a locally-correct brief can still leave the search space unbounded.** (Product + Methodology, High)
+  - Root cause: three consecutive Leader briefs were correct in every bullet yet each bounded only the axis that had last failed — phrasing, then token, then file set — so the defect moved down one level each time. The countermeasure that finally worked was structural: a per-unit completeness line **including units with zero findings**, plus a requirement that exemptions quote their governing clause.
+  - Evidence: `execution.md` — *Leader accountability* notes in T-14 attempts 1 and 2; the method section of attempt 3.
+  - Standardization: append §Bounding a worker's search space to `.agents/leader.md`. → **Applied 2026-08-19 (user-approved)**
+
+**Carried follow-up:** **C-4** — `platformSeeded` / `innovationDevRoleSeeded` in the fixture harness are structurally always `false` (dead branches). User ruling 2026-08-19: **log as follow-up for chunk 2**, which will be in those files and can verify the removal in context.
+
 
 ### 2026-08-18 — `bugfix/sp-versioning-roles-id`
 

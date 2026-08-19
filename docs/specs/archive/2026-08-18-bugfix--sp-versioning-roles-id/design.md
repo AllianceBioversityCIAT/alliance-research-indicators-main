@@ -4,7 +4,7 @@
 - **Spec id:** 2026-08-sp-versioning-roles-id
 - **Status:** implemented
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
-- **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../../innovation-use/data-model-and-catalog/routine-transcript.md)
+- **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../2026-08-19-innovation-use--data-model-and-catalog/routine-transcript.md)
 - **Last updated:** 2026-08-14
 
 ---
@@ -179,7 +179,7 @@ The regression fixture needs a **disposable** MySQL, and the repo has no working
 
 ## 7. References
 
-- Routine transcript §2.4 (the defect), §2 (the 29-block enumeration) — [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../../innovation-use/data-model-and-catalog/routine-transcript.md)
+- Routine transcript §2.4 (the defect), §2 (the 29-block enumeration) — [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../2026-08-19-innovation-use--data-model-and-catalog/routine-transcript.md)
 - `1782486943935` (tables created with `roles_id`) · `1783022620616` (drops it) · `1783029013035` (recreates `SP_versioning` still naming it)
 - Root `CLAUDE.md` §4.1 (append-only migrations), §4.3 (shared DB is not disposable)
 - ADR-11 (proposed, in the Innovation Use chunk) — green checks and lifecycle as stored routines; **this bug is a live instance of its revisit trigger**

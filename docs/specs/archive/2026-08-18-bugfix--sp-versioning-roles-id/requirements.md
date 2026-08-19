@@ -5,7 +5,7 @@
 - **Status:** implemented
 - **Owner:** David Felipe Casañas Hernández
 - **Linked design:** [`./design.md`](./design.md) · **Linked tasks:** [`./tasks.md`](./tasks.md)
-- **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../../innovation-use/data-model-and-catalog/routine-transcript.md) §2.4
+- **Routine authority:** [`../../innovation-use/data-model-and-catalog/routine-transcript.md`](../2026-08-19-innovation-use--data-model-and-catalog/routine-transcript.md) §2.4
 - **Last updated:** 2026-08-18 *(bumped from 2026-08-14 — the OQ-1 resolution was already merged into this file on 2026-08-18 per commit history, but the header was never bumped to match; corrected in the 2026-08-18 validation-remediation pass, W-1)*
 
 ---
