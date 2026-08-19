@@ -230,8 +230,12 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
   // `actors_count`) and `result_institution_types.organization_count`: this
   // fixture deliberately leaves all six NULL, because that inertness — that
   // Innovation Dev never populates them — is exactly what F16 asserts here
-  // (see the NULL assertions below, `:864-868`/`:895`), not something to
-  // diversify away. The count-column pairing itself — that `SP_versioning`
+  // (see the five `toBeNull()` count assertions in the 'F16a' test below, and
+  // the `organization_count` `toBeNull()` assertion immediately after the
+  // `institution_id` assertion in the same test — cited by anchor, not by
+  // line number, since a same-file line citation is invalidated by the very
+  // edit that writes it), not something to diversify away. The count-column
+  // pairing itself — that `SP_versioning`
   // actually copies a non-NULL value through the SELECT list — is closed
   // instead by F13b/F13c in the sibling file,
   // `innovation-use-lifecycle-routines.fixture-spec.ts:376-380`/`:394`.

@@ -10,11 +10,30 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * and/or `result_actors` rows as its row in §6.5 requires) under a reserved,
  * far-future report year (2096) distinct from other fixture files' reserved
  * years, so this file can run standalone or alongside them without collision.
- * `actor_roles` id 1 (Innovation Dev) is not seeded anywhere in the baseline
- * or in any migration on this branch (only id 2, Innovation Use, is — M4,
- * `1787071463485-insertInnovationUseRoles.ts`) — F11 seeds it itself,
- * idempotently, and only removes it in `afterAll` if this file was the one
- * that added it (FP-16 / trap 4).
+ * `actor_roles` id 1 (Innovation Dev) IS seeded by a migration — `1749957832
+ * 239-createEntitiesForInnovationDev.ts:45` inserts it via
+ * `${ActorRolesEnum.INNOVATION_DEV}` (an enum interpolation, not the literal
+ * digit `1`, which is why a value-grep for `1` missed it — corrected
+ * 2026-08-18, T-12 rework attempt 2). That migration predates this branch's
+ * schema-only baseline snapshot (`src/db/baseline/baseline.sql`, taken
+ * 2026-08-14 per `src/db/baseline/README.md`) and is already recorded as
+ * applied in the snapshot's copied `migrations` bookkeeping rows, so it
+ * never re-runs against a freshly-loaded scratch schema; and the snapshot
+ * itself carries zero business-data `INSERT`s outside that one bookkeeping
+ * table (same README). So the row genuinely is absent from the scratch
+ * schema — the comment's OPERATIVE CONCLUSION still holds, only the
+ * previously-stated reason ("not seeded anywhere ... in any migration") was
+ * wrong. Id 2 (Innovation Use) IS seeded fresh on the scratch schema, by
+ * contrast, because its migration — M4, `1787071463485-
+ * insertInnovationUseRoles.ts` — postdates the snapshot cutoff and genuinely
+ * re-runs during `migration:test:bootstrap`. F11 below still seeds id 1
+ * itself, idempotently, and only removes it in `afterAll` if this file was
+ * the one that added it (FP-16 / trap 4) — though `test/fixtures/
+ * global-setup.ts` now also seeds this exact row centrally, once, before
+ * any worker starts (see that file's header), which makes this file's own
+ * check-then-insert below a harmless, redundant no-op rather than the row's
+ * real source in practice. Left as-is: this correction's authorized scope
+ * is this comment, not that code.
  *
  * Every row created by a test is tracked by id and removed in `afterAll`,
  * guarded on the id actually being defined (FP-4/trap 5) — a partial seed

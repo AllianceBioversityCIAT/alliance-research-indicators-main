@@ -1960,3 +1960,23 @@ This is a better answer than "read the artifact more carefully," which is what t
 | **FP-49** | **T-14 · `src/CLAUDE.md` §9** | **`migration:test:bootstrap` is not idempotent** — re-running it against an already-migrated container raises `ER_TABLE_EXISTS_ERROR` and strands the schema at a pre-M6 migration point. Discovered during the T-13 correction. Run it exactly once per fresh container; recover only by full `compose:test:down` → `up` → `bootstrap`. Harmless to trust (it fails loudly), expensive to diagnose |
 | **FP-50** | **T-14 · every future spec** | **Same-file line citations are structurally self-invalidating.** Cite same-file targets by anchor; reserve line numbers for cross-file references. Concrete mechanism behind six of this spec's seven inaccurate claims |
 
+
+#### D-2 citation FAIL — **CLOSED by anchor citation**, and the fix proved its own necessity
+
+**Date:** 2026-08-18 · comment-only, one file, verified inline by the Leader (a two-anchor existence check is a *puntual verification* per `.agents/leader.md` → *Delegation Thresholds*, not an audit — no Reviewer round consumed).
+
+**Old:** `// (see the NULL assertions below, ':864-868'/':895'), not something to`
+**New:** cites the targets **by anchor** — *"the five `toBeNull()` count assertions in the 'F16a' test below, and the `organization_count` `toBeNull()` assertion immediately after the `institution_id` assertion in the same test — cited by anchor, not by line number, since a same-file line citation is invalidated by the very edit that writes it."*
+
+##### 🎯 The fix demonstrated the exact defect it was fixing
+
+The Reviewer's corrected numbers were `:884-888` / `:915`. **Verified inline after the fix landed, the true positions are `:888-892` / `:919`** — the 4-line comment rewrap displaced them. **Had the fix simply substituted the Reviewer's corrected numbers, it would have shipped an EIGHTH wrong citation in the very act of correcting the seventh.**
+
+This is no longer a hypothesis about the mechanism; it is a measurement of it. **A same-file line citation is invalidated by the very edit that writes it**, and the interval between "verified correct" and "wrong again" was a single comment rewrap. The Implementer was instructed not to trust the brief's numbers and independently re-derived the anchors instead — which is why the outcome is a working citation rather than a fresh defect.
+
+**Anchors verified by the Leader against the current file:** `F16a:` occurs exactly once (unambiguous); the five `_count).toBeNull()` assertions sit at `:888-892` on `copiedActor`; `expect(copiedInstitutionType.organization_count).toBeNull()` at `:919` sits immediately after `expect(Number(copiedInstitutionType.institution_id)).toBe(institutionCode)` at `:918`, exactly as the anchor describes. `git diff` filtered for non-comment changed lines returns **empty** — comment-only, as required. Lint clean; cold cycle green at **9 suites / 30 tests**.
+
+**FP-50 is upgraded from a recommendation to a demonstrated rule** and should be filed as such: *cite same-file targets by anchor; reserve line numbers for cross-file references.* Cross-file citations remain correct and were left as line numbers deliberately — `innovation-use-lifecycle-routines.fixture-spec.ts:376-380`/`:394` verified accurate twice, by two different reviewers, and they are not subject to this failure mode.
+
+**Running tally: seven inaccurate claims shipped; the eighth was averted by changing the citation *form* rather than its content.** That is the first intervention in this spec to break the pattern instead of adding to it.
+
