@@ -1,7 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { PLATFORM_CODES } from '@shared/constants/platform-codes';
+import { platformFromResultCodeOrNull } from '@shared/utils/platform-code.util';
 
 export const resultInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
@@ -47,26 +47,22 @@ function getYearFromUrl(router: Router): string | null {
 function getPlatformFromUrl(router: Router): string | null {
   const url = router.url;
 
-  // Derive from PLATFORM_CODES rather than listing codes here: a hardcoded subset
-  // silently omitted AICCRA, so /result/AICCRA-123 matched neither this regex nor the
-  // numeric fallback below, no reportingPlatforms param was sent, and the server fell
-  // back to platform_code='STAR' — surfacing as "Result not found" on every service.
-  const platformAlternation = Object.values(PLATFORM_CODES)
-    .map(code => code.replace(/[-/\\^$*+?.()|[\]{}]/g, ''))
-    .join('|');
-  const platformRegex = new RegExp(`result/(${platformAlternation})-(\\d+)`);
-  const platformMatch = platformRegex.exec(url);
-  if (platformMatch) {
-    return platformMatch[1];
+  // Derive from the shared util's OrNull variant (design.md §2.2, DD-4) rather
+  // than building a second alternation regex here. The previous alternation
+  // matched neither an unrecognized prefix nor a non-numeric code and fell
+  // through to `null` (no `reportingPlatforms` param sent) — a hardcoded subset
+  // once silently omitted AICCRA this exact way, and the server fell back to
+  // platform_code='STAR', surfacing as "Result not found" on every service.
+  // `platformFromResultCodeOrNull` reproduces that matching behavior exactly
+  // (case-sensitive, `null` on anything unrecognized): only the derivation moved,
+  // not what this interceptor accepts.
+  const resultCodeRegex = /result\/([A-Za-z]+-\d+|\d+)/;
+  const resultCodeMatch = resultCodeRegex.exec(url);
+  if (!resultCodeMatch) {
+    return null;
   }
 
-  const resultRegex = /result\/(\d+)/;
-  const resultMatch = resultRegex.exec(url);
-  if (resultMatch) {
-    return PLATFORM_CODES.STAR;
-  }
-
-  return null;
+  return platformFromResultCodeOrNull(resultCodeMatch[1]);
 }
 
 function addParameterToUrl(url: string, paramName: string, paramValue: string): string {
