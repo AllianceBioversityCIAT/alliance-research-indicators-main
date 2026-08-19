@@ -1330,3 +1330,25 @@ Three findings from this round are worth carrying forward:
 
 **Budget status:** **7 of 13 tasks complete.** **14 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2). Six tasks remain against ~10 rounds — the tasks left (T-09's harness, four fixture tasks, T-13's full gate) are the DB-dependent ones this spec has not yet exercised, so the remaining margin is thinner than 6-vs-10 suggests. Flagged at the gate, not deferred.
 
+## Constitution Impact: T-01 / T-07 (DD-15)
+
+**Module created / reshaped.** T-07 created `domain/entities/result-innovation-use/` as a full entity module with a new public HTTP surface (`GET`/`PATCH /api/v1/results/innovation-use/:resultCode`), and T-01 created `domain/tools/clarisa/entities/clarisa-innovation-use-levels/`. Neither moves an existing module boundary and neither needs a child guide of its own — both sit inside trees already covered by [`server/researchindicators/src/CLAUDE.md`](../../../server/researchindicators/src/CLAUDE.md). The root guide's `## Module Guides` index needs no new entry.
+
+**A child guide became actively misleading, and was fixed in this task's commit rather than deferred to `/akili-archive`.** This is the Step 3.5 exception, not a routine sync, and the grounds are specific: the guide's own *how to add a module* instructions named only the route file, which is the precise wording that produced DD-15 twice in one spec.
+
+| Site | Before | After |
+| --- | --- | --- |
+| Decision tree item 1 | *"Register routes in `domain/routes/main.routes.ts`."* | Names the route node **and** the `entities.module.ts` entry — "both, never just the route node" |
+| Step 4 *Route registration* | *"if it is a new sub-resource path, add a node under `domain/routes/main.routes.ts`"* | Retitled *"two steps, and the second is the one people miss"*, with a block quote giving the `RouterModule` mechanic, the `404` consequence, why mocked-provider specs and route-array assertions cannot catch it, the falsifiable `Reflect.getMetadata` assertion, both worked exemplars, and the DD-15 citation |
+| Directory tree comment | `# RouterModule registration tree` | `# RouterModule path-prefix tree (NOT module instantiation — see §4)` — the old comment actively reinforced the wrong mental model |
+
+**Applied to both `CLAUDE.md` and its near-mirror `AGENTS.md`.** The two files carried the three lines identically. Fixing only `CLAUDE.md` would have been **KZ-005's file-set axis verbatim** — correcting the phrasing while leaving the file set unbounded — and `AGENTS.md` is what the non-Claude hosts read, so the defect would have survived for exactly the agents least likely to have this spec's history in context. Swept after: `grep` for the superseded phrasing across all `*.md` returns **zero**; the new guidance resolves in both guides.
+
+**Why this did not wait for archive.** Deferring would have left the repo's own instructions telling the next agent to ship a `404`, with two live examples in the tree proving the instruction is followed literally. A guide that misleads is a defect with a blast radius larger than the spec that found it. It is also a documentation edit, so the Leader's no-production-code rule is not engaged.
+
+**Pending for `/akili-archive`:**
+
+- **CodeGraph re-index** — two new modules, two modified module-graph files, seven new spec files across T-01 and T-07.
+- **TRD check** — whether `docs/trd/trd.md` §4.1/§6.1 (module layout, backend architecture) should carry the DD-15 mechanic as a platform-level convention rather than only in the child guides. **No ADR is overturned** — this is a Nest composition mechanic, not an architectural decision, so no superseding ADR is owed.
+- **The four Kaizen candidates** recorded against T-01 and T-07, of which the strongest is advisory A-1 (a rejection-only test set never proves the accept direction) and the most process-relevant is the two consecutive rounds in which a Leader brief asserted repo "precedent" wrongly.
+

@@ -48,7 +48,7 @@ src/
 │   └── migration-specs/          # unit specs FOR migrations — sibling dir, deliberately outside the migrations glob (§3)
 │
 └── domain/
-    ├── routes/main.routes.ts             # RouterModule registration tree
+    ├── routes/main.routes.ts             # RouterModule path-prefix tree (NOT module instantiation — see §4)
     ├── entities/<module>/                # one Nest module per entity cluster
     │   ├── <module>.controller.ts
     │   ├── <module>.service.ts
@@ -78,7 +78,7 @@ src/
 
 Decision tree:
 
-1. **Owns an entity / table?** → `domain/entities/<module>/` with the full `controller + service + module + dto + entities + spec` set. Register routes in `domain/routes/main.routes.ts`.
+1. **Owns an entity / table?** → `domain/entities/<module>/` with the full `controller + service + module + dto + entities + spec` set. Register the route node in `domain/routes/main.routes.ts` **and add the module to `domain/entities/entities.module.ts`'s `imports`** — both, never just the route node (see *Registering a module* below).
 2. **Wraps an external system?** → `domain/tools/<integration>/` exposing one Nest service. No transport leakage to other modules.
 3. **Reusable across modules (interceptor, guard, pipe, decorator, util, base DTO)?** → `domain/shared/<kind>/`. Only put it here if at least two modules will use it. Otherwise keep it module-local.
 4. **Touches the admin panel?** → server pieces under `admin/{controllers,services}/`, React under `admin/client/`. Follow `admin/README-REACT.md` for new pages.
@@ -104,7 +104,13 @@ Naming:
    - Use `@Roles(...)` + ensure `RolesGuard` is on the controller (or the handler).
    - For result mutations, add `@UseGuards(ResultStatusGuard)` and use the `RESULT_CODE` path token + `@GetResultVersion()`.
    - Return the service promise wrapped in `ResponseUtils.format({ description, status, data })`.
-4. **Route registration** — if it is a new sub-resource path, add a node under `domain/routes/main.routes.ts`. If it is a new endpoint on an existing controller, no route change needed.
+4. **Route registration — two steps, and the second is the one people miss.** If it is a new sub-resource path, add a node under `domain/routes/main.routes.ts` **and** register the module in the module-graph file that instantiates it. If it is a new endpoint on an existing controller, no route change is needed.
+
+   > **A route node is NOT a registration.** `RouterModule.register()` stamps a `MODULE_PATH` prefix onto a module constructor, looks the module up in `modulesContainer`, and **returns silently when it is not there**. There is no boot error and no warning — every handler on the module just returns **`404`**. The module-graph file is `domain/entities/entities.module.ts` for entity modules and `domain/tools/clarisa/clarisa.module.ts` for CLARISA control lists; a tool module goes in its own tool module.
+   >
+   > **Mocked-provider unit specs cannot catch this, and neither can a spec asserting the shape of the `route` array.** The falsifiable assertion is over the module graph: `expect(Reflect.getMetadata('imports', EntitiesModule)).toContain(YourModule)`. See `domain/tools/clarisa/clarisa.module.spec.ts` and `domain/entities/entities.module.spec.ts` for the two shapes — plain membership when the module has a single incoming edge, a transitive reachability walk when it has several.
+   >
+   > This shipped twice in one spec (2026-08-19, `docs/specs/innovation-use/details-api` — DD-15), each time with a full green suite over four `404` endpoints.
 5. **Tests** — extend `<module>.controller.spec.ts` + `<module>.service.spec.ts`. Add an e2e case under `test/` if it is a new public route.
 6. **OpenSearch** — if a new field is searchable, decorate the entity column with `@OpenSearchProperty({...})` and follow the reindex path in `tools/open-search/`.
 7. **Swagger sanity check** — confirm the endpoint shows up at `/swagger` with the right tag, params, and bearer-auth lock.
