@@ -24,7 +24,7 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | **K-019** | **A refactor declared behaviour-preserving needs an explicit old-vs-new comparison over a fixed input set as its pass condition.** The existing suite was written for the old behaviour's *known* inputs and is structurally blind to a change in what the code **accepts** — it reports green while the acceptance set moves | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
 | **K-020** | **A targeted client `jest` run trips the project-wide coverage floors and exits `1` with every test passing.** Under red-before/green-after that makes "green after" unreachable. Use `--coverage=false` on targeted runs | Medium | 1 | Product | **Applied** — `client/.../src/CLAUDE.md` |
 | **KZ-012** | **The `numeric ⟺ STAR` invariant is assumed in three layers and validated in none**, and `platform_code` is `nullable: true` — a NULL renders bare-numeric and is classified STAR. Answer with `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` | Medium | 1 | Product | **Open — carries OQ-1 out of `archive/`** |
-| **K-018** | **The authoritative site list for an expectation-realignment task is the failing suite, not a grep.** Grep enumerates *mentions*; only the run enumerates *breakages*. A grep-built list names already-green sites, misses genuinely red ones, and can skip a whole file — all three happened in one spec | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
+| **KZ-013** | **Archiving a spec silently breaks every document that cites its path.** `/akili-archive` sweeps *forward* (factual claims in the root guides) but never *backward* — who pointed at the folder it just moved. Grep the spec path across `docs/` before the move | Medium | 1 | Product + Methodology | **Applied** — 6 dead references repointed (+ upstream owed) |
 | **KZ-011** | **A multi-clause table cell can be retired in half.** When one clause is retired on new evidence, its siblings inherit the retirement silently and the worker is blamed for the omission. One clause per row | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §3 (+ upstream owed) |
 
 ### Queued for upstream (Methodology — no local edit owed)
@@ -41,6 +41,9 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 > **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
+>
+> **Retired 2026-08-19 (fourth sweep, to admit KZ-013):** `K-018` (applied to
+> `general-setup/task.md` §5, where its rule now sits directly beside K-019's in the same section).
 >
 > **Retired 2026-08-19 (third sweep, to admit K-019, K-020 and KZ-012):** `K-016` (applied to
 > root `CLAUDE.md` §4.3; no TTL-cached config touched this cycle, rule stands) · `K-009` (applied to
@@ -68,6 +71,56 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-19 — bilateral/mapping-adjustments (splitter close-out)
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 0 — a splitter produces no diff | proposal.md §13 |
+| Chunks delivered / descoped | 2 / 2 — all terminal | archive-summary.md §3 |
+| Reviewer FAILs · HALTs · Pivots | 0 · 0 · 0 (held by the chunks) | — |
+| **Days the splitter stayed active after its last child archived** | **6** | children archived 2026-08-13; this archive 2026-08-19 |
+| **Inbound references broken by the children's archive** | **6**, across 2 files | grep over `docs/` |
+
+**MUDA identified:** not rework — *stale inventory*. A closed umbrella advertising a next step that had
+already been taken, plus six dead paths in documents that are read as authority. Both are the same
+waste: a reader acting on a record that stopped being true and nothing signalling it.
+
+**Lessons**
+
+- **KZ-013 — Archiving sweeps forward but never backward.** (Product + Methodology, Medium)
+  - Root cause: `/akili-archive` Step 3 mandates a *factual-claims sweep of the root guides* — it asks
+    "what did this cycle make false?" It never asks the inverse: **"who was pointing at the folder I am
+    about to move?"** Moving a spec into `archive/` changes its path, and every citation of the old path
+    dies silently. Nothing in the command greps for them.
+  - Evidence: C1 and C2 archived 2026-08-13. Six days later `docs/ux-ui/design.md` — a **constitutional**
+    document — still cited `docs/specs/bilateral/toc-optional-mapping` and
+    `docs/specs/bilateral/primary-contributing-sp` four times, and `docs/specs/drift-report.md` twice.
+    The splitter's own §13 pointed at an archived child and read as live work; it surfaced only because
+    a `/akili-resume` briefing followed the link and found nothing there.
+  - Why it matters beyond broken links: `docs/ux-ui/design.md` is where an agent goes to learn how this
+    platform is supposed to look and behave. A decision entry whose evidence path 404s is a claim that
+    cannot be checked, in the one place claims are supposed to be checkable.
+  - Same family as `/akili-specify`'s **Correction Closure**, which already mandates a two-direction
+    sweep on every Adjust round. Archiving moves an entire folder and applies neither direction.
+  - Standardization: the 6 references were repointed to their `archive/` paths.
+    → **Applied 2026-08-19 (user-approved).** The Methodology half — a backward-reference sweep step in
+    `/akili-archive` before the move — is **owed upstream**; no local edit can carry it.
+  - Deliberately NOT fixed: the splitter's own `proposal.md` §13. An archived spec is a point-in-time
+    record, and the stale pointer is now documented in its `archive-summary.md` §6 instead.
+
+**What the splitter got right, recorded because it is the reusable part.** It rejected one-spec-for-the-
+whole-ticket (couples a one-line copy change to two unspecified integrations; nothing ships until a
+missing PRMS contract exists) and rejected split-by-layer (no layer independently shippable; the module
+sits half-migrated between merges). The constraint it chose — **each chunk leaves the module fully
+working** — held: C1 and C2 shipped independently with no broken intermediate state.
+
+**Still open, and not closed by this archive:** C3/C4 (PRMS submission and review sync, adjustments
+A8/A9) were descoped by PM agreement on 2026-08-12 to a separate user story. `reviewDecision()` still
+throws *"Bilateral review decision is not implemented yet"*.
+
 
 ### 2026-08-19 — bugfix/pool-funding-source-gate
 
