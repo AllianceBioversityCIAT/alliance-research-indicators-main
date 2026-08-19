@@ -193,7 +193,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-006 (all ACs + both scenarios), R-CFS-003 AC.4, NFR-CFS-002, NFR-CFS-004
 - **Design refs:** §2.1, §5.3, §8, DD-1, V-1, V-2
-- **Status:** [ ] · **Size:** S (~90 LOC incl. e2e) · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `api-design-principles`
+- **Status:** [x] · **Size:** S (~90 est · **~250 actual**, 7 e2e tests) — PASS on attempt 2; attempt 1 FAILed (helper in main.ts forcing a require.main guard; vacuous negative) · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Scope.** One **unconditional** `app.use(prefix, router)` block in `main.ts` — **no `if` wrapper** (DD-9: a conditional mount lets an unmounted stub path fall through to `JwtMiddleware` and return **401**, violating R-CFS-004). The flag is enforced per-request inside the router, which T-05 already built. Placed **after** `helmet`/`json`/`enableCors` and **before** `listen()`. Plus `test/clarisa-stub.e2e-spec.ts` — the only place mount ordering is observable.
 
@@ -369,6 +369,7 @@ Per `cognitive-doc-design` review-empathy: PR 1's description should lead with t
 | RB-3 | 2026-08-18 | Test LOC has overrun by up to **4.4×** on the last two specs in this family, same root cause present here | Budgeted at 54% of total. A third overrun is a **Kaizen lesson**, not something to absorb | Leader | open |
 | RB-4 | 2026-08-18 | **OQ-3 has no owner** — dev enablement blocked (K-015 pattern) | Recorded in three places; escalated. Local work proceeds | DevOps / Product | **open — blocking dev only** |
 | RB-5 | 2026-08-18 | Security review of an unauthenticated route is required before merge | R-CFS-006 AC.5; PR 2 is the review surface | Security reviewer | open |
+| **RB-6** | **2026-08-19** | **`ClientGateway` never closes its socket — a pre-existing bug in shared infrastructure, surfaced by T-06.** `client.gateway.ts` opens a `socket.io-client` connection in `onModuleInit()` with **no `OnModuleDestroy` / `OnApplicationShutdown` hook**, and `SocketModule` is `@Global()`. Wherever `ARI_ROAR_MANAGEMENT_HOST` is unreachable, engine.io reconnection timers keep Node's event loop alive indefinitely: jest hung **18m40s**, and a production process would also fail to shut down cleanly. Consistent with the standing *"worker process failed to exit gracefully"* warning on the unit suite | T-06 closed it **only inside one e2e's `afterAll`** (`app.get(ClientGateway)['socket']?.disconnect()`); **production code is untouched.** `forceExit` was deliberately rejected as a fix because it would mask this leak and every future variant across *every* e2e suite. **Needs its own bugfix spec — the next e2e suite that boots `AppModule` will hit it again.** Out of scope here: it predates this spec, is not in NFR-CFS-002's protected list, and repairing a `@Global()` module's lifecycle from inside a fixture-stub task is exactly the scope creep NFR-CFS-002 exists to prevent | Server / DevOps | **open — escalated, NOT absorbed** |
 
 ---
 

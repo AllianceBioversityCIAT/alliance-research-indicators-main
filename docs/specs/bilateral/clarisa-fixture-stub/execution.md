@@ -926,3 +926,161 @@ Bare array and bare `{access_token}` · default-deny on **both** handlers, `res.
 | Reliability | The `mappingCount` reduce guards null/non-object elements and falls back to 0, so a malformed element degrades the **log line** rather than turning a valid fixture into a 500. It also sits behind the cache early-return, so the extra pass over 198 elements is one-time and never touches NFR-CFS-001's hot path |
 | Readability | `debug` asserts the *shape* of the three counts, not their values — a regression to `0 mappings` would still log green. That is **T-04's** job (it owns the 283); recorded so nobody later reads the router spec as covering it |
 | Risk | The image now carries ~50 KB of fixtures no runtime path reads. Unreachable and non-sensitive; recorded so a future image-size audit finds the reasoning instead of re-deriving it |
+
+---
+
+### Runtime Incident RI-3 — worker non-delivery, now three occurrences in one run (K-009)
+
+| Worker | Role | Non-delivery |
+| --- | --- | --- |
+| `rev-T01-2` | Reviewer | Idle, no verdict. Recovered by a **correctly addressed** poke (the first poke was mis-sent — LE-1) |
+| `impl-T06-mount` | Implementer | Idle **twice** without a report. First poke recovered a status update; second yielded nothing. **Re-dispatched to a fresh worker** |
+| `rev-T06-mount` | Reviewer | Idle, no verdict. Poked |
+
+**K-009 is now at three occurrences inside a single spec**, always with the same signature: the worker
+ingests the material, does the work, and stops at the moment of emitting the result. Not one of these was
+a work failure — in every case the artifact was correct or in progress.
+
+**A structural finding beyond the count.** The Reviewer wrapper grants `Read, Grep, Glob` and **no
+`Write`**, so for that role the message is the only possible artifact. The mitigation the Kaizen log
+credits as working against K-009 — an incremental report file that makes the verdict durable independent
+of the send — is **unavailable to the role most prone to the failure.** Two of the three non-deliveries
+here were Reviewers. **Kaizen candidate (Product): grant the reviewer wrapper a scoped write path, or
+accept that reviewer verdicts are irrecoverable by design.**
+
+#### LE-5 — a turn-bounded worker cannot wait on a long-running measurement
+
+`impl-T06-mount`'s second non-delivery was **not** the worker's fault, and reading it as one would have
+been unjust and unhelpful. It launched the e2e, its Bash call hit the tool timeout, its turn ended — and
+the process kept running for **18m40s**. It went idle waiting for a result that could never reach it,
+having correctly reported *"still executing, I'm not going to claim a pass I haven't seen."*
+
+The Leader resolved it by killing the run and measuring directly. **Rule for the rest of this run: a
+measurement that may exceed a worker's tool timeout is the Leader's to run, not the worker's** — the
+worker's turn cannot outlive the process it started.
+
+#### The 18-minute hang was never the tests
+
+Diagnosed by the Leader with `--forceExit --detectOpenHandles`, then root-caused by `impl-T06-finish`:
+
+**`ClientGateway.onModuleInit()`** (`src/domain/tools/socket/client.gateway.ts`) opens a
+`socket.io-client` connection to `ARI_ROAR_MANAGEMENT_HOST` with **no `OnModuleDestroy` /
+`OnApplicationShutdown` hook**. `SocketModule` is `@Global()` and reaches `AppModule` via
+`bilateral.module.ts`. In this environment nothing listens on that port, so engine.io reconnection timers
+keep Node's event loop alive indefinitely, and `app.close()` never touches the socket because nothing
+tells it to.
+
+- The suite itself passes in **~7.5 s**; the process then hangs forever.
+- **Pre-existing bug in shared infrastructure, not stub code.** T-06 is simply the first e2e suite in this
+  repository to boot the full `AppModule`, which is why it surfaced here. **It will bite the next one.**
+- Consistent with the standing warning on the unit suite: *"A worker process has failed to exit gracefully
+  … likely caused by tests leaking due to improper teardown."*
+
+**Fix chosen — and the reason it is the right one is blast radius, not elegance.** The worker closed the
+specific offender in the e2e's `afterAll` (`app.get(ClientGateway)['socket']?.disconnect()`), touching no
+production file. It **rejected** `forceExit` in `test/jest-e2e.json` because that would mask this leak —
+and every future variant — across **every** e2e suite in the repo, present and future. From the
+acceptance criterion's point of view the two fixes are indistinguishable; only the blast radius differs.
+
+**Leader-verified acceptance bar:** `npx jest --config ./test/jest-e2e.json clarisa-stub` with **no flags**
+→ `6 passed`, `7.5 s`, wall-clock **8.9 s**, **exit 0**, process gone. Down from a killed 18m40s hang.
+
+**Escalation owed (not absorbed):** the missing shutdown hook in `client.gateway.ts` is out of T-06's
+scope and remains unfixed in production code. It needs a ticket or a Kaizen entry — the stub spec closed
+it locally in one test's teardown and nothing more.
+
+#### LE-6 — the Leader's named falsifier predicted the wrong mechanism (K-004 facet, pointed at the Leader)
+
+Named mutation 1 (mount at `/api` instead of the prefix) **did** redden the suite, 3 of 6 — but not
+through the assertions the Leader's brief predicted. The brief claimed the sibling-path and
+unrelated-route checks would stop returning 401. They **kept passing**: Express's `app.use('/api', router)`
+intercepts only when the path *relative to the mount* matches a route inside the router, and unmatched
+relative paths fall through regardless of prefix. What actually failed was the stub's **own** routes
+returning 401 instead of 200/404.
+
+The gate held; the Leader's model of *how* it would hold was wrong. This is the K-004 facet the Kaizen log
+already records — *a falsifier authored from the design's own frame tends to name a mutation the design
+already excludes* — this time authored by the **Leader** rather than by a spec. Referred to the Reviewer
+to rule whether it exposes a genuine coverage gap (a mis-mount that would go uncaught) or merely a wrong
+prediction about a working gate.
+
+**Reviewer ruling on LE-6: wrong prediction, working gate — no coverage gap.** Express's
+`app.use('/api', router)` strips `/api` and matches the *remainder* against the router's own routes, so
+`/clarisa-stub/api/projects` matches nothing and falls through, while the stub's own paths lose their
+handler. For a sibling to reach the stub **and return the fixture**, Express would have to strip
+`/api/clarisa-stubx` and leave `/api/projects` — which no string mount can do. One residual recorded: the
+sibling test asserts `401`, the same value for "mount did not match" and "mount matched, no inner route
+did", so it cannot *distinguish* over-match from fall-through. `requirements.md` explicitly accepts
+"401 or 404, not the fixture", so this limits diagnostic resolution, not gate power.
+
+---
+
+### T-06 — Mount the router in bootstrap and prove the ordering — **attempt 2: PASS** ✅
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** on attempt **2** of 3 · 1 rework |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-006 (all ACs + both scenarios), R-CFS-003 AC.4, NFR-CFS-002, NFR-CFS-004 |
+| **Artifacts** | `main.ts` **+8 insertions** · `clarisa-stub.mount.ts` (32, new) · `test/clarisa-stub.e2e-spec.ts` (**7 tests**, new) |
+| **Workers** | `impl-T06-mount` → `impl-T06-finish` → `impl-T06-attempt2` · `rev-T06-mount` → `rev-T06-attempt2` |
+
+#### Attempt 1 FAIL — two issues, both closed in attempt 2
+
+**Issue 1 — the helper was in `main.ts`, which forced a `require.main === module` guard.** The guard
+existed *only* because of that placement; the helper has **zero** dependency on anything in `main.ts`
+(both symbols come from the stub folder). The Reviewer verified the guard was **correct today** —
+`module: commonjs`, no webpack key so the build is plain `tsc`, and `node dist/main.js`, `start:prod` and
+`nest start`'s spawn of the compiled entry all satisfy `require.main`. Not a live bug. But an
+**unrecorded, unnecessary widening on the highest-blast-radius file in the package**, whose failure mode
+is *the server silently starts nothing*, with **no gate anywhere in this repo** to catch a future bundler
+or ESM migration flipping it.
+
+Fixed per **DD-11** (added to `design.md`, §2.1's file table amended): helper moved to
+`clarisa-stub.mount.ts`; guard deleted; bare `bootstrap();` restored. **`main.ts`'s diff collapsed from 44
+lines with altered boot semantics to 8 pure insertions** — literally the "+1 unconditional mount block"
+§2.1 always specified.
+
+**Issue 2 — the "no fixture read when disabled" assertion was a vacuous negative.** It asserted an empty
+`mockedReadFileSync` call list, which would pass identically if `jest.mock('fs', …)` never intercepted —
+and the file's own comment documents that this module resists ordinary spying. Neither named mutation
+reddened that half of NFR-CFS-004.
+
+Fixed with a **fixture-path-specific positive control**, and the Reviewer confirmed it cannot pass
+vacuously: if the wrapper stopped intercepting, `mockedReadFileSync.mock` would be `undefined` and the
+assertion would **throw a TypeError** — a failure, not a pass; and if the router bypassed the seam, the
+filtered list is empty and the control fails. Either way it reddens, which is exactly what the negative
+alone could not do.
+
+#### Evidence
+
+| Check | Result |
+| --- | --- |
+| E2E, **no flags**, self-terminating | **7 passed**, 6.7 s, exit 0 (Leader-run) — down from a killed **18m40s** hang |
+| **K-004 on issue 2** | `loadProjectsOnce()` moved before the flag check → `Expected length: 0, Received length: 1` with the fixture path in the received array → reverted → 7/7 |
+| **Guard-removal falsifier, measured not asserted** | `npm run build && node dist/main.js` → `Application is running http://localhost:3099` |
+| `main.ts` position (the code read no test covers) | `enableCors` → `helmet` → `json` → `urlencoded` → **`mountClarisaStub(app)`** → `setGlobalPrefix` → `listen()` ✅ |
+| DD-1 no-injector | `INestApplication` used **type-only**, elided at emit; body is one `app.use`, no `app.get`/`moduleRef` |
+| Real function, not a copy | Repo-wide grep for `mountClarisaStub` returns only the definition, `main.ts`'s import+call, and the e2e's import+call. No inlined duplicate |
+| Full unit suite (Leader) | **329 suites / 2351 tests green**, and the arithmetic reconciles: 2271 + 31 + 26 + 23 = 2351 |
+| NFR-CFS-002, correct baseline | `git diff 7bbb4e06 -- <all seven protected paths>` **empty**, working tree included |
+| `npx eslint` (bare) | clean |
+
+**On the port substitution — the Reviewer ruled it *stronger* than a run on 3000.** Ports 3000 and 3001
+were held by unrelated processes; the Implementer verified 3099 free, booted there, and disclosed it
+rather than implying the default. Reaching the `Application is running` line is only possible from inside
+`listen().then()`, which requires the top-level `bootstrap()` to have run — precisely the invariant the
+guard's removal threatens. A run on an **occupied** port would have hit `main.ts`'s `.catch` branch and
+logged "failed to start", proving boot but **not** listen: strictly weaker, ambiguous evidence. Secondary
+confirmation: **nothing in `src/` or `test/` imports `main.ts`**, so no side-effect-import consumer
+remains for the guard to protect.
+
+#### Disclosed limitation, accepted and unchanged
+
+No mutation exercises `main.ts`'s **own** ordering. Mutating `httpservice()` would be a guaranteed no-op
+for this suite — and *a no-op mutation producing a green run is worse than no mutation*, because it reads
+as "the ordering gate cannot fail". The mutation was therefore applied to the e2e's own `beforeAll`
+(`Expected "nosniff", Received undefined`). Closing this properly would require extracting the whole
+`helmet`/`json`/`urlencoded`/`enableCors` block into a shared `configureHttpApp(app)`, which would blow
+through §2.1's `main.ts` budget far more than the guard did. **Recorded as a named gap in the spec file's
+header, not silently absorbed.**
