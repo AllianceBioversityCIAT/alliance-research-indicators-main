@@ -155,9 +155,9 @@ function eligibleProjects(fixture: FixtureProject[]): FixtureProject[] {
 function assertHasScienceProgramsCount(fixture: FixtureProject[]): void {
   const eligible = eligibleProjects(fixture);
   const trueCount = eligible.filter(hasSciencePrograms).length;
-  if (trueCount !== 140) {
+  if (trueCount !== 166) {
     throw new Error(
-      `has_science_programs true count: expected 140, got ${trueCount} ` +
+      `has_science_programs true count: expected 166, got ${trueCount} ` +
         `(eligible cohort size ${eligible.length}).`,
     );
   }
@@ -580,13 +580,13 @@ describe('Required assertions — R-CFS-001 / R-CFS-002', () => {
     );
   });
 
-  it('has_science_programs is true for exactly 140 of the 170 eligible projects, false for 30 (R-CFS-002 AC.3)', () => {
+  it('has_science_programs is true for exactly 166 of the 198 eligible projects, false for 32 (R-CFS-002 AC.3, widened by R-W3B-001)', () => {
     const fixture = loadFixture();
     const eligible = eligibleProjects(fixture);
-    expect(eligible).toHaveLength(170);
+    expect(eligible).toHaveLength(198);
     const trueCount = eligible.filter(hasSciencePrograms).length;
-    expect(trueCount).toBe(140);
-    expect(eligible.length - trueCount).toBe(30);
+    expect(trueCount).toBe(166);
+    expect(eligible.length - trueCount).toBe(32);
   });
 
   it('the entity-code histogram contains 22, 23 and 24 — never 22 alone (R-CFS-002 AC.2)', () => {
@@ -735,7 +735,7 @@ describe('Layer 2 — generic structural guard', () => {
 // =========================================================================================
 
 describe('K-004 — named falsifying inputs (the gate must be able to FAIL)', () => {
-  it('mutation 1 (the headline) — hardcoding cgiar_entity_type_object.code=22 for every mapping makes has_science_programs report 170, not 140', () => {
+  it('mutation 1 (the headline) — hardcoding cgiar_entity_type_object.code=22 for every mapping makes has_science_programs report 198, not 166', () => {
     const mutated = clone(loadFixture());
     for (const p of mutated) {
       for (const m of p.project_mappings_array ?? []) {
@@ -743,7 +743,7 @@ describe('K-004 — named falsifying inputs (the gate must be able to FAIL)', ()
       }
     }
     expect(() => assertHasScienceProgramsCount(mutated)).toThrow(
-      /has_science_programs true count: expected 140, got 170/,
+      /has_science_programs true count: expected 166, got 198/,
     );
   });
 
