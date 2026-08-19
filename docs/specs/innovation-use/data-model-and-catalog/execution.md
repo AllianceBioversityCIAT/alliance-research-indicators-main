@@ -2053,3 +2053,52 @@ Commit **`964a7d76`** is titled *"docs(fixtures): D-2 — cite same-file targets
 
 **Kaizen candidate (a third from this spec, and the only one about the Leader's own mechanics rather than a worker's):** *when two tasks are in flight in one checkout, `git add -A` silently merges them into whichever commits first.* Neither the AKILI commit standard nor `.agents/leader.md` currently says to stage by path, and the failure is invisible at commit time — `git commit` reports a clean success, and only a later `git show --stat` reveals it.
 
+
+#### T-12 — ATTEMPT 3 of 3 (review round 10): **Lens A PASS · Lens B FAIL** — split verdict; Leader adjudicates FOR Lens B on the merits, and **REFUSES the mechanical rollback**
+
+**Date:** 2026-08-18 · Files: comment text in both fixtures + one authorized assertion line.
+
+##### ✅ Closed and independently re-verified
+
+| Item | Verified by |
+| --- | --- |
+| **FAIL-1** — all five sub-clauses | Lens B: seed is in `beforeAll`; **no `DELETE FROM actor_roles` anywhere in the file** (the only such deletes in the tree use T-13's private 9151); the quoted anchor exists verbatim; `global-setup.ts` seeds once and never deletes, and is genuinely wired at `jest-fixtures.json:9` so *"before any worker"* is true rather than aspirational |
+| **FAIL-2** — the P/¬P is gone | Both lenses. `1749957832239:45` + `actor-roles.enum.ts:2` confirm the seeding; the header's reason the row is still absent is independently true (baseline 2026-08-14, schema-only, all 303 migrations recorded applied). Independent grep for the negation finds **no surviving assertion** |
+| **E-6** citations | Lens B, character-for-character against `1758125999162` |
+| **The sweep** | **Lens B re-ran it independently and found no hit the Implementer missed.** The one hit needing real reasoning — `clarisa_actor_types` code 5 in "the same FP-16 situation" — confirmed via `1761840859164:215` (2025-10-30, pre-cutoff), **and** that those two migrations are the only files in the tree touching that table, so nothing post-cutoff re-seeds it |
+| **Red-before-green** | Lens A: the inverting mutation reds F12b-1 — *"the observation that was structurally impossible under the earlier weakening mutation."* Each case now reddened by a mutation targeting the conjunct it claims to gate. **Discipline closed for the pair** |
+| **AC.9 fully gated** | Lens A found the argument the Leader had missed: the `code = 5` arm is still **text**-gated by the untouched body-text fixture — any edit to it changes the `CREATE FUNCTION` body and fails F12. **The two fixtures work as a pair, not as duplicates** — behavioral coverage where behavior can be exercised, structural coverage catching the rest. That is the substantive vindication of path (a) |
+
+##### 🔴 The FAIL — and it is a Leader briefing defect, the second of this kind
+
+The Leader's attempt-3 brief authorized **E-3** (*document that F12b-1/F12b-2 are a load-bearing mutual guard*) and **E-4** (*add a pre-state assertion inside F12b-2 making it self-contained*) **in the same brief, without reconciling them.** Once E-4 lands, E-3's text is false of the shipped file: F12b-2 no longer depends on F12b-1, so *"non-hollow **only because** F12b-1"*, *"load-bearing **mutual** guard"*, and *"an `.only` on F12b-2 would silently remove that guard"* are all untrue.
+
+> Lens B: *"E-3's wording was only true in a world without E-4; the Implementer transcribed both bullets literally and did not reconcile them."*
+
+Two secondary inaccuracies in the same paragraph: the offered routes to `Number(null) === 0` — *"a typo'd column alias or a query that matched no row"* — **produce neither** (a typo'd alias yields `undefined` → `NaN`, which *fails* `toBe(0)`; a zero-row result makes `row` undefined and throws). The only real route is the function returning SQL `NULL`. And the residual ordering hazard named is **backwards**: under `--randomize` the fragile test is now **F12b-1**, which asserts the pre-`UPDATE` state.
+
+**Both lenses saw it and split on classification** — Lens A as advisory staleness, Lens B as a false claim about the file's own behavior. **Lens B governs on the merits**, consistent with this spec's own precedent: A-6 and attempt 2's FAIL-1 were both exactly this class and both treated as FAIL-worthy.
+
+##### 🛑 THE MECHANICAL ROLLBACK IS REFUSED — it would make the tree strictly worse
+
+`/akili-execute` Step 4 prescribes, on a 3-attempt HALT, `git restore . && git clean -fd` — *"Do not leave broken code for the user to clean up."* **Applied here it would do the opposite, because of the Leader's own earlier `git add -A` error:**
+
+- Attempt 2's work is **committed** (`964a7d76`).
+- Attempt 3's work — the corrections — is **uncommitted**.
+- Therefore `git restore .` reverts **only the corrections**, restoring the two false claims attempt 3 correctly fixed while keeping everything they were fixing.
+
+**The rollback's stated purpose is to prevent leaving broken state; here it would create it.** The rule is written for a working tree containing a failed *implementation*; this tree contains a verified-sound 460-line fixture, two discharged FAILs, an independently re-run sweep, and three sentences of stale comment text. Rollback is refused and escalated instead — which is what Step 4's own escalation clause directs: *"present the blocker to the user for guidance."*
+
+**Recorded as a methodology finding:** *automatic rollback assumes the failed attempt is the only uncommitted work. When a prior attempt has been committed and the current one is the correction, rollback inverts its own intent.* Compounded here by the `964a7d76` mis-attribution, which is what put the two attempts on opposite sides of the commit boundary in the first place — **one Leader error made a second Leader error dangerous.**
+
+##### ADVISORY — recorded, never gating
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **F-1** | A, B | The E-1/E-2 non-coverage note **under-claims**. F12b-1 *does* gate the CASE's `ELSE ra.actor_type_id IS NOT NULL` arm (`:78`) — the inverting mutation proved it. Only the `code = 5` arm (`:77`) is unreached. Under-claiming is the safe direction; *"not the `code = 5` arm of the `CASE` (`:77`)"* would be exactly true |
+| **F-2** | B | `innovation-use-validation.fixture-spec.ts`'s header no longer contains the literal token `FP-16` (removed with the old text), while the corrected `beforeAll` comment points at it as *"the full, corrected account (FP-16)"*. A future `FP-16` grep lands on the pointer, not the account |
+| **F-3** | B | The surviving `"trap 4"` at that file's F11 noise-row comment resolves via `tasks.md:286` to T-09's trap 4 (*guard the empty set unconditionally* — F17's job). F11's noise row is **trap 2** (role filter, DD-4). Leaving it was within scope; re-pointing at trap 2 would be more accurate |
+| **F-4** | B | `innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts:75-77` still calls `innovation-use-validation.fixture-spec.ts` *"the ONLY fixture that still needs the REAL `actor_roles` id 1"*. The behavioral fixture also consumes id 1 as FK ballast. Defensible under its own gloss and its operative conclusion (no race, no teardown) is still true — noted so it is not mistaken for an unswept hit |
+
+**Lens B on evidence credibility:** *"nothing in this FAIL touches executable logic, so a corrected comment does not invalidate that evidence."* The 9-suite/30-test cold run and the 328-suite/2155-test unit run stand.
+
