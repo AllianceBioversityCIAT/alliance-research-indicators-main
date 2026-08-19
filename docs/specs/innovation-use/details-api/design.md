@@ -207,7 +207,7 @@ No `@OpenSearchProperty` decoration is added — family D-8, and ADR-6's amendme
 ### GET `/api/v1/tools/clarisa/innovation-use-levels`
 
 - **Controller:** `clarisa-innovation-use-levels.controller.ts` extending `BaseController`
-- **Swagger:** `@ApiTags('Clarisa')`, `@ApiBearerAuth` — inherited handler, so `@ApiOperation` goes on the subclass
+- **Swagger:** `@ApiTags('Clarisa')`, `@ApiBearerAuth` — **no `@ApiOperation`**: the handler is inherited unchanged from `BaseController`, and `@ApiOperation` is a method decorator that throws when applied at class level, so adding it would require a `find()` override this module's Scope forbids (DD-13)
 - **Response `data`:** `ClarisaInnovationUseLevel[]`, **ordered by `level` ASC** (DD-6)
 - **Errors:** `401`
 
@@ -436,6 +436,7 @@ Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions
 | **DD-10** | Pass `manager` to `upsertByCompositeKeys` | OICR omits it, leaving its quantification writes outside its transaction. Not inherited, not fixed here |
 | **DD-11** | Leave `upsertQuantificationsByRole` (zero callers) in place | Deleting dead code in a shared service is out of scope and would widen the blast radius of an API chunk |
 | **DD-12** | C-4 cleanup is scoped to the sites that are **structurally** dead — not to every occurrence of the identifier | See §11.1. The follow-up as logged is over-broad |
+| **DD-13** | Exempt `@ApiOperation` on handlers **inherited unchanged from `BaseController`** — no override on the catalog controller | `@ApiOperation` is built by `createMethodDecorator`, which dereferences `descriptor.value` unconditionally; applied at class level Nest supplies no descriptor and it throws at class-definition time. The original instruction ("`@ApiOperation` goes on the subclass, not on an override") named a placement that does not exist — a Pivot at T-01 attempt 1's review. Ruled at execution time, 2026-08-19 (`requirements.md` **D-IUA-10**). *(Rejected: authorize a `find()` override re-declaring `@Get()` to hang the annotation — the only `super.find()` in the whole `src` tree, breaking a pattern held by all 19 sibling `BaseController` subclasses, for one Swagger summary line. Also rejected: add `@ApiOperation` support to `BaseController` itself — out of scope for an API chunk, and widens the blast radius to 19 controllers.)* The exemption binds only to handlers a subclass inherits without overriding; T-07's own-declared `GET`/`PATCH` keep `@ApiOperation` and `@ApiBody` fully required |
 
 ### 11.1 Reversion challenge (Step 2.3) — DD-12
 
@@ -520,3 +521,4 @@ Each PR description follows `cognitive-doc-design` review-empathy: what to read 
 | Date | Change |
 | --- | --- |
 | 2026-08-19 | Created. Reversion challenge run on DD-12 → design narrowed (§11.1). **`requirements.md` R-IUA-003 AC.5 corrected `403` → `400`** to match `ResultStatusGuard`'s actual `BadRequestException`; swept forward across both documents in the same edit |
+| 2026-08-19 | T-01 attempt 1 Pivot resolved (T-01 attempt 2): `@ApiOperation` exempted on handlers inherited unchanged from `BaseController` — no override on the catalog controller (**DD-13**). §4's catalog entry corrected; `requirements.md` R-IUA-013 AC.3 and §5.3, and `tasks.md` T-01's Implementation notes and T-13's done criterion, amended to match; swept forward across all three documents in the same edit |

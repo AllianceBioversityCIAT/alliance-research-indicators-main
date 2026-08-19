@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** not-started
+- **Status:** in-progress — T-01 `[x]` done (2026-08-19); T-02 … T-13 todo
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -68,6 +68,7 @@ graph TD
 - **Requirements covered:** R-IUA-010 (all ACs + its scenario), R-IUA-013 AC.1, AC.5
 - **Depends on:** none
 - **Size:** S (~120 LOC) · **Effort:** `medium`
+- **Status:** ~~todo~~ → ~~`[~]` blocked (Pivot)~~ → **`[x]` DONE 2026-08-19** — PASS on attempt 2 of 3. Attempt 1 FAILed against a task instruction that is technically unachievable (`@ApiOperation` throws when applied at class level); resolved by user ruling as **DD-13 / D-IUA-10**, not by rework. Full suite green (330/330 suites, 2161/2161 tests). Evidence: [`./execution.md`](./execution.md) → *T-01* + *Pivot Record: T-01* + *T-01 — FINAL*
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Files touched**
@@ -85,7 +86,7 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 **Implementation notes**
 
 - Expose **no** name-based lookup. `findByName` on the base is a `LIKE %name%` match and catalog names repeat in pairs across adjacent levels.
-- `BaseController`'s handlers are inherited, so `@ApiOperation` goes on the subclass, not on an override.
+- `BaseController`'s handlers are inherited, and `@ApiOperation` is a method decorator (`createMethodDecorator`) that dereferences the route descriptor unconditionally — it throws when applied at class level, so there is no legal placement for it on an unmodified inherited handler. **Do not override `find()` to hang the annotation** (Pivot 2026-08-19, resolved by `design.md` DD-13 / `requirements.md` D-IUA-10): the catalog `GET` carries **no** `@ApiOperation`, matching all 19 sibling `BaseController` subclasses. This is why attempt 1's `find()` override — the only `super.find()` in the whole `src` tree — was reverted.
 
 **Done criteria**
 
@@ -109,6 +110,7 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 - **Requirements covered:** R-IUA-004 AC.1, AC.2, AC.3, AC.4, AC.6, AC.7 · R-IUA-007 AC.2 · R-IUA-008 AC.5 · R-IUA-013 AC.3 (partial)
 - **Depends on:** none
 - **Size:** M (~180 LOC) · **Effort:** `medium`
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 **Files touched**
@@ -154,6 +156,7 @@ Exercised by T-07's behavioral pipe spec, not by this task alone.
 - **Requirements covered:** R-IUA-009 AC.1, AC.4 (actors) · R-IUA-003 AC.3, AC.6 (actors) · R-IUA-004 write-side normalisation
 - **Depends on:** T-02
 - **Size:** M (~200 LOC incl. spec) · **Effort:** `xhigh` — this is one of the three deactivate predicates
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -196,6 +199,7 @@ Add `customSaveInnovationUse(resultId, data, manager)`, modelled on `customSaveI
 - **Requirements covered:** R-IUA-007 AC.1, AC.3, AC.4, AC.5 · R-IUA-009 AC.2, AC.4 (organizations)
 - **Depends on:** T-02
 - **Size:** M (~180 LOC incl. spec) · **Effort:** `xhigh`
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -233,6 +237,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-002 (all ACs + scenario) · R-IUA-004 AC.5 · R-IUA-001 (the `create` helper) · R-IUA-008 AC.1, AC.3, AC.4 (read side)
 - **Depends on:** T-02
 - **Size:** M (~330 LOC incl. spec) · **Effort:** `medium`
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -276,6 +281,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-003 (all ACs + both scenarios) · R-IUA-005 (all ACs + scenario) · R-IUA-006 (all ACs + scenario) · R-IUA-008 AC.1, AC.2, AC.5 · R-IUA-012 AC.2
 - **Depends on:** T-01, T-03, T-04, T-05
 - **Size:** L (~350 LOC incl. spec) · **Effort:** `xhigh` — transactional, ordering-sensitive, carries the off-by-one trap
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging`
 
 **Files touched**
@@ -332,6 +338,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-013 (all ACs) · R-IUA-002 AC.7 · R-IUA-003 AC.5 · R-IUA-004 AC.1–AC.8 behaviorally
 - **Depends on:** T-06
 - **Size:** M (~210 LOC incl. spec) · **Effort:** `medium`
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Files touched**
@@ -380,6 +387,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-001 (all ACs + scenario) · R-IUA-011 (all ACs + scenario) · R-IUA-012 AC.3, AC.4
 - **Depends on:** T-05, T-07
 - **Size:** S (~90 LOC incl. spec) · **Effort:** `max` — two lines that change a method shared by all six indicators
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -423,6 +431,7 @@ Full `npm test -- --silent`. **Falsifying input:** omit the `ipAvailables` membe
 - **Requirements covered:** R-IUA-002 scenario (behavioral) · R-IUA-003 AC.1, AC.3, AC.6, AC.7 + scenario 2 · R-IUA-007 AC.1, AC.3 · R-IUA-008 AC.1, AC.2 · NFR-IUA-002
 - **Depends on:** T-07, T-08
 - **Size:** L (~370 LOC) · **Effort:** `xhigh` — a mechanism no fixture in this repo has ever built
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -469,6 +478,7 @@ A shared helper that boots a Nest `TestingModule` against the **TEST** datasourc
 - **Requirements covered:** R-IUA-009 (all ACs + scenario) · R-IUA-007 AC.4 · R-IUA-008 AC.3
 - **Depends on:** T-09
 - **Size:** M (~200 LOC) · **Effort:** `xhigh` — this is the spec's highest-severity risk
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -508,6 +518,7 @@ As T-09. **Falsifying input:** remove `actor_role_id` from T-03's deactivate pre
 - **Requirements covered:** R-IUA-006 AC.1, AC.2, AC.3, AC.4 + scenario (behavioral) · R-IUA-010 AC.3
 - **Depends on:** T-01, T-06
 - **Size:** M (~260 LOC) · **Effort:** `xhigh` — the family's signature trap
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -549,6 +560,7 @@ As T-09. **F-C falsifying input:** compare the FK instead of `level` → the pai
 - **Requirements covered:** R-IUA-001 AC.1, AC.2 (behavioral) · R-IUA-011 AC.1, AC.4, AC.5 + scenario · R-IUA-012 AC.1, AC.3
 - **Depends on:** T-08
 - **Size:** M (~200 LOC) · **Effort:** `xhigh`
+- **Status:** `[ ]` todo
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -588,6 +600,7 @@ As T-09. **Falsifying input:** omit the `ipAvailables` edit → no IP Rights row
 - **Requirements covered:** R-IUA-013 AC.3, AC.7 · NFR-IUA-001 · NFR-IUA-003 · resolves **OQ-IUA-2**
 - **Depends on:** T-10, T-11, T-12
 - **Size:** M (~140 LOC incl. the NFR-001 fixture) · **Effort:** `high`
+- **Status:** `[ ]` todo
 - **Skills:** `systematic-debugging`, `nestjs-expert`
 
 **Files touched**
@@ -618,7 +631,7 @@ Method, per KZ-002 / KZ-005 / KZ-007:
 - [ ] A per-file report line exists **for every fixture file, including those with zero removals** *(KZ-007)*
 - [ ] `npm run test:fixtures` run **twice in a row on the same container** — both green. A single run cannot detect the orphaned-platform regression this cleanup risks
 - [ ] The section read issues ≤ 5 queries with 50 actor rows and no per-row pattern *(NFR-IUA-001)*
-- [ ] **Human check, recorded verbatim in the report:** `/swagger` shows all three new handlers, each with tag, `@ApiOperation` summary, bearer lock, and — for the PATCH — the `@ApiBody` schema *(R-IUA-013 AC.3)*
+- [ ] **Human check, recorded verbatim in the report:** `/swagger` shows the section `GET` and `PATCH` — the two **own-declared** handlers — each with tag, `@ApiOperation` summary, bearer lock, and — for the `PATCH` — the `@ApiBody` schema. The catalog `GET` — the one **inherited, unmodified** `BaseController` handler — shows tag and bearer lock but carries **no** `@ApiOperation` summary; confirm this as the exemption ruled in `design.md` DD-13 / `requirements.md` D-IUA-10, not as a defect *(R-IUA-013 AC.3)*
 - [ ] Every new entity write populates `AuditableEntity` fields from `request.user` — confirmed by the F-A and F-E assertions, restated here as the spec-level closure *(AC.7)*
 - [ ] Full `npm test -- --silent` green; `npm run test:cov` ≥ **60%** on all four axes *(NFR-IUA-003)*
 - [ ] `npm run lint -- --quiet` clean, **and `git status` re-checked** — the script carries `--fix`

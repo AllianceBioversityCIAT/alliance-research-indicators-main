@@ -1,0 +1,281 @@
+# Execution Log — Results (Innovation Use) / Details API
+
+- **Module:** results (`innovation-use`)
+- **Spec id:** 2026-08-innovation-use-details-api
+- **Spec path:** `docs/specs/innovation-use/details-api/`
+- **Parent spec:** [`../family.md`](../family.md) — chunk 2 of 3
+- **Linked requirements:** [`./requirements.md`](./requirements.md)
+- **Linked design:** [`./design.md`](./design.md)
+- **Linked tasks:** [`./tasks.md`](./tasks.md)
+
+---
+
+## Document Control
+
+| Field | Value |
+| --- | --- |
+| Approval Mode | **gated** (from `proposal.md` Document Control) — every continue/pause gate stops for the user |
+| Branch | `AC-1679-Create-the-innovation-use-section` |
+| Package | `server/researchindicators` (server-only chunk) |
+| Budget (`design.md` §12) | 13 tasks · ~2,400 LOC · 6–8 review rounds |
+| Rework ceiling | 3 attempts per task |
+| Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
+| Log opened | 2026-08-19 |
+
+**Review-round tally:** 2 of 6–8 consumed (T-01 attempts 1 and 2).
+
+---
+
+## Task Execution History
+
+### T-01 — Innovation Use level catalog module
+
+- **Status at the time of this entry:** `[~]` **PIVOT** — blocked on a spec defect, not on implementation quality. **Superseded — see § *T-01 — FINAL* below: the Pivot was ruled on and T-01 closed `[x]` on attempt 2.** This line is left as written rather than rewritten, because the log is append-only history; the pointer is the correction.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 (of a possible 3; the loop was stopped by the Pivot Protocol, not by the ceiling)
+- **Requirements in scope:** R-IUA-010 (AC.1–AC.6 + scenario), R-IUA-013 AC.1, AC.5
+- **Skills assigned:** `nestjs-expert`, `api-design-principles` (task defaults, unchanged) · **Effort:** `medium`
+
+#### Attempt 1
+
+**Files changed** (6 files, +236 lines, all additive):
+
+| File | State |
+| --- | --- |
+| `src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.service.ts` | new |
+| `…/clarisa-innovation-use-levels.controller.ts` | new |
+| `…/clarisa-innovation-use-levels.module.ts` | new |
+| `…/clarisa-innovation-use-levels.service.spec.ts` | new |
+| `…/clarisa-innovation-use-levels.controller.spec.ts` | new |
+| `src/domain/tools/clarisa/routes/clarisa.routes.ts` | modified — one import + one route node |
+
+**Implementer verification**
+
+- `npm test -- --silent` from `server/researchindicators` → **330 suites passed, 2161 tests passed** (full suite, not targeted).
+- Scoped: `npx jest src/domain/tools/clarisa/entities/clarisa-innovation-use-levels --silent` → 2 suites, 6 tests, green.
+- **Falsification performed:** the `order: { level: 'ASC' }` line was temporarily deleted from the service; both order-asserting specs failed with a diff showing the missing `order` key; the file was restored and the suite re-confirmed green. This is the falsifying input the task names.
+- `grep -n "findByName\|findByNames"` over both new source files → no output, exit code 1 (zero hits).
+- `npm run lint` deliberately **not** run — the script carries `--fix` and mutates files; T-01's stated gate is `npm test` only.
+
+**Implementer `Not Done / Assumptions`** (recorded verbatim, per the Step 2.3.0 rule):
+
+> One judgment call, made deliberately and reasoned through: the task's implementation note ("`BaseController`'s handlers are inherited, so `@ApiOperation` goes on the subclass, not on an override") together with `design.md` §4's explicit API-surface entry for this endpoint led me to add an `@ApiOperation` summary on the controller. Because Nest's route metadata (`@Get()`) is attached to the concrete function object rather than resolved through the prototype chain once a same-named method is redefined, overriding `find()` to add `@ApiOperation` required re-declaring `@Get()` on the override too — otherwise the route silently stops being registered. […] This is the only place where my code differs from the exemplar's literal shape.
+
+No scope was left incomplete. The entry is a declared deviation, not an omission.
+
+**Reviewer verdict: `STATUS: FAIL`** — one issue.
+
+> **1. Discovered Issue:** The controller overrides the inherited `find()` handler and re-declares `@Get()` on it, purely to hang `@ApiOperation` on the subclass. This is a **second** override beyond the one the task authorizes, and it is the exact placement the task's Implementation notes prohibit. It is also unprecedented: it is the only `super.find()` in the entire `src` tree, and none of the 19 sibling `BaseController` subclasses does this. No T-01 Done criterion requires `@ApiOperation` — criterion 4 asks only for the tag and the bearer lock, and R-IUA-013 AC.3 is deferred to T-13's human check — so the annotation buys nothing at this gate while costing a repo-wide pattern break.
+>
+> **Violated Rule:** `tasks.md` § T-01 **Scope** — *"Mirror `clarisa-innovation-readiness-levels/` exactly … with **one override**: `findAll()` adds `order: { level: 'ASC' }` (DD-6)."* And same section, **Implementation notes** — *"`BaseController`'s handlers are inherited, so `@ApiOperation` goes on the subclass, **not on an override**."* Mirrored in `design.md` § `GET /api/v1/tools/clarisa/innovation-use-levels`.
+>
+> **Remediation Suggestion:** Delete the `find()` override and the `@ApiOperation` import/decorator, leaving the exact exemplar shape. The controller spec needs no change. **Leader decision, not Implementer:** if the `@ApiOperation` summary is wanted, the spec must be amended first, because the instruction as written is unachievable — `ApiOperation` is a `createMethodDecorator` and throws when applied to a class.
+
+**Reviewer per-criterion verdicts — all six T-01 done criteria, including those with no finding** (KZ-007 completeness line):
+
+| # | Criterion | Verdict |
+| --- | --- | --- |
+| 1 | Ten rows in a `ServerResponseDto` with `id`, `level`, `name`, `definition` (AC.1, AC.2) | SATISFIED — entity exposes all four columns; envelope preserved through `super.find()` |
+| 2 | `level` ascending `0…9` (AC.3) | SATISFIED — `order` is DB-side |
+| 3 | Explicit `order` clause asserted against the mocked repo's options object (AC.4 + scenario) | SATISFIED — asserted twice; signature byte-for-byte the base's, LSP-safe |
+| 4 | `Clarisa` Swagger tag + bearer lock (AC.5) | SATISFIED — independent of the FAIL; the criterion names only tag and lock |
+| 5 | Zero `findByName` / `findByNames` call sites (AC.6) | SATISFIED — independently re-grepped, zero hits. `super(…, 'name')` is the base's `findByNameKey` config, verbatim from the exemplar; it configures but never calls the lookup |
+| 6 | `npm test -- --silent` green | SATISFIED — 330 suites / 2161 tests from the correct package root |
+
+DD-4 (zero migrations) — **held**, nothing under `src/db/migrations/`.
+
+**`ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks):**
+
+- **Reliability** — nothing in the suite guards the route registration the override depends on. The controller spec calls `controller.find()` directly, so deleting `@Get()` leaves every test green while the endpoint 404s. If the override survives, it must ship `expect(Reflect.getMetadata(PATH_METADATA, …prototype.find)).toBeDefined()`.
+- **Risk** — the override permanently decouples this handler from `BaseController.find`'s method-level metadata. Nothing is lost today, but a future handler-level decorator on the base (a guard, `@ApiQuery`, `@Version`) would reach 19 controllers and silently skip this one.
+- **Readability** — the override's code comment reframes the spec's prohibition ("an override, not an edit to the shared `BaseController`") rather than acknowledging it; editing the base was never the alternative on offer.
+- **Reliability (forward pointer → T-05 / T-06)** — `findAll(relations, where)` drops the `is_active: true` default whenever a caller supplies `where`, faithfully inherited from `clarisa-base-service.ts:54-61`. **T-06's level resolution must pass `is_active` explicitly if it ever calls `findAll` with a `where`, or it will read soft-deleted catalog rows.**
+- **Risk (forward pointer → T-05 / T-06)** — `findByName` / `findByNames` remain public on the service and the module exports it. R-IUA-010 AC.6 holds today, but the LIKE-based lookup stays reachable. **To be restated in the T-05 and T-06 briefs.**
+- **Readability** — `tasks.md` T-01 criterion 1 and `design.md` §4 name the URL as `/api/v1/tools/clarisa/…`, but `main.ts` enables URI versioning without `defaultVersion` and neither the routes tree nor `BaseController` adds a version segment. Platform-wide property, not a T-01 defect; **confirm the literal path during T-13's human `/swagger` check.**
+- **Readability** — the controller spec's `(ResponseUtils.format as jest.Mock) = mockFormat` reassignment is repo convention, copied from the exemplar, and does not leak across suites (per-file module registry + `jest.clearAllMocks()`). No change warranted.
+
+---
+
+## Pivot Record: T-01
+
+**Trigger.** The Reviewer's FAIL is well-founded against the spec as written, but the spec as written cannot be satisfied. Both branches of T-01's Implementation note are closed:
+
+- Placing `@ApiOperation` **on an override** is what the note forbids.
+- Placing `@ApiOperation` **on the subclass (class level)**, which the note directs, throws at class-definition time.
+
+**Evidence (verified inline by the Leader, at source, not taken from either worker's report).**
+`@nestjs/swagger` builds `ApiOperation` via `createMethodDecorator` (`node_modules/@nestjs/swagger/dist/decorators/api-operation.decorator.js:10-12`), and `createMethodDecorator` dereferences `descriptor.value` unconditionally:
+
+```js
+function createMethodDecorator(metakey, metadata, { overrideExisting } = { overrideExisting: true }) {
+    return (target, key, descriptor) => {
+        if (typeof metadata === 'object') {
+            const prevValue = Reflect.getMetadata(metakey, descriptor.value);
+```
+
+At class level Nest passes no `descriptor`, so the expression is `undefined.value` — a `TypeError` at class-definition time, not a silent no-op.
+
+The Implementer's supporting claim was also verified by the Reviewer at source and holds: `@nestjs/core@10.4.15`'s `PathsExplorer.exploreMethodMetadata` (`node_modules/@nestjs/core/router/paths-explorer.js:26-30`) reads `PATH_METADATA` off the concrete function object, so a `find()` override without a re-declared `@Get()` silently unregisters the route.
+
+**The contradiction this exposes is not confined to T-01.** Two approved clauses now conflict:
+
+| Clause | Says |
+| --- | --- |
+| `tasks.md` § T-01 Implementation notes · `design.md` § §4 catalog entry | `@ApiOperation` goes on the subclass, **not on an override** — *impossible* |
+| `requirements.md` R-IUA-013 AC.3 · `tasks.md` § T-13 done criterion | *"`/swagger` shows **all three new handlers**, each with tag, `@ApiOperation` summary, bearer lock"* — the catalog GET is one of the three |
+
+So simply deleting the annotation (the Reviewer's primary remediation) closes T-01 but **guarantees a T-13 failure** on R-IUA-013 AC.3. The defect must be resolved at the spec level whichever way it goes.
+
+**Alternatives.**
+
+| Option | Change | Cost |
+| --- | --- | --- |
+| **1 — Authorize the override** | Correct T-01's Implementation note + `design.md` §4; add a DD recording that `@ApiOperation` on an inherited `BaseController` handler requires a `find()` override re-declaring `@Get()`. Add the `PATH_METADATA` assertion the Reviewer's Reliability advisory requires | ~15 LOC; breaks a 19-controller pattern for one controller; carries the Risk-lens divergence permanently |
+| **2 — Exempt inherited base handlers** *(Leader's recommendation)* | Delete the override and the `@ApiOperation` — T-01 becomes the exact mirror the Scope demands. Amend R-IUA-013 AC.3 and T-13's criterion to exempt handlers inherited from `BaseController`, on the ground that all 20 such controllers are equally undecorated | The catalog endpoint shows no summary in `/swagger` — a real but minor DX loss on a control-list endpoint identical to its 19 siblings |
+| **3 — Fix it at the base** | Add `@ApiOperation` support to `BaseController` itself | Rejected: out of scope for an API chunk, and widens the blast radius to 19 controllers |
+
+**Leader's recommendation: Option 2**, on the spec's own reasoning rather than on convenience:
+
+1. T-01's Scope is emphatic — *"Mirror … **exactly** … with **one override**"*. A second override is a direct contradiction of the task's central instruction.
+2. **DD-5 is the governing precedent.** The spec already refused `@Roles(...)` on these endpoints because *"matching the reference means none"* and adding them *"would make Innovation Use the only section with a rule the client does not mirror"*. `@ApiOperation` on an overridden base handler is the identical shape of deviation.
+3. **R-IUA-013's own stated intent decides it.** The requirement exists so *"the new endpoints [are] indistinguishable from the rest of the API"*. Matching the 19 undecorated siblings **is** the conforming outcome; the override is what would make this endpoint distinguishable.
+4. The Reviewer's Risk-lens finding — a future handler-level decorator on `BaseController.find` silently skipping this one controller — is a durable maintenance hazard bought for one Swagger summary line.
+
+**Scope of the amendment under Option 2** — narrow, and it must not over-reach. The exemption covers **only** handlers inherited from `BaseController`. T-07's controller declares its own `@Get`/`@Patch` handlers, so `@ApiOperation` there is straightforward and stays fully required; T-13's human check would then verify two decorated handlers plus one exempted inherited handler, with the exemption named.
+
+**Correction closure required once the ruling lands** (two-direction sweep, per `/akili-specify` → *Correction Closure* and KZ-005): grep the whole spec folder forward for every phrasing of *"all three new handlers"* / *"every new handler"* / `@ApiOperation`, and grep backward for documents citing R-IUA-013 AC.3 or T-01's Implementation note. The superseded claim survives in phrasings the pivot analysis did not cite.
+
+**Working tree left intact.** No rollback was applied: this is a Pivot, not a 3-attempt HALT, and both live options are reachable from the current tree with a small edit (Option 1 adds an assertion; Option 2 deletes ~12 lines). The tree state is 6 files, +236, as tabulated above.
+
+**Status:** awaiting the user's ruling. Execution of T-01 does not resume until it lands.
+
+---
+
+## Pivot Resolution: T-01 — user ruling, 2026-08-19
+
+**Ruling: Option 2 — exempt handlers inherited unchanged from `BaseController`.** The catalog `GET` carries no `@ApiOperation`; T-01 becomes the exact mirror its Scope demands. The exemption is narrow and binds **only** to handlers a subclass inherits without overriding — T-07's own-declared `GET`/`PATCH` keep `@ApiOperation` and `@ApiBody` fully required.
+
+Recorded in the spec as `design.md` **DD-13** and `requirements.md` **D-IUA-10** (§13, under a new *Resolved decisions (execution-time ruling)* heading kept deliberately separate from the specify-time table, so the provenance of the ruling is not backdated).
+
+---
+
+### T-01 — Innovation Use level catalog module *(continued)*
+
+#### Attempt 2 — implements the ruling
+
+**Skills:** `nestjs-expert`, `cognitive-doc-design` · **Effort:** `high` (bumped one level from `medium`).
+
+> **Leader deviation from the task's skill list, recorded per the Delegation Discipline rule:** dropped `api-design-principles` — the API-design question was settled by the user's ruling, so it bought nothing on this attempt. Added `cognitive-doc-design` — half of attempt 2 edits persistent spec documents. The effort bump follows the rework rule, though noting the cause honestly: attempt 1 did not under-think, it followed an unachievable instruction. The bump is justified by attempt 2 being strictly harder (a multi-document correction sweep on top of the code fix), not by attempt 1's quality.
+
+**Part A — code fix.** `clarisa-innovation-use-levels.controller.ts`: removed the `find()` override, its `@Get()`, its `@ApiOperation`, the comment block, and the now-unused `Get` / `ApiOperation` imports. Result is the exemplar shape. No other source file touched — the service, module, both unit specs, and `clarisa.routes.ts` are byte-identical to attempt 1, which the Reviewer had already verdicted SATISFIED.
+
+**Part B — spec amendment (8 sites, 7 assigned + 1 the sweep found).**
+
+| # | File · section | Change |
+| --- | --- | --- |
+| 1 | `requirements.md` § R-IUA-013 AC.3 | Split: `@ApiTags`/`@ApiBearerAuth` on every handler; `@ApiOperation`/`@ApiBody` on **own-declared** handlers only; catalog `GET` named as the exemption with its ground stated inline |
+| 2 | `requirements.md` § 13 | New *Resolved decisions (execution-time ruling)* subsection carrying **D-IUA-10** |
+| 3 | `tasks.md` § T-01 Implementation notes | Unachievable instruction replaced with the correct one plus the reason, so a future reader does not re-derive the override |
+| 4 | `tasks.md` § T-13 done criteria | Human-check line now separates the two own-declared handlers from the exempted inherited one, and tells the checker to **confirm** the exemption rather than flag it |
+| 5 | `design.md` § 4 catalog `GET` entry | Swagger line corrected |
+| 6 | `design.md` § 11 | **DD-13** added, with both rejected alternatives recorded |
+| 7 | `design.md` § 15 Revision Log | One entry |
+| 8 | `requirements.md` § 5.3 DC-8 row | **Found by the sweep's backward direction, not by the assignment** — it restated AC.3's human-check content and had gone stale identically |
+
+Site 8 is the sweep earning its cost: an assignment-driven edit set would have shipped a stale DC-8 row asserting the superseded claim.
+
+**Part C — two-direction correction sweep (KZ-005, KZ-007).** File set bound explicitly to every `.md` under `docs/specs/innovation-use/`. Forward direction swept the *claim* across phrasings (`ApiOperation`, `on the subclass`, `not on an override`, `inherited handler`, `three new handlers`, `every new handler`, `new surface`, `Swagger`, `R-IUA-013`); backward direction checked every site citing R-IUA-013 AC.3, T-01's Implementation notes, or design.md §4; new terms introduced by the correction (`DD-13`, `D-IUA-10`, "inherited unchanged") re-grepped for orphaned use. Per-file completeness tables were produced by the Implementer and **independently reproduced by the Reviewer**, including files with zero findings.
+
+**Implementer verification:** `npm test -- --silent` from `server/researchindicators/`:
+
+```
+Test Suites: 330 passed, 330 total
+Tests:       2161 passed, 2161 total
+Snapshots:   1 passed, 1 total
+Time:        20.52 s
+```
+
+The controller spec passed **unchanged** — it calls `controller.find()` directly, so it exercises the inherited handler as well as the override it replaced.
+
+**Implementer `Not Done / Assumptions` (verbatim):**
+
+> - **T-01's `Status:` line** (tasks.md line 71, currently *"BLOCKED — PIVOT... Awaiting the user's ruling"*) was **not** updated. The Leader's 7-item Part B list didn't include it, and task-status bookkeeping is normally the Leader's to close out post-review — flagging rather than assuming.
+> - `proposal.md` was reviewed but not edited (see Part C note) — judgment call that its general "every endpoint" phrasing is pre-spec aspiration, not an outright-false claim, per the stated bar for editing that file.
+> - Everything else in scope (A, B, C) is complete.
+
+**Leader adjudication of both items.** Neither is outstanding task scope. Item 1 is the Leader's own bookkeeping, closed by this entry and the `tasks.md` write that follows it. Item 2 was referred to the Reviewer for adjudication and resolved below.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> The controller is now an exact structural mirror of the readiness-levels exemplar with the `find()` override fully removed, and all six T-01 done criteria verify at source — criteria 1 and 4 are strictly stronger than in attempt 1 because the envelope and the class-level Swagger metadata now reach the handler through the same inherited path as 19 shipping siblings rather than a hand-rolled re-declaration. The spec amendment implements the ruling faithfully, the exemption does not leak into T-07's obligations, T-13's human instruction is unambiguous, and my independent two-direction sweep of all six spec-family documents found zero surviving statements of the superseded claim and zero orphaned uses of the new terms.
+
+**Per-criterion verdicts — all six, including those with no finding (KZ-007):**
+
+| # | Criterion | Verdict |
+| --- | --- | --- |
+| 1 | Ten rows in a `ServerResponseDto` with `id`, `level`, `name`, `definition` (AC.1, AC.2) | SATISFIED — **improved by the revert**; `find()` now inherited verbatim, envelope structurally identical to 19 siblings rather than re-derived |
+| 2 | `level` ascending `0…9` (AC.3) | SATISFIED, with the spec's declared weakness intact (F-D cannot falsify — `design.md` §10.5) |
+| 3 | Explicit `order` clause asserted against the mocked repo's options object (AC.4 + scenario) | SATISFIED — asserted in **both** branches; the custom-`where` branch is stronger than the criterion requires |
+| 4 | `Clarisa` tag + bearer lock (AC.5) | SATISFIED — **the criterion the revert most improves**; class-level decorators are class-legal and route discovery now walks the same prototype path as the shipping exemplar, so this is proven by pattern-identity instead of needing its own metadata proof |
+| 5 | Zero `findByName` / `findByNames` call sites (AC.6) | SATISFIED — independently re-grepped, zero matches |
+| 6 | `npm test -- --silent` green | SATISFIED — 330/330 suites, 2161/2161 tests, correct package root, lean invocation |
+
+**Independent corroboration by the Reviewer** (not taken from the Implementer): `extends BaseController` matches **20** files including the new one → the "19 siblings" count in DD-13 / D-IUA-10 is exact. The `@ApiOperation` occurrences that do exist in the clarisa tree (`clarisa-levers`, `clarisa.controller`, `clarisa-projects`, `clarisa-science-programs`) are all on **own-declared** handlers, corroborating the ruling's own/inherited split. `grep 'super\.find'` over the clarisa tree returns nothing — the override is fully gone, not partially reverted.
+
+**Exemption-leak check (Part B soundness):** `design.md` §4's section `GET`/`PATCH` entries untouched; `tasks.md` T-07 still requires `@ApiOperation` on both handlers and `@ApiBody` on the PATCH; AC.3 states the own-declared obligation *before* the exemption. Three independent statements of the boundary, mutually consistent.
+
+**`ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks):**
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Readability | `requirements.md` §13's preamble said *"the specify-time AC.3 text **below**"*, but AC.3 is in §7 (above §13) and its original wording no longer exists in that file | **Fixed by the Leader** — a factual error introduced by this change set, so correcting it completes the task rather than widening it. Now points to §7 and to `execution.md`'s Pivot Record as the only verbatim copy |
+| Readability | `design.md:359` routes the Swagger-completeness gate to *"a human check (§10.4)"*, but §10.4 is "The harness question — RB-4" and says nothing about Swagger | **Pre-existing, not introduced here → recorded, not fixed.** Widening the task to absorb it is exactly what the advisory rule forbids. **Forward pointer: carry into T-13's brief** — it will bite the human checker there |
+| Risk | Attempt 1's hazard — a future handler-level decorator on `BaseController.find` silently skipping the one overriding subclass — is now **structurally eliminated** rather than mitigated, because no override exists | **Logged closed.** Supersedes the Risk advisory recorded against attempt 1 |
+| Readability | `tasks.md:338` gives T-07 "R-IUA-013 (**all ACs**)" while §3's matrix assigns "AC.3 T-13 (human)" — slightly more visible now that AC.3 has two distinguishable halves | **Pre-existing → recorded, not fixed. Forward pointer: carry into T-07's brief** (T-07 owns the own-declared half; T-13 verifies both) |
+
+**Reviewer adjudication of `proposal.md` (Leader-referred item 4) — accepted.** Recommendation: leave `proposal.md` unedited and extend D-IUA-10's `Supersedes` cell instead. Grounds, verified by the Leader at source before accepting: the family already has a settled mechanism used twice — D-IUA-5 supersedes *"proposal scope item **7**"* and D-IUA-6 supersedes *"proposal scope item **6**, **R-4**"*, in both cases **without editing `proposal.md`**. Editing it here would make this the only supersession handled differently from its two nearest neighbours. The Reviewer also noted that `proposal.md`'s success-criteria list contains at least one other equally-superseded line (*"Green checks refresh within the save response"*, overturned by D-IUA-6), so editing only the Swagger line would itself be a partial sweep — the precise KZ-005 shape. **Leader applied the recommended fix:** D-IUA-10's `Supersedes` cell now names both proposal passages by section and quoted phrase.
+
+#### Leader-applied closure edits (2026-08-19)
+
+Two spec-document edits made inline by the Leader, both within the Pivot's correction closure rather than new scope, and both post-dating the Reviewer PASS:
+
+1. `requirements.md` §13 preamble — corrected the misdirected "below" pointer (advisory 1 above).
+2. `requirements.md` D-IUA-10 `Supersedes` cell — added the two `proposal.md` passages (the Reviewer's adjudication of item 4).
+
+Neither touches source code or any acceptance criterion; both are confined to text this change set authored. Recorded here so the diff is traceable to a decision rather than appearing as an unattributed edit.
+
+---
+
+### T-01 — FINAL
+
+- **Final status:** `[x]` **DONE 2026-08-19** — PASS on attempt 2 of a possible 3.
+- **Attempts run:** 2 (attempt 1 FAIL → Pivot → user ruling → attempt 2 PASS). The FAIL was against a spec defect, not a quality defect.
+- **Requirements covered:** R-IUA-010 AC.1–AC.6 + its scenario · R-IUA-013 AC.1, AC.5
+- **Final verification:** `npm test -- --silent` from `server/researchindicators/` → 330/330 suites, 2161/2161 tests.
+- **Decisions made:** DD-13 / D-IUA-10 (the `@ApiOperation` exemption, user-ruled).
+- **Issues encountered:** one spec defect (an unachievable instruction, self-contradictory with R-IUA-013 AC.3), resolved by Pivot rather than absorbed by rework.
+- **Declared limits, restated so they are not mistaken for proven** *(T-01's "Verification & its limits")*: the `level`-ordering guarantee rests on a **code-level assertion, not a behavioral one**. Because `id = level + 1` on the current seed, PK order is coincidentally correct and **no end-to-end assertion available today can falsify a missing `order` clause**. T-11's F-D is declared weak for the same reason and would pass with the override deleted. The real gate is the unit spec on the `order` clause — itself only a presence assertion. Neither F-D green nor this PASS is evidence that ordering is guaranteed against a future re-seed.
+
+**Forward pointers created by T-01 — these are carried by the brief that consumes them, not by having been written here:**
+
+| → Task | Pointer |
+| --- | --- |
+| T-05, T-06 | `findAll(relations, where)` drops the `is_active: true` default whenever a caller supplies `where` (inherited from `clarisa-base-service.ts:54-61`). **T-06's level resolution must pass `is_active` explicitly if it calls `findAll` with a `where`, or it will read soft-deleted catalog rows.** |
+| T-05, T-06 | `findByName` / `findByNames` remain public on the catalog service and the module exports it. R-IUA-010 AC.6 holds today, but the `LIKE %name%` lookup stays reachable — restate the prohibition in both briefs. |
+| T-07 | `tasks.md:338` gives T-07 "R-IUA-013 (all ACs)" while §3's matrix assigns AC.3 to T-13. T-07 owns the **own-declared** half of AC.3 (`@ApiOperation` on both handlers, `@ApiBody` on the PATCH); T-13 verifies both halves. |
+| T-13 | `design.md:359` misroutes the Swagger-completeness gate to §10.4, which is about the fixture harness (RB-4) and says nothing about Swagger. The real substitute lives in `requirements.md` §5.3 and T-13's own criterion. |
+| T-13 | Confirm the literal URL path during the `/swagger` human check: `tasks.md` and `design.md` §4 both write `/api/v1/tools/clarisa/…`, but `main.ts` enables URI versioning **without** `defaultVersion` and neither the routes tree nor `BaseController` adds a version segment. Platform-wide property, not a T-01 defect. |
+
+**Budget status:** 1 of 13 tasks complete. **2 of 6–8 review rounds consumed** (both on T-01). Within budget, but the first task spent two rounds on a spec defect — worth watching, not yet an escalation.
+
+---
+
+## Constitution Impact: T-01
+
+- **Module created:** `ClarisaInnovationUseLevelsModule` under `src/domain/tools/clarisa/entities/` — a routine addition inside an existing package, following the pattern of 19 sibling control-list modules. No module boundary moved.
+- **Public surface change:** one new endpoint, `GET /tools/clarisa/innovation-use-levels`, registered in `clarisaRoutes`. `design.md` §4 and `requirements.md` §10 already document it; no constitutional doc is left misleading by it.
+- **Child guide:** none needed. `server/researchindicators/src/CLAUDE.md` already describes the control-list module pattern generically; this module adds no convention it does not cover, and the root guide's `## Module Guides` index needs no new entry.
+- **CodeGraph re-index: PENDING.** Five new source files are not in the index. Consumed by `/akili-archive` (Constitution & Graph Sync). Not urgent mid-spec — the graph's staleness rule already tells later tasks that the working tree wins for files this spec has touched.
+- **Code traceability:** `// @akili-spec` markers were **not** added. The one non-obvious addition — the `findAll()` order override — already carries a block comment citing T-01, R-IUA-010 AC.3/AC.4, DD-6 and §5.6 by name, which discharges the intent of the traceability rule more usefully than a bare path marker. Recorded as a deliberate Leader judgment, not an omission.
+
+---
