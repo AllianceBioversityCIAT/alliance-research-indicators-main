@@ -1,4 +1,5 @@
 // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-03 / R-CPA-003 (DD-4, DD-7)
+// also: docs/specs/bilateral/clarisa-automapper-s2 — T-01 / R-CAM-001 AC.1 (DD-9)
 
 import {
   KNOWN_CENTRE_PREFIXES,
@@ -55,6 +56,16 @@ describe('external-code.util', () => {
         expectedNormalized: 'X-A132',
         expectedRule: 'NONE',
       },
+      // S2 T-01 named input 6 (R-CAM-001 AC.1, DD-9): behavioral witness that
+      // A- (AfricaRice, live per archive-summary §137) stays outside the
+      // closed set — reds if KNOWN_CENTRE_PREFIXES is widened.
+      {
+        description:
+          'behavioral witness that A- (AfricaRice, live) stays outside the closed set — reds if KNOWN_CENTRE_PREFIXES is widened',
+        input: 'A-AG10156',
+        expectedNormalized: 'A-AG10156',
+        expectedRule: 'NONE',
+      },
       {
         description: 'strips prefix at most once (C-C-A1 -> C-A1)',
         input: 'C-C-A1',
@@ -65,6 +76,15 @@ describe('external-code.util', () => {
         description: 'strips B- at most once (B-B-100 -> B-100)',
         input: 'B-B-100',
         expectedNormalized: 'B-100',
+        expectedRule: 'STRIP_CENTRE_PREFIX',
+      },
+      // S2 T-01 named input 4 (tasks.md T-01): strips only the first prefix;
+      // the second hyphen-led segment is not a known prefix.
+      {
+        description:
+          'strips only the first prefix; the second hyphen-led segment is not a known prefix (C-D-514 -> D-514, tasks.md T-01 named input 4)',
+        input: 'C-D-514',
+        expectedNormalized: 'D-514',
         expectedRule: 'STRIP_CENTRE_PREFIX',
       },
       {
