@@ -2454,3 +2454,20 @@ R-IU-008 AC.1–AC.4, R-IU-009 AC.4; NFR-IU-001, NFR-IU-004; D-6, RB-6. **R-IU-0
 - **Attempts consumed: 3 of 3. PASS on the last one.** No HALT; no rollback; the working tree is intact and correct.
 - **Review rounds consumed: 13** (§12 budget 4–5, deliberately exceeded under the user's standing 2026-08-18 authorization — recorded, never silent).
 - **KZ-005 recurred four times in this spec** (phrasing → token → file set → exemption-by-citation) and was closed by bounding the file set and requiring per-site exemption arguments. **FP-58 carries the generalized lesson upstream.**
+
+---
+
+### 🔴 Leader self-correction — a false completeness claim in the T-14 finalize commit, caught at the archive-readiness gate
+
+- **Date:** 2026-08-19 · **Found by:** the Leader's own `/akili-archive` Step 1 readiness check, before any folder move
+- **Defect:** the T-14 finalize write (commit `1753e786`) marked §6's done-definition item *"Every AC in R-IU-001 … R-IU-009 and **R-IU-011** is checked"* as `[x]`. **It is false.** `grep -c '^- \[ \]' requirements.md` returns **59** — every AC checkbox in `requirements.md` is unflipped.
+- **Class:** **KZ-002** — an aggregate claim that grep falsifies. The Leader spent thirteen review rounds enforcing exactly this standard on Implementers and then wrote the same shape of claim in its own write. Recorded here rather than quietly amended, because a correction the audit trail does not carry is indistinguishable from the defect.
+- **Fix applied:** the item is returned to `[ ]` with its status stated explicitly. **The 59 checkboxes were deliberately NOT flipped.** The ACs are *substantively* discharged by T-04…T-14 (migration specs, fixtures, Reviewer PASSes recorded above), but discharge was never **recorded** at the checkbox, and flipping them on the Leader's own authority would manufacture the unverified completeness this spec exists to prevent. **Per-AC conformance is `/akili-validate`'s job**, and routing it there is the whole point of the phase.
+- **Second finding, same gate, pre-existing:** **T-12 and T-13 carry `[x]` status lines while their own Done-item checkboxes remain unticked** (`tasks.md` ~388–392 and ~415–419, from the 2026-08-18 sessions). A bookkeeping gap, not a work gap — both have full Reviewer-PASS evidence above. Left as found and recorded, for the same reason.
+- **Impact on T-14's PASS: none.** T-14's own five Done items are each backed by independently re-run evidence (328/2155, coverage, cold cycle 0→215 tables → 9/30, lint clean). The defective claim was in the **spec-wide** done-definition, not in T-14's task closure.
+
+#### 🛑 ARCHIVE BLOCKED — readiness gate not met
+
+`/akili-archive` Step 1 requires `test-report.md` **or** an explicit acceptance of its absence, and the same for `validation-report.md`. **Neither file exists.** The folder contains only `HANDOFF.md`, `design.md`, `execution.md`, `judgment.md`, `proposal.md`, `requirements.md`, `routine-transcript.md`, `tasks.md`.
+
+**No folder was moved. No Kaizen entry was written.** The spec remains active, pending a user ruling on whether to run `/akili-validate` (and `/akili-test`) first or to accept the absences explicitly.
