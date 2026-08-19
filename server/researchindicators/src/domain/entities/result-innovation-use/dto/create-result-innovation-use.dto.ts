@@ -59,11 +59,11 @@ function IsExclusiveOfActorMode(
   mode: 'aggregate' | 'disaggregated',
   validationOptions?: ValidationOptions,
 ): PropertyDecorator {
-  return (object: object, propertyName: string) => {
+  return (object: object, propertyName: string | symbol) => {
     registerDecorator({
       name: 'isActorCountModeExclusive',
       target: object.constructor,
-      propertyName,
+      propertyName: propertyName as string,
       options: validationOptions,
       constraints: [mode],
       validator: IsActorCountModeExclusiveConstraint,

@@ -418,3 +418,62 @@ Rounds are the metric at risk. Two of the three went to T-01, and both were spen
 **Not escalated yet** — the tripwire fires on *exceeding* the budget, and 3 of 6–8 is inside it. Recorded here so the overrun, if it comes, is visible in advance rather than discovered at T-13. Raised with the user at the T-02 gate.
 
 ---
+
+### T-02 — follow-up fix: `PropertyDecorator` parameter typing (2026-08-19)
+
+**Raised by the user**, not by the loop — their IDE reported `TS2322` on `IsExclusiveOfActorMode` after T-02 was committed (`8a02411d`).
+
+**This is the T-02 Risk advisory materialising.** The Reviewer had written: *"`npm test -- --silent` is weak evidence of compilation for these two files — nothing imports them yet, so ts-jest never transformed them. The first real type check arrives with T-07's controller or `npm run build`."* An editor type-checks the file directly and does not wait for an importer, so the user's toolchain reached the file before this spec's own gates did.
+
+**Leader diagnosis (verified by command, not inferred):**
+
+| Check | Result |
+| --- | --- |
+| `npx tsc --noEmit` (repo config) | **exit 0** — the build was never broken |
+| `npx tsc --noEmit --listFiles \| grep -c create-result-innovation-use.dto.ts` | **1** — tsc did examine the file; the green result is not a green run over an unexamined target |
+| `npx tsc --noEmit --strictFunctionTypes` | **reproduces the user's `TS2322` exactly**, at line 62 |
+
+Root cause: `tsconfig.json` sets no `strict`, so `strictFunctionTypes` is off and parameter bivariance makes the narrowing legal. `PropertyDecorator` is `(target, propertyKey: string | symbol) => void`; the factory declared `propertyName: string`. Unsound, and latent — it would break the day anyone enables `strict`.
+
+**Repo-convention finding — the reason this was not treated as a T-02 defect.** The codebase's only other custom validator, `src/domain/shared/validators/is-safe-stored-content.validator.ts`, uses the **identical** pattern in **both** its factories (`IsSafeStoredContent`, `IsSafeStoredJson`). T-02 did not invent the narrowing; it converged on the established precedent. The user's editor flags those two sites as well.
+
+**Scope decision.** Fixed **only** this spec's file. The two pre-existing occurrences sit in a shared validator outside this spec, and folding them in would have turned a user-flagged one-line correction into an unreviewed refactor of shared code — the shape the advisory rule exists to prevent. Raised with the user as their separate call; **not** minted as a task in `tasks.md`.
+
+**The change** (type-level only, zero runtime effect):
+
+```diff
+-  return (object: object, propertyName: string) => {
++  return (object: object, propertyName: string | symbol) => {
+     registerDecorator({
+       name: 'isActorCountModeExclusive',
+       target: object.constructor,
+-      propertyName,
++      propertyName: propertyName as string,
+```
+
+`registerDecorator`'s own declaration (`node_modules/class-validator/types/register-decorator.d.ts`) types `propertyName: string`, so widening the lambda parameter alone does not compile — a conversion at the call site is required, not optional. The Implementer chose `as string` over `String(propertyName)` deliberately: the assertion is purely type-level, whereas `String()` would coerce a genuine symbol to `"Symbol(foo)"` at runtime — a behavior change, however unlikely to fire. Given the constraint "if your change alters what any payload validates to, it is wrong," the zero-runtime option was the correct one.
+
+**Verification — the falsifying check is the second row, not the first.** Passing the default build proves nothing here, because it already passed *before* the fix:
+
+| # | Command | Result |
+| --- | --- | --- |
+| 1 | `npx tsc --noEmit` | exit 0 — no build regression |
+| 2 | `npx tsc --noEmit --strictFunctionTypes \| grep create-result-innovation-use` | **no output** — the command that reproduced the user's error is now silent for this file |
+| 3 | `npm test -- --silent` | 330/330 suites, 2161/2161 tests |
+| 4 | `npx eslint --no-fix src/…/dto/` | clean |
+| 5 | `git status` | one file modified; `is-safe-stored-content.validator.ts` confirmed untouched |
+
+All five re-run independently by the Leader after the Implementer reported.
+
+**No Reviewer round was spent, and that is recorded rather than glossed.** The `author ≠ auditor` gate is never collapsed for efficiency on a *task*; this is a post-task, type-only correction whose pass/fail is fully determined by the compiler, and the Leader confirmed it by re-running the falsifying command rather than by re-reasoning about the author's diff. Checking a command's output on work one did not write is Leader-inline verification, not self-audit. The review-round tally is therefore unchanged at **3**.
+
+**T-02's status is unchanged at `[x]`.** Its eight Done criteria were behavioural and none is affected by a parameter type; R-IUA-004 AC.1–AC.8 remain discharged at **T-07**, as before.
+
+**Forward pointer created:**
+
+| → Task | Pointer |
+| --- | --- |
+| T-13 | The repo's `tsconfig.json` sets no `strict`, so `npm test` and `npm run lint` do **not** catch unsound typing that a stricter editor does. T-13's full gate should include `npx tsc --noEmit` explicitly — it is not implied by the suite, and for files nothing imports yet the suite does not type-check them at all |
+| *(out of spec)* | `is-safe-stored-content.validator.ts` carries the same `PropertyDecorator` narrowing twice. Pre-existing, user's decision, deliberately not actioned here |
+
+---
