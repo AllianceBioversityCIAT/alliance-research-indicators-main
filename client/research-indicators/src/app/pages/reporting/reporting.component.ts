@@ -29,7 +29,7 @@ interface Chip {
 }
 
 /**
- * Public "Reporting Pathway Wayfinder" (route: /reporting2026).
+ * Public "Reporting Pathway Wayfinder" (route: /reporting).
  *
  * Step-by-step state machine mirroring the original design:
  *   Q1 result type -> (optional) Q2 funding source -> result screen.
@@ -40,14 +40,14 @@ interface Chip {
  *   Capacity / Innovation / Policy -> ask funding: W3/bilateral -> STAR, Program/Accelerator -> PRMS
  */
 @Component({
-  selector: 'app-reporting2026',
+  selector: 'app-reporting',
   standalone: true,
   imports: [S3ImageUrlPipe, NgClass],
-  templateUrl: './reporting2026.component.html',
+  templateUrl: './reporting.component.html',
   host: { class: 'block min-h-screen bg-[var(--ac-background)] text-[color:var(--ac-grey-900)]' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export default class Reporting2026Component {
+export default class ReportingComponent {
   readonly INDICATORS: Record<IndicatorId, Indicator> = {
     kp: { label: 'Knowledge Product', type: 'fixed' },
     oicr: { label: 'Outcome Impact Case Report', type: 'fixed' },
