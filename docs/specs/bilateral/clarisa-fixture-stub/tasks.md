@@ -159,7 +159,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-003 AC.1/AC.2/AC.3, R-CFS-004 (all ACs + scenario)
 - **Design refs:** §2.1, §4, §5.3, §9, DD-1, DD-5, DD-8
-- **Status:** [~] · **Size:** M (~200 est · **426 attempt-1**) — attempt 1 FAILed (fixture absent from `dist`; logging fields); attempt 2 queued · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
+- **Status:** [x] · **Size:** M (~200 est · **~490 actual**, 23 tests) — PASS on attempt 2; attempt 1 FAILed (fixture absent from `dist`; logging fields) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 **Scope.** `clarisa-stub.router.ts` + `clarisa-stub.config.ts` + `clarisa-stub.router.spec.ts`. Two Express handlers returning CLARISA's raw shapes, plus the flag parsing. No Nest DI — the router must be mountable before the pipeline exists.
 

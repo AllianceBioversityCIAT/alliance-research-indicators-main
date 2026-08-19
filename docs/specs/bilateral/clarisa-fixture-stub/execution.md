@@ -860,3 +860,69 @@ never after.**
 | Risk | The line-number drift above (LE-4) |
 | Readability | The header still claims every reusable checker is exercised against both real data and a mutated clone, while only `assertNoUnrecordedDivergence` is. Carried over from attempt 1, **not worsened**; mutation 5's `not.toThrow` on a near-real clone nudges `assertRecordedDivergencesStillHold` marginally closer to a real-data exercise |
 | Readability | The printed D-8 summary frames the cause as *"no institution-id dictionary exists"* where `requirements.md` says *"the export carries no institution ids"* — both true, same rationale, framing only |
+
+---
+
+### T-05 — The stub router and its env gate — **attempt 2: PASS** ✅
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** on attempt **2** of 3 · 1 rework |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-003 AC.1–AC.3, R-CFS-004 (all), R-CFS-008 (config site), NFR-CFS-004 |
+| **Final artifacts** | `clarisa-stub.config.ts` (42) · `clarisa-stub.router.ts` (~170) · `clarisa-stub.router.spec.ts` (~280, **23 tests**) · `nest-cli.json` **+5** |
+| **Workers** | `impl-T05-router` → `impl-T05-attempt2` (T2 / `sonnet`, effort **xhigh**) · `rev-T05-router` → `rev-T05-attempt2` (T3 / `opus`) |
+
+#### Issue 1 — the fixture now reaches `dist`, and the fix is proven in the path that matters
+
+**The DD-10 gate, observed red then green** (the whole point of the task):
+
+```
+RED   $ rm -rf dist && npm run build && ls dist/domain/tools/clarisa/stub/fixtures/clarisa-projects.fixture.json
+      ls: ...: No such file or directory        (exit 1 — nest build otherwise succeeded and emitted the router's own .js)
+GREEN -rw-r--r-- 863854  dist/domain/tools/clarisa/stub/fixtures/clarisa-projects.fixture.json
+```
+
+**The Docker path was verified by reading it, not inferred from the local build** — the distinction that matters, because the original defect was *specifically* about production packaging, and a fix validated only where the property already holds repeats the original mistake:
+
+- `Dockerfile:41-50` build stage does `COPY src ./src` **and** `COPY nest-cli.json ./`, then runs the same `npm run build`.
+- `.dockerignore` excludes `/dist`, `/node_modules`, `/build`, logs, coverage, IDE dirs and `.env*` — **it does not exclude `src/**/*.json`**, so the fixture is in the build context.
+- `Dockerfile:63` copies `/app/dist` wholesale, carrying the asset.
+
+**And an executing precedent settles the `outDir` question rather than argument doing it:**
+`star-results-metadata-workbook.handler.ts:35-38` resolves `join(__dirname, '../../assets/report-header-logo.png')`, and the pre-existing `domain/entities/reports/assets/**/*` entry with `outDir: "dist"` is what makes that resolve **in production today**. The new entry is the identical mechanism one folder over. `tsconfig.build.json` excludes `test` and `**/*spec.ts`, so `nest build`'s rootDir is `src` and output roots at `dist/domain/…`, not `dist/src/domain/…` — which is the only condition under which `outDir: "dist"` is correct.
+
+**Glob over-coverage — ruled, and the Reviewer argued *against* narrowing it.** `fixtures/**/*` also ships the dictionary, reference capture and provenance (~50 KB) into the image. Wasteful, not a problem: nothing serves them (`useStaticAssets` covers only `admin/public`), and no new exposure (PI fields were dropped at the converter, DD-7). Narrowing to the single filename would diverge from the precedent DD-10 cites **and fail silently the day the stub reads a second fixture.** Broad-and-wasteful is the more robust option here.
+
+#### Issue 2 — the §9 Fields column, and why these are field checks rather than presence checks
+
+All three assertions were **mutation-tested** (field stripped, test observed red, reverted), and the Reviewer verified they cannot be satisfied accidentally:
+
+| Line | Assertion | Why it is genuine |
+| --- | --- | --- |
+| `warn` | mount prefix **and** fixture path | The two strings are independent — `FIXTURE_PATH` contains no `/api/clarisa-stub` substring, so neither assertion satisfies the other |
+| `debug` | `/\d+ projects/`, `/\d+ mappings/`, `/\d+ bytes/` | Three distinct numbers each bound to its own unit word; no single number satisfies the set |
+| `error` | path **and** cause | Uses a bare `new Error('boom')` carrying **no path at all**, so the ENOENT-message coincidence that hid the original gap cannot carry it. The strongest of the three |
+
+**Byte size is captured before `JSON.parse`** — `readFileSync` → `Buffer.byteLength(raw,'utf-8')` → `JSON.parse(raw)`. It measures the file, not a re-serialization.
+
+**"Mapping count" interpretation — ruled correct.** R-CFS-002 AC.5 says *"for all **283 mappings**"* and design §5.2 asserts *"198 projects · **283 mappings**"*; in both, "mappings" means `project_mappings_array` entries summed across the fixture, which is what the reduce computes. No other reading exists in the spec text.
+
+#### Regression sweep — clean
+
+Bare array and bare `{access_token}` · default-deny on **both** handlers, `res.status(404).end()` → exactly 404, empty body · never-throws across all three failure cases · no Swagger, no Nest/DI · `LoggerUtil` only · **no per-request logging on either success path** · removal-condition literal still a **single unwrapped line, byte-identical** in `router.ts` and `config.ts` (the logging edits did not reflow it — **T-07's grep is safe**) · no JWT `exclude` entry · 8 flag×route cases plus the explicit not-401/403/500 case · **DD-9 holds** — both routes registered unconditionally, gating strictly per-request.
+
+**T-06's boundary is intact:** a repo-wide grep for `clarisa-stub|createClarisaStubRouter` under `src/` returns only the four stub-folder files. `main.ts` untouched.
+
+#### Implementer judgment calls — both accepted
+
+1. **Skipped the misleading `jest.spyOn` seam comment** (advisory), judging the fix larger than the one-line budget the brief allowed — and said so rather than quietly doing it or quietly dropping it. Correct handling of a scope bound in both directions; the Reviewer did not disagree.
+2. Derived "mapping count" from `project_mappings_array` and flagged the interpretation. Ruled correct above.
+
+#### ADVISORY (recorded, non-gating)
+
+| Lens | Finding |
+| --- | --- |
+| Reliability | The `mappingCount` reduce guards null/non-object elements and falls back to 0, so a malformed element degrades the **log line** rather than turning a valid fixture into a 500. It also sits behind the cache early-return, so the extra pass over 198 elements is one-time and never touches NFR-CFS-001's hot path |
+| Readability | `debug` asserts the *shape* of the three counts, not their values — a regression to `0 mappings` would still log green. That is **T-04's** job (it owns the 283); recorded so nobody later reads the router spec as covering it |
+| Risk | The image now carries ~50 KB of fixtures no runtime path reads. Unreachable and non-sensitive; recorded so a future image-size audit finds the reasoning instead of re-deriving it |
