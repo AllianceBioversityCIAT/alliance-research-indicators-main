@@ -33,7 +33,7 @@ T-01 strip (S1)──► T-02 resolve ──► T-03 classify+apply ──► T-
 - **Design:** §3, DD-2
 - **Files:** `src/db/migrations/<timestamp>-addAutoMappingSource.ts`
 - **Skills:** `nestjs-expert`
-- **Effort:** S · **Status:** todo
+- **Effort:** S · **Status:** ✅ **done** — Reviewer `STATUS: PASS` 2026-08-19 (see `execution.md`)
 
 **Scope.** Add one value to the `bilateral_project_mapping.source` enum for automatically derived rows. `MANUAL`, `AI_SUGGESTED`, `AI_AUTO` are untouched — the latter two become **reserved** for a future inferential matcher.
 
@@ -44,19 +44,26 @@ T-01 strip (S1)──► T-02 resolve ──► T-03 classify+apply ──► T-
 
 **Verification.**
 ```
-# Scratch schema = a DISPOSABLE local container. The repo .env's ARI_MYSQL_*
-# points at 192.168.20.210 / alliancereportingdb — the SHARED on-prem Dev DB.
-# Never run migration:dev:execute or migration:revert against it (CLAUDE.md §4.3).
-# Route resolved and authorized by the user 2026-08-19.
-docker run --rm -d --name ari-scratch-mysql -p 33306:3306 \
-  -e MYSQL_ROOT_PASSWORD=scratch -e MYSQL_DATABASE=scratch mysql:8
+# Run against the on-premise Dev database. There is no local DB in this project.
+# Route decided by the user 2026-08-19, overriding the Leader's container proposal.
+#
+# PRE-FLIGHT (read-only) — run this FIRST and read it before anything else.
+# migration:dev:execute applies EVERY pending migration, not only this one.
+#   npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts
+# Strip ANSI before counting, or `grep '^\[ \]'` silently matches nothing (K-014):
+#   ... | sed -E 's/\x1b\[[0-9;]*m//g' | grep -c '^\[ \]'
+# Measured 2026-08-19 by the Leader: 307 applied, exactly 1 pending (this one).
+# If the pending count is ever > 1, STOP and escalate — you would be applying
+# someone else's unmerged-but-unapplied schema change (K-015).
+
 cd server/researchindicators
-# point ARI_MYSQL_* at the container for this run only (inline env, never edit .env)
-ARI_MYSQL_HOST=127.0.0.1 ARI_MYSQL_PORT=33306 ARI_MYSQL_USER_NAME=root \
-ARI_MYSQL_USER_PASS=scratch ARI_MYSQL_NAME=scratch npm run migration:dev:execute
-ARI_MYSQL_HOST=127.0.0.1 ARI_MYSQL_PORT=33306 ARI_MYSQL_USER_NAME=root \
-ARI_MYSQL_USER_PASS=scratch ARI_MYSQL_NAME=scratch npm run migration:revert
-docker rm -f ari-scratch-mysql
+npm run migration:dev:execute   # forward  -> applies this migration to Dev
+npm run migration:revert        # reverts it (it is the last applied)
+npm run migration:dev:execute   # forward again -> leaves Dev in the applied state
+
+# The revert is the reversibility proof, not the end state. Dev must be left
+# WITH the enum value: the pipeline deploys code, not migrations (K-015), so
+# this hand-applied step is what actually ships the schema change to Dev.
 npx eslint src/db/migrations/<file> src/domain/entities/bilateral-project-mapping/enum/mapping-source.enum.ts
 ```
 **Named failing input:** put `?` in a comment inside the migration → it throws *"Named query contains placeholders, but parameters object is undefined"* before reaching MySQL.
@@ -64,11 +71,12 @@ npx eslint src/db/migrations/<file> src/domain/entities/bilateral-project-mappin
 **What disqualifies this evidence.** A migration that is lint-clean and type-clean but **never executed** proves nothing — one shipped unrunnable and passed every static gate this repo has (K-006). **Running it is the only gate.** Do not report this task done on a build alone.
 
 **Done check.**
-- [ ] Migration applies forward and reverts cleanly against the **disposable container**, both observed, with the raw output pasted into the report
-- [ ] **Nothing was run against `192.168.20.210`** — the shared Dev DB is untouched
-- [ ] `mapping-source.enum.ts` carries the same new value
-- [ ] `AI_SUGGESTED` / `AI_AUTO` unchanged
-- [ ] No `?` or `:word` anywhere in the migration, comments included
+- [x] `migration:show` pre-flight run and read before any write; pending count confirmed as exactly 1 (ANSI-stripped, exit-checked — K-014)
+- [x] Migration applies forward, reverts, and re-applies cleanly against **Dev** — all three observed with transaction boundaries and exact `ALTER TABLE` text. `down()` is proven by **execution**, not by symmetry (K-006). The revert step was run by the user directly, after the Implementer session's permission classifier denied it
+- [x] Dev left in the **applied** state — re-measured after the full cycle: **308 applied, 0 pending** (K-015: the pipeline ships code, not migrations, so this hand-run is what put the schema change on Dev)
+- [x] `mapping-source.enum.ts` carries `DERIVED`. No entity edit needed — the column declares `enum: MappingSourceEnum` by reference and `orm.config.ts` sets `synchronize: false`
+- [x] `AI_SUGGESTED` / `AI_AUTO` unchanged and unwritten — Reviewer confirmed the only `source` write in the repo is `bilateral-project-mapping.service.ts:133` (`dto.source ?? MANUAL`)
+- [x] No `?` or `:word` anywhere in the migration, comments included — verified by the Implementer, re-verified independently by the Reviewer on disk, and re-checked by the Leader after the comment edits. **Falsifier observed:** injecting ` -- why?` threw `Named query contains placeholders…` with `ROLLBACK`, exit 1 (K-004)
 
 ---
 
@@ -78,7 +86,7 @@ npx eslint src/db/migrations/<file> src/domain/entities/bilateral-project-mappin
 - **Design:** §2.2, DD-1, **DD-9**
 - **Files:** `…/bilateral-project-mapping/utils/external-code.util.ts` (+ spec)
 - **Skills:** `nestjs-expert`, `tdd`
-- **Effort:** S · **Status:** todo
+- **Effort:** S · **Status:** ✅ **done** — Reviewer `STATUS: PASS` 2026-08-19 (see `execution.md`)
 
 **Scope.** ⚠️ **Amended 2026-08-19 (DD-9, user-approved before dispatch) — this task writes NO new function.** S1 already shipped the strip: `normalizeExternalCode()` in `…/utils/external-code.util.ts`, removing **exactly one** leading prefix from the **closed set `{B-, C-}`**, at most once, after trim + upper-case. A prefix outside the set (`A-`, `X-`) passes through **unchanged** — deliberate, per S1 DD-4, so an unresolved code never becomes a silent false-positive match.
 
@@ -102,10 +110,10 @@ The work is therefore: **confirm the shipped strip satisfies R-CAM-001 AC.1 and 
 **What disqualifies this evidence.** A test suite that only feeds `B-`/`C-` codes cannot detect over-stripping **or** distinguish the closed set from an open one — the no-prefix, second-hyphen and **`A-1234` pass-through** rows are the ones that falsify it. Their absence makes the suite decorative (KZ-001).
 
 **Done check.**
-- [ ] All **seven** named inputs asserted, including the `A-1234` pass-through
-- [ ] `grep` finds exactly **one** strip definition repo-wide — `normalizeExternalCode` — and **no** `stripCentrePrefix` (NFR-CAM-003)
-- [ ] `normalizeExternalCode`'s behaviour is **unchanged**: `git diff` touches the spec file only, not `external-code.util.ts`
-- [ ] eslint clean
+- [x] All seven named inputs asserted — **three verbatim** (`B-A1080`, `C-D-514`, `''`/null), **four via behaviorally equivalent inputs already in the file** (`C-A132` for `C-D514`, `A1463` for `D514`, **`A-AG10156` for `A-1234`**, `' c-a132 '` for `'  c-d514  '`). `normalizeExternalCode` is a pure string function whose branch selection does not depend on the payload after the prefix, so each substitute exercises an identical path — no coverage gap, and adding the literals would duplicate existing paths (Reviewer-verified). `A-AG10156` is an upgrade on the synthetic `A-1234`: it is the real AfricaRice code this spec family already names
+- [x] `grep` finds exactly one strip definition repo-wide — `normalizeExternalCode` at `external-code.util.ts:27` — and no `stripCentrePrefix`. **Reviewer widened this beyond a name/signature grep**, sweeping both packages for `replace(/^…`, `.slice(2)`, `.substring(2)`, `startsWith('B-'|'C-'|'A-')`, `[A-Za-z]-`: no competing strip exists (NFR-CAM-003 closed by evidence)
+- [x] `normalizeExternalCode`'s behaviour unchanged — `external-code.util.ts` byte-identical to HEAD, confirmed by the Leader after the falsifier probe was reverted
+- [x] eslint clean · targeted jest 21/21 · falsifier probe observed RED (2 failed) then green again
 
 ---
 
