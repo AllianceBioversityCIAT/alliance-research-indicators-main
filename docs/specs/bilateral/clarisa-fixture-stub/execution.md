@@ -1180,3 +1180,84 @@ audit it. Protocol followed: **retry once** → `rev-T07-retry` spawned successf
 was scoped to that worker's session rather than the account. Had it failed again, the options presented to
 the user would have been a different model, a cross-host dispatch, or an **explicitly recorded waiver** —
 never a Leader self-review.
+
+---
+
+### T-08 — HITL end-to-end and the picker at 170 — **IN PROGRESS** `[~]`
+
+| Field | Value |
+| --- | --- |
+| **Status** | `[~]` — API checks **PASS**; the DC-10 human picker verdict is outstanding |
+| **Date** | 2026-08-19 |
+| **Environment** | Docker Compose — `ari_server_local` :3000, `ari_client_local` :4200 |
+
+#### Steps 2–3 — PASS, measured against the running stack
+
+| Check | Result |
+| --- | --- |
+| Stub route serving | `GET /api/clarisa-stub/api/projects` → **bare array, 198**, `phase` numeric `2026` |
+| Stub login | `POST /api/clarisa-stub/auth/login` → **200** |
+| Picker source | `GET /api/tools/clarisa/projects/bilateral` → **170** (`C-A631, C-A568, C-A539`…) |
+| Science-program flag | **140 / 170** — the number separating a faithful fixture from the naive `code: 22` one |
+| Phases | `{ phases: [{ phase: 2026, count: 170 }], phaseAbsentCount: 0 }` |
+
+**The spec's central predictions, made from live measurement during `/akili-specify`, held end-to-end
+against a running application: 170 eligible, 140 with science programs.**
+
+#### K-016 — SECOND OCCURRENCE, on the spec family that produced the lesson
+
+The picker showed *"No results found"* while the phase selector simultaneously showed `2026 (170)`.
+**Not a defect** — the `MappingPhaseResolver`'s 5-minute ambient-resolution TTL:
+
+| Time (UTC) | Event |
+| --- | --- |
+| ~12:39:29 | Resolver cached `targetPhase = 2025` |
+| 12:40:23 | User saved `2026` in the admin UI (`app_config`: `is_active=1`, `simple_value="2026"`) |
+| 12:41–12:44 | Picker empty. Server log, verbatim: `Zero eligible bilateral projects found from CLARISA host "http://localhost:3000/api/clarisa-stub/" (targetPhase=2025)` |
+| ~12:44:29 | TTL expired |
+| 12:45:25 | **170 projects** |
+
+`matchesPhase(2026, 2025)` is false for all 198 rows. The **`phases` endpoint kept reporting `2026 (170)`
+throughout**, because it deliberately omits `matchesPhase` — enumerating phases from a phase-filtered
+cohort would be circular and could only ever surface the phase already selected (DD-2 of the phase-config
+spec). That asymmetry is by design, and it is exactly what made the symptom confusing: one endpoint said
+170, the other said 0, and **both were correct**.
+
+**Why the second occurrence matters.** The Kaizen log records K-016 in almost these words from
+`bilateral/clarisa-phase-config-variable` — *"The first real user saved 2025, tested immediately, saw
+nothing, changed the value again — restarting the TTL — and reported 'no devuelve nada en ninguna phase'.
+Nothing was broken; the UI simply gave no way to distinguish 'not yet' from 'not working'."* It was filed
+**Methodology-only, no local edit owed** — so nothing in the product changed, and it caught the next
+person, on the next spec in the same family, within a day.
+
+**Escalated recommendation (product, not methodology):** the admin UI saves a phase and gives no
+indication it will not take effect for up to five minutes. Two occurrences on two consecutive specs is
+enough evidence for a product fix — a save-time notice, a cache-bust on write, or a visible "effective in
+~5 min" state. The diagnostic that made this legible was the existing `Zero eligible … (targetPhase=…)`
+warn line; keep it, it earned its place twice.
+
+**Operational rule for the rest of T-08:** after changing the phase or the host, `docker compose restart
+server` (clears the resolver cache *and* the projects cache) or wait ~5 minutes. **Do not change the value
+twice** — that restarts the TTL and makes the emptiness look permanent, which is how the first occurrence
+came to be reported as a total failure.
+
+#### Outstanding
+
+- **DC-10** — the human picker verdict at 170 options (render / filter / scroll / labels) with a
+  screenshot. **No automated substitute exists**; this is the spec's one substituted gate.
+- **Step 5** — switch back, confirm today's behaviour returns (25 eligible, phase 2025 on test).
+- **NFR-CFS-001** — optional latency sample; report the spread if three runs vary by more than the budget.
+
+#### Out of scope, raised during T-08 and routed elsewhere
+
+The user proposed that `source_of_funding: "window3"` should also pass the filter (198 rather than 170).
+**Declined for this spec.** Excluding Window 3 is not an oversight: it is an explicit
+`BUT it must NOT return 'Window 3' … 'W3', 'SRV'` clause in the archived
+`bugfix/bilateral-alliance-selector` requirements, a resolved open question (`OQ-A`), and a **named defect
+class `D2` — "Normalization too broad — Window-3 admitted"** — guarded by ~28 assertions across three spec
+files. Admitting it would change **production** behaviour (~71 Window-3-family rows against real CLARISA),
+violate this spec's **NFR-CFS-002** (`project-selector.util.ts` byte-unchanged), and move every recorded
+number (170 → 198, 140 → 166). It also folds a *pooled* funding modality into a *non-pooled* one, which is
+a MEL semantics decision rather than a filter tweak. **User elected to handle it via `/akili-quick` after
+this spec closes** — with the Leader's note that quick is likely to self-escalate on risk despite the
+one-line diff.

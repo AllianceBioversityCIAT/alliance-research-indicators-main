@@ -249,7 +249,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-003 scenario B (end-to-end), NFR-CFS-001, **DC-10** (the spec's only coverage for its dominant user-visible defect class)
 - **Design refs:** §5.4, §6, §10, §11
-- **Status:** [ ] · **Size:** M (human time) · **Depends on:** T-04, T-06, T-07 · **Skills:** `ui-ux-pro-max`, `systematic-debugging`
+- **Status:** [~] · **Size:** M (human time) — API checks PASS (170 eligible, 140 science-program, phases 2026/170); DC-10 human picker verdict outstanding · **Depends on:** T-04, T-06, T-07 · **Skills:** `ui-ux-pro-max`, `systematic-debugging`
 
 **Scope.** A human check, at the HITL pause, against a running local stack. **This task has no automated substitute** — jsdom cannot measure layout, rendering or scroll behaviour, and the CLARISA picker is uncapped (M-18).
 
