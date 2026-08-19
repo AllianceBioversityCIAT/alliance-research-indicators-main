@@ -97,7 +97,7 @@ npx eslint src/domain/tools/clarisa/projects
 
 | Field | Value |
 | --- | --- |
-| **Status** | `[~]` — code PASS, **human visual check owed** (D-7), blocked by X-6 |
+| **Status** | `[x]` — code PASS + **human visual check completed 2026-08-18** (`execution.md` → T-03 HITL) |
 | **Size** | M |
 | **Package** | `client/research-indicators` |
 | **Depends on** | `T-02` (was `T-01`, `T-02` — `T-01` dropped by pivot) |
@@ -145,7 +145,7 @@ npm run build          # the client's real type gate
 
 - [x] All eight clause-coverage rows have a passing test.
 - [x] `npm run build` clean (the client's only real type gate).
-- [ ] **The human visual check has been performed and its outcome recorded in `execution.md`.** ← blocks `[x]`; blocked by X-6
+- [x] **The human visual check has been performed and its outcome recorded in `execution.md`.** All four items pass; advisory R2 checked and did not materialise.
 
 ---
 
