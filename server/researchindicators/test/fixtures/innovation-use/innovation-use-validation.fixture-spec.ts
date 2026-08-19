@@ -202,9 +202,20 @@ describe('innovation_use_validation stored function (T-12, F1-F9/F9b/F11/F17)', 
       ]);
     }
 
-    if (innovationDevRoleSeeded) {
-      await dataSource.query(`DELETE FROM actor_roles WHERE actor_role_id = 1`);
-    }
+    // `actor_roles` id 1 is NEVER torn down here (T-13 rework attempt 2,
+    // FAIL-2/FAIL-4 / A-9). `test/fixtures/global-setup.ts` now seeds it
+    // exactly once, in Jest's main process, before any worker (and
+    // therefore before this file's own `beforeAll`) starts — the only seed
+    // point structurally immune to the per-file parallel-worker race this
+    // teardown used to be exposed to (this file's own check-then-insert
+    // above raced `innovation-dev-lifecycle-routines-unchanged.fixture-
+    // spec.ts` (T-13, F16) on a cold container over the same row, and this
+    // file's own teardown deleting the row out from under that file's
+    // still-live `result_actors` insert previously raised MySQL 1451/1452).
+    // `innovationDevRoleSeeded` is retained only as a diagnostic (whether
+    // THIS file's own check-then-insert created the row), not to gate a
+    // delete.
+    void innovationDevRoleSeeded;
     if (actorTypeOneSeeded) {
       await dataSource.query(`DELETE FROM clarisa_actor_types WHERE code = 1`);
     }

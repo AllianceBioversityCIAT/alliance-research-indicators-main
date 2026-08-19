@@ -28,81 +28,68 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * IMPORTANT — what this fixture's red-before-green input is, and is NOT:
  * none of M6's six edits, if individually removed, would turn this
  * fixture red — by design, since none of the six touches Innovation Dev.
- * (That is the point: F16 is the proof that they don't.) The gate design.md
- * §4.3 actually specifies for F16 is different: "Any edit that changes an
- * Innovation Dev column or row across the four routines — including
- * 'harmonizing' the delete divergence." The manual red demonstration
- * reported in the T-13 execution note therefore injects a hypothetical
- * *bad* edit (e.g. dropping one `result_innovation_dev` column from
- * `SP_versioning`'s existing copy block) directly against the scratch
- * schema, confirms this fixture goes red, then restores M6's real,
- * shipped bodies — never one of the six real M6 edits removed, which
- * would leave this fixture (correctly) green.
+ * (That is the point: F16 is the proof that they don't.) The gate
+ * `requirements.md` §4.3 actually specifies for F16 is different
+ * *(corrected 2026-08-18, T-13 rework attempt 2, B-3 — the prior text
+ * mis-cited `design.md` §4.3)*: "Any edit that changes an Innovation Dev
+ * column or row across the four routines — including 'harmonizing' the
+ * delete divergence." The manual red demonstration reported in the T-13
+ * execution note therefore injects a hypothetical *bad* edit (e.g. dropping
+ * one `result_innovation_dev` column from `SP_versioning`'s existing copy
+ * block) directly against the scratch schema, confirms this fixture goes
+ * red, then restores M6's real, shipped bodies — never one of the six real
+ * M6 edits removed, which would leave this fixture (correctly) green. The
+ * same technique also proves F16b/c/d discriminate on their OWN routine's
+ * pre-existing (non-M6) Innovation Dev statement — see the execution note's
+ * red-before-green table.
  *
  * Seeds one full Innovation Dev result: a `result_innovation_dev` detail
- * row (every column nullable, so no CLARISA catalog FK dependency is
- * required — design.md §3.3/§3.4 confirms none of the touched columns
- * are catalog-FK'd except by nullable ids left NULL here), one
- * `result_actors` row using the LEGACY boolean columns Innovation Dev
- * still reads/writes (`women_youth`, `women_not_youth`, `men_youth`,
- * `men_not_youth`) with the five NEW count columns left NULL (Innovation
- * Dev never populates them — proving the new columns are inert for this
- * indicator), and one `result_institution_types` row with
- * `organization_count` left NULL likewise.
+ * row with EVERY copied column given a concrete, non-NULL, mutually
+ * distinct value where a catalog FK does not make that impossible
+ * (rework attempt 2, FAIL-1 — a column left NULL on both the source and a
+ * hypothetically-dropped copy is a vacuous pass, and two same-valued
+ * columns hide a positional swap between them), one `result_actors` row
+ * using the LEGACY boolean columns Innovation Dev still reads/writes
+ * (`women_youth`, `women_not_youth`, `men_youth`, `men_not_youth`) with the
+ * five NEW count columns left NULL (Innovation Dev never populates them —
+ * proving the new columns are inert for this indicator), and one
+ * `result_institution_types` row with `organization_count` left NULL
+ * likewise.
  *
- * `actor_roles` id 1 and `institution_type_roles` id 1 (both
- * "innovation-development") are seeded by a migration that PREDATES the
- * committed schema-only baseline snapshot's cutoff — its DDL is captured,
- * its data INSERT is not (same trap as T-12's FP-16 for `actor_roles`
- * id 1; empirically re-confirmed here for `institution_type_roles` id 1,
- * which turns out NOT to be present either).
+ * **`actor_roles` / `institution_type_roles`, rework attempt 2 (FAIL-4):**
+ * attempt 1 used the REAL id 1 ("innovation-development") in both catalogs
+ * and reasoned it could not privatize them because they are the actual
+ * production role ids. That reasoning does not hold for what F16 asserts:
+ * neither `SP_versioning`, `SP_delete_result_version`,
+ * `full_delete_result_version`, nor `delete_result` filters `result_actors`
+ * or `result_institution_types` by role anywhere in their bodies — `SP_
+ * versioning`'s copy blocks key only on `result_id`/`is_active` (migration
+ * `1787083305648` :730-732, :765-766) and both delete routines remove by
+ * `result_id` alone. The role ids are pure FK ballast for this fixture's
+ * purposes — `actor_role_id`/`institution_type_role_id` are themselves
+ * columns F16 copy-compares, so they need SOME valid, resolvable value, not
+ * specifically id 1. This file therefore seeds its OWN private role ids
+ * (`devActorRoleId` / `devInstitutionTypeRoleId` below), exactly like its
+ * already-private `clarisa_actor_types` code — discharging the cross-file
+ * race (A-9) **by privacy** instead of by an argument that turned out not
+ * to hold. `innovation-use-validation.fixture-spec.ts` (T-12, F11) is the
+ * ONLY fixture that still needs the REAL `actor_roles` id 1 (its role-filter
+ * assertion is non-vacuous only against the real id) — `test/fixtures/
+ * global-setup.ts` now seeds that row once, before any worker starts, so
+ * neither file's `beforeAll` can race the other over it, and neither file
+ * tears it down.
  *
- * Both rows are semantically fixed values (the real "Innovation Dev" role
- * id in each catalog) rather than arbitrary sentinels this file can pick
- * its own private code for — and `actor_roles` id 1 is ALSO seeded,
- * idempotently, by T-12's `innovation-use-validation.fixture-spec.ts`
- * (F11). Plain check-then-insert on a row two files can both touch races
- * under Jest's parallel per-file workers (FP-39 / A-9 — confirmed
- * empirically while authoring this file's sibling, over a *different*
- * shared row: reusing report year 2097 produced a real `Duplicate entry`
- * failure). Both catalog rows are therefore seeded with `INSERT IGNORE`,
- * whose `affectedRows` is unambiguous through this driver (1 = this call
- * created it, 0 = it already existed) — unlike `INSERT ... ON DUPLICATE
- * KEY UPDATE`, which this driver reports as `affectedRows = 1` for BOTH a
- * fresh insert and a no-op update on an already-existing row, verified
- * empirically against a scratch table before choosing `INSERT IGNORE`
- * instead.
- *
- * **Neither row is ever deleted in `afterAll`, even when this file was the
- * creator.** Empirically discovered while verifying this file: a version
- * that deleted `actor_roles` id 1 whenever `actorRoleDevSeeded` was true
- * raced against T-12's `innovation-use-validation.fixture-spec.ts` (F11)
- * running concurrently in a different Jest worker — this file's cleanup
- * deleted the row while T-12's F11 test was still using it, and T-12's own
- * `result_actors` insert then failed with MySQL 1452 (FK constraint fails)
- * for a row that existed moments earlier. Both ids are therefore treated
- * exactly like `STAR` and `result_status` id 8 below: permanent,
- * foundational, cross-file-shared reference data that no individual
- * fixture file tears down. The `actorRoleDevSeeded` /
- * `institutionTypeRoleDevSeeded` flags are retained only as a diagnostic
- * (recording whether this file's own call was the creator), not to gate a
- * delete.
- *
- * Only F16a calls `SP_versioning` directly (the only one of the four
- * routines that filters its source lookup by `platform_code = 'STAR'`,
- * transcript `1783029013035:93`). F16b seeds its pre-existing "snapshot"
- * row directly instead of calling `SP_versioning` to create one —
- * `SP_delete_result_version`'s own guard (transcript §3) has no platform
- * filter — which avoids the `STAR` dependency there and isolates "does the
- * delete routine orphan the row" from "does versioning work" (FP-42).
- * `STAR` and `result_status` id 8 (`delete_result` unconditionally sets
- * `results.result_status_id = 8`, transcript §5, requiring the row to
- * exist via its FK) are real, foundational, cross-file-shared reference
- * values, seeded via `INSERT IGNORE` and — unlike this file's own private
- * rows — NEVER deleted in `afterAll`, for the same reason as this file's
- * T-13 sibling: deleting a row another fixture file's concurrently-running
- * test may still depend on is a hazard under Jest's parallel per-file
- * workers.
+ * **The `STAR` / `result_status` id 8 race, rework attempt 2 (FAIL-2):**
+ * attempt 1 seeded both via `INSERT IGNORE` and never deleted them, which
+ * only suppresses the race on a WARM schema (the residue itself is what
+ * prevents the race from firing on a rerun) and leaves it live on a COLD
+ * one — exactly the run `T-14` repeats. `test/fixtures/global-setup.ts`
+ * (Jest `globalSetup`, wired in `test/jest-fixtures.json`) now seeds `STAR`
+ * and `result_status` id 8 exactly once, in Jest's main process, strictly
+ * before any worker starts — removing the race structurally rather than
+ * suppressing its symptom. This file's own `INSERT IGNORE` calls below are
+ * kept as a harmless, idempotent, redundant safety net (never the primary
+ * seed point), and this file still never deletes either row.
  */
 describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', () => {
   const uniqueSuffix = Date.now();
@@ -112,14 +99,72 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
   const starPlatformCode = 'STAR';
   const deletedResultStatusId = 8;
 
+  // Private to THIS file, replacing attempt 1's dependency on the REAL
+  // `actor_roles` / `institution_type_roles` id 1 (FAIL-4 above). Distinct
+  // from `actorTypeCode` (9131, `clarisa_actor_types`) and from the private
+  // catalog-id band below (9141-9149) — a different table per number, so no
+  // collision, but a distinct numeral keeps failure output unambiguous.
+  const devActorRoleId = 9151;
+  const devInstitutionTypeRoleId = 9151;
+
+  // Private Innovation Dev catalog rows (FAIL-1 remediation (b)): every
+  // catalog-FK'd column `seedDevResult` previously left NULL now gets a
+  // resolvable, private, mutually distinct id — a dropped copy-list column
+  // now reads NULL against a non-NULL source instead of NULL-vs-NULL.
+  const innovationNatureId = 9141; // clarisa_innovation_characteristics.id
+  const innovationTypeCode = 9142; // clarisa_innovation_types.code
+  const innovationReadinessId = 9143; // clarisa_innovation_readiness_levels.id
+  const anticipatedUsersId = 9144; // innovation_dev_anticipated_users.id
+  const disseminationQualificationId = 9145; // dissemination_qualifications.id
+  const expansionPotentialId = 9146; // expansion_potentials.id
+  // `institution_type_id` and `sub_institution_type_id` both FK to
+  // `clarisa_institution_types (code)` — DELIBERATELY distinct codes so a
+  // transposition between the two columns is visible.
+  const institutionTypeCode = 9147; // clarisa_institution_types.code (institution_type_id)
+  const subInstitutionTypeCode = 9148; // clarisa_institution_types.code (sub_institution_type_id)
+  const institutionCode = 9149; // clarisa_institutions.code (institution_id)
+
   let platformSeeded = false;
   let reportYearSeeded = false;
   let actorTypeOneSeeded = false;
-  let actorRoleDevSeeded = false;
-  let institutionTypeRoleDevSeeded = false;
+  // Ownership flags for the private rows seeded in `beforeAll` below, via
+  // the shared `seedIfMissing` helper.
+  let devActorRoleSeeded = false;
+  let devInstitutionTypeRoleSeeded = false;
+  let innovationNatureSeeded = false;
+  let innovationTypeSeeded = false;
+  let innovationReadinessSeeded = false;
+  let anticipatedUsersSeeded = false;
+  let disseminationQualificationSeeded = false;
+  let expansionPotentialSeeded = false;
+  let institutionTypeSeeded = false;
+  let subInstitutionTypeSeeded = false;
+  let institutionSeeded = false;
 
+  /** Check-then-insert, returning whether THIS call created the row. */
+  async function seedIfMissing(
+    checkSql: string,
+    checkParams: unknown[],
+    insertSql: string,
+    insertParams: unknown[],
+  ): Promise<boolean> {
+    const [existing] = await dataSource.query(checkSql, checkParams);
+    if (existing) {
+      return false;
+    }
+    await dataSource.query(insertSql, insertParams);
+    return true;
+  }
+
+  // officialCode band: 900_000 (T-02, sp-versioning-objective-blocks),
+  // 900_100 (T-12, innovation-use-validation), 900_200 (T-13,
+  // innovation-use-lifecycle-routines), 900_300 (T-12,
+  // innovation-use-detail-round-trip), 900_400 (green-check-ip-rights).
+  // This file used 900_300 through rework attempt 1 — a direct collision
+  // with innovation-use-detail-round-trip's band (FAIL-5) — and now
+  // reserves its own, previously-unused 900_500.
   const officialCodes: number[] = [];
-  let nextCode = 900_300_000_000_000 + uniqueSuffix;
+  let nextCode = 900_500_000_000_000 + uniqueSuffix;
   function nextOfficialCode(): number {
     return nextCode++;
   }
@@ -129,6 +174,17 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     officialCode: number;
   }
 
+  // Every copied column given a concrete value; same-typed neighbours
+  // (the seven `int` columns, the four boolean `tinyint` columns) are
+  // mutually distinct where the column's domain allows it (rework attempt
+  // 2, FAIL-1 — a positional swap between two equal-valued columns in the
+  // migration's copy-list-vs-SELECT-list pairing is otherwise invisible to
+  // ANY comparison technique, literal or dynamic). The four boolean
+  // columns have only two possible values for four columns — full mutual
+  // distinctness is mathematically impossible; they alternate FALSE/TRUE
+  // instead, and the residual gap (a swap between the two FALSE-valued or
+  // between the two TRUE-valued columns specifically) is named in the T-13
+  // execution note rather than left implicit.
   const devDetail = {
     short_title: 'F16 Innovation Dev fixture short title',
     innovation_readiness_explanation:
@@ -138,22 +194,30 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     intended_beneficiaries_description: 'F16 fixture beneficiaries',
     is_new_or_improved_variety: true,
     new_or_improved_varieties_count: 3,
-    is_knowledge_sharing: false,
+    is_knowledge_sharing: true,
     tool_useful_context: 'F16 fixture tool useful context',
     results_achieved_expected: 'F16 fixture results achieved',
-    is_used_beyond_original_context: true,
+    is_used_beyond_original_context: false,
     adoption_adaptation_context: 'F16 fixture adoption context',
     other_tools: 'F16 fixture other tools',
     other_tools_integration: 'F16 fixture other tools integration',
-    is_cheaper_than_alternatives: 1,
-    is_simpler_to_use: 0,
-    does_perform_better: 1,
-    is_desirable_to_users: 1,
-    has_commercial_viability: 0,
-    has_suitable_enabling_environment: 1,
-    has_evidence_of_uptake: 1,
+    // Seven plain `int` columns (no CHECK constraint restricts them to
+    // 0/1) — given seven mutually distinct sentinel values instead of
+    // attempt 1's 1/0 pattern (four 1s, two 0s), which left several pairs
+    // swap-blind.
+    is_cheaper_than_alternatives: 101,
+    is_simpler_to_use: 102,
+    does_perform_better: 103,
+    is_desirable_to_users: 104,
+    has_commercial_viability: 105,
+    has_suitable_enabling_environment: 106,
+    has_evidence_of_uptake: 107,
     expansion_adaptation_details: 'F16 fixture expansion details',
   };
+
+  const actorCustomName = 'F16 fixture actor custom name sentinel';
+  const institutionTypeCustomName =
+    'F16 fixture institution type custom name sentinel';
 
   async function seedDevResult(
     platform: string = platformCode,
@@ -170,28 +234,32 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
 
     await dataSource.query(
       `INSERT INTO result_innovation_dev (
-         result_id, short_title, innovation_readiness_explanation,
-         no_sex_age_disaggregation, expected_outcome,
-         intended_beneficiaries_description, is_new_or_improved_variety,
-         new_or_improved_varieties_count, is_knowledge_sharing,
-         tool_useful_context, results_achieved_expected,
-         is_used_beyond_original_context, adoption_adaptation_context,
-         other_tools, other_tools_integration, is_cheaper_than_alternatives,
-         is_simpler_to_use, does_perform_better, is_desirable_to_users,
-         has_commercial_viability, has_suitable_enabling_environment,
-         has_evidence_of_uptake, expansion_adaptation_details,
-         created_by, updated_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+         result_id, short_title, innovation_nature_id, innovation_type_id,
+         innovation_readiness_id, no_sex_age_disaggregation,
+         anticipated_users_id, expected_outcome,
+         intended_beneficiaries_description, is_knowledge_sharing,
+         dissemination_qualification_id, tool_useful_context,
+         results_achieved_expected, is_used_beyond_original_context,
+         adoption_adaptation_context, other_tools, other_tools_integration,
+         is_cheaper_than_alternatives, is_simpler_to_use, does_perform_better,
+         is_desirable_to_users, has_commercial_viability,
+         has_suitable_enabling_environment, has_evidence_of_uptake,
+         expansion_potential_id, expansion_adaptation_details,
+         new_or_improved_varieties_count, is_new_or_improved_variety,
+         innovation_readiness_explanation, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
       [
         resultId,
         devDetail.short_title,
-        devDetail.innovation_readiness_explanation,
+        innovationNatureId,
+        innovationTypeCode,
+        innovationReadinessId,
         devDetail.no_sex_age_disaggregation,
+        anticipatedUsersId,
         devDetail.expected_outcome,
         devDetail.intended_beneficiaries_description,
-        devDetail.is_new_or_improved_variety,
-        devDetail.new_or_improved_varieties_count,
         devDetail.is_knowledge_sharing,
+        disseminationQualificationId,
         devDetail.tool_useful_context,
         devDetail.results_achieved_expected,
         devDetail.is_used_beyond_original_context,
@@ -205,75 +273,78 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
         devDetail.has_commercial_viability,
         devDetail.has_suitable_enabling_environment,
         devDetail.has_evidence_of_uptake,
+        expansionPotentialId,
         devDetail.expansion_adaptation_details,
+        devDetail.new_or_improved_varieties_count,
+        devDetail.is_new_or_improved_variety,
+        devDetail.innovation_readiness_explanation,
       ],
     );
 
     await dataSource.query(
       `INSERT INTO result_actors (
-         result_id, actor_type_id, actor_role_id,
+         result_id, actor_type_id, actor_role_id, actor_type_custom_name,
          sex_age_disaggregation_not_apply,
          women_youth, women_not_youth, men_youth, men_not_youth,
          created_by, updated_by
-       ) VALUES (?, ?, 1, FALSE, TRUE, FALSE, TRUE, FALSE, 1, 1)`,
-      [resultId, actorTypeCode],
+       ) VALUES (?, ?, ?, ?, FALSE, TRUE, FALSE, TRUE, FALSE, 1, 1)`,
+      [resultId, actorTypeCode, devActorRoleId, actorCustomName],
     );
 
     await dataSource.query(
       `INSERT INTO result_institution_types (
-         result_id, institution_type_role_id, is_organization_known,
-         created_by, updated_by
-       ) VALUES (?, 1, FALSE, 1, 1)`,
-      [resultId],
+         result_id, institution_type_role_id, institution_type_id,
+         sub_institution_type_id, institution_type_custom_name,
+         is_organization_known, institution_id, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, FALSE, ?, 1, 1)`,
+      [
+        resultId,
+        devInstitutionTypeRoleId,
+        institutionTypeCode,
+        subInstitutionTypeCode,
+        institutionTypeCustomName,
+        institutionCode,
+      ],
     );
 
     return { resultId, officialCode };
   }
 
-  async function fetchDevRow(resultId: number) {
+  /**
+   * `SELECT *`, not a hand-enumerated column list (rework attempt 2,
+   * FAIL-1(a)) — every column the migration's copy block touches is
+   * compared, including any a future migration adds, without re-creating
+   * the enumerate-by-name failure the routines themselves embody. The
+   * caller drops the identity/PK column(s) before comparing, since those
+   * legitimately differ between the source row and its copy.
+   */
+  async function fetchFullRow(
+    table: string,
+    resultId: number,
+    omitColumns: string[],
+  ): Promise<Record<string, unknown> | undefined> {
     const [row] = await dataSource.query(
-      `SELECT short_title, innovation_readiness_explanation,
-              no_sex_age_disaggregation, expected_outcome,
-              intended_beneficiaries_description, is_new_or_improved_variety,
-              new_or_improved_varieties_count, is_knowledge_sharing,
-              tool_useful_context, results_achieved_expected,
-              is_used_beyond_original_context, adoption_adaptation_context,
-              other_tools, other_tools_integration, is_cheaper_than_alternatives,
-              is_simpler_to_use, does_perform_better, is_desirable_to_users,
-              has_commercial_viability, has_suitable_enabling_environment,
-              has_evidence_of_uptake, expansion_adaptation_details
-       FROM result_innovation_dev WHERE result_id = ?`,
+      `SELECT * FROM ${table} WHERE result_id = ?`,
       [resultId],
     );
-    return row;
-  }
-
-  async function fetchActorRow(resultId: number) {
-    const [row] = await dataSource.query(
-      `SELECT actor_type_id, actor_role_id, sex_age_disaggregation_not_apply,
-              women_youth, women_not_youth, men_youth, men_not_youth,
-              women_youth_count, women_not_youth_count, men_youth_count,
-              men_not_youth_count, actors_count
-       FROM result_actors WHERE result_id = ?`,
-      [resultId],
-    );
-    return row;
-  }
-
-  async function fetchInstitutionTypeRow(resultId: number) {
-    const [row] = await dataSource.query(
-      `SELECT institution_type_role_id, is_organization_known, organization_count
-       FROM result_institution_types WHERE result_id = ?`,
-      [resultId],
-    );
-    return row;
+    if (!row) {
+      return row;
+    }
+    const trimmed: Record<string, unknown> = { ...row };
+    for (const column of omitColumns) {
+      delete trimmed[column];
+    }
+    return trimmed;
   }
 
   beforeAll(async () => {
     await dataSource.initialize();
 
-    // Foundational, cross-file-shared reference rows — see file header.
-    // Never deleted by this file.
+    // Foundational, cross-file-shared reference rows are seeded ONCE by
+    // `test/fixtures/global-setup.ts`, before any worker starts (see file
+    // header, FAIL-2). These calls are a harmless, idempotent, redundant
+    // safety net — never the primary seed point — and this file never
+    // deletes either row.
     await dataSource.query(
       `INSERT IGNORE INTO reporting_platforms (platform_code, platform_name) VALUES (?, 'STAR reporting platform')`,
       [starPlatformCode],
@@ -322,24 +393,81 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       actorTypeOneSeeded = true;
     }
 
-    // FP-16 (T-12), re-confirmed empirically here for both catalogs: the
-    // pre-baseline seed migration's INSERTs into `actor_roles` /
-    // `institution_type_roles` id 1 ("innovation-development") do not
-    // reproduce from the schema-only baseline snapshot. Only id 2
-    // ("innovation-use", M4) is present. Both ids are real, fixed values
-    // (not sentinels this file can privatize) and `actor_roles` id 1 is
-    // ALSO seeded by T-12's `innovation-use-validation.fixture-spec.ts` —
-    // `INSERT IGNORE` makes each seed atomic and its `affectedRows` an
-    // unambiguous "did THIS call create it" flag (see file header).
-    const actorRoleResult = await dataSource.query(
-      `INSERT IGNORE INTO actor_roles (actor_role_id, name) VALUES (1, 'innovation-development')`,
+    // Private role ids (FAIL-4) — replacing the REAL `actor_roles` /
+    // `institution_type_roles` id 1 this file used through rework attempt 1.
+    devActorRoleSeeded = await seedIfMissing(
+      `SELECT actor_role_id FROM actor_roles WHERE actor_role_id = ?`,
+      [devActorRoleId],
+      `INSERT INTO actor_roles (actor_role_id, name) VALUES (?, ?)`,
+      [devActorRoleId, 'T-13 F16 private actor role'],
     );
-    actorRoleDevSeeded = actorRoleResult.affectedRows === 1;
+    devInstitutionTypeRoleSeeded = await seedIfMissing(
+      `SELECT institution_type_role_id FROM institution_type_roles WHERE institution_type_role_id = ?`,
+      [devInstitutionTypeRoleId],
+      `INSERT INTO institution_type_roles (institution_type_role_id, name) VALUES (?, ?)`,
+      [devInstitutionTypeRoleId, 'T-13 F16 private institution type role'],
+    );
 
-    const institutionTypeRoleResult = await dataSource.query(
-      `INSERT IGNORE INTO institution_type_roles (institution_type_role_id, name) VALUES (1, 'innovation-development')`,
+    // Private Innovation Dev catalog rows (FAIL-1(b)) — every one of the
+    // six catalog-id columns `seedDevResult` copies now resolves through a
+    // real FK to a row only this file owns.
+    innovationNatureSeeded = await seedIfMissing(
+      `SELECT id FROM clarisa_innovation_characteristics WHERE id = ?`,
+      [innovationNatureId],
+      `INSERT INTO clarisa_innovation_characteristics (id, name) VALUES (?, ?)`,
+      [innovationNatureId, 'T-13 F16 private innovation nature'],
     );
-    institutionTypeRoleDevSeeded = institutionTypeRoleResult.affectedRows === 1;
+    innovationTypeSeeded = await seedIfMissing(
+      `SELECT code FROM clarisa_innovation_types WHERE code = ?`,
+      [innovationTypeCode],
+      `INSERT INTO clarisa_innovation_types (code, name) VALUES (?, ?)`,
+      [innovationTypeCode, 'T-13 F16 private innovation type'],
+    );
+    innovationReadinessSeeded = await seedIfMissing(
+      `SELECT id FROM clarisa_innovation_readiness_levels WHERE id = ?`,
+      [innovationReadinessId],
+      `INSERT INTO clarisa_innovation_readiness_levels (id, name) VALUES (?, ?)`,
+      [innovationReadinessId, 'T-13 F16 private innovation readiness level'],
+    );
+    anticipatedUsersSeeded = await seedIfMissing(
+      `SELECT id FROM innovation_dev_anticipated_users WHERE id = ?`,
+      [anticipatedUsersId],
+      `INSERT INTO innovation_dev_anticipated_users (id, name) VALUES (?, ?)`,
+      [anticipatedUsersId, 'T-13 F16 private anticipated users'],
+    );
+    disseminationQualificationSeeded = await seedIfMissing(
+      `SELECT id FROM dissemination_qualifications WHERE id = ?`,
+      [disseminationQualificationId],
+      `INSERT INTO dissemination_qualifications (id, name) VALUES (?, ?)`,
+      [
+        disseminationQualificationId,
+        'T-13 F16 private dissemination qualification',
+      ],
+    );
+    expansionPotentialSeeded = await seedIfMissing(
+      `SELECT id FROM expansion_potentials WHERE id = ?`,
+      [expansionPotentialId],
+      `INSERT INTO expansion_potentials (id, name) VALUES (?, ?)`,
+      [expansionPotentialId, 'T-13 F16 private expansion potential'],
+    );
+    institutionTypeSeeded = await seedIfMissing(
+      `SELECT code FROM clarisa_institution_types WHERE code = ?`,
+      [institutionTypeCode],
+      `INSERT INTO clarisa_institution_types (code, name) VALUES (?, ?)`,
+      [institutionTypeCode, 'T-13 F16 private institution type'],
+    );
+    subInstitutionTypeSeeded = await seedIfMissing(
+      `SELECT code FROM clarisa_institution_types WHERE code = ?`,
+      [subInstitutionTypeCode],
+      `INSERT INTO clarisa_institution_types (code, name) VALUES (?, ?)`,
+      [subInstitutionTypeCode, 'T-13 F16 private sub-institution type'],
+    );
+    institutionSeeded = await seedIfMissing(
+      `SELECT code FROM clarisa_institutions WHERE code = ?`,
+      [institutionCode],
+      `INSERT INTO clarisa_institutions (code, name) VALUES (?, ?)`,
+      [institutionCode, 'T-13 F16 private institution'],
+    );
   });
 
   afterAll(async () => {
@@ -355,13 +483,33 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
         errors.push({ label, err });
       }
     };
+    // Rework attempt 2, B-7: a lookup failure inside cleanup is now
+    // RECORDED (pushed onto `errors`) rather than silently swallowed into
+    // an empty-array fallback, which previously could surface later as a
+    // confusing, seemingly-unrelated 1451.
+    const trySelect = async <T>(
+      label: string,
+      fn: () => Promise<T>,
+      fallback: T,
+    ): Promise<T> => {
+      try {
+        return await fn();
+      } catch (err) {
+        errors.push({ label, err });
+        return fallback;
+      }
+    };
 
     for (const officialCode of officialCodes) {
-      const resultRows: { result_id: number }[] = await dataSource
-        .query(`SELECT result_id FROM results WHERE result_official_code = ?`, [
-          officialCode,
-        ])
-        .catch(() => [] as { result_id: number }[]);
+      const resultRows = await trySelect(
+        `select results by official_code ${officialCode}`,
+        () =>
+          dataSource.query(
+            `SELECT result_id FROM results WHERE result_official_code = ?`,
+            [officialCode],
+          ) as Promise<{ result_id: number }[]>,
+        [] as { result_id: number }[],
+      );
       const resultIds = resultRows.map((r) => r.result_id);
 
       for (const resultId of resultIds) {
@@ -391,23 +539,91 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       );
     }
 
-    // `actor_roles` id 1 and `institution_type_roles` id 1 are deliberately
-    // NEVER deleted here, even when `actorRoleDevSeeded` /
-    // `institutionTypeRoleDevSeeded` is true. Empirically discovered while
-    // verifying this file: deleting them at THIS file's `afterAll` raced
-    // against T-12's `innovation-use-validation.fixture-spec.ts` (F11),
-    // which ALSO depends on `actor_roles` id 1 and can still be mid-test in
-    // a concurrent Jest worker — its own `result_actors` insert then hit
-    // MySQL 1452 (FK constraint fails) because this file had just deleted
-    // the row out from under it. Both ids are treated the same as `STAR`
-    // and `result_status` id 8 (see file header): permanent, foundational,
-    // cross-file-shared scratch-schema reference data, never torn down by
-    // an individual fixture file. `actorRoleDevSeeded` /
-    // `institutionTypeRoleDevSeeded` are retained only to record whether
-    // this file's own seed call was the creator (diagnostic value in a
-    // failure report), not to gate a delete.
-    void institutionTypeRoleDevSeeded;
-    void actorRoleDevSeeded;
+    if (devActorRoleSeeded) {
+      await tryStep('delete private devActorRoleId', () =>
+        dataSource.query(`DELETE FROM actor_roles WHERE actor_role_id = ?`, [
+          devActorRoleId,
+        ]),
+      );
+    }
+    if (devInstitutionTypeRoleSeeded) {
+      await tryStep('delete private devInstitutionTypeRoleId', () =>
+        dataSource.query(
+          `DELETE FROM institution_type_roles WHERE institution_type_role_id = ?`,
+          [devInstitutionTypeRoleId],
+        ),
+      );
+    }
+    if (innovationNatureSeeded) {
+      await tryStep('delete private innovationNatureId', () =>
+        dataSource.query(
+          `DELETE FROM clarisa_innovation_characteristics WHERE id = ?`,
+          [innovationNatureId],
+        ),
+      );
+    }
+    if (innovationTypeSeeded) {
+      await tryStep('delete private innovationTypeCode', () =>
+        dataSource.query(
+          `DELETE FROM clarisa_innovation_types WHERE code = ?`,
+          [innovationTypeCode],
+        ),
+      );
+    }
+    if (innovationReadinessSeeded) {
+      await tryStep('delete private innovationReadinessId', () =>
+        dataSource.query(
+          `DELETE FROM clarisa_innovation_readiness_levels WHERE id = ?`,
+          [innovationReadinessId],
+        ),
+      );
+    }
+    if (anticipatedUsersSeeded) {
+      await tryStep('delete private anticipatedUsersId', () =>
+        dataSource.query(
+          `DELETE FROM innovation_dev_anticipated_users WHERE id = ?`,
+          [anticipatedUsersId],
+        ),
+      );
+    }
+    if (disseminationQualificationSeeded) {
+      await tryStep('delete private disseminationQualificationId', () =>
+        dataSource.query(
+          `DELETE FROM dissemination_qualifications WHERE id = ?`,
+          [disseminationQualificationId],
+        ),
+      );
+    }
+    if (expansionPotentialSeeded) {
+      await tryStep('delete private expansionPotentialId', () =>
+        dataSource.query(`DELETE FROM expansion_potentials WHERE id = ?`, [
+          expansionPotentialId,
+        ]),
+      );
+    }
+    if (institutionTypeSeeded) {
+      await tryStep('delete private institutionTypeCode', () =>
+        dataSource.query(
+          `DELETE FROM clarisa_institution_types WHERE code = ?`,
+          [institutionTypeCode],
+        ),
+      );
+    }
+    if (subInstitutionTypeSeeded) {
+      await tryStep('delete private subInstitutionTypeCode', () =>
+        dataSource.query(
+          `DELETE FROM clarisa_institution_types WHERE code = ?`,
+          [subInstitutionTypeCode],
+        ),
+      );
+    }
+    if (institutionSeeded) {
+      await tryStep('delete private institutionCode', () =>
+        dataSource.query(`DELETE FROM clarisa_institutions WHERE code = ?`, [
+          institutionCode,
+        ]),
+      );
+    }
     if (actorTypeOneSeeded) {
       await tryStep(`delete clarisa_actor_types code ${actorTypeCode}`, () =>
         dataSource.query(`DELETE FROM clarisa_actor_types WHERE code = ?`, [
@@ -430,6 +646,8 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
         ),
       );
     }
+    // `STAR` and `result_status` id 8 are deliberately NEVER deleted here —
+    // `test/fixtures/global-setup.ts` owns them exclusively (see header).
 
     try {
       if (errors.length) {
@@ -456,29 +674,111 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     expect(snapshot).toBeDefined();
     const newResultId = snapshot.result_id;
 
-    const sourceDev = await fetchDevRow(resultId);
-    const copiedDev = await fetchDevRow(newResultId);
+    // --- result_innovation_dev: SELECT * minus the PK, compared against
+    // both the dynamically-fetched source row AND a literal expected
+    // object (rework attempt 2, FAIL-1 — "assert against a literal
+    // expected object rather than against sourceDev, so a 'both sides
+    // equally wrong' copy cannot satisfy it").
+    const sourceDev = await fetchFullRow('result_innovation_dev', resultId, [
+      'result_id',
+    ]);
+    const copiedDev = await fetchFullRow('result_innovation_dev', newResultId, [
+      'result_id',
+    ]);
     expect(copiedDev).toBeDefined();
     expect(copiedDev).toEqual(sourceDev);
+    // Literal, per-field assertions on the copy for every column this file
+    // deliberately diversified — independent of whatever `sourceDev` reads,
+    // so a bug shared by both the seed and the fetch cannot hide here.
+    expect(Number(copiedDev.innovation_nature_id)).toBe(innovationNatureId);
+    expect(Number(copiedDev.innovation_type_id)).toBe(innovationTypeCode);
+    expect(Number(copiedDev.innovation_readiness_id)).toBe(
+      innovationReadinessId,
+    );
+    expect(Number(copiedDev.anticipated_users_id)).toBe(anticipatedUsersId);
+    expect(Number(copiedDev.dissemination_qualification_id)).toBe(
+      disseminationQualificationId,
+    );
+    expect(Number(copiedDev.expansion_potential_id)).toBe(expansionPotentialId);
+    expect(Number(copiedDev.is_cheaper_than_alternatives)).toBe(
+      devDetail.is_cheaper_than_alternatives,
+    );
+    expect(Number(copiedDev.is_simpler_to_use)).toBe(
+      devDetail.is_simpler_to_use,
+    );
+    expect(Number(copiedDev.does_perform_better)).toBe(
+      devDetail.does_perform_better,
+    );
+    expect(Number(copiedDev.is_desirable_to_users)).toBe(
+      devDetail.is_desirable_to_users,
+    );
+    expect(Number(copiedDev.has_commercial_viability)).toBe(
+      devDetail.has_commercial_viability,
+    );
+    expect(Number(copiedDev.has_suitable_enabling_environment)).toBe(
+      devDetail.has_suitable_enabling_environment,
+    );
+    expect(Number(copiedDev.has_evidence_of_uptake)).toBe(
+      devDetail.has_evidence_of_uptake,
+    );
+    expect(Number(copiedDev.no_sex_age_disaggregation)).toBe(0);
+    expect(Number(copiedDev.is_knowledge_sharing)).toBe(1);
+    expect(Number(copiedDev.is_used_beyond_original_context)).toBe(0);
+    expect(Number(copiedDev.is_new_or_improved_variety)).toBe(1);
 
-    const sourceActor = await fetchActorRow(resultId);
-    const copiedActor = await fetchActorRow(newResultId);
+    // --- result_actors: same SELECT * treatment, minus the identity PK
+    // and result_id.
+    const sourceActor = await fetchFullRow('result_actors', resultId, [
+      'result_actors_id',
+      'result_id',
+    ]);
+    const copiedActor = await fetchFullRow('result_actors', newResultId, [
+      'result_actors_id',
+      'result_id',
+    ]);
     expect(copiedActor).toBeDefined();
     expect(copiedActor).toEqual(sourceActor);
+    expect(copiedActor.actor_type_custom_name).toBe(actorCustomName);
+    expect(Number(copiedActor.actor_role_id)).toBe(devActorRoleId);
     // The five NEW count columns are inert for Innovation Dev — confirm
     // they stayed NULL through the copy rather than merely matching the
     // (also-NULL) source, which a bad copy could satisfy by accident.
     expect(copiedActor.women_youth_count).toBeNull();
+    expect(copiedActor.women_not_youth_count).toBeNull();
+    expect(copiedActor.men_youth_count).toBeNull();
+    expect(copiedActor.men_not_youth_count).toBeNull();
     expect(copiedActor.actors_count).toBeNull();
 
-    const sourceInstitutionType = await fetchInstitutionTypeRow(resultId);
-    const copiedInstitutionType = await fetchInstitutionTypeRow(newResultId);
+    // --- result_institution_types: same SELECT * treatment.
+    const sourceInstitutionType = await fetchFullRow(
+      'result_institution_types',
+      resultId,
+      ['result_institution_type_id', 'result_id'],
+    );
+    const copiedInstitutionType = await fetchFullRow(
+      'result_institution_types',
+      newResultId,
+      ['result_institution_type_id', 'result_id'],
+    );
     expect(copiedInstitutionType).toBeDefined();
     expect(copiedInstitutionType).toEqual(sourceInstitutionType);
+    expect(copiedInstitutionType.institution_type_custom_name).toBe(
+      institutionTypeCustomName,
+    );
+    expect(Number(copiedInstitutionType.institution_type_role_id)).toBe(
+      devInstitutionTypeRoleId,
+    );
+    expect(Number(copiedInstitutionType.institution_type_id)).toBe(
+      institutionTypeCode,
+    );
+    expect(Number(copiedInstitutionType.sub_institution_type_id)).toBe(
+      subInstitutionTypeCode,
+    );
+    expect(Number(copiedInstitutionType.institution_id)).toBe(institutionCode);
     expect(copiedInstitutionType.organization_count).toBeNull();
   }, 30000);
 
-  it('F16b: SP_delete_result_version still hard-removes an Innovation Dev version and its result_innovation_dev row', async () => {
+  it('F16b: SP_delete_result_version still hard-removes an Innovation Dev version and its result_innovation_dev, result_actors, and result_institution_types rows', async () => {
     // Seeded directly as an already-existing snapshot (is_snapshot = TRUE)
     // — `SP_delete_result_version`'s own guard has no platform filter, so
     // this needs no `SP_versioning` call and no `STAR` platform (see file
@@ -503,6 +803,13 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       [snapshotResultId],
     );
     expect(remainingActor).toHaveLength(0);
+    // FAIL-1(c): "every surviving row", not just result_innovation_dev —
+    // attempt 1 never asserted result_institution_types removal here.
+    const remainingInstitutionType = await dataSource.query(
+      `SELECT result_institution_type_id FROM result_institution_types WHERE result_id = ?`,
+      [snapshotResultId],
+    );
+    expect(remainingInstitutionType).toHaveLength(0);
     const remainingResult = await dataSource.query(
       `SELECT result_id FROM results WHERE result_id = ?`,
       [snapshotResultId],
@@ -510,8 +817,8 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     expect(remainingResult).toHaveLength(0);
   }, 30000);
 
-  it('F16c: full_delete_result_version still hard-removes an Innovation Dev result and its result_innovation_dev row', async () => {
-    const { resultId, officialCode } = await seedDevResult();
+  it('F16c: full_delete_result_version still hard-removes an Innovation Dev result and its result_innovation_dev, result_actors, and result_institution_types rows', async () => {
+    const { resultId } = await seedDevResult();
 
     const [row] = await dataSource.query(
       `SELECT full_delete_result_version(?) AS ok`,
@@ -524,16 +831,27 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       [resultId],
     );
     expect(remainingDev).toHaveLength(0);
+    // FAIL-1(c): full_delete_result_version's pre-existing (non-M6)
+    // statements also hard-remove result_actors / result_institution_types
+    // — attempt 1 never asserted either here.
+    const remainingActor = await dataSource.query(
+      `SELECT result_actors_id FROM result_actors WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(remainingActor).toHaveLength(0);
+    const remainingInstitutionType = await dataSource.query(
+      `SELECT result_institution_type_id FROM result_institution_types WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(remainingInstitutionType).toHaveLength(0);
     const remainingResult = await dataSource.query(
       `SELECT result_id FROM results WHERE result_id = ?`,
       [resultId],
     );
     expect(remainingResult).toHaveLength(0);
-
-    officialCodes.splice(officialCodes.indexOf(officialCode), 1);
   }, 30000);
 
-  it('F16d: delete_result still soft-deletes an Innovation Dev result and its result_innovation_dev row', async () => {
+  it('F16d: delete_result still soft-deletes an Innovation Dev result and its result_innovation_dev, result_actors, and result_institution_types rows', async () => {
     const { resultId } = await seedDevResult();
 
     const [row] = await dataSource.query(`SELECT delete_result(?) AS ok`, [
@@ -548,6 +866,25 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     expect(devAfterDelete).toBeDefined();
     expect(Number(devAfterDelete.is_active)).toBe(0);
     expect(devAfterDelete.deleted_at).not.toBeNull();
+
+    // FAIL-1(c): `delete_result`'s pre-existing (non-M6) statements also
+    // deactivate result_actors / result_institution_types — attempt 1
+    // never asserted either here.
+    const [actorAfterDelete] = await dataSource.query(
+      `SELECT is_active, deleted_at FROM result_actors WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(actorAfterDelete).toBeDefined();
+    expect(Number(actorAfterDelete.is_active)).toBe(0);
+    expect(actorAfterDelete.deleted_at).not.toBeNull();
+
+    const [institutionTypeAfterDelete] = await dataSource.query(
+      `SELECT is_active, deleted_at FROM result_institution_types WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(institutionTypeAfterDelete).toBeDefined();
+    expect(Number(institutionTypeAfterDelete.is_active)).toBe(0);
+    expect(institutionTypeAfterDelete.deleted_at).not.toBeNull();
 
     const [resultAfterDelete] = await dataSource.query(
       `SELECT is_active, result_status_id FROM results WHERE result_id = ?`,

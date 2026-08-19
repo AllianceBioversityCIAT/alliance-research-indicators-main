@@ -239,13 +239,33 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
         errors.push({ label, err });
       }
     };
+    // Rework attempt 2, B-7: a lookup failure inside cleanup is now
+    // RECORDED (pushed onto `errors`) rather than silently swallowed into
+    // an empty-array fallback, which previously could surface later as a
+    // confusing, seemingly-unrelated 1451.
+    const trySelect = async <T>(
+      label: string,
+      fn: () => Promise<T>,
+      fallback: T,
+    ): Promise<T> => {
+      try {
+        return await fn();
+      } catch (err) {
+        errors.push({ label, err });
+        return fallback;
+      }
+    };
 
     for (const officialCode of officialCodes) {
-      const resultRows: { result_id: number }[] = await dataSource
-        .query(`SELECT result_id FROM results WHERE result_official_code = ?`, [
-          officialCode,
-        ])
-        .catch(() => [] as { result_id: number }[]);
+      const resultRows = await trySelect(
+        `select results by official_code ${officialCode}`,
+        () =>
+          dataSource.query(
+            `SELECT result_id FROM results WHERE result_official_code = ?`,
+            [officialCode],
+          ) as Promise<{ result_id: number }[]>,
+        [] as { result_id: number }[],
+      );
       const resultIds = resultRows.map((r) => r.result_id);
 
       for (const resultId of resultIds) {
@@ -404,7 +424,7 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
   }, 30000);
 
   it('F15: full_delete_result_version leaves no orphaned result_innovation_use row (edit #5)', async () => {
-    const { resultId, officialCode } = await seedSourceResult();
+    const { resultId } = await seedSourceResult();
     await seedDetail(resultId, 7, 'A concrete justification for F15.');
 
     const [row] = await dataSource.query(
@@ -424,8 +444,6 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
       [resultId],
     );
     expect(remainingResult).toHaveLength(0);
-
-    officialCodes.splice(officialCodes.indexOf(officialCode), 1);
   }, 30000);
 
   it('F18: delete_result deactivates result_innovation_use in place, without hard-deleting it (edit #6)', async () => {

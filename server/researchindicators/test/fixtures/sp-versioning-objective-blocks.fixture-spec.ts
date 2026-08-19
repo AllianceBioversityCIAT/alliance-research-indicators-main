@@ -230,11 +230,20 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
         reportYear,
       ]);
     }
-    if (platformSeeded) {
-      await dataSource.query(
-        `DELETE FROM reporting_platforms WHERE platform_code = 'STAR'`,
-      );
-    }
+    // `STAR` is NEVER torn down here (T-13 rework attempt 2, FAIL-2 / A-9).
+    // `test/fixtures/global-setup.ts` now seeds it exactly once, in Jest's
+    // main process, before any worker (and therefore before this file's own
+    // `beforeAll`) starts — the only seed point structurally immune to the
+    // per-file parallel-worker race this teardown used to be exposed to
+    // (this file's own `beforeAll` check-then-insert above raced T-13's
+    // fixture files on a cold container: whichever file's check-then-insert
+    // or plain `INSERT` lost the race saw a 1062 duplicate-key error, and if
+    // THIS file's own teardown then deleted `STAR` while a T-13 file's
+    // `results` rows under `STAR` were still live, the T-13 file's own
+    // cleanup failed with MySQL 1451). `platformSeeded` is retained only as
+    // a diagnostic (whether THIS file's own check-then-insert created the
+    // row), not to gate a delete.
+    void platformSeeded;
 
     await dataSource.destroy();
   });
