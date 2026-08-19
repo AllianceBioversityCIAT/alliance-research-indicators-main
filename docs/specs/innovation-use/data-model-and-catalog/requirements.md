@@ -197,10 +197,10 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - Audit + soft-delete columns from `AuditableEntity`.
 
 **Acceptance criteria:**
-- [ ] AC.1 — The table exists with `result_id` as PK and both FKs resolvable.
-- [ ] AC.2 — The entity is registered in the TypeORM datasource and `tsc` compiles clean.
-- [ ] AC.3 — Inserting a row and reading it back preserves both columns and populates the audit columns.
-- [ ] AC.4 — `is_active` defaults to `1`, `deleted_at` to `NULL`, matching every sibling entity.
+- [x] AC.1 — The table exists with `result_id` as PK and both FKs resolvable.
+- [x] AC.2 — The entity is registered in the TypeORM datasource and `tsc` compiles clean.
+- [x] AC.3 — Inserting a row and reading it back preserves both columns and populates the audit columns.
+- [x] AC.4 — `is_active` defaults to `1`, `deleted_at` to `NULL`, matching every sibling entity.
 
 #### Scenario: A detail record persists
 
@@ -243,11 +243,11 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 | 10 | 9 | End-user / Beneficiaries | Innovation is commonly used by end-users or beneficiaries who were not involved in the initial innovation development. |
 
 **Acceptance criteria:**
-- [ ] AC.1 — Exactly ten active rows exist, ids 1–10, levels 0–9, no gaps and no duplicate `level`.
-- [ ] AC.2 — Every row's `name` and `definition` match the table above **verbatim**.
-- [ ] AC.3 — The seed is inside a migration file, not applied manually.
-- [ ] AC.4 — Re-running the migration suite from empty produces the identical ten rows.
-- [ ] AC.5 — `clarisa_innovation_readiness_levels` is unchanged — same row count, same contents.
+- [x] AC.1 — Exactly ten active rows exist, ids 1–10, levels 0–9, no gaps and no duplicate `level`.
+- [x] AC.2 — Every row's `name` and `definition` match the table above **verbatim**.
+- [x] AC.3 — The seed is inside a migration file, not applied manually.
+- [x] AC.4 — Re-running the migration suite from empty produces the identical ten rows.
+- [x] AC.5 — `clarisa_innovation_readiness_levels` is unchanged — same row count, same contents.
 
 #### Scenario: The catalog is reproducible and exact
 
@@ -279,10 +279,10 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - Which column set applies is determined by `actor_role_id` (R-IU-005) plus the mode flag.
 
 **Acceptance criteria:**
-- [ ] AC.1 — The five count columns exist, are nullable, and accept `0`.
-- [ ] AC.2 — Existing `result_actors` rows are unchanged after the migration — same row count, same boolean values, new columns `NULL`.
-- [ ] AC.3 — Innovation Dev's actor persistence and its green check behave identically before and after.
-- [ ] AC.4 — No column stores a total that duplicates a value derivable from parts present in the same row.
+- [x] AC.1 — The five count columns exist, are nullable, and accept `0`.
+- [x] AC.2 — Existing `result_actors` rows are unchanged after the migration — same row count, same boolean values, new columns `NULL`.
+- [x] AC.3 — Innovation Dev's actor persistence and its green check behave identically before and after.
+- [x] AC.4 — No column stores a total that duplicates a value derivable from parts present in the same row.
 
 #### Scenario: Counts coexist with the legacy booleans
 
@@ -319,9 +319,9 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - Applies when `institution_type_role_id` marks the row as Innovation Use.
 
 **Acceptance criteria:**
-- [ ] AC.1 — The column exists, is nullable, and accepts `0`.
-- [ ] AC.2 — Existing rows are unchanged; the new column is `NULL` on them.
-- [ ] AC.3 — Innovation Dev's organization persistence and green check are unaffected.
+- [x] AC.1 — The column exists, is nullable, and accepts `0`.
+- [x] AC.2 — Existing rows are unchanged; the new column is `NULL` on them.
+- [x] AC.3 — Innovation Dev's organization persistence and green check are unaffected.
 
 #### Scenario: The count column is additive only
 
@@ -344,9 +344,9 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - `ActorRolesEnum` and `InstitutionTypeRoleEnum` currently hold only `INNOVATION_DEV = 1`.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Each enum gains exactly one member with a value not already in use.
-- [ ] AC.2 — A matching catalog row is seeded by migration for each.
-- [ ] AC.3 — No existing enum member's numeric value changes.
+- [x] AC.1 — Each enum gains exactly one member with a value not already in use.
+- [x] AC.2 — A matching catalog row is seeded by migration for each.
+- [x] AC.3 — No existing enum member's numeric value changes.
 
 #### Scenario: Discriminators are additive
 
@@ -373,17 +373,17 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - Uses the existing `valid_text()` helper; introduces no new helper function.
 
 **Acceptance criteria:**
-- [ ] AC.1 — The function exists and is callable after migration.
-- [ ] AC.2 — Returns `0` for a result with no `result_innovation_use` row.
-- [ ] AC.3 — Returns `0` when `innovation_use_level_id` is null.
-- [ ] AC.4 — Returns `1` for **level 5** with a null explanation.
-- [ ] AC.5 — Returns `0` for **level 6** with an empty or whitespace-only explanation.
-- [ ] AC.6 — Returns `1` for level 6 with a valid explanation.
-- [ ] AC.7 — Returns `0` when an active Innovation-Use actor row has no resolvable actor type.
-- [ ] AC.8 — Ignores `result_actors` rows whose role is Innovation Dev.
-- [ ] AC.9 — `innovation_dev_validation` returns identical values before and after this migration for a fixed fixture set.
-- [ ] AC.10 — **Mode consistency:** returns `0` when an Innovation-Use actor row is in aggregate mode (`sex_age_disaggregation_not_apply = TRUE`) with a null `actors_count`, **and** when it is in disaggregated mode with all four counts null. *(Backs RB-5 layer 2, which `design.md` §6.4 step 4 implements. Added in round 2 — the SQL existed with no acceptance criterion authorizing it.)*
-- [ ] AC.11 — **Returns `0` for a result with zero Innovation-Use actor rows** (DD-11). Steps 3–4 are per-row predicates and would otherwise be vacuously true over an empty set, turning an actorless result green.
+- [x] AC.1 — The function exists and is callable after migration.
+- [x] AC.2 — Returns `0` for a result with no `result_innovation_use` row.
+- [x] AC.3 — Returns `0` when `innovation_use_level_id` is null.
+- [x] AC.4 — Returns `1` for **level 5** with a null explanation.
+- [x] AC.5 — Returns `0` for **level 6** with an empty or whitespace-only explanation.
+- [x] AC.6 — Returns `1` for level 6 with a valid explanation.
+- [x] AC.7 — Returns `0` when an active Innovation-Use actor row has no resolvable actor type.
+- [x] AC.8 — Ignores `result_actors` rows whose role is Innovation Dev.
+- [x] AC.9 — `innovation_dev_validation` returns identical values before and after this migration for a fixed fixture set.
+- [x] AC.10 — **Mode consistency:** returns `0` when an Innovation-Use actor row is in aggregate mode (`sex_age_disaggregation_not_apply = TRUE`) with a null `actors_count`, **and** when it is in disaggregated mode with all four counts null. *(Backs RB-5 layer 2, which `design.md` §6.4 step 4 implements. Added in round 2 — the SQL existed with no acceptance criterion authorizing it.)*
+- [x] AC.11 — **Returns `0` for a result with zero Innovation-Use actor rows** (DD-11). Steps 3–4 are per-row predicates and would otherwise be vacuously true over an empty set, turning an actorless result green.
 
 #### Scenario: The conditional explanation rule
 
@@ -419,10 +419,10 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - The submit gate needs **no change**: `completenessValidation` already ANDs every non-visual-only key it receives, so adding the key gates submission automatically.
 
 **Acceptance criteria:**
-- [ ] AC.1 — For an indicator-6 result, the returned object contains the six common keys plus `innovation_use` and `ip_rights`.
-- [ ] AC.2 — For indicators 1, 2, 4, and 5, the returned key set is exactly what it is today.
-- [ ] AC.3 — `innovation_use` is **not** in `VISUAL_ONLY_GREEN_CHECKS`.
-- [ ] AC.4 — `completenessValidation` throws `BadRequestException` when `innovation_use` is false and passes when every key is true.
+- [x] AC.1 — For an indicator-6 result, the returned object contains the six common keys plus `innovation_use` and `ip_rights`.
+- [x] AC.2 — For indicators 1, 2, 4, and 5, the returned key set is exactly what it is today.
+- [x] AC.3 — `innovation_use` is **not** in `VISUAL_ONLY_GREEN_CHECKS`.
+- [x] AC.4 — `completenessValidation` throws `BadRequestException` when `innovation_use` is false and passes when every key is true.
 
 #### Scenario: Submission is blocked while the section is incomplete
 
@@ -444,10 +444,10 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 **Details:** a standing constraint over R-IU-003, R-IU-004, R-IU-005, and R-IU-006, elevated to a requirement because it is the highest-severity failure mode of this spec (family risk FR-1, Kaizen KZ-003).
 
 **Acceptance criteria:**
-- [ ] AC.1 — The full server suite passes: `npm test -- --silent`.
-- [ ] AC.2 — Every existing `result-innovation-dev`, `result-actors`, `result-institution-types`, and `green-checks` spec passes **unmodified**.
-- [ ] AC.3 — Global Jest coverage stays ≥ 60%.
-- [ ] AC.4 — `npm run lint -- --quiet` is clean, and `git status` is re-checked afterward because the lint script carries `--fix` and mutates files.
+- [x] AC.1 — The full server suite passes: `npm test -- --silent`.
+- [x] AC.2 — Every existing `result-innovation-dev`, `result-actors`, `result-institution-types`, and `green-checks` spec passes **unmodified**.
+- [x] AC.3 — Global Jest coverage stays ≥ 60%.
+- [x] AC.4 — `npm run lint -- --quiet` is clean, and `git status` is re-checked afterward because the lint script carries `--fix` and mutates files.
 
 #### Scenario: The blast radius stays clean
 
@@ -473,10 +473,10 @@ Neither DC-2 nor DC-12 produces any runtime signal. A validation function return
 - No `DROP COLUMN`, no `MODIFY COLUMN`, no `NOT NULL` addition on an existing table.
 
 **Acceptance criteria:**
-- [ ] AC.1 — Every new migration's `down()` reverses its `up()` on a scratch schema.
-- [ ] AC.2 — No migration issues destructive DDL against a pre-existing column.
-- [ ] AC.3 — The stored-function migration drops and recreates only `innovation_use_validation`, never another `*_validation` function.
-- [ ] AC.4 — No migration runs against the shared dev database without explicit human approval.
+- [x] AC.1 — Every new migration's `down()` reverses its `up()` on a scratch schema.
+- [x] AC.2 — No migration issues destructive DDL against a pre-existing column.
+- [x] AC.3 — The stored-function migration drops and recreates only `innovation_use_validation`, never another `*_validation` function.
+- [x] AC.4 — No migration runs against the shared dev database without explicit human approval.
 
 #### Scenario: A bad deploy is recoverable
 
@@ -522,15 +522,15 @@ Indexing Innovation Use detail fields would make it the only indicator with sear
   > **Amended 2026-08-18.** This previously read *"the two hard-delete routines (transcript §4.1)"* as a single intact divergence. **The extracted bugfix's T-02b closed half of it** — it added the two missing `DELETE` statements for `result_impact_outcomes` / `result_strategic_objectives` to `SP_delete_result_version`, harmonizing the table enumeration with `full_delete_result_version`. Only the `SIGNAL` vs `RETURN FALSE` difference survives from §4.1. **That closure must not be re-opened by M6.**
 
 **Acceptance criteria:**
-- [ ] AC.1 — Versioning a populated Innovation Use result reproduces the `result_innovation_use` row on the new version, with level id and explanation intact.
-- [ ] AC.2 — Versioning preserves all four disaggregated counts, `actors_count`, and `organization_count`.
-- [ ] AC.3 — `SP_delete_result_version` leaves no orphaned `result_innovation_use` row.
-- [ ] AC.4 — `full_delete_result_version` leaves no orphaned `result_innovation_use` row.
-- [ ] AC.5 — **`delete_result` sets `result_innovation_use.is_active = FALSE` and populates `deleted_at`** — no *active* orphan survives a soft delete.
-- [ ] AC.6 — Versioning **and all three delete paths** behave identically for an **Innovation Dev** result before and after the extracted repair migrations + M6, compared column by column and row by row. *(Gated by fixture F16 — **not** by F12, which compares a stored function and executes no routine.)* *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "before and after M0+M6" — this chunk ships M1…M6, not M0.)*
-- [ ] AC.7 — M6's `down()` restores all four prior bodies exactly. *(`SP_delete_result_version`'s historical `down()` is a bare `DROP` with no recreation — the neighbouring pattern must not be copied blindly.)*
-- [ ] AC.8 — M6 makes exactly the six edits in transcript §6 and no others. In particular it adds **no** `result_quantifications` copy block (already copied at `:297`), and **the divergences that remain pre-M6 survive intact — the `SIGNAL` vs `RETURN FALSE` difference (transcript §4.1) and `delete_result`'s six soft-delete gaps (§5.1)**. *(Amended 2026-08-18: formerly "both pre-existing divergences". The §4.1 table-enumeration divergence was closed by the extracted bugfix's T-02b and is **not** to be restored — verifying against the pre-T-02b bodies would fail this AC for a false reason.)*
-- [ ] AC.9 — No routine amendment is applied to `result_actors` / `result_institution_types` on any delete path — both are already removed wholesale by row; only the versioning copy lists change.
+- [x] AC.1 — Versioning a populated Innovation Use result reproduces the `result_innovation_use` row on the new version, with level id and explanation intact.
+- [x] AC.2 — Versioning preserves all four disaggregated counts, `actors_count`, and `organization_count`.
+- [x] AC.3 — `SP_delete_result_version` leaves no orphaned `result_innovation_use` row.
+- [x] AC.4 — `full_delete_result_version` leaves no orphaned `result_innovation_use` row.
+- [x] AC.5 — **`delete_result` sets `result_innovation_use.is_active = FALSE` and populates `deleted_at`** — no *active* orphan survives a soft delete.
+- [x] AC.6 — Versioning **and all three delete paths** behave identically for an **Innovation Dev** result before and after the extracted repair migrations + M6, compared column by column and row by row. *(Gated by fixture F16 — **not** by F12, which compares a stored function and executes no routine.)* *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "before and after M0+M6" — this chunk ships M1…M6, not M0.)*
+- [x] AC.7 — M6's `down()` restores all four prior bodies exactly. *(`SP_delete_result_version`'s historical `down()` is a bare `DROP` with no recreation — the neighbouring pattern must not be copied blindly.)*
+- [x] AC.8 — M6 makes exactly the six edits in transcript §6 and no others. In particular it adds **no** `result_quantifications` copy block (already copied at `:297`), and **the divergences that remain pre-M6 survive intact — the `SIGNAL` vs `RETURN FALSE` difference (transcript §4.1) and `delete_result`'s six soft-delete gaps (§5.1)**. *(Amended 2026-08-18: formerly "both pre-existing divergences". The §4.1 table-enumeration divergence was closed by the extracted bugfix's T-02b and is **not** to be restored — verifying against the pre-T-02b bodies would fail this AC for a false reason.)*
+- [x] AC.9 — No routine amendment is applied to `result_actors` / `result_institution_types` on any delete path — both are already removed wholesale by row; only the versioning copy lists change.
 
 #### Scenario: A versioned result keeps its Innovation Use data
 

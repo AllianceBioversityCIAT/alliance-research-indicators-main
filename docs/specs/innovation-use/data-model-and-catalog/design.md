@@ -253,7 +253,7 @@ Six migrations, one per concern (template §4), append-only (ADR-5), applied in 
 | M3 | `addInnovationUseCountsToSharedTables` | 5 columns on `result_actors`, 1 on `result_institution_types` | `DROP COLUMN` × 6 — **new columns only** |
 | M4 | `insertInnovationUseRoles` | 3 discriminator rows | `DELETE` by id |
 | M5 | `createInnovationUseValidation` | The stored function | `DROP FUNCTION innovation_use_validation` |
-| **M6** | `updateLifecycleRoutinesForInnovationUse` | **Amends all FOUR lifecycle routines** — six edits (§6.7, transcript §6) | `DROP` + `CREATE` restoring all four prior bodies verbatim |
+| **M6** | `AmendLifecycleRoutinesForInnovationUse` *(corrected 2026-08-19 by `/akili-validate`, WARN-3: the spec formerly read `updateLifecycleRoutinesForInnovationUse`; the migration on disk is `1787083305648-AmendLifecycleRoutinesForInnovationUse.ts`. Migration filenames are immutable under ADR-5, so the spec is what changes.)* | **Amends all FOUR lifecycle routines** — six edits (§6.7, transcript §6) | `DROP` + `CREATE` restoring all four prior bodies verbatim |
 
 **Ordering:** **the extracted bugfix first** (it carries the former M0) — M6 reproduces `SP_versioning`'s body, so it must inherit the repaired one, and F13/F16/F18 cannot execute before it. M2 depends on M1 (FK target). M5 depends on M1–M4. **M6 depends on the extracted bugfix's repair migrations, M2 and M3** *(corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "M6 depends on M0, M2 and M3" — this chunk ships six migrations, M1…M6; M0 is not one of them)*. M3 and M4 are independent of each other.
 
