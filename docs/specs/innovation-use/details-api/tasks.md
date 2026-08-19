@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19); T-07 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **11 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[~]` — its own DD-15 instance plus three test-fidelity fixes are open; attempt 2 of 3 pending.** T-08 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **13 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -13,13 +13,14 @@
 
 ## 0. Read this first
 
-**Three traps will silently produce a green run over broken work.** They are restated per task, but a worker who internalises them here will not hit them:
+**Four traps will silently produce a green run over broken work.** They are restated per task, but a worker who internalises them here will not hit them:
 
 | # | Trap | Consequence if missed |
 | --- | --- | --- |
 | 1 | **No global `ValidationPipe`.** It is applied per handler. The reference `result-innovation-dev` controller applies none | Every `@IsInt()` / `@Min(0)` on the DTO is inert. Validation "works" in review and does nothing in production (DD-8) |
 | 2 | **`id ≠ level`.** `clarisa_innovation_use_levels.id = level + 1` | Any rule written `innovation_use_level_id >= 6` demands the justification a full level early, and passes a naive test (family D-1) |
 | 3 | **A fixture named `*.spec.ts` under `test/fixtures/` is collected by nothing.** `test/jest-fixtures.json` matches only `*.fixture-spec.ts`; `npm test`'s `rootDir` is `src` | A zero-test run that reports success (server guide §9) |
+| 4 | **A route node is NOT a registration.** `RouterModule.register()` stamps a path prefix onto a module constructor; it never instantiates the module. Every new module must ALSO be added to the module-graph file — `entities.module.ts` for entity modules, `clarisa.module.ts` for clarisa control lists | Every handler on the module returns **`404` in production** with no boot error and no warning. Mocked-provider unit specs cannot detect it, and neither can a spec asserting the shape of the `route` array. **This trap already shipped twice in this spec** — T-01 and T-07 both closed their route node without a registration (DD-15). The falsifiable assertion is over `Reflect.getMetadata('imports', <GraphModule>)` |
 
 **Global disqualifiers — an outcome that trips any of these is *inconclusive*, never a pass:**
 
@@ -70,7 +71,7 @@ graph TD
 - **Requirements covered:** R-IUA-010 (all ACs + its scenario), R-IUA-013 AC.1, AC.5
 - **Depends on:** none
 - **Size:** S (~120 LOC) · **Effort:** `medium`
-- **Status:** ~~todo~~ → ~~`[~]` blocked (Pivot)~~ → **`[x]` DONE 2026-08-19** — PASS on attempt 2 of 3. Attempt 1 FAILed against a task instruction that is technically unachievable (`@ApiOperation` throws when applied at class level); resolved by user ruling as **DD-13 / D-IUA-10**, not by rework. Full suite green (330/330 suites, 2161/2161 tests). Evidence: [`./execution.md`](./execution.md) → *T-01* + *Pivot Record: T-01* + *T-01 — FINAL*
+- **Status:** ~~todo~~ → ~~`[~]` blocked (Pivot)~~ → ~~`[x]` DONE 2026-08-19~~ → ~~`[~]` REOPENED 2026-08-19~~ → **`[x]` DONE 2026-08-19 (re-closed)** — PASS on attempt 1 of the resumed round, T-01's third review round overall. Two lines in `clarisa.module.ts` plus a falsifiable membership assertion over `Reflect.getMetadata('imports', ClarisaModule)`; suite 334/2257. The Reviewer verified the negative path **structurally** — the leaf has exactly one incoming graph edge, so deleting the registration necessarily reddens the test. Evidence: [`./execution.md`](./execution.md) → *T-01 … (resumed after the T-07 Pivot)*. **Reopen rationale retained below for audit:** — the earlier PASS stands on everything it audited, and is **not** withdrawn as an assessment of that work; but its Done criterion 1 and R-IUA-010 AC.1 both assert that `GET /api/v1/tools/clarisa/innovation-use-levels` returns ten rows, and **it returns `404`**: `ClarisaInnovationUseLevelsModule` has a route node in `clarisa.routes.ts` and no entry in `clarisa.module.ts`, so Nest never instantiates it (**DD-15**, trap 4). Found by the Leader's two-direction sweep during T-07's review, not by any Reviewer — the defect was invisible to every gate T-01 had, because mocked-provider unit specs never boot the module graph. A `[x]` whose stated outcome is false is the one state AKILI cannot carry, hence the reopen. Remaining work is one line in `clarisa.module.ts` plus one falsifiable assertion. Prior evidence retained: [`./execution.md`](./execution.md) → *T-01* + *Pivot Record: T-01* + *T-01 — FINAL*; reopen rationale → *Pivot Record: T-07*
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Files touched**
@@ -80,10 +81,11 @@ graph TD
 - `…/clarisa-innovation-use-levels.module.ts` *(new)*
 - `…/clarisa-innovation-use-levels.service.spec.ts`, `….controller.spec.ts` *(new)*
 - `src/domain/tools/clarisa/routes/clarisa.routes.ts` *(modified)*
+- `src/domain/tools/clarisa/clarisa.module.ts` *(modified — **added 2026-08-19 by the T-07 Pivot**; `+ ClarisaInnovationUseLevelsModule` in `imports`. Omitted from the original list because `design.md` §2.1's composition table omitted it. Without it the route node is a path prefix on a module Nest never instantiates — DD-15, trap 4)*
 
 **Scope**
 
-Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseService` subclass, `BaseController` subclass, three-line module — with **one override**: `findAll()` adds `order: { level: 'ASC' }` (DD-6). Register at `innovation-use-levels` in `clarisaRoutes`. The entity already exists (chunk 1).
+Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseService` subclass, `BaseController` subclass, three-line module — with **one override**: `findAll()` adds `order: { level: 'ASC' }` (DD-6). Register at `innovation-use-levels` in `clarisaRoutes` **and add the module to `clarisa.module.ts`'s `imports`** — both, not either (DD-15, trap 4; the original wording named only the route file, and that is the wording the defect came through). The entity already exists (chunk 1).
 
 **Implementation notes**
 
@@ -97,11 +99,12 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 - [ ] The service's `findAll()` passes an explicit `order` clause — asserted in the unit spec against the mocked repository's received options object *(AC.4, and the scenario's `AND IT MUST carry an explicit order clause a code reader can point at`)*
 - [ ] The endpoint renders under the `Clarisa` Swagger tag with the bearer lock *(AC.5)*
 - [ ] `grep` over the two new source files returns **zero** `findByName` / `findByNames` call sites *(AC.6, and the scenario's `BUT it must NOT resolve a level by name`)*
+- [x] **`ClarisaInnovationUseLevelsModule` is in `clarisa.module.ts`'s `imports`, asserted over `Reflect.getMetadata('imports', ClarisaModule)`** — not merely present in `clarisa.routes.ts` *(DD-15, trap 4; this is what makes AC.1's "returns ten rows" true rather than `404`. **Added 2026-08-19 by the T-07 Pivot.** A route-array assertion does NOT discharge this — it is a stand-in that never evaluates what it stands in for, KZ-001)*
 - [ ] `npm test -- --silent` green
 
 **Verification & its limits**
 
-`npm test -- --silent`. **Falsifying input:** delete the `order` override → the unit spec asserting the options object fails.
+`npm test -- --silent`. **Falsifying input:** delete the `order` override → the unit spec asserting the options object fails. **Second falsifying input (added 2026-08-19):** delete the `clarisa.module.ts` entry → the module-graph assertion fails. Note that *no* pre-Pivot gate on this task could be falsified by that deletion, which is precisely why the defect shipped.
 
 > **Declared insufficient (scenario clause `BUT it must NOT achieve that order by inheriting default primary-key ordering`):** an end-to-end assertion that the returned sequence is `0…9` **cannot** falsify a missing order clause, because `id = level + 1` makes PK order coincidentally correct on the current seed. That is why the gate is the unit spec on the clause, and why this task must **record in its report** that the ordering guarantee rests on a code-level assertion, not a behavioral one. See T-11's F-D.
 
@@ -341,7 +344,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-013 (all ACs) · R-IUA-002 AC.7 · R-IUA-003 AC.5 · R-IUA-004 AC.1–AC.8 behaviorally
 - **Depends on:** T-06
 - **Size:** M (~210 LOC incl. spec) · **Effort:** `medium`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[~]` blocked (Pivot) 2026-08-19** — attempt 1 of 3 delivered the controller, module, route node and a genuinely behavioral pipe spec; both parallel lens Reviewers returned `STATUS: FAIL`. The loop was stopped by the Pivot Protocol with **2 attempts unspent**, because the blocking defect is in the approved design (`design.md` §2.1 omitted the module-graph files) and its fix reaches into T-01, already closed `[x]`. Evidence: [`./execution.md`](./execution.md) → *T-07* + *Pivot Record: T-07*
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Files touched**
@@ -350,6 +353,8 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - `…/result-innovation-use.module.ts` *(new)*
 - `…/result-innovation-use.controller.spec.ts` *(new)*
 - `src/domain/routes/main.routes.ts` *(modified — one node in `ResultsChildren`)*
+- `src/domain/entities/entities.module.ts` *(modified — **added 2026-08-19 by the Pivot**; `+ ResultInnovationUseModule` in `imports`. Omitted from the original list because `design.md` §2.1's composition table omitted it. Without it the route node is a path prefix on a module Nest never instantiates, and both handlers return `404` — DD-15, trap 4)*
+- `src/domain/routes/main.routes.spec.ts` *(new — **added 2026-08-19 by the Pivot**, ratifying attempt 1's addition. Both lens Reviewers independently ruled it in scope: T-07's own Done criteria include the AC.5 registration criterion, and before this file that criterion had no assertion any mutation could falsify. It is **declared insufficient on its own** — asserting the shape of the `route` array does not prove the endpoint exists, which is why the DD-15 defect survived it)*
 
 **Scope**
 
@@ -373,6 +378,11 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - [ ] **Behavioral pipe spec:** construct `new ValidationPipe({ whitelist: true, transform: true })` and call `.transform(payload, { type: 'body', metatype: CreateResultInnovationUseDto })` over every T-02 case — negative, fractional, both-modes, missing `actor_type_id`, blank OTHER name, and the two accept cases *(R-IUA-004 AC.1–AC.4, AC.6–AC.8)*
 - [ ] The same pipe spec proves a payload carrying `total` is **accepted** and `total` is **absent** from the transformed object *(R-IUA-004 AC.5, and its scenario's `BUT it must NOT reject the request merely because total was present`)*
 - [ ] The both-modes rejection message identifies the offending row by index *(R-IUA-004 scenario 2's `AND IT MUST apply the check per row … the message identifies the offending row`)*
+- [ ] **`ResultInnovationUseModule` is in `entities.module.ts`'s `imports`, asserted over `Reflect.getMetadata('imports', EntitiesModule)`** — not merely present in `main.routes.ts` *(DD-15, trap 4. **Added 2026-08-19 by the Pivot.** This is what makes the two handlers reachable rather than `404`. Do **not** rely on T-08's planned `results.module.ts` import to supply it — that would make the endpoints work as a side effect of an unrelated task, with no registration where a maintainer would look)*
+- [ ] **The route is absent from `AppModule`'s `JwtMiddleware` `exclude` list**, asserted directly *(R-IUA-002 AC.7 per **DD-16**. **Added 2026-08-19 by the Pivot** — AC.7 was claimed by this task's *Requirements covered* line and by §3's matrix, but no Done criterion carried it. The residual is recorded, not hidden: this proves the mechanism that produces the `401`, not a live `401`, which needs an HTTP seam this spec's unit tier does not have)*
+- [ ] **The `@GetResultVersion()` assertion is falsifiable on BOTH handlers** — assert the specific parameters the decorator contributes (the `in: 'path'` entry plus the two `in: 'query'` entries from `versioning.decorator.ts`), never `params.length > 0` *(**added 2026-08-19 by the Pivot.** `@ApiBody` writes into the same `DECORATORS.API_PARAMETERS` array, so a length check on the PATCH handler is a tautology that survives deleting the decorator)*
+- [ ] **R-IUA-004 AC.3 is exercised on all four disaggregated count fields**, not one *(**added 2026-08-19 by the Pivot.** AC.3 is universally quantified over the four; `it.each` over the existing `disaggregatedFields` array. KZ-002 — one field is a convenient proxy for the real thing)*
+- [ ] **The both-modes rejection message names `sex_age_disaggregation_not_apply`**, not only the offending count field *(R-IUA-004 scenario 2's `AND errors names the conflict between the mode flag and the disaggregated field`; **added 2026-08-19 by the Pivot** — a field-path-only match would also be satisfied by a `@Min(0)` message)*
 - [ ] `grep` over the controller returns **zero** `@Roles` occurrences *(DD-5)*
 - [ ] No `console.*` introduced *(AC.6)*
 - [ ] `npm test -- --silent` green

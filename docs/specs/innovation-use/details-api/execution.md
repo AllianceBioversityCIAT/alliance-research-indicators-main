@@ -991,3 +991,257 @@ Mocked repositories throughout. This proves the **call sequence and the construc
 **Budget status:** 6 of 13 tasks complete. **11 of ~24 review rounds consumed.**
 
 ---
+### T-07 — Controller, module, route registration, `ValidationPipe`, Swagger
+
+- **Status at the time of this entry:** `[~]` **PIVOT** — blocked on a spec defect, not on implementation quality. The rework loop was stopped by the Pivot Protocol with **2 of 3 attempts unspent**, because the defect reaches into a task already closed `[x]` and its fix crosses task boundaries.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 (of a possible 3)
+- **Requirements in scope:** R-IUA-013 (all ACs), R-IUA-002 AC.1 (envelope half) + AC.7, R-IUA-003 AC.5, R-IUA-004 AC.1–AC.8 behaviorally
+- **Skills assigned:** `nestjs-expert`, `api-design-principles` (task defaults, unchanged) · **Effort:** `medium`
+- **Review mode:** parallel lens Reviewers (2) — conformance/wiring and test-fidelity. Chosen over the single-Reviewer lens checklist that `medium` effort would default to, because T-07 carries the only committed gate in this spec for R-IUA-004 AC.1–AC.8. This is the same up-front-rigour choice that turned T-03's three rounds into T-04's and T-05's one.
+
+#### Attempt 1
+
+**Files changed** (5 files, +657 lines, additive except one route file):
+
+| File | State |
+| --- | --- |
+| `src/domain/entities/result-innovation-use/result-innovation-use.controller.ts` | new (73) |
+| `…/result-innovation-use.module.ts` | new (18) |
+| `…/result-innovation-use.controller.spec.ts` | new (537) |
+| `src/domain/routes/main.routes.spec.ts` | new (29) — **not in T-07's *Files touched* list**; see the scope ruling below |
+| `src/domain/routes/main.routes.ts` | modified — one import + one four-line route node |
+
+**Implementer verification**
+
+- `npm test -- --silent` from `server/researchindicators` → **333 suites passed, 2255 tests passed, 1 snapshot**. Arithmetic independently reconstructed by the test-fidelity Reviewer: 331 → 333 suites is exactly two new spec files; 2214 + 41 = 2255, where 41 = 40 `it` cases in the controller spec (13 wiring + 27 pipe) + 1 in the route spec. Consistent.
+- `npx eslint --no-fix` on all new/touched files → 0 errors. `--fix` was run once on its own new files only, then re-verified clean and the suite re-run green.
+- Mutation sweep run **up front**, before reporting, per the brief: 7 mutations, each restored. All 7 behaved as predicted, including the falsifying input the task names (remove `@UsePipes` → the behavioral pipe spec stays green, the handler-decorator assertion fails).
+- The sweep also **found a genuine gap and closed it**: deleting the `innovation-use` route node left the entire suite green, because no route node in this repo was covered by any spec. The Implementer wrote `main.routes.spec.ts` in response.
+
+**Implementer `Not Done / Assumptions`** (recorded verbatim, per the Step 2.3.0 rule):
+
+> - Added `server/researchindicators/src/domain/routes/main.routes.spec.ts`, not in the task's "Files touched" list, because the mutation sweep proved the route-registration criterion (AC.5) had no automated gate at all in this repo. This is additive-only and scoped to exactly the one node this task adds.
+> - `ResultInnovationUseModule` imports `ResultActorsModule`, `ResultInstitutionTypesModule`, `ResultQuantificationsModule` (the providers the already-existing `ResultInnovationUseService` actually injects). It does not import `ClarisaInnovationUseLevelsModule` since the service resolves the catalog via `dataSource.getRepository(ClarisaInnovationUseLevel)` directly, not via an injected service — no DI dependency on that module exists.
+> - Swagger completeness (full `/swagger` render check) is out of scope per `design.md` — deferred to T-13's human check, as stated in the task.
+
+**Reviewer verdicts — both lenses `STATUS: FAIL`.**
+
+##### Lens A — conformance / wiring: `STATUS: FAIL`
+
+Eight of ten Done criteria carried **no finding** and were verified at source: envelope via `ResponseUtils.format` with `HttpStatus.OK` reaching both the envelope `status` and the wire status through `ResponseInterceptor`; `ResultStatusGuard` on PATCH only with the real guard asserting `400` not `403`; `@GetResultVersion()` as the real decorator with default `ParamOrQueryEnum.PARAM`, byte-identical to the reference controller; pipe options exactly `{ whitelist: true, transform: true }` with `forbidNonWhitelisted` deliberately absent; Swagger complete on both own-declared handlers with **DD-13's inheritance exemption neither invoked nor needed**; zero `@Roles`; zero `console.*`; and the route node correctly nested inside `ResultsChildren` under `results`, with shadowing ruled out in both directions against the digit-constrained `${RESULT_CODE}/pool-funding-alignment` sibling.
+
+Its two FAIL issues are recorded in the Pivot Record below (Issue 1) and as the spec correction (Issue 2).
+
+##### Lens B — test fidelity: `STATUS: FAIL`
+
+The central question this lens was spawned to answer — *is the pipe spec behavioral or theatrical?* — resolved **behavioral, genuinely**. The spec constructs the real `ValidationPipe`, calls `.transform(payload, { type: 'body', metatype: CreateResultInnovationUseDto })` against the **real imported DTO class**, and reads real class-validator messages off `err.getResponse().message`, matching field-path fragments rather than hand-transcribed wording. KZ-001 is satisfied: the double is the subject.
+
+It also supplied the analysis the Implementer's sweep could not, having mutated only wiring: judging each assertion against its corresponding **DTO rule** being broken. All rules are locked except one — `IsExclusiveOfActorMode('disaggregated')` is declared on all four disaggregated counts but exercised on only `women_youth_count`.
+
+Three FAIL issues, all in-scope and all cheap:
+
+1. **The `@GetResultVersion()` presence assertion on the PATCH handler is a tautology.** `@ApiBody` writes into the *same* `DECORATORS.API_PARAMETERS` array (verified in `@nestjs/swagger/dist/decorators/api-body.decorator.js:21` → `helpers.js:84-91`), so deleting `@GetResultVersion()` from `update` leaves one entry and `length > 0` still holds. The spec's own comment claims the opposite. The sweep mutated only `findOne`, which carries no `@ApiBody`, so it could not detect this. **Remediation:** assert the specific parameters the decorator contributes — the `in: 'path'` entry plus the two `in: 'query'` entries from `versioning.decorator.ts:13-40` — on **both** handlers, and correct the false comment. The `findOne` assertion is falsifiable today only by accident and becomes a tautology the moment anyone adds an `@ApiQuery` to the GET.
+2. **R-IUA-004 AC.3 is proven for one of four fields.** AC.3 is universally quantified over the four disaggregated counts; removing the decorator from the other three leaves the suite green. Since T-07 is by design the only committed gate for R-IUA-004, 75% of AC.3 is untested here and untested anywhere. **Remediation:** `it.each` over the `disaggregatedFields` array already declared in the spec. Three assertions, no new fixtures. **KZ-002 verbatim — one field is a convenient proxy for the real thing.**
+3. **Scenario 2's clause `AND errors names the conflict between the mode flag and the disaggregated field` has no covering assertion** — the current match on the field path would also be satisfied by a `@Min(0)` message. **Remediation:** additionally assert some message names `sex_age_disaggregation_not_apply`.
+
+Plus one item Lens B explicitly referred to the Leader for adjudication, recorded as **DD-15** below: **R-IUA-002 AC.7 (`401`) is claimed by T-07 and delivered by nothing.**
+
+##### Scope ruling — `main.routes.spec.ts` is IN SCOPE (both lenses concur, independently)
+
+T-07's Done criteria include *"The module is registered under `results` as `innovation-use` (AC.5)"*, and before this file that criterion had **no assertion any mutation could falsify**. Lens A quoted T-07's own *Verification & its limits* — *"Both are required, and the task must state why: the pipe spec proves the **rules** work; only the decorator assertion proves the **handler runs them**"* — and ruled that *Files touched* is a plan, not a prohibition, while the Done criteria are the contract. Lens B independently reached the same conclusion and additionally verified the file has teeth: the search is confined to `resultsNode.children`, so a node at the wrong nesting level would not satisfy it, and `.module` identity is asserted.
+
+**Both lenses also agree it is insufficient**, and that matters more than the scope question: asserting the shape of the `route` array is a stand-in for "the endpoint exists" that never evaluates what it stands in for. It is KZ-001 in the very file written to close a KZ-001-shaped gap, and it is why Issue 1 below survived a green suite.
+
+---
+
+## Pivot Record: T-07
+
+### The blocker
+
+**Two route-registered modules added by this spec are absent from the application's module graph. Four endpoints that the suite reports as delivered return `404` in production.**
+
+`RouterModule.register()` does not import or instantiate the modules it names. Verified at source in `@nestjs/core/router/router-module.js`: it returns a module exposing the routes as a `ROUTES` provider, stamps `MODULE_PATH` metadata onto each module constructor, and then looks the module up in `modulesContainer` — **returning silently when it is not found**. No boot error. No warning. A route node is a path *prefix*; module instantiation is a separate, mandatory registration.
+
+**Instance 1 — T-07 (found by Lens A, confirmed independently by the Leader).** `ResultInnovationUseModule` appears at exactly three sites repo-wide: the import and node in `main.routes.ts`, and the new route spec. It is **absent from `entities.module.ts`**, whose ~100-module `imports` array is where every other route-registered entity module lives — including `ResultInnovationDevModule` (lines 47 and 149), the exemplar this task was told to mirror. `app.module.ts` imports `EntitiesModule`, never individual entity modules.
+
+**Instance 2 — T-01, already closed `[x]` (found by the Leader's KZ-005 two-direction sweep, not by any Reviewer).** The forward sweep for the corrected term returned **zero** mentions of `entities.module` or `EntitiesModule` anywhere in the spec folder — the omission was total, not local to T-07. Testing whether the same omission had already bitten a closed task:
+
+```
+ClarisaActorTypesModule        (working sibling)  → clarisa.module.ts:17, :42  +  clarisa.routes.ts:15, :87
+ClarisaInnovationUseLevelsModule (T-01)           → clarisa.routes.ts:12, :75  only
+```
+
+`ClarisaInnovationUseLevelsModule` is **absent from `clarisa.module.ts`**. `GET /api/v1/tools/clarisa/innovation-use-levels` returns `404`.
+
+### Why this is a Pivot and not a rework
+
+The defect's root cause is in the approved design, not in either Implementer's work. `design.md` §2.1's composition table enumerates the **route** files (`main.routes.ts`, `clarisa.routes.ts`) and omits the **module-graph** files (`entities.module.ts`, `clarisa.module.ts`) entirely. Neither Implementer had a file to touch; neither Reviewer had a criterion to check. Both did what the spec said.
+
+Three consequences put this outside a rework loop:
+
+1. **It invalidates a `[x]`.** T-01's Done criterion 1 and R-IUA-010 AC.1 both assert that `GET …/innovation-use-levels` returns ten rows. It returns `404`. T-01's PASS rests on evidence — mocked-provider unit specs and a `findByName` grep — that could not have detected this. Under AKILI a `[x]` whose stated outcome is false is the one state the methodology cannot tolerate, and correcting it is not T-07's to do.
+2. **The fix crosses task boundaries**, into a file no task in this spec lists.
+3. **T-08 would have masked it.** T-08's *Files touched* includes `results.module.ts (modified — import ResultInnovationUseModule)`, which would make the Innovation Use endpoints start working as a side effect of an unrelated task — with no explicit registration where a maintainer would look, and with T-01's catalog endpoint still broken. Had the loop simply continued, the defect would have half-healed itself and become invisible.
+
+**This is a fourth instance of `tasks.md` §0's stated shape — a green run over broken work — and the first one §0 does not name.** Traps 1–3 cover an inert `ValidationPipe`, the `id ≠ level` off-by-one, and uncollected fixtures. This is trap 4: *a route node is not a registration.* The three named traps were each caught by the machinery built to catch them; this one was caught only because a doc-drift sweep was run on an unrelated finding.
+
+### Alternatives considered
+
+| Option | Assessment |
+| --- | --- |
+| **A. Fix both instances inside T-07's attempt 2** | Fastest, and the smallest diff. **Rejected as the Leader's unilateral call:** it edits a file no task lists and silently repairs a task closed `[x]`, leaving T-01's status unfalsifiable — the exact failure mode AKILI's write-evidence-before-checkbox rule exists to prevent. Viable *with* the user's approval, which is what this record asks for. |
+| **B. Reopen T-01, fix each instance in its owning task** | Most faithful to traceability: T-01 reopens `[~]` and closes on its own evidence; T-07's attempt 2 covers only its own instance. Costs one extra review round on T-01. **Recommended.** |
+| **C. Mint a new task for module-graph registration** | **Rejected on rule.** A task not in the approved `tasks.md` is scope the user never approved. The work belongs to two existing tasks that each under-delivered against their own ACs; a new task would launder that into new scope. |
+| **D. Defer to T-13's full gate** | **Rejected.** T-13 is the cleanup and human-Swagger task. Deferring leaves two `[x]`/`[~]` tasks asserting live endpoints that 404, and T-08 would mask half of it first. |
+
+### Revised technical direction (drafted, pending approval)
+
+1. **`design.md` §2.1** — add the two module-graph rows and correct the stale catalog-import claim. Both edits applied below; the composition table was the defect's origin and is the only place a future reader would look.
+2. **`design.md` §11** — record **DD-15** (module-graph registration is a distinct step from route registration) and **DD-16** (the R-IUA-002 AC.7 adjudication).
+3. **`tasks.md` §0** — add **trap 4**, so the next worker in this spec family inherits the lesson the way traps 1–3 were inherited.
+4. **`tasks.md` T-01** — reopen `[~]`; add `clarisa.module.ts` to *Files touched* and one falsifiable Done criterion.
+5. **`tasks.md` T-07** — add `entities.module.ts` and `main.routes.spec.ts` to *Files touched*; add the AC.7 criterion per DD-16; retain the three Lens B remediations for attempt 2.
+6. **No ADR is overturned.** No TRD architecture decision is engaged — this is a Nest composition mechanic, not an architectural choice.
+
+### DD-16 — the R-IUA-002 AC.7 adjudication (Leader, referred by Lens B)
+
+AC.7 (`401` on an unauthenticated read) is assigned to T-07 by both the task's *Requirements covered* line and §3's traceability matrix, but T-07's Done criteria contain no line for it and the delivered spec asserts nothing. `design.md` §10.1 rules the fixture tier out of auth entirely (*"Cannot prove … Nothing about HTTP, auth, or Swagger"*), so no downstream task inherits it. Left alone it becomes a claimed-but-undelivered AC — invisible once accepted.
+
+**Ruling: discharge it at T-07 with the mechanism, and record the residual honestly.** The `401` is produced by `JwtMiddleware` applying to the route, and the falsifiable unit-tier fact is that the new route is **not** in `AppModule`'s `exclude` list. That is a sound assertion, not a proxy for one. It does not prove a live `401`, which needs an HTTP seam this spec's unit tier does not have — so the residual is stated rather than closed. Option (b) that Lens B offered — reassigning AC.7 to T-13 — was rejected because T-13 is a human Swagger check, and routing an auth criterion into a human eyeball gate is weaker than the assertion available here.
+
+### Budget status at the Pivot
+
+**12 of ~24 review rounds consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×1) at 6 of 13 tasks complete. Option B adds one round to T-01 and one to T-07, landing at ~14 of ~24 with 7 tasks remaining. **Not a tripwire breach**, but the margin is thinner than the task count suggests and is recorded here so the next gate reads it accurately.
+
+### Correction Closure — T-07 Pivot (two-direction sweep, KZ-005)
+
+The spec edits in the *Revised technical direction* above were applied and then closed with the sweep KZ-005 mandates on **every** axis, not only the one that last failed.
+
+**Applied edits (6 files' worth, 4 documents):**
+
+| Document | Edit |
+| --- | --- |
+| `design.md` §2.1 | Added the `entities.module.ts` and `clarisa.module.ts` rows; corrected the stale *"+ the catalog module"* import claim on the `result-innovation-use.module.ts` row |
+| `design.md` Document Control | Modified-file count `4` → **6** |
+| `design.md` §11 | **DD-15** (a route node is not a registration) and **DD-16** (the AC.7 adjudication) |
+| `design.md` §15 | Revision-log entry |
+| `requirements.md` R-IUA-013 AC.5 | **Corrected** — see the backward-direction finding below |
+| `tasks.md` §0 | **Trap 4** added; header changed from "Three traps" to "Four traps" |
+| `tasks.md` T-01 | Reopened `[~]`; `clarisa.module.ts` added to *Files touched*; one falsifiable Done criterion added; Scope wording corrected; a second falsifying input added to *Verification & its limits* |
+| `tasks.md` T-07 | Status `[~]`; `entities.module.ts` and `main.routes.spec.ts` added to *Files touched*; five Done criteria added (module-graph registration, AC.7 per DD-16, and Lens B's three remediations) |
+| `tasks.md` header | Task-status line and round tally (11 → 12) |
+
+**Forward direction — the superseded value at sites the analysis did not cite.** Grep for *"the catalog module"* returned two hits: `design.md` §2.1 (the cited site, corrected) and one uncited hit in `requirements.md`. Grep for *"Three traps"* returned zero after the §0 edit. Grep for the route-only registration phrasing returned an uncited hit in **`tasks.md` T-01's Scope** (*"Register at `innovation-use-levels` in `clarisaRoutes`"*) — corrected, because that sentence is the instruction T-01's Implementer actually followed.
+
+**Backward direction — documents that cite the corrected sections and may now assert a falsehood.** This is where the sweep earned its cost. The uncited `requirements.md` hit was **R-IUA-013 AC.5 itself**:
+
+> *"AC.5 — The module is registered in `main.routes.ts` under `results` as `innovation-use`, and the catalog module under `tools/clarisa` as `innovation-use-levels`."*
+
+**That AC's original wording is the proximate cause of the defect, not merely a casualty of it.** It named route-file registration as the whole of the criterion, so both modules satisfied AC.5 *literally* while every one of their four endpoints returned `404` — and a Reviewer auditing against AC.5 as written would have been correct to PASS. Correcting §2.1 and the two task blocks while leaving AC.5 intact would have fixed the two instances and left the generator in place for the next module. AC.5 now requires the module-graph registration explicitly, names the assertion (`Reflect.getMetadata('imports', <GraphModule>)`), and states that neither a route node nor a route-array assertion discharges it.
+
+**New-value re-grep** (the axis KZ-005 adds after the first three): `DD-15` resolves in all four documents, `DD-16` in three, `trap 4` in three, `Reflect.getMetadata` in four. No dangling reference.
+
+### Working-tree state at the Pivot
+
+**Attempt 1's code is retained, uncommitted, not rolled back.** The Step 4 automatic-rollback rule binds a **HALT** — three failed attempts on the same finding — and this is a Pivot with two attempts unspent. Eight of ten Done criteria verified clean at source, and the pipe spec is behavioral, which is the expensive half of this task. Discarding it would re-spend that for nothing. Files present in the tree: the controller, module, controller spec, `main.routes.spec.ts`, and the one-node `main.routes.ts` change.
+
+**What attempt 2 owes, once the pivot is approved:** the `entities.module.ts` registration plus its falsifiable assertion, the AC.7 exclude-list assertion, and Lens B's three test-fidelity fixes (`@GetResultVersion()` parameter-level assertion on both handlers, AC.3 across all four disaggregated fields, and the `sex_age_disaggregation_not_apply` message assertion). T-01 owes one line in `clarisa.module.ts` plus one assertion.
+
+### Pivot Resolution — T-07 / T-01 (user ruling, 2026-08-19)
+
+**Ruled: Option B — reopen T-01 and fix each instance in its owning task.** T-01's `[~]` reopen (already drafted in `tasks.md`) stands as approved rather than provisional. T-07's attempt 2 covers only its own `entities.module.ts` instance plus Lens B's three test-fidelity remediations; T-01 closes on its own evidence with its own review round.
+
+The rejected alternative worth recording: Option A (fix both inside T-07's attempt 2) was the smaller diff and the faster path, and it was declined for the reason that makes Option B cost an extra round — a closed task repaired inside a different task's commit leaves no falsifiable record that the repair happened, which is the same traceability hole the write-evidence-before-checkbox rule exists to prevent. The extra round buys T-01 an audit trail of its own.
+
+**Execution order: serial, T-01 then T-07 — not parallel.** The two tasks are genuinely independent by file set (`clarisa.module.ts` vs `entities.module.ts`, disjoint spec files) and would otherwise qualify for the 2-wide parallel path. They are held serial by a hard project constraint: root `CLAUDE.md` §4.3 *Concurrency* — *"Cross-package parallelism (one server task + one client task) is safe; two tasks in the same package are not."* Both are `server/researchindicators` tasks, and both gate on `npm test`; two concurrent full-suite runs in one package compete for `node_modules`, lockfiles and build output, and the guide's stated consequence is not a slow measurement but a **wrong** one.
+
+**Effort:** both tasks start one level above their task default (`medium` → `high`), per the registry's *Effort dial* re-baseline rule — a `[~]` resume and a post-Pivot retry both arrive under-specified relative to their original brief.
+
+### T-01 — Innovation Use level catalog module *(resumed after the T-07 Pivot)*
+
+- **Status at the time of this entry:** **`[x]` DONE** — PASS on attempt 1 of this resumed round (T-01's third review round overall). Reopened `[~]` earlier today by the T-07 Pivot; closed here on its own evidence, per the user's Option B ruling.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 (of a possible 3)
+- **Requirements in scope for this round:** R-IUA-013 AC.5 (as corrected 2026-08-19), and the `404` cause behind R-IUA-010 AC.1
+- **Skills assigned:** `nestjs-expert` · **Effort:** `high` (one level above the task default, per the post-Pivot / `[~]`-resume rule)
+- **Review mode:** single Reviewer, lens checklist. `high` does not trigger the parallel-lens path, and the scope was two files / +127 lines.
+
+#### Attempt 1
+
+**Files changed** (2 files, +127 lines):
+
+| File | State |
+| --- | --- |
+| `src/domain/tools/clarisa/clarisa.module.ts` | modified — one import line + one `imports` array entry, placed in the innovation-family cluster beside `ClarisaInnovationTypesModule`, mirroring the working exemplar `ClarisaActorTypesModule` |
+| `src/domain/tools/clarisa/clarisa.module.spec.ts` | new (125) |
+
+**The assertion.** Two tests: a **direct membership** assertion over `Reflect.getMetadata('imports', ClarisaModule)` — the criterion's literal wording and the gate — plus a **transitive reachability DFS** from `AppModule` resolving three entry shapes (bare class, `DynamicModule` `{module}`, `ForwardReference` `{forwardRef}`), cycle-guarded. The `forwardRef` shape is real in this graph (`ResultOicrModule` ↔ `ResultsModule`), not defensive padding.
+
+**Implementer verification**
+
+- `npm test -- --silent` from `server/researchindicators` → **334 suites / 2257 tests**, all passing (baseline 333 / 2255, which already included T-07's in-flight attempt-1 files).
+- `npx eslint --no-fix` on both files → clean, after one prettier fix applied **by hand** rather than via `--fix`.
+- Mutation sweep run up front, all files restored:
+
+| Mutation | Expected | Observed |
+| --- | --- | --- |
+| Remove the entry from `clarisa.module.ts`'s `imports` | both tests red | **both red** — membership `toContain` fails; reachability returns `false` |
+| Remove `ClarisaModule` from `AppModule`'s imports only | reachability red | **stayed green** — redundant real paths via `ConnectionsModule` (`connections.module.ts:9`) and `BilateralModule` (`bilateral.module.ts:49`) |
+| Sever all three edges, restore all | reachability red, membership unaffected | **reachability red, membership green** |
+
+The Leader independently confirmed `git diff HEAD` is empty for `app.module.ts`, `connections.module.ts` and `bilateral.module.ts`, and that T-07's in-flight files were not disturbed.
+
+**Implementer `Not Done / Assumptions`** (recorded verbatim, per the Step 2.3.0 rule):
+
+> None outstanding for this scope. One judgment call worth flagging: the second prescribed mutation (single `AppModule`-edge removal) didn't fail as the brief anticipated, because of legitimate graph redundancy — I escalated to a full severance to actually demonstrate the walk's fidelity rather than reporting the weaker mutation as if it had passed, and stated why in the sweep table above.
+
+**Reviewer verdict: `STATUS: PASS`.**
+
+All seven Done criteria carry a completeness line. Criteria 2–5 were discharged in the earlier round and were **named, not re-audited** (KZ-007 requires zero-finding units be listed, not re-proven); the Reviewer confirmed each artifact still stands undisturbed at source — the `order: { level: 'ASC' }` clause at `clarisa-innovation-use-levels.service.ts:53`, the Swagger decorators, and zero `findByName` sites.
+
+Three findings from this round are worth carrying forward:
+
+1. **The negative path was verified structurally, not just by the sweep.** A repo-wide grep shows the leaf has **exactly one incoming graph edge** (`clarisa.module.ts:43`), so removing it *must* drive `isReachable` to `false` — mutation 1's result is a necessary consequence, not a lucky observation. The cycle guard cannot swallow the target (`visited.add` happens at pop time and the target comparison is the next statement), an unresolvable entry shape is skipped rather than treated as a match, and there is no `try`/`catch`, so a thrown error reddens the test rather than being caught as `false`.
+2. **Mutation 2's green was the *correct* answer, not a fidelity gap** — and this correction matters more than the sweep row it replaces. Nest instantiates any module reachable by *any* path, so with `ClarisaModule` still reachable through `ConnectionsModule`/`BilateralModule` the endpoint really would still serve `200`. A red test there would have meant the walk **mis-models production**. The escalation to a three-edge severance is the sound way to reach the negative path.
+3. **The reachability test adds nothing to the falsifiability of T-01's own edge.** Because the leaf has a single incoming edge, mutation 1 reddens both tests — they are not independent for the defect T-01 owns. What reachability adds is coverage of the one-level-up class (a `ClarisaModule` fully de-registered), which the triple redundancy makes unlikely. Marginal but real, and correctly ordered: membership is the gate and the file's first `it()`.
+
+**Placement:** the brief's "no precedent" was wrong and the Reviewer corrected it — three pre-existing `*.module.spec.ts` files sit beside their modules, one in this same tree (`clarisa-sdg-targets.module.spec.ts`). Only the graph-*walk* technique is new; the location and name follow `server/researchindicators/src/CLAUDE.md` §3/§9 exactly.
+
+**Collection confirmed at source** (trap 3): `package.json:129-130` sets `rootDir: "src"` and `testRegex: ".*\\.spec\\.ts$"`; the file matches. The delta was reconstructed rather than assumed — exactly one `describe` and two `it` blocks → +1 suite / +2 tests, matching 333→334 / 2255→2257, with no third test hidden in a loop or `it.each`.
+
+**Import-time safety confirmed at source.** The spec never calls `NestFactory`, `Test.createTestingModule` or `.compile()`; it only reads static `@Module()` metadata. `app.module.ts:41-42` calls `getDataSource(CORE, false)`, whose `shouldProcess: false` branch returns plain options and constructs nothing. The module-scope `new DataSource(...)` at `orm.config.ts:71-73` builds only the driver — a socket opens in `initialize()`, which nothing here calls.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+- **No live `200`.** The assertion proves the module is instantiated, not that the route responds. `design.md` §10.1 rules the fixture tier out of HTTP entirely, so **no downstream task inherits this** — it is a stated residual, not a deferral.
+- **Nest DI resolution is untested.** Nothing here compiles the module, so a missing or mis-provided `ClarisaInnovationUseLevelsService` would still surface only at boot. The sibling `clarisa-sdg-targets.module.spec.ts` *does* `.compile()` — a stronger, precedented tier this file deliberately forgoes, correctly, since compiling the leaf in isolation would not prove graph membership. The two are complementary, not substitutes.
+- **`RouterModule`'s own behavior is unasserted.** The DD-15 mechanic rests on a source reading of `router-module.js`, not on a test.
+- **The path prefix is unasserted in this round** — that `innovation-use-levels` composes under `tools/clarisa` rests on `clarisa.routes.ts` and its parent node, evidence from the earlier round.
+- **Ten *seeded* rows** is a DB-tier fact, owed to **T-11 (F-D)**.
+- **Ordering unchanged:** the `level` `0…9` guarantee rests on the unit spec's `order`-clause assertion, not a behavioral check — `id = level + 1` makes primary-key order coincidentally correct on the current seed, so an end-to-end sequence assertion cannot falsify a missing clause. See T-11's F-D.
+- **Coverage was not re-measured.** `collectCoverageFrom` is `**/*.(t|j)s`, so every file is already in the denominator and the wide import can only nudge coverage up — but this is a claim not made rather than a claim verified.
+
+#### `ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Reliability | `isReachable` has **no in-file negative control**, so its ability to return `false` is evidenced only by a transient mutation sweep that lives in no file. One line would pin it permanently: `expect(isReachable(ClarisaInnovationUseLevelsModule, AppModule)).toBe(false)` — stable, since the leaf declares no `imports`. **This is KZ-001 applied to the verifier itself** | **Recorded and it dies here.** Not actioned, not minted as a task, and T-01 was not widened to absorb it — the advisory rule binds even when the advisory is good, and this one is good. Carried to `/akili-archive` as Kaizen input, which is the legitimate route by which it may earn a proposal |
+| Resilience | This is the **only** spec under `src/` importing `AppModule`. Any import-time side effect added anywhere in the ~100-module graph will fail here, under a title about one CLARISA catalog list | Recorded. Proportionate for now; if a second graph spec appears, hoist the walk into a shared helper with one graph-wide spec |
+| Readability | The file's header comment names the mechanism, the rejected stand-in, and why importing `AppModule` is safe | Recorded — keep verbatim if the helper is ever hoisted |
+| Risk | Near zero. Two lines of module composition; no runtime behavior change beyond making a previously dead controller reachable; no auth, migration or data surface touched | Recorded |
+
+**Final verification:** `npm test -- --silent` → **334 suites / 2257 tests** green · `npx eslint --no-fix` clean on both files · `git diff HEAD` empty on all three mutation targets.
+
+**Forward pointers created by this round**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-07 (attempt 2)** | The `entities.module.ts` instance of DD-15 is still open. Note the asymmetry the Reviewer surfaced: `ResultInnovationUseModule` will have **one** incoming edge, so a membership assertion over `Reflect.getMetadata('imports', EntitiesModule)` is fully falsifiable on its own — a reachability walk is optional there, not load-bearing as it was here |
+| **T-08** | Its planned `results.module.ts` import of `ResultInnovationUseModule` would add a **second** edge. Once T-07's `entities.module.ts` registration lands, T-08 must not be read as the thing that makes the endpoints work |
+| **T-11 (F-D)** | Ten *seeded* rows and the behavioral `0…9` order remain owed here, and F-D is already declared unfalsifiable on the current seed |
+| **T-13** | Human `/swagger` check still owns confirming the catalog `GET` renders under `Clarisa` with the bearer lock **and** that its missing `@ApiOperation` is the DD-13 exemption rather than a defect |
+| Kaizen (archive) | Three candidates: **(a)** a verifier needs its own negative control — KZ-001 applied one level up, from the advisory above; **(b)** a mutation that stays green can be the *correct* answer when the graph has redundant paths, so "mutation stayed green ⇒ missing test" is a heuristic, not a law; **(c)** a Leader brief asserting "no precedent exists" should be grep-checked before it reaches a worker — this one was wrong and the Reviewer caught it |
+
+**Budget status:** 6 of 13 tasks complete (T-01 restored to `[x]`; T-07 remains `[~]`). **13 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×1).
+
