@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-04 `[x]` done (2026-08-19); T-05 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **7 consumed**
+- **Status:** in-progress — T-01 … T-05 `[x]` done (2026-08-19); T-06 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **8 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -239,7 +239,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-002 (all ACs + scenario) · R-IUA-004 AC.5 · R-IUA-001 (the `create` helper) · R-IUA-008 AC.1, AC.3, AC.4 (read side)
 - **Depends on:** T-02
 - **Size:** M (~330 LOC incl. spec) · **Effort:** `medium`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — **PASS on attempt 1, zero rework**; 1 review round (plus two Reviewer spawns lost to `529 Overloaded`, escalated to the user rather than reviewed inline; user ruled wait-and-retry, and the third spawn returned a full T3 verdict with independence intact). Mutation sweep M1–M8 all red. Suite 331 suites / 2196 tests. AC.1's envelope half corrected to joint T-05/T-07 ownership — a spec bookkeeping error, not missing work. Evidence: [`./execution.md`](./execution.md) → *T-05*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -261,7 +261,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 **Done criteria**
 
-- [ ] Response is a `ServerResponseDto` with the section under `data` *(R-IUA-002 AC.1)*
+- [ ] `findOne` returns the section object exactly as shaped in `design.md` §4 — the object that becomes `data`. *(R-IUA-002 AC.1, **partially**: the `ServerResponseDto` envelope and `status: 200` are structurally **T-07**'s, where the handler and `ResponseUtils.format` exist. T-05 has no HTTP seam and must not create a controller to force this green — corrected 2026-08-19 at T-05's review, same class of bookkeeping error as R-IUA-007 AC.4 at T-04)*
 - [ ] Each collection is filtered by its role discriminator — asserted against the arguments each child service received *(AC.2, AC.3, AC.4, R-IUA-008 AC.3, and the scenario's `BUT it must NOT return any … row belonging to another role discriminator`)*
 - [ ] Each actor row carries a server-computed `total` *(AC.5)*
 - [ ] A result with a detail row and no children returns `[]` for all three collections and does not throw *(AC.6, and the scenario's `AND IT MUST return [] rather than null`)*
@@ -365,7 +365,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 **Done criteria**
 
-- [ ] Both handlers return the envelope via `ResponseUtils.format` *(R-IUA-013 AC.1)*
+- [ ] Both handlers return the envelope via `ResponseUtils.format` *(R-IUA-013 AC.1, and the **envelope half of R-IUA-002 AC.1** — T-05 supplies the section object that becomes `data`; the `ServerResponseDto` wrapper and `status: 200` are discharged here)*
 - [ ] PATCH carries `ResultStatusGuard`; the spec covers **one allowed and one denied** result status. The denied case asserts **`400`**, the guard's actual `BadRequestException` — not `403` *(R-IUA-003 AC.5)*
 - [ ] Both handlers carry `@GetResultVersion()` *(R-IUA-013 AC.4)*
 - [ ] The module is registered under `results` as `innovation-use` *(AC.5)*
@@ -656,7 +656,7 @@ Closure is at **scenario and clause** granularity, not requirement id. Every `BU
 | Requirement | ACs | Scenario(s) | `BUT NOT` / `AND IT MUST` clauses | Owning tasks |
 | --- | --- | --- | --- | --- |
 | R-IUA-001 | AC.1 T-08+T-12 · AC.2 T-08+T-12 · AC.3 T-08 · AC.4 T-08 | T-08, T-12 | `BUT NOT create for other indicator` → T-08 · `AND IT MUST populate audit from request.user` → T-08, T-12 | T-05, T-08, T-12 |
-| R-IUA-002 | AC.1–AC.6 T-05 · AC.7 T-07 | T-05 + T-09 | `BUT NOT return other-role rows` → T-05 · `AND IT MUST return [] not null` → T-05 | T-05, T-07, T-09 |
+| R-IUA-002 | **AC.1 T-05 (section object) + T-07 (envelope)** · AC.2–AC.6 T-05 · AC.7 T-07 | T-05 + T-09 | `BUT NOT return other-role rows` → T-05 · `AND IT MUST return [] not null` → T-05 | T-05, T-07, T-09 |
 | R-IUA-003 | AC.1 T-06+T-09 · AC.2 T-06 · AC.3 T-09 · AC.4 T-06 · AC.5 T-07 · AC.6 T-03/T-09 · AC.7 T-06/T-09 | S1 T-06 · S2 T-09 | `BUT NOT leave first row persisted` → T-06 · `AND IT MUST report via GlobalExceptions` → T-06 · `BUT NOT deactivate non-IU rows` → T-10 · `AND IT MUST NOT hard-delete B` → T-03, T-09 | T-03, T-06, T-07, T-09, T-10 |
 | R-IUA-004 | AC.1–AC.4 T-02/T-07 · AC.5 T-05/T-07 · AC.6–AC.8 T-02/T-07 | S1 T-07 · S2 T-07 | `BUT NOT reject because total present` → T-07 · `AND IT MUST recompute on every read` → T-05 · `BUT NOT silently null one side` → T-02 · `AND IT MUST identify the offending row` → T-07 | T-02, T-03, T-05, T-07 |
 | R-IUA-005 | AC.1–AC.5 T-06 | T-06 | `BUT NOT deactivate before failing` → T-06 · `AND IT MUST treat distinct OTHER names as distinct` → T-06 | T-06 |

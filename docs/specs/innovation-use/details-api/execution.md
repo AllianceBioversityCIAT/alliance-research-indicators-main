@@ -22,7 +22,7 @@
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
 
-**Review-round tally:** **7 of ~24 consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1) at 4 of 13 tasks. Budget re-baselined 2026-08-19 by user ruling — see § *Budget Escalation* and its resolution.
+**Review-round tally:** **8 of ~24 consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1) at 5 of 13 tasks. T-05 additionally cost two Reviewer spawns that died on `529 Overloaded` without returning a verdict — wall-clock, not rounds. Budget re-baselined 2026-08-19 by user ruling — see § *Budget Escalation* and its resolution.
 
 ---
 
@@ -767,5 +767,110 @@ Mocked repositories throughout. This proves the predicate objects, saved-row sha
 | T-05 / T-06 | `resolveOrganizationCount`'s doc comment is a good precedent: it explains the `{}`-vs-`undefined` reasoning so the next reader need not re-derive it |
 
 **Budget status:** 4 of 13 tasks complete. **7 of ~24 review rounds consumed** — on the re-baselined budget, and T-04 came in at one round against T-03's three.
+
+---
+
+### T-05 — implementation complete, **review blocked by a harness runtime failure** (2026-08-19)
+
+**Not a work FAIL.** Two consecutive Reviewer spawns terminated with `API Error: 529 Overloaded` before returning any verdict — a server-side capacity error, not a judgement on the diff. `/akili-execute`'s *Runtime-failure fallback* prescribes: retry once, then degrade by role. The retry is spent.
+
+**The Leader did not review inline, and will not.** The fallback table is explicit for this role:
+
+> **Reviewer** — **Never inline.** The Leader reviewing work it supervised breaks `author ≠ auditor`, and a runtime failure does not suspend a correctness constraint. Offer the user: a different model (`/model`), a cross-host dispatch (per the registry), or an explicit recorded waiver.
+
+**State is safe and recoverable.** T-05's two files are written, the full suite is green (331 suites / 2196 tests), `tsc` and eslint are clean — but the task is **not** marked `[x]`, nothing is committed, and no evidence of completion has been recorded. This is the evidence-before-checkbox ordering doing its job: an interrupted run leaves work that can be re-reviewed, never a `[x]` nobody can justify.
+
+**Cross-host dispatch is unavailable on this machine.** The model-routing registry records Antigravity (`agy`) as *documented but not installed as of 2026-08-03*, so the T6/cross-host escape hatch cannot be exercised here. Recorded so the option is not re-proposed.
+
+**Escalated to the user.** Options presented: wait and retry (recommended — 529 is transient and costs only wall-clock); run the Reviewer on a different model, noting that the registry's T3 fallback is the Implementer's own tier and would collapse the model axis of `author ≠ auditor` while preserving the fresh-context axis; or an explicitly recorded waiver.
+
+**Pending work if review resumes:** the brief asked the Reviewer to rule on three specific things — whether spreading the full `ResultActor` entity violates `design.md` §4's documented field list, whether `actors_count ?? null` preserves a legitimate zero, and whether **R-IUA-002 AC.1 is a spec bookkeeping error** (the criterion names a `ServerResponseDto` envelope that only T-07's controller can produce, while §3's matrix assigns AC.1–AC.6 to T-05). That third one is the same class of defect corrected at T-04 for R-IUA-007 AC.4.
+
+---
+
+### T-05 — `ResultInnovationUseService`: `create`, read assembly, total derivation
+
+- **Final status:** `[x]` **DONE 2026-08-19** — **PASS on attempt 1, zero rework.**
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 · **Review rounds consumed:** 1
+- **Requirements covered:** R-IUA-002 AC.2–AC.6 + scenario (AC.1 **partially** — see the bookkeeping correction) · R-IUA-004 AC.5 · R-IUA-001 (the `create` helper) · R-IUA-008 AC.1, AC.3, AC.4
+- **Skills assigned:** `nestjs-expert`, `tdd` (task defaults, unchanged) · **Effort:** `medium`
+
+> **Review dispatch cost three spawns, but only one review round.** Two consecutive Reviewer spawns died on `API Error: 529 Overloaded` before returning any verdict — a harness capacity failure, not a judgement. Per `/akili-execute`'s *Runtime-failure fallback*, the Leader retried once, then **escalated to the user rather than reviewing inline**: the fallback table forbids the Leader auditing work it supervised, because that breaks `author ≠ auditor` and a server error does not suspend a correctness constraint. **User ruling: wait and retry.** The third spawn returned a full T3 verdict with independence intact on both axes — no model degradation, no waiver. A spawn that returns no verdict costs wall-clock, not a review round; the tally reflects **one**.
+
+#### The change (2 new files)
+
+`create(resultId, manager?)` mirrors `ResultInnovationDevService.create` exactly. `findOne(resultId)` loads the detail row with a catalog relation join, fetches the three child collections **in parallel** through their own services with the role argument, and attaches a derived `total` per actor row. `update()` — the write transaction — is **T-06's** and is deliberately absent (`grep "update("` → zero occurrences).
+
+**Total derivation (`design.md` §5.5), the task's named trap:**
+
+```ts
+if (actor?.sex_age_disaggregation_not_apply === true) return actor?.actors_count ?? null;
+const counts = [women_youth_count, women_not_youth_count, men_youth_count, men_not_youth_count];
+if (counts.every(c => c === null || c === undefined)) return null;   // ← NOT 0
+return counts.reduce((sum, c) => sum + (c ?? 0), 0);
+```
+
+The `allAbsent` guard sits **before** the reduce. Without it the obvious `reduce((a,b) => a + (b ?? 0), 0)` returns `0`, which would claim the user entered a total of nought when they entered nothing — and `innovation_use_validation` reads that difference. The mode is compared with `=== true`, never truthiness, so read-side classification matches the write-side rule T-03 established.
+
+**DD-9 resolved by relation join, not service call.** The Implementer used `relations: { innovation_use_level: true }` off the detail row and exposed only `detail?.innovation_use_level?.level`. It explicitly avoided `ClarisaInnovationUseLevelsService.findAll(relations, where)` because **T-01's forward pointer** established that the inherited base drops its `is_active: true` default the moment a caller supplies a `where` — that path can read soft-deleted catalog rows. The Reviewer verified the rationale comment is factually true against `clarisa-base-service.ts:50-67`. **A forward pointer carried by a brief did its job.**
+
+#### Verification
+
+`npm test -- --silent` → **331** suites, **2196**/2196 tests (330/2184 after T-04 — exactly +1 suite and +12 tests, matching the new file) · `npx tsc --noEmit` clean · `npx eslint --no-fix` clean, zero findings, no hand-fix needed · `git status` → only the two intended files · `grep findByName|findByNames` → zero (R-IUA-010 AC.6).
+
+**Mutation sweep M1–M8, front-loaded per standing practice since T-04.** Every mutation turned **exactly one** predicted test red; none left the suite green: all-NULL→`0`; drop actors role arg; drop organizations role arg; wrong quantifications role; `null` instead of `[]`; `=== true`→truthy; aggregate sums the four instead of using `actors_count`; whole catalog object instead of the scalar.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+All eight done criteria adjudicated by name. Findings verified at source rather than asserted:
+
+- **`actors_count ?? null` preserves a legitimate `0`** — `0 ?? null → 0`; `||` would have collapsed it.
+- **A partial disaggregated set is correct** — `allAbsent` short-circuits only when all four are absent, so `?? 0` inside the reduce can never manufacture a total out of nothing. `[2, null, null, 1]` → `3`.
+- **NFR-IUA-001: 4 round trips, under the target of 5** — one `findOne` with a LEFT JOIN (the join is *not* a fifth query), plus three child `find`s. `relations` is not passed to any child, and the `.map` is pure in-memory — **nothing per-row**. T-13's 50-row assertion should hold.
+- **`selectManager(manager, …)` returns `manager.getRepository(entity)` when a manager is present** (`orm.util.ts:4-13`) — so **T-08 can call `create(resultId, manager)` inside the creation transaction**, as its own criteria require.
+- **DD-9 relation key matches the entity's declared relation** (`result-innovation-use.entity.ts:59-68`), and the DD-9 test is genuinely discriminating: its fixture sets `id: 7, level: 6`, so returning the id *or* the whole object both fail.
+- **Test fidelity (KZ-001): no recurrence.** All 12 tests can fail and each asserts production behaviour rather than a literal it authored. The M1–M8 claims are structurally credible against the assertions as written.
+- **Spreading full entities is not a contract violation.** The reference `findOne` (`result-innovation-dev.service.ts:466-496`) returns its child collections as the raw arrays the child services hand back, audit columns and `is_active` included; there is no serialization layer, and `design.md` §4 contains no exclusivity clause. Consistent with the exemplar → advisory, not a gate.
+
+**Reviewer ruling on the missing-`NotFoundException` question — and it caught something forward-looking.** Correctly out of scope, because T-06's criteria explicitly claim it and `design.md` §4 attributes the GET's `404` to `ResultsUtil.setup` (the `SetUpInterceptor`), not to `findOne`. More importantly: **adding a throw to `findOne` would break T-06**, which must re-read through this same method post-commit at §5.1 step 12. The defensive `?.` / `?? null` guards are strictly safer than the reference, which dereferences unguarded at `:480`.
+
+#### Leader-applied spec correction — R-IUA-002 AC.1
+
+The Implementer declined to fabricate a controller-level test to force a done criterion green, and flagged it instead. The Reviewer ruled it **a spec bookkeeping error, not missing work** — the same class corrected at T-04 for R-IUA-007 AC.4 — and gave exact wording. Grounds: AC.1's envelope half is produced by `ResponseUtils.format` in a controller that T-05's *Files touched* list does not include and that **T-07** owns; T-07 already carries the discharging criterion; and §3's matrix already lists R-IUA-002's owning tasks as *T-05, T-07, T-09* — only the AC-column split was wrong.
+
+Corrected at three sites, swept both directions:
+
+| Site | Change |
+| --- | --- |
+| §3 matrix, R-IUA-002 row | `AC.1–AC.6 T-05` → **`AC.1 T-05 (section object) + T-07 (envelope)` · AC.2–AC.6 T-05** |
+| T-05 done criterion 1 | Now names the section object as the deliverable and states the envelope is structurally T-07's, with the instruction not to create a controller to force it green |
+| T-07 done criterion 1 | Now names the **envelope half of R-IUA-002 AC.1** alongside R-IUA-013 AC.1, so joint ownership is visible from both sides |
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Reliability | **Two zero-preserving paths are correct in code but uncovered by tests** — aggregate with `actors_count: 0` (would regress to `null` if `??` ever became `||`), and disaggregated `[0,0,0,0]` (must be `0`, not `null`). These are the exact mirror of the all-NULL trap the criteria *do* cover | **Forward pointer → T-09 (F-A)**, which exercises real rows |
+| Reliability | `create`'s test asserts the audit spread happened but not **which** `SetAuditEnum` was passed — the mock returns `{ created_by: 1 }` for any argument, so `SetAuditEnum.UPDATE` would still pass | **Forward pointer → T-08 / T-12** |
+| Reliability | **No test passes a `manager` into `create`**, so the `selectManager` branch T-08 depends on is untested here — and T-08 asserts only that `create` is *called* with the manager, not that it *uses* it. Code is verbatim from the reference, so a coverage gap rather than a suspected defect | **Forward pointer → T-08 and T-12 (F-E)** — neither task currently closes it |
+| Reliability | The `?? []` collection guards are **unreachable** — both child methods return `mainRepo.find(...)`, which yields `[]`. The Implementer disclosed this as "verified inert by mutation M5", which is the right disclosure | Recorded |
+| Resilience | `Promise.all` raises peak pool usage per read from 1 to 3 — immaterial at default pool sizes; error semantics are safe. Transaction affinity is *improved*: `findOne` accepts no `manager`, so T-06's step-12 re-read is **structurally forced** outside the transaction, which is where §5.1 puts it | Recorded — a happy accident worth keeping |
+| Readability | The wire payload is a **superset** of `design.md` §4 — audit columns, `is_active` and the role discriminator ship on every row. Pre-existing platform pattern, not drift. If chunk 3 ever wants the documented shape to be the literal shape, that is a design decision, **not a quiet fix in T-06** | Recorded |
+
+#### Declared limits, restated so they are not mistaken for proven
+
+Mocked repositories. This proves the assembly shape, the role arguments and the derivation — **not** that the section round-trips against MySQL. R-IUA-002's scenario and R-IUA-008 AC.1 are discharged by **T-09 (F-A)**. R-IUA-002 AC.7 (`401`) is **T-07's**.
+
+#### Forward pointers created by T-05
+
+| → Task | Pointer |
+| --- | --- |
+| **T-06** | **Do not add a `NotFoundException` to `findOne`.** T-06 re-reads through it post-commit (§5.1 step 12); a throw there would break the re-read. T-06's own `404` belongs on the write path, before `BEGIN` |
+| T-08 / T-12 | `create`'s `selectManager(manager)` branch is untested on both sides — T-05 never passes a manager, T-08 asserts only that `create` is *called* with one. **F-E is the natural place to prove the row actually lands inside the creation transaction** |
+| T-09 (F-A) | Cover the two zero-preserving derivation paths: aggregate `actors_count: 0`, and disaggregated `[0,0,0,0]` → `0` not `null` |
+| T-13 | NFR-IUA-001 measured at **4 queries** for one result with no per-row pattern — the ≤5 target holds by construction, but T-13 must confirm it at 50 actor rows |
+
+**Budget status:** 5 of 13 tasks complete. **8 of ~24 review rounds consumed.**
 
 ---
