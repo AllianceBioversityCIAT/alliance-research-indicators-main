@@ -225,6 +225,12 @@ describe('BilateralService source-based read-only gate (T-15.2)', () => {
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01'],
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      // re-base: has_contribution:true now requires a resolved Primary
+      // (R-BIL-121). Fixture-only change — the claim under test (both
+      // read-only gates are cleared, so the write proceeds) is untouched.
+      // 'SP01' is the only catalog code mocked for this result.
+      primary_sp_code: 'SP01',
     };
 
     await expect(

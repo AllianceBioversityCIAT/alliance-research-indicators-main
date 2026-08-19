@@ -18,6 +18,7 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Request } from 'express';
@@ -27,9 +28,11 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
+import { BilateralMappingCoverageService } from './bilateral-mapping-coverage.service';
 import { CreateBilateralProjectMappingDto } from './dto/create-bilateral-project-mapping.dto';
 import { UpdateBilateralProjectMappingDto } from './dto/update-bilateral-project-mapping.dto';
 import { ListBilateralProjectMappingsQueryDto } from './dto/list-bilateral-project-mappings.query.dto';
+import { CoverageReportQueryDto } from './dto/coverage-report.query.dto';
 
 type RequestWithUser = Request & { user?: User };
 
@@ -38,6 +41,7 @@ class DeactivateBilateralProjectMappingDto {
 }
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / R-BIL-080
+// @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-05 / R-CPA-006 / DD-12
 //
 // Admin REST surface mounted at /api/bilateral-project-mappings (path
 // registration in domain/routes/main.routes.ts). NOTE: the path intentionally
@@ -51,7 +55,10 @@ class DeactivateBilateralProjectMappingDto {
 @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
 @Controller()
 export class BilateralProjectMappingController {
-  constructor(private readonly service: BilateralProjectMappingService) {}
+  constructor(
+    private readonly service: BilateralProjectMappingService,
+    private readonly coverageService: BilateralMappingCoverageService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List bilateral project mappings (paginated)' })
@@ -64,6 +71,42 @@ export class BilateralProjectMappingController {
         status: HttpStatus.OK,
       }),
     );
+  }
+
+  // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-05 / R-CPA-006 / DD-12
+  // MUST be declared ABOVE @Get(':id') so Nest matches route before ParseIntPipe.
+  @Get('coverage-report')
+  @ApiOperation({
+    summary:
+      'Generate coverage report classifying bilateral contracts against CLARISA projects',
+  })
+  @ApiQuery({
+    name: 'phase',
+    required: false,
+    type: Number,
+    description: 'CLARISA phase filter override (e.g. 2026)',
+  })
+  @ApiQuery({
+    name: 'limit-samples',
+    required: false,
+    type: Number,
+    description:
+      'Maximum number of sample items per resolution tier (1-50, default 10)',
+  })
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async getCoverageReport(@Query() query: CoverageReportQueryDto) {
+    const limitSamples = query['limit-samples'];
+    return this.coverageService
+      .getCoverageReport(query.phase, limitSamples)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: data.environment.upstream_contract_available
+            ? 'Bilateral mapping coverage report generated'
+            : `Bilateral mapping coverage report: upstream contract is not published in the measured environment (${data.environment.clarisa_host})`,
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Get(':id')

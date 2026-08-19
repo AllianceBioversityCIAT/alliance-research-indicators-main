@@ -1,0 +1,328 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import {
+  Global,
+  HttpStatus,
+  INestApplication,
+  Module,
+  VersioningType,
+} from '@nestjs/common';
+import { RouterModule } from '@nestjs/core';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import request from 'supertest';
+import { BilateralProjectMappingModule } from './bilateral-project-mapping.module';
+import { BilateralMappingCoverageService } from './bilateral-mapping-coverage.service';
+import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
+import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
+import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
+import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+
+// @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-06 / R-CPA-006 / R-CPA-007
+//
+// HTTP-level specification exercising real Nest routing, URI versioning,
+// global prefix, RolesGuard execution, and singleton lifecycle preservation.
+//
+// Defect classes proven:
+// - D10: Route shadowing by @Get(':id') (ParseIntPipe 400 vs 200)
+// - D6: 403 error envelope behavior vs presence-only assertions
+// - D11: Scope.REQUEST cascade detection (instance identity verification)
+
+let mockAgressoRepo: {
+  createQueryBuilder: jest.Mock;
+};
+
+let mockBilateralRepo: {
+  find: jest.Mock;
+  findOne: jest.Mock;
+  create: jest.Mock;
+  save: jest.Mock;
+  createQueryBuilder: jest.Mock;
+};
+
+let mockDataSource: {
+  getRepository: jest.Mock;
+  createEntityManager: jest.Mock;
+};
+
+const makeContractQb = (contracts: Partial<AgressoContract>[] = []) => {
+  const qb: Record<string, jest.Mock> = {};
+  qb.select = jest.fn().mockReturnValue(qb);
+  qb.where = jest.fn().mockReturnValue(qb);
+  qb.andWhere = jest.fn().mockReturnValue(qb);
+  qb.getMany = jest.fn().mockResolvedValue(contracts);
+  return qb;
+};
+
+@Global()
+@Module({
+  providers: [
+    {
+      provide: DataSource,
+      useFactory: () => mockDataSource,
+    },
+    {
+      provide: getRepositoryToken(BilateralProjectMapping),
+      useFactory: () => mockBilateralRepo,
+    },
+  ],
+  exports: [DataSource, getRepositoryToken(BilateralProjectMapping)],
+})
+class MockDbModule {}
+
+describe('CoverageReportHttp (HTTP integration)', () => {
+  let app: INestApplication;
+  let mockClarisaProjectsService: {
+    listProjectsForCoverage: jest.Mock;
+  };
+
+  beforeEach(async () => {
+    mockClarisaProjectsService = {
+      listProjectsForCoverage: jest.fn(),
+    };
+
+    mockAgressoRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(makeContractQb()),
+    };
+
+    mockBilateralRepo = {
+      find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue(null),
+      create: jest.fn((dto) => dto),
+      save: jest.fn((entity) => Promise.resolve(entity)),
+      createQueryBuilder: jest.fn().mockReturnValue({
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      }),
+    };
+
+    mockDataSource = {
+      getRepository: jest.fn((entity) => {
+        if (entity === AgressoContract) return mockAgressoRepo;
+        return mockBilateralRepo;
+      }),
+      createEntityManager: jest.fn().mockReturnValue({
+        getRepository: jest.fn((entity) => {
+          if (entity === AgressoContract) return mockAgressoRepo;
+          return mockBilateralRepo;
+        }),
+      }),
+    };
+
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        MockDbModule,
+        RouterModule.register([
+          {
+            path: 'bilateral-project-mappings',
+            module: BilateralProjectMappingModule,
+          },
+        ]),
+        BilateralProjectMappingModule,
+      ],
+    })
+      .overrideProvider(BilateralProjectMappingRepository)
+      .useValue({})
+      .overrideProvider(ClarisaProjectsService)
+      .useValue(mockClarisaProjectsService)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+
+    // Replicate main.ts prefix and URI versioning EXACTLY (Kaizen K-004)
+    app.setGlobalPrefix('api');
+    app.enableVersioning({
+      type: VersioningType.URI,
+    });
+
+    // Test middleware setting request.user according to x-mock-role header
+    app.use((req: any, res: any, next: any) => {
+      const roleHeader = req.headers['x-mock-role'];
+      if (roleHeader !== undefined && roleHeader !== null) {
+        const numRole = Number(roleHeader);
+        req.user = {
+          sec_user_id: 1,
+          roles: isNaN(numRole) ? [] : [numRole],
+        };
+      }
+      next();
+    });
+
+    await app.init();
+  });
+
+  afterEach(async () => {
+    if (app) {
+      await app.close();
+    }
+    jest.restoreAllMocks();
+  });
+
+  describe('Route resolution & role permissions (Defect class D10, R-CPA-006 AC.1, AC.2, AC.4)', () => {
+    const fixtureProjects: ClarisaProject[] = [
+      {
+        id: 101,
+        short_name: 'P-101',
+        source_of_funding: 'Bilateral',
+        external_code: 'A100',
+        source_center_acronym: 'CIAT',
+        phase: 2026,
+        full_name: 'Project 101',
+        lead_institution_object: {
+          id: 49,
+          acronym: 'ABC',
+          name: 'Alliance',
+        },
+      },
+    ];
+
+    const fixtureContracts: Partial<AgressoContract>[] = [
+      {
+        agreement_id: 'A100',
+        funding_type: 'BILATERAL',
+        short_title: 'Contract 100',
+      },
+    ];
+
+    it('returns 200 with coverage report for SYSTEM_ADMIN (no /v1 in route)', async () => {
+      mockClarisaProjectsService.listProjectsForCoverage.mockResolvedValueOnce({
+        all: fixtureProjects,
+        slice: fixtureProjects,
+        phaseUsed: 2026,
+      });
+      mockAgressoRepo.createQueryBuilder.mockReturnValueOnce(
+        makeContractQb(fixtureContracts),
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .set('x-mock-role', String(SecRolesEnum.SYSTEM_ADMIN))
+        .expect(HttpStatus.OK);
+
+      expect(res.body.status).toBe(HttpStatus.OK);
+      expect(res.body.description).toMatch(
+        /Bilateral mapping coverage report generated/i,
+      );
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.environment.upstream_contract_available).toBe(true);
+      expect(res.body.data.resolution.EXACT_CODE.count).toBe(1);
+      expect(res.body.data.agresso.bilateral_contract_total).toBe(1);
+    });
+
+    it('returns 200 with coverage report for CENTER_ADMIN', async () => {
+      mockClarisaProjectsService.listProjectsForCoverage.mockResolvedValueOnce({
+        all: fixtureProjects,
+        slice: fixtureProjects,
+        phaseUsed: 2026,
+      });
+      mockAgressoRepo.createQueryBuilder.mockReturnValueOnce(
+        makeContractQb(fixtureContracts),
+      );
+
+      const res = await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .set('x-mock-role', String(SecRolesEnum.CENTER_ADMIN))
+        .expect(HttpStatus.OK);
+
+      expect(res.body.status).toBe(HttpStatus.OK);
+      expect(res.body.data.resolution.EXACT_CODE.count).toBe(1);
+    });
+
+    it('passes query parameters through to the service on HTTP GET', async () => {
+      mockClarisaProjectsService.listProjectsForCoverage.mockResolvedValueOnce({
+        all: fixtureProjects,
+        slice: fixtureProjects,
+        phaseUsed: 2026,
+      });
+      mockAgressoRepo.createQueryBuilder.mockReturnValueOnce(
+        makeContractQb(fixtureContracts),
+      );
+
+      const res = await request(app.getHttpServer())
+        .get(
+          '/api/bilateral-project-mappings/coverage-report?phase=2026&limit-samples=5',
+        )
+        .set('x-mock-role', String(SecRolesEnum.CENTER_ADMIN))
+        .expect(HttpStatus.OK);
+
+      expect(res.body.status).toBe(HttpStatus.OK);
+      expect(
+        mockClarisaProjectsService.listProjectsForCoverage,
+      ).toHaveBeenCalledWith(2026);
+    });
+  });
+
+  describe('403 Forbidden behavioral gate (Defect class D6, R-CPA-006 AC.3)', () => {
+    it('returns 403 Forbidden when caller carries an unprivileged role', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .set('x-mock-role', '999')
+        .expect(HttpStatus.FORBIDDEN);
+
+      expect(res.body.statusCode).toBe(HttpStatus.FORBIDDEN);
+      expect(res.body.message).toMatch(/Forbidden/i);
+    });
+
+    it('returns 403 Forbidden when caller carries no authenticated user', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .expect(HttpStatus.FORBIDDEN);
+
+      expect(res.body.statusCode).toBe(HttpStatus.FORBIDDEN);
+    });
+  });
+
+  describe('Singleton lifecycle verification (Defect class D11, R-CPA-007 AC.4, DD-11)', () => {
+    it('proves the same service instance serves successive requests (preserves singleton scope)', async () => {
+      const instances: BilateralMappingCoverageService[] = [];
+
+      jest
+        .spyOn(BilateralMappingCoverageService.prototype, 'getCoverageReport')
+        .mockImplementation(async function (
+          this: BilateralMappingCoverageService,
+        ) {
+          instances.push(this);
+          return {
+            environment: {
+              clarisa_host: 'https://clarisatest-back.ciat.cgiar.org/',
+              upstream_contract_available: true,
+            },
+            measured_at: new Date().toISOString(),
+            phase_used: 2026,
+            definitions: {
+              bilateral_contract_predicate: 'predicate',
+              normalization_rules: 'rules',
+            },
+            clarisa: {} as any,
+            agresso: { bilateral_contract_total: 1 },
+            resolution: {} as any,
+            normalization: null,
+            samples: null,
+          };
+        });
+
+      await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .set('x-mock-role', String(SecRolesEnum.SYSTEM_ADMIN))
+        .expect(HttpStatus.OK);
+
+      await request(app.getHttpServer())
+        .get('/api/bilateral-project-mappings/coverage-report')
+        .set('x-mock-role', String(SecRolesEnum.SYSTEM_ADMIN))
+        .expect(HttpStatus.OK);
+
+      // Verify two HTTP requests executed against the service
+      expect(instances).toHaveLength(2);
+
+      // Assert singleton identity: instance 1 strictly equals instance 2
+      expect(instances[0]).toBe(instances[1]);
+
+      // Assert identity with the application module container instance
+      const containerInstance = app.get(BilateralMappingCoverageService);
+      expect(instances[0]).toBe(containerInstance);
+    });
+  });
+});

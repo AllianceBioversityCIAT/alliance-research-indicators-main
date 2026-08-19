@@ -1,17 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { BilateralProjectMappingController } from './bilateral-project-mapping.controller';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
+import { BilateralMappingCoverageService } from './bilateral-mapping-coverage.service';
+import { CoverageReportQueryDto } from './dto/coverage-report.query.dto';
 import { RolesGuard, ROLES_KEY } from '../../shared/guards/roles.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / T-15.6
-// Verifies handler wiring + role gating (R-BIL-080).
+// @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-05 / R-CPA-006 / DD-12
+// Verifies handler wiring, DTO validation, and role gating metadata.
 
 describe('BilateralProjectMappingController', () => {
   let controller: BilateralProjectMappingController;
   let service: jest.Mocked<BilateralProjectMappingService>;
+  let coverageService: jest.Mocked<BilateralMappingCoverageService>;
 
   const fakeUser = { sec_user_id: 42 } as User;
   const reqUser = { user: fakeUser } as { user: User };
@@ -30,16 +36,23 @@ describe('BilateralProjectMappingController', () => {
             deactivate: jest.fn(),
           },
         },
+        {
+          provide: BilateralMappingCoverageService,
+          useValue: {
+            getCoverageReport: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     controller = module.get(BilateralProjectMappingController);
     service = module.get(BilateralProjectMappingService);
+    coverageService = module.get(BilateralMappingCoverageService);
   });
 
   afterEach(() => jest.clearAllMocks());
 
-  describe('role gating (R-BIL-080)', () => {
+  describe('role gating (R-BIL-080 / R-CPA-006)', () => {
     it('declares @Roles(CENTER_ADMIN, SYSTEM_ADMIN) at controller level', () => {
       const roles = Reflect.getMetadata(
         ROLES_KEY,
@@ -78,6 +91,109 @@ describe('BilateralProjectMappingController', () => {
       expect(service.list).toHaveBeenCalledWith({});
       expect(out.status).toBe(HttpStatus.OK);
       expect(out.description).toMatch(/found/i);
+    });
+  });
+
+  describe('getCoverageReport (T-05 / R-CPA-006)', () => {
+    it('delegates to coverageService.getCoverageReport and wraps response in ServerResponseDto envelope', async () => {
+      const mockReport = {
+        environment: {
+          clarisa_host: 'https://clarisatest-back.ciat.cgiar.org/',
+          upstream_contract_available: true,
+        },
+        measured_at: '2026-08-14T00:00:00.000Z',
+        phase_used: 2026,
+      } as any;
+
+      coverageService.getCoverageReport.mockResolvedValue(mockReport);
+
+      const out = await controller.getCoverageReport({
+        phase: 2026,
+        'limit-samples': 15,
+      });
+
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(2026, 15);
+      expect(out.status).toBe(HttpStatus.OK);
+      expect(out.description).toMatch(/coverage report generated/i);
+      expect(out.data).toBe(mockReport);
+    });
+
+    it('handles empty query parameters without errors', async () => {
+      const mockReport = {
+        environment: {
+          clarisa_host: 'https://clarisatest-back.ciat.cgiar.org/',
+          upstream_contract_available: true,
+        },
+      } as any;
+      coverageService.getCoverageReport.mockResolvedValue(mockReport);
+
+      await controller.getCoverageReport({});
+
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+      );
+    });
+
+    it('sets description indicating upstream contract is not published when upstream_contract_available is false (R-CPA-005)', async () => {
+      const mockReportUnavailable = {
+        environment: {
+          clarisa_host: 'https://api.clarisa.cgiar.org/',
+          upstream_contract_available: false,
+        },
+        measured_at: '2026-08-14T00:00:00.000Z',
+        phase_used: 2026,
+      } as any;
+
+      coverageService.getCoverageReport.mockResolvedValue(
+        mockReportUnavailable,
+      );
+
+      const out = await controller.getCoverageReport({});
+
+      expect(out.status).toBe(HttpStatus.OK);
+      expect(out.description).toMatch(
+        /upstream contract is not published in the measured environment/i,
+      );
+      expect(out.description).toContain('https://api.clarisa.cgiar.org/');
+      expect(out.data).toBe(mockReportUnavailable);
+    });
+  });
+
+  describe('CoverageReportQueryDto validation', () => {
+    it('accepts valid query with phase and limit-samples', async () => {
+      const dto = plainToInstance(CoverageReportQueryDto, {
+        phase: 2026,
+        'limit-samples': 10,
+      });
+      const errors = await validate(dto);
+      expect(errors).toHaveLength(0);
+      expect(dto.phase).toBe(2026);
+      expect(dto['limit-samples']).toBe(10);
+    });
+
+    it('rejects limit-samples < 1 (e.g. 0)', async () => {
+      const dto = plainToInstance(CoverageReportQueryDto, {
+        'limit-samples': 0,
+      });
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.property === 'limit-samples')).toBe(true);
+    });
+
+    it('rejects limit-samples > 50 (e.g. 51)', async () => {
+      const dto = plainToInstance(CoverageReportQueryDto, {
+        'limit-samples': 51,
+      });
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.property === 'limit-samples')).toBe(true);
+    });
+
+    it('rejects non-integer phase', async () => {
+      const dto = plainToInstance(CoverageReportQueryDto, {
+        phase: 'not-a-number',
+      });
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.property === 'phase')).toBe(true);
     });
   });
 
