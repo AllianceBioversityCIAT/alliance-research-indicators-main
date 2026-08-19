@@ -79,6 +79,57 @@ would catch it. Not `max`: the tier↔effort rule forbids maxing a T2 tier.
 
 ---
 
+### S-4 — Approval Mode and testing policy changed by the user (2026-08-19, mid-run)
+
+**User instruction:** *"continue in yolo mode but the recommendation is be careful with test, execute
+the all test all the time consume a lot of time."*
+
+| | Before | After |
+| --- | --- | --- |
+| **Approval Mode** | `gated` (from `proposal.md`) | **autonomous** — the routine per-task continue/pause gate auto-passes and is logged, exactly as `pre-approved` behaves |
+| **Test policy** | Full suite after every worker report | **Targeted first, full suite only where blast radius earns it** |
+
+**Budget tripwire — treated as answered.** The ~1,900-vs-~800 LOC re-forecast was put to the user with
+the T-01 report; the reply was to continue. Recorded as an **acknowledged re-baseline to ~1,900 LOC**,
+not as a silently ignored tripwire. It will **not** be re-escalated for the same cause; it fires again
+only if the trajectory departs materially from that re-forecast.
+
+**Exceptions still stop for the user** even under autonomous mode — a HALT, a Pivot, or a `FATAL_FAIL`
+is content nobody could approve in advance.
+
+#### Testing policy, stated precisely so it is auditable
+
+| Situation | Command |
+| --- | --- |
+| Default, per task | `npx jest <targeted paths>` — the specs the task touches |
+| Boot-path or shared-surface change (**T-06**, `main.ts`) | Full `npm test -- --silent` — broad blast radius (KZ-003) |
+| Before the final commit of the spec | Full `npm test -- --silent` once |
+| Coverage | **Not re-run.** Resolved below |
+
+Measured cost that motivates this: full suite **177 s**, coverage run **277 s**. Repeating either per
+task would have added roughly 30–40 minutes across the remaining tasks for information that targeted
+runs already provide.
+
+**Risk accepted, named rather than buried:** targeted runs cannot see a regression an additive change
+causes in an untouched suite. Mitigated by the full run at T-06 and the final full run — not eliminated.
+T-02 through T-05 add **new files only** and touch no existing module, which is what makes the targeted
+default defensible here rather than merely cheaper.
+
+#### Advisory A — RESOLVED (coverage floor holds)
+
+`npm run test:cov` → **exit 0**, 326 suites / 2271 tests. Jest fails the run when a configured
+`coverageThreshold` is not met, so the **60% global floor was not breached** by T-01's ~335 uncovered
+lines, and design §10's "threshold unchanged" claim still holds.
+
+**Honest limit on this evidence:** the exact percentage is *not* recorded — the captured output retained
+only the tail and jest prints the `All files` row at the top of the table. Exit 0 answers the question
+advisory A actually asked (*is the floor breached?*); it does **not** tell us the remaining headroom.
+Re-measuring for the number was declined under the new test policy. If T-02's converter plus T-04's
+spec later push it close, the signal will be an exit-code failure, not a gradual reading — a known blind
+spot, recorded rather than papered over.
+
+---
+
 ## Task Execution History
 
 ### Runtime Incident RI-1 — Reviewer non-delivery on T-01, **plus a mis-addressed recovery poke**
@@ -315,3 +366,138 @@ falsifier export seam, and the "what disqualifies this evidence" logic all add l
   remember.
 - **CodeGraph re-index pending** — the new folder is not in the index.
 - For `/akili-archive`: the `[SPEC …]` vs `// @akili-spec …` tag-format divergence (decision 2 above).
+
+---
+
+### T-02 — Build the converter (export → CLARISA-shaped fixture) — **PASS**
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** on attempt **1** (no rework) |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-001, R-CFS-002 (all ACs), R-CFS-007 |
+| **Implementer** | `impl-T02-fixture` — T2 / `sonnet`, effort **high**, skills `tdd` + `error-handling-patterns` (Leader again dropped `nestjs-expert`) |
+| **Reviewer** | `rev-T02-fixture` — T3 / `opus`, read-only. Delivered its verdict without a poke |
+| **Rework attempts** | 0 |
+
+#### Files
+
+`convert-export.ts` (632) · `convert-export.spec.ts` (405, 31 tests) · `clarisa-projects.fixture.json`
+(20233 lines / 863,854 bytes, generated) · `clarisa-projects.provenance.json` (**+6 lines only**).
+Nothing outside the stub folder.
+
+#### Verification evidence
+
+198 projects · 283 mappings · **170** eligible · **140 / 30** `has_science_programs` among eligible
+(the number that separates a correct converter from the naive `code: 22` one, which would read 170) ·
+entity histogram `{22: 205, 23: 37, 24: 41}` · vocabulary `high|medium|low` only, zero `H`/`M`/`L` ·
+allocations numeric and summing to 100 with 0 exceptions · 198/198 unique `external_code` ·
+PII grep 0 matches · determinism sha256 `c13c4058…` identical across two runs.
+
+**Both falsifiers observed FAILING, not asserted (K-004):** the timestamp mutation produced a
+**792-line** diff before being reverted to the identical sha256; the SP14 case aborted with
+`UnknownProgramCodeError … Refusing to fabricate … or silently drop`, exit 1, and `shasum -c` afterward
+confirmed **both** outputs byte-untouched — proving it did not silently degrade to fewer mappings.
+A third K-004 probe on the test seam (`buildMappings` `continue` instead of `throw`) reddened exactly
+the 2 predicted tests.
+
+`npx eslint` clean after `prettier --write`. Targeted `npx jest` 31/31. Full suite deliberately not run
+(new files only; policy S-4).
+
+#### Leader ruling reversed by the Reviewer — the `annual` field
+
+**The Leader was wrong and the Reviewer corrected it. Recording that directly, because a correction
+that reads as a co-discovery teaches the wrong lesson.**
+
+The Leader measured `annual` as `"0.00"` in **298 of 299** real projects, judged the `FY Budget → annual`
+mapping a likely **eighth divergence** against R-CFS-005's closed D-1…D-7 set, and escalated it.
+The Reviewer ruled **immaterial — neither FAIL nor advisory**, and its reasoning is better:
+
+1. R-CFS-001's "value CLARISA itself returns" rule is **scoped to fields the export cannot supply**,
+   with a closed enumeration `annual` is not in. Design §5.2 step 3 governs: *"Map the fields the export
+   supplies; set **the rest** to the value CLARISA returns."* `annual` is in the first half.
+2. Not DD-2 synthesis — a real PRMS figure in a real CLARISA field invents nothing. The converter draws
+   DD-2's actual line correctly elsewhere, nulling `organization_code`/`funder_code` **because**
+   populating them would fabricate CLARISA institution ids.
+3. **D-1…D-7 are consequence rows, not a value-equality ledger.** Each names an effect on the
+   consumption path. `annual` has no consequence to name: one grep hit in the whole server tree, its own
+   type declaration, and no consumer.
+4. **The decisive one.** If "differs from the reference capture in value" made a divergence, then
+   `total_budget`, `remaining`, `summary`, `description`, the dates, `short_name`, `full_name`,
+   `external_code` and `source_of_funding` would all be divergences too. *The whole fixture is different
+   data in CLARISA's shape — that is the design.* The closed set is only maintainable under the
+   consequence reading.
+
+The proposed one-line change to `"0.00"` was **not** made: it would replace a real figure with a dead
+constant and lose information for no requirement. Same ruling for `comments` (283/283 `null`; the
+`Justification` columns provably exist and are simply blank, since `readExportRows` aborts on a missing
+column and the run succeeded).
+
+**Leader's note on its own error:** the escalation was still worth making — it converted an unexamined
+default into an explicit, reasoned ruling. But the *substance* was the Reviewer's, and the Leader's
+"eighth divergence" framing would have forced either a needless rework or an unnecessary spec edit.
+This is `author ≠ auditor` catching the **Leader**, not the Implementer, which is the case the
+Delegation Ceiling explicitly warns is unguarded.
+
+#### ADVISORY (recorded, never gating, never a new task)
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| **A** | Reliability | **`allocation` has no NaN guard** unlike its neighbours — `Number(slot.allocation)` is unvalidated while `formatMoney` and `translateHml` both throw. Blank → `0`; non-numeric → `NaN` → `JSON.stringify` emits **`null`**, a silent R-CFS-002 AC.5 violation on a *future* regeneration. The header's "an unparseable cell aborts before either output file is touched" is therefore true for money and HML but not for `Allc %`/`ID` | **Latent, not live** — committed fixture is 283/283 numeric (independently verified), and T-04's `typeof` assertion is a backstop. **Not fixed**: advisories may not mint a task or widen one. If this should be fixed it needs a proposal, which is the user's call |
+| **B** | Reliability | `mergeProvenance` rebuilds from exactly `capture` + `removal_condition` + `export`, so a future fourth top-level key would be silently dropped | No loss today (file has exactly those three) |
+| **C** | Reliability | A data row with a blank `ID` is skipped silently | Row count came out at exactly 198, matching M-1 |
+| **D** | Risk | **R-CFS-007 AC.1 has no CI-able form — by the spec's own design.** The committed determinism test compares `JSON.stringify` of two in-process calls (pure core only); the file-level two-run byte diff is transient and **cannot** be committed because DD-7 keeps the export out of the repo | **Recorded deliberately so nobody later reads the missing CI gate as an oversight.** This is a spec limitation, not an Implementer gap |
+| **E** | Readability | `console.*` rather than `LoggerUtil` | Same adjudication as T-01 advisory H; consistent precedent, flagged so it is not relitigated |
+| **F** | Verification gap | No coverage run reported for T-01+T-02's ~970 lines of partially covered script | **Leader actioned** — see below |
+
+#### Forward pointers — carried into later briefs
+
+- **→ T-04 (from Reviewer audit point 4):** the 170/140 self-check exists in **no committed artifact** —
+  it came from a transient script. T-04 **must import** `isBilateralFunding`/`isAllianceProject` from
+  `../../projects/utils/project-selector.util` and must not restate them, or the number proves nothing.
+- **→ T-04 (advisory A):** keep the `typeof allocation === 'number'` assertion — it is the live backstop
+  for the missing NaN guard, not a formality.
+- **→ T-08 / HITL (Reviewer's closing note):** against the stub,
+  `bilateral-mapping-coverage.service.ts:466` compares `lead_institution_object?.acronym`, which D-6
+  nulls for every fixture project. The coverage endpoint will therefore show `legacySelectorOnly = 0`,
+  `bothSelectors = 0`, and **all 170 in `specSelectorOnly`**. Expected, but alarming if unanticipated
+  mid-demo. Also `organization_code`/`funder_code` are `null` where CLARISA returns real integers —
+  correct (populating them would fabricate ids), and D-5/D-6's shape, though no D-row names them.
+
+---
+
+### T-03 — Generate and commit the fixture and its provenance — **PASS (folded into a Leader verification)**
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** — no Implementer dispatched |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-001 AC.1/AC.3/AC.4, R-CFS-007 AC.2, R-CFS-008 AC.1 (fixture site), NFR-CFS-003 |
+
+**In-flight decomposition adjustment, recorded rather than silently taken.** T-03's deliverables were
+already produced by T-02: proving determinism *required* running the converter, and forward pointer B
+made it merge provenance correctly. T-03 therefore adds **no new artifact** — what remained was an
+assertion battery and a commit, which is inline Leader work under the Delegation Thresholds
+(a puntual verification plus a commit, writing no files).
+
+**Why no Reviewer was spawned, and the limit of that.** T-03 produces no diff of its own; handing a
+Reviewer an empty change set is the **K-011** hazard directly — a reviewer given a 0-byte artifact does
+not report "nothing to audit", it returns a confident verdict about the wrong thing. The substance of
+T-03 *was* independently audited: `rev-T02-fixture` re-derived the load-bearing counts **from the
+committed fixture**, independently of the Implementer's report — 198 `phase` values unquoted, 283
+numeric allocations, 566 HML values, `22`×205 + `23`/`24`×78, 28 `window3` rows retained, PII clean.
+**Honest limit:** no agent audited the *decision to fold T-03*. That judgment is the Leader's alone.
+
+**Leader assertion battery — 10/10 PASS** (run with both workers idle):
+
+| Check | Result |
+| --- | --- |
+| array length === 198 | 198 |
+| `phase` numeric 2026, all elements | 0 violations |
+| `external_code` populated / unique | 198 / 198 |
+| total mappings === 283 | 283 |
+| fixture ≤ 2 MB (NFR-CFS-003) | **863,854 bytes (0.82 MB)** — inside design §13's 0.6–1.2 MB estimate |
+| provenance removal condition **verbatim** | exact match |
+| provenance retains `capture` block | 13 dictionary entries preserved |
+| provenance has `export` block | row_count 198 |
+| uniform 32-key set across all 198 | 1 distinct set, 32 keys |

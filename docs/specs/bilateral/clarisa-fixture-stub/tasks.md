@@ -72,7 +72,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-001, R-CFS-002 (all ACs), R-CFS-007
 - **Design refs:** §2.1, §5.2, DD-2, DD-3, DD-6, DD-7
-- **Status:** [ ] · **Size:** M (~140 LOC) · **Depends on:** T-01 · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
+- **Status:** [x] · **Size:** M (~140 LOC est · **1037 actual**: 632 converter + 405 spec) · **Depends on:** T-01 · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
 
 **Scope.** The deterministic converter. Reads the export with `exceljs`, emits **all 198 rows** (not the eligible 170 — DD-3) as objects carrying **exactly** the 32 reference keys, and writes the sibling provenance file.
 
@@ -103,7 +103,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-001 AC.1/AC.3/AC.4, R-CFS-007 AC.2, R-CFS-008 AC.1 (fixture site), NFR-CFS-003
 - **Design refs:** §2.1, §5.2, DD-6
-- **Status:** [ ] · **Size:** S (~40 hand-written LOC + generated data) · **Depends on:** T-02 · **Skills:** `nestjs-expert`
+- **Status:** [x] · **Size:** S (~40 est · **0 actual** — folded into a Leader verification; artifacts produced by T-02) · **Depends on:** T-02 · **Skills:** `nestjs-expert`
 
 **Scope.** Run the converter, commit the fixture and the provenance file. The provenance file records the source filename, export date, reference-capture date and host, the expected counts, and the **removal condition verbatim**.
 
