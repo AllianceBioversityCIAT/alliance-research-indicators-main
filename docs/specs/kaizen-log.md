@@ -16,15 +16,15 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-014** | **A filtered view of a command's output is not the output.** Truncating a discovery search makes *absent* and *excluded* indistinguishable, and counting ANSI-coloured output silently reads zero. Check the total, normalize escapes, and look for an error **before** counting | **High** | 3 (one spec) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 |
-| **K-015** | **CI/CD deploys code but does NOT apply migrations**, while the constitution claimed releases were "100% automated". A merged migration sat 4 days and several deploys unapplied, with nothing surfacing it | **High** | 1 | Product | **Applied** — root `CLAUDE.md` §4.3 |
+| **K-014** | **A filtered view of a command's output is not the output.** Truncating a discovery search makes *absent* and *excluded* indistinguishable, and counting ANSI-coloured output silently reads zero. Check the total, normalize escapes, and look for an error **before** counting | **High** | **5** (+2: the Leader committed it **twice in one run**, on the lesson it had copied into two worker briefs) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 |
+| **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | Proposed — see K-016.b |
+| **K-017** | **A runtime artifact that must exist in the build output needs its own packaging defect class.** A unit suite runs over `src`, so it structurally cannot see that the artifact never reaches `dist` — every test passes over a file that will not be there in the field | **High** | 1 | Product + Methodology | Proposed |
+| **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Un-retired** — the rule held; the mechanism is new |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | 4 | Product | Proposed |
+| **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | **5** (+1: a fidelity gate certified data containing an unrecorded divergence) | Product | Proposed |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
-| **KZ-003** | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean | Medium | 1 | Product | Proposed |
-| **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | 1 | Product | Proposed |
+| **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
-| **KZ-009** | Before trusting any measured ratio or margin, **measure the instrument's noise floor**. A rigorous harness can still measure the wrong quantity | **High** | 1 | Product | Proposed |
 | **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed |
 
 ### Queued for upstream (Methodology — no local edit owed)
@@ -39,12 +39,91 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | **K-013** | A requirement derived from a live measurement needs the date and the invalidating condition |
 | **K-016** | An NFR that accepts user-visible latency without a paired requirement for how the UI signals it creates a trap: the user cannot distinguish "not yet" from "broken" |
 
-> **Retired this cycle (institutionalized and still in force):** `K-001`, `K-002`, `K-006`, `K-009`,
+> **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
+>
+> **Retired 2026-08-19** to hold the 10-row cap while admitting K-016, K-017 and the returning K-009:
+> `K-015` (applied to root `CLAUDE.md` §4.3; no migrations in this cycle, rule stands) · `KZ-003`
+> (applied — §4.3 now carries the narrowed full-suite/parallelism rule, followed throughout this run) ·
+> `KZ-009` (its discipline now lives in `docs/specs/general-setup/task.md`'s mandatory *"what disqualifies
+> this evidence"* clause, exercised on every task this cycle).
+>
+> **`K-009` was un-retired the same day.** Its rule was institutionalized and *held* — three non-deliveries
+> were all correctly recorded as runtime failures — but the cycle produced a **mechanism** (a verdict
+> emitted as plain text instead of via `SendMessage`) and a **structural finding** (the reviewer wrapper has
+> no `Write`, so the known mitigation cannot apply to it). Institutionalizing a rule retires the *rule*,
+> not the *failure mode*.
 
 ---
 
 ## Entries
+
+### 2026-08-19 — `bilateral/clarisa-fixture-stub`
+
+**Metrics.** 8 tasks (7 `[x]`, **1 `[~]` — T-08 waived by the user**) · **4 Reviewer FAILs / 4 rework
+attempts** (T-04, T-05, T-06, T-07 — each PASSed on attempt 2) · **0 HALTs · 0 Pivots · 0 FATAL_FAILs** ·
+**3 runtime incidents** (K-009 non-delivery ×3; **2 quota deaths** mid-task) · **7 Leader errors recorded
+(LE-1…LE-7)** · 5 advisory blocks · **4 spec amendments during execution** (D-8, DD-9, DD-10, DD-11) ·
+budget **~800 → ~3,000 LOC (3.7×)** after one re-baseline · final suite **329 / 2,351 green**, e2e **7/7
+self-terminating** (from a killed 18m40s hang) · no `test-report.md` / `validation-report.md` (absence
+accepted at archive).
+
+**The headline is not the passes.** Three of the four FAILs were defects that had **passed every automated
+check available to them**. `author ≠ auditor` caught the **Leader** twice, which is the position the
+Delegation Ceiling names as unguarded.
+
+**K-016 — SECOND OCCURRENCE, and the first filing's disposition is the root cause.** The picker showed
+*"No results found"* while the phase selector simultaneously showed `2026 (170)`. Nothing was broken: the
+`MappingPhaseResolver` had cached `targetPhase=2025` at ~12:39:29, the user saved `2026` at 12:40:23, and
+the 5-minute TTL served the stale value until ~12:44:29 — 170 projects appeared at 12:45:25. The `phases`
+endpoint stayed correct throughout because it deliberately omits `matchesPhase` (enumerating phases from a
+phase-filtered cohort would be circular), so **one endpoint said 170, the other said 0, and both were
+right**. *Root cause of the recurrence: the first filing was classified **Methodology-only, no local edit
+owed**, so nothing in the product changed and it caught the next person, on the next spec in the same
+family, within 24 hours.* A lesson with no local edit is a lesson that will fire again. *Evidence:
+`archive/2026-08-19-bilateral--clarisa-fixture-stub/execution.md` → T-08, K-016 timeline table.*
+**Severity High · target reclassified Methodology → Product.**
+
+**K-017 — A runtime artifact that must exist in the build output needs its own packaging defect class.**
+T-05 shipped a router resolving its fixture as `join(__dirname, 'fixtures', …)`. The app runs from `dist`;
+`nest-cli.json`'s single `assets` entry covered only `reports/`; `tsc` emits only *imported* JSON; the
+Dockerfile production stage copies `dist` and **no `src`**. With the flag on it would have returned ENOENT
+→ JSON 500 → `BadRequestException` — *reading as a CLARISA outage*, the exact misdirection R-2 existed to
+prevent. **All 20 of its tests passed**, because both jest configs run ts-jest over `src`, where
+`__dirname` resolves into the source tree. *Root cause: the spec's own defect-class table (DC-1…DC-11)
+enumerated visual and staleness blind spots but never a **packaging** one, so no gate existed for the
+class — and the harness could not have evaluated it.* Fixed by DD-10 with a gate proven red-then-green
+(`npm run build && ls dist/…`). *Evidence: same `execution.md` → T-05 attempt 1 FAIL, Issue 1.*
+**Severity High · Product + Methodology.**
+
+**K-009 — un-retired at recurrence 6, because the mechanism is finally named.** Three non-deliveries in
+one spec: `rev-T01-2` (idle, no verdict), `impl-T06-mount` (idle twice), `rev-T06-mount` (idle, no
+verdict). The rule from the previous cycle held — every one was recorded as a runtime failure, never read
+as a clean result — but one worker **diagnosed its own cause**: *"my earlier output went to plain text
+instead of SendMessage."* That converts K-009 from "workers forget to report" into a specific, addressable
+failure. Compounded structurally: the `akili-reviewer` wrapper grants `Read, Grep, Glob` and **no
+`Write`**, so the mitigation the log credits as working — a durable incremental report file — is
+**unavailable to the role most prone to the failure**, and two of the three losses were Reviewers.
+Empirically, putting *"your verdict must be sent with SendMessage; that send is the deliverable"* at the
+**top** of the brief worked: every subsequent Reviewer delivered unpoked. *Evidence: same `execution.md` →
+RI-1, RI-3, LE-1, LE-5.* **Severity High · Product.**
+
+**Also worth recording (not lessons).**
+- **The third consecutive test-volume budget miss** — the standing "Watch" from two cycles ago now has its
+  third occurrence and by its own rule promotes to a lesson. Deliberately **not** taken as a fourth lesson
+  slot (cap is 3); carried forward. Note the cause **split** this cycle: T-01 was 4.8× on *implementation*
+  because the spec's rigor mandates — K-014 guards, K-004 falsifier seams, disqualifier logic — are
+  themselves code that a "what does this task do" estimate never prices.
+- **The removal condition was written as *presence* when it needed *completeness*.** It reads *"when
+  CLARISA publishes `external_code` and phase-2026 data"* — satisfied within 24 h (0/299 → 78/377) — yet
+  live CLARISA yields **50** eligible against the stub's **170**, with `has_science_programs` **0/50**. A
+  literal reading would delete a stub still carrying 120 projects. **A Leader authoring error**, recorded
+  in the archive summary rather than smoothed over.
+- **K-013 fired inside 24 hours** and was *detectable only because* the dates and invalidating conditions
+  were recorded. The discipline paid for itself on its first outing.
+- **A falsifier fitted to the net.** T-04 attempt 1's mutation introduced its "extra divergence" through
+  the single invariant its net already checked — a new facet of K-004 on a **test**-shaped net rather than
+  a design-shaped one. Attempt 2 re-pointed it at a field no D-row covers.
 
 ### 2026-08-18 — `bilateral/clarisa-phase-config-variable`
 
