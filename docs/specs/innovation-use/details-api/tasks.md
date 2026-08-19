@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01, T-02, T-03 `[x]` done (2026-08-19); T-04 … T-13 todo. Review-round budget was escalated after T-03 and **resolved 2026-08-19 by user ruling: re-baselined to ~24, review depth unchanged**
+- **Status:** in-progress — T-01 … T-04 `[x]` done (2026-08-19); T-05 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **7 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -198,10 +198,10 @@ Add `customSaveInnovationUse(resultId, data, manager)`, modelled on `customSaveI
 
 ### T-04 — `ResultInstitutionTypesService.customSaveInnovationUse`
 
-- **Requirements covered:** R-IUA-007 AC.1, AC.3, AC.4, AC.5 · R-IUA-009 AC.2, AC.4 (organizations)
+- **Requirements covered:** R-IUA-007 AC.1, AC.3, AC.5 · R-IUA-009 AC.2, AC.4 (organizations) · **contributes to** R-IUA-007 AC.4 (the unmodified-Dev-specs regression gate below) but does **not** discharge it — AC.4 is a behavioural role-isolation claim owned by **T-10**, per §3's matrix and R-IUA-009's scenario clause `AND IT MUST be proven by a fixture …, not by a unit spec over a mocked repository`
 - **Depends on:** T-02
 - **Size:** M (~180 LOC incl. spec) · **Effort:** `xhigh`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — **PASS on attempt 1, zero rework**; 1 review round (2 parallel lens Reviewers, both PASS). Five shared private helpers parameterised by role (the opposite of T-03's sibling-helper ruling, per this task's own Implementation notes); `organization_count` gated by `resolveOrganizationCount`, which returns `{}` so the key is structurally absent on the Dev path. Mutation sweep M1–M9 required **up front** rather than after a FAIL — the process change that turned T-03's three rounds into one. Suite 2184/2184. Evidence: [`./execution.md`](./execution.md) → *T-04*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -225,7 +225,7 @@ Add `customSaveInnovationUse(resultId, data, manager)` modelled on `customSaveIn
 - [ ] Removing a row soft-deletes exactly that row *(AC.3)*
 - [ ] The deactivate predicate names `institution_type_role_id: INNOVATION_USE` *(R-IUA-009 AC.2, AC.4)*
 - [ ] A row without `organization_count` saves *(AC.5)*
-- [ ] Every pre-existing Innovation Dev spec in this file still passes **unmodified** — if any assertion had to change, that is a behavior change and an escalation, not a fix *(R-IUA-007 AC.4)*
+- [ ] Every pre-existing Innovation Dev spec in this file still passes **unmodified** — if any assertion had to change, that is a behavior change and an escalation, not a fix *(regression gate contributing to R-IUA-007 AC.4; AC.4 itself is discharged by **T-10**)*
 - [ ] `npm test -- --silent` green
 
 **Verification & its limits**

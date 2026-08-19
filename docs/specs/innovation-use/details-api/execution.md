@@ -22,7 +22,7 @@
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
 
-**Review-round tally:** **6 of 6–8 consumed** (T-01 ×2, T-02 ×1, T-03 ×3) at 3 of 13 tasks. **Budget escalated to the user 2026-08-19** — see § *Budget Escalation*.
+**Review-round tally:** **7 of ~24 consumed** (T-01 ×2, T-02 ×1, T-03 ×3, T-04 ×1) at 4 of 13 tasks. Budget re-baselined 2026-08-19 by user ruling — see § *Budget Escalation* and its resolution.
 
 ---
 
@@ -675,5 +675,97 @@ The user declined the two options that would have bought rounds back by reducing
 **Correction closure — two-direction sweep run (KZ-005).** Forward: every surviving occurrence of `6–8` across `docs/specs/innovation-use/**` was inspected and is either explicitly framed as the superseded value (*"re-baselined from 6–8"*) or is append-only history in this log. Backward: every occurrence of the new value `~24` carries its provenance; no orphan. The new term the correction introduced (`re-baselin*`) was re-grepped and resolves consistently in all four documents. One false positive excluded: `requirements.md:94` matches `6-8` inside the line citation `result-institution-type.entity.ts:76-81`.
 
 **Carried to `/akili-archive`'s Kaizen step**, as a methodology signal rather than a chunk-2 accident: *two consecutive chunks in this family set their review-round budget at roughly a third of the actual, and the second did so **after** explicitly correcting for the first.* A per-chunk estimate that is corrected upward and still lands 3× low suggests the estimator is missing a structural cost, not being unlucky — candidate causes worth testing at the retrospective: rework rounds triggered by spec defects rather than code defects (2 of the 6 here), and parallel lens reviews being counted as one round when they cost three.
+
+---
+
+### T-04 — `ResultInstitutionTypesService.customSaveInnovationUse`
+
+- **Final status:** `[x]` **DONE 2026-08-19** — **PASS on attempt 1, zero rework.**
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 · **Review rounds consumed:** 1 (2 parallel lens Reviewers, both PASS)
+- **Requirements covered:** R-IUA-007 AC.1, AC.3, AC.5 · R-IUA-009 AC.2, AC.4 (organizations)
+- **Skills assigned:** `nestjs-expert`, `tdd` (task defaults, unchanged) · **Effort:** `xhigh`
+
+#### The change
+
+`customSaveInnovationUse` added, and the five shared private helpers **parameterised** by `InstitutionTypeRoleEnum` rather than duplicated — the opposite of T-03's ruling, and deliberately so. T-03 had to add a sibling because its done criteria froze `customSaveInnovationDev` byte-identical; **T-04 has no byte-identity criterion**, and its gate is behavioural instead: *every pre-existing Innovation Dev spec must pass **unmodified***. Both briefs named the other's ruling explicitly so the two approaches could not cross-contaminate.
+
+`organization_count` is threaded through a single new helper:
+
+```ts
+private resolveOrganizationCount(institution, role) {
+  return role === InstitutionTypeRoleEnum.INNOVATION_USE
+    ? { organization_count: setNull((institution as InnovationUseOrganizationDto)?.organization_count) }
+    : {};
+}
+```
+
+**The `{}` return is the design decision worth preserving.** For a non-Use role the key is **structurally absent** from the returned object — not set to `undefined`. Lens A judged this materially stronger, not merely stylistic: `'organization_count' in row === false` means no TypeORM code path can reach the column for a Dev row, so correctness does not depend on the library's undefined-skipping behaviour (the very implementation detail T-03 had to go read at `SubjectChangedColumnsComputer.js:49-51`).
+
+#### What the mutation sweep being front-loaded bought
+
+T-03 spent an entire review round discovering its tests could not fail. T-04's brief therefore **required the mutation sweep in attempt 1** rather than demanding it after a FAIL. Result: **PASS on attempt 1, one round instead of three.**
+
+The Implementer ran M1–M9 and reported one that did not work:
+
+> **M9 — first attempt turned nothing red.** The simulated delete was gated on `result_institution_type_id` being truthy, and the hard-delete test uses an insert-path row with no id, so the guard never fired. Reported rather than passed off; corrected to call `delete` unconditionally, which **did** turn the "soft-deletes only" test red.
+
+Lens B confirmed the disclosure is accurate at source and that disclosing it "rather than banking the green is the behavior this lens exists to reward."
+
+#### Verification
+
+`npm test -- --silent` → 330/330 suites, **2184**/2184 (2174 after T-03; +10 = 8 Use cases + 2 Dev-leak checks) · `npx tsc --noEmit` clean · `npx eslint --no-fix …/result-institution-types/` — 3 prettier errors found and **fixed by hand without `--fix`**, then re-verified clean along with the suite and tsc.
+
+**Leader-verified independently:**
+
+| Check | Result |
+| --- | --- |
+| Spec file deletions | Exactly **one** line: `-import { DataSource } from 'typeorm';` (replaced to add `IsNull`). **No pre-existing assertion deleted or modified** |
+| Hardcoded `INNOVATION_DEV` count | HEAD **10** → working **5**, all five at *call sites* (3 in `saveInnovationDev`'s untouched `create()` route, 2 newly explicit in `customSaveInnovationDev`). **Zero remain inside any private helper.** 10 − 7 replaced + 2 new call-site passes = 5 — arithmetic confirms Lens A's "seven replacements, none missed, none added" |
+
+#### Reviewer verdicts — 2 parallel lenses, both `STATUS: PASS`
+
+**Lens A (conformance + Innovation Dev regression).** Traced `customSaveInnovationDev` end to end with `role = INNOVATION_DEV` against every parameterised helper: **no produced object differs in any key — value or presence.** Spreading `{}` adds no key and does not perturb `Object.keys` order. It independently re-grepped the blast radius and confirmed every private helper is file-local, with `result-innovation-dev.service.ts:296` the sole external caller of the changed class and its signature unchanged. It also verified both union members declare **every** property the helpers dereference — material because `tsconfig.json` sets `strictNullChecks: false` and would not flag a missing one.
+
+> **Lens A stated its own tooling limit rather than papering over it:** its wrapper is read-only, so it could not run `git show HEAD:`, and it named which claims rested on the Leader-supplied diff. `dist/` turned out to be post-change and therefore not an independent baseline — it said so. The Leader closed that gap with the hardcoded-literal count above.
+
+**Lens B (test fidelity + mutation-sweep audit).** All ten new tests carry a named production mutation that reds them; **none is vacuous**; none asserts a literal the test authored itself. All nine reported mutation counts verified structurally credible, **with no incidental `TypeError` reds** — every method the mutations touch is defined on the shared `buildTempRepo` double.
+
+> **Lens B verified the decisive matcher semantics at source instead of assuming them.** The Dev-leak check needs to distinguish an *absent* key from one *present but `undefined`* — `{}` versus `{ organization_count: undefined }` — since only the first is a genuine non-leak. At `node_modules/@jest/expect-utils/build/utils.js:82-84`, `endPropIsDefined = !isPrimitive(object) && prop in object`, and `prop in object` is true for a key present with `undefined`. So `not.toHaveProperty` **fails** in both cases: it is the strongest available matcher and the correct one. It also confirmed `INNOVATION_DEV = 1 ≠ INNOVATION_USE = 2`, without which every role assertion would have been silently vacuous.
+
+**Lens B's summary judgement on the process change:** *"Did front-loading the sweep work? Yes, and measurably. All three T-03 anti-patterns are corrected."* — faithful doubles, hard-delete assertions reading call state rather than a fixture literal, `is_active: true` pinned on both write paths, `organization_count` pinned on both plus absence on the Dev path, and one test pinning `save`'s array length.
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| **B — ADV-1, highest value** | The **`existData` reactivation branch is never exercised** — every test stubs `findOne` to `null`. Deleting `if (existData) dataTemp['result_institution_type_id'] = …` leaves the suite **green**, while in production a resent, previously-deactivated row would **insert a duplicate instead of reactivating**. The one defect-bearing mutation the sweep did not attempt, and the closest structural analogue to T-03's failure | **Forward pointer → T-09.** Not reworked: both lenses PASSed, and opening an attempt to absorb an advisory is precisely what the advisory rule forbids. **T-09's F-A does not currently name an organization reactivation case** — see the pointer table |
+| A — Risk | The update path trusts a client-supplied `result_institution_type_id` with **no check that the row belongs to this result or this role**. A payload naming an Innovation Dev row's id would save it with `institution_type_role_id: INNOVATION_USE` and blank its type columns | **Forward pointer → T-06.** Same shape as T-03's actors finding; inherited verbatim from the Dev reference, newly reachable now that two roles share the table. Lens A notes **T-10 as specified will not catch it** (F-B saves with empty arrays) |
+| A — Reliability | `removeDuplicates` leaves `key` **`undefined`** for a row with no `OTHER` type, no sub-type, no type id and falsy `is_organization_known` — all such rows collapse into one map entry. `constructWhereClause` for such a row reduces to `{ result_id, institution_type_role_id }`, so `findOne` binds it to an **arbitrary existing** Use row and stamps that row's id onto it, overwriting an unrelated organization. Pre-existing and unchanged — but **newly reachable**, because every field of `InnovationUseOrganizationDto` is optional by design (R-IUA-007 AC.5 draft-save), making `{ organization_count: 5 }` a valid payload row | **Forward pointer → T-06 and T-09** |
+| B — ADV-2 | The hard-delete guard covers the **insert path only**; a delete planted in `buildUpdateData`'s branch would ship green. Per §3's matrix the hard-delete clause is owned by T-03/T-09, so this test is a bonus | Recorded |
+| B — ADV-3 | Test 3's second assertion reads the `save` double's **echo**, not a read-back — it proves nothing the preceding matcher did not. R-IUA-007 AC.1's round-trip is T-09/T-10's | Recorded |
+| B — ADV-4/5/6 | Two `is_organization_known: true` branches do not pin `institution_type_role_id`; only one test pins `save`'s array length; `buildTempRepo` omits `softRemove`/`createQueryBuilder` | Recorded, minor |
+| B — ADV-7 | **Addressed to the Leader, not the code.** `tasks.md` T-04's header claimed R-IUA-007 **AC.4**, but §3's matrix assigns AC.4 to **T-10 alone** | **Fixed by the Leader — see below** |
+
+#### Leader-applied spec correction (ADV-7)
+
+The matrix was right and the task header was over-claiming: R-IUA-007 AC.4 (*"No `result_institution_types` row with `institution_type_role_id = INNOVATION_DEV` is read, written or deactivated by this endpoint"*) is a **behavioural** role-isolation claim, and R-IUA-009's scenario states it `MUST be proven by a fixture …, not by a unit spec over a mocked repository`. T-04's unmodified-Dev-specs criterion is a *regression gate contributing to* AC.4, not a discharge of it.
+
+`tasks.md` T-04's *Requirements covered* line and its fifth done criterion now both defer AC.4 to T-10 explicitly. Swept: lines 480 and 504 (T-10) and 664 (matrix) already agreed; the task header was the sole outlier and is now consistent.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+Mocked repositories throughout. This proves the predicate objects, saved-row shapes and where-clauses are **constructed** correctly — **not** that MySQL leaves Innovation Dev rows alone. R-IUA-007 AC.4 and R-IUA-009's scenario are discharged by **T-10 (F-B)**, and R-IUA-007 AC.1's round-trip by **T-09 (F-A)**. Neither is discharged here.
+
+#### Forward pointers created by T-04
+
+| → Task | Pointer |
+| --- | --- |
+| **T-09 (F-A)** | **Add an organization *reactivation* case**: seed an organization row, deactivate it, re-send the same identity, and assert the **id is reused** rather than a duplicate inserted. F-A's current criteria name an *actor* edit-and-resave but no organization reactivation, so ADV-1's gap survives T-09 as written |
+| T-06 | Validate that any client-supplied child id (`result_institution_type_id`, and `result_actors_id` per T-03) belongs to `(result_id, role)` before the write. **Two tasks have now independently surfaced this**; still awaiting the user's decision on whether it is in scope |
+| T-06 | Reject identity-less organization rows — a row with no type, sub-type, custom name or known institution has an `undefined` dedup key and an unconstrained where-clause |
+| T-05 / T-06 | `resolveOrganizationCount`'s doc comment is a good precedent: it explains the `{}`-vs-`undefined` reasoning so the next reader need not re-derive it |
+
+**Budget status:** 4 of 13 tasks complete. **7 of ~24 review rounds consumed** — on the re-baselined budget, and T-04 came in at one round against T-03's three.
 
 ---
