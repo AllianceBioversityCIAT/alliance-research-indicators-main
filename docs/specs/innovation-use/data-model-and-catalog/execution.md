@@ -1920,3 +1920,43 @@ Three corrections owed since T-12's escalation, applied by the Leader (commit `d
 
 **Result: the sweep found no residue.** Recorded because a sweep that ran and found nothing is evidence; a sweep that was never run is indistinguishable from it in the audit trail, and that ambiguity is exactly how KZ-005 recurred three times here.
 
+
+#### T-13 post-PASS correction (D-1…D-5) — **4 of 5 VERIFIED TRUE · D-2 FAIL · fix QUEUED behind T-12**
+
+**Date:** 2026-08-18 · single Reviewer (proportionate: +31/−14 in one file, comment text and one seed value) · **T-13's `[x]` is NOT reopened** — its five Done items were met and remain met; this is a comment-citation defect in an advisory-class cleanup.
+
+| Finding | Verdict | Verified against |
+| --- | --- | --- |
+| **D-1** `is_knowledge_sharing 3 → 7` | ✅ **TRUE** | Reviewer re-enumerated the reachable numeric values itself: `{9141,9142,9143,2,9144,9145,7,101,102,103,104,105,106,107,9146,3,5,41,42}` + `is_active=1` (defaulted, not inserted) + `deleted_at=NULL`. `7` free; `107 ≠ 7`; the prior `3` **did** genuinely collide with `new_or_improved_varieties_count: 3` — a `tinyint`↔`bigint` pair, so the cross-type concern was the real one. Sibling INSERTs re-checked and internally distinct |
+| **D-3** CHECK parenthetical | ✅ **TRUE, exactly** | `CHECK` in `baseline.sql` → 9 hits at `13,14,8231,8232,8258,8259,8275,8276` + `6512`. `innovation_readiness_explanation` is plain `text` at `:3229`, no CHECK. `1787068132517:21` does say what is claimed, about `innovation_use_level_explanation` |
+| **D-4** "ten" | ✅ **TRUE** | 4 (`:3206,3210,3214,3227`) + 5 (`:2813-2817`) + 1 (`:3320`) = 10 nullable boolean tinyints; the three `is_active` are `NOT NULL DEFAULT '1'`, making 13 with them. New text explicit about which set |
+| **D-5** vacuous guards removed | ✅ **TRUE** | `fetchFullRow` asserts `toHaveLength(1)` (`:441`) and returns non-optional. All four raw-destructure guards survive (`:783, :1012, :1023, :1031`) |
+| **D-2** rewritten paragraph | 🔴 **FAIL on one clause** | See below |
+
+##### 🔴 The seventh inaccurate claim — introduced by the correction to the previous six
+
+The new paragraph's **self-citation** is wrong: `:233` reads *"(see the NULL assertions below, `:864-868`/`:895`)"*. In the file as it stands, `:864` is an `actor_role_id` assertion and `:865-868` are a comment block about the five **legacy boolean** columns — the opposite of the count columns being described; `:895` is a bare `);`. The real assertions are at **`:884-888`** and **`:915`**. The Reviewer checked the pre-diff frame too, in case the numbers were merely stale: cumulative hunk offset at that point is `+18` (`@@ -880,7 +898,6 @@`), so the old numbers would have been `:866-870`/`:898`. **Wrong in both frames.**
+
+Every other D-2 clause holds: every diversifiable pairing is mutually distinct across all three INSERTs (confirmed column-by-column against the DDLs); the six count columns are genuinely absent from all three seed column lists and genuinely asserted NULL; and the **cross-file** citation `innovation-use-lifecycle-routines.fixture-spec.ts:376-380`/`:394` is **exactly right** (`:376-380` are the five `toBe(11..15)` assertions, `:394` is `organization_count → 42`).
+
+- **Violated rule:** the correction's own D-2 acceptance criterion (*"are the cited line numbers correct in the file as it now stands?"*), and the sentence's own standard three lines above it at `:226-227` — *"verified column-by-column against `baseline.sql`, **not assumed**."* A pointer that points at the wrong lines is an assumed citation. Also root `CLAUDE.md` §5.
+
+##### 🔑 The structural insight — this is the finding, not the line numbers
+
+> **A same-file line citation is invalidated by the very edit that writes it.**
+
+Cross-file line citations are fine and were verified exactly right. **Same-file** pointers are self-defeating by construction: the comment shifts the code it points at. That mechanism explains why this class keeps recurring here and is not a matter of care. **Remediation adopted: cite same-file targets by anchor**, never by number — e.g. *"the five `toBeNull()` count assertions in F16a"* — and keep line numbers only for cross-file references.
+
+This is a better answer than "read the artifact more carefully," which is what the previous six corrections each amounted to. **It belongs in `/akili-archive`'s Kaizen as a candidate lesson with a concrete mechanism and a concrete rule**, rather than another recurrence count against KZ-002.
+
+##### Disposition
+
+**QUEUED, not dropped.** The fix is a two-token edit plus an anchor rewrite, but its verification needs `test:fixtures` and lint — and T-12's Implementer currently holds the scratch container. Running a measurement beside an active worker does not produce a slow result, it produces a **wrong** one (`.agents/leader.md` → *Concurrency protocol*). The files do not conflict; the harness does. **Fix dispatches when T-12 lands.**
+
+**ADVISORY (Reviewer) — a concern of the Leader's, closed:** the `migration:test:bootstrap` non-idempotency **does not** undermine any T-13 evidence. A schema stranded at a pre-M6 point lacks `result_innovation_use` and the six count columns entirely, so it fails loudly with `ER_BAD_FIELD_ERROR` on the very assertions in question rather than passing falsely. **The failure mode is a red, not a false green**, and the cold cycle taken after the container recycle stands. Filed as harness work for T-14 (see FP-49).
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-49** | **T-14 · `src/CLAUDE.md` §9** | **`migration:test:bootstrap` is not idempotent** — re-running it against an already-migrated container raises `ER_TABLE_EXISTS_ERROR` and strands the schema at a pre-M6 migration point. Discovered during the T-13 correction. Run it exactly once per fresh container; recover only by full `compose:test:down` → `up` → `bootstrap`. Harmless to trust (it fails loudly), expensive to diagnose |
+| **FP-50** | **T-14 · every future spec** | **Same-file line citations are structurally self-invalidating.** Cite same-file targets by anchor; reserve line numbers for cross-file references. Concrete mechanism behind six of this spec's seven inaccurate claims |
+
