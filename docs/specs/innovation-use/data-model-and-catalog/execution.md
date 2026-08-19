@@ -1980,3 +1980,50 @@ This is no longer a hypothesis about the mechanism; it is a measurement of it. *
 
 **Running tally: seven inaccurate claims shipped; the eighth was averted by changing the citation *form* rather than its content.** That is the first intervention in this spec to break the pattern instead of adding to it.
 
+
+#### T-12 — ATTEMPT 2 (review round 9): **Lens A FAIL · Lens B FAIL** — the fixture is clean, the A-6 rider is not
+
+**Date:** 2026-08-18 · Effort `xhigh` · Files: new `innovation-dev-validation-behavioral.fixture-spec.ts` (460 lines) + a docblock-only hunk in `innovation-use-validation.fixture-spec.ts`.
+
+##### ✅ The deliverable the user's path-(a) ruling asked for is SOUND — both lenses, independently
+
+| Question | Verdict | Evidence |
+| --- | --- | --- |
+| **Does it discharge AC.9?** | ✅ | `requirements.md:384` asks the function *"returns identical values before and after this migration for a fixed fixture set."* The fixture seeds a fixed result, calls the real function, asserts returned **values** derived from the defining migration. Paired with the retained body-text fixture, AC.9's substance is met. Both kept, exactly as ruled |
+| **Is the `is_active = FALSE` substitution adequate?** | ✅ | Lens A traced it: F12b-1 evaluates the `ELSE ra.actor_type_id IS NOT NULL` arm (`:78`) → `tempActors = 1 = tempFullActors, > 0`; F12b-2 re-evaluates COUNT (`:68-72`) and SUM (`:74-84`) over the **M3-touched** table with the row filtered out → `0 = 0` holds, `(tempActors > 0)` at `:111` is the sole failing conjunct. Exactly one conjunct varies (FP-42). The race-avoidance rationale is factually correct — `innovation-use-validation.fixture-spec.ts:167-185` **does** own an unguarded check-then-insert/delete for codes 1 and 5, and `global-setup.ts:50-61` does **not** seed them |
+| **FP-47 — the trap** | ✅ **avoided** | Lens B verified column-by-column: all three `= TRUE`-compared columns (`:31`, `:36`, `:46`) seeded **literal `0`**. **No sentinel ≥ 2 anywhere.** Placeholder/literal arity re-counted (14 columns / 12 placeholders + 2 literals), parameter array positionally aligned |
+| **Short-circuit reachability** | ✅ | `:108` is literally `RETURN IF(anticipatedUserId = 1 OR anticipatedUserId IS NULL, TRUE, …)`. `anticipated_users_id = 9164` defeats it and resolves behind `FK_dc8dbf9ddb348acc41d3271687c`. **The reachability-by-pairing argument is sound** — `tempFullActors`/`tempActors` are referenced only inside the short-circuited FALSE branch, so an observed flip entails the branch was evaluated |
+| **Is F12b-1's `1` earned or accidental?** | ✅ **earned** | Lens B walked every conjunct. The only true-by-default term is `IF(readinessLevel >= 7, knowledgeSharing, TRUE)`, which the file itself discloses |
+| **Mutation attributability** | ✅ | Dropping `(tempFullActors = tempActors) AND (tempActors > 0) AND` is a **weakening** of a conjunction — a TRUE case must stay TRUE. **F12b-1 green + F12b-2 red is exactly the correct signature, not evidence of independence** |
+| **`level = 1` immateriality** | ✅ | `is_knowledge_sharing = 0` → `:52`'s ELSE → `TRUE`, so `:114` is `TRUE` on both branches of `readinessLevel >= 7` |
+| **Cross-file safety & scope** | ✅ | Ids 9161–9166, band `900_600`, report year 2103, platform `T12F12B` all verified unused across all seven fixture files. Teardown FK-correct. `actor_roles` 1 / `institution_type_roles` 1 referenced read-only. Two files only; no migration, no `global-setup.ts`, no `jest-fixtures.json`, no production source |
+
+Cold cycle green at **9 suites / 30 tests**; `npm test -- --silent` → **328 suites / 2155 tests**, unchanged; lint clean; zero leftover rows.
+
+##### 🔴 FAIL — both issues in the A-6 comment rider, both raised by both lenses
+
+**FAIL-1 — the replacement ships a NEW false claim (#8).** `innovation-use-validation.fixture-spec.ts:29-31` now asserts *"F11 below still seeds id 1 itself, idempotently, and only removes it in `afterAll` if this file was the one that added it."* The file's own `afterAll` at `:224-237` says the opposite **in capitals** — *"`actor_roles` id 1 is NEVER torn down here (T-13 rework attempt 2, FAIL-2/FAIL-4 / A-9)"* — retains the flag only as a diagnostic (`void innovationDevRoleSeeded;` at `:237`), and there is **no `DELETE FROM actor_roles` anywhere in the file**. `global-setup.ts:30-34` independently forbids it. **The clause was carried forward verbatim from the very text being corrected, without being checked against the artifact — the exact failure mode the edit existed to remedy.** (Lens A adds: the seeding lives in `beforeAll` at `:192-200`, not in the F11 test, so that half of the sentence is wrong too.)
+
+**FAIL-2 — the ORIGINAL falsehood survives verbatim, 170 lines below, in the same file.** `:187-189` still reads: *"FP-16: the Innovation Dev role (actor_role_id = 1) is not seeded by the baseline or by any migration on this branch — only the Innovation Use role (id 2) is (M4)."* False by precisely the argument the new header supplies. **The file now asserts P at `:187-189` and ¬P at `:13-17`.**
+
+> Lens A: *"A-6 named `:13-17` as its site, so the letter is met, but the false claim is still shipped and the file is now self-contradictory — the correction's purpose is not discharged."*
+
+##### ⚠️ Leader accountability — this FAIL is a briefing defect, and it is KZ-005
+
+**KZ-005 is this project's applied lesson** (`.agents/leader.md` §Spec Drift / Pivot Protocol): *a correction sweep must enumerate the superseded claim in every phrasing, not only the string that was edited.* Earlier in this same session the Leader ran exactly that sweep, in both directions, on the three owed doc corrections — and recorded it.
+
+**Then briefed the A-6 correction by pointing at the line range A-6 named (`:13-17`), with no instruction to sweep the file.** The Implementer corrected the cited site, which is what it was asked to do. **The lesson was in the Leader's context and was applied asymmetrically: to the corrections the Leader performed itself, and not to the one it delegated.**
+
+That is the finding, and it is more useful than the two comment lines: **KZ-005 as written is scoped to pivots and to the corrector's own edits. It does not travel into a delegated correction unless the brief carries it — and a brief that names a line range actively suppresses it**, because it tells the worker where to look and thereby where to stop. Attempt 3's brief carries the sweep as an explicit deliverable instead of a line pointer.
+
+##### ADVISORY — recorded, never gating
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **E-1** | A | The new file's `:113-115` claims the `is_active` route is *"exactly as sensitive"* to an M3-adjacent regression as the `code = 5` path. **Not exactly** — `code = 5` exercises the `WHEN ra.actor_type_id = 5 THEN ra.actor_type_custom_name IS NOT NULL` arm (`:77`), which neither case reaches. Adequate for AC.9 (which enumerates no branch), but an overstated equivalence in a shipped comment is the same family as the false-claim pattern |
+| **E-2** | B | F12b-1's actor conjunct resolves through `:78`'s `ELSE ra.actor_type_id IS NOT NULL` on a `bigint NOT NULL` column (`baseline.sql:2812`) — **an unfalsifiable branch**. The pair gates the `is_active` filter and the `tempActors > 0` guard, **not** the actor-type-resolution `CASE`. Honestly disclosed at `:88-115`; worth an explicit non-coverage note |
+| **E-3** | B | `callValidation` does `Number(row.v)`, and `Number(null) === 0`. The `toBe(0)` case is non-hollow **only because F12b-1 proves the same `resultId` yields `1` first.** That mutual guard is load-bearing and undocumented — a future reader could reasonably delete or reorder F12b-1 |
+| **E-4** | A, B | F12b-2 mutates the row F12b-1 depends on, so the two `it`s are **order-coupled**. Safe under Jest's in-file declaration order, but `--randomize` or an `.only` on F12b-2 would break F12b-1 rather than itself |
+| **E-5** | B | **No red-demonstration exists for F12b-1 individually** — the applied mutation was a weakening, which cannot red it by construction. An inverting mutation (forcing `tempActors := 0`) would produce one and is cheap |
+| **E-6** | A, B | `:106-107` cites `:71`/`:83` for the `AND ra.is_active = TRUE` predicate, which is on `:72`/`:84` (`:71`/`:83` are the `WHERE ra.result_id = result_code` lines). Off by one against the exact-single-line citation pattern used elsewhere in the file |
+
