@@ -224,7 +224,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-008 (all ACs)
 - **Design refs:** §2.1, §7, §11
-- **Status:** [ ] · **Size:** S (~40 LOC) · **Depends on:** T-06 · **Skills:** `cognitive-doc-design`
+- **Status:** [x] · **Size:** S (~40 est · **~39 actual**) — PASS on attempt 2; attempt 1 FAILed (location list named three sites, grep returns five, omitting the canonical one) · **Depends on:** T-06 · **Skills:** `cognitive-doc-design`
 
 **Scope.** `.env.example` entries for `ARI_CLARISA_STUB_ENABLED` and the stub `ARI_CLARISA_HOST` values, following the existing commented-block style used by `ARI_CLARISA_PROJECTS_PHASE`. State the **trailing slash** requirement and the removal condition.
 

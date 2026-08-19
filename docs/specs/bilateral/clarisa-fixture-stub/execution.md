@@ -1084,3 +1084,99 @@ as "the ordering gate cannot fail". The mutation was therefore applied to the e2
 `helmet`/`json`/`urlencoded`/`enableCors` block into a shared `configureHttpApp(app)`, which would blow
 through §2.1's `main.ts` budget far more than the guard did. **Recorded as a named gap in the spec file's
 header, not silently absorbed.**
+
+---
+
+### T-07 — Document the variables and the removal condition — **attempt 2: PASS** ✅
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** on attempt **2** of 3 · 1 rework |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-008 (all three ACs) |
+| **Artifact** | `server/researchindicators/.env.example` — a ~39-line documented block |
+| **Workers** | `impl-T07-envdocs` → `impl-T07-attempt2` · `rev-T07-envdocs` (**died on quota, RI-4**) → `rev-T07-retry` → `rev-T07-attempt2` |
+
+#### What was delivered
+
+Both CLARISA variables documented in the file's own house style (the `ARI_CLARISA_PROJECTS_PHASE`
+commented-block pattern), covering: default-deny with the value required to be **exactly `true`** (not
+`1`/`yes`/`TRUE` — a forward-flagged note from T-05's Implementer); the **mandatory trailing slash** with
+its full failure chain (`…/api/clarisa-stubauth/login` → 404 → `BadRequestException`, which reads as a
+CLARISA outage rather than the config typo it is); the **restart requirement** (the 5-minute cache makes a
+switch invisible, and a stale cache reads as *"the switch did not work"* — K-016); and **OQ-3's
+unassigned state**, recorded without inventing an owner (K-015).
+
+**`ARI_CLARISA_HOST` was absent from `.env.example` entirely** before this task, despite the code
+requiring it. Documenting the new flag beside an undocumented dependency would have been half a job.
+
+#### Attempt 1 FAIL — a false index in the document that claims to be the index
+
+The block's own location list read *"grepped in three places: this file, the stub's provenance fixture,
+and `clarisa-stub.config.ts`"*. A literal grep returns **five** sites, and the list **omitted
+`clarisa-stub.router.ts`** — precisely the one R-CFS-008 names canonically (*"a header comment on the stub
+controller"*), substituting a file the requirement does not name for the file it does.
+
+**Why that was a FAIL and not a nit:** the same parenthetical instructs *"do not paraphrase or wrap it"*.
+A maintainer revising the wording would follow the list, update three copies, and leave the router header
+and the harvester's constant **stale** — the exact K-003 silent drift AC.1 exists to catch, seeded in the
+one document a configurer treats as authoritative.
+
+Fixed by naming the real set. Leader-verified after: sentence count **1** in `.env.example`, **5** files
+repo-wide, **line unchanged byte-for-byte**, and every match site now named.
+
+#### Security question — cleared thoroughly, not by assertion
+
+The Implementer disclosed copying the **real test and prod CLARISA hostnames out of the gitignored `.env`**
+into the tracked `.env.example`. That is a standard way secrets escape, so it was audited rather than
+accepted:
+
+- Those hostnames appear in **~30 tracked files**, including
+  `coverage-report.dto.ts`'s Swagger `@ApiProperty({ example: … })` — i.e. already served to every
+  `/swagger` reader. CLARISA is CGIAR's public control-list API. **The diff discloses nothing new.**
+- The claimed precedent is real: `ARI_PRMS_TOC_HOST` and `ARI_TOC_INTEGRATION_HOST` both carry real,
+  uncommented hostnames in the same file.
+- **Nothing credential-shaped came across.** The Reviewer read all 80 lines rather than checking two
+  variables: the only credential-ish hits are pre-existing `xxxxx` placeholders, and
+  `ARI_CLARISA_USER`/`ARI_CLARISA_PASS` were **never introduced at all**. `.env` remains gitignored.
+- **Leaving `ARI_CLARISA_HOST` active at the test host is the right default**, ruled by working through
+  both alternatives: commented-out makes `Clarisa` post to `undefinedauth/login` → the same misleading
+  "CLARISA outage" symptom the block itself warns about, minus the diagnostic; prod-active points a
+  newcomer's laptop at production CLARISA.
+
+#### LE-7 — the Leader propagated an imprecise claim into two briefs
+
+The Leader told two briefs that the harvester's copy of the removal condition was *"wrapped across three
+comment lines and will not match a literal grep"*. The T-07 Reviewer corrected it. **Verified: the file
+holds *two* copies** — a header comment (lines 20–23) that **is** wrapped and does **not** match, and a
+`REMOVAL_CONDITION` constant (line 47) that **is** a single unwrapped line and **does**. Both reviewers
+were right about different sites; the Leader's generalisation to "the harvester's copy" was the imprecise
+part, and it understated the match count in every brief that carried it.
+
+#### Advisories deliberately NOT fixed — and the Implementer was told not to
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Reliability | *"indistinguishable from routes that do not exist"* is a **mild overclaim** — a genuinely nonexistent sibling path answers **401** from `JwtMiddleware` while the two stub paths answer an empty **404**, a differential revealing that two paths are special. The overclaim **originates in `clarisa-stub.router.ts`'s comment**, not in the doc | **Left.** Advisory; the operative fact for a `.env.example` reader ("disabled behaves as if the routes are not there") is correct |
+| Readability | *"198 CLARISA bilateral projects"* is accurate about the payload, but the picker shows **170** — a configurer could have a "the stub is truncating" moment | **Left.** Advisory |
+| Reliability | The inline `# local` / `# dev` comments on the stub host lines are **safe** — `dotenv` is pinned at 16.4.7, which strips unquoted inline comments. Checked rather than assumed | No action; recorded so nobody re-derives it |
+
+**Both fixable in one word each, and both deliberately refused.** Advisories may not widen a task, and
+that rule was enforced against the Leader repeatedly this run (the `allocation` NaN guard, the misleading
+`jest.spyOn` seam comment). Suspending it for a convenient case is how it stops meaning anything. The
+rework brief explicitly instructed the Implementer to leave them, and the re-review was told not to raise
+them — penalising correct compliance would teach exactly the wrong lesson about scope.
+
+#### Runtime Incident RI-4 — second quota death of the run
+
+`rev-T07-envdocs` (Reviewer) died mid-audit: *"You've hit your session limit · resets 4:50am."* Second
+quota casualty after `impl-T04-attempt2` (RI-2).
+
+**The Reviewer's fallback is stricter than the Implementer's and was honoured.** `/akili-execute`'s table
+is explicit that the Reviewer degrades **never to inline** — a runtime failure does not suspend a
+correctness constraint, and the Leader had already independently verified parts of T-07 (no credential
+leak, `.env` gitignored, the literal in all three locations), which makes it exactly the wrong party to
+audit it. Protocol followed: **retry once** → `rev-T07-retry` spawned successfully, confirming the quota
+was scoped to that worker's session rather than the account. Had it failed again, the options presented to
+the user would have been a different model, a cross-host dispatch, or an **explicitly recorded waiver** —
+never a Leader self-review.
