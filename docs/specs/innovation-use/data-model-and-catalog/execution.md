@@ -1571,3 +1571,175 @@ Rework attempts remaining on T-12 itself: **2 of 3** (unused). The constraint is
 **Also owed regardless of the path** (both are doc-only, neither consumes a review round): the `tasks.md` R-IU-003 over-claim (two sites), and **A-6's factually false shipped comment** — which T-09's precedent treats as FAIL-class, and which the Leader cannot convert from an advisory unilaterally.
 
 **Standing instruction:** do not spawn T-12's attempt 2, and do not mark T-12 `[x]`, without the user's ruling on (a) vs (b). T-13 is independently eligible (its dependency T-10 is `[x]`) and does **not** require this ruling.
+
+---
+
+### T-13 — Lifecycle fixtures F13–F16, F18 · **ATTEMPT 1: 3 FAIL / 0 PASS → BUDGET ESCALATION, task `[~]`**
+
+**Date:** 2026-08-18 · **Implementer attempts:** 1 · **Reviewers:** 3 parallel lens Reviewers (mode selected by the data-loss surface, per `/akili-execute` §2.3) · **Rework NOT spawned** — see the tripwire section below.
+
+**Requirements covered (attempted):** R-IU-011 AC.1–AC.6; DC-12.
+
+#### What was delivered
+
+| File | Lines | Contents |
+| --- | --- | --- |
+| `test/fixtures/innovation-use/innovation-use-lifecycle-routines.fixture-spec.ts` | 461 (new) | F13a/b/c, F14, F15, F18 |
+| `test/fixtures/innovation-use/innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts` | 561 (new) | F16a/b/c/d |
+| `test/jest-fixtures.json` | +1 line | `"testTimeout": 30000` (FP-40 — the one authorized edit) |
+
+Leader deviation recorded: **`systematic-debugging` added** to the task's assigned skills (`nestjs-expert`, `tdd`) — the red-before-green mutation work is failure-driven by construction.
+
+#### Implementer verification — verbatim
+
+- `npm run compose:test:up` → started; polled `mysqladmin ping`, ready after 2 attempts (FP-27's readiness gap worked around again).
+- `npm run migration:test:bootstrap` → both `sp-versioning-roles-id` repair migrations (`1784250000000`, `1784300000000`) applied; `SHOW CREATE PROCEDURE SP_versioning` contains zero `roles_id` references. **The T-13 disqualifier (MySQL 1054 without the repairs) is discharged.**
+- `npm run test:fixtures` → **8 suites / 28 tests passed**.
+- `npm test -- --silent` → **328 suites / 2155 tests passed** — matches the T-11/T-12 baseline exactly. **No regression.**
+- `npm run lint -- --quiet` → clean; `git status` re-checked after — `--fix` mutated nothing beyond the three intended files.
+- `npm run compose:test:down` → torn down.
+
+#### Red-before-green table as reported by the Implementer
+
+| Fixture | Edit removed | Outcome | Verbatim |
+| --- | --- | --- | --- |
+| F13a | #3 (`result_innovation_use` copy block) | **FAILED** | `expect(copiedDetail).toBeDefined()` → `Received: undefined` |
+| F13b | #1 (5 count columns on `result_actors`) | **FAILED** | `expect(copiedActor.women_youth_count).toBe(11)` → `Expected: 11, Received: null` |
+| F13c | #2 (`organization_count`) | **FAILED** | `expect(copiedInstitutionType.organization_count).toBe(42)` → `Expected: 42, Received: null` |
+| F14 | #4 (`DELETE` in `SP_delete_result_version`) | **ERRORED** | `QueryFailedError: Cannot delete or update a parent row: a foreign key constraint fails (...result_innovation_use, CONSTRAINT FK_result_innovation_use_result_id...)` |
+| F15 | #5 (`DELETE` in `full_delete_result_version`) | **ERRORED** | same FK error, against `full_delete_result_version` |
+| F18 | #6 (`UPDATE` in `delete_result`) | **FAILED** | `expect(Number(detailAfterDelete.is_active)).toBe(0)` → `Expected: 0, Received: 1` |
+| F16a | hypothetical — dropped `short_title` from the **existing** `result_innovation_dev` block, **not** an M6 edit | **FAILED** | `- "short_title": "F16 Innovation Dev fixture short title", + "short_title": null` |
+
+**Errored vs failed (T-13 Done item 5), recorded here because a transient agent message cannot satisfy it (Lens A, RISK advisory):** F14 and F15 reddened as **errors** — MySQL 1451, a RESTRICT FK violation — not assertion failures. All three lenses independently ruled this a *legitimate* red: the orphaned `result_innovation_use` row blocks the routine's own `DELETE FROM results`, so the missing edit is load-bearing and the error names the table explicitly. F13a/b/c, F18 and F16a reddened as ordinary **assertion failures**. **No fixture was ever inconclusive** — the scratch MySQL provisioned cleanly and every fixture executed the real routine.
+
+#### Reviewer verdicts — 3 lenses, all FAIL
+
+| Lens | Verdict | Issues |
+| --- | --- | --- |
+| **A — spec conformance (the gate)** | **FAIL** | 1 — F16 compares a subset, not "every copied column" |
+| **B — reliability / falsifiability** | **FAIL** | 3 — F16 subset (converged with A, plus the vacuous-NULL and positional-swap angles); cold-run race invalidates the green evidence; F16b/c/d never observed red |
+| **C — resilience / cross-file safety** | **FAIL** | 3 — cold-run race (two undisclosed failure branches beyond the Implementer's); `actor_roles` id 1 race still live in the T-12→T-13 direction; `result_official_code` band collision |
+
+#### FAIL-1 — F16 does not compare every copied column · **converged, Lens A + Lens B independently**
+
+Enumerated from the **shipped routine body**, not from expectation (KZ-002 applied as briefed):
+
+| Table | Columns the routine copies | Columns F16a reads |
+| --- | --- | --- |
+| `result_innovation_dev` (migration `:769-805`) | 35 | 22 (`fetchDevRow` `:233-249`) |
+| `result_actors` (migration `:687-708`) | 20 | 12 (`fetchActorRow` `:251-261`) |
+| `result_institution_types` (migration `:734-749`) | 14 | 3 (`fetchInstitutionTypeRow` `:263-270`) |
+
+**29 of 66 comparable copied columns are never read.** Lens B added the part that makes a naive fix insufficient: **six of the omitted columns are also omitted from the seed INSERT** (`seedDevResult` `:172-184`), so they are NULL in the source row — widening the `SELECT` alone yields NULL-vs-NULL, a vacuous pass. And within the 22 that *are* compared, seven tinyints share values (five `1`, two `0`), so **a positional swap between two same-valued columns produces an identical row and a green F16a**.
+
+Consequence, in the spec's own words: `tasks.md:333` closed T-10 with *"DC-12 is discharged structurally only; **F16 remains the sole gate on a positional swap** (FP-31)"*. **F16 as delivered does not discharge FP-31 for the six NULL catalog-id columns at all, and discharges it only partially across the booleans.** "Every surviving row" is partial too: F16b omits `result_institution_types`; F16c/F16d check only `result_innovation_dev` + `results`.
+
+- **Violated rule:** `design.md:332` (§6.5, F16 row) — *"compare **every copied column and every surviving row**"*; restated `tasks.md:407`; Done item `tasks.md:417` — *"F16 shows Innovation Dev **byte-identical** across all four routines"*.
+
+#### FAIL-2 — the delivered mechanism does not run on a cold container · **converged, Lens B + Lens C**
+
+The Implementer disclosed this in `Not Done` and both lenses found it **worse than disclosed**. `SP_versioning` filters its source lookup on `AND r.platform_code = 'STAR'` (migration `:93`) — the only one of the four routines that does. The pre-existing `sp-versioning-objective-blocks.fixture-spec.ts` seeds `'STAR'` with an **unguarded check-then-insert** (`:83-91`) and **deletes it** when it was the creator (`:233-237`). Lens C enumerated three cold-start failure branches, two of them undisclosed:
+
+| Branch | Mechanism | Disclosed? |
+| --- | --- | --- |
+| **A** | T-02 sees no row → T-13's `INSERT IGNORE` lands → T-02's plain `INSERT` raises **1062** → T-02's `beforeAll` throws, failing a previously-green file | yes (the "~50%") |
+| **B** | T-02 wins the seed, finishes first, its `DELETE` hits **1451** against T-13's live `results` rows → T-02's bare-`await` teardown skips `destroy()` — **exactly the A-8 leaked-pool scenario, now reachable, in the file T-13 cannot harden** | **no** |
+| **C** | T-02 deletes `'STAR'` between T-13's `INSERT IGNORE` and T-13's `INSERT INTO results` → **1452** on T-13 | **no** |
+
+**Lens B's finding on the evidence itself is the one that matters most:** the `INSERT IGNORE`-and-never-delete mitigation leaves `'STAR'` as residue, which permanently forces T-02's `platformSeeded` to `false` — the same effect the manual pre-seed buys. Therefore *"repeatable across 5+ consecutive clean runs"* **is not evidence of race-freedom: runs 2..N are not independent trials of run 1.** Every reported green was taken after a hand-run, uncommitted pre-seed:
+
+```sql
+INSERT IGNORE INTO reporting_platforms (platform_code, platform_name) VALUES ('STAR', 'STAR reporting platform');
+INSERT IGNORE INTO result_status (result_status_id, name) VALUES (8, 'Deleted');
+```
+
+- **Violated rule:** **KZ-006** (`kaizen-log.md:16`, applied at `general-setup/task.md:108`) — *"at least one criterion exercises the mechanism end to end; per-piece checks can all pass while the mechanism cannot run at all."* Also `tasks.md:410` — T-13's named Verification is *the fixture script*, which does not pass on a cold bootstrap as delivered. Also `design.md:360` (§6.5.1 Disqualifier) — a harness whose result depends on inter-worker timing is **inconclusive, not passed**.
+- **Lens C is explicit that this is NOT fixable inside T-13's two-file boundary** and must not be attempted there: any `STAR` insert T-13 issues can land inside T-02's check-then-insert window, and T-13 cannot stop depending on `STAR` because `SP_versioning` filters on it.
+
+#### FAIL-3 — F16b, F16c, F16d were never observed red · Lens B
+
+The Leader asked whether these are structurally un-reddenable. **They are not** — Lens B named the one-line mutation for each, derived from the routine bodies:
+
+| Sub-case | Mutation | Predicted red |
+| --- | --- | --- |
+| F16b | remove `DELETE FROM result_innovation_dev` from `SP_delete_result_version` (migration `:1199`) | errored (FK 1451), the F14/F15 shape |
+| F16c | same removal from `full_delete_result_version` (`:1384`) | errored |
+| F16d | remove `UPDATE result_innovation_dev` from `delete_result` (`:1602-1606`) | **assertion** red — the only F16 sub-case whose red comes from an assertion rather than an engine error |
+
+- **Violated rule:** `tasks.md:418` — *"**Each** fixture observed red with its corresponding edit removed"*; `tasks.md:411` — *"A fixture never observed failing has not been shown to discriminate."*
+- **No file change required** if all three redden as predicted — this is an evidence gap, not a code defect.
+
+#### FAIL-4 — `actor_roles` id 1 race, still live in the direction that fires · Lens C
+
+The Implementer found and fixed the T-13→T-12 direction (its first draft deleted the row, breaking T-12's F11 with 1452). **The T-12→T-13 direction is untouched and T-13 newly *creates* the reference that makes it fire.** `innovation-use-validation.fixture-spec.ts:205-207` deletes `actor_roles` id 1 when it was the creator; `seedDevResult` (`:212-220`) inserts `result_actors` rows referencing id 1 in **all four** F16 tests, surviving until `afterAll`. T-12 wins that race often — it runs 12 fast function calls against T-13's four stored-routine calls — and its `DELETE` then raises 1451, whose bare-`await` teardown skips `destroy()`.
+
+- **Violated rule:** FP-39 / A-9 as briefed. The file header at `:60-68` claims `INSERT IGNORE` discharges A-9; **it does not — atomicity of the insert says nothing about a concurrent delete of the same row by another file.**
+- **In scope and cheap (Lens C):** neither routine filters `result_actors` / `result_institution_types` by role — `SP_versioning`'s copy blocks key only on `result_id`/`is_active` (migration `:730-732`, `:765-766`) and both delete routines remove by `result_id`. **The role ids are pure FK ballast.** Give the file **private** role ids (e.g. 9131, matching its private `clarisa_actor_types` code), seed by plain check-then-insert, delete under `tryStep`. Discharges A-9 **by privacy** rather than by an argument that does not hold.
+
+#### FAIL-5 — `result_official_code` band collision · Lens C
+
+`innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts:122` uses base `900_300_000_000_000` — **the same base as `innovation-use-detail-round-trip.fixture-spec.ts:53`**. Every other fixture reserves its own band (900_000 T-02, 900_100 T-12 validation, 900_200 T-13 file 1, 900_400 green-check-ip-rights), so this is a slip, not a convention. `result_official_code` has **no `UNIQUE` constraint** (`baseline.sql:4129`), so nothing errors at insert; instead the F16 file's `afterAll` `DELETE FROM results WHERE result_official_code = ?` (`:387-391`) targets **the round-trip fixture's row**, raising 1451 while its `result_innovation_use` child exists — *"the F16 suite fails with a cause that looks nothing like its symptom."* Because the file allocates five sequential codes, collision needs only a **five-millisecond window**, not same-millisecond module load.
+
+- **In scope, one line:** move to an unused band (e.g. `900_500_000_000_000`) and comment the bands already taken.
+
+#### What the lenses explicitly CLEARED — recorded so it is not re-litigated
+
+| Cleared | Lens | Basis |
+| --- | --- | --- |
+| **The F16a hypothetical red is legitimate** | A | F16 has no corresponding M6 edit *by construction* — removing one would correctly leave F16 green. `requirements.md:160` supplies F16's own falsifying input: *"any edit that changes an Innovation Dev column or row."* Dropping `short_title` is exactly that |
+| **F14/F15's errored reds are legitimate** | A, B, C | MySQL 1451 is the direct semantic consequence of the missing `DELETE`, not an environment artifact; the message names `result_innovation_use` |
+| **F16b's self-seeded snapshot is NOT a KZ-001 violation** | B | `SP_delete_result_version`'s guard (migration `:1097-1105`) keys on exactly `is_active`, `is_snapshot`, `report_year_id`, `result_official_code`; the double supplies all four with the values a real snapshot carries. Its two divergences (private `platform_code`, NULL `result_status_id`) are immaterial — the routine has no platform filter and reads no status |
+| **F13 completeness (Done item 1)** | A | All eight values asserted with concrete `toBe` expectations, zero truthiness checks. The three-way split is a *strengthening* — one M6 edit per sub-case |
+| **F18 semantics (Done item 2)** | A | `:444-450` reads `is_active, deleted_at` with a `SELECT` **not** filtered by `is_active`, asserts defined + `0` + non-null `deleted_at`. No absence assertion anywhere. The active-orphan class is correctly gated |
+| **`Number(null)` cannot mask F18** | B | `result_innovation_use.is_active` is `tinyint NOT NULL DEFAULT 1` (`1787068132517:48`); `Number(undefined)` → `NaN` would fail regardless |
+| **FP-42 one-conjunct isolation holds** | B | F13a seeds no actor/institution row; F13b no detail/institution row; F13c no detail/actor row. Each of edits #1/#2/#3 reddens exactly one sub-case |
+| **FP-39's teardown half (A-8) is genuinely implemented** | C | `tryStep` (collect, rethrow after) at `:234-241` / `:350-357`, every `DELETE` routed through it, `destroy()` in `finally` at `:312-314` / `:443-445`. **No pool leak on any exit path in T-13's own files** |
+| **No mutation scaffolding leaked** | C | No `DROP`/`CREATE PROCEDURE|FUNCTION`, no commented-out routine body, no scratch script in either file |
+| **`testTimeout: 30000` is load-bearing, not redundant** | C | The per-test third argument does **not** cover `beforeAll`/`afterAll`; only the config key does |
+| **No table written-but-uncleaned beyond the four disclosed** | C | All 29 `SP_versioning` copy blocks filter on `result_id = temp_result_id`, incl. `submission_history` (`:1055-1081`) |
+| **Scope respected** | A | `jest-fixtures.json` carries exactly the authorized line; no migration edited, no T-12 fixture edited |
+
+#### ADVISORY findings — recorded, never gating, and per `/akili-execute` §2.4 **none of these may become a task in this spec**
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **B-1** | A, B | **F14/F15's post-`CALL` assertions are structurally non-falsifiable.** `FK_result_innovation_use_result_id` is RESTRICT, so no reachable state has the routine succeed *and* the detail row survive — `expect(remainingDetail).toHaveLength(0)` (`:397`, `:420`) can never fail independently. The real discriminator is the engine error at `CALL` time, not the assertion the fixture name advertises. Worth a comment so a future reader does not "simplify" away the parent-row assertion, which is the half doing the work |
+| **B-2** | A | **Doc drift:** `requirements.md:159` predicts F14/F15's failure mode as *"the detail row survives"* — a state the RESTRICT FK makes impossible. Root `CLAUDE.md` §5 says fix the document rather than let docs and code drift |
+| **B-3** | A | **Wrong pointer in a shipped comment:** `innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts:34-35` cites *"design.md §4.3"* for F16's falsifying input. `design.md` has no §4.3 — the quoted text is at `requirements.md:160`, inside **requirements.md** §4.3. Substance right, pointer sends the next reader to the wrong file. *(Same family as T-12's A-6, which is still owed)* |
+| **B-4** | C | `officialCodes.splice(officialCodes.indexOf(officialCode), 1)` (`:428` / `:533`) carries the `indexOf === -1 → splice(-1, 1)` footgun, silently dropping the *last* tracked code. Cannot fire today; the splice is unnecessary anyway |
+| **B-5** | B, C | **`INSERT IGNORE` downgrades *all* recoverable errors to warnings**, not only duplicate-key — a NOT NULL or FK failure also yields `affectedRows = 0`. The file header's claim at `:68-74` that `affectedRows` is an unambiguous did-I-create-it signal happens to hold for these four rows but would not survive reuse on a row with a required column |
+| **B-6** | C | `testTimeout: 30000` now applies to the six sibling files too, previously on Jest's 5 s default. Masks nothing (a hang still fails) but a genuine hang surfaces 6× slower. Worth a note in `jest-fixtures.json` explaining why the value is global |
+| **B-7** | C | The `.catch(() => [])` on the id-lookup `SELECT` (`:243-248` / `:359-364`) swallows the failure without recording it in `errors`; routing it through `tryStep` with an empty-array fallback keeps the resilience and adds the diagnostic |
+| **B-8** | A | With `testTimeout` global, the per-test `, 30000)` third arguments on all ten `it(...)` calls are redundant — harmless, but they suggest some tests have a special budget |
+| **B-9** | C | **There is no spec-level zero-leftover-rows requirement.** `design.md` §6.5/§6.5.1 and `tasks.md` T-13 impose none; the convention originates in `sp-versioning-objective-blocks.fixture-spec.ts:13-15`'s header prose. So the residue is a **convention deviation, not a spec violation**, and Lens C did not gate on it — but that residue is currently **load-bearing for warm-run stability**, which argues for relocating those rows into a bootstrap seed |
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-43** | **T-14** | **The cold-run gate.** Whatever fix FAIL-2 receives, T-14's full-suite regression must be taken from a genuinely cold `compose:test:down` → `compose:test:up` → `migration:test:bootstrap` → `test:fixtures`, with **no manual seeding**. Lens B: *"a single cold green is worth more here than five warm ones."* |
+| **FP-44** | **T-14 · ADR-11's checklist** | **F16's column-coverage method.** If FAIL-1 is fixed by `SELECT *` + deep-compare-minus-identity, record that as the reusable pattern — a hand-enumerated `SELECT` list re-creates exactly the enumerate-by-name failure the four routines already embody (KZ-002 at the test layer) |
+| **FP-45** | **any future fixture author · `src/CLAUDE.md` §9** | **The `result_official_code` band registry.** Five files now reserve bands (900_000 / 900_100 / 900_200 / 900_300 / 900_400) with no written registry, and FAIL-5 is the first collision. The band list belongs in a comment the next author will actually see |
+| **FP-46** | **T-14, and the next spec touching fixtures** | **B-5's `INSERT IGNORE` reasoning defect.** The pattern is being copied between fixture files with a justification that only accidentally holds |
+
+FP-39 **partially discharged** — its A-8 teardown half is genuinely implemented and verified by Lens C; its A-9 half is **not** (FAIL-4). FP-40 **discharged** (`testTimeout` landed and is load-bearing). FP-42 **discharged** (one-conjunct isolation verified by trace). **FP-41 remains live** — F12 is a standing gate for T-14. **FP-31 is NOT discharged** — F16 was to be its sole gate and does not yet serve.
+
+#### 🛑 BUDGET TRIPWIRE — fired a second time; rework deliberately NOT spawned
+
+Pre-declared to the user at dispatch: *"if a lens returns FAIL, I stop and bring it to you rather than spending the round."* Three lenses returned FAIL.
+
+| Signal | Budgeted (§12) | Actual now | State |
+| --- | --- | --- | --- |
+| Tasks | 13 | **11 done**, T-12 `[~]`, T-13 `[~]`, T-14 pending | two parked |
+| LOC | ~2,600 | **~7,200** (+1,022 this task) | exceeded — pre-declared as expected |
+| **Review rounds** | **4–5** | **5 consumed** | **⛔ AT THE CEILING. A T-13 rework round is the 6th — over budget** |
+
+Rework attempts remaining on T-13 itself: **2 of 3** (unused). The binding constraint is the spec-level review-round budget, not the task-level ceiling.
+
+**Cause, honestly.** This is not a Leader briefing failure like T-12's. The brief carried FP-39, FP-40, FP-42 and all four Kaizen lessons verbatim, and the Implementer applied most of them correctly — A-8, FP-42 and FP-40 are all discharged, the full suite is green with zero regression, and the six-edit red-before-green demonstration is sound. **Two of the five FAILs are genuine misses inside the delivered files** (F16's column subset; the official-code band). **One is an evidence gap requiring no code change** (F16b/c/d never reddened). **Two are collisions with pre-existing fixture files that T-13 was forbidden by its own scope bounds to touch** — and Lens C states plainly that FAIL-2 *cannot* be fixed inside T-13's boundary. The scope bound I set as Leader is therefore itself part of the cause: it was correct for protecting T-12's files and wrong for the harness-level reference rows, which have no owner in this spec at all.
+
+**Also owed regardless of the path chosen** (doc-only, consumes no review round): T-12's still-outstanding `tasks.md` R-IU-003 over-claim at `:370` and `:461`, T-12's A-6 factually false shipped comment, and now **B-2** (`requirements.md:159`'s impossible failure mode) and **B-3** (the wrong `design.md §4.3` pointer — the same defect family as A-6, in a second file).
+
+**Standing instruction:** do not spawn T-13 attempt 2 without the user's ruling on the scope-boundary question (FAIL-2's fix lies outside T-13 by construction). T-13's task status is `[~]`; **no rollback was applied** — this is a deliberate stop at attempt 1, not a 3-attempt HALT, and the delivered work is largely sound and salvageable.
+

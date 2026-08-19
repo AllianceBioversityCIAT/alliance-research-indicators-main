@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]`; **T-12 `[~]` ESCALATED** (2026-08-18) — 11 of 13 done. ⚠️ **T-12 awaits a user ruling** (F12: harness vs spec); **T-13 is independently eligible and does not need that ruling**. FP-23 retired, FP-16 discharged
+- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]`; **T-12 `[~]` ESCALATED** and **T-13 `[~]` ESCALATED** (both 2026-08-18) — 11 of 13 done. ⚠️ **Two rulings pending:** T-12 (F12 — fix-the-harness vs fix-the-spec) and T-13 (scope boundary — the cold-run race is unfixable inside T-13's two files). **Review-round budget is spent (5 of 4–5); the next rework round in either task is over budget.** T-14 is blocked on both. FP-23 retired; FP-16, FP-40, FP-42 discharged; FP-39 half-discharged; **FP-31 NOT discharged**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -397,7 +397,7 @@ graph TD
 
 - **Requirements covered:** **R-IU-011 (AC.1–AC.6)**; DC-12
 - **Design references:** §6.5 fixture table, §6.7's blast-radius note
-- **Size:** L · **Dependencies:** T-10 (and its external bugfix dependency) · **Status:** todo
+- **Size:** L · **Dependencies:** T-10 (and its external bugfix dependency) · **Status:** ~~todo~~ → **`[~]` IN PROGRESS / ESCALATED 2026-08-18** — attempt 1: **all 3 lens Reviewers FAIL** (5 issues). F13/F14/F15/F18 land and are sound; **F16 is the problem** — it compares 22 of 35 + 12 of 20 + 3 of 14 copied columns, so FP-31 (positional swap) stays ungated. Rework NOT spawned: this is the **second** budget escalation — the 5th review round is spent and a T-13 rework is the 6th. **Awaiting a user ruling on the scope boundary** — FAIL-2 (cold-run race) is *not fixable inside T-13's two files* by construction. See [`./execution.md`](./execution.md) → *T-13*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Scope** — fixtures that **execute** the routines: F13 versioning · F14 `SP_delete_result_version` · F15 `full_delete_result_version` · **F18 `delete_result`** · F16 the Innovation Dev regression gate across all four.
