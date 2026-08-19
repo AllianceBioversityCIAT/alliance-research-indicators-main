@@ -1323,7 +1323,7 @@ Three findings from this round are worth carrying forward:
 
 | → Task | Pointer |
 | --- | --- |
-| **T-08** | Its *Files touched* includes `results.module.ts (modified — import ResultInnovationUseModule)`. **That would add a second incoming edge** and weaken `entities.module.spec.ts`'s membership assertion from "structurally necessary" to "one of two paths". Decide deliberately whether T-08 still needs that import now that `entities.module.ts` carries the registration — if it does, the membership assertion should become a reachability assertion, or T-08 must not be read as the thing that makes the endpoints work |
+| **T-08** | Its *Files touched* includes `results.module.ts (modified — import ResultInnovationUseModule)`. **That import is REQUIRED — it is a DI edge, not a redundant registration.** *(Corrected 2026-08-19 at T-08's dispatch: the Leader had first recorded it as possibly droppable now that `entities.module.ts` carries the registration, and grep-checked the claim before briefing. `ResultsService` injects `_resultInnovationDevService` and `results.module.ts` imports `ResultInnovationDevModule` for exactly that reason; T-08 adds `_resultInnovationUseService` to the same constructor, so `ResultsModule` must import the module that exports it. Dropping it yields `Nest can't resolve dependencies of the ResultsService` at boot — invisible to mocked-provider specs, the same invisibility class as DD-15.)* **Consequence for `entities.module.spec.ts`, stated precisely:** the import does not alter `EntitiesModule`'s `imports` array, so the membership assertion remains exactly as falsifiable — deleting `entities.module.ts:151` still reddens it. What narrows is its *meaning*: with a second instantiation path via `ResultsModule`, that deletion would no longer break the endpoint, so the assertion becomes a **convention check rather than a proxy for reachability**. Keep it; do not upgrade it to a reachability walk, and do not let T-08 be read as the thing that makes the endpoints work |
 | **T-09 (F-A)** | The first tier that can prove the endpoints actually serve `200`. Everything above is metadata-level. Its harness is also KZ-006's one end-to-end criterion for this spec |
 | **T-13** | Human `/swagger` check owns R-IUA-013 AC.3 entirely — both own-declared handlers' `@ApiOperation`/`@ApiBody` **and** `@ApiProperty` ×25 — plus the DD-13 exemption confirmation on the catalog `GET`. Note the corollary: `total`-stripping is proven, but the Swagger contract a client reads is ungated until a human looks |
 | **Kaizen (archive)** | Four candidates: **(a)** advisory A-1, the surviving aggregate-mode mutant — a rejection-only test set never proves the accept direction; **(b)** the same mechanic can demand opposite assertions in two tasks, decided by graph edge count (T-01 needed reachability, T-07 needed membership) — so "use the stronger assertion" is not a general rule; **(c)** **two consecutive rounds in which a Leader brief asserted "precedent"/"no precedent" wrongly** and the Reviewer corrected it — brief claims about repo state should be grep-checked before dispatch; **(d)** a false comment accompanying a correct assertion is a defect worth gating on (attempt 1) but a merely overclaiming one may not be (A-2) — the line between them is whether the claim is false *today* |
@@ -1351,4 +1351,110 @@ Three findings from this round are worth carrying forward:
 - **CodeGraph re-index** — two new modules, two modified module-graph files, seven new spec files across T-01 and T-07.
 - **TRD check** — whether `docs/trd/trd.md` §4.1/§6.1 (module layout, backend architecture) should carry the DD-15 mechanic as a platform-level convention rather than only in the child guides. **No ADR is overturned** — this is a Nest composition mechanic, not an architectural decision, so no superseding ADR is owed.
 - **The four Kaizen candidates** recorded against T-01 and T-07, of which the strongest is advisory A-1 (a rejection-only test set never proves the accept direction) and the most process-relevant is the two consecutive rounds in which a Leader brief asserted repo "precedent" wrongly.
+
+### T-08 — Result-creation path: detail row + IP Rights row
+
+- **Status at the time of this entry:** **`[x]` DONE** — **PASS on attempt 1, zero rework**; 1 review round (2 parallel lens Reviewers, both PASS).
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1 (of a possible 3)
+- **Requirements in scope:** R-IUA-001 (all ACs + scenario), R-IUA-011 (all ACs + scenario), R-IUA-012 AC.4
+- **Skills assigned:** `nestjs-expert`, `tdd` (task defaults, unchanged) · **Effort:** `max`, set by the task itself — *"two lines that change a method shared by all six indicators"*
+- **Review mode:** parallel lens Reviewers (2), which `max` effort mandates. Split: conformance/regression-blast-radius, and test fidelity.
+
+#### Attempt 1
+
+**Files changed** (3 files; **2 lines of behavioural production code**):
+
+| File | State |
+| --- | --- |
+| `src/domain/entities/results/results.service.ts` | modified +6 — the `INNOVATION_USE` `switch` case and the `ipAvailables` member (the two behavioural additions), plus the `ResultInnovationUseService` import and its constructor parameter (mechanical DI wiring) |
+| `src/domain/entities/results/results.module.ts` | modified +2 — import + `imports` entry, after `ResultInnovationDevModule`. **A required DI edge, not bookkeeping** |
+| `src/domain/entities/results/results.service.spec.ts` | modified +124, additions only |
+
+**Implementer verification, then re-run independently by the Leader**
+
+- `npm test -- --silent` **full suite, never targeted** (KZ-003 — this method serves every indicator) → **336 suites / 2264 tests / 1 snapshot**. Baseline 336 / 2262; **+2 tests, +0 suite files.**
+- `npx tsc --noEmit` → clean. `npx eslint --no-fix` on all three files → clean; `npm run lint` never run.
+- **TDD evidence:** the indicator-6 test was written and failed red (`Expected number of calls: 1, Received: 0`) **before** the production edit, green after. The five pre-existing branches were extended additively rather than driven red→green, since they already passed at `HEAD` — the correct application of `tdd` to a task whose risk is regression, not new logic.
+
+**Mutation sweep** (each restored, byte-diff verified):
+
+| Mutation | Observed |
+| --- | --- |
+| Remove the `INNOVATION_USE` case | red |
+| **Remove its `break` (fall-through)** | **red**, via the `KNOWLEDGE_PRODUCT` mock's `not.toHaveBeenCalled()` at `results.service.spec.ts:1459` |
+| Remove the `ipAvailables` member | red — the task's own named falsifying input |
+| Pass no `manager` | red |
+| Add `innovation_use` to `VISUAL_ONLY_GREEN_CHECKS` | red (verified by mutating `find-green-checks.dto.ts` and running its existing spec, then restoring) |
+| Hardcoded user id instead of `CurrentUserUtil` | **reported "not applicable within scope"** rather than fabricated — adjudicated below and upheld |
+| **Remove the `results.module.ts` import** | **stayed GREEN**, reported honestly with the catching tier named and no fabricated test |
+
+**Implementer `Not Done / Assumptions`** (recorded verbatim, per the Step 2.3.0 rule):
+
+> - None outstanding for this task's scope. One judgment call worth flagging: I placed the new `INNOVATION_USE` case between `OICR` and `KNOWLEDGE_PRODUCT` in the switch (rather than appending it last before `default`), specifically so the fall-through mutation would have an observable side effect to catch — if placed last, removing its `break` would fall into a no-op `default:` and the brief's required fall-through mutation would never redden anything, which the brief explicitly said would mean "AC.4's proof is nominal." This ordering choice is additive (no existing case's body or position relative to each other changed; only the insertion point shifted line numbers below it), and is why the fall-through mutation above shows a genuine red.
+> - The `docs/specs/innovation-use/details-api/execution.md` file shows as modified in `git status` — I did not touch it; it already carried a Leader-applied correction to the T-08 forward-pointer text (the one this brief quotes verbatim) before I started. Left untouched.
+
+**Reviewer verdicts — both lenses `STATUS: PASS`.** All nine Done criteria met.
+
+##### The findings worth keeping
+
+1. **Two independent forensic proofs that no pre-existing assertion was weakened** — the risk the Leader named as the highest-value possible finding, since AC.4 is the criterion `max` effort exists for.
+   - **Lens B reconciled the line budget exactly.** All 124 insertions accounted for: 1 import + 1 mock declaration + 4 factory + 4 provider + 5 `not.toHaveBeenCalled()` lines + 109 for the two new tests = **124**. Every insertion is pure addition, so **zero insertions remain available for a rewritten line** — a modified assertion would have consumed one and left the budget short. It then inventoried the assertion sets to exclude deletions: all five pre-existing tests are symmetric, with a single *uniform* omission (`mockResultKnowledgeProductService`) which is exactly the acknowledged pre-existing gap. A deletion would show as asymmetry; there is none.
+   - **Lens A found a negative control.** The OICR test still asserts `expect.any(Object)` for the manager at `:1344`, while both new tests assert the concrete `mockEntityManager`. Anyone editing those five bodies would almost certainly have normalised that inconsistency; its survival is positive evidence they were untouched — stronger than a line count, and arrived at independently.
+2. **The `KNOWLEDGE_PRODUCT` coverage gap was real, and closing it is a genuine strengthening.** Both lenses confirmed `mockResultKnowledgeProductService` occurred at exactly three sites before this edit — declaration, factory, provider — and **zero assertions**. AC.4 was therefore *unprovable* for that branch at `HEAD`. The new test pins `toHaveBeenCalledWith(result_id, mockEntityManager)` — the manager object, not a matcher — plus six zero-call assertions.
+3. **The fall-through mutation genuinely binds, and it is well-formed evidence.** Lens B traced it: case order is `1, 4, 2, 5, 6, 3, default`; deleting the new `break` reaches `_resultKnowledgeProductService.create`, failing the assertion at `:1459`. And on T-06's lesson that an uncompilable mutation proves nothing — `tsconfig.json:19` sets `"noFallthroughCasesInSwitch": false`, so the break-less switch **compiles**. Leader-confirmed at source. Lint would flag it; `npm test` does not run lint.
+4. **An unclaimed bonus.** The new zero-call line on the OICR test makes **OICR's** `break` falsifiable too — previously it had no fall-through guard at all, because nothing asserted the `KNOWLEDGE_PRODUCT` mock.
+5. **Two blast-radius risks the diff cannot show, both provably absent (Lens A).** Inserting a constructor parameter at index 12 of 40 would silently shift 27 arguments for any positional caller — `new ResultsService(` occurs nowhere in `src`, and DI is type-based throughout. And no module cycle: `ResultInnovationUseModule` imports only three leaf modules with no `imports` of their own, so there is no path back to `ResultsModule`. **No `forwardRef` was needed and none was added** — the escalation clause had nothing to fire on.
+6. **The "second instantiation path" concern is settled by precedent, and the Leader had it backwards at the previous gate.** `ResultInnovationDevModule` is *already* registered in **both** `entities.module.ts:150` and `results.module.ts:76`, and `ResultIpRightsModule` in both — each with a controller. T-08 reproduces, one line below its precedent, a double-edge pattern already in production. No duplicate controller registration, no route conflict.
+7. **Mock isolation is order-independent (Lens B).** Reset is triple-layered: the top-level `beforeEach` reconstructs the mock as a fresh object and recompiles the `TestingModule`; `afterEach` calls `jest.clearAllMocks()`; the `createResultType scenarios` `beforeEach` calls it again. `clearAllMocks` clears history but not implementations, so the parent's `transaction.mockImplementation` survives. No shared un-reset mock, no latent order flake — the failure mode the Leader asked about specifically.
+8. **T-07's advisory A-1 does not recur.** Lens B checked the IP Rights rule in both directions across all six indicators and found the **accept** direction asserted for 1, 2 and 6 — not a rejection-only set. The residual is that 1 and 2 assert *called-with* rather than `times(1)`; structurally safe, since there is one call site under a boolean guard.
+
+##### Adjudications
+
+- **Criterion 8 — "exactly two added logical lines": MET, and the wording was defective.** The diff is +6 physical. Lens A ruled that the task's own *Scope*, its *Files touched* entry for `results.module.ts`, and `design.md` §5.7 **each presuppose the DI wiring** — injection is impossible without the import and the parameter — so enforcing the count literally would penalise the work for obeying the document. Same class as the corrections at T-04 (R-IUA-007 AC.4), T-05 (R-IUA-002 AC.1) and T-07 (AC.5). **Corrected in `tasks.md` with Lens A's exact replacement wording**, and swept: the superseded phrasing returns zero hits.
+- **Switch placement: sound engineering, not contortion.** Behaviour-neutral by language semantics (every case `break`s, so position cannot affect dispatch — there is no cost to weigh against the benefit); no convention to break, since the order was already `1, 4, 2, 5, 3`; and the alternative is actively worse — appended last, `default: break;` absorbs the fall-through, so the new `break` would be **dead today and untestable**, becoming a live defect the day someone adds a seventh case after it. The residual is that the rationale lives in this log rather than at the call site.
+- **Criterion 6 (audit fields): genuinely discharged upstream, nothing owed here.** The new case calls `create(resultId, manager)` — **no user-id parameter exists in T-08's surface**, so there is nothing to hardcode and no mutation to fabricate. Both lenses verified the hand-off rather than accepting it: `result-innovation-use.service.spec.ts:207-214` asserts `objectContaining({ result_id: 42, created_by: 1 })` **and** `expect(mockCurrentUser.audit).toHaveBeenCalledWith(SetAuditEnum.NEW)`. Lens B identified why the second line is what makes it bind — hardcoding `created_by: 1` in place of the `audit(NEW)` spread would still satisfy the `objectContaining` check but leaves `audit` uncalled, so it reddens. Reporting the mutation inapplicable and naming where the coverage lives was correct, and preferable to inventing one.
+- **`ip_rights` in `VISUAL_ONLY_GREEN_CHECKS`: pre-existing gap, out of scope.** The criterion's stated method is a `grep` and the grep is clean (`find-green-checks.dto.ts:5-7` holds only `'pool_funding_alignment'`). The one assertion file involved is **chunk-1-owned** and asserts `innovation_use`'s absence but not `ip_rights`'s. The Implementer flagged it rather than silently widening scope — the correct call.
+- **The honest green is a real gap, NOT a tier limit — recorded explicitly so it cannot later be framed as one.** Lens B answered the Leader's question directly: **yes, a unit-tier assertion was available** — `expect(Reflect.getMetadata('imports', ResultsModule)).toContain(ResultInnovationUseModule)`, the exact pattern this spec introduced at T-01 and T-07, needing no DI boot. So "stayed green" is a gap at this tier. It is **not** a spec violation: no T-08 criterion requires it, and R-IUA-013 AC.5 names `entities.module.ts`, discharged at T-07 and verified intact. Severity is also lower than DD-15's — removing this import fails **loudly at boot** (`Nest can't resolve dependencies of the ResultsService`), not silently as a `404`. **T-08 correctly did not let the `results.module.ts` import stand in for the `entities.module.ts` registration**, exactly as T-07's criterion warned.
+
+#### Spec corrections applied at this review
+
+| Document | Correction |
+| --- | --- |
+| `tasks.md` T-08 *Requirements covered* | Claimed **R-IUA-012 AC.3**, which §3's matrix assigns to **T-12** (verified at source, `tasks.md:680`) and which no T-08 Done criterion carries; T-12 already owns it in its own header and done criteria. Narrowed to **AC.4**. **Third instance of this class** in this spec |
+| `tasks.md` T-08 Done criterion 8 | Rewritten per Lens A's exact wording — see the adjudication above |
+
+#### Declared limits, restated so they are not mistaken for proven
+
+Every child service is a `jest.fn()` — **KZ-001's exact double**. Proven: the *calls* are made, once, with the transaction's manager. **Not proven:** that a `result_innovation_use` or `result_ip_rights` row lands, that `is_active = TRUE`, that `created_by` reaches MySQL, that `completness` becomes reachable, or that the section `PATCH` no longer `404`s.
+
+- **Owed to T-12 (F-E):** R-IUA-001 AC.1/AC.2 behaviourally, R-IUA-011 AC.1/AC.4/AC.5 + its scenario's key-set clause, R-IUA-012 AC.1/AC.3.
+- **Owed to T-09 (F-A):** R-IUA-001's scenario clause *"a subsequent PATCH succeeds rather than 404"* — named in T-08's own *Verification & its limits*.
+- **Owed to T-13:** `npm run test:cov` ≥ 60%, not measured this attempt; two production lines make a regression implausible.
+
+#### `ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks)
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| B-1 | **Risk (doc drift introduced by this task)** | `entities.module.spec.ts:25-31`'s docstring now states something **false**: *"`ResultInnovationUseModule` has exactly one incoming graph edge — this assertion."* `results.module.ts:77` is a second edge. **The gate is intact** — the assertion still reddens if the `entities.module.ts` entry is deleted, because it tests direct membership — but the *operational* stake the docstring documents is gone: with two edges, deleting that entry would no longer `404` the endpoints | **Recorded; dies here.** Notably **the drift was caused by the Leader's own instruction** not to touch that file, not by Implementer error — the alternative would have been widening T-08 into T-07's deliverable. Escalated to the user at the gate rather than buried, since a false comment is the class of defect that FAILed T-07 attempt 1. Distinguishable from that case: T-07's comment was false *when written*; this one was true when written and made false by a later approved change — ordinary doc drift |
+| B-2 | Reliability | The `results.module.ts` DI edge has **no assertion, and one was available at this tier** (see the adjudication above). A gap, not a tier limit | **Recorded; dies here.** The natural home is **T-09**, which is the first task in this spec that boots real Nest modules — carried as a forward pointer, *not* as an added criterion |
+| A-1 | Reliability | The 6×6 negative matrix is one column short: the five pre-existing branch tests gained an `INNOVATION_USE` zero-call line but carry no `KNOWLEDGE_PRODUCT` one. **The single line that matters is present** (`:1459`, the one catching the fall-through), so the gate is sound | Recorded |
+| A-2 | Reliability | Criterion 5's "exactly one" for indicators 1 and 2 is `toHaveBeenCalledWith` without `toHaveBeenCalledTimes(1)`. Tightening was correctly avoided as an AC.4 violation; the guarantee rests on a single call site under a boolean guard plus T-12's row-level proof | Recorded |
+| A-3 | Readability | The switch-placement rationale is invisible at the call site. A maintainer tidying `createResultType` into numeric order would move the case last and silently retire the `break` coverage. One comment line would preserve it — **deliberately not requested as rework**, since it would enlarge a diff whose smallness is part of its value | Recorded |
+| A-4 / B-3 | Risk | `ip_rights`'s absence from `VISUAL_ONLY_GREEN_CHECKS` has no dedicated assertion while `innovation_use`'s does, and R-IUA-011's scenario forbids both. Pre-existing, chunk-1-owned | Recorded |
+| B-4 | **Reliability (currently unowned at every tier)** | **Nothing proves `ResultInnovationUseService.create` *honors* the manager it receives.** T-08 proves the manager is passed; T-05's create test calls `service.create(42)` with no manager; and F-E would not expose the difference, since a row written outside the transaction still lands. The code is correct (`result-innovation-use.service.ts:64` uses `selectManager`), but the property is **unasserted at every tier** | **Recorded — the most interesting finding of this round**, because it is invisible to the whole verification strategy rather than to one task. Not actioned: it is out of T-08's scope and no criterion carries it. Carried to `/akili-archive` as Kaizen input, and as a forward pointer to T-09 |
+
+**Final verification:** `npm test -- --silent` → **336 suites / 2264 tests** green · `npx tsc --noEmit` clean · `npx eslint --no-fix` clean — **all re-run independently by the Leader**. `tsconfig.json:19` `noFallthroughCasesInSwitch: false` confirmed at source.
+
+**Forward pointers created by T-08**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-09 (F-A)** | **Two items, both cheap where T-09 is already going.** (a) T-09 is the first task in this spec that boots real Nest modules; a single `Test.createTestingModule({ imports: [AppModule] }).compile()` smoke suite would permanently close the **DI-invisibility class** — the same class as DD-15, one level down — which is currently why removing the `results.module.ts` import stays green. (b) R-IUA-001's scenario clause *"a subsequent PATCH succeeds rather than 404"* is owed here |
+| **T-09 / T-12** | **Advisory B-4:** that `create` *honors* its `manager` is unasserted at every tier, and F-E cannot expose it (a row written outside the transaction still lands). If any tier can bind it cheaply, this is where |
+| **T-12 (F-E)** | Owns R-IUA-012 **AC.3** (the header claim removed from T-08 today), plus R-IUA-001 AC.1/AC.2 behaviourally and R-IUA-011 AC.1/AC.4/AC.5 |
+| **T-13** | Candidates for its cleanup pass, none of which are added criteria: the `ip_rights` `VISUAL_ONLY_GREEN_CHECKS` assertion, the two `times(1)` tightenings, the `entities.module.spec.ts` docstring drift (B-1), and the switch-placement comment (A-3) |
+| Kaizen (archive) | Three candidates: **(a)** advisory B-4 — a property invisible to *every* tier of a verification strategy, which no per-task review can surface; **(b)** insertion-budget reconciliation as a technique for proving a spec was extended and not rewritten, when the reviewer has no `git diff`; **(c)** a Leader instruction not to touch a file can itself create doc drift (B-1) — the narrow-scope instruction and the no-stale-docs rule can conflict, and the conflict should be named at brief time rather than discovered at review |
+
+**Budget status:** **8 of 13 tasks complete.** **15 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1). Five tasks remain against ~9 rounds — and **all five are the DB-dependent ones this spec has never exercised**: T-09's Nest fixture harness (never built in this repo), T-10/T-11/T-12's fixtures against the scratch schema, and T-13's full gate. Everything closed so far has been mocked unit work at ~1.9 rounds/task. The remaining margin is thinner than 5-vs-9 suggests, and the next task is the one that finds out.
 

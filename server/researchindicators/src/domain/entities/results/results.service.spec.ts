@@ -32,6 +32,7 @@ import { AllianceUserStaffService } from '../alliance-user-staff/alliance-user-s
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
+import { ResultInnovationUseService } from '../result-innovation-use/result-innovation-use.service';
 import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 import { CreateResultDto } from './dto/create-result.dto';
 import { SetAuditEnum } from '../../shared/utils/current-user.util';
@@ -83,6 +84,7 @@ describe('ResultsService', () => {
   let mockClarisaLeversService: jest.Mocked<ClarisaLeversService>;
   let mockAgressoContractService: jest.Mocked<AgressoContractService>;
   let mockResultInnovationDevService: jest.Mocked<ResultInnovationDevService>;
+  let mockResultInnovationUseService: jest.Mocked<ResultInnovationUseService>;
   let mockResultSdgsService: jest.Mocked<ResultSdgsService>;
   let mockResultOicrService: jest.Mocked<ResultOicrService>;
   let mockClarisaCountriesService: jest.Mocked<ClarisaCountriesService>;
@@ -224,6 +226,10 @@ describe('ResultsService', () => {
       create: jest.fn(),
     } as any;
 
+    mockResultInnovationUseService = {
+      create: jest.fn(),
+    } as any;
+
     mockResultSdgsService = {
       create: jest.fn(),
       find: jest.fn(),
@@ -354,6 +360,10 @@ describe('ResultsService', () => {
         {
           provide: ResultInnovationDevService,
           useValue: mockResultInnovationDevService,
+        },
+        {
+          provide: ResultInnovationUseService,
+          useValue: mockResultInnovationUseService,
         },
         {
           provide: ResultSdgsService,
@@ -1149,6 +1159,7 @@ describe('ResultsService', () => {
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
         expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
       });
 
       it('should create policy change service for POLICY_CHANGE indicator', async () => {
@@ -1195,6 +1206,7 @@ describe('ResultsService', () => {
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
         expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
       });
 
       it('should create innovation dev service for INNOVATION_DEV indicator', async () => {
@@ -1244,6 +1256,7 @@ describe('ResultsService', () => {
         expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
       });
 
       it('should not call any specialized service for other indicators', async () => {
@@ -1287,6 +1300,7 @@ describe('ResultsService', () => {
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
         expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
       });
 
       it('should create OICR service for OICR indicator', async () => {
@@ -1333,6 +1347,116 @@ describe('ResultsService', () => {
         expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
         expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
         expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
+      });
+
+      // R-IUA-001 AC.4 / T-08: this branch has always existed and was
+      // previously uncovered by any `createResultType` scenario test in
+      // this file — closing that gap is part of proving AC.4 (the five
+      // pre-existing branches are unchanged) means something for this
+      // branch too, not only the four that already had coverage.
+      it('should create knowledge product service for KNOWLEDGE_PRODUCT indicator (pre-existing branch, previously uncovered)', async () => {
+        // Arrange
+        const createResult: CreateResultDto = {
+          contract_id: 'CONTRACT123',
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          title: 'Knowledge Product Result',
+          year: 2024,
+          description: 'Test description',
+          is_ai: false,
+        };
+
+        const savedResult = {
+          result_id: 18,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        };
+
+        // Setup mocks
+        mockMainRepo.findOne.mockResolvedValue(null);
+        (service as any).newOfficialCode.mockResolvedValue(12354);
+        mockRepository.save.mockResolvedValue(savedResult);
+        mockAgressoContractService.findOne.mockResolvedValue({
+          agreement_id: 'AGR123',
+          departmentId: 'DEPT001',
+          center_amount: 1000,
+          center_amount_usd: 1000,
+          grant_amount: 2000,
+          grant_amount_usd: 2000,
+        } as any);
+        mockClarisaLeversService.homologatedData.mockReturnValue('Test Lever');
+        mockClarisaLeversService.findByName.mockResolvedValue(null);
+        mockCurrentUser.audit.mockReturnValue({});
+
+        // Act
+        await service.createResult(createResult);
+
+        // Assert
+        expect(mockResultKnowledgeProductService.create).toHaveBeenCalledWith(
+          savedResult.result_id,
+          mockEntityManager,
+        );
+        expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
+        expect(mockResultIpRightsService.create).not.toHaveBeenCalled();
+        expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationUseService.create).not.toHaveBeenCalled();
+      });
+
+      // R-IUA-001 AC.1, AC.3 / R-IUA-011 AC.1: the additive sixth branch.
+      it('should create innovation use service AND an ip rights row for INNOVATION_USE indicator', async () => {
+        // Arrange
+        const createResult: CreateResultDto = {
+          contract_id: 'CONTRACT123',
+          indicator_id: IndicatorsEnum.INNOVATION_USE,
+          title: 'Innovation Use Result',
+          year: 2024,
+          description: 'Test description',
+          is_ai: false,
+        };
+
+        const savedResult = {
+          result_id: 19,
+          indicator_id: IndicatorsEnum.INNOVATION_USE,
+        };
+
+        // Setup mocks
+        mockMainRepo.findOne.mockResolvedValue(null);
+        (service as any).newOfficialCode.mockResolvedValue(12355);
+        mockRepository.save.mockResolvedValue(savedResult);
+        mockAgressoContractService.findOne.mockResolvedValue({
+          agreement_id: 'AGR123',
+          departmentId: 'DEPT001',
+          center_amount: 1000,
+          center_amount_usd: 1000,
+          grant_amount: 2000,
+          grant_amount_usd: 2000,
+        } as any);
+        mockClarisaLeversService.homologatedData.mockReturnValue('Test Lever');
+        mockClarisaLeversService.findByName.mockResolvedValue(null);
+        mockCurrentUser.audit.mockReturnValue({});
+
+        // Act
+        await service.createResult(createResult);
+
+        // Assert — R-IUA-001 AC.1: exactly one call, with the transaction's manager
+        expect(mockResultInnovationUseService.create).toHaveBeenCalledTimes(1);
+        expect(mockResultInnovationUseService.create).toHaveBeenCalledWith(
+          savedResult.result_id,
+          mockEntityManager,
+        );
+        // R-IUA-011 AC.1: an ip_rights row is written for indicator 6 too
+        expect(mockResultIpRightsService.create).toHaveBeenCalledTimes(1);
+        expect(mockResultIpRightsService.create).toHaveBeenCalledWith(
+          savedResult.result_id,
+          mockEntityManager,
+        );
+        // R-IUA-001 AC.3 / scenario "must NOT create a row for any other indicator"
+        expect(mockResultCapacitySharingService.create).not.toHaveBeenCalled();
+        expect(mockResultPolicyChangeService.create).not.toHaveBeenCalled();
+        expect(mockResultInnovationDevService.create).not.toHaveBeenCalled();
+        expect(mockResultOicrService.create).not.toHaveBeenCalled();
+        expect(mockResultKnowledgeProductService.create).not.toHaveBeenCalled();
       });
     });
   });

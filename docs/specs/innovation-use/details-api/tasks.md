@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` done (2026-08-19) — closed on attempt 2 after the Pivot.** T-08 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **14 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` done — closed on attempt 2 after the Pivot. T-08 `[x]` done — PASS on attempt 1.** T-09 … T-13 todo — **all five remaining tasks are the DB-dependent ones this spec has not yet exercised.** Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **15 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -397,10 +397,10 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 ### T-08 — Result-creation path: detail row + IP Rights row
 
-- **Requirements covered:** R-IUA-001 (all ACs + scenario) · R-IUA-011 (all ACs + scenario) · R-IUA-012 AC.3, AC.4
+- **Requirements covered:** R-IUA-001 (all ACs + scenario) · R-IUA-011 (all ACs + scenario) · R-IUA-012 **AC.4** *(header corrected 2026-08-19 at T-08's review: it had also claimed **AC.3**, which §3's matrix assigns to **T-12** and which no T-08 Done criterion carries — T-12's own *Requirements covered* and its done criteria already own it. Bookkeeping error, not missing work; third instance of this class after R-IUA-007 AC.4 at T-04 and R-IUA-002 AC.1 at T-05)*
 - **Depends on:** T-05, T-07
 - **Size:** S (~90 LOC incl. spec) · **Effort:** `max` — two lines that change a method shared by all six indicators
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — **PASS on attempt 1, zero rework**; 1 review round (2 parallel lens Reviewers, both PASS). Two behavioural lines in `createResultType`/`ipAvailables` plus the required DI edge in `results.module.ts`. AC.4's regression proof was verified two independent ways — an exact 124-line insertion reconciliation leaving zero insertions available for a rewritten line, and a surviving `expect.any(Object)` negative control — and the `KNOWLEDGE_PRODUCT` branch, which had **zero** assertions at `HEAD`, is now pinned. Fall-through mutation confirmed binding and confirmed compiling (`noFallthroughCasesInSwitch: false`). Suite 336/2264, `tsc --noEmit` clean. Two spec bookkeeping corrections applied at review (criterion 8's wording; the R-IUA-012 AC.3 header claim, which belongs to T-12). Behavioural gates remain **T-09 (F-A)** and **T-12 (F-E)**. Evidence: [`./execution.md`](./execution.md) → *T-08*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
@@ -421,15 +421,15 @@ Add `case IndicatorsEnum.INNOVATION_USE: await this._resultInnovationUseService.
 
 **Done criteria**
 
-- [ ] Creating with `indicator_id = 6` calls `ResultInnovationUseService.create` exactly once with the transaction's `manager` *(R-IUA-001 AC.1)*
-- [ ] Creating with `indicator_id` 1–5 calls it **zero** times *(AC.3, and the scenario's `BUT it must NOT create a row for any other indicator`)*
-- [ ] The five pre-existing indicator branches invoke exactly the same services with exactly the same arguments as at `HEAD` *(AC.4)*
-- [ ] Creating with `indicator_id = 6` calls `ResultIpRightsService.create` once *(R-IUA-011 AC.1)*
-- [ ] Indicators 3, 4, 5 → zero IP Rights calls; indicators 1, 2 → exactly one, unchanged *(AC.2, AC.3)*
-- [ ] Audit fields on the detail row come from `CurrentUserUtil`, not a hardcoded id *(R-IUA-001 AC.2, and the scenario's `AND IT MUST populate the audit columns from request.user`)*
-- [ ] `grep` over `VISUAL_ONLY_GREEN_CHECKS` shows neither `innovation_use` nor `ip_rights` added *(R-IUA-012 AC.4, R-IUA-011 scenario's `BUT it must NOT make ip_rights non-blocking`)*
-- [ ] `git diff src/domain/entities/results/results.service.ts` shows **exactly two** added logical lines
-- [ ] Full server suite `npm test -- --silent` green — **not a targeted run** (KZ-003: this method serves every indicator)
+- [x] Creating with `indicator_id = 6` calls `ResultInnovationUseService.create` exactly once with the transaction's `manager` *(R-IUA-001 AC.1)*
+- [x] Creating with `indicator_id` 1–5 calls it **zero** times *(AC.3, and the scenario's `BUT it must NOT create a row for any other indicator`)*
+- [x] The five pre-existing indicator branches invoke exactly the same services with exactly the same arguments as at `HEAD` *(AC.4)*
+- [x] Creating with `indicator_id = 6` calls `ResultIpRightsService.create` once *(R-IUA-011 AC.1)*
+- [x] Indicators 3, 4, 5 → zero IP Rights calls; indicators 1, 2 → exactly one, unchanged *(AC.2, AC.3)*
+- [x] Audit fields on the detail row come from `CurrentUserUtil`, not a hardcoded id *(R-IUA-001 AC.2, and the scenario's `AND IT MUST populate the audit columns from request.user`)*
+- [x] `grep` over `VISUAL_ONLY_GREEN_CHECKS` shows neither `innovation_use` nor `ip_rights` added *(R-IUA-012 AC.4, R-IUA-011 scenario's `BUT it must NOT make ip_rights non-blocking`)*
+- [x] `git diff src/domain/entities/results/results.service.ts` shows **additions only — no line removed or modified** — comprising exactly **two behavioural additions** (the `INNOVATION_USE` `switch` case and the `ipAvailables` member) plus the mechanical DI wiring they require (the `ResultInnovationUseService` import and its constructor parameter). Six physical added lines. *(Wording corrected 2026-08-19 at T-08's review. The original read "shows **exactly two** added logical lines", which the task's own *Scope*, its *Files touched* entry for `results.module.ts`, and `design.md` §5.7 all contradict — each presupposes the DI wiring, and injection is impossible without the import and the parameter. Enforcing the count literally would have penalised the work for obeying the document.)*
+- [x] Full server suite `npm test -- --silent` green — **not a targeted run** (KZ-003: this method serves every indicator)
 
 **Verification & its limits**
 
