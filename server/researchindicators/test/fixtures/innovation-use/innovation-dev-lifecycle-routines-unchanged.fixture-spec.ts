@@ -174,30 +174,60 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     officialCode: number;
   }
 
-  // Every copied column given a concrete value; same-typed neighbours
-  // (the seven `int` columns, the four boolean `tinyint` columns) are
-  // mutually distinct where the column's domain allows it (rework attempt
-  // 2, FAIL-1 — a positional swap between two equal-valued columns in the
-  // migration's copy-list-vs-SELECT-list pairing is otherwise invisible to
-  // ANY comparison technique, literal or dynamic). The four boolean
-  // columns have only two possible values for four columns — full mutual
-  // distinctness is mathematically impossible; they alternate FALSE/TRUE
-  // instead, and the residual gap (a swap between the two FALSE-valued or
-  // between the two TRUE-valued columns specifically) is named in the T-13
-  // execution note rather than left implicit.
+  // Every copied column given a concrete value; same-typed neighbours (the
+  // seven `int` columns, and — widened in rework attempt 3, Lens B — the
+  // eleven boolean `tinyint` columns across the three tables plus the four
+  // audit columns per table) are mutually distinct where the column's
+  // domain allows it (rework attempt 2, FAIL-1 — a positional swap between
+  // two equal-valued columns in the migration's copy-list-vs-SELECT-list
+  // pairing is otherwise invisible to ANY comparison technique, literal or
+  // dynamic).
+  //
+  // Rework attempt 3, Lens B: attempt 2's claim that "full mutual
+  // distinctness is mathematically impossible" for the boolean columns was
+  // wrong and is deleted. `no_sex_age_disaggregation`, `is_knowledge_sharing`,
+  // `is_used_beyond_original_context`, and `is_new_or_improved_variety`
+  // (`baseline.sql:3206/3210/3214/3227`) — and `result_actors`'s
+  // `sex_age_disaggregation_not_apply`/`women_youth`/`women_not_youth`/
+  // `men_youth`/`men_not_youth` (`baseline.sql:2813-2817`) — are plain
+  // `tinyint DEFAULT NULL` with NO CHECK constraint and no trigger anywhere
+  // in the migration set restricting them to 0/1 (verified: the only
+  // `CHECK` hits in `baseline.sql` are on `innovation_readiness_explanation`
+  // and `FOREIGN_KEY_CHECKS`/`UNIQUE_CHECKS` session variables). The domain
+  // is the full `tinyint` range, so every one of these columns now takes a
+  // distinct sentinel >= 2 instead of alternating FALSE/TRUE. `is_active` is
+  // the one column that must stay `1` (the copy blocks filter
+  // `WHERE ... is_active = TRUE`) — leaving every other tinyint >= 2 makes
+  // `is_active` unique by construction too, closing the neighbourhood
+  // completely. `result_institution_types`'s lone boolean,
+  // `is_organization_known`, is left at `FALSE` (0) deliberately: with
+  // `is_active` at 1, the two are already mutually distinct, so there is
+  // nothing to diversify there.
+  //
+  // The audit columns (`created_by`/`updated_by`, `created_at`/`updated_at`)
+  // get the same treatment in all three INSERTs below: two distinct literal
+  // values (`auditCreatedBy`/`auditUpdatedBy`) and two distinct literal
+  // timestamps (`auditCreatedAt`/`auditUpdatedAt`), replacing the previous
+  // `1, 1` literal and the shared `CURRENT_TIMESTAMP(6)` default that left
+  // both pairs transposition-blind.
+  //
+  // No residual transposition gap remains in this fixture after this
+  // change — every same-typed column pairing within each of the three
+  // INSERTs' copy-list-vs-SELECT-list mapping is now mutually distinct,
+  // verified column-by-column against `baseline.sql`, not assumed.
   const devDetail = {
     short_title: 'F16 Innovation Dev fixture short title',
     innovation_readiness_explanation:
       'F16 Innovation Dev fixture readiness explanation.',
-    no_sex_age_disaggregation: false,
+    no_sex_age_disaggregation: 2,
     expected_outcome: 'F16 fixture expected outcome',
     intended_beneficiaries_description: 'F16 fixture beneficiaries',
-    is_new_or_improved_variety: true,
+    is_new_or_improved_variety: 5,
     new_or_improved_varieties_count: 3,
-    is_knowledge_sharing: true,
+    is_knowledge_sharing: 3,
     tool_useful_context: 'F16 fixture tool useful context',
     results_achieved_expected: 'F16 fixture results achieved',
-    is_used_beyond_original_context: false,
+    is_used_beyond_original_context: 4,
     adoption_adaptation_context: 'F16 fixture adoption context',
     other_tools: 'F16 fixture other tools',
     other_tools_integration: 'F16 fixture other tools integration',
@@ -218,6 +248,38 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
   const actorCustomName = 'F16 fixture actor custom name sentinel';
   const institutionTypeCustomName =
     'F16 fixture institution type custom name sentinel';
+
+  // `result_actors`'s five legacy boolean `tinyint` columns (rework attempt
+  // 3, Lens B remediation) — `baseline.sql:2813-2817` declares all five as
+  // plain `tinyint DEFAULT NULL`, no CHECK/trigger, so each gets a distinct
+  // sentinel >= 2 instead of attempt 2's FALSE/TRUE alternation. This closes
+  // the `women_youth <-> men_youth` blind spot Lens B named as the single
+  // most plausible copy-paste error in a hand-maintained SELECT list.
+  const actorSexAgeDisaggregationNotApply = 2;
+  const actorWomenYouth = 3;
+  const actorWomenNotYouth = 4;
+  const actorMenYouth = 5;
+  const actorMenNotYouth = 6;
+
+  // Audit columns (rework attempt 3, Lens B remediation) — `created_by`/
+  // `updated_by` previously shared the literal `1, 1` and `created_at`/
+  // `updated_at` both defaulted to the same `CURRENT_TIMESTAMP(6)` in every
+  // one of the three INSERTs below, so a `created_by <-> updated_by` or
+  // `created_at <-> updated_at` transposition in any copy block was
+  // invisible. Two distinct literal values/timestamps close that gap.
+  const auditCreatedBy = 41;
+  const auditUpdatedBy = 42;
+  const auditCreatedAt = new Date('2024-01-01T00:00:00.000Z');
+  const auditUpdatedAt = new Date('2024-01-02T00:00:00.000Z');
+
+  /**
+   * `created_at`/`updated_at` may come back from the raw `mysql2` driver as
+   * either a `Date` or a date string depending on column/session settings —
+   * `new Date(value)` normalizes either shape before comparing instants.
+   */
+  function toTime(value: unknown): number {
+    return new Date(value as string | number | Date).getTime();
+  }
 
   async function seedDevResult(
     platform: string = platformCode,
@@ -246,8 +308,9 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
          has_suitable_enabling_environment, has_evidence_of_uptake,
          expansion_potential_id, expansion_adaptation_details,
          new_or_improved_varieties_count, is_new_or_improved_variety,
-         innovation_readiness_explanation, created_by, updated_by
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+         innovation_readiness_explanation,
+         created_at, updated_at, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         resultId,
         devDetail.short_title,
@@ -278,6 +341,10 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
         devDetail.new_or_improved_varieties_count,
         devDetail.is_new_or_improved_variety,
         devDetail.innovation_readiness_explanation,
+        auditCreatedAt,
+        auditUpdatedAt,
+        auditCreatedBy,
+        auditUpdatedBy,
       ],
     );
 
@@ -286,17 +353,32 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
          result_id, actor_type_id, actor_role_id, actor_type_custom_name,
          sex_age_disaggregation_not_apply,
          women_youth, women_not_youth, men_youth, men_not_youth,
-         created_by, updated_by
-       ) VALUES (?, ?, ?, ?, FALSE, TRUE, FALSE, TRUE, FALSE, 1, 1)`,
-      [resultId, actorTypeCode, devActorRoleId, actorCustomName],
+         created_at, updated_at, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        resultId,
+        actorTypeCode,
+        devActorRoleId,
+        actorCustomName,
+        actorSexAgeDisaggregationNotApply,
+        actorWomenYouth,
+        actorWomenNotYouth,
+        actorMenYouth,
+        actorMenNotYouth,
+        auditCreatedAt,
+        auditUpdatedAt,
+        auditCreatedBy,
+        auditUpdatedBy,
+      ],
     );
 
     await dataSource.query(
       `INSERT INTO result_institution_types (
          result_id, institution_type_role_id, institution_type_id,
          sub_institution_type_id, institution_type_custom_name,
-         is_organization_known, institution_id, created_by, updated_by
-       ) VALUES (?, ?, ?, ?, ?, FALSE, ?, 1, 1)`,
+         is_organization_known, institution_id,
+         created_at, updated_at, created_by, updated_by
+       ) VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, ?, ?, ?)`,
       [
         resultId,
         devInstitutionTypeRoleId,
@@ -304,6 +386,10 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
         subInstitutionTypeCode,
         institutionTypeCustomName,
         institutionCode,
+        auditCreatedAt,
+        auditUpdatedAt,
+        auditCreatedBy,
+        auditUpdatedBy,
       ],
     );
 
@@ -317,20 +403,23 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
    * the enumerate-by-name failure the routines themselves embody. The
    * caller drops the identity/PK column(s) before comparing, since those
    * legitimately differ between the source row and its copy.
+   *
+   * Rework attempt 3, Lens B advisory (B-2): asserts exactly one row before
+   * destructuring — previously `const [row] = await dataSource.query(...)`
+   * silently read only the first row, so a copy block that (incorrectly)
+   * inserted the row twice would still pass.
    */
   async function fetchFullRow(
     table: string,
     resultId: number,
     omitColumns: string[],
-  ): Promise<Record<string, unknown> | undefined> {
-    const [row] = await dataSource.query(
+  ): Promise<Record<string, unknown>> {
+    const rows: Record<string, unknown>[] = await dataSource.query(
       `SELECT * FROM ${table} WHERE result_id = ?`,
       [resultId],
     );
-    if (!row) {
-      return row;
-    }
-    const trimmed: Record<string, unknown> = { ...row };
+    expect(rows).toHaveLength(1);
+    const trimmed: Record<string, unknown> = { ...rows[0] };
     for (const column of omitColumns) {
       delete trimmed[column];
     }
@@ -721,10 +810,25 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     expect(Number(copiedDev.has_evidence_of_uptake)).toBe(
       devDetail.has_evidence_of_uptake,
     );
-    expect(Number(copiedDev.no_sex_age_disaggregation)).toBe(0);
-    expect(Number(copiedDev.is_knowledge_sharing)).toBe(1);
-    expect(Number(copiedDev.is_used_beyond_original_context)).toBe(0);
-    expect(Number(copiedDev.is_new_or_improved_variety)).toBe(1);
+    expect(Number(copiedDev.no_sex_age_disaggregation)).toBe(
+      devDetail.no_sex_age_disaggregation,
+    );
+    expect(Number(copiedDev.is_knowledge_sharing)).toBe(
+      devDetail.is_knowledge_sharing,
+    );
+    expect(Number(copiedDev.is_used_beyond_original_context)).toBe(
+      devDetail.is_used_beyond_original_context,
+    );
+    expect(Number(copiedDev.is_new_or_improved_variety)).toBe(
+      devDetail.is_new_or_improved_variety,
+    );
+    // Audit columns (rework attempt 3, Lens B remediation) — literal, so a
+    // created_by <-> updated_by or created_at <-> updated_at transposition
+    // cannot hide behind the earlier `toEqual(sourceDev)` check.
+    expect(Number(copiedDev.created_by)).toBe(auditCreatedBy);
+    expect(Number(copiedDev.updated_by)).toBe(auditUpdatedBy);
+    expect(toTime(copiedDev.created_at)).toBe(auditCreatedAt.getTime());
+    expect(toTime(copiedDev.updated_at)).toBe(auditUpdatedAt.getTime());
 
     // --- result_actors: same SELECT * treatment, minus the identity PK
     // and result_id.
@@ -740,6 +844,22 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     expect(copiedActor).toEqual(sourceActor);
     expect(copiedActor.actor_type_custom_name).toBe(actorCustomName);
     expect(Number(copiedActor.actor_role_id)).toBe(devActorRoleId);
+    // The five legacy boolean columns (rework attempt 3, Lens B remediation)
+    // — literal, distinct-sentinel assertions so a transposition between any
+    // two (most notably `women_youth <-> men_youth`, the pair Lens B named)
+    // is visible here rather than only satisfying `toEqual(sourceActor)`.
+    expect(Number(copiedActor.sex_age_disaggregation_not_apply)).toBe(
+      actorSexAgeDisaggregationNotApply,
+    );
+    expect(Number(copiedActor.women_youth)).toBe(actorWomenYouth);
+    expect(Number(copiedActor.women_not_youth)).toBe(actorWomenNotYouth);
+    expect(Number(copiedActor.men_youth)).toBe(actorMenYouth);
+    expect(Number(copiedActor.men_not_youth)).toBe(actorMenNotYouth);
+    // Audit columns (rework attempt 3, Lens B remediation).
+    expect(Number(copiedActor.created_by)).toBe(auditCreatedBy);
+    expect(Number(copiedActor.updated_by)).toBe(auditUpdatedBy);
+    expect(toTime(copiedActor.created_at)).toBe(auditCreatedAt.getTime());
+    expect(toTime(copiedActor.updated_at)).toBe(auditUpdatedAt.getTime());
     // The five NEW count columns are inert for Innovation Dev — confirm
     // they stayed NULL through the copy rather than merely matching the
     // (also-NULL) source, which a bad copy could satisfy by accident.
@@ -776,6 +896,15 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     );
     expect(Number(copiedInstitutionType.institution_id)).toBe(institutionCode);
     expect(copiedInstitutionType.organization_count).toBeNull();
+    // Audit columns (rework attempt 3, Lens B remediation).
+    expect(Number(copiedInstitutionType.created_by)).toBe(auditCreatedBy);
+    expect(Number(copiedInstitutionType.updated_by)).toBe(auditUpdatedBy);
+    expect(toTime(copiedInstitutionType.created_at)).toBe(
+      auditCreatedAt.getTime(),
+    );
+    expect(toTime(copiedInstitutionType.updated_at)).toBe(
+      auditUpdatedAt.getTime(),
+    );
   }, 30000);
 
   it('F16b: SP_delete_result_version still hard-removes an Innovation Dev version and its result_innovation_dev, result_actors, and result_institution_types rows', async () => {

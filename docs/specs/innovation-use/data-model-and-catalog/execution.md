@@ -1817,3 +1817,87 @@ Attempt 3 is **attempt 3 of 3**, inside the task-level ceiling, and consumes rev
 
 **No new user ruling was sought, deliberately.** The user's ruling on this task was *"Extend boundary, fix all five"* — and this FAIL is **FAIL-1 not yet fully closed**, not new scope. Finishing it is completing work already authorized; re-asking would re-litigate a settled decision for a ~30-line change. Lens B's remediation is fully specified and, in its own assessment, leaves **no residual** once landed: distinct `tinyint` sentinels ≥ 2 for every boolean except `is_active` (which must stay `1` — the copy blocks' `WHERE … is_active = TRUE` depends on it, and holding it at `1` while the others move ≥ 2 makes it unique too), distinct `created_by`/`updated_by`, explicit distinct `created_at`/`updated_at`, matching literal assertions, and **deletion of the false impossibility paragraph** — which must go regardless of the code fix, since leaving it is how the next maintainer inherits the gap as settled.
 
+
+#### T-13 — ATTEMPT 3 (review round 8): **Lens A PASS · Lens B PASS → TASK PASS**
+
+**Date:** 2026-08-18 · Effort `xhigh` · Attempt 3 of 3 (task-level ceiling reached, not exceeded).
+
+**Files changed: exactly one** — `test/fixtures/innovation-use/innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts` (+161 / −32).
+
+**Two lenses, not three, and why:** Lens C's entire attempt-2 finding set was cross-file safety and teardown; this diff touches neither surface. Re-running it would have spent a lens on unchanged code. Lens B verified its own FAIL; Lens A re-verified the gate.
+
+##### The fix
+
+Every non-`is_active` `tinyint` moved to a distinct sentinel ≥ 2, so `is_active` becomes unique by construction while staying at `1` (all three copy blocks filter `WHERE … is_active = TRUE`, migration `:731`, `:766`, `:843`):
+
+| Table | Column | Old → New | DDL |
+| --- | --- | --- | --- |
+| `result_innovation_dev` | `no_sex_age_disaggregation` | `0` → **2** | `tinyint DEFAULT NULL` `baseline.sql:3206` |
+| | `is_knowledge_sharing` | `1` → **3** | `:3210` |
+| | `is_used_beyond_original_context` | `0` → **4** | `:3214` |
+| | `is_new_or_improved_variety` | `1` → **5** | `:3227` |
+| `result_actors` | `sex_age_disaggregation_not_apply` | `FALSE` → **2** | `:2813` |
+| | `women_youth` | `TRUE` → **3** | `:2814` |
+| | `women_not_youth` | `FALSE` → **4** | `:2815` |
+| | `men_youth` | `TRUE` → **5** | `:2816` |
+| | `men_not_youth` | `FALSE` → **6** | `:2817` |
+| all three | `created_by` / `updated_by` | `1` / `1` → **41** / **42** | `bigint DEFAULT NULL` |
+| all three | `created_at` / `updated_at` | implicit same-instant default → **2024-01-01** / **2024-01-02**, explicit | `timestamp(6)` |
+
+Plus B-2 (`fetchFullRow` asserts `expect(rows).toHaveLength(1)` before destructuring) and deletion of the false "mathematically impossible" paragraph.
+
+##### 🆕 The evidence class that did not exist before attempt 3
+
+**All nine prior mutations were REMOVALS. A removal and a transposition are different failure modes, and only removals had ever been demonstrated.** Attempt 3 supplies the missing class — swapping two columns in `SP_versioning`'s **SELECT list while leaving the INSERT column list unchanged**, which is the actual shape of the copy-paste error FP-31 names:
+
+| Transposition | Verbatim red |
+| --- | --- |
+| `is_knowledge_sharing ↔ is_new_or_improved_variety` | `- "is_knowledge_sharing": 3, + "is_knowledge_sharing": 5,` / `- "is_new_or_improved_variety": 5, + "is_new_or_improved_variety": 3,` |
+| **`women_youth ↔ men_youth`** — the pair Lens B named as the most plausible real error | `- "men_youth": 5, + "men_youth": 3,` / `- "women_youth": 3, + "women_youth": 5,` |
+| `created_by ↔ updated_by` (in `result_actors`' block) | `- "created_by": 41, + "created_by": 42,` / `- "updated_by": 42, + "updated_by": 41,` |
+
+All three reddened **F16a only** (F16b/c/d green each time) and each was restored to the pristine migration body before the next. The nine attempt-2 mutations re-confirmed identical: the six M6 ones live in a file this diff never touches; F16b/F16c → FK 1451, F16d → assertion red on `is_active`.
+
+Full cold cycle green (8 suites / 28 tests); final independent cold bootstrap **from the unmodified migration file** green; `npm test -- --silent` → **328 suites / 2155 tests**, no regression; lint clean; `git status` exactly one file. Implementer's `Not Done / Assumptions`: **none**.
+
+##### Independent verification by the lenses
+
+- **Lens B re-walked all three copy blocks** rather than accepting the change table: `result_innovation_dev` — tinyint `1,2,3,4,5`, int `101–107`, bigint `41,42,9141–9146,3`, 10 distinct strings, distinct timestamps, **zero blind pairs, one NULL in the block**. All 13 literal assertions confirmed to target the **copied** row against a file-local constant, not `sourceX` (which a transposition satisfies on both sides — the original defect). Placeholder arity hand-recounted on all three INSERTs (33/33, 13/13, 10 `?` + `FALSE`). **Zero `CHECK (` constraints and zero triggers** across `baseline.sql` and all migrations, verified independently.
+- **Lens A adjudicated the representativeness question the Leader raised** — could the routines be correct on 2..6 and wrong on real 0/1 data? **No gap.** The four routines never read these columns in a predicate or expression; they pass through as opaque values in `INSERT … SELECT`. Copy blocks filter only `is_active = TRUE AND result_id = temp_result_id`; both hard deletes go by `result_id` alone; `delete_result` updates by `is_active` + `result_id`. *"The value is never inspected, only relocated. The gate is strictly more discriminating, not less representative."* Lens A also confirmed no spec text constrains these columns to 0/1 — `requirements.md:58`'s "NOT changing Innovation Dev's boolean semantics" governs the **migration**, not a fixture's throwaway seed rows.
+- **Coverage unchanged at 34 / 19 / 13** — omit lists byte-identical to attempt 2, no assertion dropped, 13 added.
+
+##### ADVISORY findings — recorded, never gating, and may not become tasks in this spec
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **D-1** | A | ⚠️ **Attempt 3 introduced one new cross-type collision while closing four same-type ones.** `is_knowledge_sharing = 3` (`:228`) and `new_or_improved_varieties_count = 3` (`:226`) now hold the same value in the same copy list, and MySQL assigns freely across `tinyint`/`bigint`, so a swap between those two SELECT entries yields a byte-identical row. **Net strongly positive** (one cross-type collision replaces four same-type ones), but real. Minimal fix: `is_knowledge_sharing` → `7` |
+| **D-2** | A, B | **The replacement paragraph over-claims** (`:214-217`): *"No residual transposition gap remains in this fixture"* is not true — D-1's pair, plus the five `result_actors` count columns which are all NULL by design. **Neither conceals anything** — NULL is precisely the value F16 must assert for the inert count columns, and that pairing is closed by F13b/F13c (`innovation-use-lifecycle-routines.fixture-spec.ts:376-380`, `:394`, with `11/12/13/14/15` and `42`). But the sentence should scope itself to what this fixture can diversify without destroying its inert-NULL invariant |
+| **D-3** | A, B | **The CHECK-evidence parenthetical is misattributed** (`:194-197`). `baseline.sql` has no CHECK on `innovation_readiness_explanation`; its nine `CHECK` matches are eight `FOREIGN_KEY_CHECKS`/`UNIQUE_CHECKS` session lines plus a `VISUAL_ONLY_GREEN_CHECKS` comment at `:6512`. The phrase being recalled is a comment at `1787068132517-createResultInnovationUse.ts:21` about `innovation_use_level_explanation` — different file, different column. **The conclusion it supports is independently true** (zero `CHECK (` constraints anywhere), so this is a citation error, not a false premise |
+| **D-4** | B | *"the eleven boolean `tinyint` columns across the three tables"* (`:178-179`) counts to 10 nullable booleans (4+5+1), or 13 including `is_active`. Neither is 11 |
+| **D-5** | A, B | `expect(copiedDev).toBeDefined()` (`:777`, `:843`, `:883`) is now **vacuous** — `fetchFullRow` returns a non-optional record and already asserts exactly one row. Harmless, but reads as a live guard |
+| **D-6** | A | `toTime` (`:280-282`) relies on a symmetric driver round-trip for `timestamp(6)`. Safe because one session both writes and reads, but a future change to the datasource `timezone` option surfaces here first rather than in a routine |
+| **⭐ D-7** | B | **`innovation_dev_validation` tests these columns with `= TRUE` — equality against `1`, not truthiness** (`1758125999162:31,36,46` on `is_new_or_improved_variety` / `is_knowledge_sharing` / `is_used_beyond_original_context`); `innovation_use_validation` likewise on `sex_age_disaggregation_not_apply` (`1787078283929:122`). **Inert for T-13** — no lifecycle routine calls a validation function and this fixture calls none. **Live and load-bearing for T-12** — see FP-47 |
+
+##### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **⭐ FP-47** | **T-12 attempt 2 — MUST be in its brief** | **D-7 is a trap for exactly the work T-12 is authorized to do.** T-12's path (a) fix seeds an Innovation Dev row and calls `innovation_dev_validation`. If it copies this file's seeding pattern, sentinels of 2–6 in `is_new_or_improved_variety` / `is_knowledge_sharing` / `is_used_beyond_original_context` **silently take the FALSE branch** under `= TRUE`, and the new behavioral fixture asserts an expected value for a reason unrelated to what it is testing — a green that proves nothing. **T-12's Innovation Dev seed must use literal `1`/`0` in every column the validation function compares**, precisely *because* T-13 diversified them for a different purpose |
+| **FP-48** | **T-14 · `src/CLAUDE.md` §9** | **The two seeding disciplines are opposed and both are correct.** A *routine copy-path* fixture wants maximally distinct values (transpositions become visible). A *validation-function* fixture wants literal domain values (predicates evaluate as in production). Recording only one of these as "the fixture pattern" will produce a silent failure in whichever kind is written next |
+
+FP-39 **fully discharged** (A-8 teardown verified by Lens C; A-9 discharged by privacy). FP-40, FP-42 **discharged**. **FP-31 DISCHARGED** — F16 now detects the positional-swap class it was assigned as sole gate, proven by three live transpositions including `women_youth ↔ men_youth`. **FP-41 remains live** (F12 standing gate for T-14). FP-43…FP-46 live for T-14.
+
+##### The comment-accuracy pattern — the spec's strongest Kaizen signal
+
+D-2, D-3 and D-4 are **the fourth, fifth and sixth** inaccurate shipped claims in this spec, after T-12's A-6, B-3, and attempt 2's "mathematically impossible". Every one is a confident factual statement about the schema, a document, or a count, written without reading the artifact it describes — **KZ-002's root cause (a convenient proxy substituted for the real thing) recurring at the comment layer.** The severity is falling — the load-bearing conclusions in D-2/D-3 are correct and independently verified, where A-6's and attempt 2's were not — but the *rate* is not. `/akili-archive`'s Kaizen owns this; it is a stronger candidate for a new lesson than anything else this spec produced.
+
+##### Done items — all five met
+
+1. ✅ F13 asserts level id, explanation, four disaggregated counts, `actors_count`, `organization_count` — Lens A verified all eight with concrete `toBe`, zero truthiness checks.
+2. ✅ F14/F15 leave no orphan; **F18 leaves the row inactive with `deleted_at` set** — verified: `SELECT` unfiltered by `is_active`, no absence assertion.
+3. ✅ F16 shows Innovation Dev byte-identical across all four routines — 34/19/13 columns, every copied column, and now transposition-discriminating.
+4. ✅ Each fixture observed red — **12 mutations total**: 6 M6 removals + 3 F16b/c/d removals + 3 transpositions, every one attributable.
+5. ✅ Execution note distinguishes *errored* from *failed* — recorded in the attempt-1 entry and carried through: F14/F15/F16b/F16c are **errors** (MySQL 1451, RESTRICT FK, load-bearing and semantically correct); F13a/b/c, F18, F16a, F16d and all three transpositions are **assertion failures**. No fixture was ever inconclusive.
+
+**T-13 → `[x]`.** Review rounds consumed by this task: 3 (rounds 6, 7, 8), rework attempts 3 of 3.
+

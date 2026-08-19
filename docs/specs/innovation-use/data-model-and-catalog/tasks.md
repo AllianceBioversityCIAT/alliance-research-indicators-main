@@ -397,7 +397,7 @@ graph TD
 
 - **Requirements covered:** **R-IU-011 (AC.1–AC.6)**; DC-12
 - **Design references:** §6.5 fixture table, §6.7's blast-radius note
-- **Size:** L · **Dependencies:** T-10 (and its external bugfix dependency) · **Status:** ~~todo~~ → **`[~]` IN PROGRESS / ESCALATED 2026-08-18** — attempt 1: **all 3 lens Reviewers FAIL** (5 issues). F13/F14/F15/F18 land and are sound; **F16 is the problem** — it compares 22 of 35 + 12 of 20 + 3 of 14 copied columns, so FP-31 (positional swap) stays ungated. Rework NOT spawned: this is the **second** budget escalation — the 5th review round is spent and a T-13 rework is the 6th. **Awaiting a user ruling on the scope boundary** — FAIL-2 (cold-run race) is *not fixable inside T-13's two files* by construction. See [`./execution.md`](./execution.md) → *T-13*
+- **Size:** L · **Dependencies:** T-10 (and its external bugfix dependency) · **Status:** ~~todo~~ → ~~`[~]` ESCALATED~~ → **`[x]` DONE 2026-08-18** — PASS on attempt 3 of 3 (2 rework rounds; review rounds 6-8). All five Done items met. **FP-31 DISCHARGED** — F16 now detects positional swaps, proven by 3 live SELECT-list transpositions including `women_youth ↔ men_youth`. 12 mutations observed red in total. Cold-run race closed structurally by `globalSetup`. ⚠️ **FP-47 is a trap for T-12** — see [`./execution.md`](./execution.md) → *T-13*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Scope** — fixtures that **execute** the routines: F13 versioning · F14 `SP_delete_result_version` · F15 `full_delete_result_version` · **F18 `delete_result`** · F16 the Innovation Dev regression gate across all four.
