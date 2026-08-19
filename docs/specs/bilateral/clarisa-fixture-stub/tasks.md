@@ -48,7 +48,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-001 (baseline for AC.2), R-CFS-002 AC.1, R-CFS-005 AC.1
 - **Design refs:** §2.1, §5.1, DD-2, DD-4
-- **Size:** S (~70 LOC) · **Depends on:** none · **Skills:** `nestjs-expert`, `error-handling-patterns`
+- **Status:** [x] · **Size:** S (~70 LOC est · **335 actual**) · **Depends on:** none · **Skills:** `error-handling-patterns`, `systematic-debugging` (Leader dropped `nestjs-expert` — see `execution.md` S-3)
 
 **Scope.** A one-shot script that logs in to CLARISA, fetches `/api/projects`, and writes two committed artifacts: a **trimmed reference capture** (a handful of real projects, enough to carry all 32 keys and several mappings) and the **dictionary** of distinct `global_unit_object` values keyed by `smo_code`, copied verbatim. Records the capture host and date into the provenance file.
 
@@ -72,7 +72,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-001, R-CFS-002 (all ACs), R-CFS-007
 - **Design refs:** §2.1, §5.2, DD-2, DD-3, DD-6, DD-7
-- **Size:** M (~140 LOC) · **Depends on:** T-01 · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
+- **Status:** [ ] · **Size:** M (~140 LOC) · **Depends on:** T-01 · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
 
 **Scope.** The deterministic converter. Reads the export with `exceljs`, emits **all 198 rows** (not the eligible 170 — DD-3) as objects carrying **exactly** the 32 reference keys, and writes the sibling provenance file.
 
@@ -103,7 +103,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-001 AC.1/AC.3/AC.4, R-CFS-007 AC.2, R-CFS-008 AC.1 (fixture site), NFR-CFS-003
 - **Design refs:** §2.1, §5.2, DD-6
-- **Size:** S (~40 hand-written LOC + generated data) · **Depends on:** T-02 · **Skills:** `nestjs-expert`
+- **Status:** [ ] · **Size:** S (~40 hand-written LOC + generated data) · **Depends on:** T-02 · **Skills:** `nestjs-expert`
 
 **Scope.** Run the converter, commit the fixture and the provenance file. The provenance file records the source filename, export date, reference-capture date and host, the expected counts, and the **removal condition verbatim**.
 
@@ -125,7 +125,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-005 (all ACs + scenario), R-CFS-001 AC.2, R-CFS-002 AC.2/AC.3/AC.4/AC.5
 - **Design refs:** §10, DD-2, DD-4
-- **Size:** L (~230 LOC) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
+- **Status:** [ ] · **Size:** L (~230 LOC) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
 
 **Scope.** `clarisa-stub.fidelity.spec.ts`, running in `npm test`. Compares the generated fixture against the committed reference capture and asserts the divergence list is a **closed set of exactly seven**. This is the KZ-001 gate: it exists to catch a fixture that looks right and evaluates wrong.
 
@@ -159,7 +159,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-003 AC.1/AC.2/AC.3, R-CFS-004 (all ACs + scenario)
 - **Design refs:** §2.1, §4, §5.3, §9, DD-1, DD-5, DD-8
-- **Size:** M (~200 LOC incl. tests) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
+- **Status:** [ ] · **Size:** M (~200 LOC incl. tests) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 **Scope.** `clarisa-stub.router.ts` + `clarisa-stub.config.ts` + `clarisa-stub.router.spec.ts`. Two Express handlers returning CLARISA's raw shapes, plus the flag parsing. No Nest DI — the router must be mountable before the pipeline exists.
 
@@ -193,7 +193,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-006 (all ACs + both scenarios), R-CFS-003 AC.4, NFR-CFS-002, NFR-CFS-004
 - **Design refs:** §2.1, §5.3, §8, DD-1, V-1, V-2
-- **Size:** S (~90 LOC incl. e2e) · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `api-design-principles`
+- **Status:** [ ] · **Size:** S (~90 LOC incl. e2e) · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Scope.** One env-gated `app.use(prefix, router)` block in `main.ts`, placed **after** `helmet`/`json`/`enableCors` and **before** `listen()`. Plus `test/clarisa-stub.e2e-spec.ts` — the only place mount ordering is observable.
 
@@ -224,7 +224,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-008 (all ACs)
 - **Design refs:** §2.1, §7, §11
-- **Size:** S (~40 LOC) · **Depends on:** T-06 · **Skills:** `cognitive-doc-design`
+- **Status:** [ ] · **Size:** S (~40 LOC) · **Depends on:** T-06 · **Skills:** `cognitive-doc-design`
 
 **Scope.** `.env.example` entries for `ARI_CLARISA_STUB_ENABLED` and the stub `ARI_CLARISA_HOST` values, following the existing commented-block style used by `ARI_CLARISA_PROJECTS_PHASE`. State the **trailing slash** requirement and the removal condition.
 
@@ -249,7 +249,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-003 scenario B (end-to-end), NFR-CFS-001, **DC-10** (the spec's only coverage for its dominant user-visible defect class)
 - **Design refs:** §5.4, §6, §10, §11
-- **Size:** M (human time) · **Depends on:** T-04, T-06, T-07 · **Skills:** `ui-ux-pro-max`, `systematic-debugging`
+- **Status:** [ ] · **Size:** M (human time) · **Depends on:** T-04, T-06, T-07 · **Skills:** `ui-ux-pro-max`, `systematic-debugging`
 
 **Scope.** A human check, at the HITL pause, against a running local stack. **This task has no automated substitute** — jsdom cannot measure layout, rendering or scroll behaviour, and the CLARISA picker is uncapped (M-18).
 
