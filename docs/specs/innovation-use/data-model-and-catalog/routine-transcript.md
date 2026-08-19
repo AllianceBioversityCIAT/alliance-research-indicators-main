@@ -141,7 +141,7 @@ Migration order confirms the defect is live: `1783022620616` (drops `roles_id`) 
 2. M6's `down()` would restore a body that is equally broken.
 3. Any versioning fixture is un-runnable until the blocks are repaired, which makes **DC-12 ungated** regardless of how well M6 is written.
 
-**Ruling: DD-13** (`design.md` §11) — the repair lands in its own migration **M0**, ahead of M6, and is verified by fixture **F18** independently of Innovation Use. See the escalation note in `design.md` §12: this is a pre-existing production defect affecting all six indicators, and the user may prefer to extract it into its own bugfix spec.
+**Ruling: DD-13** (`design.md` §11) — the repair lands in its own migration, ahead of M6, independently of Innovation Use. See the escalation note in `design.md` §12: this is a pre-existing production defect affecting all six indicators. *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly named that migration "M0" and presented extraction into its own bugfix spec as an open option for the user. It was ruled 2026-08-14 — option B — and the repair now ships as `repairSpVersioningObjectiveBlocks` in the extracted [`sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec; see `design.md` §12 "✅ Resolved escalation" for the closed record. This correction also deleted the pre-existing "and is verified by fixture F18" clause from the sentence above — correctly, since F18 is `design.md` §6.5's soft-delete fixture (R-IU-011 AC.5), not this repair's, and §12 names **F19** as the repair's regression gate, so per this spec's own recorded method (`design.md` §12: "prefer deleting a claim to correcting it") the wrong attribution was deleted rather than renumbered.)*
 
 ---
 

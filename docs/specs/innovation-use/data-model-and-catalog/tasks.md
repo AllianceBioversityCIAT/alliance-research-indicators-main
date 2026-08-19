@@ -2,14 +2,14 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — **T-01 … T-13 all `[x]` (12 of 13 done; T-03 extracted).** **T-14 is the only remaining task** and is now unblocked. Both 2026-08-18 escalations resolved by user ruling: T-13 → extended scope, all five FAILs fixed; T-12 → path (a), behavioral fixture added alongside the body-text one. **FP-31 discharged.** Review-round budget (§12: 4–5) deliberately exceeded to **10** with explicit user authorization — recorded, not silent. T-14 carries 10 forward pointers (FP-41, FP-43…FP-50) including two genuine harness defects.
+- **Status:** **COMPLETE — T-01 … T-14 all resolved (13 of 13 done; T-03 extracted, carries no checkbox).** Both 2026-08-18 escalations resolved by user ruling: T-13 → extended scope, all five FAILs fixed; T-12 → path (a), behavioral fixture added alongside the body-text one. **FP-31 discharged.** Review-round budget (§12: 4–5) deliberately exceeded to **10** with explicit user authorization — recorded, not silent. T-14 carries 10 forward pointers (FP-41, FP-43…FP-50) including two genuine harness defects.
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
 - **Routine authority:** [`./routine-transcript.md`](./routine-transcript.md) revision 2 — **M6 is written from it, not from prose** (DD-12)
 - **Parent spec:** [`../family.md`](../family.md) — chunk 1 of 3
 - **Depends on:** [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) — **satisfied by construction; NOT a task gate.** *(Corrected 2026-08-18 — residual site of correction item 1, missed by that pass's own sweep, KZ-005. This formerly read "ARCHIVED but NOT MERGED … Must be merged before T-10 starts.")* Both repair migrations are committed on **this** branch (`9392c010`, `4dd884f6`) at timestamps ordered **before** every Innovation Use migration, so any migration run applies the repair first and M6 inherits the repaired body automatically. The bugfix cannot merge separately — it is part of this development, on this branch. **What survives is a ROLLOUT check, not a task gate:** `SHOW CREATE PROCEDURE SP_versioning` against the *target* database must show no `roles_id` before M6 runs there (its DevOps hand-off is unsent and its §7 sign-off open). Declared here 2026-08-18 by that spec's T-03 (`design.md` §6 "Coupling"); carried in `../family.md`'s children table, which is already corrected
-- **Last updated:** 2026-08-18 — T-01 and T-02 closed `[x]` as verified no-ops by `/akili-execute` (Reviewer PASS; evidence in [`./execution.md`](./execution.md)). Prior same-day edit: T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03
+- **Last updated:** 2026-08-19 — **T-14 closed `[x]` (PASS on attempt 3 of 3; review rounds 11–13, both lenses PASS).** Chunk 1 is complete; chunk 2 (`innovation-use/details-api`) is unblocked. Evidence: [`./execution.md`](./execution.md) → *T-14*. Prior: 2026-08-18 — T-01 and T-02 closed `[x]` as verified no-ops by `/akili-execute` (Reviewer PASS; evidence in [`./execution.md`](./execution.md)). Prior same-day edit: T-01/T-02/T-10 superseded/corrected/notified, dependency declared — see notes inline; by `bugfix/sp-versioning-roles-id` T-03
 
 ---
 
@@ -424,7 +424,7 @@ graph TD
 
 - **Requirements covered:** R-IU-008 (AC.1–AC.4), R-IU-009 (AC.4); NFR-IU-001, NFR-IU-004; D-6, RB-6
 - **Design references:** §10, §11 (ADR-11 + ADR-6 amendment), §13
-- **Size:** M · **Dependencies:** T-11, T-12, T-13 · **Status:** todo
+- **Size:** M · **Dependencies:** T-11, T-12, T-13 · **Status:** ~~todo~~ → ~~`[~]` PAUSED~~ → **`[x]` DONE 2026-08-19** — PASS on attempt 3 of 3 (2 rework rounds; review rounds 11–13). Both lenses PASS. **KZ-005's fourth recurrence closed** by bounding the file set and requiring per-site exemption arguments. Evidence: [`./execution.md`](./execution.md) → *T-14*
 - **Skills:** `nestjs-expert`, `cognitive-doc-design`
 
 **Scope**
@@ -442,11 +442,11 @@ graph TD
 - **Disqualifier:** a timing taken for NFR-IU-001 **while any delegated agent is running is not a measurement** (root guide §4.3) — measure in a quiet window or report inconclusive. And no AC may be closed by editing an existing Innovation Dev spec's expectations (R-IU-008 AC.2).
 
 **Done**
-- [ ] Full suite green; every Innovation Dev spec passes **unmodified**
-- [ ] Coverage ≥ 60%, not regressed
-- [ ] `npm run lint -- --quiet` clean and `git status` re-checked
-- [ ] ADR-11 and the ADR-6 amendment filed in the TRD
-- [ ] `family.md` chunk 1 status updated; rollout note recorded
+- [x] Full suite green; every Innovation Dev spec passes **unmodified** — **328 suites / 2155 tests**, independently re-run by the Leader; zero `result-innovation-dev` files touched across the whole task (R-IU-008 AC.2 discharged on evidence, not assertion)
+- [x] Coverage ≥ 60%, not regressed — **83.75 / 74.88 / 84.75 / 83.76**, unchanged from baseline
+- [x] `npm run lint -- --quiet` clean and `git status` re-checked — the `--fix` flag mutated nothing; file set unchanged after the run
+- [x] ADR-11 and the ADR-6 amendment filed in the TRD — `docs/trd/trd.md` §2.4; ADR-11 in its reserved number, reservation note removed, zero dangling references
+- [x] `family.md` chunk 1 status updated; rollout note recorded — status written in the **same commit** as this checkbox, so no window exists in which it claims a completion `tasks.md` does not show (the A-3 defect); §13 rollout corrected to the on-branch, pre-flight-only reality
 
 ---
 
@@ -507,10 +507,10 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: state what t
 
 ## 6. Done definition
 
-- [ ] All T-01 … T-14 are `done` (T-03 extracted — verify instead that both `sp-versioning-roles-id` repair migrations are present and ordered before M6)
-- [ ] Every AC in R-IU-001 … R-IU-009 and **R-IU-011** is checked (**R-IU-012 is closed by the extracted bugfix spec**), and every scenario clause in §3 is owned and satisfied
-- [ ] Coverage ≥ 60%; full suite green with Innovation Dev specs unmodified
-- [ ] No endpoint added (chunk 1 exposes none) — Swagger unchanged **by design**
-- [ ] ADR-11 + ADR-6 amendment filed in the TRD
-- [ ] `family.md` chunk 1 marked `done`; chunk 2 unblocked
-- [ ] Rollout note recorded: **bugfix merged first**, then migration order M1 → M6, backout order reversed, DevOps informed
+- [x] All T-01 … T-14 are `done` (T-03 extracted — verify instead that both `sp-versioning-roles-id` repair migrations are present and ordered before M6)
+- [x] Every AC in R-IU-001 … R-IU-009 and **R-IU-011** is checked (**R-IU-012 is closed by the extracted bugfix spec**), and every scenario clause in §3 is owned and satisfied
+- [x] Coverage ≥ 60%; full suite green with Innovation Dev specs unmodified
+- [x] No endpoint added (chunk 1 exposes none) — Swagger unchanged **by design**
+- [x] ADR-11 + ADR-6 amendment filed in the TRD
+- [x] `family.md` chunk 1 marked `done`; chunk 2 unblocked
+- [x] Rollout note recorded — *(corrected 2026-08-19 by T-14, discharging advisory A-4: this formerly read "**bugfix merged first**", which the delivered `design.md` §13 correction contradicts. There is no separate bugfix release to merge first — both repair migrations are committed on **this** branch and timestamp-ordered before M1–M6, so a single migration run applies them first by construction.)* Migration order: the two repair migrations → M1 → M6, applied in one run; backout order reversed; **rollout pre-flight** (`SHOW CREATE PROCEDURE SP_versioning` on the target DB shows no `roles_id`) recorded as a DevOps step, not a task gate; DevOps informed via `design.md` §13 Comms

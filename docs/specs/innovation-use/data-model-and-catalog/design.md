@@ -22,9 +22,9 @@
 | Delegation | Two blind read-only judges (Judgment Day round 1). No design subagent authored content. |
 | Judgment Day | Rounds 1–3, all **ESCALATED**; lineage **exhausted** (2 fix rounds, 2 re-judgments). Round 1: 21 findings. Round 2: 17/21 closed, 11 new. Round 3: 12 new, incl. a **fourth** routine and a DEFECTIVE transcript. Rounds 1–2 applied in-lineage; **round 3 applied by the fresh pass** (§15). |
 | Fresh pass (2026-08-14) | Scoped to the SQL-lifecycle layer per [`./HANDOFF.md`](./HANDOFF.md) §2. Routine set re-derived **by call site**, all four bodies re-transcribed **by reading**. Non-SQL layers untouched — verified sound across three rounds. |
-| Reversion challenge (Step 2.3) | **Not triggered.** No decision removes, disables, or inverts delivered behavior. Every DDL statement is additive; §6.7's routine changes *add* columns, blocks and statements without removing any. **M0 (§5) repairs a non-executable block** — a repair of broken behavior, not a reversion of delivered behavior. |
+| Reversion challenge (Step 2.3) | **Not triggered.** No decision removes, disables, or inverts delivered behavior. Every DDL statement is additive; §6.7's routine changes *add* columns, blocks and statements without removing any. **The `SP_versioning` repair** *(corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "M0 (§5) repairs a non-executable block" — §5 no longer contains an M0; the repair now ships as `repairSpVersioningObjectiveBlocks` in the extracted [`sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec, per §12's resolved routing)* — repairs a non-executable block; a repair of broken behavior, not a reversion of delivered behavior. |
 | Budget (Step 2.4) | **13 tasks · ~2,600 LOC · 4–5 review rounds** (+~2,750 in the extracted [`sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec — *corrected 2026-08-18 from "+~2,110"; that spec's T-02 Pivot grew its own budget after this figure was written; found by the backward sweep in that spec's 2026-08-18 validation-remediation pass*). Revised three times by review — see §12. |
-| ⚠️ Escalation | **`SP_versioning` is non-executable today, for all six indicators** (transcript §2.4). Pre-existing, discovered by this pass, and blocking for M6. Ruling **DD-13** puts the repair in **M0**; §12 records the option to extract it into its own bugfix spec instead. **This is a user decision.** |
+| ⚠️ Escalation | **`SP_versioning` is non-executable in `main` today, for all six indicators** (transcript §2.4). Pre-existing, discovered by this pass. **Resolved 2026-08-14 (DD-13, §12): routed to option B** — the repair ships as its own migration in the extracted [`sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec, committed on this branch and timestamp-ordered before M1–M6, so M6's dependency on the repaired body is satisfied by construction. *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly presented this as an open decision — "Ruling DD-13 puts the repair in M0; §12 records the option to extract... This is a user decision" — after the ruling had already closed it.)* |
 | Unresolved product ruling | **R-IU-010 / OpenSearch** — resolved here per the design's recommendation (§7). One-line reversal if overruled. |
 
 ---
@@ -37,7 +37,7 @@ The design is deliberately boring where the risk is high and explicit where the 
 - **Catalog:** ten rows seeded by migration, `id = level + 1`. Not synced from CLARISA, because CLARISA does not publish the two fields the feature depends on.
 - **Validation:** one MySQL stored function mirroring `innovation_dev_validation`, with one deliberate divergence — it filters by role discriminator, where the Innovation Dev original does not.
 - **Lifecycle (re-specified by the fresh pass):** **four** routines — `SP_versioning`, `SP_delete_result_version`, and the FUNCTIONs `full_delete_result_version` and **`delete_result`** — enumerate every child table, and on the copy path every column, **by name**. Unamended, an Innovation Use result loses its entire detail record on version/snapshot, is orphaned on both hard-delete paths, and is left as an **active orphan** on soft delete. §6.7 covers this; at ~3,070 LOC it is the single largest piece of work in the chunk.
-- **A blocking pre-existing defect (new):** `SP_versioning` **cannot execute today** — two of its blocks reference a column dropped by an earlier migration (transcript §2.4). M6 must reproduce that body, so the repair (**M0**) is a prerequisite, not an optional cleanup. See the §12 escalation.
+- **A blocking pre-existing defect (found, and closed by construction):** `SP_versioning` **cannot execute in `main` today** — two of its blocks reference a column dropped by an earlier migration (transcript §2.4). M6 must reproduce that body, so the repair was a prerequisite, not an optional cleanup. It now ships as `repairSpVersioningObjectiveBlocks` in the extracted [`sp-versioning-roles-id`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) spec, committed on this branch and timestamp-ordered before M1–M6, so any migration run applies it first automatically — see the §12 resolution. *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly named the repair "M0" and framed it as a still-pending prerequisite of this chunk.)*
 
 The dominant risk remains that stored-function and stored-procedure logic has **no automated gate in this repository**. §6.5 defines the fixture harness that substitutes for one, and §6.6 states exactly what a green run does *not* prove. The fresh pass is itself evidence for that risk: **three consecutive review rounds asserted a wrong routine count**, and the layer where the spec's claims were least reliable is exactly the layer with no automated gate.
 
@@ -91,7 +91,7 @@ graph TD
     RIT[(result_institution_types<br/>+1 count)]
     RQ[(result_quantifications<br/>reused as-is)]
     ROLES[(actor_roles / institution_type_roles<br/>quantification_roles — +1 row each)]
-    SPV["SP_versioning<br/>+ copy block, + 6 columns<br/>⚠️ repaired by M0 first"]
+    SPV["SP_versioning<br/>+ copy block, + 6 columns<br/>⚠️ repaired first, externally<br/>(sp-versioning-roles-id, on branch)"]
     SPD["SP_delete_result_version<br/>PROCEDURE — version hard delete<br/>+ delete block"]
     SPF["full_delete_result_version<br/>FUNCTION — hard delete<br/>+ delete block"]
     SDR["delete_result<br/>FUNCTION — THE SOFT DELETE<br/>3 call sites<br/>+ update statement"]
@@ -133,7 +133,7 @@ graph TD
 | `src/domain/entities/results/entities/result.entity.ts` | inverse relation to the detail entity | changed |
 | `src/domain/entities/green-checks/repository/green-checks.repository.ts` | `INNOVATION_USE` case + `ip_rights` inclusion | changed |
 | `src/domain/entities/green-checks/dto/find-green-checks.dto.ts` | optional `innovation_use` | changed |
-| `src/db/migrations/*` | **seven** append-only migrations — M0 … M6 (§5) | **new** |
+| `src/db/migrations/*` | **six** append-only migrations — M1 … M6 (§5) *(corrected 2026-08-19 by T-14, KZ-005 sweep: formerly "seven … M0 … M6" — M0 was extracted to `bugfix/sp-versioning-roles-id` per §12's ruling and ships as that spec's own migrations, not this chunk's)* | **new** |
 | `src/db/config/mysql/orm.test.config.ts` | TEST-bound `DataSource` — hard prerequisite for every SQL gate (§6.5.1) | **new** |
 | `test/fixtures/innovation-use/*` | stored-routine truth-table harness (§6.5) | **new** |
 
@@ -241,7 +241,7 @@ One inherited constraint is recorded so chunk 2 does not rediscover it: `Control
 
 ## 5. Migrations
 
-Seven migrations, one per concern (template §4), append-only (ADR-5), applied in order.
+Six migrations, one per concern (template §4), append-only (ADR-5), applied in order *(corrected 2026-08-19 by T-14: formerly "seven" — the table below already marked M0 `~~M0~~ EXTRACTED`. Attempt 1's correction swept only this summary sentence and claimed it was the only remaining mismatch; it was not. A full M0-token sweep of the **spec folder**, not just this file (attempts 2–3), found further live sites across this file's §5 body, its §0 metadata table and Executive Summary, and other files in the folder. See `execution.md`'s T-14 record for the complete hit table.)*.
 
 > **Supersedes** `proposal.md`'s "~3 append-only migrations" estimate, which predates the stored-procedure finding.
 
@@ -255,11 +255,11 @@ Seven migrations, one per concern (template §4), append-only (ADR-5), applied i
 | M5 | `createInnovationUseValidation` | The stored function | `DROP FUNCTION innovation_use_validation` |
 | **M6** | `updateLifecycleRoutinesForInnovationUse` | **Amends all FOUR lifecycle routines** — six edits (§6.7, transcript §6) | `DROP` + `CREATE` restoring all four prior bodies verbatim |
 
-**Ordering:** **the extracted bugfix first** (it carries the former M0) — M6 reproduces `SP_versioning`'s body, so it must inherit the repaired one, and F13/F16/F18 cannot execute before it. M2 depends on M1 (FK target). M5 depends on M1–M4. **M6 depends on M0, M2 and M3**. M3 and M4 are independent of each other.
+**Ordering:** **the extracted bugfix first** (it carries the former M0) — M6 reproduces `SP_versioning`'s body, so it must inherit the repaired one, and F13/F16/F18 cannot execute before it. M2 depends on M1 (FK target). M5 depends on M1–M4. **M6 depends on the extracted bugfix's repair migrations, M2 and M3** *(corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "M6 depends on M0, M2 and M3" — this chunk ships six migrations, M1…M6; M0 is not one of them)*. M3 and M4 are independent of each other.
 
-**Safety rules** (R-IU-009): no `DROP COLUMN` on a pre-existing column · no `MODIFY COLUMN` · no `NOT NULL` on an existing table · M5 names only `innovation_use_validation` in both `DROP` and `CREATE` · **M0 and M6 reproduce each routine body in full** (the repo's established pattern) and their `down()` restores the exact prior bodies — **including M0's, which restores a body known to be broken**, because a `down()` that "improves" on its `up()` is not a reversal.
+**Safety rules** (R-IU-009): no `DROP COLUMN` on a pre-existing column · no `MODIFY COLUMN` · no `NOT NULL` on an existing table · M5 names only `innovation_use_validation` in both `DROP` and `CREATE` · **M6 reproduces its routine bodies in full** (the repo's established pattern) and its `down()` restores the exact prior bodies *(corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly bound this rule to "M0 and M6" and to "M0's, which restores a body known to be broken" — a safety rule this chunk does not ship. The extracted bugfix's own migration, `repairSpVersioningObjectiveBlocks`, follows the identical verbatim-body pattern and restores a body known to be broken; that migration's safety rule is that spec's own to state, not this one's)*.
 
-> **M0's `down()` deliberately restores a non-executable procedure.** That is correct: `down()` must return the schema to its prior state, defects included. Recorded here so it is not read as an oversight and "fixed" into a partial revert.
+> **Pointer, not a rule this spec states:** the extracted `sp-versioning-roles-id` spec's own `repairSpVersioningObjectiveBlocks` migration records why its `down()` deliberately restores a non-executable procedure — that is correct, since `down()` must return the schema to its prior state, defects included. Restated here only so M6's author does not mistake that spec's `down()` for an oversight and "fix" it into a partial revert. *(Corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "M0's `down()`" — the migration in question is `repairSpVersioningObjectiveBlocks`, in the extracted `sp-versioning-roles-id` spec, not a migration this chunk ships.)*
 
 **Seeding in-migration is a deliberate break with local precedent.** `clarisa_innovation_readiness_levels` rows were never inserted by any migration — verified: zero `INSERT INTO clarisa_innovation_readiness_levels` anywhere. They entered the shared database out-of-band, which is why that catalog cannot be reconstructed from source. M1 does not repeat that (DD-2).
 
@@ -329,7 +329,7 @@ No test in this repository has ever executed a stored routine. The harness lives
 | **F13** | **`CALL SP_versioning` on an Innovation Use result with level, explanation, all five actor counts and an organization count** | **every field and count present on the new version** | **DC-12 / R-IU-011 AC.1, AC.2** |
 | **F14** | **`CALL SP_delete_result_version` on an Innovation Use version** | **no orphaned `result_innovation_use` row** | **DC-12 / R-IU-011 AC.3** |
 | **F15** | **`SELECT full_delete_result_version(?)` on an Innovation Use result** | **no orphaned `result_innovation_use` row** | **DC-12 / R-IU-011 AC.4** — hard delete, missed in round 1 |
-| **F16** | **Version *and* run all three delete paths on an **Innovation Dev** result, before vs after M0+M6; compare every copied column and every surviving row** | **identical** | **R-IU-011 AC.6 — the routine regression gate.** Not F12, which is a stored-*function* comparison and executes no routine |
+| **F16** | **Version *and* run all three delete paths on an **Innovation Dev** result, before vs after the extracted repair migrations + M6; compare every copied column and every surviving row** | **identical** | **R-IU-011 AC.6 — the routine regression gate.** Not F12, which is a stored-*function* comparison and executes no routine *(corrected 2026-08-19 by T-14 attempt 2, M0-token sweep: formerly "before vs after M0+M6")* |
 | **F17** | **Innovation Use result with zero actor rows** | **`0`** per DD-11 | The vacuous-truth case (§6.4) |
 | **F18** | **`SELECT delete_result(?)` on an Innovation Use result** | **`result_innovation_use.is_active = FALSE` and `deleted_at` set** | **DC-12 / R-IU-011 AC.5 — the soft-delete path, missed in rounds 1–3.** Its absence leaves an **active orphan**, which is worse than a hard orphan: the row is still visible to every `is_active = TRUE` query |
 | ~~F19~~ | **EXTRACTED** with M0 → owned by [`../../archive/2026-08-18-bugfix--sp-versioning-roles-id/`](../../archive/2026-08-18-bugfix--sp-versioning-roles-id/) as its red-before-green regression fixture | — | DC-13, now gated externally |
@@ -607,15 +607,17 @@ Estimated from the finished design; a **tripwire** for `/akili-execute`, not a q
 
 ## 13. Rollout
 
+> **Corrected 2026-08-19 by T-14.** This table still carried the extracted-M0 framing (a separate "M0" release step this chunk would wait on) after DD-13 was routed to option B and the repair migrations landed **on this branch** (§12 "✅ Resolved escalation"). There is no separate M0 release and no merge to wait for: `1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts` and `1784300000000-RepairSpVersioningObjectiveBlocks.ts` are committed on `AC-1679-Create-the-innovation-use-section`, timestamp-ordered before every M1–M6 migration, so any migration run applies them first automatically. What survives is a **rollout pre-flight**, not a migration-order decision — restated below.
+
 | Concern | Plan |
 | --- | --- |
-| **Migration order** | **M0** → M1 → M2 → M3 → M4 → M5 → M6. Schema and routines deploy **together**; nothing reads the new tables until chunk 2 |
-| **M0 ordering is not optional** | M6 reproduces `SP_versioning`'s body, so it must inherit the repaired one. If DD-13 is routed as option **B** (§12), M0 ships in its own release **before** this chunk and chunk 1 declares a dependency on it |
+| **Migration order** | The two `sp-versioning-roles-id` repair migrations, then M1 → M2 → M3 → M4 → M5 → M6, in that order **by construction** — all six are timestamp-ordered after the repairs, so a single migration run applies them in this sequence with no separate step. Schema and routines deploy **together**; nothing reads the new tables until chunk 2 |
+| **Rollout pre-flight (replaces "M0 ordering")** | Before M6 runs against a given database, confirm `SHOW CREATE PROCEDURE SP_versioning` on **that database** shows no `roles_id`. This is a DevOps verification that the repair has already reached the target, not a task gate — on the scratch schema and on this branch it is satisfied automatically because the repairs are ordered first |
 | **M6 ordering is not optional** | M6 must land in the **same release** as M2/M3. A window where the tables exist but the routines do not know about them is a window where versioning silently loses data and soft delete leaves active orphans |
 | **Feature flag** | **None.** The chunk is inert by construction — no endpoint, no UI. The only observable changes: indicator-6 results gain `innovation_use` and `ip_rights` green checks (neither completable today), and the lifecycle procedures copy additional columns |
-| **Backout** | Revert M6 → M0 in reverse order. Every `down()` drops only what its `up()` created; M6's `down()` restores the exact prior bodies of all four routines, and **M0's restores the broken `SP_versioning` body verbatim** (§5) — a faithful reversal, not a partial one. Backout cannot touch pre-existing columns |
+| **Backout** | Revert M6 → M1 in reverse order, then the two repair migrations if the target is being fully rolled back. Every `down()` drops only what its `up()` created; M6's `down()` restores the exact prior bodies of all four routines, and the repair migrations' `down()`s restore their respective pre-repair bodies verbatim (§14 precedent list) — a faithful reversal, not a partial one. Backout cannot touch pre-existing columns |
 | **Shared-DB gate** | R-IU-009 AC.4 — no migration runs against the shared dev database without explicit human approval. All testing on the scratch schema (§6.5.1) |
-| **Comms** | STAR client team (chunk 3 depends on this contract); MEL/product owner for the §7 OpenSearch ruling and §6.2's IP-Rights submit consequence; **DevOps for M6**, since it redefines routines used by every indicator |
+| **Comms** | STAR client team (chunk 3 depends on this contract); MEL/product owner for the §7 OpenSearch ruling and §6.2's IP-Rights submit consequence; **DevOps for M6 and the rollout pre-flight**, since M6 redefines routines used by every indicator |
 
 ---
 

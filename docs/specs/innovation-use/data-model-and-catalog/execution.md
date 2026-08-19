@@ -2140,3 +2140,317 @@ Two secondary inaccuracies in the same paragraph: the offered routes to `Number(
 
 **T-12 → `[x]`.** Attempts: 3 + a Leader-inline correction. Review rounds consumed: 9, 10, and the inline audit.
 
+
+---
+
+### T-14 — Full-suite regression, coverage, and TRD/ADR filing · **ATTEMPT 1 (review round 11): Lens A PASS · Lens B FAIL** → split verdict, Leader adjudicates **FOR Lens B**; task `[~]`, PAUSED BY USER
+
+- **Date:** 2026-08-19
+- **Status:** `[~]` — attempt 1 of 3 consumed. **Rework deliberately NOT spawned:** the user asked to pause once the reviews landed. No rework attempt was opened that could not be seen through.
+- **Implementer attempts:** 1 · **Effort:** `xhigh` · **Review mode:** parallel lens Reviewers (xhigh trigger)
+- **Requirements covered (claimed):** R-IU-008 AC.1–AC.4, R-IU-009 AC.4; NFR-IU-001, NFR-IU-004; D-6, RB-6
+- **Files changed (4 — `tasks.md` excluded deliberately, see *Leader process note* below):** `docs/trd/trd.md`, `docs/specs/innovation-use/data-model-and-catalog/design.md`, `docs/specs/innovation-use/family.md`, `server/researchindicators/src/CLAUDE.md`
+- **Working tree at pause:** the 4 files above remain **modified and uncommitted**. Nothing is staged; no commit was made.
+
+#### ✅ D1 regression evidence — INDEPENDENTLY RE-RUN BY THE LEADER, not merely relayed
+
+The Reviewers are wrapper-restricted to `Read`/`Grep`/`Glob` and **cannot execute a suite**, so the D1 numbers were unverifiable by either lens. The Leader re-ran them in a quiet window with **no delegated agent active** (root guide §4.3 — a measurement taken while an agent runs is not a measurement, it is a wrong number). All three matched the Implementer's report exactly:
+
+| Check | Implementer reported | Leader re-ran | Match |
+| --- | --- | --- | --- |
+| `npm test -- --silent` | 328 suites / 2155 tests pass | **328 suites / 2155 tests pass**, 17.392 s | ✅ exact |
+| `npm run lint -- --quiet` + `git status` after | clean, no `--fix` mutation | **clean**; `git status` unchanged (same 4 doc files) | ✅ exact |
+| R-IU-008 AC.2 blast radius | 158 insertions, 0 deletions | **6 files, 158 insertions(+), 0 deletions**; `grep -c "^-[^-]"` → **0** | ✅ exact |
+
+**R-IU-008 AC.2 is discharged on evidence, not assertion:** zero `result-innovation-dev` files were touched at all, and the two green-checks spec files gained lines only — no existing expectation was altered. The AC's negative clause (*"must NOT be made to pass by editing an existing Innovation Dev spec's expectations"*) is structurally satisfied.
+
+**Not re-run by the Leader:** the cold fixture cycle (`compose:test:down` → `up` → `migration:test:bootstrap` once → `test:fixtures` → 9 suites / 30 tests, incl. F12 and F12b by name, FP-41 re-run) and the falsifying-input mutation (`result-innovation-dev.controller.spec.ts`, `toHaveBeenCalledWith(11, dto)` → `999`, 1 suite red, restored, 328/328 green). These rest on the Implementer's transcript. **Recorded as a residual evidence gap, not as verified** — FP-43 exists precisely because warm/false greens have happened in this spec.
+
+**NFR-IU-001 — satisfied without a timing, correctly.** Its `How verified` clause is *review the join plan*, not a stopwatch. `innovation_use_validation` runs 4 correlated `SELECT … INTO` statements keyed on `result_id = result_code` (PK/FK lookup, never an unbounded scan); `innovation_dev_validation`, the accepted baseline, runs 5. Indicator-6's plan is a **subset in shape and lighter in count** than indicator-2's. No timing was attempted, so the disqualifier never engaged.
+
+#### Reviewer verdicts — 2 lenses, split
+
+**Lens A (spec conformance) — `STATUS: PASS`.** Every clause verified at source:
+
+| Clause | Verdict |
+| --- | --- |
+| ADR-11 **opens** with how to build the checklist (call-site enumeration **before** the routine list) | ✅ — method, then transcribe-by-reading, then name-by-behavior, then the 2→3→4 history; the standing "all FOUR" rule comes only after |
+| FP-41's two blind spots filed (schema change under an enumerated name; helper redefinition) | ✅ both, framed as *"blind spots this gate does NOT close"* |
+| FP-44's `SELECT *` + minus-identity method, **with its reason** | ✅ — and the reference implementation resolves: `fetchFullRow` exists in `innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts` |
+| SQL-outside-coverage caveat | ✅ inside ADR-11 (see ADVISORY A-1 for the residual) |
+| ADR-6 filed as **amendment, not supersession** | ✅ verbatim force: *"the decorator mechanism stands; only the stated location is wrong"* |
+| ADR numbering integrity | ✅ ADR-11 in its reserved number, numeric order; reservation note removed; **zero dangling references** repo-wide |
+| `family.md` chunk 1 done + chunk 2 unblocked | ✅ |
+| §13 rollout correction internally consistent; **Backout row still coherent** after the M0 row was replaced | ✅ both cited repair migrations exist and are timestamp-ordered before all six M1–M6 |
+| Scope — no excess | ✅ docs-only; the five `src/CLAUDE.md` additions are each explicitly forward-propagated to T-14, not free-lance |
+
+**Lens B (claim falsifiability) — `STATUS: FAIL`, one issue.** Lens B first verified **nine** claim families TRUE against the artifact — recorded here so no later round re-litigates them:
+
+| # | Claim | Verified |
+| --- | --- | --- |
+| 1 | FP-45 band registry — all seven file→band pairings, **and completeness** | ✅ read all nine `*.fixture-spec.ts`; **no eighth band exists** — the two unlisted fixtures (`smoke`, `innovation-dev-validation-unchanged`) insert into `results` not at all. Collision story and private band `9161`–`9166` both true |
+| 2 | ADR-11's `fetchFullRow` reference implementation | ✅ `SELECT *`, one-row assert, deletes caller-supplied identity columns — exactly as claimed |
+| 3 | ADR-6 amendment's two **cross-file** citations | ✅ both accurate; `_getMappingForSchema()` reflects off the 5th `super()` argument, so "DTO not entity" follows from the code |
+| 4 | ADR-11's routine set is **four**, and "all four" still holds | ✅ re-enumerated **by call site**, the method the ADR itself mandates. No fifth routine is called from `src` |
+| 5 | FP-46's `global-setup.ts` table list + no-outgoing-FK claim | ✅ all four tables declare no FK; every FK involving them is incoming |
+| 6 | FP-49 non-idempotence | ✅ `bootstrap` is unconditional; no idempotence guard; `ER_TABLE_EXISTS_ERROR` is the correct predicted failure |
+| 7 | FP-48's `= TRUE` sentinel trap | ✅ four such predicates; MySQL evaluates `2 = TRUE` as `2 = 1` → false |
+| 8 | "Six migrations, M1 … M6" | ✅ exactly six `1787*` migrations, matching §5 one-for-one |
+| 9 | **FP-50 self-compliance** | ✅ **the diff introduces zero same-file line citations.** Every same-file reference is a section anchor or a named identifier; the only line citations are cross-file, which FP-50 permits. **No eighth inaccurate citation** |
+
+#### 🔴 THE FAIL — the KZ-005 sweep is incomplete, and the correction text asserts its own completeness
+
+- **Discovered Issue:** the §5 edit reads *"the table below already marks M0 `~~M0~~ EXTRACTED`; this summary sentence had not been updated to match"* — implying the summary sentence was §5's only mismatch. **It was not.** Three further live, present-tense extracted-M0 sites survive **inside §5 itself**, within ~18 lines of the edit: the *Ordering* paragraph (*"M6 depends on M0, M2 and M3"*), the *Safety rules* paragraph (*"M0 and M6 reproduce each routine body in full … including M0's, which restores a body known to be broken"* — a safety rule governing a migration this chunk does not ship), and the blockquote instructing a future author about `M0`'s `down()`. Three more outside §5: the §0 *Reversion challenge* row (*"M0 (§5) repairs a non-executable block"* — §5 no longer contains an M0), the §0 *⚠️ Escalation* row (*"This is a user decision"* — ruled option B on 2026-08-14 and closed), and the Executive Summary. Secondary sites: §6.5's F16 row, and `requirements.md`'s **live** R-IU-011 bullet and AC.6.
+- **Violated Rule:** `design.md` §12 *"✅ Resolved escalation — DD-13's routing"*, which scopes retention precisely to *"R-IU-012, DD-13, and the M0 **row** above"* — the §5 **table row** only, not §5's prose, the §0 metadata table, or the Executive Summary. Also root `CLAUDE.md` §5 (*"Do NOT silently let docs and code drift"*) and **KZ-005** itself.
+- **Remediation:** re-run the sweep on the literal token `M0` across the whole spec folder and classify every hit as (a) self-marked historical → leave, or (b) live assertion → correct. Then **narrow the §5 correction's parenthetical** so it no longer claims the summary sentence was the sole mismatch.
+
+##### ⚖️ Leader adjudication — FOR Lens B, and the FAIL is in-scope
+
+The split is not a disagreement about facts: Lens A audited whether the **required content** was delivered (it was, completely), Lens B audited whether the **claims are true** (one is not). Both are right about what they examined. The FAIL binds because the KZ-005 two-direction sweep was **named as mandatory in the Implementer's brief**, reported as complete, and is not. That is spec-conformance, not advisory.
+
+**This is KZ-005's third recurrence in this spec, and the most exact one yet.** KZ-005 says: *enumerate the superseded claim in every phrasing, not only the string that was edited.* The Implementer swept for the phrasing it had edited and found the two sites nearest it. The `M0` token — the actual superseded claim, in every phrasing — was never swept. **The lesson describes this failure precisely and the failure happened anyway**, which is the finding worth carrying upstream: KZ-005 is currently `applied` to `.agents/leader.md`, and it did not reach the worker that needed it.
+
+**Leader accountability:** the brief mandated the sweep and named its two directions, but did not name the **token** to sweep. Cousin of the two briefing defects already recorded in this spec (T-12 attempt 2's A-6 line range; attempt 3's E-3/E-4 contradiction) — a brief locally correct in every bullet that still leaves the worker's search space unbounded.
+
+#### ⚠️ Leader process note — the premature `tasks.md` write, caught and parked
+
+The Implementer **flipped `tasks.md` to `[x]`** (T-14's status line, its five Done items, §6's Done definition, and the top-of-file Status/Last-updated) as part of its own delivery. That is the Leader's write, and it landed **before any evidence existed in `execution.md`** — the exact ordering `/akili-execute` Step 3 forbids, and the only one of the two failure states that is unrecoverable: a `[x]` with no attempt history is indistinguishable from an unverified completion, and `/akili-resume` would skip it with nothing to flag.
+
+**Action taken:** the file was copied to the session scratchpad (`tasks-t14-parked.md`) and `git checkout --` reverted the tree, restoring the recoverable state (no evidence, task still open). **The parked write must NOT now be applied — the verdict is FAIL, so T-14 is `[~]`, not `[x]`.** It is retained only as drafting material for whenever T-14 does pass.
+
+**Cause: a Leader briefing gap.** The brief did not forbid touching `tasks.md`. Every future Implementer brief in this project should state that `tasks.md` and `execution.md` are Leader-owned and out of the worker's write scope.
+
+#### ADVISORY findings — recorded, never gating; 0 rework attempts consumed; per `/akili-execute` §2.4 **none of these may become a task in this spec**
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **A-1** | A | `design.md` directs the SQL-outside-coverage caveat at *"the TRD's testing section"*; it was filed inside ADR-11 only. The TRD §12 **Coverage floor** row is where a reader actually forms the false belief and now has no pointer to ADR-11. One cross-reference would fully discharge it. Non-gating — the design says "should", and T-14's Scope names §2.4 only |
+| **A-2** | A | ADR-6's original *"co-located with the entity"* text is retained verbatim with the amendment appended after it. A skimmer who stops at the first sentence still inherits the wrong claim. Striking the clause inline would make the correction unmissable |
+| **A-3** | A | `family.md` now asserts *"T-01…T-14 all `[x]`"* — a claim about `tasks.md` content that is **currently false** (T-14 is `[~]`). **Upgraded by the Leader from advisory to rework scope:** it was written on the assumption of a PASS. Also slightly over-stated even on a PASS, since T-03 is extracted and has no checkbox |
+| **A-4** | A | `tasks.md` §6 still reads *"Rollout note recorded: **bugfix merged first**"* — which the delivered §13 correction now directly contradicts. Same staleness RB-A already fixed elsewhere in the file. **Fold into the eventual `tasks.md` write** so the spec does not close on a self-contradiction |
+| **A-5** | A | Two items forward-filed to T-14 by earlier lenses remain open and are in **no** current write: **C-4** (`platformSeeded` / `innovationDevRoleSeeded` are structurally always `false` — dead branches; a fixture *code* change that legitimately exceeds a docs-only authorization) and **C-6** (T-02's *"fails with the container down"* criterion is no longer literally reproducible because `globalSetup` throws first; T-14 was asked to restate it and has not). **Both will be lost at archive if not re-filed** |
+| **A-6** | A | The new `src/CLAUDE.md` bullets are ordered FP-45, FP-48, FP-49, FP-46, FP-50; sequential ordering reads better in a list a future author scans |
+| **B-1** | B | FP-46's justification is **narrower than its own premise**: it names three error classes `INSERT IGNORE` downgrades (FK, `NOT NULL`, truncation) but justifies "cannot misfire" using only the FK class. Lens B independently confirmed the conclusion is nonetheless **true** (all `NOT NULL` columns supplied, no value can truncate) — so this is an under-argued correct claim, not a false one. **Fifth appearance of the `INSERT IGNORE`-reasoning defect** (B-5, FP-46, C-1, now B-1) — the entry created to record the defect reproduced its reasoning shape |
+| **B-2** | B | §13's Backout row cites *"(§14 precedent list)"* for the repair migrations' `down()` semantics. §14 does list both bodies, but presents them as *shape* precedents and says nothing about `down()`. Citing the two repair migration filenames directly would be self-evidencing |
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-51** | **T-14 attempt 2 — MUST be in its brief** | **Sweep the TOKEN, not the phrasing.** The remediation is a sweep of the literal token `M0` across the whole spec folder, classifying every hit as self-marked-historical (leave) or live assertion (correct). A brief that names only the *directions* of a KZ-005 sweep leaves the search space unbounded; a brief that names the **token** bounds it. This is the concrete fix for the third KZ-005 recurrence |
+| **FP-52** | **every future Implementer brief, this project** | **`tasks.md` and `execution.md` are Leader-owned.** State it explicitly in the brief. An Implementer that flips its own checkbox produces the one state AKILI cannot recover from, and it will do so helpfully unless told not to |
+| **FP-53** | **`/akili-archive` Kaizen step** | **KZ-005 is marked `applied` and still recurred, in the exact shape it describes.** It was applied to `.agents/leader.md`; the failure occurred in a *worker* executing a Leader-mandated sweep. A lesson applied only to the orchestrator does not reach the agent that performs the action |
+| **FP-54** | **T-14 attempt 2** | **A-3 is now rework scope, not advisory** — `family.md` asserts a `tasks.md` state that is currently false. Either it lands together with the eventual `[x]` write, or it must be softened until then |
+| **FP-55** | **T-14 attempt 2 / archive** | **A-4, A-5 (C-4 + C-6), A-1, A-2, B-1, B-2** are the discharge list. C-4 needs a scope ruling — it is a fixture code change, outside a docs-only T-14 |
+
+#### Residual evidence gap, stated plainly
+
+The **cold fixture cycle** and the **falsifying-input mutation** were reported by the Implementer and not independently re-run by the Leader. Neither lens could check them. They are the two pieces of D1 evidence resting on a single source. If attempt 2 re-runs the cycle anyway (it must, per FP-43, since the doc corrections do not touch code), that gap closes for free.
+
+#### Not Done / Assumptions — carried verbatim from the Implementer, with the Leader's assessment
+
+1. *"The `bugfix/sp-versioning-roles-id` repair migrations still have not run against the shared dev DB."* — **Correct and out of scope.** This is the documented rollout pre-flight, a DevOps step by design, and `design.md` §13 now says so accurately.
+2. *"Historical decision records (DD-13, R-IU-012, `routine-transcript.md`, `proposal.md`, `HANDOFF.md`) deliberately left untouched."* — **Sound for the items it names.** Lens B independently verified R-IU-012 carries an explicit self-marking blockquote, and §12 covers DD-13 and the §5 table row; the other three are point-in-time records by document type. **The defect was never the exclusions — it is the six live sites the sweep never reached.**
+3. *"No production/source code was changed."* — **Verified true** by the Leader: the diff is docs-only, and `git status` after the reverted mutation is clean.
+
+#### Loop state at pause
+
+- **Attempts consumed: 1 of 3.** Two remain.
+- **Rework NOT spawned** — user asked to pause once the reviews landed. Opening a rework loop (up to 2 more attempts × Implementer + Reviewer) that could not be seen through would have left a supervised delegation outstanding.
+- **`tasks.md`: untouched, T-14 remains `[ ]`.** The parked `[x]` draft sits in the session scratchpad and is **not** to be applied at this verdict.
+- **Nothing committed.** Four doc files modified in the working tree.
+- **Review rounds consumed: 11** (round 11 = this dual-lens pass). The §12 budget of 4–5 remains deliberately exceeded under the user's standing 2026-08-18 authorization.
+
+
+---
+
+### T-14 — ATTEMPT 2 (review round 12): **Lens A FAIL · Lens B FAIL** → task FAILs; Leader adjudicates the lens conflict FOR Lens A on the crux
+
+- **Date:** 2026-08-19
+- **Status:** `[~]` — **attempt 2 of 3 consumed. One attempt remains.**
+- **Implementer attempts:** 1 (this attempt) · **Effort:** `xhigh` · **Review mode:** parallel lens Reviewers
+- **Effort deviation, deliberate:** the rework rule bumps effort one level per retry, which would put attempt 2 at `max`. The registry's *Tier ↔ effort rule* forbids `max` on a T2 tier (escalate the tier instead, and no tier escalation was warranted for a docs-only sweep). Effort therefore held at `xhigh`; the corrective force came from **bounding the search space** (FP-51 — name the token, not the directions) rather than from more thinking. Recorded so it does not read as an oversight.
+- **User scope ruling (pre-spawn):** attempt 2 authorized for **exactly two items** — the FAIL-1 sweep and A-3. Advisories A-1, A-2, B-1, B-2, C-4, C-6 ruled **out of scope** per `/akili-execute` §2.4 (an advisory may not widen an approved task). C-4 additionally excluded as fixture *code* inside a docs-only task.
+- **Files changed (4):** `design.md`, `requirements.md`, `routine-transcript.md`, `family.md`. Attempt 1's `docs/trd/trd.md` and `server/researchindicators/src/CLAUDE.md` untouched and still uncommitted.
+
+#### ✅ Residual evidence gap from attempt 1 — CLOSED by independent Leader re-run
+
+Attempt 1 recorded two pieces of D1 evidence resting on a single source. Both were re-run by the Leader personally, in a quiet window with **no delegated agent active** (root guide §4.3), before any Reviewer was spawned:
+
+| Check | Result | Note |
+| --- | --- | --- |
+| `npm test -- --silent` | **328 suites / 2155 tests pass**, 18.4 s | matches Implementer exactly |
+| Scratch container state **before** bootstrap | **0 tables** | proves the cycle was genuinely cold, not a warm re-run — the gap FP-43 exists for |
+| `migration:test:bootstrap` (run once) | clean; **215 tables**; ends at `AmendLifecycleRoutinesForInnovationUse1787083305648` (M6) | all six routines present: `innovation_use_validation`, `innovation_dev_validation`, `SP_versioning`, `SP_delete_result_version`, `full_delete_result_version`, `delete_result` |
+| `npm run test:fixtures` | **9 suites / 30 tests pass** | `F12b-1` / `F12b-2` confirmed present **by name** |
+| Coverage | 83.75 / 74.88 / 84.75 / 83.76 | unchanged; well above the 60% floor |
+
+Also verified structurally: `docker-compose.test.yml` declares **no volumes**, so `compose:test:down` destroys the data layer. The cold cycle cannot silently degrade into a warm one.
+
+**Leader check on a suspected shortfall:** `docs/trd/trd.md` shows only 5 changed lines, which looked light for T-14's headline deliverable. It is not — ADR-11 and the ADR-6 amendment are each a single very long table row. Both present and intact. Recorded so the small diffstat is not re-flagged later.
+
+#### Reviewer verdicts — 2 lenses, BOTH FAIL
+
+**Lens A (spec conformance + scope discipline) — `STATUS: FAIL`, 3 issues.**
+
+Cleared first, recorded so no later round re-litigates it:
+- **FAIL-1's named sites: 9 of 9 corrected.** §5 Ordering (`:258`), §5 Safety rules (`:260`), §5 `down()` blockquote (`:262`), §0 Reversion challenge (`:25`), §0 Escalation (`:27`), Executive Summary (`:40`), §6.5 F16 (`:332`), `requirements.md:520`, `requirements.md:530`.
+- **§5 parenthetical was narrowed** (`design.md:244` now states attempt 1's completeness claim was false).
+- **A-3 discharged** — `family.md:44` no longer claims completion and states "**Chunk 2 is not yet unblocked**"; the FR-6 / satisfied-by-construction content preserved.
+- **Scope — zero excess.** All six forbidden advisories verified absent one by one. Neither `tasks.md` nor `execution.md` touched; `tasks.md:427` still `**Status:** todo`; `requirements.md:530` still `- [ ] AC.6`. **No checkbox flipped anywhere.** The FP-52 briefing fix held.
+
+**Lens B (claim falsifiability) — `STATUS: FAIL`, 1 issue.** Verified TRUE at source before failing:
+- Independently re-derived the hit table: **52 occurrences, matching the Implementer's 52 exactly**; 0 in `trd.md`; no substring noise.
+- **Both repair migrations exist** at the cited paths — `1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts`, `1784300000000-RepairSpVersioningObjectiveBlocks.ts` — and the full ordering claim holds: `1784250000000 < 1784300000000 < 1787066437593 < 1787068132517 < 1787070034303 < 1787071463485 < 1787078283929 < 1787083305648`.
+- §13's Backout row accurate — both repairs carry real `down()` bodies restoring their **respective** pre-repair procedures.
+- §13's rollout pre-flight "satisfied automatically" — true.
+- `family.md`'s "9 fixture suites … including F12/F12b/F16" — true; "banked, not closure" framing accurate.
+- Bookkeeping note: the Implementer reported "11–12 live (b)" but actually corrected **15**. It *understated* its own work.
+
+#### ⚖️ Leader adjudication — the lenses CONFLICT; ruled FOR Lens A on the crux, verified at source
+
+The two lenses classified the same three `requirements.md` sites oppositely. This was **not** taken on either lens's authority — the Leader read all three at source:
+
+| Site | Lens B | Lens A | Text at source | Ruling |
+| --- | --- | --- | --- | --- |
+| `requirements.md:639` (§8 Data Requirements Summary) | (a) "rides on R-IU-012's marking" | **(b)** | Live inventory of *this chunk's* data changes. **Repair** row: `DROP + CREATE (M0, R-IU-012)`. A parenthetical **cross-reference** to a retained block does not inherit that block's strikethrough. Directly contradicts `design.md:136` — "**six** append-only migrations — M1 … M6" — corrected by this same task | **(b) — Lens A** |
+| `requirements.md:679` (RB-11 mitigation) | (a) "risk register, R-IU-012-bound" | **(b)** | *"M0 repairs it ahead of M6 … **Escalated to the user** in `design.md` §12 — the repair **may be extracted** into its own bugfix spec so it ships sooner."* Present tense, asserts the routing is still open, sits among live RB-8/RB-9 mitigations | **(b) — Lens A** |
+| `requirements.md:697` (D-11 decisions table) | (a) "decision-discovery log" | **(b)** | *"carried in this chunk **by default**, with the option to extract … **Routing is escalated to the user**"* — while `:702`, four lines below in the same section, reads *"**No open questions remain for this chunk.**"* The same table demonstrates the correct treatment at `~~D-5~~` (struck through, "REVISED 2026-08-14 → see **D-8**"); D-11 received no such marking | **(b) — Lens A** |
+
+**The governing clause is exact.** `design.md:604` retains *"R-IU-012, DD-13, and the M0 **row** above"*. RB-11, D-11 and §8's Repair row are **none of those three**. Lens B asserted the exemption without arguing it against §12's text.
+
+**Where Lens B was right, and Lens A agreed: U-1.** R-IU-012's own body (`requirements.md:563-592`) sits under a struck heading (`~~R-IU-012~~ … **EXTRACTED**`) and a blockquote opening *"**Ruled 2026-08-14** … retained below as the **record of the discovery**"*. Its "Repaired by migration **M0**" and "**Routing is a user decision**" bullets are inside that self-marking, and `design.md:604` retains it **by name**. Editing it would have violated §12, not honored it. **Both lenses and the Leader concur: correctly left alone. Not to be re-opened.**
+
+**U-3 also correctly left alone** — `design.md:601` is an Option A row immediately followed by "Ruled 2026-08-14: option B"; `design.md:424` sits under the heading "#### What M6 must NOT do" and its content is true today.
+
+**Root cause (Lens A's phrasing, retained verbatim because it is exactly right):** *"attempt 2 executed the sweep thoroughly on the file it had already been editing and treated the folder-wide instruction as satisfied by touching two other files at sites the Reviewer had named by hand — the token was swept, but only within the file where the token had last embarrassed anyone."*
+
+**This is KZ-005's fourth recurrence in this spec, one level up.** Attempt 1 swept a phrasing instead of a token. Attempt 2 swept the token, but scoped to a **file** instead of the folder — and inherited an exemption by **proximity to a citation** rather than by reading §12's retention clause against each site. The lesson keeps being applied one level shallower than the defect.
+
+**Leader accountability, again.** The brief said "across the whole spec folder" and gave the grep command — but did **not** require the hit table to be organized *by file with a per-file completeness statement*, which is what would have made the `requirements.md` shortfall visible in the Implementer's own report. The brief bounded the token and left the **file set** unbounded. Third consecutive briefing defect of the same shape in this spec (T-12 attempt 2's line range; attempt 3's E-3/E-4 contradiction; attempt 1's unbounded sweep directions).
+
+#### 🔴 THE MERGED FAIL LIST — attempt 3's complete scope, all four confirmed by the Leader at source
+
+| # | Source | Issue | Confirmed |
+| --- | --- | --- | --- |
+| **F-1** | Lens A | Three live `M0` sites survive in `requirements.md`, outside §12's retention scope: **`:679` RB-11**, **`:697` D-11**, **`:639` §8 Repair row**. Two re-assert the exact falsehood (routing still open) that attempt 2 removed from §0 | ✅ read at source |
+| **F-2** | Lens B | `routine-transcript.md:144`'s carve-out states *"This correction does **not** touch the 'fixture F18' reference above"* — but the edit **deleted** the clause `and is verified by fixture **F18**`. A correction note wrong about its own edit is trusted and therefore worse than none | ✅ confirmed against the diff |
+| **F-3** | Lens A | `design.md:260` ends *"that migration's safety rule is that spec's own to state, **not this one's**"*; `:262`, the very next paragraph, then states exactly that rule normatively in this spec | ✅ read at source |
+| **F-4** | Lens A | `design.md:244`'s narrowed parenthetical scopes itself to *"this file"* when the ordered sweep was folder-wide, and omits a seventh site it corrected in the same pass (`design.md:94`, the §3 mermaid node). Its pointer to *"`execution.md`'s T-14 record for the complete hit table"* resolves once **this entry** lands | ✅ partial — pointer now satisfied by this entry |
+
+#### ADVISORY findings — recorded, never gating; 0 rework attempts consumed; per `/akili-execute` §2.4 **none of these may become a task in this spec**
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **C-7** | A | The corrections are now longer than the text they correct — `design.md:244` is a 5-line parenthetical inside a 1-line sentence. A reader hits three nested "formerly X, now Y" layers before reaching the rule. The pattern at `design.md:250` / `tasks.md:11` (clean sentence + one trailing footnote per section) reads far better |
+| **C-8** | A | `family.md:44` is now a ~10-line paragraph in a 6-column index table whose sibling rows read "pending". The evidence dump belongs in `execution.md`; the family index needs the status verdict and the blocking fact only |
+| **C-9** | A | The corrections alternate singular/plural for the same dependency — "repair **migrations**" (`design.md:258`, `:332`, `requirements.md:530`) vs "repair **migration**" (`requirements.md:520`) vs naming only `repairSpVersioningObjectiveBlocks` (`design.md:25`, `:40`). Both readings are defensible; the spec should say which it means once |
+| **C-10** | B | Three residual `M0` tokens are present-tense and unmarked — `design.md:424`, `routine-transcript.md:223`, `routine-transcript.md:239`. Each states something **true** using a legacy label, and each is the *inverse* of attempt 1's defect (they assert the repair is NOT this chunk's). Not gating. If a future pass wants zero legacy tokens outside the §12-retained record, these are the three |
+| **C-11** | B | `design.md` §5 names M6 `updateLifecycleRoutinesForInnovationUse`; the file on disk is `1787083305648-**Amend**LifecycleRoutinesForInnovationUse.ts`. Pre-existing, carries no `M0` token, outside this sweep — but it is a spec-vs-disk name mismatch of exactly the class KZ-005 targets |
+| **C-12** | A | `family.md:44` says T-14 is `` `[~]` `` while `tasks.md:427` reads `**Status:** todo`. The substantive claim (T-14 open) is true and the Leader's record fixes it at `[~]`; safest phrasing is "T-14 open" with no marker until the Leader's write lands |
+
+**Still carried, still un-discharged, and now at risk of loss at archive:** A-1, A-2, B-1, B-2, **C-4**, C-6 from attempt 1 — ruled out of scope by the user for attempt 2 and re-filed here so `/akili-archive` can see them. **C-4 remains the only one requiring a scope ruling** (it is a fixture *code* change: `platformSeeded` / `innovationDevRoleSeeded` are structurally always `false`).
+
+#### Forward pointers
+
+| FP | Target | Content |
+| --- | --- | --- |
+| **FP-56** | **T-14 attempt 3 — MUST be in its brief** | **Bound the FILE SET, not just the token.** Require the hit table to be organized **by file**, with an explicit per-file "N hits, M classified (b), all corrected" line for **every** file in the folder — including files with zero corrections. Attempt 2's flat 52-row table hid a whole-file shortfall in plain sight. This is the concrete fix for the fourth KZ-005 recurrence |
+| **FP-57** | **T-14 attempt 3** | **Exemption must be argued against §12's text, per site.** Attempt 2 inherited R-IU-012's retention by *proximity to a citation*. The rule: a site is exempt only if it is literally R-IU-012's block, DD-13, or §5's M0 table row. Citing one of those does not confer exemption |
+| **FP-58** | **`/akili-archive` Kaizen step** | **KZ-005 has now recurred four times in one spec, each at a different granularity** (phrasing → token → file → exemption-by-citation). A lesson that names one granularity gets applied at that granularity only. The lesson text needs the general form: *sweep the claim, and bound the search space explicitly at every axis — phrasing, token, file set, and exemption criterion* |
+| **FP-59** | **every future Reviewer brief, this project** | **When two lenses classify the same site oppositely, the Leader must read it at source — never count votes.** Here the majority-of-one lens (B) was wrong on all three contested sites, and its error was *asserting* an exemption without arguing it against the governing clause. A brief should require each lens to quote the governing clause when claiming an exemption |
+| **FP-60** | **archive** | Advisories A-1, A-2, B-1, B-2, C-4, C-6 (attempt 1) and C-7…C-12 (attempt 2) are undischarged by explicit user ruling, not by oversight |
+
+#### Loop state
+
+- **Attempts consumed: 2 of 3. ONE REMAINS.** A third FAIL triggers HALT.
+- **Review rounds consumed: 12.** §12 budget of 4–5 remains deliberately exceeded under the user's standing 2026-08-18 authorization.
+- **`tasks.md`: untouched. T-14 remains `[ ]` in the file, `[~]` in this record.**
+- **Nothing committed.** Seven doc files modified in the working tree.
+
+---
+
+### T-14 — ATTEMPT 3 of 3 (review round 13): **Lens A PASS · Lens B PASS → TASK PASS** ✅
+
+- **Date:** 2026-08-19
+- **Status:** **`[x]` DONE** — PASS on attempt 3 of 3 (2 rework rounds; review rounds 11–13). **This closes chunk 1: T-01 … T-14 are all resolved.**
+- **Implementer attempts:** 1 (this attempt) · **Effort:** `xhigh` (held, not bumped — see attempt 2's effort-deviation note) · **Review mode:** parallel lens Reviewers
+- **Files changed (3):** `design.md`, `requirements.md`, `routine-transcript.md`. **60 incremental lines, 5 changed lines of substance.** `family.md` correctly untouched (A-3 was discharged in attempt 2).
+
+#### Method — what finally worked, recorded because two attempts failed first
+
+Attempts 1 and 2 failed the same way at different granularities: **the search space was bounded on one axis and left unbounded on the next one down.** Attempt 1 bounded the *phrasing*. Attempt 2 bounded the *token* but left the **file set** unbounded, and additionally inherited an exemption by *proximity to a citation*.
+
+Attempt 3's brief closed both, and this is the reusable part:
+
+1. **Bound the FILE SET, not just the token.** The brief required a **per-file completeness line** — `<file>: N hits · M classified (b) · all corrected` — for **every** file in the folder, *including files with zero hits and zero corrections*, emitted **before** any per-site detail. Attempt 2's flat 52-row table hid a whole-file shortfall in plain sight; a per-file line makes that shape of miss unreportable without noticing it.
+2. **Exemption must be ARGUED against the governing clause, per site.** The brief stated the rule explicitly: *a site is exempt only if it literally IS R-IU-012's block, DD-13, or §5's M0 table row. Citing one of those confers no exemption.* Every `(a)` classification had to carry its argument or quote its self-marking.
+
+Both countermeasures are the concrete, transferable form of KZ-005 and belong upstream (FP-58).
+
+#### Leader independent verification — re-run on the attempt-3 state, quiet window, no delegated agent active
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent` | **328 suites / 2155 tests pass**, 17.5 s |
+| Scratch container **before** bootstrap | **0 tables** — provably cold |
+| `migration:test:bootstrap` (once) | OK; **215 tables** |
+| `npm run test:fixtures` | **9 suites / 30 tests pass** |
+| Coverage | 83.75 / 74.88 / 84.75 / 83.76 — unchanged, above the 60% floor |
+| Working-tree diff scanned for `.ts`/`.js`/`.json`/`.sql` | **NONE — docs-only confirmed** |
+
+The Leader also built the **incremental** diff (post-attempt-2 state reconstructed from the saved attempt-2 patch, then diffed against the working tree) so both lenses audited *only* attempt 3's 60 lines rather than re-litigating passed work.
+
+#### Reviewer verdicts — 2 lenses, both PASS
+
+**Lens A (spec conformance + scope discipline) — `STATUS: PASS`.**
+
+| Item | Verdict |
+| --- | --- |
+| **F-1a** `requirements.md:697` D-11 | ✅ follows the `~~D-5~~` precedent exactly — ID struck, original claim struck, `**RULED 2026-08-14 — option B.**` appended, rationale preserved in past tense. Remains a **decision record**, not a deletion. `:702`'s "No open questions remain" now holds |
+| **F-1b** `:679` RB-11 | ✅ "**Shipped** … `repairSpVersioningObjectiveBlocks` … timestamp-ordered before M1–M6". No M0, no open routing |
+| **F-1c** `:639` §8 Repair row | ✅ struck + `EXTRACTED`; the `(M0, R-IU-012)` attribution contradicting `design.md:136` is gone |
+| **F-2** `routine-transcript.md:144` | ✅ the sentence today does **not** contain "verified by fixture F18"; the note discloses the deletion instead of denying it. All three supporting citations verified |
+| **F-3** `design.md:260`/`:262` | ✅ one frame — `:262` now opens "**Pointer, not a rule this spec states:**", asserting no rule in this spec's voice |
+| **F-4** `design.md:244` | ✅ scope corrected to "the **spec folder**, not just this file"; enumeration **dropped** (the permitted option), completeness delegated to this record |
+| **Retention integrity** | ✅ `requirements.md:563-592` untouched — including `:576` "Repaired by migration **M0**" and `:577` "**Routing is a user decision**", AC checkboxes unflipped. `design.md:250`, `:536`, `:604` not in the diff |
+| **Scope** | ✅ zero excess, zero shortfall. No `tasks.md`, no `execution.md`, no `trd.md`/`src/CLAUDE.md`/`family.md`, no code, **no checkbox flipped**. All ruled-out advisories verified untouched, C-10's three sites included |
+
+**Lens B (claim falsifiability) — `STATUS: PASS`.** Independently enumerated the folder (**11 files, matching the Implementer's list — no file missing**) and classified **all 58 `M0` hits**.
+
+- **Zero surviving live (b).** Every hit is an authorized exemption, self-marked historical by text Lens B quoted, or a Leader-ruled advisory.
+- **Count reconciliation — the check that would have caught a fabricated table.** Lens B found `requirements.md` at **10** hits against the Implementer's reported **12**, and resolved it **in the Implementer's favour**: pre-attempt-3 the file had 12 M0-bearing lines; attempt 3's own rewrites removed the token from `:639` and `:679`. The table reports *hits found by the sweep*, not post-correction residue. `design.md` stays 23 and `routine-transcript.md` stays 3 because their correction notes retain the token by design.
+- **All six claim families verified TRUE at source**, including all four sub-claims of the F-2 correction note: F18 **is** §6.5's soft-delete fixture (`design.md:334`) bound to **R-IU-011 AC.5**; §12 **does** name F19 (`design.md:602`); and the quoted *"prefer deleting a claim to correcting it"* **is verbatim** at `design.md:591`. Lens B called this "the strongest item in the diff."
+- **Migration + ordering re-verified:** `1784300000000-RepairSpVersioningObjectiveBlocks.ts` exists; `1784300000000` < all six `1787*` migrations.
+- **Archive link resolves** — `../../archive/2026-08-18-bugfix--sp-versioning-roles-id/` from `requirements.md` → a real folder with 7 files.
+- **Ruling date corroborated at four independent sites** — `design.md:604`, `design.md:27`, `requirements.md:565`, `family.md:97`.
+
+#### Not Done / Assumptions — carried verbatim from the Implementer, with the Leader's assessment
+
+1. *"`design.md:335` was flagged as a borderline self-marked-historical site (uses the legacy 'M0' label truthfully) but is not named by F-1…F-4 or by C-10; left untouched per the 'exactly four items' scope. Worth the Leader's attention if a future pass wants zero legacy tokens outside the §12-retained record."* — **Correct, and correctly out of scope.** `design.md:335` reads `~~F19~~ EXTRACTED with M0`, a struck row that states a true fact with a legacy label. Both lenses independently classified it non-gating; Lens B grouped it with the ruled C-10 advisories. **Recorded as C-13 below**, not treated as owed scope: it was excluded by the user's own two-item ruling, so this is a declared exclusion, not an omission.
+2. *"No other assumptions — all four items were fixed as specified, sourced verbatim before editing, and both the file-set enumeration and the second-direction re-grep were run as the method required."* — **Verified true.** Both lenses confirm the method was run and the diff contains exactly the four items.
+
+**Per `/akili-execute` §2.3 item 0** a declared gap normally blocks `[x]`. It does not here: the single item is not undelivered *authorized* scope — it sits outside the four items the user's ruling defined, and both lenses cleared it. It is carried forward, not silently absorbed.
+
+#### ADVISORY findings — recorded, never gating; per `/akili-execute` §2.4 **none of these may become a task in this spec**
+
+| # | Lens | Advisory |
+| --- | --- | --- |
+| **C-13** | A + B | **`RB-11` and D-11 assert "F19 is that spec's gate", but `F19` appears NOWHERE in `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/`.** F19 is *this* spec's label, mapped onto that spec's fixture (`test/fixtures/sp-versioning-objective-blocks.fixture-spec.ts`) by `design.md:335`. **True under that mapping, one hop from false if the mapping is ever dropped.** Suggested phrasing: *"that spec's red-before-green regression fixture (`sp-versioning-objective-blocks.fixture-spec.ts`, this spec's F19)"*. The single second-direction finding of the round |
+| **C-14** | A | Both rewritten passages (`design.md:262`, `routine-transcript.md:144`) still read *"corrected 2026-08-19 by T-14 **attempt 2**"* although **attempt 3** rewrote them. Defensible (the underlying correction was attempt 2's; attempt 3 re-framed it) but a reader diffing by attempt will mis-locate them |
+| **C-15** | A + B | `design.md:244` traded a specific enumeration for a general one and now **under-states** its own coverage — the region list omits §3's mermaid node (`:94`, the very site F-4 flagged) and §6.5's F16 row (`:332`). Under-statement, not falsehood; the `execution.md` pointer carries the load |
+| **C-16** | B | `requirements.md:639`'s *"n/a — owned by that spec"* is correct but terse. *"n/a for this chunk — that spec's migration carries a real `down()`"* would close the ambiguity |
+| **C-17** | B | RB-11 names **one** repair migration; the extracted spec ships **two** (`RepairSpDeleteResultVersionObjectiveTables` is mandatory per that spec's RB-5, "never ship the first alone"). Accurate for the `SP_versioning` defect RB-11 describes, and `design.md:610/614` correctly say "two repair migrations" — no contradiction, but worth a glance if RB-11 is ever reused as a summary |
+| **C-18** | B | Three further residual legacy-label sites in the same class as C-10, recorded so a future sweep does not rediscover them as new: `design.md:570`, `design.md:577`, `proposal.md:215`. None asserts M0 ships in this chunk's migration set; each uses M0 as a historical label in a budget or retrospective narrative |
+
+**Undischarged advisories carried to archive** (excluded by explicit user ruling, not oversight): A-1, A-2, B-1, B-2, **C-4**, C-6 (attempt 1); C-7 … C-12 (attempt 2); C-13 … C-18 (attempt 3). **C-4 still requires a scope ruling** — it is a fixture *code* change (`platformSeeded` / `innovationDevRoleSeeded` are structurally always `false`).
+
+#### Requirements covered — final
+
+R-IU-008 AC.1–AC.4, R-IU-009 AC.4; NFR-IU-001, NFR-IU-004; D-6, RB-6. **R-IU-008 AC.2 discharged on evidence:** zero `result-innovation-dev` files touched across the whole task; no existing Innovation Dev expectation altered. **NFR-IU-001 satisfied without a timing, correctly** — its `How verified` clause is *review the join plan*, not a stopwatch; `innovation_use_validation` runs 4 correlated PK/FK-keyed `SELECT … INTO` statements against `innovation_dev_validation`'s 5, a subset in shape and lighter in count. The disqualifier (no measurement while an agent runs) never engaged.
+
+#### Loop state — CLOSED
+
+- **Attempts consumed: 3 of 3. PASS on the last one.** No HALT; no rollback; the working tree is intact and correct.
+- **Review rounds consumed: 13** (§12 budget 4–5, deliberately exceeded under the user's standing 2026-08-18 authorization — recorded, never silent).
+- **KZ-005 recurred four times in this spec** (phrasing → token → file set → exemption-by-citation) and was closed by bounding the file set and requiring per-site exemption arguments. **FP-58 carries the generalized lesson upstream.**
