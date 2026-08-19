@@ -48,7 +48,7 @@ Note the shape: that is **Express's default 404 body**, not the `ServerResponseD
 2. **Expected:** the result renders; pool-funding alignment is simply not offered.
 3. **Actual:** the page renders, the tab is correctly absent, **and an error is displayed** naming an endpoint the user never asked for.
 
-### Root Cause (confirmed — three links, each verified in code)
+### Root Cause (confirmed — four links, each verified in code)
 
 **1. The client asks unconditionally.** `bilateral.service.ts:150`:
 
