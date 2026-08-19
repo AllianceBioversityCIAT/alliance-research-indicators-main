@@ -156,7 +156,8 @@ Therefore: writing `innovation_use_validation` and adding a matching `toContain(
 | --- | --- |
 | F3 / F4 | Writing the rule as `innovation_use_level_id >= 6`: F4 returns `1` instead of `0` |
 | F13 | Omitting any of the six new columns from `SP_versioning`'s copy lists: that column reads `NULL` on the new version |
-| F14 / F15 / F18 | Omitting the corresponding statement from that routine: the detail row survives (or, for F18, survives **active**) |
+| F14 / F15 | Omitting the corresponding `DELETE` from that routine. **Corrected 2026-08-18 (T-13, Lens A + Lens B):** this formerly predicted *"the detail row survives"*, a state `FK_result_innovation_use_result_id`'s **RESTRICT** rule makes unreachable — the orphan blocks the routine's own `DELETE FROM results`, so the fixture **errors with MySQL 1451** rather than asserting a surviving row. Observed exactly so in T-13. The gate is genuine; only this predicted symptom was wrong |
+| F18 | Omitting the `UPDATE` from `delete_result`: the detail row survives **active** (`is_active = TRUE`, `deleted_at` NULL). **This row is unchanged and remains correct** — `delete_result` is a soft delete, so no FK is violated and the fixture fails on an assertion rather than erroring |
 | F16 | Any edit that changes an Innovation Dev column or row across the four routines — including "harmonizing" the delete divergence |
 | F19 | Running it **before** M0: `CALL SP_versioning` raises MySQL 1054 and the fixture errors rather than asserting |
 

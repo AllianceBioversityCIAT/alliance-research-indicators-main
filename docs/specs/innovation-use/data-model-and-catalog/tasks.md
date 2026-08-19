@@ -367,7 +367,7 @@ graph TD
 
 ### T-12 — Validation-function fixtures F1–F12, F9b, F17
 
-- **Requirements covered:** R-IU-006 (AC.2–AC.11), R-IU-001 (AC.3), R-IU-003 (mode exclusivity), R-IU-007 (via F10); DC-2, DC-3, DC-10
+- **Requirements covered:** R-IU-006 (AC.2–AC.11), R-IU-001 (AC.3), **R-IU-003 (mode *completeness* — RB-5 layer 2; *exclusivity* is chunk 2's API edge, `requirements.md:304`)**, R-IU-007 (via F10); DC-2, DC-3, DC-10
 - **Design references:** §6.5 fixture table, §6.6
 - **Size:** L · **Dependencies:** T-09, T-02 · **Status:** ~~todo~~ → **`[~]` IN PROGRESS / ESCALATED 2026-08-18** — attempt 1: **Lens B PASS, Lens C PASS, Lens A FAIL** on F12 only (body-text assertion where AC.9 specifies a behavioral comparison). **14 of 15 fixtures accepted.** Rework NOT spawned: this FAIL is the pre-declared budget escalation (review rounds at the 4–5 ceiling). **Awaiting a user ruling on path (a) fix-the-harness vs (b) fix-the-spec** — see [`./execution.md`](./execution.md) → *T-12*
 - **Skills:** `nestjs-expert`, `tdd`
@@ -458,7 +458,7 @@ graph TD
 | --- | --- | --- | --- |
 | R-IU-001 | AC.1–AC.4 | *detail record persists* · BUT NOT two active rows → **T-05** (PK) · AND IT MUST reject an off-catalog level id → **T-05** (FK) · AC.3 round trip → **T-12** | T-05, T-08, T-12 |
 | R-IU-002 | AC.1–AC.5 | *reproducible and exact* · BUT NOT ids 13–20 · AND IT MUST NOT be inserted outside a migration · AND IT MUST NOT modify readiness levels | T-04 |
-| R-IU-003 | AC.1–AC.4 | *counts coexist* · BUT NOT alter/drop/repurpose → **T-06** · AND IT MUST NOT add a disaggregated total → **T-06** · *modes exclusive* · BUT NOT populate both modes → **T-09** (F9/F9b) · AND IT MUST allow mode switching without schema change → **T-06** (all nullable) | T-06, T-08, T-09, T-12 |
+| R-IU-003 | AC.1–AC.4 | *counts coexist* · BUT NOT alter/drop/repurpose → **T-06** · AND IT MUST NOT add a disaggregated total → **T-06** · *modes exclusive — **NOT gated in chunk 1***; the populated-mode **completeness** half is gated by **T-09** (F9/F9b), but **BUT NOT populate both modes** rests entirely on chunk 2's API edge (RB-5 layer 3, `requirements.md:304`) — F9/F9b do **not** gate it and cannot · AND IT MUST allow mode switching without schema change → **T-06** (all nullable) | T-06, T-08, T-09, T-12 |
 | R-IU-004 | AC.1–AC.3 | *additive only* · BUT NOT `NOT NULL` | T-06, T-08 |
 | R-IU-005 | AC.1–AC.3 | *discriminators are additive* · BUT NOT renumber or reuse an id | T-07, T-08 |
 | R-IU-006 | AC.1–AC.11 | *conditional explanation* · BUT NOT require at level ≤ 5 → **F3** · AND IT MUST NOT use `level_id >= 6` → **F3/F4** · AND IT MUST treat whitespace as empty → **F5/F6** · *role isolation* · BUT NOT change Innovation Dev counting → **F11/F12** | T-09, T-12 |

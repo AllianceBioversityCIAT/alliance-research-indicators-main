@@ -176,9 +176,12 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
 
   // Every copied column given a concrete value; same-typed neighbours (the
   // seven `int` columns, and — widened in rework attempt 3, Lens B — the
-  // eleven boolean `tinyint` columns across the three tables plus the four
-  // audit columns per table) are mutually distinct where the column's
-  // domain allows it (rework attempt 2, FAIL-1 — a positional swap between
+  // ten nullable boolean `tinyint` columns across the three tables (four in
+  // `result_innovation_dev`, five in `result_actors`, one in
+  // `result_institution_types` — `is_active` excluded and discussed
+  // separately below) plus the four audit columns per table) are mutually
+  // distinct where the column's domain allows it (rework attempt 2, FAIL-1
+  // — a positional swap between
   // two equal-valued columns in the migration's copy-list-vs-SELECT-list
   // pairing is otherwise invisible to ANY comparison technique, literal or
   // dynamic).
@@ -191,9 +194,16 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
   // `sex_age_disaggregation_not_apply`/`women_youth`/`women_not_youth`/
   // `men_youth`/`men_not_youth` (`baseline.sql:2813-2817`) — are plain
   // `tinyint DEFAULT NULL` with NO CHECK constraint and no trigger anywhere
-  // in the migration set restricting them to 0/1 (verified: the only
-  // `CHECK` hits in `baseline.sql` are on `innovation_readiness_explanation`
-  // and `FOREIGN_KEY_CHECKS`/`UNIQUE_CHECKS` session variables). The domain
+  // in the migration set restricting them to 0/1 (verified:
+  // `grep -n CHECK src/db/baseline/baseline.sql` returns 9 lines — 8
+  // `FOREIGN_KEY_CHECKS`/`UNIQUE_CHECKS` session-variable toggles plus one
+  // `VISUAL_ONLY_GREEN_CHECKS` comment at `:6512` — none of which
+  // constrains any column's domain. `baseline.sql` has no CHECK constraint
+  // on `innovation_readiness_explanation` either; that name was
+  // misattributed here — the actual "no CHECK constraint" comment lives at
+  // `src/db/migrations/1787068132517-createResultInnovationUse.ts:21` and
+  // describes a different column, `innovation_use_level_explanation`, in a
+  // different table). The domain
   // is the full `tinyint` range, so every one of these columns now takes a
   // distinct sentinel >= 2 instead of alternating FALSE/TRUE. `is_active` is
   // the one column that must stay `1` (the copy blocks filter
@@ -211,10 +221,20 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
   // `1, 1` literal and the shared `CURRENT_TIMESTAMP(6)` default that left
   // both pairs transposition-blind.
   //
-  // No residual transposition gap remains in this fixture after this
-  // change — every same-typed column pairing within each of the three
-  // INSERTs' copy-list-vs-SELECT-list mapping is now mutually distinct,
-  // verified column-by-column against `baseline.sql`, not assumed.
+  // Every pairing this fixture can diversify without destroying its
+  // inert-NULL invariant is now mutually distinct within each of the three
+  // INSERTs' copy-list-vs-SELECT-list mapping, verified
+  // column-by-column against `baseline.sql`, not assumed. That excludes
+  // `result_actors`'s five NEW count columns (`women_youth_count`,
+  // `women_not_youth_count`, `men_youth_count`, `men_not_youth_count`,
+  // `actors_count`) and `result_institution_types.organization_count`: this
+  // fixture deliberately leaves all six NULL, because that inertness — that
+  // Innovation Dev never populates them — is exactly what F16 asserts here
+  // (see the NULL assertions below, `:864-868`/`:895`), not something to
+  // diversify away. The count-column pairing itself — that `SP_versioning`
+  // actually copies a non-NULL value through the SELECT list — is closed
+  // instead by F13b/F13c in the sibling file,
+  // `innovation-use-lifecycle-routines.fixture-spec.ts:376-380`/`:394`.
   const devDetail = {
     short_title: 'F16 Innovation Dev fixture short title',
     innovation_readiness_explanation:
@@ -224,7 +244,7 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     intended_beneficiaries_description: 'F16 fixture beneficiaries',
     is_new_or_improved_variety: 5,
     new_or_improved_varieties_count: 3,
-    is_knowledge_sharing: 3,
+    is_knowledge_sharing: 7,
     tool_useful_context: 'F16 fixture tool useful context',
     results_achieved_expected: 'F16 fixture results achieved',
     is_used_beyond_original_context: 4,
@@ -774,7 +794,6 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
     const copiedDev = await fetchFullRow('result_innovation_dev', newResultId, [
       'result_id',
     ]);
-    expect(copiedDev).toBeDefined();
     expect(copiedDev).toEqual(sourceDev);
     // Literal, per-field assertions on the copy for every column this file
     // deliberately diversified — independent of whatever `sourceDev` reads,
@@ -840,7 +859,6 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       'result_actors_id',
       'result_id',
     ]);
-    expect(copiedActor).toBeDefined();
     expect(copiedActor).toEqual(sourceActor);
     expect(copiedActor.actor_type_custom_name).toBe(actorCustomName);
     expect(Number(copiedActor.actor_role_id)).toBe(devActorRoleId);
@@ -880,7 +898,6 @@ describe('Innovation Dev lifecycle routines are unchanged by M6 (T-13, F16)', ()
       newResultId,
       ['result_institution_type_id', 'result_id'],
     );
-    expect(copiedInstitutionType).toBeDefined();
     expect(copiedInstitutionType).toEqual(sourceInstitutionType);
     expect(copiedInstitutionType.institution_type_custom_name).toBe(
       institutionTypeCustomName,
