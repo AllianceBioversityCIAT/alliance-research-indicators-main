@@ -10,16 +10,16 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 > **Pruned 2026-08-18** at the `bilateral/clarisa-phase-config-variable` archive, as the previous
 > note instructed. Eight institutionalized/applied lessons were **retired** (their rule now lives in
-> a guide or template and remains in force): `K-001`, `K-002`, `K-006`, `K-009`, `K-010`, `KZ-004`,
+> a guide or template and remains in force): `K-001`, `K-002`, `K-006`, `K-009` **(un-retired 2026-08-19 — see the note below; the retirement itself was correct at the time)**, `K-010`, `KZ-004`,
 > `KZ-005`, `KZ-006`. Methodology lessons awaiting upstream moved to their own list below, since they
 > bind the AKILI repo rather than this project. The digest is back to the **10-row cap**.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-014** | **A filtered view of a command's output is not the output.** Truncating a discovery search makes *absent* and *excluded* indistinguishable, and counting ANSI-coloured output silently reads zero. Check the total, normalize escapes, and look for an error **before** counting | **High** | **5** (+2: the Leader committed it **twice in one run**, on the lesson it had copied into two worker briefs) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 |
-| **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | Proposed — see K-016.b |
-| **K-017** | **A runtime artifact that must exist in the build output needs its own packaging defect class.** A unit suite runs over `src`, so it structurally cannot see that the artifact never reaches `dist` — every test passes over a file that will not be there in the field | **High** | 1 | Product + Methodology | Proposed |
-| **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Un-retired** — the rule held; the mechanism is new |
+| **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | **Applied** — root `CLAUDE.md` §4.3 |
+| **K-017** | **A runtime artifact that must exist in the build output needs its own packaging defect class.** A unit suite runs over `src`, so it structurally cannot see that the artifact never reaches `dist` — every test passes over a file that will not be there in the field | **High** | 1 | Product + Methodology | **Applied** — `general-setup/requirements.md` §4 (+ upstream owed) |
+| **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Applied** — `.agents/reviewer.md` (mechanism named) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
 | **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | **5** (+1: a fidelity gate certified data containing an unrecorded divergence) | Product | Proposed |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
@@ -37,7 +37,7 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | **K-011** | An empty or stale artifact does not produce a null review; it produces a confident review of the wrong thing |
 | **K-012** | Name the concrete failing input in the brief — K-004 alone does not make a Bug-Mode test falsifiable |
 | **K-013** | A requirement derived from a live measurement needs the date and the invalidating condition |
-| **K-016** | An NFR that accepts user-visible latency without a paired requirement for how the UI signals it creates a trap: the user cannot distinguish "not yet" from "broken" |
+| **K-016** | An NFR that accepts user-visible latency without a paired requirement for how the UI signals it creates a trap: the user cannot distinguish "not yet" from "broken". **Local Product edit APPLIED 2026-08-19 (root `CLAUDE.md` §4.3) after a second occurrence — the template upstream is still owed, and the recurrence is the argument for it.** |
 
 > **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
