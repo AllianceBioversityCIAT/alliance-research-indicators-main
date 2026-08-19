@@ -1743,3 +1743,17 @@ Rework attempts remaining on T-13 itself: **2 of 3** (unused). The binding const
 
 **Standing instruction:** do not spawn T-13 attempt 2 without the user's ruling on the scope-boundary question (FAIL-2's fix lies outside T-13 by construction). T-13's task status is `[~]`; **no rollback was applied** — this is a deliberate stop at attempt 1, not a 3-attempt HALT, and the delivered work is largely sound and salvageable.
 
+
+#### ✅ USER RULING — 2026-08-18, both escalations resolved
+
+| Escalation | Ruling | Consequence |
+| --- | --- | --- |
+| **T-13 scope boundary** | **Extend the boundary; fix all five FAILs** | T-13's scope bound is widened to authorize a harness-level `globalSetup` (or bootstrap seed) owning the four foundational reference rows. Costs the **6th** review round |
+| **T-12 F12** | **Path (a) — fix the harness** | A behavioral `innovation_dev_validation` fixture is added *alongside* the body-text one. Costs the **7th** review round |
+
+**The review-round budget (§12: 4–5) is now deliberately exceeded with explicit user authorization.** Recorded here as the authorization itself, not as a silent overrun — §12's budget stands as written and is simply overridden for these two tasks. `/akili-archive`'s Kaizen owns the question of whether a 4–5 round budget was ever right for a spec carrying an irreversible four-routine migration.
+
+**Sequencing — the two reworks are NOT parallel-safe.** They share `test/jest-fixtures.json`, the `test/fixtures/innovation-use/` directory, the scratch MySQL container on port 3307, and one `npm run test:fixtures` invocation. Per `.agents/leader.md` → *Delegation Thresholds*, disjoint source files are necessary but not sufficient; this fails the shared-build-output/port half decisively. **T-13 runs first** — its `globalSetup` is the foundation T-12's new fixture seeds against, and running T-12 first would have it author catalog seeding that T-13 then centralizes.
+
+**Effort deviation, recorded.** The rework rule bumps effort one level per retry (`xhigh` → `max`), but the tier↔effort rule forbids `max` on a T2 Implementer and escalating the tier to opus would collapse `author ≠ auditor` against the opus Reviewers. Attempt 2 therefore stays at **`xhigh`**, and the escalation is delivered through the brief instead — which is the honest lever here: attempt 1's FAILs came from a scope bound the Leader set plus two genuine misses, not from under-thinking, and all three lenses supplied concrete, file-and-line remediations that attempt 1 simply did not have.
+
