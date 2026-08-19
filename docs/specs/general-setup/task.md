@@ -110,6 +110,8 @@ Per task, declare:
 
 **Name the concrete input that makes the gate red, in the task, before the test is written (K-012).** Red-before-green checks falsifiability *after* the test exists; naming the input makes a non-falsifiable assertion obvious *while it is being authored*. Measured on one spec, same methodology throughout: the task whose brief omitted it shipped **3** tests that passed on `HEAD`, the next shipped **1**, the one that named the input verbatim shipped **0**.
 
+**A refactor declared behaviour-preserving needs an explicit old-vs-new comparison over a fixed input set as its pass condition (K-019).** The existing suite was written for the old behaviour's *known* inputs, so it is structurally blind to a change in what the code **accepts** — it can report green while the acceptance set has moved. Name the inputs, run both versions, require zero divergences.
+
 **When a task realigns existing expectations, derive its site list from the failing suite, not from a grep (K-018).** Grep enumerates *mentions* of the value you are changing; only the run enumerates *breakages*. A list built by grep fails in three directions at once — it names sites that are already green for an unrelated reason, misses genuinely red ones, and can skip a whole file. Apply the change, run the suite, and let the failures write the list.
 
 A task is NOT done until:

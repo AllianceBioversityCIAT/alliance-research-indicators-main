@@ -16,16 +16,16 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | **Applied** — root `CLAUDE.md` §4.3 |
-| **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Applied** — `.agents/reviewer.md` (mechanism named) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
 | **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **High** | **6** (+1: widening a predicate made a fidelity cohort 198-of-198, so the count would also pass against a predicate returning `true` unconditionally) | Product | Proposed |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
 | **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
+| **K-019** | **A refactor declared behaviour-preserving needs an explicit old-vs-new comparison over a fixed input set as its pass condition.** The existing suite was written for the old behaviour's *known* inputs and is structurally blind to a change in what the code **accepts** — it reports green while the acceptance set moves | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
+| **K-020** | **A targeted client `jest` run trips the project-wide coverage floors and exits `1` with every test passing.** Under red-before/green-after that makes "green after" unreachable. Use `--coverage=false` on targeted runs | Medium | 1 | Product | **Applied** — `client/.../src/CLAUDE.md` |
+| **KZ-012** | **The `numeric ⟺ STAR` invariant is assumed in three layers and validated in none**, and `platform_code` is `nullable: true` — a NULL renders bare-numeric and is classified STAR. Answer with `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` | Medium | 1 | Product | **Open — carries OQ-1 out of `archive/`** |
 | **K-018** | **The authoritative site list for an expectation-realignment task is the failing suite, not a grep.** Grep enumerates *mentions*; only the run enumerates *breakages*. A grep-built list names already-green sites, misses genuinely red ones, and can skip a whole file — all three happened in one spec | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
 | **KZ-011** | **A multi-clause table cell can be retired in half.** When one clause is retired on new evidence, its siblings inherit the retirement silently and the worker is blamed for the omission. One clause per row | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §3 (+ upstream owed) |
-| **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed |
 
 ### Queued for upstream (Methodology — no local edit owed)
 
@@ -41,6 +41,12 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 > **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
+>
+> **Retired 2026-08-19 (third sweep, to admit K-019, K-020 and KZ-012):** `K-016` (applied to
+> root `CLAUDE.md` §4.3; no TTL-cached config touched this cycle, rule stands) · `K-009` (applied to
+> `.agents/reviewer.md`; **both workers delivered on every one of the four dispatches this session**,
+> rule held) · `KZ-010` (held — the verification command was pre-flighted before the fix existed and
+> the pre-flight is what found K-020; its client-specific form now lives in the child guide).
 >
 > **Retired 2026-08-19 (second sweep, to admit K-018 and KZ-011):** `K-014` (applied to root
 > `CLAUDE.md` §4.3 and **observed holding this run** — totals checked before counting, no
@@ -62,6 +68,80 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-19 — bugfix/pool-funding-source-gate
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 1 | tasks.md |
+| Reviewer FAIL rework attempts | **1** (T-01) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 0 | `/akili-test` not run (accepted) |
+| Validation FAIL / WARN | — | `/akili-validate` not run (accepted) |
+| Advisories recorded | 5 | execution.md |
+| Budget: LOC | **≈ 90 budgeted → 238 actual** | design.md §14 |
+| Budget: review rounds | **1 → 2** | design.md §14 |
+
+**MUDA identified:** one rework round, caused by a refactor stepping outside "refactor only". The LOC
+overrun is **not** waste — production landed on budget (~51 vs ~37) and the excess is test code, most
+of it the coverage the FAIL correctly demanded.
+
+**Lessons**
+
+- **K-019 — The safety net could not see the property that moved.** (Product + Methodology, Medium)
+  - Root cause: the DD-4 interceptor refactor was authorised to move the *derivation* into a shared
+    util; it also replaced the URL matcher, widening its acceptance set (`/result/FOO-123` null→STAR,
+    `/result/tip-123` null→TIP, case-sensitivity lost). Its designated safety net,
+    `result.interceptor.spec.ts`, enumerates `PLATFORM_CODES` and is therefore **structurally
+    incapable** of exercising an unrecognized or differently-cased prefix — 29/29 green certified
+    nothing about the two cases that changed.
+  - Evidence: execution.md — T-01 attempt 1, Reviewer FAIL; design.md §14 predicted this leak by
+    name ("most likely the interceptor refactor growing").
+  - The fix that worked, and why it is the lesson: the Leader made an **old-vs-new comparison over
+    nine URLs at zero divergences** the pass condition. It paid twice — the remediation's own first
+    draft skipped STAR in the prefix loop and introduced a *new* divergence on `/result/STAR-31288`,
+    which no unit suite would have surfaced.
+  - Standardization: one line in `docs/specs/general-setup/task.md` §5.
+    → **Applied 2026-08-19 (user-approved)**. Upstream to AKILI owed.
+
+- **K-020 — The verification command lies about its own result.** (Product, Medium)
+  - Root cause: the client's coverage floors are **project-wide**, so a targeted single-file run
+    trips them and exits `1` with every test passing. Measured before any fix existed:
+    `npx jest …/bilateral.service.spec.ts --silent` → exit 1 on 63/63 green; with `--coverage=false`
+    → exit 0. Under Bug Mode's red-before/green-after protocol this makes "green after" unreachable,
+    and an agent reading the exit code would report a healthy suite as red.
+  - Evidence: execution.md — Leader pre-flight. The child guide documented the floors but not this
+    consequence.
+  - Standardization: one line in `client/research-indicators/src/CLAUDE.md`.
+    → **Applied 2026-08-19 (user-approved)**.
+
+- **KZ-012 — An invariant three layers depend on, and none validates.** (Product, Medium, **OPEN**)
+  - `numeric ⟺ STAR` is assumed by `result.interceptor.ts`, by the new `platform-code.util.ts`, and
+    by the server's digits-only `RESULT_CODE` route. Nothing checks it. The database stores
+    `result_official_code` as a **number** and `platform_code` as a separate `varchar(50)` that is
+    **`nullable: true`** — the prefix is composed for display, never stored. A row with NULL or empty
+    `platform_code` therefore renders bare-numeric and is classified STAR.
+  - Evidence: `result.entity.ts:177-182`; archived spec `requirements.md` §8 OQ-1.
+  - **Recorded here deliberately so it survives the archive.** It was that spec's OQ-1, merge-blocking
+    for production, and burying it in `archive/` is how an open question stops being asked.
+  - Answer it with: `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` — any NULL
+    or `''` with a non-zero count falsifies the invariant.
+  - Bounded: if false, behaviour for such a result equals today's, so the archived fix does not
+    worsen it. No local edit proposed — this is an open finding, not a rule.
+
+**Jidoka held.** The Reviewer stopped the line on a change with **nil user impact** — the server maps
+absent / `'STAR'` / unknown all to STAR — and explicitly offered a recorded waiver. The Leader upheld
+the FAIL instead: an unauthorised, untested behaviour change in an interceptor on every HTTP request,
+where the next code shape added to the router would inherit a classification nobody chose.
+
+**The Step 2.3 reversion challenge earned its keep before any code existed.** It found that
+`BilateralService` is root-scoped, `currentAlignment` has no reset on navigation, and the failing 404
+was *load-bearing* — both the bug and the only thing clearing stale state. A guard that merely skipped
+would have passed AC.1 and AC.2, shipped, and shown the pool-funding tab on a TIP result.
+
 
 ### 2026-08-19 — bugfix/w3-bilateral-funding-filter
 

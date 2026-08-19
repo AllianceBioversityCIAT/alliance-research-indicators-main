@@ -148,6 +148,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - Service tests: assert on the `MainResponse<T>` envelope with `HttpTestingController`.
 - Component tests: cover role-conditional rendering, signal-driven state transitions, form validity, error surfaces.
 - Coverage floors (project-wide, enforced by `jest.config.ts`): statements 40%, branches 20%, lines 45%, functions 30%. Don't regress on changed files.
+- ⚠️ **A targeted single-file run trips those project-wide floors and exits `1` with every test passing** (measured: `npx jest <file> --silent` → exit 1 on 63/63 green; `--coverage=false` → exit 0). An exit code from a targeted run without `--coverage=false` is not a signal — and under a red-before/green-after protocol it makes "green after" unreachable (K-020).
 - Excluded from coverage by design: `app.config.ts`, `app.routes.ts`, `shared/sockets/websocket.service.ts`, `shared/components/alert/alert.component.ts`.
 
 ---
