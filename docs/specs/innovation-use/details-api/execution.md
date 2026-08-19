@@ -1245,3 +1245,88 @@ Three findings from this round are worth carrying forward:
 
 **Budget status:** 6 of 13 tasks complete (T-01 restored to `[x]`; T-07 remains `[~]`). **13 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×1).
 
+#### Attempt 2 — PASS
+
+- **Status at the time of this entry:** **`[x]` DONE** — PASS on attempt 2 of 3, both lens Reviewers concurring.
+- **Effort:** `high` (bumped from `medium` per the rework rule — a fix that failed is usually under-thinking)
+- **Review mode:** parallel lens Reviewers (2), same split as attempt 1. Justified on the same ground plus a new one: T-07 still carries the only committed gate for R-IUA-004 AC.1–AC.8, and attempt 1 had proved that one review round could pass a `404` through.
+
+**Files changed** (7 files touched; 2 lines of production code, the rest specs):
+
+| File | State |
+| --- | --- |
+| `src/domain/entities/entities.module.ts` | modified — one import (`:48`) + one `imports` array entry (`:151`), beside `ResultInnovationDevModule`. **This is the entire production fix for DD-15.** |
+| `src/domain/entities/entities.module.spec.ts` | new (43) — membership assertion over `Reflect.getMetadata('imports', EntitiesModule)` |
+| `src/app.module.spec.ts` | new (49) — DD-16's AC.7 exclude-list assertion |
+| `…/result-innovation-use.controller.spec.ts` | modified 537 → 600 — the three Lens B remediations |
+| `…/result-innovation-use.controller.ts` · `…/result-innovation-use.module.ts` · `main.routes.ts` · `main.routes.spec.ts` | **unchanged from attempt 1** — line counts match this log's attempt-1 record exactly, corroborating the byte-identical claim |
+
+**Implementer verification, then re-run independently by the Leader**
+
+- `npm test -- --silent` → **336 suites / 2262 tests / 1 snapshot**, all passing (baseline 334 / 2257 after T-01's commit).
+- `npx tsc --noEmit` → **clean** (Leader-run; this is the first real type check of the controller and module, closing the T-02 Risk advisory that `npm test` was weak evidence of compilation for files nothing imported).
+- `npx eslint --no-fix` over all seven files → exit 0, zero output; `git status` re-checked after, no lint mutation.
+- **16-mutation two-axis sweep**, each applied → confirmed red → restored, restoration verified byte-identical via `diff -q` against backups. This is the correction of attempt 1's structural evidence gap: that sweep broke only decorators and wiring, so it proved the wiring had teeth and said nothing about the pipe spec.
+
+| Axis | Mutations | Result |
+| --- | --- | --- |
+| Wiring (7) | remove the `entities.module.ts` entry · remove `@GetResultVersion()` from `update` · from `findOne` · remove `@UsePipes` · remove `@UseGuards` · remove the route node · add the route to the exclude list | all red. The `update` case is the exact tautology attempt 1 missed: only `@ApiBody`'s `in: 'body'` entry remained |
+| DTO rules (9) | `IsExclusiveOfActorMode('disaggregated')` removed from **each of the four fields individually** · `('aggregate')` from `actors_count` · `@Min(0)`→`@Min(-1)` · `@IsInt()`→`@IsNumber()` · `@Matches(/\S/)`→`/.*/` · `whitelist` false | all red. None stayed green; **none failed to compile** (T-06's lesson — an uncompilable mutation is not evidence) |
+
+**Implementer `Not Done / Assumptions`** (recorded verbatim, per the Step 2.3.0 rule):
+
+> None. All six scope items are implemented, the full two-axis mutation sweep is complete with every mutation independently confirmed red and restored, and the full suite is green at 336/2262.
+
+**Reviewer verdicts — both lenses `STATUS: PASS`.** All fifteen Done criteria discharged, each walked against an artifact; both lenses state explicitly that none is met only nominally.
+
+##### The findings worth keeping
+
+1. **The edge-count asymmetry held, and in T-07's favour.** Lens A grepped every site referencing `ResultInnovationUseModule` and confirmed **exactly one incoming graph edge** (`entities.module.ts:151`) — the route node is not an edge (that is DD-15's whole point) and neither is the import statement. So deleting that line *necessarily* reddens the membership assertion: the sweep's red is a structural consequence, not an observation. The Leader's instruction not to build a reachability walk here was therefore correct, and this is the clean **inverse of T-01**, where `ClarisaModule` has three redundant incoming edges and membership alone would have been the weaker assertion. One mechanic, two opposite correct answers, decided by edge count.
+2. **The tautology is closed for a checkable reason.** `@GetResultVersion()` contributes exactly three entries — `in: 'path'` (`resultCode`) plus two `in: 'query'` (`reportingPlatforms`, `reportYear`), confirmed in the installed `@nestjs/swagger` decorator sources. `expectVersioningParams` names all three, and on `update` the `@ApiBody` entry is *separately* asserted as `in: 'body'`, so `arrayContaining` cannot be satisfied by `@ApiBody` alone. Metadata is defined per-method on `descriptor.value`, so the two handlers' assertions are genuinely independent. **The previously-false comment was corrected and both lenses verified every factual claim in the new one at source** — a corrected assertion under a still-wrong comment would have been a trap for the next reader, which is why the comment was part of the remediation rather than cosmetic.
+3. **AC.3's four cases fail for the right reason, provably.** Case 2's payload seeds `5` — valid for `@IsInt` and `@Min(0)` — so the exclusivity constraint is the only rule that can fire, and `expectRejectedNaming` additionally demands the fragment `sex_age_disaggregation_not_apply`, which **only** `IsActorCountModeExclusiveConstraint.defaultMessage` can emit. The wrong-reason substitution Lens B flagged at attempt 1 is structurally excluded, not merely unobserved.
+4. **The reported 2-vs-1 mutation asymmetry has exactly the offered cause.** Lens B checked every other site touching `women_youth_count` — Case 1's negative/fractional cases fail on `@Min`/`@IsInt` with the flag `false`, Case 6 supplies no counts, Case 9 supplies it with the flag `false` where the rule correctly passes — and found precisely two cases depend on that one decorator. No alternative cause.
+5. **The `whitelist` mutation's scope, stated precisely.** Case 9 binds the option on the pipe *the spec constructs*; it is structurally blind to the controller's `@UsePipes` options, exactly as the file's own comment says. The controller's options are bound separately by the `PIPES_METADATA` assertion reading Nest's real `validatorOptions` / `isTransformEnabled`. Both halves exist; nothing is left ungated.
+6. **Arithmetic reconstructed by hand, independently, by both lenses.** Controller spec: 13 wiring + 30 pipe = 43 cases, versus attempt 1's 13 + 27 = 40 → **+3**, exactly Case 2 expanding 1 → 4 under `it.each`. Two new suites contribute +2 suites / +2 tests. 334 + 2 = 336; 2257 + 3 + 2 = 2262. Every `it.each` expanded by its array length; no test hidden in a loop, none double-counted.
+7. **AC.7's second half is true but unasserted, and Lens A checked it rather than assuming.** AC.7 needs *not excluded* **and** *actually in scope*; `app.module.ts:106-109` calls `.forRoutes({ path: '*', method: RequestMethod.ALL })`, so `JwtMiddleware` genuinely covers the route. The spec asserts only the first half — sound but incomplete, and the criterion asks for no more. Recorded as advisory below rather than silently treated as covered.
+8. **A brief error corrected, again.** The Leader's brief said a `*.module.spec.ts` precedent existed (three files). Lens A found **four**, including `app.controller.spec.ts` / `app.service.spec.ts` siblings validating `app.module.spec.ts`'s placement. Second consecutive round in which a Leader "precedent" claim was wrong in the worker's favour — see the Kaizen pointer.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+2,262 green tests are **not** behavioral coverage of this section. Every repository in this tier is mocked (`design.md` §10.1: *"Cannot prove … Anything about actual persistence"*), and this diff adds **no HTTP seam at all**.
+
+- **The `404` symptom is now gated by a `@Module()` metadata read, not by a booted app answering `200`.** That is exactly what the corrected R-IUA-013 AC.5 asks for, and it is still **one abstraction short of the symptom** — worth stating plainly, since this task's whole Pivot was caused by an abstraction one step short of a symptom.
+- **Not proven:** that Nest invokes the `@UsePipes` pipe at request time. `PIPES_METADATA` proves the decorator is attached with the right options; the pipe spec proves the rules work on a pipe the test built.
+- **AC.7's residual, as DD-16 requires it be stated:** the exclude-list assertion proves the *mechanism* producing the `401`, **not a live `401`**. No tier in this spec proves that — §10.1 rules the fixture tier out of auth entirely. The file records this itself.
+- **Owed to T-09 (F-A):** R-IUA-003 AC.1 (with T-06), AC.3, AC.6 audit columns, AC.7's `AND IT MUST NOT hard-delete B`, scenario 2; the persistence half of R-IUA-002 AC.1–AC.6 and R-IUA-007 AC.1/AC.3. KZ-006's one end-to-end criterion for this spec lands there, not here.
+- **Owed to T-10 (F-B):** role isolation — R-IUA-003's `BUT NOT deactivate any row whose actor_role_id is not INNOVATION_USE`, R-IUA-007 AC.4.
+- **Owed to T-11 (F-C/F-D):** R-IUA-006's `id 6` vs `id 7` discriminating pair (trap 2), and R-IUA-010's order clause — with §10.5's standing caveat that **F-D cannot falsify a missing order clause**.
+- **Owed to T-12 (F-E):** R-IUA-001, R-IUA-011, R-IUA-012.
+- **Owed to T-13:** R-IUA-013 AC.3 in full (the human `/swagger` check is the only gate for `@ApiProperty` ×25 and both handlers' Swagger surface), AC.7, NFR-IUA-001, and `npm run test:cov` ≥ 60%. Coverage was not measured this attempt; T-07's criteria do not ask for it, and the added production code is two lines plus a fully-exercised controller, so no regression is plausible.
+
+#### `ADVISORY` findings (4R lens — recorded, non-gating, and they do not become tasks)
+
+| # | Lens | Finding | Disposition |
+| --- | --- | --- | --- |
+| A-1 | Reliability | **Aggregate mode is never proven *usable*.** All eleven payloads containing `actors_count` expect a rejection, so mutating the constraint's aggregate branch to `return false` — making `actors_count` unsuppliable entirely — leaves the whole suite green. **This is the one surviving mutant on the DTO axis**, and it is asymmetric: the disaggregated branch's accept direction *is* bound by Case 9. One line closes it (`{actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 7}` must resolve with `actors_count === 7`). No Done criterion demands it — criterion 5's "two accept cases" are T-02's, delivered as Cases 6 and 7 | **Recorded; dies here.** Not actioned, T-07 not widened. Carried to `/akili-archive` as the strongest Kaizen candidate of this round |
+| A-2 | **Risk (auth-adjacent)** | **`app.module.spec.ts`'s comment overclaims regression protection.** *"A future change that widened the exclude list to cover the Innovation Use route would be caught by this assertion"* is **false** for any wildcard entry (`results/(.*)`, `*`) covering the route without the literal substring `innovation-use`. Both lenses found it independently. A maintainer adding such an entry would see the test pass and could read the comment as having vetted an auth bypass. DD-16 authorizes only the today-true claim, and all seven current excludes were checked against the route — none matches, so the assertion is correct today | **Recorded; dies here — but escalated to the user at the gate rather than buried**, because Lens B explicitly referred it to the Leader and the invited failure is an auth bypass a green test appears to have vetted. It is *not* a spec gap (nothing is wrong today, and the risk is future), so the Pivot path does not apply and T-07 is not widened. Recommended as a follow-up outside this spec |
+| A-3 | Reliability | `capturedExcludes` is **assigned, not accumulated** (`app.module.spec.ts:31`). A second `apply().exclude().forRoutes()` chain would overwrite the first, and an Innovation Use exclusion in the earlier chain would pass unnoticed — a *silent* pass, unlike the loud `TypeError` the double's other divergences produce. `push(...routes)` closes it | Recorded |
+| A-4 | Reliability | The index case does not assert the **innocent** row is unnamed. Scenario 2's `one valid row is not rejected because a sibling row is invalid` would still hold under a constraint that flagged row 0 too, since the assertion only checks presence. Structural risk is low (the constraint reads `args.object`, its own row) but one negative assertion — no message contains `actors.0` — would make it a fact rather than an inference | Recorded |
+| A-5 | Readability | (a) The pipe suite jumps `Case 7` → `Case 9` with no note that Case 8 is T-02's `@ApiProperty` criterion, exempt to T-13. (b) `fail(...)` at two sites is unreachable and undefined under jest-circus; if ever reached it surfaces as `ReferenceError` rather than the intended message. Inherited pattern | Recorded |
+| A-6 | Readability | The `@Roles` grep is anchored `/^\s*@Roles\(/m`, tighter than the criterion's "zero `@Roles` occurrences" — it would miss an inline `@UseGuards(RolesGuard) @Roles(...)`. Cannot be introduced without touching the import block | Recorded |
+| A-7 | Resilience | `app.module.spec.ts` is the **second** spec under `src/` importing `AppModule` — **the exact trigger condition T-01's own advisory named** (*"if a second graph spec appears, hoist the walk into a shared helper"*). Two unrelated titles now break on any import-time side effect added anywhere in the ~100-module graph | Recorded. The predicted trigger has fired; belongs to `/akili-archive` Kaizen, not to T-07 |
+| A-8 | Readability | `main.routes.spec.ts`'s header still reads `T-07 (R-IUA-013 AC.5)` unqualified, while post-correction AC.5 has two halves and that file covers only the route-file one. The insufficiency is recorded in `tasks.md` and in `entities.module.spec.ts`'s docstring, but not in the file a maintainer opens first | Recorded |
+| A-9 | Readability | `app.module.spec.ts:23` transcribes an exclude as `reports/:resultCode/pdf`; the real value is `reports/:resultCode(\d+)/pdf`. Cosmetic | Recorded |
+
+**Final verification:** `npm test -- --silent` → **336 suites / 2262 tests** green · `npx tsc --noEmit` clean · `npx eslint --no-fix` clean on all seven files — **all three re-run independently by the Leader**, not relayed.
+
+**Forward pointers created by T-07**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-08** | Its *Files touched* includes `results.module.ts (modified — import ResultInnovationUseModule)`. **That would add a second incoming edge** and weaken `entities.module.spec.ts`'s membership assertion from "structurally necessary" to "one of two paths". Decide deliberately whether T-08 still needs that import now that `entities.module.ts` carries the registration — if it does, the membership assertion should become a reachability assertion, or T-08 must not be read as the thing that makes the endpoints work |
+| **T-09 (F-A)** | The first tier that can prove the endpoints actually serve `200`. Everything above is metadata-level. Its harness is also KZ-006's one end-to-end criterion for this spec |
+| **T-13** | Human `/swagger` check owns R-IUA-013 AC.3 entirely — both own-declared handlers' `@ApiOperation`/`@ApiBody` **and** `@ApiProperty` ×25 — plus the DD-13 exemption confirmation on the catalog `GET`. Note the corollary: `total`-stripping is proven, but the Swagger contract a client reads is ungated until a human looks |
+| **Kaizen (archive)** | Four candidates: **(a)** advisory A-1, the surviving aggregate-mode mutant — a rejection-only test set never proves the accept direction; **(b)** the same mechanic can demand opposite assertions in two tasks, decided by graph edge count (T-01 needed reachability, T-07 needed membership) — so "use the stronger assertion" is not a general rule; **(c)** **two consecutive rounds in which a Leader brief asserted "precedent"/"no precedent" wrongly** and the Reviewer corrected it — brief claims about repo state should be grep-checked before dispatch; **(d)** a false comment accompanying a correct assertion is a defect worth gating on (attempt 1) but a merely overclaiming one may not be (A-2) — the line between them is whether the claim is false *today* |
+
+**Budget status:** **7 of 13 tasks complete.** **14 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2). Six tasks remain against ~10 rounds — the tasks left (T-09's harness, four fixture tasks, T-13's full gate) are the DB-dependent ones this spec has not yet exercised, so the remaining margin is thinner than 6-vs-10 suggests. Flagged at the gate, not deferred.
+

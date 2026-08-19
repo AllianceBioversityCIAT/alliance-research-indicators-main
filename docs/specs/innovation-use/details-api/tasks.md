@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[~]` — its own DD-15 instance plus three test-fidelity fixes are open; attempt 2 of 3 pending.** T-08 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **13 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` done (2026-08-19) — closed on attempt 2 after the Pivot.** T-08 … T-13 todo. Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **14 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -344,7 +344,7 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 - **Requirements covered:** R-IUA-013 (all ACs) · R-IUA-002 AC.7 · R-IUA-003 AC.5 · R-IUA-004 AC.1–AC.8 behaviorally
 - **Depends on:** T-06
 - **Size:** M (~210 LOC incl. spec) · **Effort:** `medium`
-- **Status:** ~~todo~~ → **`[~]` blocked (Pivot) 2026-08-19** — attempt 1 of 3 delivered the controller, module, route node and a genuinely behavioral pipe spec; both parallel lens Reviewers returned `STATUS: FAIL`. The loop was stopped by the Pivot Protocol with **2 attempts unspent**, because the blocking defect is in the approved design (`design.md` §2.1 omitted the module-graph files) and its fix reaches into T-01, already closed `[x]`. Evidence: [`./execution.md`](./execution.md) → *T-07* + *Pivot Record: T-07*
+- **Status:** ~~todo~~ → ~~`[~]` blocked (Pivot) 2026-08-19~~ → **`[x]` DONE 2026-08-19** — PASS on **attempt 2 of 3**, both lens Reviewers concurring; 2 review rounds. Attempt 1's blocking defect was DD-15 (a route node without a module-graph registration, both endpoints `404`), which also reached back into T-01 and forced a Pivot. Attempt 2 added the `entities.module.ts` registration with a membership assertion that is **structurally necessary** — the module has exactly one incoming graph edge — plus DD-16's AC.7 exclude-list assertion and the three Lens B test-fidelity fixes. 16-mutation **two-axis** sweep (7 wiring + 9 DTO-rule) all red; suite 336/2262, `tsc --noEmit` clean. Behavioural gates remain **T-09 (F-A)** … **T-12 (F-E)** and T-13's human Swagger check. Evidence: [`./execution.md`](./execution.md) → *T-07* + *Pivot Record: T-07* + *T-07 Attempt 2 — PASS*. **Pivot history retained below for audit:** — attempt 1 of 3 delivered the controller, module, route node and a genuinely behavioral pipe spec; both parallel lens Reviewers returned `STATUS: FAIL`. The loop was stopped by the Pivot Protocol with **2 attempts unspent**, because the blocking defect is in the approved design (`design.md` §2.1 omitted the module-graph files) and its fix reaches into T-01, already closed `[x]`. Evidence: [`./execution.md`](./execution.md) → *T-07* + *Pivot Record: T-07*
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 **Files touched**
@@ -371,21 +371,21 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 **Done criteria**
 
-- [ ] Both handlers return the envelope via `ResponseUtils.format` *(R-IUA-013 AC.1, and the **envelope half of R-IUA-002 AC.1** — T-05 supplies the section object that becomes `data`; the `ServerResponseDto` wrapper and `status: 200` are discharged here)*
-- [ ] PATCH carries `ResultStatusGuard`; the spec covers **one allowed and one denied** result status. The denied case asserts **`400`**, the guard's actual `BadRequestException` — not `403` *(R-IUA-003 AC.5)*
-- [ ] Both handlers carry `@GetResultVersion()` *(R-IUA-013 AC.4)*
-- [ ] The module is registered under `results` as `innovation-use` *(AC.5)*
-- [ ] **Behavioral pipe spec:** construct `new ValidationPipe({ whitelist: true, transform: true })` and call `.transform(payload, { type: 'body', metatype: CreateResultInnovationUseDto })` over every T-02 case — negative, fractional, both-modes, missing `actor_type_id`, blank OTHER name, and the two accept cases *(R-IUA-004 AC.1–AC.4, AC.6–AC.8)*
-- [ ] The same pipe spec proves a payload carrying `total` is **accepted** and `total` is **absent** from the transformed object *(R-IUA-004 AC.5, and its scenario's `BUT it must NOT reject the request merely because total was present`)*
-- [ ] The both-modes rejection message identifies the offending row by index *(R-IUA-004 scenario 2's `AND IT MUST apply the check per row … the message identifies the offending row`)*
-- [ ] **`ResultInnovationUseModule` is in `entities.module.ts`'s `imports`, asserted over `Reflect.getMetadata('imports', EntitiesModule)`** — not merely present in `main.routes.ts` *(DD-15, trap 4. **Added 2026-08-19 by the Pivot.** This is what makes the two handlers reachable rather than `404`. Do **not** rely on T-08's planned `results.module.ts` import to supply it — that would make the endpoints work as a side effect of an unrelated task, with no registration where a maintainer would look)*
-- [ ] **The route is absent from `AppModule`'s `JwtMiddleware` `exclude` list**, asserted directly *(R-IUA-002 AC.7 per **DD-16**. **Added 2026-08-19 by the Pivot** — AC.7 was claimed by this task's *Requirements covered* line and by §3's matrix, but no Done criterion carried it. The residual is recorded, not hidden: this proves the mechanism that produces the `401`, not a live `401`, which needs an HTTP seam this spec's unit tier does not have)*
-- [ ] **The `@GetResultVersion()` assertion is falsifiable on BOTH handlers** — assert the specific parameters the decorator contributes (the `in: 'path'` entry plus the two `in: 'query'` entries from `versioning.decorator.ts`), never `params.length > 0` *(**added 2026-08-19 by the Pivot.** `@ApiBody` writes into the same `DECORATORS.API_PARAMETERS` array, so a length check on the PATCH handler is a tautology that survives deleting the decorator)*
-- [ ] **R-IUA-004 AC.3 is exercised on all four disaggregated count fields**, not one *(**added 2026-08-19 by the Pivot.** AC.3 is universally quantified over the four; `it.each` over the existing `disaggregatedFields` array. KZ-002 — one field is a convenient proxy for the real thing)*
-- [ ] **The both-modes rejection message names `sex_age_disaggregation_not_apply`**, not only the offending count field *(R-IUA-004 scenario 2's `AND errors names the conflict between the mode flag and the disaggregated field`; **added 2026-08-19 by the Pivot** — a field-path-only match would also be satisfied by a `@Min(0)` message)*
-- [ ] `grep` over the controller returns **zero** `@Roles` occurrences *(DD-5)*
-- [ ] No `console.*` introduced *(AC.6)*
-- [ ] `npm test -- --silent` green
+- [x] Both handlers return the envelope via `ResponseUtils.format` *(R-IUA-013 AC.1, and the **envelope half of R-IUA-002 AC.1** — T-05 supplies the section object that becomes `data`; the `ServerResponseDto` wrapper and `status: 200` are discharged here)*
+- [x] PATCH carries `ResultStatusGuard`; the spec covers **one allowed and one denied** result status. The denied case asserts **`400`**, the guard's actual `BadRequestException` — not `403` *(R-IUA-003 AC.5)*
+- [x] Both handlers carry `@GetResultVersion()` *(R-IUA-013 AC.4)*
+- [x] The module is registered under `results` as `innovation-use` *(AC.5)*
+- [x] **Behavioral pipe spec:** construct `new ValidationPipe({ whitelist: true, transform: true })` and call `.transform(payload, { type: 'body', metatype: CreateResultInnovationUseDto })` over every T-02 case — negative, fractional, both-modes, missing `actor_type_id`, blank OTHER name, and the two accept cases *(R-IUA-004 AC.1–AC.4, AC.6–AC.8)*
+- [x] The same pipe spec proves a payload carrying `total` is **accepted** and `total` is **absent** from the transformed object *(R-IUA-004 AC.5, and its scenario's `BUT it must NOT reject the request merely because total was present`)*
+- [x] The both-modes rejection message identifies the offending row by index *(R-IUA-004 scenario 2's `AND IT MUST apply the check per row … the message identifies the offending row`)*
+- [x] **`ResultInnovationUseModule` is in `entities.module.ts`'s `imports`, asserted over `Reflect.getMetadata('imports', EntitiesModule)`** — not merely present in `main.routes.ts` *(DD-15, trap 4. **Added 2026-08-19 by the Pivot.** This is what makes the two handlers reachable rather than `404`. Do **not** rely on T-08's planned `results.module.ts` import to supply it — that would make the endpoints work as a side effect of an unrelated task, with no registration where a maintainer would look)*
+- [x] **The route is absent from `AppModule`'s `JwtMiddleware` `exclude` list**, asserted directly *(R-IUA-002 AC.7 per **DD-16**. **Added 2026-08-19 by the Pivot** — AC.7 was claimed by this task's *Requirements covered* line and by §3's matrix, but no Done criterion carried it. The residual is recorded, not hidden: this proves the mechanism that produces the `401`, not a live `401`, which needs an HTTP seam this spec's unit tier does not have)*
+- [x] **The `@GetResultVersion()` assertion is falsifiable on BOTH handlers** — assert the specific parameters the decorator contributes (the `in: 'path'` entry plus the two `in: 'query'` entries from `versioning.decorator.ts`), never `params.length > 0` *(**added 2026-08-19 by the Pivot.** `@ApiBody` writes into the same `DECORATORS.API_PARAMETERS` array, so a length check on the PATCH handler is a tautology that survives deleting the decorator)*
+- [x] **R-IUA-004 AC.3 is exercised on all four disaggregated count fields**, not one *(**added 2026-08-19 by the Pivot.** AC.3 is universally quantified over the four; `it.each` over the existing `disaggregatedFields` array. KZ-002 — one field is a convenient proxy for the real thing)*
+- [x] **The both-modes rejection message names `sex_age_disaggregation_not_apply`**, not only the offending count field *(R-IUA-004 scenario 2's `AND errors names the conflict between the mode flag and the disaggregated field`; **added 2026-08-19 by the Pivot** — a field-path-only match would also be satisfied by a `@Min(0)` message)*
+- [x] `grep` over the controller returns **zero** `@Roles` occurrences *(DD-5)*
+- [x] No `console.*` introduced *(AC.6)*
+- [x] `npm test -- --silent` green
 
 **Verification & its limits**
 
