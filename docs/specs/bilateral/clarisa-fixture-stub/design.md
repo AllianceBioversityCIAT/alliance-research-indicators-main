@@ -92,12 +92,28 @@ Everything new lives under one folder so removal is a single `rm -rf` plus two s
 | `src/domain/tools/clarisa/stub/clarisa-stub.fidelity.spec.ts` | The fidelity check (R-CFS-005) — runs in `npm test` |
 | `src/domain/tools/clarisa/stub/clarisa-stub.router.spec.ts` | Raw-shape, flag-gating and mount-narrowness tests |
 
-**Modified existing files — exactly two:**
+**Modified existing files — exactly three** *(amended 2026-08-19 during execution; was two)*:
 
 | Path | Change |
 |---|---|
-| `src/main.ts` | One env-gated `app.use(prefix, router)` block, placed **after** `helmet`/`json`/`enableCors` and **before** `listen()` |
+| `src/main.ts` | One **unconditional** `app.use(prefix, router)` block, placed **after** `helmet`/`json`/`enableCors` and **before** `listen()`. See DD-9 — this must **not** be wrapped in an `if` |
 | `.env.example` | Document `ARI_CLARISA_STUB_ENABLED`, the stub `ARI_CLARISA_HOST` values, the trailing slash, and the removal condition |
+| **`nest-cli.json`** | **+1 `assets` entry** so the fixture reaches `dist`. See DD-10 |
+
+> **Why the count moved from two to three.** T-05's Reviewer found that the running application
+> **never sees the fixture**. `clarisa-stub.router.ts` resolves it as `join(__dirname, 'fixtures', …)`,
+> but the app always runs from `dist` (`start:prod` is `node dist/main`; the Dockerfile production
+> stage copies only `/app/dist` + `node_modules` and **no `src`**), and nothing puts that JSON in
+> `dist`: `nest-cli.json`'s single `assets` entry covers only `domain/entities/reports/assets/**/*`,
+> and `tsc` emits only **imported** `.json` — this file is read through `fs`, never imported.
+> Verified by the Leader against `nest-cli.json`, `package.json` and `Dockerfile:54-74`.
+>
+> **The symptom is the one R-2 exists to prevent:** ENOENT → the handler's JSON 500 →
+> `Clarisa.get()` wraps it in a `BadRequestException` → reads as a CLARISA outage. **No test could
+> catch it**: both `jest.config` and `test/jest-e2e.json` run ts-jest over `src`, so `__dirname`
+> resolves into the source tree and all 20 of T-05's tests pass against a file that will not exist in
+> the field. This is the *harness structurally cannot evaluate the property* case, arriving in a place
+> the spec's own DC table never anticipated.
 
 ### 2.2 Reuse
 
@@ -234,7 +250,7 @@ No `sync_process_log` rows, no new metrics or dashboards. The existing `"Zero el
 
 | Suite | Covers | Notes |
 |---|---|---|
-| `clarisa-stub.fidelity.spec.ts` (unit) | R-CFS-001, R-CFS-002, R-CFS-005 — key-set equality vs the reference capture, type assertions, dictionary byte-equality, the 140/170 count, HML vocabulary, allocation sums, the 7-item divergence list as a **closed set** | The largest test artifact. Compares generated data against committed real data — no mocks |
+| `clarisa-stub.fidelity.spec.ts` (unit) | R-CFS-001, R-CFS-002, R-CFS-005 — key-set equality vs the reference capture, type assertions, dictionary byte-equality, the 140/170 count, HML vocabulary, allocation sums, the 8-item divergence list as a **closed set** | The largest test artifact. Compares generated data against committed real data — no mocks |
 | `clarisa-stub.router.spec.ts` (unit) | R-CFS-003, R-CFS-004 — raw array root, no envelope keys, token shape, and 404 across unset / truthy / unrecognised flag values | Exercises the router as an Express handler with fake req/res; no Nest bootstrap needed |
 | `test/clarisa-stub.e2e-spec.ts` (e2e) | R-CFS-003 AC.4, R-CFS-006 AC.1–4 — mount ordering without a JWT, sibling-prefix non-match, an unrelated route still enveloped and still 401 | The **only** place mount ordering can be proven; a unit test cannot see it. Pattern already validated (M-19) |
 | Converter determinism (unit) | R-CFS-007 — two runs, **byte** diff | Must compare bytes; a parsed comparison normalizes the defect away (DC-8) |
@@ -273,6 +289,10 @@ Per **KZ-003**, the full suite is re-measured after implementation, not only the
 | **DD-6** | 2026-08-18 | Provenance lives in a **sibling file**, not inside the fixture array | Determinism (R-CFS-007): a generation date inside the payload makes every regeneration a diff, and would leak a non-CLARISA key into a 32-key contract |
 | **DD-7** | 2026-08-18 | Keep the export **out** of the repository | It carries PI names and emails. The converter is committed, so a future export regenerates without the file ever being tracked |
 | **DD-8** | 2026-08-18 | Do **not** Swagger-document the stub | It impersonates CLARISA; publishing it as ARI API surface invites a consumer, and consumers outlive stubs |
+| **DD-9** | **2026-08-19** | **T-06 mounts the router UNCONDITIONALLY.** The routes are always registered; the flag decides **per request** (404 vs real response). §2.1's earlier phrase *"env-gated `app.use`"* describes the block's **effect**, not a syntactic `if` | **A conditional mount is the failure mode, not belt-and-braces.** `JwtMiddleware` is applied `.forRoutes({path:'*'})` with no stub entry in `.exclude(...)`, so with the flag unset an unmounted stub path falls through to it and returns **401** — measured in M-19, where an unmatched sibling under the prefix did exactly that. That directly violates R-CFS-004's *"BUT it must NOT be a 401, 403, or 500 — those disclose that a handler exists"* and AC.1. NFR-CFS-004's *"registered-but-404ing handlers"* is the tiebreaker text, and requirements outrank design where they conflict |
+| **DD-10** | **2026-08-19** | Ship the fixture to `dist` via a **`nest-cli.json` `assets` entry**, mirroring the existing `domain/entities/reports/assets/**/*` precedent | Keeps the `fs` read seam, the lazy load, and all 20 router tests intact. The rejected alternative — a lazy `require()` of the JSON (viable, since `tsconfig.json` sets `resolveJsonModule`) — would hold the "exactly two modified files" count but swaps the `fs` seam for Node's module cache, forcing a rewrite of the no-read-when-disabled and unreadable-fixture tests. Paying one extra modified file is cheaper than weakening two tests. **`nest-cli.json` is not in NFR-CFS-002's named list**, so the zero-diff gate is unaffected |
+
+> **DD-10 needs a gate that can go red today (K-004).** `npm run build && ls dist/domain/tools/clarisa/stub/fixtures/clarisa-projects.fixture.json` — **observe it FAIL before the fix**, then pass after. A packaging fix whose gate was never seen red is exactly the class of change that silently regresses when someone later prunes `assets`.
 
 ### Reversion challenge — DD-1 (mandated, Step 2.3)
 

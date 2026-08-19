@@ -125,9 +125,9 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-005 (all ACs + scenario), R-CFS-001 AC.2, R-CFS-002 AC.2/AC.3/AC.4/AC.5
 - **Design refs:** §10, DD-2, DD-4
-- **Status:** [ ] · **Size:** L (~230 LOC) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
+- **Status:** [x] · **Size:** L (~230 est · **820 actual**, 26 tests) — PASS on attempt 2; attempt 1 FAILed (missing D-8 assertion) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
 
-**Scope.** `clarisa-stub.fidelity.spec.ts`, running in `npm test`. Compares the generated fixture against the committed reference capture and asserts the divergence list is a **closed set of exactly seven**. This is the KZ-001 gate: it exists to catch a fixture that looks right and evaluates wrong.
+**Scope.** `clarisa-stub.fidelity.spec.ts`, running in `npm test`. Compares the generated fixture against the committed reference capture and asserts the divergence list is a **closed set of exactly eight**. This is the KZ-001 gate: it exists to catch a fixture that looks right and evaluates wrong.
 
 **Implementation notes**
 - Key-set equality **in both directions** — a missing key and an extra key are different defects and both must fail.
@@ -136,20 +136,20 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 - Assert `complementarity`/`efficiencies` ∈ `{high, medium, low}` across all 283 mappings, and that no `H`, `M` or `L` appears.
 - Assert `allocation` is `typeof 'number'` and per-project allocations sum to **100**.
 - Assert each `global_unit_object` is byte-equal to its dictionary entry.
-- Enumerate divergences **D-1…D-7** as the complete expected set; an eighth must fail, and the failure message must distinguish *recorded* from *new*.
+- Enumerate divergences **D-1…D-8** as the complete expected set; a ninth must fail, and the failure message must distinguish *recorded* from *new*.
 - Print the divergence list on success, so a reader of a passing run still sees the gaps (R-CFS-005 AC.3).
 - Re-derive the eligible cohort using the **shipped** predicates imported from `project-selector.util.ts` — never a local reimplementation, or the check drifts from the code it is defending.
 
 **Verification**
-- [ ] `npm test -- --silent` passes with the check included.
-- [ ] The passing output lists all seven recorded divergences.
+- [ ] `npx jest <this spec> --silent` passes with the check included.
+- [ ] The passing output lists all eight recorded divergences. **Run this one WITHOUT `--silent`** — jest suppresses test `console.log` under `--silent`, so AC.3 is unobservable through the flag the line above uses. The two bullets measure different things and need different invocations.
 
 **Named falsifying inputs (each must produce a FAIL — this is the K-004 obligation, and citing K-004 is not applying it).**
 1. **The headline mutation:** hardcode `cgiar_entity_type_object.code = 22` for every program in the converter → `has_science_programs` becomes **170**, the assertion expecting **140** fails. *This is the exact defect the proposal's §10 invited; if this mutation does not redden the suite, the gate is worthless.*
 2. Add a key (`principal_investigator_email`) to one fixture element → key-set equality fails.
 3. Remove a key (`remaining`) from one element → key-set equality fails **in the other direction**.
 4. Change one `phase` to the string `"2026"` → type assertion fails.
-5. Add an eighth divergence → the closed-set assertion fails, and the message says *new*, not *recorded*.
+5. Add a ninth divergence → the closed-set assertion fails, and the message says *new*, not *recorded*.
 
 **What disqualifies this evidence.** A green run proves nothing until at least mutations **1–3** have been observed reddening the suite (K-004). Record which mutations were actually executed; **"the check passes" is not the evidence — "the check failed when broken, then passed when fixed" is.** A presence-assertion (`the field exists`) explicitly does **not** discharge AC.2/AC.3: a green test has previously certified a clamp whose classes were all present and whose effect was a no-op. The **140-vs-170 arithmetic** is the behavioural proof.
 
@@ -159,7 +159,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 
 - **Requirements covered:** R-CFS-003 AC.1/AC.2/AC.3, R-CFS-004 (all ACs + scenario)
 - **Design refs:** §2.1, §4, §5.3, §9, DD-1, DD-5, DD-8
-- **Status:** [ ] · **Size:** M (~200 LOC incl. tests) · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
+- **Status:** [~] · **Size:** M (~200 est · **426 attempt-1**) — attempt 1 FAILed (fixture absent from `dist`; logging fields); attempt 2 queued · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 **Scope.** `clarisa-stub.router.ts` + `clarisa-stub.config.ts` + `clarisa-stub.router.spec.ts`. Two Express handlers returning CLARISA's raw shapes, plus the flag parsing. No Nest DI — the router must be mountable before the pipeline exists.
 
@@ -195,7 +195,7 @@ Orange = the gate the whole fidelity argument rests on. Blue = the only coverage
 - **Design refs:** §2.1, §5.3, §8, DD-1, V-1, V-2
 - **Status:** [ ] · **Size:** S (~90 LOC incl. e2e) · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `api-design-principles`
 
-**Scope.** One env-gated `app.use(prefix, router)` block in `main.ts`, placed **after** `helmet`/`json`/`enableCors` and **before** `listen()`. Plus `test/clarisa-stub.e2e-spec.ts` — the only place mount ordering is observable.
+**Scope.** One **unconditional** `app.use(prefix, router)` block in `main.ts` — **no `if` wrapper** (DD-9: a conditional mount lets an unmounted stub path fall through to `JwtMiddleware` and return **401**, violating R-CFS-004). The flag is enforced per-request inside the router, which T-05 already built. Placed **after** `helmet`/`json`/`enableCors` and **before** `listen()`. Plus `test/clarisa-stub.e2e-spec.ts` — the only place mount ordering is observable.
 
 **Implementation notes**
 - Position is a **design constraint, not a detail**: mounting before `helmet` would strip security headers from the stub (reversion challenge #3).

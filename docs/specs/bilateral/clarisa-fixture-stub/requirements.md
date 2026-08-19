@@ -283,10 +283,27 @@ Divergences that MUST be enumerated, each already measured:
 | D-5 | `interim_director_review`, `project_results` have no export counterpart | Present as `null`; any consumer of them sees nothing |
 | D-6 | `lead_institution_object` / `funder_institution_object` are `null` | The export carries names but no institution ids; synthesizing them would invent CLARISA identifiers |
 | D-7 | PI name/email are dropped | Intentional (no CLARISA counterpart), with the welcome side effect of keeping contact details out of git |
+| **D-8** | **`organization_code` / `funder_code` are `null`** — the export carries no institution ids, and synthesizing them would invent CLARISA identifiers (DD-2). Measured: `organization_code` is `null` in **198/198** fixture projects and populated in **5/5** reference projects (45, 45, 45, 49, 5); `funder_code` is `null` in 198/198 fixture and **4/5** reference | Present as `null`; any consumer of them sees nothing. Same rationale as D-6 and same consequence wording as D-5 |
+
+> **D-8 was added on 2026-08-19, during execution, after T-04's Reviewer ruled its absence a FAIL.**
+> The converter's behaviour is **correct and unchanged** — nulling these fields is right, because
+> populating them would fabricate CLARISA identifiers. Only the *record* was missing. The row was
+> owed from the start: three authors independently filed these two fields under D-6's rationale
+> (T-02's Reviewer, T-04's Implementer, and `convert-export.ts`'s own header, which cites DD-2/D-6 by
+> name) and none of them wrote the row. See `execution.md` → T-04 attempt 1.
+>
+> **Why the `annual` precedent did not extend to them.** Design §5.2 step 3 is one sentence with two
+> halves — *"Map the fields the export supplies; set **the rest** to the value CLARISA returns."*
+> `annual` was ruled immaterial because it sits in the **first** half (the export supplies it).
+> `organization_code` sits in the **second**. And D-5 is the standing proof that a nulled field with
+> no consumer still earns a row: `interim_director_review` and `project_results` are not even in the
+> shipped `ClarisaProject` DTO, so they have strictly *fewer* consumers than these two, which are
+> declared at `clarisa-project.types.ts:74-75`.
 
 **Acceptance criteria**
 - [ ] AC.1 — The check runs in CI (`npm test`) and fails on any key-set or type mismatch against the reference capture.
-- [ ] AC.2 — The seven divergences above are asserted as the **complete** expected set; an eighth divergence fails the check.
+- [ ] AC.2 — The **eight** divergences above are asserted as the **complete** expected set; a **ninth** divergence fails the check.
+- [ ] AC.2b — D-8's assertion covers the **fixture side for both fields** (`organization_code` and `funder_code` are `null` in all 198) but the **reference side for `organization_code` only** (populated in 5/5). `funder_code` is populated in just 1 of 5 reference projects, so asserting its reference side would be an n=5 sampling artefact, not a divergence check.
 - [ ] AC.3 — The check reports the divergence list in its output, so a reader of a passing run still sees the gaps.
 
 #### Scenario: A new divergence is not absorbed silently
@@ -436,7 +453,8 @@ This trades one risk for a different, smaller one, and the review target changes
 | `ClarisaProjectsService` + predicates + resolver | **None.** Exercised, never modified (NFR-CFS-002) |
 | `clarisa.connection.ts` | **None.** Same call, different `ARI_CLARISA_HOST` |
 | `app.module.ts` | **None.** The `exclude` list is not widened (M-19, R-CFS-006) |
-| `main.ts` | **+1** env-gated mount block in bootstrap — the only edit to an existing shared file |
+| `main.ts` | **+1** unconditional mount block in bootstrap (DD-9) |
+| `nest-cli.json` | **+1** `assets` entry so the fixture reaches `dist` (DD-10, added 2026-08-19) |
 | `ResponseInterceptor` | **Unchanged and never reached** by the stub, which is served ahead of the Nest pipeline (R-CFS-003) |
 | Swagger | The stub is **not** documented, by design — it is a temporary substitute, not API surface |
 | `ARI_CLARISA_HOST` | Gains a **third** possible target (**K-005**). Today: line 11 test (active), line 12 prod (commented). The stub becomes a third commented option |

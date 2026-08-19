@@ -501,3 +501,362 @@ numeric allocations, 566 HML values, `22`×205 + `23`/`24`×78, 28 `window3` row
 | provenance retains `capture` block | 13 dictionary entries preserved |
 | provenance has `export` block | row_count 198 |
 | uniform 32-key set across all 198 | 1 distinct set, 32 keys |
+
+---
+
+### LE-2 — Leader error: K-014 committed twice by the Leader, in the same session, on the same lesson
+
+Advisory F (T-02) asked for a coverage measurement across T-01+T-02. Run: **exit 0, 2302 tests passed**
+(2271 + T-02's 31 — arithmetic consistent). Jest fails a run when a configured `coverageThreshold` is
+not met, so the **60% global floor holds** and design §10's claim survives. **Advisory F resolved.**
+
+**But the percentage is again unrecorded, for the second time, by the same mistake.** The first run's
+output was truncated past the `All files` row. For the second run the Leader filtered with
+`grep -E "^All files|…"` — and jest prefixes that row with **ANSI colour escapes**, so a `^`-anchored
+pattern can never match it. Zero hits was read as "not in the output" when it meant "excluded by my own
+filter".
+
+This is **K-014 exactly as written** — *"`migration:show` emits ANSI escapes, so `grep '^\[ \]'` matched
+nothing and read as zero pending"* — committed by the Leader who copied that same lesson into two worker
+briefs in this run. **Citing a lesson is not applying it (K-004's facet, now demonstrated on K-014).**
+Correct habit, adopted for the rest of this run: normalize with `sed 's/\x1b\[[0-9;]*m//g'` before
+matching, or match unanchored, and always check the raw output before believing a count.
+
+Not re-run for the number: 277 s for a cosmetic figure, against a user instruction about test cost, when
+exit 0 already answers the question advisory F asked. **Known limit, stated rather than implied:** we
+know the floor is not breached; we do not know the headroom. If a later task pushes it under, the signal
+will be an abrupt exit-code failure rather than a gradual reading.
+
+### LE-3 — Concurrency rule bent by the Leader (no observed harm)
+
+The T-01+T-02 coverage run was launched in the background and was **still executing when
+`impl-T04-fidelity` was spawned**, briefly overlapping a measurement with an active worker — the precise
+thing root `CLAUDE.md` §4.3 forbids, and the documented cause of phantom `excel-workbook.builder.spec.ts`
+failures in this repo twice.
+
+**Mitigating facts, not an excuse:** the overlap was seconds at the tail of a 277 s run, and a freshly
+spawned worker is loading skills and reading files rather than running jest. **No harm observed** — the
+coverage run exited 0 with a consistent test count.
+
+**Recorded because the failure mode is invisible when it does fire:** it surfaces as an inexplicable
+error in the *other* worker, not in the measurement. If `impl-T04-fidelity` reports an anomalous or
+unreproducible test failure, this overlap is the first hypothesis to test, and the correct response is to
+re-measure in isolation before believing the failure. Sequencing rule for the rest of this run:
+**a background measurement must be confirmed finished before the next worker is spawned.**
+
+---
+
+### T-04 — The fidelity check — **attempt 1: FAIL** (rework in progress)
+
+| Field | Value |
+| --- | --- |
+| **Status** | `[~]` — attempt 1 FAILed, attempt 2 pending |
+| **Date** | 2026-08-19 |
+| **Implementer** | `impl-T04-fidelity` — T2 / `sonnet`, effort **high** |
+| **Reviewer** | `rev-T04-fidelity` — T3 / `opus`. Delivered without a poke |
+
+#### The finding — an eighth divergence sat in the data the gate certified
+
+`STATUS: FAIL`, one blocking issue, and it is the most valuable result of this run.
+
+The Implementer built a strong artifact — 25 tests, six mutations each **neutralized and re-run** to prove
+redness causally depends on the mutation, expected values traced to spec text rather than to the fixture.
+It then declined the brief's "per-field type agreement" for a stated reason: a literal sweep *"would fail
+against the current, already-reviewed, committed fixture — not against a mutation — which can't be right."*
+
+**The Reviewer ruled that sentence is the finding, stated correctly and then discarded.** A gate reddening
+on committed data is the ordinary way a real defect surfaces; treating it as proof the gate is
+miscalibrated inverts the evidence.
+
+**Measured, and re-verified by the Leader:**
+
+| Field | Fixture | Reference capture |
+| --- | --- | --- |
+| `organization_code` | `null` **198/198** | populated **5/5** — `45, 45, 45, 49, 5` |
+| `funder_code` | `null` **198/198** | `null` 4/5 (one populated: `9510`) |
+
+`organization_code` is a 100%-vs-0% structural difference, not n=5 sampling noise.
+
+#### Why the `annual` precedent did not transfer — and why the Leader missed it
+
+Design §5.2 step 3 is **one sentence with two halves**: *"Map the fields the export supplies; set **the
+rest** to the value CLARISA returns."* The T-02 ruling placed `annual` in the **first** half — the export
+supplies it. `organization_code` is in the **second**. The precedent cannot cross that sentence, and both
+the Implementer and the **Leader** carried it across anyway.
+
+The refutation is in the spec's own table: **D-5's consequence column already reads *"Present as `null`;
+any consumer of them sees nothing."*** So a nulled field with no consumer demonstrably *does* earn a
+D-row — and `interim_director_review` / `project_results` are not even in the shipped `ClarisaProject`
+DTO, giving them strictly **fewer** consumers than `organization_code`/`funder_code`, which are declared
+at `clarisa-project.types.ts:74-75`. The Leader's "read by nothing ⇒ immaterial" test was refuted by the
+document the Leader wrote it from.
+
+**Convergence was fourfold and still nobody wrote the row:** T-02's Reviewer flagged it for T-04's
+attention · T-04's Implementer hit it and raised it again · `convert-export.ts`'s own header groups these
+fields with `lead_institution_object`/`funder_institution_object` and cites **DD-2/D-6 by name** · the
+Leader escalated the adjacent `annual` question. Three authors filed these fields under D-6's rationale
+and none amended the table.
+
+**The sharpest observation, worth keeping:** *the falsifier was fitted to the net.* Named mutation 5
+introduced its "eighth divergence" through `short_name`/`full_name` — the **one** non-key-set invariant
+Layer 2 happens to check — while a genuine eighth divergence sat untouched in the committed data. The
+mutation proved the net catches what the net was shaped around. This is a new facet of **K-004**
+(a falsifier authored from the design's own frame names a mutation the design already excludes), now
+observed on a *test-shaped* net rather than a design-shaped one. **Kaizen candidate.**
+
+#### Spec amendment — D-8 added (Leader, behaviour-preserving)
+
+Treated as a **defect in the requirements record**, not a Pivot: the design and approach are sound, the
+converter is **correct and unchanged** — nulling those fields is right, because populating them would
+fabricate CLARISA identifiers. Only the record was missing, and it was owed from the start.
+
+- `requirements.md` R-CFS-005 — **D-8 row added** with the measurement, plus a dated note explaining why
+  the `annual` precedent did not extend. **AC.2** now reads *eight … a ninth divergence fails*, and a new
+  **AC.2b** encodes the Reviewer's sampling nuance: assert the **fixture side for both** fields, the
+  **reference side for `organization_code` only** — `funder_code` is populated in just 1 of 5 reference
+  projects, so asserting its reference side would test an n=5 artefact.
+- **Correction Closure sweep, both directions, executed.** Forward: `design.md` §10 `7-item → 8-item`;
+  `tasks.md` T-04 scope `exactly seven → exactly eight`, `D-1…D-7 → D-1…D-8`, `an eighth must fail → a
+  ninth`, `all seven recorded → all eight`, named mutation 5 `eighth → ninth`. Backward: re-read each
+  referrer. **Two false positives deliberately left untouched** — *"the seven `source_*` fields"*
+  (a different seven) and `DD-7` (a design decision, not a divergence). This is exactly why the sweep
+  greps the literal and then re-reads context rather than mass-substituting.
+
+#### Also fixed while in the file — a self-contradicting verification pair (from advisory RISK)
+
+`tasks.md` T-04 required both `npm test -- --silent` **and** "the passing output lists all … recorded
+divergences". Jest's `--silent` suppresses test `console.log`, so **AC.3 is unobservable through the very
+flag the adjacent bullet mandates.** The two bullets measure different things and now carry different
+invocations. A spec that cannot satisfy its own AC under its own command is a gate that quietly does not
+exist.
+
+#### Confirmed sound by the Reviewer — recorded so it is not re-litigated on attempt 2
+
+- **K-008: the constants are not circular.** Every number traces to spec text authored before the fixture
+  existed — 198 → M-1, 170 → M-2, **140 / 30 → R-CFS-002 AC.3 verbatim**, 283 → AC.5, 22/23/24 → M-11/M-12,
+  `{high, medium, low}` → M-15. The derivation script measured; the *spec* is what is asserted.
+- **Mutations 5 and 6 genuinely test R-CFS-005's discrimination clause** — each asserts its own path fires
+  **and** the other does not, verified as a real two-by-two. "The best-executed part of the file."
+- Shipped predicates imported, not restated (T-02's forward pointer discharged) · cross-element key-set
+  equality asserted here, not inherited · `typeof allocation === 'number'` retained · histogram asserts
+  22 **and** 23 **and** 24 · vocabulary uses exact set equality, foreclosing `H`/`M`/`L` rather than
+  merely testing for them · dictionary oracle is key-order sensitive · scope clean, mutations operate on
+  JSON-round-trip clones so committed fixtures cannot be written (Leader confirmed sha256 unchanged).
+
+#### Rework dispatch — deliberately serialized
+
+Attempt 2 is **not** dispatched concurrently with `impl-T05-router`. Two Implementers in the same package
+both invoking jest is the combination root `CLAUDE.md` §4.3 names, and having just recorded **LE-3** for
+bending that rule it would be incoherent to bend it again by choice. Attempt 2 waits for T-05 to land.
+Effort bumps **high → xhigh** per the rework rule (a fix that failed is usually under-thinking).
+
+---
+
+### Runtime Incident RI-2 — Implementer killed by a session quota mid-task (T-04 attempt 2)
+
+| Field | Value |
+| --- | --- |
+| **Worker** | `impl-T04-attempt2` (T2 / `sonnet`, effort `xhigh`) |
+| **Signal** | `idleReason: failed` — *"You've hit your session limit · resets 11pm (America/Bogota)"* |
+| **Classification** | **Runtime failure, not a work FAIL.** An environment blocker; it says nothing about the quality of the work |
+| **State left behind** | **Partial, unreported, and unverified** — the most dangerous kind |
+
+**Why a died-mid-task worker is worse than one that never ran.** It leaves code on disk that *looks*
+finished and carries no evidence. Nothing distinguishes "complete and correct" from "half-applied" by
+inspection, and a Leader in a hurry would read a green suite as completion. The state was therefore
+established by measurement rather than assumed:
+
+| Probe | Result |
+| --- | --- |
+| File size | 778 (attempt 1) → **820** lines — work happened |
+| `npx jest <fidelity spec>` | **26 passed** (was 25) — the suite is green |
+| D-8 assertion present, with AC.2b asymmetry | **Yes** — *"funder_code is an n=5 sample, asserted fixture-side only"* |
+| Divergence count updated | **Yes** — `toHaveLength(8)`, "exactly eight" |
+| Named mutation 5 re-pointed | **Yes** — now drops `total_budget`, *"a field no D-row and no bespoke invariant covers"*, replacing the fitted-to-the-net `short_name`/`full_name` vehicle |
+| Stale `annual` precedent claim | **Corrected, not merely deleted** — the comment now states why the precedent cannot cross design §5.2 step 3's sentence, and cites the FAIL and the D-8 amendment |
+| Fixture integrity | sha256 `c13c4058…` **unchanged** |
+
+**Conclusion: the rework's *code* is materially complete; its *evidence* is entirely absent.** The two
+checks introduced by attempt 2 — the D-8 assertion and mutation 5's new vehicle — have **never been
+observed red**. Under K-004 that is exactly the gap that FAILed attempt 1, so the task cannot be closed
+on a green suite alone.
+
+**Recovery, per the per-role fallback table.** The Implementer's documented fallback is *"ask the user to
+approve the Leader-inline fallback"*. Before asking, the cheaper hypothesis was tested: **is the quota
+account-wide, or scoped to that worker's session?** A fresh Implementer (`impl-T04-evidence`) spawned
+**successfully**, which settles it — delegation is available, so no inline fallback is needed and
+**`author ≠ auditor` is preserved**. Testing the blocker beat reasoning about it: assuming the quota was
+global would have pushed the Leader into writing code it would then have had to avoid reviewing.
+
+The follow-up task is deliberately **narrow** — produce the missing K-004 evidence for the two new
+checks, end byte-identical, change no design — rather than a full re-dispatch of the rework. Re-running
+the whole task would risk a second worker rewriting correct code it had no reason to trust.
+
+---
+
+### T-05 — The stub router and its env gate — **attempt 1: FAIL** (rework queued)
+
+| Field | Value |
+| --- | --- |
+| **Status** | `[~]` — attempt 1 FAILed |
+| **Implementer** | `impl-T05-router` — T2 / `sonnet`, effort **high** |
+| **Reviewer** | `rev-T05-router` — T3 / `opus`. Delivered without a poke |
+| **Files** | `clarisa-stub.config.ts` (42) · `clarisa-stub.router.ts` (154) · `clarisa-stub.router.spec.ts` (230) |
+
+#### Issue 1 (blocking) — the running application never sees the fixture
+
+The single most valuable finding of the run, and **no test in this repository could have caught it.**
+
+`clarisa-stub.router.ts` resolves `FIXTURE_PATH = join(__dirname, 'fixtures', …)`. The application always
+runs from `dist`, and nothing puts that JSON there. **Verified by the Leader, not taken on trust:**
+
+- `nest-cli.json` declares exactly one `assets` entry — `domain/entities/reports/assets/**/*`. The stub
+  fixtures are not covered.
+- `tsc` emits only **imported** `.json`; this file is read through `fs` and never imported.
+- `Dockerfile:54-74` — the production stage copies `/app/dist`, `node_modules` and `package*.json`.
+  **`src` is not in the image at all**, and `CMD` is `node dist/main.js`.
+
+**Symptom:** with the flag on, ENOENT → the handler's (correct) JSON 500 → `Clarisa.get()` wraps it in a
+`BadRequestException` → **reads as a CLARISA outage.** That is precisely the misdirection R-2 exists to
+prevent, and it would have surfaced first at T-08's human check rather than at any gate.
+
+**Why it was invisible:** both `jest.config` and `test/jest-e2e.json` run ts-jest over `src`, so
+`__dirname` resolves into the source tree and **all 20 of T-05's tests pass against a file that will not
+exist in the field.** This is the *harness structurally cannot evaluate the property* case — the same
+class as DC-10, arriving in a place the spec's own defect-class table never anticipated. **Kaizen
+candidate: the DC table enumerated visual and staleness blind spots but not packaging ones.**
+
+**Resolution — DD-10.** Add a `nest-cli.json` `assets` entry mirroring the existing `reports/assets`
+precedent. The rejected alternative (a lazy `require()` of the JSON, viable since `resolveJsonModule` is
+set) would preserve design §2.1's "exactly two modified files" but swaps the `fs` seam for Node's module
+cache, forcing a rewrite of the no-read-when-disabled and unreadable-fixture tests. One extra modified
+file is cheaper than two weakened tests. **`nest-cli.json` is not in NFR-CFS-002's named list**, so the
+zero-diff gate is unaffected.
+
+**The fix carries a gate that can go red today (K-004):**
+`npm run build && ls dist/domain/tools/clarisa/stub/fixtures/clarisa-projects.fixture.json` — observe it
+FAIL before the fix, pass after.
+
+#### Issue 2 (minor) — logging fields, not levels
+
+Levels are right and the no-per-request rule is honoured, but design §9's **Fields** column was dropped:
+the `warn` omits the fixture path, the `debug` omits mapping count and byte size, and the `error` omits
+the path — absent *exactly* in the `JSON.parse` case where it is least inferable. These lines are the
+compensating control for the lost `LoggingInterceptor` (§5.3, reversion challenge #2); honouring the
+level while dropping the fields is what makes the compensation hollow.
+
+#### Priority ruling — always-register is CORRECT, and it changes T-06
+
+The Reviewer ruled **in the Implementer's favour**, and the reasoning inverts what the design's wording
+implied:
+
+> A conditional mount is **the failure mode, not belt-and-braces.** `JwtMiddleware` is applied
+> `.forRoutes({path:'*'})` with no stub entry in `.exclude(...)`. With the flag unset and the mount
+> wrapped in an `if`, the two stub paths are never registered, fall through to `JwtMiddleware`, and
+> return **401** — violating R-CFS-004's *"BUT it must NOT be a 401, 403, or 500 — those disclose that a
+> handler exists."* M-19 already measured this: an unmatched sibling under the prefix fell through to 401.
+
+Recorded as **DD-9**, and propagated: `design.md` §2.1 and `tasks.md` T-06 now say **unconditional, no
+`if` wrapper**, with the reasoning inline so T-06's Implementer cannot re-derive the wrong answer.
+R-CFS-004 AC.4 remains satisfied by the lazy seam — verified by inspection, not merely unexercised:
+`handleProjects` returns before `loadProjectsOnce` is reachable, and that is the sole `readFileSync`
+caller.
+
+#### Confirmed sound — recorded so attempt 2 does not regress it
+
+Raw wire shapes satisfy `Clarisa.getToken()`/`Clarisa.get()` exactly · default-deny is `=== 'true'`,
+convention-consistent with `ENV.validateEnvBoolean` and marginally stricter · never-throws holds for all
+three named cases (unreadable, unparseable, parsed-but-not-array) · no Swagger, no Nest, no DI ·
+removal-condition literal present as a single unwrapped line in **both** `config.ts` and `router.ts`
+(T-07's three-location grep will match) · **no JWT `exclude` entry added** · the 4 flag values × 2 routes
+matrix is required by R-CFS-004's both-routes clause, not padding.
+
+#### ADVISORY (non-gating)
+
+| Lens | Finding |
+| --- | --- |
+| Readability | `router.ts` documents a `jest.spyOn(fs, …)` seam that the spec **explicitly says does not work** (non-configurable descriptors) and does not use — it uses `jest.mock('fs', factory)`, which works regardless of import style. The stated seam is not the actual seam, and the comment would mislead a maintainer who "simplifies" the import into thinking they broke the tests |
+| Risk | With the mount unconditional (as it must be), a disabled stub is **distinguishable by differential response**: `/api/clarisa-stub/api/projects` → empty 404, while `/api/clarisa-stub/anything-else` → 401 from `JwtMiddleware`. Inherent to the 404-not-401 rule the spec itself mandates, and the leaked information is nil — but **hand this to the R-CFS-006 security reviewer rather than let them find it**, and record it in T-08's HITL notes |
+| Reliability | Nothing asserts the *absence* of per-request logging (design §9's fourth row). A call-count assertion on the second and third successful requests would close it cheaply |
+| Reliability | `cachedProjects` read-once holds under concurrency only because the load is synchronous on a single event loop — worth one line in the comment, since the claim currently rests on a null check |
+
+---
+
+### T-04 — The fidelity check — **attempt 2: PASS** ✅
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS** on attempt **2** of 3 · 1 rework |
+| **Date** | 2026-08-19 |
+| **Requirements covered** | R-CFS-005 (all ACs incl. new AC.2/AC.2b), R-CFS-001 AC.2, R-CFS-002 AC.2/AC.3/AC.4/AC.5 |
+| **Final artifact** | `clarisa-stub.fidelity.spec.ts` — **820 lines, 26 tests** |
+| **Workers** | `impl-T04-attempt2` (died on quota, RI-2) → `impl-T04-evidence` (K-004 evidence) → `rev-T04-attempt2` (T3 / `opus`) |
+
+#### Reviewer verdict
+
+> The original FAIL is genuinely remediated — D-8 is asserted in D-6's form inside the Layer 1 registry
+> and as a named test, with AC.2b's asymmetry respected exactly, and the corrected Layer-2 scoping
+> comment now states something true against design §5.2 step 3 read verbatim. Mutation 5's re-pointing
+> to `total_budget` is a real falsifier, not a fitted one, and nothing on the attempt-1 confirmed-sound
+> list regressed.
+
+**Audited against data, not prose** — the part that makes this verdict worth trusting:
+
+- Counted **396** `organization_code`/`funder_code` nulls in the fixture = exactly **198 × 2**; reference
+  capture shows `organization_code` = `45, 45, 45, 49, 5` (**5/5** populated) and `funder_code` null ×4 /
+  `9510` ×1 (**1/5**). Matches D-8's recorded figures character-for-character and **independently
+  confirms AC.2b's premise** — `funder_code`'s reference side is correctly *absent*, because asserting it
+  would have tested an n=5 artefact.
+- Verified the corrected comment against `design.md:173` **verbatim**, not against the summary of it.
+- Grep for `seven` / `D-1..D-7` / `set of 7` returns **nothing** — the Leader's correction sweep closed.
+
+#### The falsifier is genuinely generic — the finding that FAILed attempt 1 is closed
+
+`total_budget` appears at **exactly four places in the whole file, all inside mutation 5 itself.** No
+D-row names it, and Layer 2's only bespoke invariant is `short_name === full_name`, so nothing in the net
+was shaped around it. Its removal is caught **solely** by `assertKeySetEquals`, which compares
+`Object.keys` against the reference and is field-agnostic by construction.
+
+This is the direct repair of the attempt-1 defect the Reviewer named as *"the falsifier was fitted to the
+net."* The independent evidence (disabling only the project-level key-set block makes mutation 5 stop
+throwing) is **exactly what the code predicts** — the mapping-level check and the `short_name`/`full_name`
+invariant are untouched by deleting a project-level scalar.
+
+**D-8 is integrated into the two-by-two, not bolted beside it:** mutation 5 also calls
+`assertRecordedDivergencesStillHold` on the same clone and requires it *not* to throw, which now transits
+the D-8 branches, while the regressed-D-1 test asserts the mirror direction.
+
+#### K-004 evidence (produced by `impl-T04-evidence` after RI-2)
+
+| Gate | Observed |
+| --- | --- |
+| **D-8 assertion** | Clone mutated to `organization_code = 12345` → `Expected: true, Received: false` → reverted → PASS |
+| **Mutation 5 (new vehicle)** | Project-level key-set block disabled → `Received function did not throw` → reverted → 26/26 green |
+| AC.3 printed list (non-`--silent`) | All **eight** rows, D-1 … D-8 |
+| File integrity | Byte-identical to pre-experiment backup |
+| Fixture sha256 | `c13c4058…` **unchanged** |
+
+#### LE-4 — Leader note: the evidence transcript and the audited file are no longer line-identical
+
+The evidence worker honestly reported **one pre-existing prettier error** it had not introduced —
+verified by running eslint against an untouched backup *before* its own edits — and declined to fix it,
+because its brief scoped edits to the mutation experiments. That is the correct reading of a scope bound
+in both directions: it neither silently fixed nor silently omitted.
+
+The **Leader** then applied `npx prettier --write` (fixer) and verified with bare `npx eslint` → **exit
+0**, suite re-run **26/26**. Fixer and gate are separate commands, per K-001.
+
+**Consequence, recorded so nobody chases it:** that reformat shifted the lines the evidence transcript
+cites — the D-8 expect moved `502 → 496`, mutation 5's `793 → 788`. The Reviewer caught the discrepancy
+and confirmed **the quoted source text still matches the current file exactly in both cases**, so the
+evidence stands. But a transcript whose line numbers no longer resolve is the kind of small inconsistency
+that costs a future reader an hour. **Rule for the rest of this run: format before capturing evidence,
+never after.**
+
+#### ADVISORY (recorded, non-gating)
+
+| Lens | Finding |
+| --- | --- |
+| Risk | The line-number drift above (LE-4) |
+| Readability | The header still claims every reusable checker is exercised against both real data and a mutated clone, while only `assertNoUnrecordedDivergence` is. Carried over from attempt 1, **not worsened**; mutation 5's `not.toThrow` on a near-real clone nudges `assertRecordedDivergencesStillHold` marginally closer to a real-data exercise |
+| Readability | The printed D-8 summary frames the cause as *"no institution-id dictionary exists"* where `requirements.md` says *"the export carries no institution ids"* — both true, same rationale, framing only |
