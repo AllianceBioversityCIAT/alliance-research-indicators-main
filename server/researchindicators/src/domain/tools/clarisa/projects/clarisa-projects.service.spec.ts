@@ -224,9 +224,11 @@ describe('ClarisaProjectsService', () => {
   });
 
   describe('listBilateralProjects', () => {
-    it('filters to source_of_funding === "Bilateral" led by the Alliance (ABC)', async () => {
+    it('filters to bilateral-family funding led by the Alliance (ABC); the Window 3 row is dropped for lacking Alliance affiliation, not for its funding', async () => {
       connectionGet.mockResolvedValueOnce([
         bilateralProject(1, 'T-PJ-003262'),
+        // Window 3 funding is now bilateral-family (R-W3B-001); this row stays
+        // ineligible only because it carries no Alliance affiliation.
         window3Project(2, 'N-303008'),
         bilateralProject(3, '1078-CHI0'),
       ]);
@@ -271,7 +273,7 @@ describe('ClarisaProjectsService', () => {
       expect(connectionGet).toHaveBeenCalledTimes(1);
     });
 
-    it('bug-mode regression: returns all 25 eligible production-shaped projects across all 11 observed funding spellings without phase or source_center_acronym', async () => {
+    it('bug-mode regression: returns all 30 eligible production-shaped projects across all 11 observed funding spellings without phase or source_center_acronym (R-W3B-001 admits 5 more W3 rows)', async () => {
       const allianceInstitution = {
         id: 49,
         name: 'Alliance of Bioversity and CIAT',
@@ -318,8 +320,7 @@ describe('ClarisaProjectsService', () => {
           project_mappings_array: [],
         },
 
-        // --- NEGATIVE ROWS (Must be excluded) ---
-        // Window 3 spellings (all 6 observed spellings)
+        // --- W3-FAMILY ROWS (eligible since R-W3B-001) ---
         {
           id: 501,
           short_name: 'PROD-W3-1',
@@ -355,6 +356,7 @@ describe('ClarisaProjectsService', () => {
           lead_institution_object: allianceInstitution,
           project_mappings_array: [],
         },
+        // --- NEGATIVE ROWS (Must be excluded) ---
         {
           id: 506,
           short_name: 'PROD-SRV',
@@ -468,7 +470,7 @@ describe('ClarisaProjectsService', () => {
 
       const out = await service.listBilateralProjects();
 
-      expect(out).toHaveLength(25);
+      expect(out).toHaveLength(30);
     });
 
     it('attaches has_science_programs boolean to each returned project (R-BAS-004)', async () => {
@@ -592,7 +594,9 @@ describe('ClarisaProjectsService', () => {
         .mockImplementation(() => {});
 
       connectionGet.mockResolvedValueOnce([
-        window3Project(2, 'N-303008'), // non-bilateral
+        // Window 3 funding is now bilateral-family (R-W3B-001); this row stays
+        // ineligible only because it carries no Alliance affiliation.
+        window3Project(2, 'N-303008'),
       ]);
 
       const out = await service.listBilateralProjects();
@@ -635,14 +639,15 @@ describe('ClarisaProjectsService', () => {
           phase: 2025,
           project_mappings_array: [],
         },
-        // Ineligible (Window 3) but carries phase 2026. If the derivation
-        // were circular (i.e. read from listBilateralProjects(), which
-        // already applies matchesPhase) or derived from the FULL payload
-        // instead of the eligible cohort, 2026 would leak into the result.
+        // Ineligible (SRV funding — Window 3 no longer qualifies as ineligible
+        // after R-W3B-001) but carries phase 2026. If the derivation were
+        // circular (i.e. read from listBilateralProjects(), which already
+        // applies matchesPhase) or derived from the FULL payload instead of
+        // the eligible cohort, 2026 would leak into the result.
         {
           id: 3,
           short_name: 'INELIGIBLE-2026',
-          source_of_funding: 'Window 3',
+          source_of_funding: 'SRV',
           source_center_acronym: 'CIAT',
           phase: 2026,
           project_mappings_array: [],
@@ -669,7 +674,7 @@ describe('ClarisaProjectsService', () => {
         {
           id: 11,
           short_name: 'NON-BILATERAL-2026',
-          source_of_funding: 'Window 3', // not bilateral funding
+          source_of_funding: 'SRV', // not bilateral funding (Window 3 no longer qualifies after R-W3B-001)
           source_center_acronym: 'CIAT',
           phase: 2026,
           project_mappings_array: [],
@@ -819,7 +824,7 @@ describe('ClarisaProjectsService', () => {
         {
           id: 102,
           short_name: 'P-LEGACY-02',
-          source_of_funding: 'Window 3',
+          source_of_funding: 'SRV', // Window 3 no longer qualifies as ineligible after R-W3B-001
           project_mappings_array: [],
           lead_institution_object: {
             id: 49,
