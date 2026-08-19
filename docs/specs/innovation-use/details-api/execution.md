@@ -22,7 +22,7 @@
 | Leader model tier | T1 · Implementer T2 · Reviewer T3 (`author ≠ auditor` enforced by the `.claude/agents/akili-*` wrappers) |
 | Log opened | 2026-08-19 |
 
-**Review-round tally:** 3 of 6–8 consumed (T-01 attempts 1–2, T-02 attempt 1). See § *Budget Tripwire*.
+**Review-round tally:** **6 of 6–8 consumed** (T-01 ×2, T-02 ×1, T-03 ×3) at 3 of 13 tasks. **Budget escalated to the user 2026-08-19** — see § *Budget Escalation*.
 
 ---
 
@@ -475,5 +475,130 @@ All five re-run independently by the Leader after the Implementer reported.
 | --- | --- |
 | T-13 | The repo's `tsconfig.json` sets no `strict`, so `npm test` and `npm run lint` do **not** catch unsound typing that a stricter editor does. T-13's full gate should include `npx tsc --noEmit` explicitly — it is not implied by the suite, and for files nothing imports yet the suite does not type-check them at all |
 | *(out of spec)* | `is-safe-stored-content.validator.ts` carries the same `PropertyDecorator` narrowing twice. Pre-existing, user's decision, deliberately not actioned here |
+
+---
+
+### T-03 — `ResultActorsService.customSaveInnovationUse`
+
+- **Final status:** `[x]` **DONE 2026-08-19** — PASS on **attempt 3 of 3**. The rework ceiling was reached but not breached.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 3 · **Review rounds consumed:** 3
+- **Requirements covered:** R-IUA-009 AC.1, AC.4 (actors) · R-IUA-003 AC.3, AC.6 (actors) · R-IUA-004 write-side normalisation
+- **Skills assigned:** `nestjs-expert`, `tdd` (task defaults, unchanged) · **Effort:** `xhigh` throughout — see the effort note under attempt 3
+
+**Leader disambiguation issued before attempt 1.** `tasks.md` T-03 says *"Reuse its `constructWhereClause` shape, role-swapped"*, which admits two readings: parameterise the shared private helper, or add a sibling. The Done criteria settle it — `customSaveInnovationDev` must be **byte-identical to HEAD**, and parameterising would change its call site. Ruled: **add a sibling helper**. T-04 receives the opposite instruction for its own file, where the spec explicitly asks for parameterisation; the briefs were written to keep the two approaches from cross-contaminating.
+
+---
+
+#### Attempt 1 — FAIL (test fidelity)
+
+Production code written as a role-swapped mirror of `customSaveInnovationDev`, plus `resolveInnovationUseCounts` and `constructWhereClauseInnovationUse`. 8 new tests. Suite 2161 → 2169.
+
+**Reviewed by three parallel lens Reviewers** (the `xhigh` + data-loss-surface path in `/akili-execute`'s review-lens table):
+
+| Lens | Verdict |
+| --- | --- |
+| A — correctness / spec conformance | **PASS** — all six Done criteria met |
+| B — test fidelity (KZ-001) | **FAIL** — three issues |
+| C — data integrity / blast radius | **PASS** — five questions answered, all cleared |
+
+**Lens C's verification is worth recording because it was done at the source rather than from memory.** It read TypeORM 0.3.20's `SubjectChangedColumnsComputer.js:49-51` —
+
+```js
+// we don't perform operation over undefined properties (but we DO need null properties!)
+if (entityValue === undefined) return;
+```
+
+— confirming that an explicit `null` in a partial entity **does** emit `SET col = NULL`, so the mode normalisation genuinely erases stale counts on edit. It also verified `save([])` is a provable no-op (`EntityPersistExecutor.js:120-122` returns early), that the new cross-module DTO import is **type-elided** at emit and cycle-free with exact mirror-image precedent (`result-innovation-dev.service.ts:38` imports `CreateResultActorDto` the other way), and that no `forwardRef` is warranted — so **T-08's circular-import escalation clause should not fire for this import.**
+
+**Lens B FAIL — three issues, all citing Done criteria:**
+
+1. `expect(tempRepo).not.toHaveProperty('delete')` is **vacuous** — `tempRepo` is the object literal `{ findOne, update, save }` the test itself built ten lines earlier. True for every possible state of the production code, and it encodes a *false* claim about the double's fidelity, since a real `Repository<ResultActor>` does carry `delete`.
+2. Mode normalisation, the `OTHER` rule and the flag were asserted **only on the update path**; the insert path was pinned on three keys. Named surviving mutation: delete the `...counts` spread from the insert branch and **the whole suite stays green** while every newly created actor row persists with no counts.
+3. **No test asserted `is_active: true` on any saved row.** The method's shape is deactivate-everything-then-save; without that key every row stays `is_active = false` and a populated save silently blanks the section.
+
+Lens B also established that attempt 1's single falsification demo turned **test 1 red and only test 1** — tests 3–8 never inspect the predicate. One demonstration had been presented as evidence for eight tests.
+
+**Leader adjudication of the two PASS lenses' advisories.** Lens A and Lens C **independently converged** on an unflagged defect: the mode *flag* was written raw on the update path while the counts derived from `=== true`. Lens C traced it to ground in chunk 1's own migration (`1787078283929-createInnovationUseValidation.ts:122-124`) — a client editing a previously-aggregate row while omitting the flag persists `TRUE` alongside `actors_count = NULL`, and `innovation_use_validation` returns FALSE **permanently**. Both lenses classified it advisory, correctly, since no AC names the flag column. **Ruled into attempt 2's scope anyway**, on the ground that a rework attempt was already open on Lens B's grounds, the fix is one line inside the method T-03 owns, and `design.md` §5.2's *stated purpose* governs it. Recorded explicitly because it departs from both reviewers' own classification: **had Lens B passed, this would have become a forward pointer to T-06, not a rework trigger.**
+
+---
+
+#### Attempt 2 — FAIL (one new issue) · **the Leader's brief was the defect**
+
+All three Lens B issues **closed and independently confirmed**. Suite 2169 → 2173. A required 8-mutation sweep (M1–M8) replaced attempt 1's single demo; every mutation turned the intended test red.
+
+**It failed on a new issue, and the cause was the Leader's instruction, not the Implementer's work.** The attempt-2 brief asserted *"The insert path is already correct (`setNull` at 228-230)"* and constrained the change to one line. That assertion was made without verification and was wrong. The Implementer followed it exactly **and flagged the residual in its `Not Done / Assumptions`** — noting that a truthy non-boolean on insert produces the same class of drift. Per Step 2.3.0 a `Not Done` entry means the task is not complete; the Leader read it and dispatched the review regardless. **That is a Leader error, recorded as one.**
+
+The Reviewer then dismantled the safety argument properly: JS `=== true` and MySQL `= TRUE` are **different predicates over the same value**. They agree on `undefined`/`null`/`false`/`true` and diverge on every truthy non-boolean. The path was reachable end-to-end:
+
+- `InnovationUseActorDto.sex_age_disaggregation_not_apply` has `@IsOptional()` and **no `@IsBoolean()`**, so `1` passes the pipe untransformed;
+- `IsActorCountModeExclusiveConstraint` also uses `=== true`, so `1` **plus** four disaggregated counts is a *valid* payload;
+- insert path: counts written disaggregated, `setNull(1)` → `1` → persisted as `TRUE`;
+- `innovation_use_validation` takes the aggregate branch, finds `actors_count IS NULL` → **FALSE permanently**.
+
+The same defect class the update-path fix closed, left live on its sibling.
+
+---
+
+#### Attempt 3 — PASS
+
+**Effort held at `xhigh`, not bumped — recorded because it departs from the rework rule.** That rule bumps on the premise that a failed fix means under-thinking. That premise was false here: the Implementer executed the brief correctly and flagged what the brief excluded. Bumping would have treated a Leader error as a worker error. The brief was corrected instead. (The tier rule also forbids `max` on a T2 tier, so the alternative would have been a tier escalation — unwarranted for a fully-specified remediation.)
+
+**Leader ruling: take the Reviewer's *preferred* fix, not its minimal one.** The minimal fix was a one-line mirror. Instead, `isAggregate` is derived **once per row** and consumed by both the flag write and `resolveInnovationUseCounts` on both branches:
+
+```ts
+const isAggregate = institution?.sex_age_disaggregation_not_apply === true;
+const counts = this.resolveInnovationUseCounts(institution, isAggregate);
+// … both branches write `sex_age_disaggregation_not_apply: isAggregate`
+```
+
+Rationale: three independent `=== true` occurrences is precisely how this defect arose twice. One derived value makes flag/count disagreement **structurally impossible** rather than a rule three call sites must each remember. That closes the class, not the instance.
+
+Three fold-ins, each strengthening a criterion T-03 already claims: the hard-delete test now passes **one row** so the per-row loop actually executes (with `data: []` it had been passing **vacuously**); the reactivation test now asserts `is_active: true` — the property that makes reactivation *reactivation*; and a comment at the derivation explains the divergence from the byte-identical sibling.
+
+**Mutation sweep extended to M1–M12.** Every mutation turned at least one test red; none left the suite green.
+
+**Final verification:** `npm test -- --silent` → 330/330 suites, **2174**/2174 · `npx tsc --noEmit` clean · `npx eslint --no-fix src/domain/entities/result-actors/` clean · service file **zero deletions** vs HEAD (Leader-verified).
+
+**Byte-identity of the four fenced methods** — by brace-depth extraction against `git show HEAD:...`: `customSaveInnovationDev` (2492 chars), `saveInnovationDev` (970), `formatData` (298), `constructWhereClause` (550) — **all BYTE-IDENTICAL**.
+
+> **A verification instruction the Leader got wrong, and the worker corrected.** The attempt-2 brief asked for single-line scope to be proved via `git diff --unified=0 | grep '^-'`. The Implementer reported that this check **cannot fail** here, because `customSaveInnovationUse` does not exist at HEAD at all — the whole method is uncommitted, so there are no `-` lines regardless of what changed. It substituted a direct method-body byte comparison. The Reviewer independently confirmed the substitution is sound and that the grep addresses a process check, not a spec criterion. A check that cannot fail is not evidence, and the worker caught it before the Leader did.
+
+#### Reviewer verdict — attempt 3 — `STATUS: PASS`
+
+All six Done criteria **MET**. Two findings worth preserving:
+
+- **The sibling-safety claim was verified two independent ways.** The comment asserts `customSaveInnovationDev` is safe writing the flag raw *because it never derives per-mode counts from that flag*. Confirmed: (1) it writes its four booleans unconditionally, with no mode branch, so no count is derived from the flag; and (2) the consumer agrees — the live `innovation_dev_validation` body (`1758125999162-AdaptInnovationDevValidationToManyToolFunctions.ts`) contains **zero** occurrences of `sex_age_disaggregation_not_apply`, `men_youth`, `women_youth` or `actors_count`. It never reads the flag at all. **The desync class does not exist for Innovation Dev.**
+- **`customSaveInnovationUse` is the only writer of role-2 `result_actors` rows** anywhere under `src/domain/entities` — so no second write site can reintroduce the disagreement.
+
+**Adjudication of the two caveats the Implementer disclosed rather than buried:**
+
+| Caveat | Reviewer's ruling |
+| --- | --- |
+| M1–M8 were **reconstructed, not replayed** (no attempt-2 transcript available), so byte-identity with the original set cannot be certified | **Evidentiary purpose discharged.** A sweep's job is to prove the tests are falsifiable; any set that perturbs the properties under test and turns them red does that. Non-vacuity is independently readable off the assertions — each compares *literal* expectations against recorded `save`/`update`/`findOne` arguments, so none can pass vacuously. **No property left unproven.** The residual loss is bookkeeping: the sweep is not reproducible from the record |
+| M2 and M12 are **blunt** — 13 failures each, mostly incidental `TypeError` | **Fold-in 2's purpose genuinely achieved.** The hard-delete test owns the *only* double in the file defining `delete`/`remove`/`softDelete`, so under M12 it fails on its own assertion (`expect(del).not.toHaveBeenCalled()`) while the other 12 throw. And this is exactly what fold-in 2 bought: with the previous `data: []` the loop never ran, `del` was never called, and the test would have passed **vacuously** while the mutation was caught only by incidental `TypeError`s |
+
+**`ADVISORY` findings (recorded, non-gating, and they do not become tasks):**
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Readability | The new comment cites `customSaveInnovationDev:110-111` — a **same-file line citation**, the anti-pattern `server/researchindicators/src/CLAUDE.md` §9 **FP-50** records. Accurate today and the cited method is frozen by Done criterion 5 for the rest of this spec, so it will not drift here | Recorded. Not fixed — advisory, and the drift risk it warns about is absent for this spec's duration |
+| Risk (methodology) | The mutation sweep is **not replayable from the record** — which is what forced attempt 3's reconstruction. Recording the mutation diffs, or a script applying them, would make the next rework loop's sweep a re-run rather than a re-invention | **Carried to `/akili-archive`'s Kaizen step.** This is a methodology gap, not a code defect |
+| Reliability | M2's bluntness is a symptom of the file's doubles being minimal. Promoting the hard-delete test's fuller double to a shared factory would make future hard-delete mutations fail on assertions rather than `TypeError`s | **Forward pointer → T-04**, which faces the same file shape |
+| Risk (from attempt 1, Lens A + Lens C, both) | `result_actors_id` is trusted **without an ownership check**: a payload naming another result's or another role's row updates it in place, keeping its `result_id` but having `actor_role_id` rewritten to `INNOVATION_USE` and its counts overwritten. Literally reachable violation of R-IUA-009 AC.3 via a malformed client | **Leader-ruled out of scope for T-03** and deliberately not fixed — byte-identical in `customSaveInnovationDev` **in production today**, `tasks.md` T-03 mandates mirroring that reference, and `design.md` §5.2 prescribes the shape with no ownership leg. Closing it here would diverge from the reference the task requires. **Forward pointer → T-06**, whose pre-write pass already loads rows for R-IUA-005. **Raised to the user as a pre-existing production finding** |
+
+**Declared limits, restated so they are not mistaken for proven:** the repository is mocked throughout, so all of the above proves the **predicate objects are constructed** — not that MySQL leaves Innovation Dev rows alone. R-IUA-009's scenario is explicit: `AND IT MUST be proven by a fixture that seeds both roles on one result, not by a unit spec over a mocked repository`. **The behavioural proof is T-10 (F-B), and it is not discharged here.**
+
+**Forward pointers created by T-03:**
+
+| → Task | Pointer |
+| --- | --- |
+| T-06 | `result_actors_id` ownership check — the pre-write validation pass already loads rows for the duplicate-actor rule (R-IUA-005) and is the natural home for validating `(result_actors_id → result_id, actor_role_id)`. **Awaiting a user decision; do not assume it is in scope** |
+| T-04 | Same file shape, same minimal-double problem. Consider a shared repository-double factory that defines `delete`/`remove`/`softDelete`, so hard-delete mutations fail on assertions rather than `TypeError`s |
+| T-04 | T-04 **is** instructed to parameterise its shared private helpers — the opposite of T-03's ruling. Its done criterion requires the pre-existing Innovation Dev specs to pass **unmodified**; that is the regression gate |
+| T-10 (F-B) | This task's role-isolation guarantee is entirely unproven behaviourally. F-B is the gate, and `requirements.md` R-IUA-009's scenario names the falsifying input: remove `actor_role_id` from the deactivate predicate and Innovation Dev rows must flip inactive |
+| T-10 / T-09 | A fixture that always re-sends `sex_age_disaggregation_not_apply` will **not** exercise the flag-desync class this task fixed. Include an edit that omits the flag on a previously-aggregate row |
+
+**Budget status:** 3 of 13 tasks complete. **6 of 6–8 review rounds consumed.** Escalated to the user at this gate — see below.
 
 ---

@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01, T-02 `[x]` done (2026-08-19); T-03 … T-13 todo
+- **Status:** in-progress — T-01, T-02, T-03 `[x]` done (2026-08-19); T-04 … T-13 todo. **Review-round budget escalated to the user after T-03** (6 of 6–8 consumed at 3 of 13 tasks)
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -156,7 +156,7 @@ Exercised by T-07's behavioral pipe spec, not by this task alone.
 - **Requirements covered:** R-IUA-009 AC.1, AC.4 (actors) · R-IUA-003 AC.3, AC.6 (actors) · R-IUA-004 write-side normalisation
 - **Depends on:** T-02
 - **Size:** M (~200 LOC incl. spec) · **Effort:** `xhigh` — this is one of the three deactivate predicates
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — PASS on **attempt 3 of 3**; 3 review rounds. Attempt 1 reviewed by 3 parallel lens Reviewers (correctness PASS, data-integrity PASS, test-fidelity FAIL). Attempt 2 closed those but failed on an insert-path mode-flag defect the Leader's own brief had wrongly excluded. Attempt 3 hoisted a single `isAggregate` predicate consumed by both branches, making flag/count disagreement structurally impossible. Suite 2174/2174; 12-mutation sweep all red. Behavioural role-isolation proof remains **T-10 (F-B)**, not discharged here. Evidence: [`./execution.md`](./execution.md) → *T-03*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Files touched**
