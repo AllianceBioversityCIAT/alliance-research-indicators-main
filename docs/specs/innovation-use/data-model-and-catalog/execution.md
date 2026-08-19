@@ -1901,3 +1901,22 @@ D-2, D-3 and D-4 are **the fourth, fifth and sixth** inaccurate shipped claims i
 
 **T-13 → `[x]`.** Review rounds consumed by this task: 3 (rounds 6, 7, 8), rework attempts 3 of 3.
 
+
+#### 📋 Owed doc corrections CLOSED — 2026-08-18, with the KZ-005 two-direction sweep actually run
+
+Three corrections owed since T-12's escalation, applied by the Leader (commit `d0e8131c`); no review round consumed.
+
+| Site | Was | Now |
+| --- | --- | --- |
+| `tasks.md:370` | `R-IU-003 (mode exclusivity)` in T-12's *Requirements covered* | `R-IU-003 (mode **completeness** — RB-5 layer 2; **exclusivity** is chunk 2's API edge, `requirements.md:304`)` |
+| `tasks.md:461` | `*modes exclusive* · BUT NOT populate both modes → **T-09** (F9/F9b)` — **named F9/F9b as the gate on a clause they demonstrably do not gate** | Splits the two halves: completeness → T-09 (F9/F9b); *both-populated* → **not gated in chunk 1**, rests on chunk 2's API edge (RB-5 layer 3) |
+| `requirements.md:159` | F14/F15/F18 share a row predicting *"the detail row survives"* | **Split.** F14/F15 corrected — the RESTRICT FK makes that state unreachable; the orphan blocks the routine's own `DELETE FROM results`, so the fixture **errors with MySQL 1451**, observed exactly so in T-13. F18 kept unchanged and marked correct — `delete_result` is a soft delete, no FK violated, so it fails by assertion |
+
+**The sweep, both directions — this is the discipline that failed three times in this spec:**
+
+- **Forward (the superseded claim in *every* phrasing, not just the edited string).** Grepped `exclusiv` and `survives` across the whole family folder plus `mutually exclusive` across server source. Four further sites carry the exclusivity language — `requirements.md:275`, `requirements.md:296` (the Scenario), `design.md` DD-7, and migration `1787070034303:15`. **All four state the mode exclusivity as a domain *invariant*, which is true; none claims chunk 1 enforces or gates it.** No residual over-claim. The one genuine residual — `result-actor.entity.ts:79`'s "MUTUALLY EXCLUSIVE" column comment — was already recorded at `requirements.md:304` as knowingly left alone because it is merged code, so it is accounted for rather than missed.
+- **Backward (documents citing the corrected sections, which may now assert a falsehood).** `tasks.md:468` maps R-IU-011's clauses to F14/F15/F16/F18 as gates without restating the predicted symptom — unaffected. `requirements.md:677` (RB-8) states the enumerate-by-name mechanism, not the symptom — unaffected. `design.md` §10 carries no F14/F15 symptom prediction.
+- **Re-grep for values the correction itself introduced:** the new text cites `requirements.md:304` and `RB-5 layer 3`; both verified present and saying what is claimed (`requirements.md:302-305`).
+
+**Result: the sweep found no residue.** Recorded because a sweep that ran and found nothing is evidence; a sweep that was never run is indistinguishable from it in the audit trail, and that ambiguity is exactly how KZ-005 recurred three times here.
+
