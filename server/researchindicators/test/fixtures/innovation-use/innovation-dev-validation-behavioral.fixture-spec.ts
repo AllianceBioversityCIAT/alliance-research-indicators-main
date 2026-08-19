@@ -97,16 +97,24 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * therefore flips the actor conjunct a DIFFERENT, equally genuine way that
  * needs no shared catalog at all: it seeds ONE resolvable actor row (private
  * `actor_type_id`, never `5`) for the "valid" case, then, for the SAME
- * seeded result, sets that row's `is_active = FALSE` (`:71`/`:83`'s `WHERE
- * ... AND ra.is_active = TRUE` filters it out of both `tempFullActors` and
- * `tempActors`) before the second call. `tempFullActors = tempActors` stays
- * TRUE (`0 = 0`) but `tempActors > 0` (`:111`) now fails, so the actor
- * conjunct — and only the actor conjunct, since the institution row and
- * every other field are untouched between the two calls — flips the result
- * from `1` to `0`. This is the SAME seeded result in both cases (task
- * brief's "flipped to 0 through the ACTOR block"), and is exactly as
- * sensitive to a hypothetical M3-adjacent regression in the actor-resolution
- * logic as the `code = 5` path would have been, without the cross-file race.
+ * seeded result, sets that row's `is_active = FALSE` (`:71-72`/`:83-84`'s
+ * `WHERE ra.result_id = result_code AND ra.is_active = TRUE` filters it out
+ * of both `tempFullActors` and `tempActors`) before the second call.
+ * `tempFullActors = tempActors` stays TRUE (`0 = 0`) but `tempActors > 0`
+ * (`:111`) now fails, so the actor conjunct — and only the actor conjunct,
+ * since the institution row and every other field are untouched between the
+ * two calls — flips the result from `1` to `0`. This is the SAME seeded
+ * result in both cases (task brief's "flipped to 0 through the ACTOR
+ * block"). It is NOT, however, equally sensitive to every hypothetical
+ * M3-adjacent regression the `code = 5` path would have caught:
+ * deactivating a row exercises only the `WHERE ... AND ra.is_active = TRUE`
+ * filter (`:72`/`:84`) and the `tempActors > 0` guard (`:111`) — it never
+ * reaches the actor-type-resolution `CASE` itself (`:76-79`), specifically
+ * the `WHEN ra.actor_type_id = 5 THEN ra.actor_type_custom_name IS NOT NULL`
+ * arm (`:77`), because this fixture's actor row is never `actor_type_id =
+ * 5`. This is an explicit non-coverage note, not a claim of equivalence:
+ * the pair gates the `is_active` filter and the `tempActors > 0` guard, but
+ * not the actor-type-resolution `CASE`.
  *
  * Reachability is proven by the pairing itself: if `anticipatedUserId = 1`
  * or NULL had been used (short-circuiting `:108`), deactivating the actor
@@ -116,6 +124,23 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * red-before-green mutation demonstration in the T-12 execution note
  * additionally confirms this by breaking the actor conjunct directly in the
  * function body on the scratch schema and observing this file go red.
+ *
+ * **Why F12b-2 re-asserts `1` before its `UPDATE`.** `callValidation`
+ * returns `Number(row.v)`, and `Number(null) === 0` in JavaScript — so
+ * `toBe(0)` alone cannot distinguish "the stored function genuinely
+ * returned 0" from "the function returned SQL `NULL`". (That is the only
+ * route to the ambiguity: a mistyped column alias yields `undefined` and
+ * `Number(undefined)` is `NaN`, which *fails* `toBe(0)`; a query matching
+ * no row leaves `row` undefined and throws.) F12b-2 therefore re-asserts
+ * the non-zero value `1` on the SAME `resultId` before its `UPDATE`,
+ * ruling out "always coerces to 0" for this connection and row **within
+ * F12b-2 itself** — so its assertion is non-hollow independently of
+ * F12b-1 and of execution order.
+ *
+ * The residual order dependence runs the other way: **F12b-1** asserts the
+ * pre-`UPDATE` state, so it would fail if F12b-2 ran first under
+ * `--randomize` or a custom sequencer. Jest's in-file declaration order
+ * makes that safe today.
  *
  * Teardown follows the `tryStep`/`trySelect` per-step try/catch shape from
  * `innovation-use-lifecycle-routines.fixture-spec.ts` (FP-39): every step is
@@ -450,6 +475,13 @@ describe('innovation_dev_validation behavioral fixture — actor block (T-12, re
   });
 
   it('F12b-2: the SAME result, with its sole actor row deactivated, returns 0 — the actor block (M3-touched table) genuinely flips it', async () => {
+    // Order-coupling guard (E-4/E-5): this test mutates the row F12b-1
+    // depends on, so under `--randomize` or an `.only` on this test alone,
+    // F12b-1 would never run first. Re-asserting the pre-state here makes
+    // this test self-contained instead of silently relying on execution
+    // order.
+    expect(await callValidation(resultId)).toBe(1);
+
     await dataSource.query(
       `UPDATE result_actors SET is_active = FALSE WHERE result_actors_id = ?`,
       [actorId],

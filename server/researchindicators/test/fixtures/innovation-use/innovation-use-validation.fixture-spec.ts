@@ -26,14 +26,16 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * wrong. Id 2 (Innovation Use) IS seeded fresh on the scratch schema, by
  * contrast, because its migration — M4, `1787071463485-
  * insertInnovationUseRoles.ts` — postdates the snapshot cutoff and genuinely
- * re-runs during `migration:test:bootstrap`. F11 below still seeds id 1
- * itself, idempotently, and only removes it in `afterAll` if this file was
- * the one that added it (FP-16 / trap 4) — though `test/fixtures/
- * global-setup.ts` now also seeds this exact row centrally, once, before
- * any worker starts (see that file's header), which makes this file's own
- * check-then-insert below a harmless, redundant no-op rather than the row's
- * real source in practice. Left as-is: this correction's authorized scope
- * is this comment, not that code.
+ * re-runs during `migration:test:bootstrap`. This file's own `beforeAll`
+ * below still check-then-inserts id 1 itself, idempotently, but never
+ * removes it — this file's own `afterAll` says so explicitly (see its
+ * comment beginning "`actor_roles` id 1 is NEVER torn down here") —
+ * because `test/fixtures/global-setup.ts` now seeds this exact row
+ * centrally, once, before any worker starts (see that file's header),
+ * which makes this file's own check-then-insert below a harmless,
+ * redundant no-op rather than the row's real source in practice. Left
+ * as-is: this correction's authorized scope is this comment, not that
+ * code.
  *
  * Every row created by a test is tracked by id and removed in `afterAll`,
  * guarded on the id actually being defined (FP-4/trap 5) — a partial seed
@@ -184,11 +186,12 @@ describe('innovation_use_validation stored function (T-12, F1-F9/F9b/F11/F17)', 
       actorTypeFiveSeeded = true;
     }
 
-    // FP-16: the Innovation Dev role (actor_role_id = 1) is not seeded by
-    // the baseline or by any migration on this branch — only the
-    // Innovation Use role (id 2) is (M4). F11 needs a real, resolvable
-    // Innovation Dev actor row to prove the role filter is non-vacuous, so
-    // this catalog row must exist. Seed idempotently.
+    // The Innovation Dev role (actor_role_id = 1) IS seeded by a migration
+    // on this branch — see this file's header comment above for the full,
+    // corrected account (FP-16) of why the row is nonetheless genuinely
+    // absent from a freshly-loaded scratch schema. F11 needs a real,
+    // resolvable Innovation Dev actor row to prove the role filter is
+    // non-vacuous, so this catalog row must exist. Seed idempotently.
     const [existingDevRole] = await dataSource.query(
       `SELECT actor_role_id FROM actor_roles WHERE actor_role_id = 1`,
     );

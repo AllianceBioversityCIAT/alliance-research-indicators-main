@@ -2102,3 +2102,41 @@ Two secondary inaccuracies in the same paragraph: the offered routes to `Number(
 
 **Lens B on evidence credibility:** *"nothing in this FAIL touches executable logic, so a corrected comment does not invalidate that evidence."* The 9-suite/30-test cold run and the 328-suite/2155-test unit run stand.
 
+
+#### T-12 — **CLOSED: PASS** via user-approved Leader-inline correction
+
+**Date:** 2026-08-18 · The rework loop was exhausted (3 attempts), so `/akili-execute`'s Leader-inline fallback applied — **explicitly approved by the user**, as that clause requires. The Leader wrote three sentences of comment text; **a Reviewer audited them, because `author ≠ auditor` does not lapse when the author is the Leader.** The Reviewer's brief said so, and told it to be *more* adversarial than usual since the Leader's own brief caused the defect.
+
+**The fix:** replaced the paragraph falsified by E-4 with one attributing the guard to the in-test assertion, dropping the two incorrect `Number(null)` illustrations, and inverting the ordering caveat to name **F12b-1** as the order-sensitive test.
+
+**Reviewer verdict: PASS.** All four claims verified against the artifact, and two verified *beyond* what the Leader claimed:
+
+| Claim | Verification |
+| --- | --- |
+| `Number(row.v)`, `Number(null) === 0` | `callValidation` is verbatim `const [row] = await dataSource.query(...); return Number(row.v);` |
+| **`NULL` is the ONLY route to the ambiguity** | Mistyped alias → `undefined` → `NaN`, and `Object.is(NaN, 0)` is false, so `toBe(0)` **fails**; empty result → `row` undefined → `TypeError`. **Checked against the driver, not just the reasoning:** `orm.config.ts:53` sets `bigNumberStrings: false` and declares no `typeCast`, so mysql2 returns a JS number and **the only non-number value reachable is `null`.** Exhaustive for this harness |
+| F12b-2 is non-hollow independently of F12b-1 | Pre-assert at `:483` precedes the `UPDATE` at `:485-488`. **The Reviewer then closed a route the Leader had not considered** — a *state-dependent* SQL `NULL` on the post-`UPDATE` call: with the actor row deactivated, `tempActors = 0` (`IFNULL(…, FALSE)`, migration `:74-80`), so `(tempActors > 0)` is FALSE at `:111`, and **MySQL's `FALSE AND NULL = FALSE` forces the `RETURN` to `0` regardless of any NULL.** The 0 is *provably* genuine |
+| Order dependence runs the other way | F12b-1 asserts the pre-`UPDATE` state and nothing restores `is_active = TRUE` (afterAll only deletes), so F12b-2-first would red F12b-1. **"Safe today" verified against config, not recollection:** `test/jest-fixtures.json` declares no `randomize` and no `testSequencer`; `package.json:25` passes no `--randomize` |
+
+**Stale framing gone repo-wide:** independent grep of `mutual guard|non-hollow only because|silently remove that guard|typo'd column alias` across `server/researchindicators/test/` returns **zero hits**. Nothing regressed — private band 9161–9166, `900_600`, teardown order, and both test bodies untouched.
+
+**Leader verification:** cold cycle (`compose:test:down` → `up` → readiness poll → `migration:test:bootstrap` once → `test:fixtures`) → **9 suites / 30 tests passed**; `npm run lint -- --quiet` clean with no `--fix` mutation; container torn down. The Leader held its own edit to the same cold-cycle bar it imposed on every Implementer.
+
+##### ⚠️ The Leader-side finding — two of this spec's inaccurate claims originated in briefs, not in worker error
+
+| Defect | Mechanism |
+| --- | --- |
+| **A-6's incomplete correction** (attempt 2 FAIL-2) | The brief named the line range A-6 cited. **A brief that names a line range does not merely omit the sweep — it suppresses it**, by telling the worker where to look and thereby where to stop. The Leader had run exactly that KZ-005 sweep on its *own* edits an hour earlier |
+| **E-3 vs E-4** (attempt 3 FAIL) | The brief authorized both, and **E-4 falsifies E-3**. The worker applied both literally, as instructed |
+
+**Both are the same shape: a brief locally correct in each bullet and globally inconsistent.** The worker follows faithfully and ships the contradiction. `.agents/leader.md` → *Delegation Discipline* specifies what to **put** in a brief and says nothing about checking the items **against each other**, or about carrying KZ-005 into a delegated correction. **This is a Leader-side failure mode with no current coverage.**
+
+##### ADVISORY — recorded, not fixed (advisory discipline: they do not grow scope, even when the file is already open)
+
+| # | Advisory |
+| --- | --- |
+| **F-1** | The E-1/E-2 non-coverage note **under-claims** — F12b-1 does gate the `ELSE` arm (`:78`); only the `code = 5` arm (`:77`) is unreached. Re-confirmed by the Reviewer as an under-claim, not a falsehood. Safe direction |
+| **G-1** | *(new, pre-existing, Implementer-authored, outside the Leader's changed region)* the inline comment at `:480` says *"under `--randomize` … F12b-1 would never run first."* Exact for `.only`, but a **modality overstatement** for `--randomize`, where F12b-1 might still shuffle first. *"would not necessarily run first"* is precise. Same class of over-strong claim this spec keeps shipping — worth tightening next time the file is legitimately open |
+
+**T-12 → `[x]`.** Attempts: 3 + a Leader-inline correction. Review rounds consumed: 9, 10, and the inline audit.
+

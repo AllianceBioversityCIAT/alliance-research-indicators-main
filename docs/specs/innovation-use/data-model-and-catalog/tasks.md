@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-data-model
-- **Status:** in-progress — T-01, T-02, T-04 … **T-11** `[x]`; **T-12 `[~]` ESCALATED** and **T-13 `[~]` ESCALATED** (both 2026-08-18) — 11 of 13 done. ⚠️ **Two rulings pending:** T-12 (F12 — fix-the-harness vs fix-the-spec) and T-13 (scope boundary — the cold-run race is unfixable inside T-13's two files). **Review-round budget is spent (5 of 4–5); the next rework round in either task is over budget.** T-14 is blocked on both. FP-23 retired; FP-16, FP-40, FP-42 discharged; FP-39 half-discharged; **FP-31 NOT discharged**
+- **Status:** in-progress — **T-01 … T-13 all `[x]` (12 of 13 done; T-03 extracted).** **T-14 is the only remaining task** and is now unblocked. Both 2026-08-18 escalations resolved by user ruling: T-13 → extended scope, all five FAILs fixed; T-12 → path (a), behavioral fixture added alongside the body-text one. **FP-31 discharged.** Review-round budget (§12: 4–5) deliberately exceeded to **10** with explicit user authorization — recorded, not silent. T-14 carries 10 forward pointers (FP-41, FP-43…FP-50) including two genuine harness defects.
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -369,7 +369,7 @@ graph TD
 
 - **Requirements covered:** R-IU-006 (AC.2–AC.11), R-IU-001 (AC.3), **R-IU-003 (mode *completeness* — RB-5 layer 2; *exclusivity* is chunk 2's API edge, `requirements.md:304`)**, R-IU-007 (via F10); DC-2, DC-3, DC-10
 - **Design references:** §6.5 fixture table, §6.6
-- **Size:** L · **Dependencies:** T-09, T-02 · **Status:** ~~todo~~ → **`[~]` IN PROGRESS / ESCALATED 2026-08-18** — attempt 1: **Lens B PASS, Lens C PASS, Lens A FAIL** on F12 only (body-text assertion where AC.9 specifies a behavioral comparison). **14 of 15 fixtures accepted.** Rework NOT spawned: this FAIL is the pre-declared budget escalation (review rounds at the 4–5 ceiling). **Awaiting a user ruling on path (a) fix-the-harness vs (b) fix-the-spec** — see [`./execution.md`](./execution.md) → *T-12*
+- **Size:** L · **Dependencies:** T-09, T-02 · **Status:** ~~todo~~ → ~~`[~]` ESCALATED~~ → **`[x]` DONE 2026-08-18** — user ruled **path (a) — fix the harness**. A behavioral `innovation_dev_validation` fixture (F12b-1/F12b-2) now sits **alongside** the body-text F12; both are kept and they gate different things — behavioral where behavior can be exercised, structural for the `code = 5` arm neither case reaches. PASS after 3 attempts + a user-approved Leader-inline comment correction, itself Reviewer-audited. A-6 discharged **and swept** (the original falsehood also survived 170 lines below the cited site). Evidence: [`./execution.md`](./execution.md) → *T-12*
 - **Skills:** `nestjs-expert`, `tdd`
 
 **Scope** — the fixtures under `test/fixtures/innovation-use/` that exercise `innovation_use_validation` on real MySQL: F1–F8, **F9, F9b**, F10, F11, F12, F17, plus the R-IU-001 detail-row round trip.
