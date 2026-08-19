@@ -75,6 +75,8 @@ Each task uses this structure:
 - **Status:** todo | in-progress | done | blocked
 ```
 
+**One clause per row (KZ-011).** Never bundle two independently-justified instructions in one table cell or bullet. When execution retires one of them, the siblings inherit the retirement silently and the worker is blamed for the omission — split them, so each can be retired on its own evidence.
+
 ---
 
 ## 4. Standard task categories
@@ -110,6 +112,8 @@ Per task, declare:
 **Bug Mode — where the regression test belongs.** The red-before-green test MUST be owned by the task that **changes the buggy code path**, never by a task that creates new code. A test over a newly-created function is green from the moment it compiles and could never have been red, so assigning the evidence there closes Bug Mode without producing the one artifact Bug Mode exists for. A new unit still owes a gate **proven able to fail** — demonstrate it by mutation — but that is a different claim from reproducing the defect.
 
 **Name the concrete input that makes the gate red, in the task, before the test is written (K-012).** Red-before-green checks falsifiability *after* the test exists; naming the input makes a non-falsifiable assertion obvious *while it is being authored*. Measured on one spec, same methodology throughout: the task whose brief omitted it shipped **3** tests that passed on `HEAD`, the next shipped **1**, the one that named the input verbatim shipped **0**.
+
+**When a task realigns existing expectations, derive its site list from the failing suite, not from a grep (K-018).** Grep enumerates *mentions* of the value you are changing; only the run enumerates *breakages*. A list built by grep fails in three directions at once — it names sites that are already green for an unrelated reason, misses genuinely red ones, and can skip a whole file. Apply the change, run the suite, and let the failures write the list.
 
 A task is NOT done until:
 - `npm run lint` passes.

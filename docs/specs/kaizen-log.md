@@ -27,15 +27,15 @@ Other AKILI commands read only the `## Active Lessons` table below.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-014** | **A filtered view of a command's output is not the output.** Truncating a discovery search makes *absent* and *excluded* indistinguishable, and counting ANSI-coloured output silently reads zero. Check the total, normalize escapes, and look for an error **before** counting | **High** | **5** (+2: the Leader committed it **twice in one run**, on the lesson it had copied into two worker briefs) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 |
 | **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | **Applied** — root `CLAUDE.md` §4.3 |
-| **K-017** | **A runtime artifact that must exist in the build output needs its own packaging defect class.** A unit suite runs over `src`, so it structurally cannot see that the artifact never reaches `dist` — every test passes over a file that will not be there in the field | **High** | 1 | Product + Methodology | **Applied** — `general-setup/requirements.md` §4 (+ upstream owed) |
 | **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Applied** — `.agents/reviewer.md` (mechanism named) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion | **High** | **5** (+1: a fidelity gate certified data containing an unrecorded divergence) | Product | Proposed |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **High** | **6** (+1: widening a predicate made a fidelity cohort 198-of-198, so the count would also pass against a predicate returning `true` unconditionally) | Product | Proposed |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
 | **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
+| **K-018** | **The authoritative site list for an expectation-realignment task is the failing suite, not a grep.** Grep enumerates *mentions*; only the run enumerates *breakages*. A grep-built list names already-green sites, misses genuinely red ones, and can skip a whole file — all three happened in one spec | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
+| **KZ-011** | **A multi-clause table cell can be retired in half.** When one clause is retired on new evidence, its siblings inherit the retirement silently and the worker is blamed for the omission. One clause per row | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §3 (+ upstream owed) |
 | **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed |
 
 ### Queued for upstream (Methodology — no local edit owed)
@@ -53,6 +53,11 @@ Other AKILI commands read only the `## Active Lessons` table below.
 > **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
 >
+> **Retired 2026-08-19 (second sweep, to admit K-018 and KZ-011):** `K-014` (applied to root
+> `CLAUDE.md` §4.3 and **observed holding this run** — totals checked before counting, no
+> truncated discovery search) · `K-017` (applied to `general-setup/requirements.md` §4; this
+> cycle produced no runtime artifact needing packaging, rule stands).
+>
 > **Retired 2026-08-19** to hold the 10-row cap while admitting K-016, K-017 and the returning K-009:
 > `K-015` (applied to root `CLAUDE.md` §4.3; no migrations in this cycle, rule stands) · `KZ-003`
 > (applied — §4.3 now carries the narrowed full-suite/parallelism rule, followed throughout this run) ·
@@ -68,6 +73,71 @@ Other AKILI commands read only the `## Active Lessons` table below.
 ---
 
 ## Entries
+
+### 2026-08-19 — bugfix/w3-bilateral-funding-filter
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 2 | tasks.md |
+| Reviewer FAIL rework attempts | **2** (T-01 x1, T-02 x1) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 0 | `/akili-test` not run (accepted) |
+| Validation FAIL / WARN | — | `/akili-validate` not run (accepted) |
+| Advisories recorded | 8 (4 per task) | execution.md |
+| Budget: review rounds | **1 budgeted → 4 actual** | design.md §14 |
+
+**MUDA identified:** 2 rework rounds — 100% of this run's defects — and a 300% overrun on the
+review-round budget. **Neither FAIL was an implementation error.** Both were *stale prose around
+correct assertions*, and both trace to an inaccurate site list in `tasks.md`, i.e. to planning
+waste, not execution waste.
+
+**Lessons**
+
+- **K-018 — The site list was built by grep instead of by running the suite.** (Product + Methodology, Medium)
+  - Root cause: T-02's site table was assembled by grepping for the *value* being changed
+    (`Window 3`) across the spec files. Grep enumerates *mentions*; only the run enumerates
+    *breakages*. The list was wrong in three directions at once: 3 of 6 named sites were already
+    green (their `window3Project` fixtures were never Alliance-affiliated, so `isAllianceProject`
+    excluded them regardless of funding), 1 genuinely-red site was never named, and a second
+    affected file was missed entirely. The measurement that would have produced the correct list
+    — apply the one-line change, run the suite, read the failures — was available and free at
+    specify time.
+  - Evidence: execution.md — T-02 attempt 1, "Two corrections to the spec's blast-radius
+    analysis"; tasks.md — Site-list correction (Leader decision L-1).
+  - Gemba note, from the Reviewer: *"a keyword sweep verifies presence of the keyword, not
+    absence of the defect."*
+  - Standardization: one line in `docs/specs/general-setup/task.md` §5, beside the K-012
+    named-input rule. → **Applied 2026-08-19 (user-approved)**. Upstream to AKILI owed.
+
+- **KZ-011 — A multi-clause table cell was retired in half.** (Product + Methodology, Medium)
+  - Root cause: `tasks.md` T-02 bundled two independently-justified clauses in one cell — an id
+    change and a title re-statement. The Leader retired the first on new evidence; the
+    Implementer reasonably read the whole row as retired. The second clause stood on its own
+    reasoning (the *predicate* is no longer `=== "Bilateral"`, true regardless of fixture shape).
+  - Evidence: execution.md — T-02, Leader decision L-4; Reviewer FAIL citing `tasks.md:105`,
+    "second clause of that row".
+  - Standardization: one line in `docs/specs/general-setup/task.md` §3.
+    → **Applied 2026-08-19 (user-approved)**. Upstream to AKILI owed.
+
+- **KZ-001 — recurrence 5 → 6.** No new lesson opened; the root cause is already in the digest.
+  - This occurrence: widening the predicate made the stub fidelity gate's eligible cohort
+    **198 of 198** fixture rows, so `expect(eligible).toHaveLength(198)` would *also* pass against
+    an `isBilateralFunding` that returned `true` unconditionally. Nothing went red — the gate
+    simply stopped discriminating. Defect class D-2 (over-widening) now has **no guard at the
+    fidelity layer**; it rests entirely on the `SRV`/blank/`NON-BILATERAL` negatives in
+    `project-selector.util.spec.ts`, which are now load-bearing for the whole spec.
+  - Evidence: execution.md — T-02, ADVISORY (RISK). Digest row broadened to name cohort
+    assertions, not only test doubles.
+
+**Jidoka held.** The Reviewer stopped the line on both FAILs rather than waving through prose that
+contradicted the assertions beneath it, and the 3-attempt ceiling was never approached. Two
+worker behaviors worth preserving: the Implementer **refused to edit three tests the work order
+named**, having verified in isolation that they were already correct; and a flaky unrelated suite
+timeout was **re-run in isolation and confirmed unrelated rather than chased**.
+
 
 ### 2026-08-19 — `bilateral/clarisa-fixture-stub`
 
