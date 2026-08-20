@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, Logger } from 'typeorm';
 import {
   createInnovationUseHarness,
   InnovationUseHarness,
@@ -71,6 +71,19 @@ import { ResultInnovationUseService } from '../../../src/domain/entities/result-
  * points on all three collections (`requirements.md` §5.2 DC-2's
  * "duplicates" half), not only the "orphans" half `.find(...)` alone
  * proves.
+ *
+ * **T-13 extension (NFR-IUA-001).** The fourth `it` below seeds 50
+ * additional `result_actors` rows directly (raw SQL, bypassing the service
+ * -- this measures the READ path's query shape, not reconciliation, which
+ * the `it`s above already cover) against the SAME `resultId`, then swaps a
+ * counting `Logger` onto `dataSource` (the exact `DataSource` instance
+ * `ResultInnovationUseService` reads through -- its constructor calls
+ * `this.dataSource.getRepository(...)`) for the duration of one
+ * `findOne(resultId)` call. F-A is the chosen host per `tasks.md` T-13: it
+ * already boots the harness and reads the section, so no second harness
+ * boot is needed. Cleanup is automatic -- this file's own `afterAll`
+ * already deletes every `result_actors` row `WHERE result_id = ?` with no
+ * further column filter.
  */
 describe('Innovation Use section round trip via the real ResultInnovationUseService (T-09, F-A)', () => {
   const uniqueSuffix = Date.now();
@@ -707,5 +720,91 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
     expect(new Date(after.updated_at).getTime()).toBeGreaterThan(
       new Date(before.updated_at).getTime(),
     );
+  });
+
+  it('NFR-IUA-001 — the section read issues no per-row query pattern at 50 actor rows', async () => {
+    // Seed 50 additional Innovation Use actor rows directly (raw SQL,
+    // bypassing the service -- this measures the READ path's query shape,
+    // not reconciliation, which the `it`s above already cover). All 50
+    // reference the existing private `actorTypeCodeA` FK and
+    // `actor_role_id = 2` (`ActorRolesEnum.INNOVATION_USE`) against the
+    // SAME `resultId` this file already owns -- cleaned up automatically by
+    // this file's own `afterAll`, which deletes every `result_actors` row
+    // `WHERE result_id = ?` with no further column filter.
+    const rowCount = 50;
+    const valuesSql = Array.from(
+      { length: rowCount },
+      () => '(?, ?, TRUE, ?, 2)',
+    ).join(', ');
+    const params: number[] = [];
+    for (let i = 0; i < rowCount; i++) {
+      params.push(resultId, actorTypeCodeA, i + 1);
+    }
+    await dataSource.query(
+      `INSERT INTO result_actors (result_id, actor_type_id, sex_age_disaggregation_not_apply, actors_count, actor_role_id)
+       VALUES ${valuesSql}`,
+      params,
+    );
+
+    // Count queries via a TypeORM `Logger` swapped onto `dataSource` for
+    // the duration of one `findOne` call. This is the exact `DataSource`
+    // instance `ResultInnovationUseService` reads through
+    // (`this.mainRepo = this.dataSource.getRepository(...)` in its
+    // constructor), so every query the read path issues passes through
+    // `logQuery` here -- delegating to the original logger so behavior is
+    // otherwise unchanged (this repo's TEST datasource sets `logging:
+    // false`, `orm.config.ts:54`, so the delegate call is a no-op today,
+    // kept only so a future `logging: true` would not silently lose
+    // output).
+    const originalLogger = dataSource.logger;
+    let queryCount = 0;
+    const countingLogger: Logger = {
+      logQuery: (query, parameters, queryRunner) => {
+        queryCount++;
+        return originalLogger.logQuery(query, parameters, queryRunner);
+      },
+      logQueryError: (error, query, parameters, queryRunner) =>
+        originalLogger.logQueryError(error, query, parameters, queryRunner),
+      logQuerySlow: (time, query, parameters, queryRunner) =>
+        originalLogger.logQuerySlow(time, query, parameters, queryRunner),
+      logSchemaBuild: (message, queryRunner) =>
+        originalLogger.logSchemaBuild(message, queryRunner),
+      logMigration: (message, queryRunner) =>
+        originalLogger.logMigration(message, queryRunner),
+      log: (level, message, queryRunner) =>
+        originalLogger.log(level, message, queryRunner),
+    };
+
+    let section: Awaited<ReturnType<typeof harness.service.findOne>>;
+    (dataSource as unknown as { logger: Logger }).logger = countingLogger;
+    try {
+      section = await harness.service.findOne(resultId);
+    } finally {
+      (dataSource as unknown as { logger: Logger }).logger = originalLogger;
+    }
+
+    // "No per-row pattern": the 50 rows seeded above, plus the 2 still
+    // active from the prior `it` (A and C; B was deactivated), surface in
+    // ONE read -- a per-row implementation would have scaled `queryCount`
+    // with the row count instead of holding constant.
+    expect(section.actors.length).toBeGreaterThanOrEqual(rowCount);
+    // Sanity that the counting mechanism is actually wired, not a vacuous
+    // 0 that would make the upper-bound assertion below pass trivially.
+    expect(queryCount).toBeGreaterThan(0);
+    // NFR-IUA-001's target: at most 5 round trips. Observed: exactly 5, not
+    // 4 as `execution.md`'s T-05 entry estimated by inspection -- measuring
+    // at source (temporary per-query logging, removed before this file was
+    // committed) showed `mainRepo.findOne` with a `relations` join costs
+    // TWO queries, not one: TypeORM's repository `findOne` combines a
+    // relation JOIN with an implicit `LIMIT 1` by first running a
+    // `SELECT DISTINCT ... LIMIT 1` subquery to pick the winning id, THEN
+    // the full joined `SELECT ... WHERE id IN (?)` -- a known TypeORM
+    // pattern for "JOIN + LIMIT" that a plain relation-free read does not
+    // pay. Plus the 3 child `find`s (actors, organizations,
+    // quantifications) = 5 total. Still at, not over, the ≤5 target, and
+    // still constant in the actor row count -- the two extra rows in this
+    // read (52 total: 50 seeded here + A and C surviving the prior `it`)
+    // did not add a 6th query.
+    expect(queryCount).toBeLessThanOrEqual(5);
   });
 });

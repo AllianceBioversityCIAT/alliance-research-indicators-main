@@ -61,7 +61,6 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
   // year is reserved for this fixture and cleaned up when seeded by it.
   const reportYear = 2094;
 
-  let platformSeeded = false;
   let reportYearSeeded = false;
   let portfolioId: number;
   let impactOutcomeId: number;
@@ -80,16 +79,11 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
   beforeAll(async () => {
     await dataSource.initialize();
 
-    const [existingPlatform] = await dataSource.query(
-      `SELECT platform_code FROM reporting_platforms WHERE platform_code = 'STAR'`,
-    );
-    if (!existingPlatform) {
-      await dataSource.query(
-        `INSERT INTO reporting_platforms (platform_code, platform_name) VALUES ('STAR', 'T-02 fixture platform')`,
-      );
-      platformSeeded = true;
-    }
-
+    // `STAR` is seeded unconditionally by `test/fixtures/global-setup.ts`
+    // before any worker starts (T-13 C-4 cleanup, 2026-08-19) — this file no
+    // longer creates it itself (removed: the `platformSeeded`-guarded
+    // check-then-insert, structurally always a no-op once global-setup runs
+    // first).
     const [existingYear] = await dataSource.query(
       `SELECT report_year FROM report_years WHERE report_year = ?`,
       [reportYear],
@@ -230,20 +224,11 @@ describe('SP_versioning objective-blocks regression fixture (T-02)', () => {
         reportYear,
       ]);
     }
-    // `STAR` is NEVER torn down here (T-13 rework attempt 2, FAIL-2 / A-9).
-    // `test/fixtures/global-setup.ts` now seeds it exactly once, in Jest's
-    // main process, before any worker (and therefore before this file's own
-    // `beforeAll`) starts — the only seed point structurally immune to the
-    // per-file parallel-worker race this teardown used to be exposed to
-    // (this file's own `beforeAll` check-then-insert above raced T-13's
-    // fixture files on a cold container: whichever file's check-then-insert
-    // or plain `INSERT` lost the race saw a 1062 duplicate-key error, and if
-    // THIS file's own teardown then deleted `STAR` while a T-13 file's
-    // `results` rows under `STAR` were still live, the T-13 file's own
-    // cleanup failed with MySQL 1451). `platformSeeded` is retained only as
-    // a diagnostic (whether THIS file's own check-then-insert created the
-    // row), not to gate a delete.
-    void platformSeeded;
+    // `STAR` is NEVER created or torn down here — `global-setup.ts` owns it
+    // exclusively (see this file's `beforeAll`). The `platformSeeded` guard
+    // that used to gate this delete was removed at T-13 (C-4 cleanup): the
+    // row it guarded is one `global-setup.ts` seeds unconditionally before
+    // any worker starts, so the guard was structurally always `false`.
 
     await dataSource.destroy();
   });

@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[x]` done — with an OPEN PRODUCT DEFECT: `R-IUA-009 AC.3` is not met by the product** (cross-result row corruption, pre-existing and shared with Innovation Dev), quarantined via `it.failing` under option B; role isolation itself is proven. **Options A/D remain open.** **T-11 `[x]` done.** **T-12 `[x]` done.** T-13 todo — **and its double-green fixture gate collides with T-10's deliberate red; carve out at dispatch.** **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **23 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[x]` done — with an OPEN PRODUCT DEFECT: `R-IUA-009 AC.3` is not met by the product** (cross-result row corruption, pre-existing and shared with Innovation Dev), quarantined via `it.failing` under option B; role isolation itself is proven. **Options A/D remain open.** **T-11 `[x]` done.** **T-12 `[x]` done.** **T-13 `[~]` — nine of ten criteria met; the human `/swagger` check is the sole outstanding item and requires the user.** **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **24 consumed — exactly on budget**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -618,7 +618,7 @@ As T-09. **Falsifying input:** omit the `ipAvailables` edit → no IP Rights row
 - **Requirements covered:** R-IUA-013 AC.3, AC.7 · NFR-IUA-001 · NFR-IUA-003 · resolves **OQ-IUA-2**
 - **Depends on:** T-10, T-11, T-12
 - **Size:** M (~140 LOC incl. the NFR-001 fixture) · **Effort:** `high`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[~]` 2026-08-19 — PASS on attempt 1, zero rework, with ONE criterion outstanding BY DESIGN.** Nine of ten Done criteria met. **Criterion 6 — the human `/swagger` check — awaits the user's own observation and cannot be discharged by any agent**; it is the only gate `R-IUA-013 AC.3` has, and the task requires it be *"reported as a human observation, never as a command result"*. Per Step 2.3.0 a task with an outstanding gap never reaches `[x]` even on a Reviewer PASS. C-4 cleanup: **2 dead sites removed, 10 live guards kept**, classification enumerated by grep over all 14 files and ruled **conclusive**. NFR-IUA-001: **exactly 5 queries** with 52 active actor rows — and it **corrects this spec's own T-05 estimate of 4**, since `findOne` with a relation join costs 2 (TypeORM's id-picking subquery). Fixture suite 14/49 green **twice consecutively**; unit 336/2264; coverage 89.69/75.61/85.13/89.14. Evidence: [`./execution.md`](./execution.md) → *T-13*
 - **Skills:** `systematic-debugging`, `nestjs-expert`
 
 **Files touched**
@@ -644,16 +644,16 @@ Method, per KZ-002 / KZ-005 / KZ-007:
 
 **Done criteria**
 
-- [ ] Every occurrence of both identifiers across the whole `test/fixtures/` tree is classified dead or live, with the guarded row named *(KZ-002)*
-- [ ] Only dead sites removed; each removal's commit message quotes the guarded row *(KZ-005)*
-- [ ] A per-file report line exists **for every fixture file, including those with zero removals** *(KZ-007)*
-- [ ] `npm run test:fixtures` run **twice in a row on the same container** — both green. A single run cannot detect the orphaned-platform regression this cleanup risks
-- [ ] The section read issues ≤ 5 queries with 50 actor rows and no per-row pattern *(NFR-IUA-001)*
+- [x] Every occurrence of both identifiers across the whole `test/fixtures/` tree is classified dead or live, with the guarded row named *(KZ-002)*
+- [x] Only dead sites removed; each removal's commit message quotes the guarded row *(KZ-005)*
+- [x] A per-file report line exists **for every fixture file, including those with zero removals** *(KZ-007)*
+- [x] `npm run test:fixtures` run **twice in a row on the same container** — both green. A single run cannot detect the orphaned-platform regression this cleanup risks
+- [x] The section read issues ≤ 5 queries with 50 actor rows and no per-row pattern *(NFR-IUA-001)*
 - [ ] **Human check, recorded verbatim in the report:** `/swagger` shows the section `GET` and `PATCH` — the two **own-declared** handlers — each with tag, `@ApiOperation` summary, bearer lock, and — for the `PATCH` — the `@ApiBody` schema. The catalog `GET` — the one **inherited, unmodified** `BaseController` handler — shows tag and bearer lock but carries **no** `@ApiOperation` summary; confirm this as the exemption ruled in `design.md` DD-13 / `requirements.md` D-IUA-10, not as a defect *(R-IUA-013 AC.3)*
-- [ ] Every new entity write populates `AuditableEntity` fields from `request.user` — confirmed by the F-A and F-E assertions, restated here as the spec-level closure *(AC.7)*
-- [ ] Full `npm test -- --silent` green; `npm run test:cov` ≥ **60%** on all four axes *(NFR-IUA-003)*
-- [ ] `npm run lint -- --quiet` clean, **and `git status` re-checked** — the script carries `--fix`
-- [ ] `git status` clean of unintended changes
+- [x] Every new entity write populates `AuditableEntity` fields from `request.user` — confirmed by the F-A and F-E assertions, restated here as the spec-level closure *(AC.7)*
+- [x] Full `npm test -- --silent` green; `npm run test:cov` ≥ **60%** on all four axes *(NFR-IUA-003)*
+- [x] `npm run lint -- --quiet` clean, **and `git status` re-checked** — the script carries `--fix`
+- [x] `git status` clean of unintended changes
 
 **Verification & its limits**
 

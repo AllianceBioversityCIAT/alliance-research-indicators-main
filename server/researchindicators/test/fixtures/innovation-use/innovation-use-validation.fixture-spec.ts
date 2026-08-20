@@ -54,7 +54,6 @@ describe('innovation_use_validation stored function (T-12, F1-F9/F9b/F11/F17)', 
 
   let platformSeeded = false;
   let reportYearSeeded = false;
-  let innovationDevRoleSeeded = false;
   let actorTypeOneSeeded = false;
   let actorTypeFiveSeeded = false;
 
@@ -186,21 +185,13 @@ describe('innovation_use_validation stored function (T-12, F1-F9/F9b/F11/F17)', 
       actorTypeFiveSeeded = true;
     }
 
-    // The Innovation Dev role (actor_role_id = 1) IS seeded by a migration
-    // on this branch — see this file's header comment above for the full,
-    // corrected account (FP-16) of why the row is nonetheless genuinely
-    // absent from a freshly-loaded scratch schema. F11 needs a real,
+    // The Innovation Dev role (actor_role_id = 1) is seeded unconditionally
+    // by `test/fixtures/global-setup.ts` before any worker starts — this
+    // file no longer creates it itself (removed at T-13 C-4 cleanup: the
+    // `innovationDevRoleSeeded`-guarded check-then-insert, structurally
+    // always a no-op once global-setup runs first). F11 needs a real,
     // resolvable Innovation Dev actor row to prove the role filter is
-    // non-vacuous, so this catalog row must exist. Seed idempotently.
-    const [existingDevRole] = await dataSource.query(
-      `SELECT actor_role_id FROM actor_roles WHERE actor_role_id = 1`,
-    );
-    if (!existingDevRole) {
-      await dataSource.query(
-        `INSERT INTO actor_roles (actor_role_id, name) VALUES (1, 'innovation-dev')`,
-      );
-      innovationDevRoleSeeded = true;
-    }
+    // non-vacuous, and global-setup's seed already guarantees it exists.
   });
 
   afterAll(async () => {
@@ -224,20 +215,12 @@ describe('innovation_use_validation stored function (T-12, F1-F9/F9b/F11/F17)', 
       ]);
     }
 
-    // `actor_roles` id 1 is NEVER torn down here (T-13 rework attempt 2,
-    // FAIL-2/FAIL-4 / A-9). `test/fixtures/global-setup.ts` now seeds it
-    // exactly once, in Jest's main process, before any worker (and
-    // therefore before this file's own `beforeAll`) starts — the only seed
-    // point structurally immune to the per-file parallel-worker race this
-    // teardown used to be exposed to (this file's own check-then-insert
-    // above raced `innovation-dev-lifecycle-routines-unchanged.fixture-
-    // spec.ts` (T-13, F16) on a cold container over the same row, and this
-    // file's own teardown deleting the row out from under that file's
-    // still-live `result_actors` insert previously raised MySQL 1451/1452).
-    // `innovationDevRoleSeeded` is retained only as a diagnostic (whether
-    // THIS file's own check-then-insert created the row), not to gate a
-    // delete.
-    void innovationDevRoleSeeded;
+    // `actor_roles` id 1 is NEVER created or torn down here —
+    // `global-setup.ts` owns it exclusively (see this file's `beforeAll`).
+    // The `innovationDevRoleSeeded` guard that used to gate this delete was
+    // removed at T-13 (C-4 cleanup): the row it guarded is one
+    // `global-setup.ts` seeds unconditionally before any worker starts, so
+    // the guard was structurally always `false`.
     if (actorTypeOneSeeded) {
       await dataSource.query(`DELETE FROM clarisa_actor_types WHERE code = 1`);
     }

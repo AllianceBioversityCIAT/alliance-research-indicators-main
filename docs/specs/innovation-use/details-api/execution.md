@@ -1893,3 +1893,87 @@ The Implementer found **40 pre-existing prettier errors** on the file the Leader
 
 **Budget status:** **13 of 13 tasks have been attempted; 12 complete, T-10 `[x]` with a documented open product defect.** **23 of ~24 review rounds consumed.** T-13 is now eligible and is the last task — it will consume the 24th round, leaving **zero** headroom for rework. The LOC axis has already breached at ~2.8× on the fixture tier (see T-12's escalation).
 
+### T-13 — C-4 cleanup, full gate, human Swagger check
+
+- **Status at the time of this entry:** `[~]` — **PASS on attempt 1, zero rework, with ONE criterion outstanding by design.** Nine of ten Done criteria are met; **criterion 6, the human `/swagger` check, awaits the user's own observation and cannot be discharged by any agent.** Per Step 2.3.0 — *"a task with an outstanding gap never reaches `[x]`, even on a Reviewer `PASS`"* — T-13 stays `[~]`.
+- **Date:** 2026-08-19 · **Attempts:** 1 · **Review rounds:** 1 (single Reviewer, lens-checklist — `high` effort's default, no deviation)
+- **Requirements in scope:** R-IUA-013 AC.3, AC.7 · NFR-IUA-001 · NFR-IUA-003 · resolves **OQ-IUA-2**
+- **Files changed (3, all under `test/fixtures/`):** `sp-versioning-objective-blocks.fixture-spec.ts` (one removal) · `innovation-use/innovation-use-validation.fixture-spec.ts` (one removal) · `innovation-use/innovation-use-section-round-trip.fixture-spec.ts` (extended with the NFR assertion)
+
+#### (a) The C-4 cleanup — 2 removed, 10 kept, and the classification is conclusive
+
+**The trap this criterion exists for:** chunk 1's Kaizen logged `platformSeeded` / `innovationDevRoleSeeded` as *"structurally always false"*, and **that finding is over-broad**. A guard is dead only where the row it protects is one of `global-setup.ts`'s four unconditional seeds; a guard protecting a **private** platform code is **live**, because it gates that file's `afterAll` `DELETE` and those inserts are plain `INSERT`, not `INSERT IGNORE`. Remove one and the **next** run collides on a duplicate key — so the wrong cleanup yields a suite that is green once and red the second time. That is why criterion 4 mandates two consecutive runs, and it is DD-12/§11.1's whole subject: the reversion challenge was run on exactly this cleanup and found a concrete breakage.
+
+| Verdict | Count | Sites |
+| --- | --- | --- |
+| **DEAD — removed** | 2 | `sp-versioning-objective-blocks` (`reporting_platforms 'STAR'`) · `innovation-use-validation` (`actor_roles` id 1) |
+| **LIVE — kept** | 10 | every guard protecting a private platform code: `T09IUFA`, `T10IUFB`, `T11IULB`, `T12IURC`, `T12IUV`, `T12RT1`, `T12F10`, `T12F12B`, `T13IULC`, `T13IUDR` |
+| No occurrence | 3 | `smoke`, `innovation-dev-validation-unchanged`, `innovation-use-catalog-order` |
+
+**14 files enumerated by grep over the whole tree (KZ-002), matching the 14 collected suites** — not from `design.md` §11.1's illustrative list, which is the failure mode this criterion names. A per-file line exists for every file **including the three with zero occurrences** (KZ-007).
+
+**The Reviewer confirmed both DEAD verdicts at source rather than by inspection**: `global-setup.ts:50-52` and `:56-58` are **unconditional** `INSERT IGNORE`s inside Jest's `globalSetup`, which runs once before any worker; both are root catalog rows with no outgoing FK (FP-46's own carve-out, so the `IGNORE` cannot silently no-op them into absence); and **no fixture anywhere deletes either row** — zero `DELETE … 'STAR'`, zero `DELETE FROM actor_roles` in the tree. Each removed `if (!existing)` was therefore structurally unreachable.
+
+**It also ran the KZ-005 axis check I had not asked for:** the only other fixture inserting into `actor_roles`/`institution_type_roles` uses deliberately **private** role ids, not id 1 — so no differently-named guard hides a fifth dead site.
+
+**On conclusiveness, stated honestly:** the double green alone is only probabilistic (it exercises the collision only for platforms actually seeded in run 1). Combined with the static facts that neither removal touched a private code and all ten private guards are byte-present, the Reviewer ruled it **conclusive**.
+
+**The judgment call — removing the whole check-then-insert block, not just the boolean — was ruled IN SCOPE** on three independent grounds: `global-setup.ts`'s docstring states *"No fixture file may create or tear down any of these four rows from here on"*, so a surviving SELECT+INSERT of an owned row violates the very contract the removal closes; that docstring records the **teardown** halves as already removed in chunk 1, leaving the boolean's only consumer the diagnostic `void` §11.1 itself notes, so once the boolean goes the block has no consumer at all; and chunk-1 C-4 named *"dead branches"* — the branch **is** the block. Both removals replaced the code with an in-place comment **naming the guarded row**, so KZ-005's quote-the-row discipline held at the code site, not only in a commit message.
+
+#### (b) NFR-IUA-001 — exactly 5 queries, and it corrects this log
+
+Extended **F-A** (`innovation-use-section-round-trip`), which already boots the harness and reads the section, so no second harness boot was needed. Seeds 50 `result_actors` rows by raw SQL, swaps a counting TypeORM `Logger` onto the DataSource for the duration of one `findOne`, restores it in `finally`.
+
+**Observed: 5 queries. And that corrects `execution.md`'s own T-05 entry, which estimated 4 by inspection.** `mainRepo.findOne({ relations: { innovation_use_level: true } })` costs **2**, not 1 — the Reviewer verified the mechanism at source in `typeorm`: `EntityManager.js:604-609` sets `take: 1` unconditionally, and `SelectQueryBuilder.js:1960-1961` takes the two-query id-picking path exactly when `(skip || take) && joinAttributes.length > 0`, which the relation satisfies. So: a `SELECT DISTINCT … LIMIT 1` id-picking subquery, then the joined `SELECT … WHERE id IN (?)`, plus 3 child reads = **5**.
+
+**The zero margin is the honest state, not a defect — and the reason is better than "it passes".** `requirements.md` NFR-IUA-001 **itself enumerates five items** ("detail row, actors, organizations, quantifications, catalog join"), so 5 is the number the requirement was dimensioned for. **T-05's "4 round trips … the join is *not* a fifth query" was right about the JOIN and wrong about the id-picking subquery.** An estimate made by reading code sat in this log for eleven tasks until something finally counted it.
+
+**Measurement soundness, verified rather than assumed:** `MysqlQueryRunner.js:151` resolves `logger` as a property lookup on the DataSource at call time, so the swap is observed; `harness.dataSource` is the single `moduleRef.get(DataSource)` instance that the service and every child repository bind to. No under-count vector survives — no second connection, no query cache, no concurrent in-file work inside the awaited call, and sibling fixtures run in separate workers with their own DataSource. An anti-vacuity guard (`toBeGreaterThan(0)`) is present.
+
+**"No per-row pattern" is genuinely proven, and the row count is right:** **52** active rows (50 seeded + A and C; B was deactivated in the prior `it` and is excluded by `find`'s `is_active: true`), with `actors.length >= 50` asserted in the same test — so a per-row read would have driven the count past 50 and blown the bound. Bounded honestly: it proves no per-row pattern **on the actors collection**, which is exactly what NFR-IUA-001's "how verified" asks. Raw-SQL seeding is legitimate because the measurement is of the **read** path; routing 50 rows through `customSaveInnovationUse` would add write-path queries to the measured window and prove nothing extra.
+
+#### (c) Criterion 6 — OUTSTANDING, correctly refused, and it is the user's
+
+**The Implementer refused to perform or simulate the human `/swagger` check, and that refusal was the right call.** The Reviewer confirmed no substitute exists anywhere in the diff — no decorator assertion, no `Reflect.getMetadata` stand-in, no grep — satisfying the task's own rule that it *"must be reported as a human observation, never as a command result"* and KZ-001. **R-IUA-013 AC.3 is `unmet-pending-human`, not met.**
+
+Two riders already on the record that the human observation must carry:
+- **Confirm the literal URL.** `main.ts` enables URI versioning with **no `defaultVersion`**, so no version segment is emitted (recorded earlier in this log at the T-01 discussion).
+- **Confirm the DD-13 / D-IUA-10 exemption as an exemption, not a defect** — the catalog `GET` is the one *inherited, unmodified* `BaseController` handler and correctly carries **no** `@ApiOperation`. Plus `@ApiProperty` ×25 across the DTOs.
+
+#### Gates
+
+| Gate | Result |
+| --- | --- |
+| `npm run test:fixtures` ×2, same container | **14 suites / 49 tests, 0 failed — both runs.** Exactly +1 against T-10's 48 baseline: the one new `it` and nothing else |
+| `npm test -- --silent` | **336 suites / 2264 tests** green |
+| `npm run test:cov` | **89.69 / 75.61 / 85.13 / 89.14** — all ≥ the 60% floor |
+| `npm run lint -- --quiet` | clean; **`git status` re-checked after** (the script carries `--fix`) — **no mutation** |
+| `git status` | only the 3 intended files; `git diff HEAD -- src/` **empty** |
+
+**Coverage is reported as what it is:** per NFR-IUA-003's disqualifier and `design.md` §10.5, **it is not evidence for DC-2, DC-3, DC-5 or DC-7** — SQL sits outside Jest coverage (ADR-11) and the fixture suite is a separate Jest project not counted in it.
+
+#### A cross-check worth keeping — the quarantine proved itself
+
+`it.failing` **fails when its body passes.** So "0 failed" on both runs *positively proves* T-10's two quarantined assertions **still fail** — i.e. the `R-IUA-009 AC.3` defect is still open and the marker is still load-bearing. A green suite is normally silent about a quarantine; this inversion makes it speak. The Reviewer also confirmed the file was untouched, its `'T10IUFB'` guard correctly classified LIVE, exactly 2 `it.failing` calls, and zero `.skip`/`xit`/`.only`/`.todo` anywhere under `test/`.
+
+#### The advisory queue stayed out — verified structurally
+
+Reviewers across T-09…T-12 recorded cleanup candidates and repeatedly suggested T-13 as their home. **None became work**, and the Reviewer confirmed it structurally rather than on assertion: the `afterAll` sequences are still unguarded awaits in both named fixtures, `innovation-use-catalog-order` (F-D's `Number()` coercion, the undeclared `901_000`) is untouched, `nest-harness.ts` (the duplicated `StubResultsUtil`) is untouched, and the message-breadth and `resolveInnovationUseLevel` doc-comment items live in `src/`, whose diff is empty. **An advisory never becomes work — held.**
+
+#### Corrections to this log
+
+- **A Leader arithmetic slip:** the T-13 dispatch brief said "`innovation-use-validation` … + the other **10** LIVE files", implying 11. There are exactly **10** live-guard files **including** `innovation-use-validation` (nine besides it). Substance unaffected; corrected here.
+- **`execution.md`'s T-05 query estimate (4) is superseded by the measured 5** — see (b).
+- **OQ-IUA-2 is substantively resolved** (2 removed with the guarded row named, 10 kept), but `requirements.md`'s open-question row is **still unstruck**, unlike OQ-IUA-1 which carries the `~~…~~ RESOLVED` treatment. Bookkeeping for `/akili-archive` on a document this diff correctly did not touch.
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| **Readability — the one worth an edit** | **`innovation-use-validation.fixture-spec.ts:30-38` is now FALSE and contradicts two comments this same diff added.** The header still says the `beforeAll` *"still check-then-inserts id 1 itself, idempotently"* and *"Left as-is: this correction's authorized scope is this comment, not that code"* — while `:188-194` correctly says the file *"no longer creates it itself"*. **Two comments in one file asserting opposite facts about the same six removed lines.** No criterion covers it, no behaviour depends on it, and the operative comments are the correct ones | **Recorded, not actioned.** Ruled non-gating by the Reviewer. Flagged to the user as a recommended two-sentence deletion — and noted because a stale header contradicting the code is precisely what cost a round at T-11 |
+| Readability | Both new comment blocks cite **"T-13" with no spec slug**, and **chunk 1 has its own T-13 that touched these exact two files.** A reader cannot tell which. FP-50's citation discipline applies | Recorded |
+| Risk | **NFR-IUA-001 sits exactly at its ceiling.** One added relation on the detail `findOne`, or a fourth child read, breaks it. Honest state rather than a defect — the requirement enumerates five round trips itself — but **the fixture is now the tripwire**, so keep the `toBeLessThanOrEqual(5)` bound rather than relaxing it | Recorded |
+| Reliability | The `≤ 5` bound proves no per-row pattern **for the actors collection only**; organizations and quantifications stay at one row each and are not scaled. That is what NFR-IUA-001 asks; recorded so a later reader does not over-read it | Recorded |
+
+**Budget status:** **12 of 13 tasks `[x]`; T-13 `[~]` with one human criterion outstanding.** **24 of ~24 review rounds consumed — exactly on the re-baselined budget, with zero rework spent on T-13.** The LOC axis remains breached at ~2.8× on the fixture tier (T-12's escalation, unchanged and intrinsic).
+
