@@ -229,10 +229,8 @@ export class DuplicateResolutionService {
         const participants = members.filter(
           (member) => member.normalizedPublicLink === key.normalizedPublicLink,
         );
-        // The sweep flags cross-year groups for review rather than resolving them.
-        const rawResolution = resolveDuplicateGroup(participants, {
-          flagCrossYear: true,
-        });
+        // Cross-year same-handle groups resolve under Rules 1–3 (R-CYD-001).
+        const rawResolution = resolveDuplicateGroup(participants);
 
         // R-RES-010 AC.8 — a participant with more than one qualifying
         // identity is refused FOR ITSELF, before anything below can act on

@@ -42,3 +42,26 @@ Tests: 1 failed, 42 passed, 43 total
 - **Issues:** none
 - **Note:** worktree `node_modules` → symlink to main package for test run only; not committed.
 
+
+### T-02 — Remove sweep year veto; make T-01 green
+
+| Field | Value |
+| --- | --- |
+| **Final status** | PASS |
+| **Date** | 2026-08-20 |
+| **Attempts** | 2 |
+| **Requirements** | R-CYD-001 AC.1–AC.3; NFR-CYD-001 |
+| **Implementer** | attempt1 [c0e1919e](c0e1919e-eaa9-4566-8c46-2060069361d7) · attempt2 [9a76f23b](9a76f23b-d41e-443b-b53a-5d1cb5c06c45) |
+| **Reviewer** | attempt1 FAIL [7319e8db](7319e8db-8cf2-40d0-a410-faafdae33266) · attempt2 PASS [2ebb4aef](2ebb4aef-b9ea-402f-b2d5-37761aef88f8) |
+
+#### Attempt 1
+- Files: util (delete flagCrossYear early-return), duplicate-resolution.service (drop option)
+- Verify: priority 43/43 · resolution 75/75
+- Reviewer: **FAIL** — unused `options` param breaks `@typescript-eslint/no-unused-vars`; optional stale repo JSDoc
+
+#### Attempt 2 (effort high)
+- Files: `_options` rename; `duplicate-candidate.repository.ts` JSDoc corrected (Leader absorbed optional issue)
+- Verify: 43/43 · 75/75 · `npm run lint -- --quiet` exit 0 (migration prettier touch restored, not committed)
+- Reviewer: **PASS**
+- Forward note for T-03: enum `CROSS_YEAR_REVIEW` docstring still says "never auto-deleted"
+

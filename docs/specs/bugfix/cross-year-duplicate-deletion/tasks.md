@@ -3,7 +3,7 @@
 - **Module:** results
 - **Spec id:** 2026-08-cross-year-duplicate-deletion
 - **Depth:** Lite · **Bug Mode**
-- **Status:** in-progress (T-01 done; next T-02)
+- **Status:** in-progress (T-02 done; next T-03)
 - **Owner:** ARI server squad
 - **Linked requirements:** `./requirements.md`
 - **Linked design:** `./design.md` (DD-1, DD-2, DD-3; budget 2–3 tasks / ~80–150 LOC)
@@ -71,7 +71,7 @@ graph TD
 
 ### T-02 — Remove sweep year veto; make T-01 green
 
-- **Status:** todo
+- **Status:** [x] done
 - **Size:** S
 - **Dependencies:** T-01
 - **Requirements covered:** R-CYD-001 AC.1–AC.3; NFR-CYD-001
@@ -95,9 +95,9 @@ graph TD
   - **Fail input:** re-introduce `flagCrossYear: true` early-return → T-01 must fail again.
   - NFR-CYD-001: grep confirms no new call to soft `delete_result` / `deleteLogicalResultById` in the touched delete path.
 - **Done criteria:**
-  - [ ] T-01 green on the fixed util + call site.
-  - [ ] No soft-delete fallback introduced.
-  - [ ] Family year-scoping code paths untouched (diff does not modify `query.service.ts` delete scope).
+  - [x] T-01 green on the fixed util + call site.
+  - [x] No soft-delete fallback introduced.
+  - [x] Family year-scoping code paths untouched (diff does not modify `query.service.ts` delete scope).
 
 ---
 

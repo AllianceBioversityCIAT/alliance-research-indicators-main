@@ -216,13 +216,14 @@ export function resolveDuplicatePair(
  *
  * @param participants Rows sharing one normalized public link. Callers MUST
  *        already have filtered to live, non-snapshot, in-scope-platform rows.
- * @param options.flagCrossYear When true (the sweep), a group spanning more than
- *        one `reportYearId` is reported for review instead of resolved. The sync
- *        path leaves it false because it matches within a single report year.
+ * @param options.flagCrossYear Deprecated no-op — kept for call-site
+ *        backward compatibility only. Report-year differences no longer veto
+ *        rule evaluation (R-CYD-001); cross-year same-handle groups resolve
+ *        under Rules 1–3 exactly as same-year groups do.
  */
 export function resolveDuplicateGroup(
   participants: DuplicateGroupParticipant[],
-  options: { flagCrossYear?: boolean } = {},
+  _options: { flagCrossYear?: boolean } = {},
 ): DuplicateGroupResolution {
   const none = (
     classification: DuplicateGroupClassification,
@@ -251,20 +252,6 @@ export function resolveDuplicateGroup(
       DuplicateGroupClassification.SAME_SYSTEM_IGNORED,
       'All participants belong to one platform; same-system duplicates are not corrected.',
     );
-  }
-
-  if (options.flagCrossYear) {
-    const years = new Set(
-      participants
-        .map((p) => p.reportYearId)
-        .filter((y) => y !== null && y !== undefined),
-    );
-    if (years.size > 1) {
-      return none(
-        DuplicateGroupClassification.CROSS_YEAR_REVIEW,
-        `Participants span ${years.size} report years; auto-deletion is confined to a single year.`,
-      );
-    }
   }
 
   // --- pairwise evaluation -------------------------------------------------
