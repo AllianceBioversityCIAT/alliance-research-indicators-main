@@ -100,7 +100,7 @@ describe('OicrFormFieldsComponent', () => {
     autofillinOicr: WritableSignal<boolean>;
     createOicrBody: WritableSignal<any>;
     resultPageStep?: jest.Mock;
-  } as any;
+  };
 
   beforeEach(async () => {
     apiMock = {

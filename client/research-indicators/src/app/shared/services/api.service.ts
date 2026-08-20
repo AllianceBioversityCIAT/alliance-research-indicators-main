@@ -78,6 +78,7 @@ import {
   BilateralMappingListQuery,
   BilateralProjectMapping,
   ClarisaBilateralProjectOption,
+  ClarisaProjectPhasesResponse,
   CreateBilateralMappingBody,
   UpdateBilateralMappingBody
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
@@ -855,6 +856,15 @@ export class ApiService {
   GET_ClarisaBilateralProjects = (search?: string): Promise<MainResponse<ClarisaBilateralProjectOption[]>> => {
     const url = () => `tools/clarisa/projects/bilateral`;
     if (search) return this.TP.getWithParams(url(), { search });
+    return this.TP.get(url(), {});
+  };
+
+  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-03 / R-CPC-003
+  // Distinct CLARISA project phases present in the eligible cohort, with a
+  // per-year count. Powers the admin-editable year selector on the
+  // Configuration Variables edit modal (design.md §7.2).
+  GET_ClarisaProjectPhases = (): Promise<MainResponse<ClarisaProjectPhasesResponse>> => {
+    const url = () => `tools/clarisa/projects/phases`;
     return this.TP.get(url(), {});
   };
 

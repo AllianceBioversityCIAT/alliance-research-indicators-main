@@ -1,0 +1,22 @@
+{
+  "capture": {
+    "host": "https://clarisatest-back.ciat.cgiar.org/",
+    "captured_at": "2026-08-19T01:46:02.387Z",
+    "fetched_project_count": 299,
+    "reference_capture_project_count": 5,
+    "reference_capture_selection_rule": "first N projects, in response order, carrying >=1 mapping (N=5)",
+    "dictionary_entry_count": 13,
+    "dictionary_entity_code_histogram": {
+      "22": 8,
+      "23": 1,
+      "24": 4
+    }
+  },
+  "export": {
+    "source_filename": "prms-projects-20260818.xlsx",
+    "export_date": "2026-08-18",
+    "row_count": 198,
+    "mapping_count": 283
+  },
+  "removal_condition": "when CLARISA publishes external_code and phase-2026 data, unset the flag and delete the stub, fixture, dictionary, reference capture and converter; do not maintain them"
+}

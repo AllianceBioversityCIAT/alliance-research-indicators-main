@@ -112,6 +112,9 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
     ResultRepository,
     DuplicateCandidateRepository,
     ResultDuplicateResolutionLogService,
+    DuplicateResolutionService,
+    DuplicateResolutionRunner,
+    StarRelationshipService,
   ],
 })
 export class ResultsModule {}

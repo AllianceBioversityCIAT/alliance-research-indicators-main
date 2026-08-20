@@ -12,27 +12,74 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { TocLevel } from '../../../tools/toc-integration/dto/toc-integration.types';
+import { SpRole } from './sp-role.type';
 
-export interface SelectedLeverResponse {
+// T-05 note: a class (not an interface) — it is nested inside AlignmentResponse
+// via `@ApiProperty({ type: () => [SelectedLeverResponse] })`, and Swagger's
+// `type: () => X` factory can only reference a runtime value, not an
+// interface (erased at compile time). Still consumed as a pure structural
+// type by `BilateralService` — never `new`s this — so the wire shape is
+// unchanged (R-BIL-114 AC.2).
+export class SelectedLeverResponse {
+  @ApiProperty({ type: String })
   lever_code: string;
+
+  @ApiProperty({ type: String })
   lever_name: string;
 }
 
-export interface SelectedScienceProgramResponse {
+// T-05 note: same class-not-interface reasoning as SelectedLeverResponse above.
+export class SelectedScienceProgramResponse {
+  @ApiProperty({ type: String })
   code: string;
+
+  @ApiProperty({ type: String })
   name: string;
+
+  @ApiProperty({ type: String, nullable: true })
   category: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
   color: string | null;
+
   // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.4 / R-BIL-074
   // Stable per-SP FE asset key (defaults to `code` until per-SP branding splits).
+  @ApiPropertyOptional({ type: String, nullable: true })
   icon_key?: string | null;
+
   // Optional — populated when the entry came from the CLARISA per-result path
   // (R-BIL-076). Null when the source is the local alignment row (legacy lever
   // catalog), which doesn't carry allocations.
+  @ApiPropertyOptional({ type: Number, nullable: true })
   allocation?: number | null;
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03/T-08 / R-BIL-120, R-BIL-123
+  // Derived from sp_role, never transmitted per-row on write (R-BIL-120 —
+  // the wire carries no per-row role field). `null` means role not yet
+  // chosen — reachable ONLY on legacy rows written before this migration
+  // (R-BIL-126); never produced by a write that passes R-BIL-121.
+  //
+  // Required at the TS level (`role:`, not `role?:`) as of T-08:
+  // `toSelectedSciencePrograms` (bilateral.service.ts) now populates it on
+  // every entry via the `sp_roles` carrier (design.md §4). Keeping the `?`
+  // once the field is always populated would let a future construction site
+  // omit it silently — and `JSON.stringify` drops `undefined` keys, so a
+  // path that missed it would omit `role` from the wire entirely, silently
+  // contradicting the `@ApiProperty` (not `@ApiPropertyOptional`) contract
+  // below, which already documents `role` as an always-present, nullable
+  // field with `required: true` in the OpenAPI schema.
+  @ApiProperty({
+    enum: ['PRIMARY', 'CONTRIBUTING'],
+    nullable: true,
+    example: 'PRIMARY',
+    description:
+      'Role not yet chosen — legacy rows only. Every row written after this change always resolves to PRIMARY or CONTRIBUTING; null is unreachable on a fresh save (R-BIL-121) and appears only on alignments saved before this migration (R-BIL-126).',
+  })
+  role: SpRole | null;
 }
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-095
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
 //
 // One saved per-SP ToC alignment in the frozen §5 read-back shape (D-V2-5).
 // Snapshot-sourced EXCLUSIVELY from `result_pool_funding_toc_alignment` —
@@ -40,51 +87,185 @@ export interface SelectedScienceProgramResponse {
 // `unit_messurament` (verbatim upstream spelling, D-V2-4) is renamed to
 // `unit_of_measurement` at the wire. ToC refs + snapshot fields are null
 // for "No" rows (`aligns_with_toc: false`).
-export interface TocAlignmentReadbackResponse {
+//
+// T-05 note: a `@ApiProperty`-annotated CLASS (not an interface), following
+// the module's own precedent (`bilateral-hlos-indicators.response.dto.ts`
+// T-04 note) — Swagger cannot introspect an interface. Still consumed as a
+// pure structural type by `BilateralService` (`toTocAlignmentReadback`
+// returns an object literal, never `new`s this) — the wire shape is
+// unchanged (R-BIL-114 AC.2 / design §5.3).
+//
+// Partial-row null contract (R-BIL-114, toc-optional-mapping): when
+// `aligns_with_toc: true` but no `indicator_id` was ever supplied (Level +
+// HLO floor only, R-BIL-111 A-1), `indicator_id`, `indicator_description`,
+// `unit_of_measurement`, `target_value`, and `target_year` are `null` — the
+// row has no indicator to derive them from. `toc_result_title` stays
+// populated because the ToC result itself IS chosen. `target_year` in
+// particular must stay null rather than default to the live mappable
+// version, so a partial row never claims a target year for a target it has
+// no indicator for. Every field is null for a "No" row
+// (`aligns_with_toc: false`).
+export class TocAlignmentReadbackResponse {
+  @ApiProperty({ type: String, example: 'SP01' })
   sp_code: string;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      "Per-SP answer: does this result align with this SP's Theory of Change?",
+  })
   aligns_with_toc: boolean;
+
+  @ApiProperty({
+    enum: ['OUTPUT', 'OUTCOME', 'EOI'],
+    nullable: true,
+    example: 'OUTPUT',
+    description: 'Null when aligns_with_toc is false.',
+  })
   level: TocLevel | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 5187,
+    description: 'Null when aligns_with_toc is false.',
+  })
   toc_result_id: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 5972,
+    description:
+      'Null when aligns_with_toc is false, OR when aligns_with_toc is true but no indicator was chosen — a "Yes" may stop at Level + HLO (R-BIL-111, R-BIL-114 AC.1).',
+  })
   indicator_id: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 10,
+    description:
+      'Null when aligns_with_toc is false, or when no indicator was chosen for the row.',
+  })
   quantitative_contribution: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'HLO1.AOW1.IO1 Steer to impact',
+    description:
+      'Always populated when a ToC result is chosen (aligns_with_toc: true), independent of whether an indicator was also chosen. Null only when aligns_with_toc is false.',
+  })
   toc_result_title: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Market intelligence is packaged into…',
+    description:
+      'Null when aligns_with_toc is false, or when no indicator was chosen for the row.',
+  })
   indicator_description: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Number',
+    description:
+      'Null when aligns_with_toc is false, or when no indicator was chosen for the row.',
+  })
   unit_of_measurement: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '10',
+    description:
+      'Null when aligns_with_toc is false, or when no indicator was chosen for the row.',
+  })
   target_value: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 2026,
+    description:
+      'MAPPABLE_LIVE_VERSION (2026) when an indicator was chosen. Null when aligns_with_toc is false, or when no indicator was chosen — a partial row must not claim a target year for a target it has no indicator for.',
+  })
   target_year: number | null;
 }
 
-export interface AlignmentResponse {
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
+//
+// T-05 note: same class-not-interface reasoning as `TocAlignmentReadbackResponse`
+// above. Still consumed as a pure structural type by `BilateralService`
+// (`getAlignment` / `updateAlignment` return object literals, never `new`s
+// this) — the wire shape is unchanged.
+export class AlignmentResponse {
+  @ApiProperty({ type: String, example: 'STAR-5238' })
   result_code: string;
+
+  @ApiProperty({ type: Boolean })
   eligible: boolean;
+
+  @ApiProperty({ type: Boolean })
   has_pool_funding_alignment_eligible: boolean;
+
+  @ApiProperty({ type: Boolean, nullable: true })
   has_contribution: boolean | null;
+
+  @ApiProperty({ type: () => [SelectedLeverResponse] })
   selected_levers: SelectedLeverResponse[];
+
+  @ApiProperty({ type: () => [SelectedScienceProgramResponse] })
   selected_science_programs: SelectedScienceProgramResponse[];
+
+  @ApiProperty({ type: Boolean })
   is_synced_to_prms: boolean;
+
   // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.2 / R-BIL-071
   // Union of two gates:
   //   1. PRMS-sourced (`platform_code === 'PRMS'`) — PRMS owns the data, STAR is read-only.
   //   2. Synced to PRMS (`is_synced_to_prms === true`) — STAR-sourced result already pushed.
   // Writes against either condition return 409 even for SYSTEM_ADMIN.
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Union of PRMS-sourced OR is_synced_to_prms. Writes against either condition return 409 even for SYSTEM_ADMIN.',
+  })
   is_read_only: boolean;
+
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
   // `report_year_id !== MAPPABLE_LIVE_VERSION (2026)` — same Number(...)
   // comparison as the hlos-indicators read (D-V2-7).
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'report_year_id !== MAPPABLE_LIVE_VERSION (2026) — same comparison as the hlos-indicators read.',
+  })
   version_locked: boolean;
-  // Active rows only, ordered sp_code ASC; snapshot-sourced (R-BIL-095).
-  // Always present — `[]` when there are no saved rows or the result is
-  // not pool-funding-eligible.
+
+  @ApiProperty({
+    type: () => [TocAlignmentReadbackResponse],
+    description:
+      'Active rows only, ordered sp_code ASC; snapshot-sourced (R-BIL-095). Always present — [] when there are no saved rows or the result is not pool-funding-eligible.',
+  })
   toc_alignments: TocAlignmentReadbackResponse[];
 }
 
-// @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-03 / R-BIL-111, R-BIL-113
 //
 // One per-SP ToC alignment answer (design §5 PATCH contract). Field-presence
-// rules conditioned on `aligns_with_toc` (level/toc_result_id/indicator_id
-// required when true) are enforced in BilateralService as structural
-// validation — the per-alignment `{ sp_code, field, error }` 400 contract
-// owns them (design §6.3 step 2b), NOT class-validator.
+// rules conditioned on `aligns_with_toc` are enforced in BilateralService as
+// structural validation — the per-alignment `{ sp_code, field, error }` 400
+// contract owns them (design §6.1), NOT class-validator. The required floor
+// for `aligns_with_toc: true` is `level` + `toc_result_id` only
+// (R-BIL-111 §5.1, D-C1-3); `indicator_id` and `quantitative_contribution`
+// are optional, but each supplied field is still catalog-validated
+// (R-BIL-113), and a supplied `quantitative_contribution` without an
+// `indicator_id` is rejected with `contribution_without_indicator`
+// (R-BIL-113 AC.6).
 export class TocAlignmentInputDto {
   @ApiProperty({
     type: String,
@@ -108,7 +289,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     enum: ['OUTPUT', 'OUTCOME', 'EOI'],
     description:
-      'ToC catalog level. Required when aligns_with_toc is true; must be in the result type’s allowed_levels (R-BIL-094).',
+      'ToC catalog level. Required when aligns_with_toc is true (Level + HLO floor, R-BIL-111); must be in the result type’s allowed_levels (R-BIL-094).',
   })
   @IsOptional()
   @IsIn(['OUTPUT', 'OUTCOME', 'EOI'])
@@ -117,7 +298,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     description:
-      'Upstream ToC result id. Required when aligns_with_toc is true; validated against the (SP, level) catalog.',
+      'Upstream ToC result id. Required when aligns_with_toc is true (Level + HLO floor, R-BIL-111); validated against the (SP, level) catalog.',
   })
   @IsOptional()
   @IsInt()
@@ -126,7 +307,7 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     description:
-      'Upstream indicator id. Required when aligns_with_toc is true; validated against the chosen ToC result’s indicators.',
+      'Upstream indicator id. Optional even when aligns_with_toc is true — a "Yes" may stop at Level + HLO (R-BIL-111). When supplied, validated against the chosen ToC result’s indicators (R-BIL-113 AC.3).',
   })
   @IsOptional()
   @IsInt()
@@ -135,7 +316,8 @@ export class TocAlignmentInputDto {
   @ApiPropertyOptional({
     type: Number,
     nullable: true,
-    description: 'Quantitative contribution (numeric, nullable).',
+    description:
+      'Quantitative contribution (numeric, nullable). Requires indicator_id to be present — a contribution is expressed in the selected indicator’s unit of measurement, so supplying it without an indicator_id returns 400 contribution_without_indicator (R-BIL-113 AC.6).',
   })
   @IsOptional()
   @IsNumber()
@@ -169,6 +351,25 @@ export class UpdatePoolFundingAlignmentDto {
   @IsArray()
   @IsString({ each: true })
   lever_codes?: string[];
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-121, D-C2-12
+  //
+  // Optional at the class-validator layer BY DESIGN. The conditional
+  // requirement ("required when has_contribution === true") lives in
+  // structural validation (resolvePrimarySpCode, T-06) alongside the rest of
+  // the per-alignment 400 contract, keeping one error vocabulary rather than
+  // two — mirrors C1's placement of the ToC field-presence rules (D-C1-3).
+  // Do NOT add @IsNotEmpty or a conditional validator here.
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 50,
+    description:
+      'Science Program code designated as Primary. Required when has_contribution is true (returns 400 errors.primary_sp.code = "primary_sp_required" when absent, empty, or whitespace-only); ignored when has_contribution is false.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  primary_sp_code?: string;
 
   @ApiPropertyOptional({
     type: String,
