@@ -433,3 +433,174 @@ That build closes the `tsc` gap the Leader created by forbidding workers to run 
 Reviewer's finding that ts-jest's diagnostics-on mode had already been type-checking the file all along.
 
 **Final status: PASS on attempt 2 of 3.** One rework round consumed of the design §14 budget's two.
+
+### T-03 — Classification, apply, and supersession — **rework in progress (attempt 2 of 3)**
+
+- **Date:** 2026-08-19/20 · **Effort:** `xhigh` · **Requirements:** R-CAM-003, R-CAM-005, R-CAM-002 (idempotency + AC.2), NFR-CAM-002, NFR-CAM-004
+
+**Effort note.** The dial says correctness-critical work deserves `max`, and this is the only task in the
+spec that writes. But "never `max` a cheaper tier — escalate the tier instead", and escalating the
+Implementer to the Reviewer's model would collapse `author ≠ auditor`. Resolved as `xhigh` on T2,
+compensated by naming all four traps explicitly in the brief and by requiring **observed** falsifiers.
+
+**TRAP 1 (the T-00 forward pointer) resolved — option (a).** `classify()`/`apply()` never construct
+`CreateBilateralProjectMappingDto`; they write entities directly. Reviewer verified two ways: the DTO
+appears in the service only inside comments, and class-validator decorators are evaluated by the HTTP
+`ValidationPipe`, not by `repo.create()`/`save()`. The admin-facing contract is untouched and
+NFR-CAM-002's `null` survives. **Carrying that pointer into the brief is what prevented this** — the
+natural failure would have been a 400 per row, and the natural "fix" a constant `1.0`, which is exactly
+what DD-7 exists to prevent.
+
+#### Attempt 1 — Reviewer verdict `STATUS: FAIL` (1 gating issue, **test-only**)
+
+Everything else cleared, and several points were verified rather than assumed:
+
+| Point | Finding |
+| --- | --- |
+| R-CAM-003 MANUAL immutability | A **real** field-by-field snapshot, not a presence assertion — and backed by a stronger proof: `update`, `create` and `save` are the only write calls in `apply()` and all three are asserted `not.toHaveBeenCalled()`, so "none called" is complete rather than inferential |
+| R-CAM-005 AC.1/AC.2 | Deactivate-by-`{id}` then a separate create. `.update(` occurs exactly once in the file; the only `agresso_agreement_id` assignment is on a **new** row. Ordering is right and non-obvious: deactivate must precede create or `uk_bpm_active_agreement` rejects the insert |
+| R-CAM-002 idempotency | `apply()` re-runs step 6 **inside the transaction** rather than trusting a caller-supplied classification — which is precisely what design §5's *"idempotency comes from step 6, not from a transaction guard"* mandates |
+| NFR-CAM-002 / 004 | Both created paths go through one `newDerivedRow()` hard-coding `source: DERIVED`, `confidence_score: null` |
+| Audit fields / soft-delete | The deactivate payload is byte-identical to `BilateralProjectMappingService.deactivate()`. **Checked specifically:** `deleted_at` on `AuditableEntity` is a plain `@Column`, **not** a `@DeleteDateColumn` — so it triggers no automatic filtering and the superseded row stays visible through the Status filter, as R-CAM-005 AC.1 requires. A `@DeleteDateColumn` here would have silently broken that clause |
+| Transaction boundaries | The whole apply, including each deactivate+create pair, is one transaction — the "contract with no active mapping" window cannot persist |
+| Both judgment calls | **Ruled sound.** `DataSource.getRepository` bypasses nothing: the repository is an eleven-line shell with zero custom methods and zero overrides — audit-field and soft-delete conventions live in the *service*, which this write path correctly does not reuse |
+
+**The FAIL — an untested guard on the one Map collision that is reachable.**
+
+`.andWhere('bpm.is_active = :isActive', …)` on the step-6 read is load-bearing and **no test reddens if it
+is deleted.** After any supersede an inactive and an active row legitimately share one
+`agresso_agreement_id`; that filter is the only thing keeping the dead row out of `existingByAgreement`.
+Without it `Map.set` last-write-wins picks whichever row TypeORM returns last, and a stale row can be read
+as `alreadyMapped` (write silently skipped) or as `supersede` (the already-dead row re-deactivated while
+the live one is bypassed) — **D-3 and D-2**. This is the identical gap closed one task ago on the AGRESSO
+side. **KZ-001, recurrence 8.**
+
+#### The Leader's hypothesis was refuted — and the Reviewer found the real variant
+
+The Leader raised a leading-space `Map` collision, arguing T-02's safety argument (*"`agreement_id` is the
+PRIMARY KEY"*) does not transfer to this table. Half of that was checked by the Leader before dispatch and
+found dead: `bilateral_project_mapping` **does** enforce partial uniqueness, via a STORED generated column
+`active_agreement_id GENERATED ALWAYS AS (IF(is_active = 1, agresso_agreement_id, NULL))` with
+`UNIQUE INDEX uk_bpm_active_agreement`.
+
+The other half — that PAD SPACE does not fold a *leading* space, so `' D514'` and `'D514'` could both be
+active — **the Reviewer refuted, on three independent grounds**: (1) the `IN` list carries only trimmed
+ids and a leading space is significant, so such a row is never returned by the query and cannot enter the
+Map at all; (2) any collision would require two active rows matching the *same* normalized id, which the
+unique index forbids; (3) no shipped write path can even author one — `BilateralProjectMappingService`
+trims on create and has no `agresso_agreement_id` branch on update, so only direct SQL could produce it.
+
+**The Reviewer then found the reachable variant the Leader had missed:** the collision is real, but the
+axis is `is_active`, not whitespace. That is the FAIL above. *Recorded because the Leader's framing was
+wrong and the correction is the more valuable half of this review.*
+
+#### Rework dispatched (attempt 2) — test-only, plus one data-fidelity fix
+
+- **The behavioural gate first:** a fixture returning **two** rows for `D514` — an inactive `MANUAL` at project 22 and an active `DERIVED` at project 25 — asserting `supersede` against the **active** row. One test falsifying both the missing filter and a wrong Map ordering. Plus argument-shape assertions, both to be **observed RED** with the `andWhere` deleted (K-004).
+- **A real data-fidelity defect in T-03's own writes:** `newDerivedRow` stored `clarisaProjectFullName` into `clarisa_project_short_name`, whose comment reads *"Snapshot of CLARISA short_name at mapping time (D-PI-11)"*. Silently wrong, and after a run the table would show a mix of short and full names. Fixed properly by adding `clarisaProjectShortName` to `AutomapperCandidate` — which **also unblocks design §6.2's `short_name — full_name` label**, a requirement the report shape could not satisfy at all. This touches `resolve()` (already PASSed) as a one-field addition, authorised deliberately and with no logic change.
+- Fourth comment-precision item of the spec: the mapping-side `' d514 '` fixture's comment must note that the leading-space half is **unreachable on this table**.
+
+#### Budget — at the ceiling, recorded not absorbed
+
+Design §14 budgeted **2 review rounds**. T-02 spent one; this is the second. **T-04, T-05 and T-06 remain,
+and a third round breaches the budget.**
+
+The Reviewer explicitly left the counting decision to the Leader and noted that, since production needs no
+change, the T-01 precedent (*"corrected in place, no rework round consumed"*) would cover it. **It is
+counted anyway.** The Reviewer issued a FAIL because the evidence did not cover the property, and that is
+a real gate; not counting it would redefine the budget at the moment it starts to bind.
+
+**But the budget is probably not the problem.** Both rounds went to the *same* defect class — a gate that
+did not discriminate, first on the AGRESSO side and now on the mapping side — and neither was a design
+error. That is a signal about how tests are written in this codebase, not about how the spec was sized.
+
+#### ⚠️ FORWARD POINTERS TO T-05 — carry verbatim or they are lost
+
+1. **`apply()` performs no validation of its `resolved` argument.** It does not confirm the contract
+   exists, does not confirm eligibility, does not re-derive the id — it writes the pairs it is handed.
+   Fine for a service method reached only from `resolve()`. **Not fine if T-05's controller accepts
+   `resolved` from the request body:** a caller could POST arbitrary `{clarisaProjectId, derivedContractId}`
+   pairs and have them written as `DERIVED` rows, bypassing R-CAM-001 entirely; a candidate with an empty
+   derived id would be written as a row with an empty contract id. **T-05's apply endpoint MUST derive
+   `resolved` server-side by calling `resolve()`, and MUST NOT accept a candidate list from the request.**
+   *Honest consequence, which also binds T-06:* apply then re-resolves rather than replaying the preview,
+   so under the 5-minute CLARISA cache (K-016, RB-6) the applied set can differ from the previewed one.
+   That is the correct trade — a stale preview must not be able to write — but **the UI must not promise
+   "apply exactly what you saw"**.
+2. **T-00's second pointer is still open.** `@IsEnum(MappingSourceEnum)` on the create/update/list DTOs now
+   lets any admin caller hand-write `source: 'DERIVED'`, weakening the provenance signal DD-2 assumes.
+   T-03 correctly left it — not in its done-check — but it belongs to **T-05**, which owns the HTTP surface.
+
+#### ADVISORY (recorded, not turned into work)
+
+- **RISK — no `pessimistic_write` on the step-6 read.** The sibling `BilateralProjectMappingService.create()` takes that lock for exactly this reason. Two concurrent applies, or an apply racing an admin create, can both classify a contract `toCreate`; the unique index then rejects the second insert with a raw 1062 and rolls back the whole bulk apply — a 500 envelope where the sibling returns a clean 409. **No data corruption** (the index is the backstop), and R-CAM-002's *"running twice in a row"* is sequential and proven. New scope, not a T-03 edit — belongs in the risks log.
+- **RESILIENCE — unbounded `IN` list, second occurrence** (now the mapping-table query too). Same conclusion as T-02: not needed today.
+
+#### T-03 — attempt 2: Reviewer verdict `STATUS: PASS`
+
+**The harness catch is the substantive part of this attempt, and it was the Implementer's, unprompted.**
+While drafting the required test it noticed that `makeMappingQb`'s `andWhere` was a **no-op stub** — so
+deleting the production `andWhere` would not have changed what `getMany()` returned, and **the test as
+first drafted would not have reddened.** It found this by tracing what a stub-only double actually
+verifies, *before running anything*, and strengthened the mock to filter for real.
+
+That is **KZ-001 one level up**: not a fixture that fails to discriminate, but the *scaffold* that cannot.
+Its own wording — *"a test double that doesn't evaluate what it stands in for produces a green suite over
+broken behavior"* — describes this exactly. The class normally goes unnoticed because the test is green
+either way. **Without the catch we would have closed a FAIL with a test that looked like coverage and
+measured nothing.**
+
+**Was the harness tuned until it passed, or until it measures?** The Leader put this to the Reviewer
+directly, because the mock now encodes SQL semantics in JavaScript — a new place where the double and the
+thing it stands for can drift. Ruled a **strengthening, not a tuning**, on a distinction worth keeping:
+tuning-to-pass weakens a double or makes it return what the code wants; this change made the mock
+**stricter** — it now *drops* rows it previously returned, and a mock that discards more of its own fixture
+cannot be a concession to the code under test.
+
+The Reviewer then enumerated the mutation space to check the double cannot manufacture a pass:
+
+| Mutation | Mock behaviour | Result |
+| --- | --- | --- |
+| `andWhere` deleted | stops filtering, returns both rows | both tests red |
+| clause renamed, still valid SQL | silently stops filtering | both red |
+| both predicates merged into one `where` | `andWhere` never called | both red |
+| gate intact | only the active row survives | green |
+
+**No mutation makes the mock filter while production does not** — it filters only on the exact literal
+clause, which the sibling shape assertion independently anchors. The two tests are complementary and
+neither suffices alone: the shape test anchors the string, the behavioural test anchors the effect.
+
+**On the active-first fixture ordering** (the Leader asked whether it was fragile): with the gate in place
+the inactive row is filtered out *before* the Map is built, so **the passing path does not depend on order
+at all**. Order is load-bearing only for the *falsifier* — reversed, the mutant would coincidentally land
+on the right answer. And the fixture **is** the row order: a literal in the test file, not DB output, so
+mutation-detection is deterministic. A comment records that the order is deliberate.
+
+**The `short_name` fix is better than it looked.** `ClarisaProject.short_name` is **required** while
+`full_name?` is optional — so the old code could write `null` into the column for a project that has a
+perfectly good name. The new code structurally cannot. It improves null-safety, not just semantics. The
+candidate now carries both names, closing the design §6.2 label gap flagged in attempt 1.
+
+**Leader's full-suite measurement (quiet window, all workers idle):**
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **330 suites / 2379 tests green** · 104.7 s |
+| `npm run build` | **exit 0** |
+
+**Final status: PASS on attempt 2 of 3.**
+
+#### ⚠️ NEW forward pointer to T-06 — `short_name` and `full_name` are the SAME STRING on the real feed
+
+`clarisa-stub.fidelity.spec.ts:708-713` asserts, on the stub fixture **and** on the reference capture from
+the live feed, that `short_name === full_name` on **every** element; `stub/tools/convert-export.ts:29`
+documents the source mapping as *"Name → short_name AND full_name (verbatim, same value)"*.
+
+Two consequences:
+1. The `short_name` fix above is correct by contract but **will not visibly change the stored value** for real data. Nobody should report that as a failed fix.
+2. **Design §6.2's `short_name — full_name` label will render `X — X` on every project today.** R-5's intent is *"never a bare id"*, not *"always two names"* — **T-06 must collapse the label when the two are equal.**
+
+#### ADVISORY (recorded, not work)
+
+- **The boundary of what the double proves.** `where` remains a plain stub, so the mock does not simulate the `IN (:...ids)` filter; the shape assertion covers the clause and its ids instead. The double proves the `is_active` semantics and **not** the IN-list semantics — that is the honest description of it.
+- **One spot where the double is more permissive than reality:** the mock filters `r.is_active !== false`, keeping `undefined`, whereas SQL `is_active = true` drops NULL. Unreachable — the column is `NOT NULL DEFAULT true` and the row helper always sets it. Recorded only because the Leader asked precisely where mock and reality can diverge.

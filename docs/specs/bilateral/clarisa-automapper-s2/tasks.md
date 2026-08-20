@@ -169,7 +169,7 @@ npx eslint <files>
 - **Dependencies:** T-00, T-02
 - **Files:** `…/automapper.service.ts` (+ spec)
 - **Skills:** `nestjs-expert`, `tdd`
-- **Effort:** M · **Status:** todo
+- **Effort:** M → raised to `xhigh` · **Status:** ✅ **done** — Reviewer `STATUS: PASS` on attempt 2 of 3 (see `execution.md`)
 
 **Scope.** For each resolved pair, consult the existing mapping and act per the §5 table. Implement apply.
 
@@ -202,11 +202,14 @@ npx eslint <files>
 **What disqualifies this evidence.** A test asserting only that the `MANUAL` row *still exists* is a presence-assertion and proves nothing — it must assert the row is **unchanged**, field by field, including `clarisa_project_id`, `source` and `notes`. "Still there" passes against a row that was rewritten.
 
 **Done check.**
-- [ ] Every named input above asserted
-- [ ] `grep` finds no code path assigning `agresso_agreement_id` on an update
-- [ ] `grep` finds no `AI_SUGGESTED` / `AI_AUTO` written by the matcher
-- [ ] Every created row has `confidence_score` null
-- [ ] Idempotency proven by a count before/after a second apply
+- [x] Every named input asserted. `MANUAL` immutability is a **real field-by-field snapshot**, not a presence assertion — and backed by a stronger proof: `update`, `create` and `save` are the only write calls in `apply()` and all three are asserted `not.toHaveBeenCalled()`
+- [x] No code path assigns `agresso_agreement_id` on an update — `.update(` occurs exactly once and its payload is `{ is_active, deleted_at, updated_by }`; the only `agresso_agreement_id` assignment is on a **new** row (R-CAM-005 AC.2)
+- [x] No `AI_SUGGESTED` / `AI_AUTO` written — the only hits are comments. Both create paths go through one `newDerivedRow()` hard-coding `source: DERIVED`
+- [x] Every created row has `confidence_score` null. **The DTO trap was avoided by bypassing the DTO entirely** — `CreateBilateralProjectMappingDto` requires `confidence_score` when `source !== MANUAL`, and `DERIVED` lands on that side; the matcher writes entities directly, so the validator never fires and the admin contract is untouched
+- [x] Idempotency proven by a count before/after a second apply — `apply()` re-runs step 6 **inside the transaction** rather than trusting a caller-supplied classification, which is what design §5 mandates
+- [x] **The `is_active` gate on the step-6 read is falsifiable** — the reachable Map collision (an inactive and an active row sharing a contract id after a supersede). Behavioural two-row test observed RED with the `andWhere` deleted. **The mock's `andWhere` had to be strengthened from a no-op stub first**, or the test would not have reddened at all (KZ-001 at the scaffold level)
+- [x] `clarisa_project_short_name` stores the **short** name, not the full name — observed RED against the old line
+- [x] Full server suite **330 suites / 2379 tests green**; `npm run build` **exit 0** (Leader, quiet window)
 
 ---
 
@@ -381,6 +384,8 @@ Clause-level. Each row quotes the clause it claims.
 | RB-4 | 2026-08-19 | Migration merged but never applied (**K-015**) | Named in PR 1's description; check `migration:show` before assuming | open |
 | RB-5 | 2026-08-19 | Zero collisions today ≠ zero collisions always | Ambiguity branch built anyway (DD-4) | closed by design |
 | RB-6 | 2026-08-19 | The 5-minute CLARISA cache makes a fresh run read stale projects (**K-016**) | The run report states the feed fetch timestamp | open |
+| RB-7 | 2026-08-20 | **Concurrent applies are not serialized.** The step-6 classification SELECT takes no lock, while the sibling `BilateralProjectMappingService.create()` deliberately takes `setLock('pessimistic_write')`. Two concurrent applies — or an apply racing an admin create — can both classify a contract `toCreate`; `uk_bpm_active_agreement` then rejects the second insert with a raw 1062 and **rolls back the entire bulk apply** (a 500 envelope, where the sibling returns a clean 409) | **No data corruption** — the unique index is the backstop — and R-CAM-002's *"running twice in a row"* is sequential and proven. Accepted for v1; the matcher is admin-triggered, not scheduled (R-CAM-002 forbids a cron), so concurrent runs require two admins acting simultaneously | open — accepted |
+| RB-8 | 2026-08-20 | **Apply re-resolves rather than replaying the preview.** T-05's apply endpoint must derive `resolved` server-side (otherwise a caller could POST arbitrary pairs and bypass R-CAM-001), so under the 5-minute CLARISA cache the applied set can differ from the previewed one | The correct trade — a stale preview must never be able to write. **T-06's UI must not promise "apply exactly what you saw"**; it states the feed timestamp instead (RB-6) | open — binds T-05 and T-06 |
 
 ---
 

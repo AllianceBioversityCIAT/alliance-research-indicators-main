@@ -1,12 +1,17 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { normalizeExternalCode } from './utils/external-code.util';
+import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
+import { MappingSourceEnum } from './enum/mapping-source.enum';
+import { User } from '../../complementary-entities/secondary/user/user.entity';
 
 // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-02 / R-CAM-001, NFR-CAM-001
+// @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-03 / R-CAM-002 (idempotency),
+// R-CAM-003, R-CAM-005, NFR-CAM-002, NFR-CAM-004
 //
 // SINGLETON-SCOPED BY DESIGN — see bilateral-project-mapping.module.ts header
 // and parent design.md §12 DD-11 (inherited from clarisa-project-automapping).
@@ -16,6 +21,10 @@ import { normalizeExternalCode } from './utils/external-code.util';
 // REQUEST scope through this module re-introduces the DI cycle NFR-BAS-001
 // exists to prevent. Read AGRESSO via DataSource.getRepository(), the
 // pattern already shipped in bilateral-mapping-coverage.service.ts.
+// The bilateral_project_mapping table (T-03's own concern) is read/written
+// the SAME way — DataSource.getRepository(BilateralProjectMapping) — so the
+// DI shape stays exactly ClarisaProjectsService + DataSource; no new
+// constructor dependency, no BilateralProjectMappingRepository injection.
 //
 // Resolution only (design.md §5 steps 1-5): eligible cohort -> guard ->
 // derive -> group -> confirm in AGRESSO. NO WRITES. Classification against
@@ -23,10 +32,20 @@ import { normalizeExternalCode } from './utils/external-code.util';
 // apply are T-03's scope — this service's `resolved` bucket means "unique,
 // exists in AGRESSO, not yet checked against existing mapping rows (the
 // bilateral_project_mapping table) — step 6 is T-03's".
+//
+// T-03 DTO TRAP (resolved, see execution.md T-00 FORWARD POINTER): the
+// admin-facing CreateBilateralProjectMappingDto requires `confidence_score`
+// whenever `source !== MANUAL` (@ValidateIf with no @IsOptional). That
+// collides with NFR-CAM-002 (confidence_score MUST stay null). classify()/
+// apply() below never construct or pass through that DTO — they write
+// BilateralProjectMapping rows directly via the repository, exactly like
+// BilateralProjectMappingService.create()'s own transaction does internally,
+// keeping the admin-facing HTTP contract completely untouched.
 
 export interface AutomapperCandidate {
   clarisaProjectId: number;
   clarisaProjectFullName: string | null;
+  clarisaProjectShortName: string | null;
   externalCode: string | null;
   derivedContractId: string;
 }
@@ -35,6 +54,36 @@ export interface AutomapperResolution {
   resolved: AutomapperCandidate[];
   ambiguous: AutomapperCandidate[];
   unresolved: AutomapperCandidate[];
+}
+
+// design.md §5 step 6 — classification of a `resolved` candidate against the
+// existing bilateral_project_mapping row (if any) for its derived contract.
+// `toCreate` needs nothing beyond the candidate; the other three buckets
+// exist because of an active row, so they carry it — typed separately so a
+// missing `existingMappingId` is a compile error, not a runtime possibility
+// (T-05's supersede/deactivate write depends on it being present).
+export interface AutomapperToCreateEntry extends AutomapperCandidate {
+  action: 'toCreate';
+}
+
+export interface AutomapperReconciledEntry extends AutomapperCandidate {
+  action: 'alreadyMapped' | 'divergent' | 'supersede';
+  existingMappingId: number;
+  existingClarisaProjectId: number;
+}
+
+export interface AutomapperClassification {
+  toCreate: AutomapperToCreateEntry[];
+  alreadyMapped: AutomapperReconciledEntry[];
+  divergent: AutomapperReconciledEntry[];
+  supersede: AutomapperReconciledEntry[];
+}
+
+export interface AutomapperApplyResult {
+  created: number;
+  alreadyMapped: number;
+  divergent: number;
+  superseded: number;
 }
 
 @Injectable()
@@ -71,6 +120,7 @@ export class AutomapperService {
     const candidates: AutomapperCandidate[] = cohort.map((p) => ({
       clarisaProjectId: p.id,
       clarisaProjectFullName: p.full_name ?? null,
+      clarisaProjectShortName: p.short_name ?? null,
       externalCode: p.external_code ?? null,
       derivedContractId: normalizeExternalCode(p.external_code).normalized,
     }));
@@ -147,6 +197,196 @@ export class AutomapperService {
     );
 
     return { resolved, ambiguous, unresolved };
+  }
+
+  /**
+   * design.md §5 step 6 — PREVIEW ONLY, no writes. Consults the existing
+   * active bilateral_project_mapping row (if any) for each resolved
+   * candidate's derived contract id and classifies it per the table:
+   * none -> toCreate; active/same project -> alreadyMapped; active MANUAL/
+   * different project -> divergent (R-CAM-003, never touched); active
+   * non-MANUAL/different project -> supersede (R-CAM-005).
+   */
+  async classify(
+    resolved: AutomapperCandidate[],
+  ): Promise<AutomapperClassification> {
+    const repo = this.dataSource.getRepository(BilateralProjectMapping);
+    return this.classifyAgainstExisting(repo, resolved);
+  }
+
+  /**
+   * Performs only what a preview would have classified (design.md §5 step 7).
+   * Re-runs step 6 against CURRENT state inside the write transaction rather
+   * than trusting a caller-supplied classification: that is what makes apply
+   * idempotent (R-CAM-002 "AND IT MUST be idempotent") — a stale preview
+   * handed back a second time finds its own prior writes already there and
+   * classifies them alreadyMapped, writing nothing. Idempotency lives in
+   * step 6, not in a transaction guard (design §5).
+   */
+  async apply(
+    resolved: AutomapperCandidate[],
+    user: User,
+  ): Promise<AutomapperApplyResult> {
+    const actorUserId = user.sec_user_id;
+
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(BilateralProjectMapping);
+      const classification = await this.classifyAgainstExisting(repo, resolved);
+
+      for (const entry of classification.toCreate) {
+        const row = repo.create(this.newDerivedRow(entry, actorUserId));
+        await repo.save(row);
+      }
+
+      for (const entry of classification.supersede) {
+        // Deactivate the superseded row by id ONLY — never re-point its
+        // agresso_agreement_id or clarisa_project_id (R-CAM-005 AC.2). The
+        // edit dialog already tells users the contract is immutable after
+        // creation; automation inherits that rule.
+        await repo.update(
+          { id: entry.existingMappingId },
+          {
+            is_active: false,
+            deleted_at: new Date(),
+            updated_by: actorUserId,
+          },
+        );
+
+        // Supersession is deactivate + CREATE — two rows, never one row
+        // mutated in place.
+        const row = repo.create(this.newDerivedRow(entry, actorUserId));
+        await repo.save(row);
+      }
+
+      // alreadyMapped and divergent are report-only buckets — no write for
+      // either. A divergent MANUAL row is left byte-identical (R-CAM-003).
+
+      const result: AutomapperApplyResult = {
+        created: classification.toCreate.length,
+        alreadyMapped: classification.alreadyMapped.length,
+        divergent: classification.divergent.length,
+        superseded: classification.supersede.length,
+      };
+
+      this.logger._log(
+        `apply complete: created=${result.created}, alreadyMapped=${result.alreadyMapped}, ` +
+          `divergent=${result.divergent}, superseded=${result.superseded}`,
+      );
+
+      return result;
+    });
+  }
+
+  /**
+   * Shared by classify() (preview, non-transactional repo) and apply()
+   * (transactional manager's repo) so step 6 has exactly one implementation.
+   */
+  private async classifyAgainstExisting(
+    repo: Repository<BilateralProjectMapping>,
+    resolved: AutomapperCandidate[],
+  ): Promise<AutomapperClassification> {
+    const toCreate: AutomapperToCreateEntry[] = [];
+    const alreadyMapped: AutomapperReconciledEntry[] = [];
+    const divergent: AutomapperReconciledEntry[] = [];
+    const supersede: AutomapperReconciledEntry[] = [];
+
+    if (resolved.length === 0) {
+      return { toCreate, alreadyMapped, divergent, supersede };
+    }
+
+    const ids = resolved.map((c) => c.derivedContractId);
+    const existingRows = await repo
+      .createQueryBuilder('bpm')
+      .where('bpm.agresso_agreement_id IN (:...ids)', { ids })
+      .andWhere('bpm.is_active = :isActive', { isActive: true })
+      .getMany();
+
+    // Same case/whitespace symmetry fix as T-02's AGRESSO-side lookup
+    // (utf8mb4_unicode_520_ci on this table too — orm.config.ts:60). A
+    // MANUAL row is hand-typed and may not already be trim()+toUpperCase()d;
+    // comparing it against a normalized derivedContractId without matching
+    // normalization here would reproduce the exact K-005/KZ-013 mirror bug
+    // T-02 fixed, just on this table instead of AGRESSO's.
+    const existingByAgreement = new Map<string, BilateralProjectMapping>();
+    for (const row of existingRows) {
+      const key = row.agresso_agreement_id?.trim().toUpperCase();
+      if (key) existingByAgreement.set(key, row);
+    }
+
+    for (const candidate of resolved) {
+      const existing = existingByAgreement.get(candidate.derivedContractId);
+
+      if (!existing) {
+        toCreate.push({ ...candidate, action: 'toCreate' });
+        continue;
+      }
+
+      if (existing.clarisa_project_id === candidate.clarisaProjectId) {
+        alreadyMapped.push({
+          ...candidate,
+          action: 'alreadyMapped',
+          existingMappingId: existing.id,
+          existingClarisaProjectId: existing.clarisa_project_id,
+        });
+        continue;
+      }
+
+      // Existing active row points at a DIFFERENT project than the matcher
+      // just derived.
+      if (existing.source === MappingSourceEnum.MANUAL) {
+        // MANUAL is immutable to automation — not "usually", never. Report
+        // it; a silent skip and a clean agreement are indistinguishable in
+        // the output (R-CAM-003 "AND IT MUST").
+        divergent.push({
+          ...candidate,
+          action: 'divergent',
+          existingMappingId: existing.id,
+          existingClarisaProjectId: existing.clarisa_project_id,
+        });
+      } else {
+        // Phases supersede: deactivate + create, never re-point (R-CAM-005).
+        supersede.push({
+          ...candidate,
+          action: 'supersede',
+          existingMappingId: existing.id,
+          existingClarisaProjectId: existing.clarisa_project_id,
+        });
+      }
+    }
+
+    return { toCreate, alreadyMapped, divergent, supersede };
+  }
+
+  /**
+   * The row payload for a row the matcher creates — whether via toCreate or
+   * as the new active row of a supersede. `source` is ALWAYS T-00's DERIVED
+   * value (NFR-CAM-004 — never AI_SUGGESTED/AI_AUTO) and `confidence_score`
+   * is ALWAYS null (NFR-CAM-002 — a constant 1.0 is worse than empty, DD-7).
+   * Written directly against the entity shape — deliberately NOT through
+   * CreateBilateralProjectMappingDto, whose @ValidateIf(source !== MANUAL)
+   * requires confidence_score and would fight this null (see file header).
+   *
+   * `clarisa_project_short_name`'s own column comment is "Snapshot of
+   * CLARISA short_name at mapping time (D-PI-11)" — it takes
+   * clarisaProjectShortName, never clarisaProjectFullName. Writing the full
+   * name here would leave the table showing a silent mix of short and full
+   * names across MANUAL vs matcher-created rows.
+   */
+  private newDerivedRow(
+    entry: AutomapperCandidate,
+    actorUserId: number,
+  ): Partial<BilateralProjectMapping> {
+    return {
+      agresso_agreement_id: entry.derivedContractId,
+      clarisa_project_id: entry.clarisaProjectId,
+      clarisa_project_short_name: entry.clarisaProjectShortName ?? null,
+      source: MappingSourceEnum.DERIVED,
+      confidence_score: null,
+      notes: null,
+      is_active: true,
+      created_by: actorUserId,
+      updated_by: actorUserId,
+    };
   }
 
   private hasExternalCode(project: ClarisaProject): boolean {
