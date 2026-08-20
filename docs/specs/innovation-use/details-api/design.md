@@ -363,7 +363,10 @@ This adds `ResultInnovationUseModule` to `ResultsModule`'s imports. `ResultInnov
 - `CgiarLogger` instance on the service, matching `ResultInnovationDevService`.
 - `warn` on a rejected save, with `result_id` and the rule that fired — never the payload (it carries no secrets, but logging bodies is not this repo's pattern).
 - No new `sync_process_log` row type (nothing scheduled).
-- `ResponseInterceptor` already logs by status; a `400` lands at `warn` with no extra work.
+- ⚠️ **CORRECTED 2026-08-20.** This bullet read: *"`ResponseInterceptor` already logs by status; a `400` lands at `warn` with no extra work."* **That is false for a *thrown* 4xx**, which is every rejection this section produces. Verified at source: `ResponseInterceptor.logBasedOnStatus` runs inside `next.handle().pipe(map(...))` and the interceptor has **zero `catchError`** — so a thrown `BadRequestException` never reaches it. It is handled by `GlobalExceptions`, which calls `_logger._error(...)` **unconditionally, regardless of status** (`global.exception.ts:34`).
+  **So a thrown `400` lands at `ERROR`, not `warn`** — and that is true platform-wide, not only here: every client-error rejection in this codebase is logged at the level operational failures live at. Signal is not lost, which is why §9's `warn` requirement is additive rather than redundant, but the *reason* §9 gave for treating the interceptor as sufficient background coverage was wrong.
+  **Why this bullet mattered more than a typo:** it was the third leg of the reasoning that scoped the two `assertInnovationUseOwnership` rejections out of this section's logger. That decision **still stands** — its first two legs (a logger belongs on *this* section's service, and the mirror never wraps a child call to re-log) are independently sufficient. But a decision partly resting on a false premise deserves the premise corrected rather than quietly relied on again.
+  **Carried for cleanup:** the false claim was mirrored verbatim into a code comment at `result-innovation-use.service.ts:78-81` when FAIL-2 landed. That comment is now stale against this correction — recorded here for `/akili-archive`, not patched, since an advisory does not widen a closed task.
 - **No metric or dashboard is added.** Stated so the absence is a decision, not an omission.
 
 ---
