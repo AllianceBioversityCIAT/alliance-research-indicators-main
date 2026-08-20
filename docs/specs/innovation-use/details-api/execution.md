@@ -2196,7 +2196,10 @@ That claim is true **of `tasks.md` §2's four carved-out Done criteria** and of 
 | --- | --- | --- |
 | `tasks.md` §2 (task Done criteria) | **0** | The claim above, correctly scoped |
 | `tasks.md` §7 | **1 `[ ]` + 1 `[~]`** | Both deliberate and both mine. `[ ]` *"Every scenario clause in §3 owned and discharged"* — genuinely open (R-IUA-011's *"submit transition is permitted"* is owned by no task). `[~]` — the suite figures, **withheld pending the closing run** |
-| `requirements.md` AC boxes | **76** | **A documentation inconsistency, not a coverage gap** — and it is being named rather than fixed by mass-ticking |
+| `requirements.md` AC boxes | **72 unticked of 73 total** | **A documentation inconsistency, not a coverage gap** — named rather than fixed by mass-ticking |
+| `requirements.md` §15 Sign-off | **4** | Human sign-offs — correctly unticked. **But one is now false, see below** |
+
+> ⚠️ **Corrected 2026-08-20, same day: this table first said "76" AC boxes.** That conflated 72 unticked ACs with the 4 unticked **§15 Sign-off** rows, which are human sign-offs and not ACs at all. The register in `validation-report.md` says **73**, and it is right — 73 total ACs, of which AC.4 is now ticked, leaving 72. **This is the fifth wrong count in this spec and the third of mine, asserted inside the very entry arguing that counts must be grepped rather than stated.** The grep that settles it: `grep -c '^\s*- \[ \] AC\.'` = 72, `grep -c '^\s*- \[x\] AC\.'` = 1.
 
 On that last row: `requirements.md`'s AC boxes were **never** part of this spec's evidence chain. Coverage authority is `test-report.md`'s requirement-to-test matrix, which carries per-AC verdicts with test-file citations. Ticking 76 boxes from that matrix would add no evidence while creating 76 new opportunities for exactly the drift this round spent its whole budget correcting — and this spec has already shipped **four** wrong counts and one false "it is true now". **The boxes are left as authored state.** Carried to the archive as an accepted WARN with that reasoning, not as an oversight.
 

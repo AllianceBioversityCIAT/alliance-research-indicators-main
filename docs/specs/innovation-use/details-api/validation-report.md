@@ -125,7 +125,17 @@ Literally satisfiable, since IP Rights is a section. Against R-IUA-012's own use
 
 ---
 
-## WARN register — 21, grouped
+## WARN register — 22, grouped
+
+### WARN-1 · DD-3's rollback dependency was asserted by no test *(labelled during remediation round 2, not in the original audit)*
+
+> **Provenance, stated because the label's absence caused a real problem.** `WARN-1` was **not** a label in this report as originally written — the string appeared nowhere in it, and neither did the word *rollback*. It was coined by the **Leader's dispatch brief** during remediation round 2, and the Implementer, correctly using the label it was given, cited `WARN-1 (validation-report.md)` at **five** sites in `innovation-use-role-isolation.fixture-spec.ts`. Those five citations therefore named a finding this document did not contain. Caught by the round-2 Reviewer as an advisory. The row is added here to make the label resolvable rather than rewriting five in-code comments to point elsewhere — but the defect was **the Leader inventing an identifier in a brief and not registering it**, and that is what the entry records.
+
+**The finding itself.** `design.md` DD-3's 2026-08-20 exception states that the ownership gate (§5.1 steps 7a/8a) satisfies *"a failure persists nothing"* **by rollback**, not by validating before `BEGIN`: step 6's `UPDATE result_innovation_use SET innovation_use_level_id, innovation_use_level_explanation, audit(UPDATE)` has already executed when the gate throws. **No test asserted that the rollback actually occurs.** The design document's own exception was the only evidence for its most load-bearing claim.
+
+**Closed** by before/after `result_innovation_use` snapshots on both rejected saves (#3 and #4) in `innovation-use-role-isolation.fixture-spec.ts`, each proven to redden under a temporary catch-and-swallow of the ownership rejection. Note the trap that made the obvious version of this assertion useless: comparing `updated_at` alone does **not** discriminate, because TypeORM's `UpdateQueryBuilder` writes `@UpdateDateColumn` as bare `CURRENT_TIMESTAMP` (whole-second precision) into a `timestamp(6)` column, so two writes inside one wall-clock second are byte-identical. The assertion only has teeth because a real data column (`innovation_use_level_id`) is part of the mutation.
+
+### The original 21, grouped
 
 **Requirement-level (10):** R-IUA-002 AC.7 mechanism-only (DD-16, bounded) · R-IUA-003 AC.5 guard unproven through the real pipeline · **R-IUA-003 AC.7 names `results.last_updated_date`, a column that does not exist** — `AuditableEntity` has only `updated_at`, and the fixture **silently re-mapped the requirement** rather than flagging it (seventh instance of the criterion-text-defect class, and the only one uncorrected) · R-IUA-003 S1's *"level unchanged in the database"* thin · R-IUA-004 S2's clause mis-assigned to T-02, a task whose own verification says it is unverifiable in isolation (fourth occurrence of the mis-assignment pattern) · R-IUA-005 AC.2's exclusive falsifier never run · R-IUA-009 AC.4's third table has no unit-tier owner · R-IUA-010 AC.3/AC.4 ordering has **no behavioural gate at any tier** · R-IUA-011's *"submit transition is permitted"* owned by no task · R-IUA-013 AC.1's envelope unproven on the wire.
 
