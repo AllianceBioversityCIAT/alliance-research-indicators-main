@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. T-10 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **18 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[~]` blocked (Pivot) — a confirmed cross-result data-corruption defect, pre-existing and shared with Innovation Dev; role isolation itself holds.** T-11 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **19 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -491,7 +491,7 @@ A shared helper that boots a Nest `TestingModule` against the **TEST** datasourc
 - **Requirements covered:** R-IUA-009 (all ACs + scenario) · R-IUA-007 AC.4 · R-IUA-008 AC.3
 - **Depends on:** T-09
 - **Size:** M (~200 LOC) · **Effort:** `xhigh` — this is the spec's highest-severity risk
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[~]` blocked (Pivot) 2026-08-19** — the fixture is **complete and correct**; **2 of its 7 tests fail because the code does not have the property R-IUA-009 AC.3 asserts.** Role isolation itself **HOLDS** — all three role-key falsifications went red as predicted, and every Innovation Dev row is byte-identical. The blocker is the **cross-result** half: a payload submitting another result's row ids overwrites that result's rows, confirmed against real MySQL (`actor_type_id` 900853→900854, `actors_count` 900882→900883, `result_id` unchanged). Root cause is a **caller-supplied primary key with no `result_id` and no ownership check** in both hand-written id-present branches — **shared with `customSaveInnovationDev`, so pre-existing platform behaviour this spec did not introduce.** `result_quantifications` is structurally immune (`upsertByCompositeKeys` matches on the composite key scoped to the calling result and ignores a supplied id). Awaiting a user ruling on four options. Evidence: [`./execution.md`](./execution.md) → *T-10* + *Pivot Record*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -500,7 +500,9 @@ A shared helper that boots a Nest `TestingModule` against the **TEST** datasourc
 
 **Scope**
 
-Seed **one** result carrying both Innovation Dev and Innovation Use rows in all three shared tables, plus a **second** result with Innovation Use rows. Save the section on result 1 with empty arrays. Assert every Innovation Dev row and every result-2 row is untouched.
+Seed **one** result carrying both Innovation Dev and Innovation Use rows in all three shared tables, plus a **second** result with Innovation Use rows. Save the section on result 1 **twice**: once with **empty arrays**, and once with a payload that **submits result 2's row ids inside result 1's payload**. Assert every Innovation Dev row and every result-2 row is untouched after both.
+
+> **The second save was added 2026-08-19 at T-10's dispatch, and it is the one that actually discharges AC.3.** An empty-array save submits no row id at all, so *"no row belonging to result 2 changed"* would pass by never attempting the touch — a proxy, and the third instance of that shape in this spec (KZ-002). Two independent Reviewers then confirmed the real exposure at source during T-09: `result-institution-types.service.ts`'s `buildUpdateData` returns a **caller-supplied `result_institution_type_id` with no `result_id` and no ownership check anywhere** in `customSaveInnovationUse` / `processInstitution`, so a payload carrying another result's row id updates that foreign row in place — role, institution type, `organization_count`, `is_active: true`, `updated_by` — while its `result_id` still points elsewhere. `result-actors.service.ts`'s id-present branch has the same shape. **The defect is shared with `customSaveInnovationDev`, so it is pre-existing platform behaviour, not something this spec introduced.** This task's job is to *gate* it, and its outcome is a finding either way: if the rows are protected, AC.3 is proven by the real thing; if they are not, that is a genuine product defect to escalate, **not** a test to soften.
 
 **Implementation notes**
 
@@ -513,7 +515,8 @@ Seed **one** result carrying both Innovation Dev and Innovation Use rows in all 
 - [ ] Every Innovation Use actor row is `is_active = FALSE` after the empty-array save
 - [ ] Every Innovation Dev row in `result_actors` is byte-identical, `is_active` included *(R-IUA-009 AC.1, and the scenario's assertion)*
 - [ ] Same for `result_institution_types` *(AC.2, R-IUA-007 AC.4)* and `result_quantifications` roles 1 and 2 *(AC.2, R-IUA-008 AC.3)*
-- [ ] No row belonging to result 2 changed *(AC.3)*
+- [ ] No row belonging to result 2 changed after the **empty-array** save *(AC.3, first half)*
+- [ ] **No row belonging to result 2 changed after a save that submits result 2's row ids inside result 1's payload** — whole-row `SELECT *` diff, all three shared tables *(AC.3, second half; **added 2026-08-19 at T-10's dispatch** — see the Scope note. This is the only criterion that reaches `buildUpdateData`/`buildNewData`'s id-present branch, which the empty-array save never touches. **If result 2's rows ARE modified, report it as a `PRODUCT_BUG`-class finding and stop — do not weaken the assertion to make it pass.**)*
 - [ ] The comparison uses a whole-row `SELECT *` diff — asserted by reading the helper, and **stated in the report**
 - [ ] **Zero-finding line:** the report names all three tables *including any with no differences*, rather than reporting only where something was found (KZ-007)
 - [ ] `npm run test:fixtures` non-zero collected count, green

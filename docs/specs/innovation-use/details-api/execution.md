@@ -1565,3 +1565,72 @@ The organization "id unchanged" residual was ruled **benign and structural**: `b
 
 **Budget status:** **9 of 13 tasks complete.** **18 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1, T-09 ×3). Four tasks remain against ~6 rounds. **The harness risk — the single largest unknown in this spec — is now retired**, and T-10/T-11/T-12 all reuse it, which is the strongest reason to expect the remaining tasks to cost less per task than T-09 did. Against that: T-12 carries the `indicators` blocker above, and T-13 is a full-gate task with a human check. Reported at the gate, not deferred.
 
+### T-10 — **F-B** role isolation
+
+- **Status at the time of this entry:** `[~]` **PIVOT** — blocked on a **confirmed product defect**, not on implementation quality. The fixture is complete and correct; **2 of its 7 tests fail because the code does not have the property R-IUA-009 AC.3 asserts.** The rework loop was stopped with 2 of 3 attempts unspent, because no attempt can make this green without changing production code that no task in this spec authorizes.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1
+- **Requirements in scope:** R-IUA-009 (all ACs + scenario) · R-IUA-007 AC.4 · R-IUA-008 AC.3
+- **Skills assigned:** `nestjs-expert`, `systematic-debugging` · **Effort:** `xhigh`
+- **File created:** `test/fixtures/innovation-use/innovation-use-role-isolation.fixture-spec.ts` (710 lines), band `900_800`, year `2110`, platform `T10IUFB`
+- **Suite:** `npm run test:fixtures` → **11 suites / 40 tests; 2 failed, 38 passed.** All ten sibling suites still pass unchanged.
+
+#### What the fixture proved — role isolation HOLDS
+
+**Every role-discriminator assertion passed, including the falsification the spec calls its most important.** This is the reassuring half and it is worth stating first: the three deactivate predicates do scope by role, and MySQL leaves Innovation Dev alone.
+
+| Falsifying mutation | Observed |
+| --- | --- |
+| Remove `actor_role_id` from `result-actors.service.ts`'s `customSaveInnovationUse` deactivate predicate | **red** — Innovation Dev actor rows flipped inactive, as predicted |
+| Remove `institution_type_role_id` from `result-institution-types.service.ts`'s `deactivateExistingRecords` | **red** — Dev organization rows flipped; actor and quantification checks stayed green |
+| Remove role scoping from the quantification deactivate path | **red** — role-1/role-2 quantification rows flipped; actor and organization checks stayed green |
+
+All restored; `git diff HEAD -- src/` **empty**, Leader-verified. R-IUA-009's scenario clause `BUT it must NOT rely on "a result has one indicator" as the reason it is safe` is discharged: the fixture seeds a result carrying **both** indicators' rows in all three shared tables, a state that assumption forbids, and the role scoping is still correct.
+
+**Zero-finding line (KZ-007, all three tables named):** `result_actors` — Dev row byte-identical after both saves. `result_institution_types` — Dev row byte-identical after both saves. `result_quantifications` — roles 1 and 2 byte-identical after both saves. **No differences in any of the three on the role axis.**
+
+#### The blocker — R-IUA-009 AC.3 is false of the code, confirmed against real MySQL
+
+The second save submits **result 2's row ids inside result 1's payload**. Result 1's save then overwrote result 2's rows. Leader-verified by direct run, values quoted from the failure output:
+
+```
+result 2's result_actors row
+-   "actor_type_id": 900853,      -   "actors_count": 900882,
++   "actor_type_id": 900854,      +   "actors_count": 900883,
+```
+
+`result_id` still points at **result 2**. The same happened to `result_institution_types` (`institution_type_id` and `organization_count` overwritten). So a caller saving the Innovation Use section on result 1 can silently rewrite another result's rows — role, type, count, `is_active: true`, `updated_by` — by supplying their primary keys.
+
+**Root cause, confirmed at source by two independent Reviewers during T-09 and now empirically:** `result-actors.service.ts`'s `result_actors_id`-present branch and `result-institution-types.service.ts`'s `buildUpdateData` (**both** branches) build their save payload from a **caller-supplied primary key with no `result_id` and no ownership check anywhere** in `customSaveInnovationUse` / `processInstitution`.
+
+**`result_quantifications` is structurally immune** and the contrast is instructive: `upsertByCompositeKeys` never reads a caller-supplied `id`. It matches only on `(quantification_number, unit, description)` **scoped to the calling `result_id`**, so the attack payload's `id` is ignored and the submission lands as a new row for result 1. The generic base-service algorithm is safe; the two hand-written ones are not.
+
+**Scope of the defect — wider than this spec:** both id-present branches are **shared with `customSaveInnovationDev`**, which is live in production today. This is **pre-existing platform behaviour that this spec did not introduce** — chunk 1 and the Innovation Dev section have the same exposure. This task's contribution is that it is now *proven* rather than inferred.
+
+**Why this is a Pivot and not a rework.** The three remaining attempts cannot close it. Making the suite green requires either (a) changing shared production code that no task in this spec authorizes and whose blast radius includes Innovation Dev, or (b) weakening an assertion that is correctly asserting an approved AC. The Implementer was explicitly instructed not to do (b) and did not — it reported and stopped, which is the correct behaviour and the reason the finding exists at all.
+
+#### Options put to the user
+
+| Option | Assessment |
+| --- | --- |
+| **A. Fix the ownership check in this spec** | Add `result_id` scoping to both id-present branches so a submitted row id is only honoured when it belongs to the calling result. Closes a real vulnerability and makes T-10 green by making AC.3 true. **Costs:** touches shared code used by `customSaveInnovationDev`, so it needs its own review round and a regression argument for the Innovation Dev section; and it is production work outside T-10's stated *Files touched*. **Recommended if the vulnerability is to be closed now.** |
+| **B. Quarantine the two assertions, keep the finding** | Mark them as expected-failing with the defect recorded inline and in `execution.md`, so the suite returns to green and T-11/T-12 proceed unblocked. **Honest only if the marker is unmistakable** — a skipped test is a known-bug marker, not coverage. Preserves the evidence without claiming the property holds. **Recommended if the fix should be a separate, properly-scoped change.** |
+| **C. Narrow R-IUA-009 AC.3** | Reduce the AC to what the code actually guarantees (role isolation, which is proven) and record the cross-result exposure as an explicit out-of-scope defect with a follow-up proposal. **Rejected as a default:** it retires a true requirement to match a defect, and the next reader sees an AC that was met rather than a vulnerability that was deferred. Viable only as a deliberate, recorded decision. |
+| **D. Fix it as its own spec** | Cleanest boundary — the defect is platform-wide, not Innovation-Use-specific, so a dedicated change with its own requirements and regression proof for both sections is arguably where it belongs. Leaves this spec blocked on B in the meantime. |
+
+**No ADR is overturned.** This is a missing authorization check, not an architecture decision.
+
+#### The suite is committed red, deliberately
+
+`design.md` §10.6 establishes the fixture suite as a **local Docker gate, not CI**, so a red fixture blocks no pipeline. Committing it preserves 710 lines of correct work plus the evidence, and the red state is the *accurate* state of the world: the code has this defect. T-11 and T-12 can still distinguish these two known failures from new ones. **Left uncommitted, the finding would be the easiest thing in this spec to lose.**
+
+#### Environment finding — worth tracking, not this task's to fix
+
+`quantification_roles` ids **1 and 2** (`actual_count`, `extrapolate_estimates`) were **absent** from the scratch schema despite being migration-seeded, with only id 3 present and `AUTO_INCREMENT=4`. The Implementer self-healed with an idempotent `INSERT IGNORE`, following `global-setup.ts`'s own precedent for `actor_roles`/`institution_type_roles` id 1, and never tore them down. **This is the third instance of the same class**: the committed baseline captured DDL but not seed rows — see `indicators` (empty, blocking T-12) and `global-setup.ts`'s own FP-16 note. Recommend `/akili-archive` route it to the baseline snapshot's owner rather than accreting per-file `INSERT IGNORE` patches.
+
+#### Declared limits
+
+Nothing about HTTP, auth, the envelope, or the `ValidationPipe` — the fixture calls the service directly. The 1.1s second-boundary guard was **not** needed, correctly: these assertions are "no change occurred", not "a value advanced", so there is no truncated-precision race. *(Incidentally, the failure output confirms T-09's TypeORM finding independently: `updated_at` went `…01.632Z` → `…01.000Z`, second-truncated.)* Save #1 exercises `upsertByCompositeKeys`'s **early-return** branch; save #2 exercises its **create-new** branch — neither is the `In(idsToDeactivate)` branch T-09 gated, per T-09's forward pointer (b).
+
+**Budget status:** 9 of 13 tasks complete, **T-10 `[~]`**. **19 of ~24 review rounds consumed** — this task consumed one round as a Pivot without a Reviewer spawn, since the blocker is a product defect the Implementer proved, not a conformance question a Reviewer adjudicates.
+
