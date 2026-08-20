@@ -295,3 +295,141 @@ when non-zero, converting today's documented silent-truncation hazard into a lou
 - **READABILITY (noted, not acted on).** 42 comment lines to 2 SQL lines. The Reviewer judged most of it load-bearing (PLACEHOLDER TRAP and REVERT SAFETY each encode a repo Kaizen), with WHY A NEW VALUE the one section that restates NFR-CAM-004 almost verbatim. Left as-is: this migration is precisely the artifact class K-006 says gets shipped unexamined.
 - **❌ REJECTED after measurement — the `378` "transcription slip".** The Reviewer flagged `execution.md`'s *"Dev now reads `[X] 378`"* as irreconcilable with the 307/308 pre-flight and the 358/357 pair, and recommended correcting it before archive. **It was correct.** That number is TypeORM's `migrations.id` — an **auto-increment**, not a count. Re-measured after the full cycle: it now reads **`[X] 379`**, because the revert `DELETE`d the row and the re-apply `INSERT`ed a fresh one, burning an id. The Reviewer's own inference — that ~50 DB rows have no file on disk — is what makes ids run to 371 on 307 applied, and it is right; the conclusion drawn from it was not.
   **Why this is recorded rather than quietly dropped:** applying it would have written a *false* value into the audit trail under the authority of a Reviewer correction — **KZ-007** exactly ("a correction record reads as settled fact, is rarely re-verified, and propagates"). Verified before writing, per that lesson. **Dev end state, measured 2026-08-19: 308 applied, 0 pending.**
+
+### T-02 — Resolution, ambiguity, and the environment guard — **rework in progress**
+
+- **Date:** 2026-08-19 · **Effort:** `high` (Leader raised it from the task file's `M`), bumped to `xhigh` for attempt 2
+- **Requirements:** R-CAM-001 (both scenarios, AC.1–AC.4); NFR-CAM-001
+- **Files:** `automapper.service.ts` (new), `automapper.service.spec.ts` (new), `bilateral-project-mapping.module.ts` (provider + export)
+
+#### Leader constraints issued before dispatch — the design document is wrong on one point
+
+`design.md` §2 says the service *"reuses ClarisaProjectsService + AgressoContract repository"*. **Taken
+literally that breaks the module.** `bilateral-project-mapping.module.ts`'s own header forbids it:
+*"Do NOT import AgressoContractModule or provide AgressoContractRepository (DD-11)"* — that repository
+carries `Scope.REQUEST` via `CurrentUserUtil`, and injecting it cascades REQUEST scope through the module,
+re-introducing the DI cycle NFR-BAS-001 exists to prevent.
+
+**Not escalated as a Pivot**, because a sanctioned route already ships in the same folder:
+`bilateral-mapping-coverage.service.ts` reads AGRESSO via `DataSource.getRepository(AgressoContract)`,
+injecting only `DataSource`. That file was given as the exemplar **for DI shape and QueryBuilder usage
+only**, with an explicit warning that its *iteration direction* (contract-first) is the framing this spec
+replaced. Reviewer confirmed the resulting code is project-first end to end.
+
+#### Attempt 1 — Reviewer verdict `STATUS: FAIL` (1 issue)
+
+**Confirmed correct and not re-opened:** project-first iteration · AC.4 (the only contract column selected
+is `agreement_id`; `clarisaProjectFullName` is written and never read — the display passthrough R-5
+requires) · NFR-CAM-003 (one import, one call site, no second strip) · module registration with no
+REQUEST-scope leak · synthetic 198 fixture, D-7 compliant · **all three Implementer judgment calls ruled
+sound and kept** (`is_active` filter, blank-id bypass of grouping, `UnprocessableEntityException`).
+
+**The FAIL — two equality rules for one comparison.**
+
+| Side | Rule applied |
+| --- | --- |
+| SQL — `contract.agreement_id IN (:...ids)` | `utf8mb4_unicode_520_ci`: **case-insensitive and PAD SPACE**. Matches a stored `d514` *and* a stored `'D514 '` |
+| JS — `found.has(candidate.derivedContractId)` | **exact**, against a value already `trim().toUpperCase()`d by `normalizeExternalCode` |
+
+The database confirms the contract exists; the JS check then discards that confirmation and routes the
+project to `unresolved`. **False negatives only** — nothing is written incorrectly, a preview simply
+under-reports. It violates R-CAM-001's *"proposes a mapping only after confirming that contract exists"*
+(the confirmation is performed and thrown away) and, contrapositively, the unresolved scenario's own
+precondition. Structurally it is NFR-CAM-003's failure mode in miniature: **normalization applied to one
+side of a comparison and not the other** (K-005, KZ-013).
+
+**The suite could not see it.** Every contract fixture was already upper-case and unpadded — KZ-001's
+shape, now at recurrence 7 on this codebase.
+
+**Remediation is one line** (`c.agreement_id?.trim().toUpperCase()`), explicitly **not**
+`normalizeExternalCode` on the AGRESSO side: that would also strip a leading `B-`/`C-` from contract ids,
+widening the match to the coverage service's tier-2 semantics, which no requirement asks for.
+
+#### On the two Leader hypotheses raised at dispatch
+
+Both were stated to the Reviewer **as hypotheses to verify or refute**, deliberately — the Leader shipped
+two falsifier arguments in T-01's brief the same day and both were false, one exactly backwards.
+
+- **H1 (case/whitespace asymmetry) — CONFIRMED.** It is the FAIL above.
+- **H2 (`clarisaProjectId: p.id` unchecked coercion) — REFUTED.** `ClarisaProject.id` is declared `number`;
+  the assignment is `number → number`. The coverage service's `Number(p.id)` is defensive against wire
+  data, not evidence of a wider declared type. The Leader resolved this independently by reading the type
+  before the Reviewer reported.
+- **The K-002 worry behind H2 is also closed, and by a mechanism the Leader had not accounted for.** The
+  Leader forbade `npm run build` to avoid a concurrent-run collision, and then worried aloud that `tsc`
+  had therefore never seen the file. The Reviewer found `package.json:126-128` runs **ts-jest in default
+  (diagnostics-on) mode** — so the jest run *did* type-check the service, and a type error would have
+  surfaced as a suite failure. An isolated `npm run build` is still owed at the measurement window, but
+  this was never an open K-002 hole.
+
+#### Rework dispatched (attempt 2, effort `xhigh`)
+
+Reviewer report passed **verbatim** (Structured Feedback rule) plus an attempt history naming what already
+passed, so the fix does not churn the parts that were right. Three items folded in, all of them
+**corrections to T-02's own output rather than new scope**:
+
+- **The fix**, with a mandatory order of operations: write the `' d514 '` fixture test **first**, observe it RED against unfixed code, *then* apply the one-line normalization. A fix landed before its test is a fix with no evidence.
+- **Rename `toCreate` → `resolved`.** Design §4 uses `toCreate` for the **final** bucket produced after §5 step 6. T-02's is produced after step 5 and is a strict *superset* — it still contains what step 6 will classify `alreadyMapped`, `divergent` and `supersede`. A T-03 apply path that iterates `resolution.toCreate` and inserts duplicates already-mapped rows and overwrites `MANUAL` divergences: **D-3 and D-2, the two highest-severity classes in requirements §7.** The header comment documented this correctly, but a comment is a weak guard against a name that reads as an instruction.
+- **Delete a test that measures nothing.** `spec.ts:110-116` was `expect(true).toBe(true)` under the name *"proves the fixture is discriminating…"*. The property **is** covered — by the `unresolved` and `ambiguous` blocks — but this test asserted a proof in its Jest output line while measuring nothing. Same class as T-01's two false descriptions. Text moved to a `//` comment where it is true.
+- **Assert the `is_active` filter**, which no test covered: deleting the `andWhere` from the service reddened nothing.
+
+**Advisories recorded and closed here, deliberately NOT turned into work** (the advisory-never-grows-scope
+rule — a task not in the approved `tasks.md` is scope nobody approved):
+
+- **Unbounded `IN` list.** 198 ids is nothing, but the cohort denominator moved 299 → 377 → 911 in five days (RB-2). At a few thousand ids this risks `max_allowed_packet` and a planner regression. Chunking costs ~6 lines. **Not needed today**; if it ever is, it is a proposal, not a T-02 edit.
+- **Forward pointer to T-06.** A project with no `external_code` reaches `unresolved` with `derivedContractId: ''` — honest in the service, but design §6.2 says *"`unresolved` shows the derived contract id"*, and an empty cell reads as missing data. **T-06 must render an explicit "no external_code"**, not nothing. This pointer goes into T-06's brief or it is lost.
+- **Spec clarification owed (one line).** §4.2's "198/198 resolve" does not state whether the probe filtered `is_active`. If it did not, a live run may come in **under** 198 for a reason that is correct behaviour, not a regression. Worth stating so the next reader does not read the gap as a defect.
+- Related and ruled **right**: the service deliberately does **not** filter `funding_type`. §4.2's matched set is `BLR 168 · W3R 30`, and the coverage service's `BLR/BILATERAL` filter would have silently dropped the 30 `W3R` matches.
+
+#### T-02 — attempt 2: Reviewer verdict `STATUS: PASS`
+
+**The fix, and why it cannot introduce the mirror bug.** `c.agreement_id?.trim().toUpperCase()` closes both
+halves. The Leader asked the Reviewer specifically whether normalizing the DB side could now collapse two
+distinct contracts into one key — the symmetric failure. It cannot, and the reason is structural rather
+than probabilistic: **`agreement_id` is the PRIMARY KEY, and the unique index enforces the column's
+collation.** Under `utf8mb4_unicode_520_ci` PAD SPACE, `'D514'`, `'d514'` and `'D514 '` **are the same
+key** — MySQL will not let two such rows coexist, so there is nothing to collapse. Leading space is the
+one variant the collation treats as distinct, and it is inert twice over: the `IN` list carries only
+trimmed ids so such a row can never be returned, and the output's `derivedContractId` always comes from
+the **project** side — no contract row is ever carried into `AutomapperCandidate`. **The Set is a
+membership filter, not a join.**
+
+**The fix is provably narrowing-only.** The Set is built from rows SQL *already returned*, so this side can
+only stop discarding confirmations; it can never admit a contract the database did not match.
+
+**NFR-CAM-003 re-checked explicitly**, since a later reader may raise it: `.trim().toUpperCase()` is **not**
+a second normalization in the sense the NFR governs. That NFR's target and gate are both about the *prefix
+strip*; no strip is defined here, `normalizeExternalCode` still has exactly one call site, and the
+identical `.trim().toUpperCase()` already ships at `bilateral-mapping-coverage.service.ts:173` under S1's
+review. The inline comment records why the util was deliberately **not** used on the AGRESSO side — doing
+so would strip a leading `B-`/`C-` from contract ids and widen the match to the coverage service's tier-2
+semantics, which no requirement asks for.
+
+**The new fixture is conjunctive** — it reds if *either* `trim()` or `toUpperCase()` is dropped. One
+fixture guards both halves. Test arithmetic corroborates the report independently: 11 `it()` blocks, one
+deleted and one added against attempt 1's 11.
+
+**Residual, non-gating and recorded:** `_unicode_520_ci` is accent-insensitive, so SQL could in principle
+return a row differing by a diacritic that `toUpperCase()` will not fold — a false *negative*, same
+direction as the original bug, and irrelevant for ASCII-alphanumeric agreement ids. No accent fold added.
+
+**Third false test-artifact comment of the day, corrected.** The new test's comment claimed the SQL side is
+*"case- and trailing-space-insensitive"* and then used `' d514 '` — with a **leading** space, which PAD
+SPACE does **not** forgive, so *"SQL would confirm this contract exists"* was not true of that fixture.
+**The fixture was kept** (the Reviewer noted it is a superset of the reachable case and guards both halves)
+and only the prose was corrected: the comment now distinguishes what the collation forgives from what the
+fixture additionally exercises on the JS side. Two such comments were corrected in T-01; this pattern —
+*plausible reasoning written into a durable artifact without being observed* — is the one recurring defect
+of this run, and it has been caught by the Reviewer every time, never by the author.
+
+**Leader's full-suite measurement, taken in the quiet window after every worker reported (§4.3):**
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` (whole server package) | **330 suites / 2365 tests, all passing** · 134.7 s |
+| `npm run build` | **exit 0**, `dist/domain/entities/bilateral-project-mapping/automapper.service.js` emitted |
+
+That build closes the `tsc` gap the Leader created by forbidding workers to run it — and confirms the
+Reviewer's finding that ts-jest's diagnostics-on mode had already been type-checking the file all along.
+
+**Final status: PASS on attempt 2 of 3.** One rework round consumed of the design §14 budget's two.

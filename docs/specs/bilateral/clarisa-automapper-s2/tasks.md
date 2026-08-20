@@ -124,7 +124,7 @@ The work is therefore: **confirm the shipped strip satisfies R-CAM-001 AC.1 and 
 - **Dependencies:** T-01
 - **Files:** `…/automapper.service.ts` (+ spec), fixtures
 - **Skills:** `nestjs-expert`, `systematic-debugging`, `tdd`
-- **Effort:** M · **Status:** todo
+- **Effort:** M → raised to `high`, then `xhigh` for the rework · **Status:** ✅ **done** — Reviewer `STATUS: PASS` on attempt 2 of 3 (see `execution.md`)
 
 **Scope.** Load the eligible cohort **using the shipped predicates**, derive contract ids, group them, look them up in AGRESSO, and classify into `toCreate` / `ambiguous` / `unresolved`. No writes in this task.
 
@@ -149,12 +149,16 @@ npx eslint <files>
 **What disqualifies this evidence.** ⚠️ **Do not assert a hard-coded 198 against a live feed (D-7).** The fixture pins 198/198 because that is what was measured on 2026-08-19; a live run reports whatever it finds. A test that hits the network and expects 198 will pass today and mislead within days — the feed moved 299 → 377 → 911 in five days.
 
 **Done check.**
-- [ ] Fixture cohort resolves 198/198 with zero unresolved
-- [ ] Two-projects-one-contract fixture lands in `ambiguous`, and was observed failing without the grouping step
-- [ ] No-`external_code` cohort aborts with zero writes
-- [ ] `grep` finds no name/description comparison in the service
-- [ ] Eligibility comes from the shipped predicates — no local reimplementation
-- [ ] No test asserts a fixed count against a live feed
+- [x] Synthetic fixture cohort resolves 198/198 with zero unresolved (D-7: generated locally, no network, labelled synthetic in the file)
+- [x] Two-projects-one-contract fixture lands in `ambiguous`, neither in `resolved` — **observed failing** with the grouping step removed (`Expected: [1, 2]` / `Received: []`)
+- [x] No-`external_code` cohort aborts (422) with zero writes, proven by `expect(mockDataSource.getRepository).not.toHaveBeenCalled()` — **observed failing** with the guard removed (`Received promise resolved instead of rejected`)
+- [x] No name/description comparison — the only contract column selected is `agreement_id`; `clarisaProjectFullName` is written and never read (the display passthrough R-5 requires). Reviewer-confirmed
+- [x] Eligibility comes from `ClarisaProjectsService.listBilateralProjects` — zero hits for `isBilateralFunding|isAllianceProject|matchesPhase` in the new service
+- [x] No test asserts a fixed count against a live feed
+- [x] **AGRESSO existence check is case/whitespace-symmetric** — the FAIL from attempt 1. Fixture `' d514 '` observed RED before the fix and green after; the assertion is conjunctive, reddening if either `trim()` or `toUpperCase()` is dropped
+- [x] `is_active` filter asserted — observed reddening when the `andWhere` is removed
+- [x] The step-5 bucket is named `resolved`, not `toCreate` — design §4's `toCreate` is the *final* bucket produced after step 6, and reusing the name would invite T-03 to insert a superset (D-3 duplicate rows, D-2 overwritten `MANUAL` rows)
+- [x] Full server suite **330 suites / 2365 tests green**; `npm run build` **exit 0** (Leader, quiet window)
 
 ---
 

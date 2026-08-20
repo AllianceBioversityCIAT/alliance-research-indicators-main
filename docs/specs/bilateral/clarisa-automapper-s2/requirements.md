@@ -77,6 +77,16 @@ Every figure below was measured this session against `clarisatest-back` and the 
 
 > **The 30 `W3R` matches exist only because of the W3 funding fix shipped today.** Without it the cohort is 170 and those 30 contracts are unmappable.
 
+> **`is_active` caveat, added 2026-08-19 during T-02 review.** The 2026-08-19 probe behind "198 / 198" does
+> **not** record whether it filtered `agresso_contracts.is_active`. The shipped matcher **does** filter to
+> active contracts — matching `bilateral-mapping-coverage.service.ts` and `agresso-contract.repository.ts`,
+> which both treat an inactive contract as one that does not exist for platform purposes; mapping to a
+> deactivated contract would create an active mapping row pointing at something the rest of the platform
+> filters out. **Consequence:** a live run may resolve **fewer** than 198. That is correct behaviour, not a
+> regression, and it must not be read as one. Note the matcher deliberately does **not** filter
+> `funding_type` — the matched set is `BLR 168 · W3R 30`, and the coverage service's `BLR/BILATERAL` filter
+> would silently drop the 30 `W3R` matches.
+
 ### 4.3 Production — the release blocker, measured not assumed
 
 | Signal | Test | **Production** |

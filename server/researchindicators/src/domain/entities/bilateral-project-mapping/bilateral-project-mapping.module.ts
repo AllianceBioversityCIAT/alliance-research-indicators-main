@@ -5,10 +5,12 @@ import { BilateralProjectMappingRepository } from './repositories/bilateral-proj
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
 import { BilateralProjectMappingController } from './bilateral-project-mapping.controller';
 import { BilateralMappingCoverageService } from './bilateral-mapping-coverage.service';
+import { AutomapperService } from './automapper.service';
 import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-projects.module';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.13 (shell) / T-15.14 (CRUD)
 // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-05 (coverage wiring)
+// @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-02 (automapper wiring)
 //
 // All providers are SINGLETON-scoped — no CurrentUserUtil / ResultsUtil
 // injection — per parent design.md §3.4 Constraint A and §12 DD-11.
@@ -24,12 +26,14 @@ import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-proj
     BilateralProjectMappingService,
     BilateralProjectMappingRepository,
     BilateralMappingCoverageService,
+    AutomapperService,
   ],
   exports: [
     TypeOrmModule,
     BilateralProjectMappingService,
     BilateralProjectMappingRepository,
     BilateralMappingCoverageService,
+    AutomapperService,
   ],
 })
 export class BilateralProjectMappingModule {}
