@@ -495,7 +495,7 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
     expect(Number(detailAudit.updated_by)).toBe(actingUserId);
 
     // `customSaveInnovationUse` audits a brand-new actor row with
-    // `SetAuditEnum.NEW` (`result-actors.service.ts:244`) — only
+    // `SetAuditEnum.NEW` (`result-actors.service.ts`'s `customSaveInnovationUse` id-less branch) — only
     // `created_by` is set on first insert; `updated_by` is populated only
     // once a row is later re-saved by id (`SetAuditEnum.UPDATE`, asserted
     // in the next `it`, after A and C are edited/resent). Asserting
@@ -706,7 +706,7 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
 
     // org1 was resaved BY id this time (`result_institution_type_id` present
     // in the payload), which takes `buildUpdateData`'s `SetAuditEnum.UPDATE`
-    // spread (`result-institution-types.service.ts:240`) — a different
+    // spread (`result-institution-types.service.ts`'s `buildUpdateData`) — a different
     // service and a different helper than the actor UPDATE branch asserted
     // above. That branch previously had zero coverage at any tier (R-IUA-003
     // AC.6, "written from request.user on both inserted and updated rows").

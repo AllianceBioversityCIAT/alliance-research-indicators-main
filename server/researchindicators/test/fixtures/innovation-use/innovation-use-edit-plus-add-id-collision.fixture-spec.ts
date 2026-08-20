@@ -38,9 +38,12 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * `customSaveInnovationUse`). Its id-less branch (same method, the `else`
  * arm) calls `constructWhereClauseInnovationUse` — which builds
  * `{ result_id, actor_role_id: INNOVATION_USE, actor_type_id,
- * actor_type_custom_name: IsNull() }` with **no `is_active` filter and no
+ * actor_type_custom_name: IsNull() }` with — **as of the moment this
+ * file was written, before the fix landed** — no `is_active` filter and no
  * exclusion of a `result_actors_id` already claimed earlier in the same
- * payload** — then, if that `findOne` hits, sets
+ * payload. The exclusion **now exists** (`Not(In(excludeIds))`, guarded on a
+ * non-empty list); this paragraph is the reproduction's hypothesis, kept as
+ * the record of what was wrong. It then, if that `findOne` hits, sets
  * `dataTemp['result_actors_id'] = existData.result_actors_id`. An ordinary
  * "edit row X to a new type, and separately add a new row of X's OLD type"
  * payload (exactly what a UI produces when a user changes one actor's type
@@ -78,6 +81,16 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * `type_<institution_type_id>`, giving row 1 (`changedTo`) and row 2
  * (`original`) distinct keys, same shape as the actor duplicate check
  * above.
+ *
+ * **⚠️ That paragraph describes the PRE-FIX call chain and is kept as the
+ * hypothesis, not as a live description** *(framing added 2026-08-20 at the
+ * second `/akili-validate`, which flagged it as reading like current
+ * behaviour)*. The chain now has one more step: `reconcileAdoptedPrimaryKey`
+ * sits between `processInstitution` and `dataToSave.push`, and converts an
+ * adopted PK back into a genuine insert — closing exactly the second gap
+ * above. Its own claimed-id set was corrected the same day (**FAIL-2**) to
+ * read the rows that survive `removeDuplicates` rather than the raw payload,
+ * because against the raw payload it fired on a phantom collision.
  *
  * **What scenario 1 does NOT exercise.** `assertInnovationUseOwnership`'s
  * *unauthorized-id* rejection in either service — untouched, unmocked,
@@ -223,6 +236,10 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
 
   let dupActorsError: unknown;
   let dupOrgsError: unknown;
+
+  // Results created inside a test body (the sweep-reachability control),
+  // rather than in `beforeAll` — tracked so `afterAll` can remove them.
+  const sweepProofResultIds: number[] = [];
 
   /**
    * Re-selects the SAME row by its own immutable primary key at two points
@@ -665,6 +682,17 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
       ]);
     }
 
+    for (const id of sweepProofResultIds) {
+      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
+        id,
+      ]);
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [id],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [id]);
+    }
+
     for (const code of institutionTypesSeeded) {
       await dataSource.query(
         `DELETE FROM clarisa_institution_types WHERE code = ?`,
@@ -951,6 +979,55 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
 
       expect(witnessAfter).toEqual(rollbackWitnessActorRowBefore);
       expect(Number(witnessAfter.is_active)).toBe(1);
+
+      // **Reachability precondition, added 2026-08-20 (second
+      // `/akili-validate`).** Without this, the assertions above are a pure
+      // END-STATE comparison and cannot tell "the sweep ran and was rolled
+      // back" from "the sweep never ran" — deleting the sweep in
+      // `ResultActorsService.customSaveInnovationUse` left this test GREEN
+      // while its name became false. This control re-runs the very same
+      // `actors: []` payload against a result whose organizations are FINE,
+      // so step 8 does not throw and the sweep's effect is allowed to
+      // commit. The witness-shaped row MUST come back deactivated: that is
+      // what proves the sweep is a real write on this exact path, which is
+      // the premise the rollback assertion above rests on. Delete the sweep
+      // and this expectation reddens.
+      const sweepProofResult = await dataSource.query(
+        `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+         VALUES (1, ?, ?, ?, 0, NULL)`,
+        [nextOfficialCode(), platformCode, reportYear],
+      );
+      const sweepProofResultId = sweepProofResult.insertId;
+      sweepProofResultIds.push(sweepProofResultId);
+      await harness.service.create(sweepProofResultId);
+
+      const sweepProofActor = await dataSource.query(
+        `INSERT INTO result_actors (
+           result_id, actor_type_id, actor_role_id, sex_age_disaggregation_not_apply,
+           actors_count, is_active, created_by, updated_by
+         ) VALUES (?, ?, ?, TRUE, ?, 1, ?, ?)`,
+        [
+          sweepProofResultId,
+          actorTypeCodeRollbackWitness,
+          ActorRolesEnum.INNOVATION_USE,
+          rollbackWitnessActorsCount,
+          actingUserId,
+          actingUserId,
+        ],
+      );
+
+      await harness.service.update(sweepProofResultId, {
+        actors: [],
+        organizations: [],
+        quantifications: [],
+      } as CreateResultInnovationUseDto);
+
+      const sweptRow = await fetchRowByPk(
+        'result_actors',
+        'result_actors_id',
+        sweepProofActor.insertId,
+      );
+      expect(Number(sweptRow.is_active)).toBe(0);
     });
   });
 });

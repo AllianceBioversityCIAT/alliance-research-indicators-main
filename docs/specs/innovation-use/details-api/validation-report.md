@@ -1,6 +1,8 @@
 # Validation Report — Results (Innovation Use) / Details API
 
-> ## ❌ NOT ARCHIVE-READY — 7 FAIL · 22 WARN · 1 BLOCKED
+> ## ⚠️ REMEDIATED — 7 FAIL raised, 6 closed in-session · 22 WARN · 1 BLOCKED
+>
+> **Both product defects are FIXED, falsified and committed (`df504ee7`).** The record sweep is applied. What remains is **two human gates**, neither closable by an agent. See *Post-remediation state* directly below the original verdict.
 >
 > **Two of the seven are product defects, and one of them is reachable, silent, and destroys data on a `200`.** The other five are record defects, in a spec whose own thesis is that claims must be derived rather than asserted.
 >
@@ -18,12 +20,12 @@
 
 | Field | Value |
 | --- | --- |
-| Verdict | ❌ **NOT ARCHIVE-READY** |
+| Verdict | ⚠️ **Blocking defects closed; two human gates open.** Original verdict ❌ NOT ARCHIVE-READY preserved below |
 | FAIL | **7** — 2 product defects, 5 record defects |
 | WARN | **22** — enumerated in the register below; the total is the row count of that enumeration, not an asserted figure (3 task · 1 file-existence · 11 coverage · 4 design-conformance · 2 commit-review · 1 agent-guide) |
 | BLOCKED | **1** — review-round actual cannot be derived from the tree |
 | Build integrity | ✅ `npm run build` · `tsc --noEmit` · `npm run lint -- --quiet` all clean |
-| Unit | **336 suites / 2285 tests** green · coverage **89.79 / 75.75 / 85.30 / 89.26** (floor 60) |
+| Unit | **336 suites / 2296 tests** green · coverage **89.80 / 75.82 / 85.31 / 89.27** (floor 60) — re-derived after the FAIL-1/FAIL-2 fixes added 11 tests |
 | Fixtures | **15 suites / 71 tests** green, twice on the same scratch container |
 | Independence | **The Leader authored the commit under audit (`941b0260`), every `execution.md` entry, and every spec correction in this and the previous round.** Model identity satisfies `author ≠ auditor`; investment in the narrative does not. Phases 1/2/4, 5, and 6 were delegated to three auditors with fresh context and disjoint lenses. **That decision is what surfaced FAIL-1, FAIL-2 and FAIL-3 — none of which any green run would have shown.** |
 
@@ -47,7 +49,7 @@
 | --- | --- |
 | 1 · Task completion | 10 PASS · 3 WARN · 0 FAIL |
 | 2 · File existence | All `design.md` §2.1 paths present · **WARN** — 4 files hold gates and appear in no task's *Files touched* |
-| 3 · Build integrity | ✅ build · tsc · lint · 336/2285 unit · 15/71 fixtures ×2 · coverage 89.79/75.75/85.30/89.26 |
+| 3 · Build integrity | ✅ build · tsc · lint · 336/2296 unit · 15/71 fixtures ×2 · coverage 89.80/75.82/85.31/89.27 |
 | 4 · Requirement coverage | **1 FAIL** (FAIL-3) · 11 WARN · 116 clause instances checked, 102 pass |
 | 5 · Quality / defect hunt | **2 FAIL** (both product defects) · advisory register updated |
 | 6 · Design conformance | **4 FAIL** (contract gap + 3 record-integrity) · 4 WARN |
@@ -397,8 +399,8 @@ CodeGraph re-index and the TRD §4.1/§6.1 check remain pending for `/akili-arch
 
 | Tier | Figure | Provenance |
 | --- | --- | --- |
-| Unit | **336 suites / 2285 tests** green | Re-run by the Leader today |
-| Coverage | **89.79 / 75.75 / 85.30 / 89.26** | Re-run today; reproduced the recorded figures to the digit |
+| Unit | **336 suites / 2296 tests** green | Re-run after the fixes (was 2285 + 11 new) |
+| Coverage | **89.80 / 75.82 / 85.31 / 89.27** | Re-derived after the fixes. The pre-fix run reproduced the recorded 89.79/75.75/85.30/89.26 to the digit |
 | Fixtures | **15 suites / 71 tests** green, twice consecutively | Re-run today, same scratch container |
 | Build | `npm run build` clean (`nest build` + admin Vite bundle) | Run today |
 | `tsc --noEmit` | clean | Run today |
@@ -445,9 +447,42 @@ CodeGraph re-index and the TRD §4.1/§6.1 check remain pending for `/akili-arch
 
 ---
 
+## Post-remediation state (same session, 2026-08-20)
+
+Everything above is the **verdict as raised**. This section records what was then done. Commits: `df504ee7` (both product fixes + their traceability), plus the record sweep.
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| **FAIL-1** | Identity-less organization overwrite | ✅ **FIXED** — `ResultInnovationUseService.validateOrganizationsAreIdentified`, **before `BEGIN`**. 9 unit tests; **falsified** (disabling it reddens 6). Placed in the service, not the DTO the ruling's wording named, because DD-8 records no global `ValidationPipe` (a DTO rule is inert for any non-piped caller — DC-10) and the fixture tier calls the service directly, so a DTO-only rule could not be proven at the tier that found the defect. Same blast radius as ruled: Use path only, no shared helper touched |
+| **FAIL-2** | Phantom-collision reconcile | ✅ **FIXED** — the claimed-id set now derives from the rows that survive `removeDuplicates`, not the raw payload. 2 unit tests; **falsified** (reverting the set to raw `data` reddens the phantom case). Included under "everything not needing a ruling": one correct fix, contained in a private Use-only method |
+| **FAIL-3** | T-01 c1 closed by an adjacent thing | ✅ **UN-TICKED** and re-classed **BLOCKED ON G-3**. §7's *"the unflipped count is zero"* corrected to **one**. Sibling c4 verified genuinely discharged and left `[x]` |
+| **FAIL-4** | Duplicate-PK `400` had no contract row | ✅ **CLOSED** — `design.md` §4 gained rows for **both** that `400` and FAIL-1's; `requirements.md` gained **R-IUA-007 AC.6**; the six `§15` citations repointed at §4, including the two in shipped `src/` |
+| **FAIL-5** | 13 stale figure sites | ✅ **SWEPT** — every site listed above. `test-report.md`'s currency banner and provenance row rewritten to state the trajectory (2264 → 2275 → 2279 → 2285 → **2296**) and the real lesson: **fewer sites asserting one figure**, not a better number |
+| **FAIL-6** | `tasks.md:5` and `:691` | ✅ **FIXED** — header status line rewritten (it had carried five stale or retracted claims at once); *"all owned"* corrected to *"21 owned; one is not"*, naming the R-IUA-011 orphan and the §3 preamble that makes 21 clauses invisible by construction |
+| **FAIL-7** | FR-7 understated the Dev exposure | ✅ **RESTATED** — `family.md` FR-7 now names **four** protections the Dev endpoint lacks, and flags that FAIL-1's root is in `constructWhereClause`, a helper **shared** with `customSaveInnovationDev`, so that shape reaches Dev through code this spec never modified |
+| WARN | Test 5 weaker than its name | ✅ **HARDENED** — gained a reachability control that lets the sweep's effect commit. Deleting the sweep now **reddens** it; before, it stayed green while its name became false |
+| WARN | Fixture header present-tense | ✅ **FRAMED** — both paragraphs marked as the pre-fix hypothesis, and the organizations one now names `reconcileAdoptedPrimaryKey` |
+| WARN | Rotted citations | ✅ **CONVERTED** to anchors in `requirements.md`, `tasks.md`, `design.md`, `execution.md` and the two shipped fixture citations FP-50 had carried |
+| WARN | LOC / review-round actuals | ✅ **RE-DERIVED** — fixture tier **4,619 LOC** (was 3,225); rounds restated as **≥ 26** rather than a false exact, since the true figure is not derivable from the tree |
+
+**Verification after remediation:** unit **336 / 2296** green · coverage **89.80 / 75.82 / 85.31 / 89.27** · fixtures **15 / 71** green twice · `tsc` clean · `npm run build` clean · lint clean with `git status` re-checked after its `--fix`.
+
+**One process note worth keeping.** A falsification was restored with `git checkout` on a file whose fix was not yet committed, which silently reverted the fix along with the falsification — caught only because the next grep came back `0`. Falsifications on uncommitted work must be reverted **by targeted replacement**, never by `git checkout`. The remaining falsifications in this session were.
+
+---
+
 ## Archive Readiness Recommendation
 
-**Do not archive.** FAIL-1 is a reachable, silent data-destruction path on a `200`, and FAIL-2 is a defect inside the remediation shipped to close the previous one. Neither is closable without a user ruling, because both live next to a helper shared with a live sibling feature. The five record defects are the Leader's to sweep, and one of them — FAIL-5 — is a correction-closure rule the Leader invoked and then skipped.
+**As raised: do not archive.** FAIL-1 was a reachable, silent data-destruction path on a `200`, and FAIL-2 a defect inside the remediation shipped to close the previous one. Neither was closable without a user ruling, because both live next to a helper shared with a live sibling feature. The five record defects were the Leader's to sweep, and one — FAIL-5 — was a correction-closure rule the Leader invoked and then skipped.
+
+**After remediation (see the section above): the code is clear; two human gates are not.**
+
+| Gate | Why an agent cannot close it |
+| --- | --- |
+| **Security review** — `requirements.md` §15 | Two authorization controls now exist on tables shared with Innovation Dev (`assertInnovationUseOwnership`, and now the identity rule), plus an unvalidated-FK `500` that discloses the database and constraint name to any authenticated caller. The row that declared the review *not required* was falsified by this spec's own remediation |
+| **FR-7** — `family.md` | `customSaveInnovationDev` shares the same tables and lacks **all four** of this spec's protections. FAIL-1's root is in `constructWhereClause`, a **shared** helper, so that shape reaches Dev through code this spec never modified. Needs its own spec with a migration-grade human review gate |
+
+**Archiving chunk 2 is defensible once those two are acknowledged as open** — they are filed, scoped and owned, not hidden. **What must not happen is summarising this archive as "authorization fixed" or "organizations fixed."** Both are fixed on **one of two endpoints over the same tables**, and the asymmetry is precisely what makes the summary tempting and wrong.
 
 **What this spec got right is worth stating beside that**, because the failures are what a working process looks like: 336 unit suites and 15 fixture suites green, a clean production build, coverage at 89/76/85/89 reproduced to the digit, four genuine product defects found across three rounds and **none hidden**, a falsification that reproduced an actual bypass rather than merely reddening an assertion, and a fixture tier that now catches two corruption shapes a `200` would otherwise have concealed.
 

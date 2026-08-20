@@ -2,7 +2,7 @@
 
 > ## ⚠️ This document is **LIVE, not frozen** — read this first
 >
-> It was issued as a point-in-time record and has since been **selectively edited** (2026-08-20) as remediation closed findings. That mixture is itself a defect: a reader could not tell which rows were frozen and which were current, and an audit found **ten stale figure sites and two stale ❌ verdicts** surviving inside it *after* its header figures had been corrected — the same "verify deletion, not just insertion" failure this spec had logged one round earlier, recurring in the document `execution.md` names as the coverage authority. **Every figure and verdict in this file is now current as of the 2026-08-20 closing run.** Historical claims are marked as such inline.
+> It was issued as a point-in-time record and has since been **selectively edited** (2026-08-20) as remediation closed findings. That mixture is itself a defect: a reader could not tell which rows were frozen and which were current, and an audit found **ten stale figure sites and two stale ❌ verdicts** surviving inside it *after* its header figures had been corrected — the same "verify deletion, not just insertion" failure this spec had logged one round earlier, recurring in the document `execution.md` names as the coverage authority. **Every figure and verdict in this file was re-derived on 2026-08-20 at the second `/akili-validate` run** — which found **six** figure sites in this file still stale *after* the sentence you are reading had claimed they were all current, and after its header rows alone had been corrected. That is the failure this banner was written about, committed by the banner. Figures now: unit **336 / 2296**, coverage **89.80 / 75.82 / 85.31 / 89.27**, fixtures **15 / 71**. Historical claims are marked as such inline.
 >
 > **Overall: FAIL — 5 unresolved failures. Superseded by `validation-report.md` (2026-08-20).** Originally issued as *PASS with 6 recorded gaps*; both the verdict and the count were wrong. There are **7** gaps, not 6 — the enumeration below always ran G-1…G-7 while three headings said "6", in a document whose own thesis is that counts must be grepped rather than asserted. And `/akili-validate` found a **second, un-gated variant** of G-1 that falsifies four ACs this report marked ✅. Retained as a point-in-time record; read `validation-report.md` for the current verdict. Original summary followed: PASS with 6 recorded gaps — one of which is a confirmed product defect and one of which needs a human.** No test was rewritten to hide a failure. Every gap below is a decision with a reason, not an omission.
 
@@ -22,10 +22,10 @@
 | Overall status | ⚠️ **SUPERSEDED — see `validation-report.md`.** Issued as PASS with 6 gaps; actually **7** gaps and **FAIL** |
 | Suites in scope | 3 of 4 — backend unit, integration/fixtures, **E2E blocked (see gap G-3)**; frontend N/A |
 | Testers spawned | **1** (integration/fixture tier). The other suites were **cited, not re-authored** |
-| Backend unit | **336 suites / 2285 tests**, all green · coverage **89.79 / 75.75 / 85.30 / 89.26** against a 60 floor |
-| Fixtures (real MySQL) | **15 suites / 71 tests, 0 failed** — run **twice** on the same scratch container. Was 66; the duplicate-PK `400` gained a fixture tier later on 2026-08-20 (`execution.md` → *The duplicate-PK `400` gains a fixture tier*) |
+| Backend unit | **336 suites / 2296 tests**, all green · coverage **89.80 / 75.82 / 85.31 / 89.27** against a 60 floor |
+| Fixtures (real MySQL) | **15 suites / 71 tests, 0 failed** — run **twice** on the same scratch container. Chain: 49 → 54 → 64 → 66 (sixth fixture) → 71 (its duplicate-PK scenario) |
 | Typecheck / lint | `tsc --noEmit` clean · `eslint --no-fix` clean on every touched file |
-| Provenance | **One closing run, 2026-08-20, executed by the Leader — not relayed from any worker report.** Identical figures in `tasks.md` §7. **Amended:** the fixture row alone was re-derived from a later run the same day (66 → 71), under the same two-consecutive-run discipline; coverage was deliberately not re-run, the change being test-only with no production lines added. Withheld through two remediation rounds on purpose: this line had gone stale twice (2264 → 2275 → 2279), and the fix for a repeatedly-stale figure is to derive it once from one run rather than to restate it faster |
+| Provenance | **All four figures re-derived by one run on 2026-08-20 at the second `/akili-validate`**, after that round's FAIL-1/FAIL-2 fixes added 11 unit tests — so the earlier 2285/89.79-tuple values are themselves superseded. Not relayed from any worker report. **Trajectory, kept because it is the point:** 2264 → 2275 → 2279 → 2285 → **2296**, and fixtures 49 → 54 → 64 → 66 → **71**. Five restatements of the same cell. The lesson this row originally drew — *derive it once from one run rather than restate it faster* — was right and still insufficient, because the figure goes stale whenever the tree changes, not whenever someone is careless. **The durable fix is not a better number here; it is fewer places asserting one.** Sites that must agree: this row, `tasks.md` §7, `validation-report.md`. Grep all three before trusting any |
 | Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
 | Gaps requiring a human | **0** — the `/swagger` observation (`R-IUA-013 AC.3`) was **performed and recorded** on 2026-08-20 (`execution.md` → *Human `/swagger` Observation*), closing G-7 |
 
@@ -33,12 +33,12 @@
 
 ## Summary
 
-**This run authored very little and verified a great deal, deliberately.** The spec's test suites were written during `/akili-execute` — 336 unit suites across T-01…T-08, and five real-MySQL fixtures (F-A…F-E) across T-09…T-13. This command's own rule is to **cite, not rewrite** author-produced coverage; duplicating it would be waste paid on every future test run. So one Tester was spawned, with its entire budget aimed at **two properties that three separate Reviewers had independently found unowned at every tier**.
+**This run authored very little and verified a great deal, deliberately.** The spec's test suites were written during `/akili-execute` — **8** unit suite files across T-01…T-08, and **six** real-MySQL fixtures (F-A…F-E plus the PK-collision fixture) across T-09…T-13. This command's own rule is to **cite, not rewrite** author-produced coverage; duplicating it would be waste paid on every future test run. So one Tester was spawned, with its entire budget aimed at **two properties that three separate Reviewers had independently found unowned at every tier**.
 
 | Suite | Disposition | Detail |
 | --- | --- | --- |
-| Backend unit | **Cited** | 336 suites / **2279** tests **repo-wide** *(closing run, 2026-08-20)*; this spec authored **8** of those suite files (T-01…T-08) — the original wording "authored T-01…T-08" wrongly attributed the whole repo's suite count to this spec. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
-| Integration / fixtures | **Cited + extended by 1 Tester** | F-A…F-E authored T-09…T-13 (49 tests). The Tester added **5 tests** closing the two unowned properties → 54; the two 2026-08-20 remediation rounds added **10 more** → **64** |
+| Backend unit | **Cited** | 336 suites / **2296** tests **repo-wide** *(re-validation run, 2026-08-20)*; this spec authored **8** of those suite files (T-01…T-08) — the original wording "authored T-01…T-08" wrongly attributed the whole repo's suite count to this spec. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
+| Integration / fixtures | **Cited + extended by 1 Tester** | F-A…F-E authored T-09…T-13 (49 tests). The Tester added **5 tests** closing the two unowned properties → 54; the two 2026-08-20 remediation rounds added **10 more** → 64; the PK-collision fixture added a **sixth file** → 66; its duplicate-PK scenario added **5 more** → **71** |
 | Frontend unit | **N/A — not a gap** | `design.md` scopes this chunk **server-only**; the STAR client is chunk 3 (`details-page`). Recorded so the absence reads as a decision |
 | E2E | **BLOCKED — gap G-3** | Infrastructure exists but cannot be used without writing to a **shared** database. See G-3 |
 
@@ -76,22 +76,23 @@ Closed with a rolled-back transaction: `create(id, m)` inside `dataSource.transa
 
 ## Suites
 
-### Backend unit — 336 suites / 2279 tests, green
+### Backend unit — 336 suites / 2296 tests, green
 
 Authored during execute; cited here. The mutation discipline is why they are credible rather than merely numerous: T-07 ran a **two-axis, 16-mutation** sweep (7 wiring + 9 DTO-rule); T-03 a 12-mutation sweep; T-04 M1–M9 **up front**, which is the change that turned T-03's three review rounds into T-04's one.
 
 **What this tier structurally cannot prove** (`design.md` §10.1): anything about persistence, HTTP, auth, the envelope on the wire, or Swagger.
 
-### Integration / fixtures — 14 suites / 64 tests, green on two consecutive runs
+### Integration / fixtures — 15 suites / 71 tests, green on two consecutive runs
 
 Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, not a courtesy** — T-13's C-4 cleanup risked orphaning a `reporting_platforms` row that only a *second* run would collide with.
 
 | Fixture | Proves |
 | --- | --- |
 | **F-A** section round trip *(+ this run's 5 tests)* | Save→read equality, edit preserving row id, selective removal soft-deleting **exactly** that row across all three collections, the four-way audit branch structure, `results.updated_at` advancing, NFR-IUA-001's query bound, **DD-14**, **B-4** |
-| **F-B** role isolation | Innovation Dev rows byte-identical by whole-row `SELECT *` diff (ADR-11) across both saves, against a result deliberately holding **both** indicators' rows. **The 2 formerly-quarantined tests now pass**, plus a third for the cross-role variant — assertions 18 → 24 |
+| **F-B** role isolation | Innovation Dev rows byte-identical by whole-row `SELECT *` diff (ADR-11) across both saves, against a result deliberately holding **both** indicators' rows. **The 2 formerly-quarantined tests now pass**, plus a third for the cross-role variant. *(An "assertions 18 → 24" figure stood here and was unresolvable against the file under any reading — 16 `it(` blocks, 30 `expect(` calls. Removed rather than restated: the file's test count is derivable by grep and does not need asserting here.)* |
 | **F-C** level boundary | The `id 6`/`id 7` discriminating pair in one test body against the real seeded catalog — the family's signature `id = level + 1` trap |
 | **F-D** catalog order | Levels read `0…9`. **Declared weak on the record — see G-5** |
+| **PK-collision** `innovation-use-edit-plus-add-id-collision` *(sixth fixture, added 2026-08-20 — this row was missing while the header count already said 71)* | Both PK-collision shapes against real MySQL: the **id-less** adoption (an added row adopting the edited row's PK) and the **id-present** duplicate (two rows submitting one owned PK → `400`, nothing persisted, transaction rolled back). 7 tests |
 | **F-E** creation + green checks | Both child rows land, `created_by` from the acting user, the `innovation_use` key present for indicator 6 and absent for indicator 2 (exact 9-key set), `completness` **both ways** |
 
 ### Frontend unit — not applicable
@@ -109,7 +110,7 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | R-IUA-001 | detail row from creation; audit from `request.user` | unit + F-E | `results.service.spec.ts`; F-E | ✅ |
 | R-IUA-002 | read the section; round-trips identically | unit + F-A | `result-innovation-use.service.spec.ts`; F-A | ✅ |
 | R-IUA-002 AC.7 | `401` unauthenticated | unit (mechanism) | exclude-list assertion, **DD-16** | ⚠️ **G-4** — mechanism only |
-| R-IUA-003 | atomic write; soft-delete; audit; `last_updated_date` | unit + F-A | T-06 suite; F-A | ✅ |
+| R-IUA-003 | atomic write; soft-delete; audit; `updated_at` *(column name corrected 2026-08-20 — `last_updated_date` does not exist; `AuditableEntity` declares only `updated_at`)* | unit + F-A | T-06 suite; F-A | ✅ |
 | R-IUA-004 | counts, exclusive modes, derived `total` | unit (pipe spec) | `result-innovation-use.controller.spec.ts` — **the only committed gate**, 27 cases | ✅ |
 | R-IUA-005 | duplicate actor types rejected | unit | T-06 suite | ⚠️ **G-6** — one case's falsifier unrun |
 | R-IUA-006 AC.1–AC.4 | level ≥ 6 justification; the off-by-one pair | unit + **F-C** | T-06 suite; F-C | ✅ |
@@ -127,8 +128,8 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | R-IUA-013 AC.1/AC.2/AC.4/AC.5/AC.6/AC.7 | envelope, exceptions, decorators, registration, no `console`, audit | unit + F-A/F-E | T-07 suite; `entities.module.spec.ts` | ✅ |
 | R-IUA-013 **AC.3** | Swagger surface | **human** | user's own observation, recorded verbatim | ✅ **G-7 CLOSED 2026-08-20** |
 | NFR-IUA-001 | ≤ 5 queries at 50 actor rows | **F-A** | measured **exactly 5** with 52 active rows | ✅ at the ceiling |
-| NFR-IUA-002 | fixtures collected & green from a fresh bootstrap | F-A…F-E | **64** tests, twice | ✅ |
-| NFR-IUA-003 | coverage ≥ 60% | `test:cov` | **89.76/75.64/85.27/89.22** | ✅ |
+| NFR-IUA-002 | fixtures collected & green from a fresh bootstrap | F-A…F-E + PK-collision | **71** tests, twice | ✅ |
+| NFR-IUA-003 | coverage ≥ 60% | `test:cov` | **89.80/75.82/85.31/89.27** | ✅ |
 
 **Negative constraints (`BUT it must NOT`) explicitly asserted:** no hard-delete (F-A, unfiltered id read-back) · no cross-role deactivation (F-B, 3 falsifications) · `total` not rejected when client-sent, and stripped (T-07 Case 9) · no `GreenChecksRepository` call on the write path (DD-7, grep = 0) · neither `innovation_use` nor `ip_rights` in `VISUAL_ONLY_GREEN_CHECKS` (F-E + grep) · no `@Roles` on the controller (DD-5) · level never resolved by FK or by name (F-C + grep).
 

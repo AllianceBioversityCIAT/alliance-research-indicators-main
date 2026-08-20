@@ -35,7 +35,7 @@
 
 **Why now:** chunk 1 shipped the schema, the catalog and the `innovation_use_validation` stored function. Nothing can reach any of it — there is no module, no route, and no server-side rule enforcement. Chunk 3 cannot start against an unspecified contract.
 
-**The finding that reshaped this chunk.** `ResultsService.createResultType()` (`results.service.ts:526-558`) has no `case IndicatorsEnum.INNOVATION_USE:`, and its `ipAvailables` array excludes indicator 6. Chunk 1 nonetheless added indicator 6 to the green-check `ip_rights` conjunction. The composite effect **on `main` today**:
+**The finding that reshaped this chunk.** `ResultsService.createResultType()` (`results.service.ts`, the `createResultType` switch) has no `case IndicatorsEnum.INNOVATION_USE:`, and its `ipAvailables` array excludes indicator 6. Chunk 1 nonetheless added indicator 6 to the green-check `ip_rights` conjunction. The composite effect **on `main` today**:
 
 | Step | What happens now | Consequence |
 | --- | --- | --- |
@@ -97,8 +97,8 @@ Non-functional requirements are `NFR-IUA-<NNN>`.
 | `result-innovation-use` **module / controller / service / DTOs** | **ABSENT** | only `entities/` and `entity-metadata.spec.ts` exist in that folder |
 | Route registration for `innovation-use` | **ABSENT** | `main.routes.ts` `ResultsChildren` has `innovation-dev`, not `innovation-use` |
 | Catalog controller/service/module for use levels | **ABSENT** | `clarisa-innovation-use-levels/` contains `entities/` only |
-| `case INNOVATION_USE` in `createResultType` | **ABSENT** | `results.service.ts:531-548` |
-| `INNOVATION_USE` in `ipAvailables` | **ABSENT** | `results.service.ts:550-553` |
+| `case INNOVATION_USE` in `createResultType` | **ABSENT** *(as of 2026-08-19; **delivered by T-08** — the row records the pre-implementation state)* | `results.service.ts`, the `createResultType` switch |
+| `INNOVATION_USE` in `ipAvailables` | **ABSENT** *(as of 2026-08-19; **delivered by T-08**)* | `results.service.ts`, the `ipAvailables` array |
 | `ResultQuantificationsService.upsertQuantificationsByRole` | exists, **zero callers** | grep over `src`, excluding specs |
 
 ### 4.2 In scope

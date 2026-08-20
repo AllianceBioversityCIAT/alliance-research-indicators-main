@@ -1510,7 +1510,7 @@ Fixture 543 → 691 (+147): two organizations, two quantifications, selective re
 
 Fixture 691 → 711 (+20). The required org1 update-by-id audit assertion, plus the optional loop reshape of `it` #2's org/quant audit queries (pre-blessed by Lens 2 as *"free to fold in"*), closing org2's and quant2's `created_by`.
 
-**The falsification is the evidence, and the contrast is the point:** deleting `...audit(SetAuditEnum.UPDATE)` from `result-institution-types.service.ts:240` now fails **exactly one test** — `expect(Number(org1Audit.updated_by)).toBe(actingUserId)`, `Expected: 900720, Received: 0` — where before attempt 3 it left the whole suite green. Restored byte-identically; `git diff HEAD -- src/` empty.
+**The falsification is the evidence, and the contrast is the point:** deleting `...audit(SetAuditEnum.UPDATE)` from `result-institution-types.service.ts`'s `buildUpdateData` *(line citation removed 2026-08-20 — it had rotted)* now fails **exactly one test** — `expect(Number(org1Audit.updated_by)).toBe(actingUserId)`, `Expected: 900720, Received: 0` — where before attempt 3 it left the whole suite green. Restored byte-identically; `git diff HEAD -- src/` empty.
 
 The Reviewer verified the failure mode is the one the assertion would actually produce, rather than accepting it: `buildUpdateData`'s else-branch object carries no `created_by`, so that column survives from the `SetAuditEnum.NEW` insert, and with `:240` deleted `updated_by` stays NULL → `Number(null) === 0`. It also confirmed **no accidental green-case coercion** — `Number(900720)` is the only value satisfying the assertion; NULL→0, undefined→NaN and 0 all fail against a non-zero sentinel.
 
@@ -2157,7 +2157,7 @@ Closed before the re-run but never written down — an omission worth naming, be
 
 | Item | Evidence |
 | --- | --- |
-| Logger | `result-innovation-use.service.ts:83` — `private readonly logger = new CgiarLogger(ResultInnovationUseService.name)` |
+| Logger | `result-innovation-use.service.ts` → the `logger` field declaration — `private readonly logger = new CgiarLogger(ResultInnovationUseService.name)` |
 | Four `warn` sites | `:143` (no detail row), `:274` (level resolves to no catalog row), `:305` (level ≥ 6 justification missing, R-IUA-006), `:340` (duplicate actor identity, R-IUA-005) |
 | Payload audit | All four hand-read: `result_id` + a rule identifier only. **No payload field, no user id, no free text from the request.** |
 | §9 bullet 4 was **factually false** and is corrected (`83ef9393`) | It claimed `ResponseInterceptor` logs a thrown `400` at `warn`. That interceptor has **zero `catchError`**, so a thrown exception never reaches it — it reaches `GlobalExceptions`, which calls `_logger._error` **unconditionally**. Every thrown `400` lands at ERROR platform-wide. The design document asserted a logging level the platform does not produce |
@@ -2241,7 +2241,7 @@ The round-2 Reviewer found it; I verified both instances at source. **FP-50 (`sr
 | Citation | Claims | Actually |
 | --- | --- | --- |
 | `innovation-use-section-round-trip.fixture-spec.ts:498` → `result-actors.service.ts:244` | `SetAuditEnum.NEW` | line 244 is `});`. The spread is at **138** and **265** — attempt 1 inserted above it |
-| `…:709` → `result-institution-types.service.ts:240` | an audit spread | line 240 is **inside the new guard's doc comment** |
+| `…:709` → `result-institution-types.service.ts:240` | an audit spread | Not a spread and not a comment: line 240 is `tempRepo,`, an argument to `deactivateExistingRecords`. The real spreads are the two `audit(SetAuditEnum.UPDATE)` sites in `buildUpdateData`/`buildDataTemplate`. *(This row's own diagnosis was wrong when written and was corrected 2026-08-20 — the table documenting citation rot had rotted, and then its description of the rot was inaccurate too.)* |
 
 Both were correct when written and were invalidated by **this spec's own edits to the cited files**. FP-50's premise — that a same-file citation is fragile because *your* edit moves it — is right as far as it goes, but a cross-file citation is drift-proof only against edits to **its own** file. Nothing protects it from an edit to the file it points at, and a spec that edits both files breaks it exactly as easily.
 
