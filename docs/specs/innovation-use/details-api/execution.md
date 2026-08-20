@@ -2208,3 +2208,78 @@ On that last row: `requirements.md`'s AC boxes were **never** part of this spec'
 `customSaveInnovationDev` retains the defect. Filed as **FR-7** in [`../family.md`](../family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
 
 The framing is the load-bearing part: the new guard is a property of the **endpoint, not the data**. These rows are protected when written through this endpoint and **not otherwise** — any authenticated principal who can edit some indicator-2 result can still rewrite any `result_actors` / `result_institution_types` row by PK through the Innovation Dev endpoint, **including the Innovation Use rows just protected**. Exposure is now **asymmetric**, and that asymmetry is what makes *"authorization fixed"* the likely mis-summary of this archive. FR-7 says so in those words.
+
+### FAIL-B / WARN-1 — the rework loop (2026-08-20)
+
+| Attempt | Verdict | Outcome |
+| --- | --- | --- |
+| 1 | **FAIL** (1 issue) | Fix, tests and falsification all correct. Rejected on **three same-file `~:NNN` citations inside a comment the same edit invalidated** — off by exactly 9, the length of the paragraph inserted above them, and `~:761` landed inside a *different* `it`. **FP-50** (`src/CLAUDE.md` §9) exists because six of seven bad citations in an earlier spec failed this exact way |
+| 2 | pending review | Citations → anchors; FP-50 swept across all five attempt-1 files with per-file completeness lines including zero-finding files (KZ-007); advisory item 4 applied symmetrically to both guards |
+
+**Independently verified by the Leader, not relayed:** unit **336 suites / 2279 tests**; fixtures **14 suites / 63 tests, 0 failed** twice on the same container; `tsc --noEmit` clean. The anchor replacement leaves **zero** `~:NNN` in that file, and the dedup landed at `result-actors.service.ts:308` / `result-institution-types.service.ts:250` — mirror guards, fixed symmetrically.
+
+#### Two findings that are mine, not the Implementer's
+
+**1 — I invented an identifier and never registered it.** `WARN-1` and the word *rollback* appeared **zero** times in `validation-report.md`, yet the Implementer cited `WARN-1 (validation-report.md)` at five sites — because **my dispatch brief supplied that label**. Five artifacts pointing at a finding the named document did not contain. Caught by the round-2 Reviewer as an advisory, not by any test, and not by me. Closed by registering a real WARN-1 row (register 21 → 22) whose opening paragraph is its own provenance.
+
+> **The generalisable failure:** an identifier minted in transient inter-agent output and then cited in a durable artifact. The brief is discarded; the citation is not. **A label used in a brief must exist in the document the brief names, before the brief is sent.**
+
+**2 — my brief contradicted itself, and the Implementer caught it.** Advisory item 3 asked for a before/after snapshot inside save #4 while the same brief forbade touching save #4's structure. The Implementer identified the conflict, honoured the explicit constraint, took the advisory's own "skip if it risks a flake" carve-out, and **declared the skip** rather than quietly satisfying half of it. That is the correct handling of a contradictory instruction. **The `Not Done` field is a compliant declared skip, not outstanding scope** — the advisory was optional by construction and advisories never gate.
+
+> Residual, carried: the fixture's test name says *"persisting nothing"*, and what is proven is the `result_innovation_use` row and the Dev org row byte-identical. The **absence of an inserted sibling row** is unasserted. Referred to the round-2 Reviewer for a ruling on whether the name overclaims.
+
+#### A third defect, found by counting checkboxes
+
+`requirements.md` §15 read *"Security review — **not required**: no auth path, secret, or exclude-list change."* True when written. **Falsified by this spec's own remediation:** `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev, deciding by `(result_id, role)` whether a caller-supplied primary key may be written. The exclude list and secrets path are genuinely untouched, so the row is not simply wrong — **it is answering a question that changed underneath it**, which is why nobody noticed. Marked **REQUIRED**, cross-referenced to **FR-7**, since the sibling `customSaveInnovationDev` over the same tables still has no such control and that asymmetry is a security reviewer's call rather than an implementer's.
+
+#### FP-50 has a blind spot, and this spec walked into it — guide amendment owed
+
+The round-2 Reviewer found it; I verified both instances at source. **FP-50 (`src/CLAUDE.md` §9) says: *"cite same-file targets by anchor, never by line number; a cross-file line citation is fine."* The second clause is wrong** — or rather, it is true of only one of the two ways a citation rots.
+
+| Citation | Claims | Actually |
+| --- | --- | --- |
+| `innovation-use-section-round-trip.fixture-spec.ts:498` → `result-actors.service.ts:244` | `SetAuditEnum.NEW` | line 244 is `});`. The spread is at **138** and **265** — attempt 1 inserted above it |
+| `…:709` → `result-institution-types.service.ts:240` | an audit spread | line 240 is **inside the new guard's doc comment** |
+
+Both were correct when written and were invalidated by **this spec's own edits to the cited files**. FP-50's premise — that a same-file citation is fragile because *your* edit moves it — is right as far as it goes, but a cross-file citation is drift-proof only against edits to **its own** file. Nothing protects it from an edit to the file it points at, and a spec that edits both files breaks it exactly as easily.
+
+**The measurement that makes this non-theoretical:** FP-50 was written after *six of seven* inaccurate citations in an earlier spec turned out to be same-file line numbers. That measurement is what made the rule feel complete, and it is also what hid the other half — the sample was drawn from a spec that happened not to edit its cited files. **A rule derived from one failure distribution inherits that distribution's blind spots.**
+
+**Amendment owed to `src/CLAUDE.md` §9** (deferred until the in-flight attempt lands, because the Implementer reads that guide): a cross-file line citation is acceptable **only to a file this spec does not touch**; cite by anchor whenever the target is in the spec's own change set. Two citations in this spec need converting.
+
+### Attempt 3 — PASS at the ceiling (2026-08-20)
+
+Reviewer **PASS** on the third and final attempt. All three deltas verified at source; no settled item disturbed.
+
+| Delta | Verdict |
+| --- | --- |
+| The false parenthetical → explicit cross-file citation quoting a real describe title | Closed. Anchor resolves both directions; the sibling comment's *"below"* is **still** correct in its own file (describe below the comment), which is what I asked the Reviewer to check and had not checked myself |
+| WARN-1 qualifier → past tense + quoted heading | Closed. Heading matches character for character |
+| Post-only sentinel assertion closing save #4's insert direction | Closed — and the Reviewer verified it **non-vacuous on static grounds**, independent of the reported falsification: the id-less sibling routes through `buildNewData`, whose `constructWhereClause` is role-scoped, so no existing row matches and the row is **inserted** carrying `organization_count` |
+
+**The Reviewer retired its own earlier reading rather than carrying it forward.** It had called save #4's *"persisting nothing"* name a mild overclaim and declined to re-litigate it "for consistency with my own prior pass". With the assertion in place it ruled the claim **fully discharged** — all three write directions now covered (insert, update of the referenced row, and step 6 reverted by rollback). A self-imposed consistency rule was correctly not allowed to stand in for the answer.
+
+**Closing figures — one run, recorded identically in `tasks.md` §7 and `test-report.md`:** unit **336 suites / 2279 tests**; coverage **89.76 / 75.64 / 85.27 / 89.22** (floor 60); fixtures **14 suites / 64 tests, 0 failed** twice on the same container; `tsc` and `eslint --no-fix` clean. Executed by the Leader, not relayed.
+
+#### The shape of this round's cost, stated plainly
+
+**Three attempts, three FAILs, and the code was correct from attempt 1.** Every rejection was about prose describing the code:
+
+| Attempt | Defect | Class |
+| --- | --- | --- |
+| 1 | Three same-file `~:NNN` citations invalidated by the same edit that wrote them | citation drift |
+| 2 | A comment claiming a *"FAIL-B block above"* that did not exist, and attributing `removeDuplicates`/`uniqueData` to a service having neither — a parenthetical lifted from the sibling file with the direction word hand-flipped | **unresolvable anchor** |
+| 3 | — (grep gate on every reference written) | — |
+
+That is not wasted review budget: a comment telling a maintainer to look for a dedup that was never in that service is a real defect with a real cost. But it does say where this spec's residual risk lives, and it is **not** in the logic.
+
+#### FP-50 amended — and my amendment was wrong twice before it was right
+
+The Reviewer's advisory found that FP-50's blessing of cross-file line citations is unsafe, with two live instances. **Two corrections to my own proposal, both from asking rather than asserting:**
+
+1. **My diagnosis was wrong.** I framed the hazard as *cross-file*. It is not — it is **the citing and cited files sharing an edit window**. Attempt 1's failure and these two are the same mechanism on opposite sides of a file boundary.
+2. **My affected-citation set was short by one.** I said two; there are **three** (`innovation-use-role-isolation.fixture-spec.ts` → `innovation-use-result-creation.fixture-spec.ts:787`, a file this spec created), plus a `node_modules` case that needs no repo edit at all to rot, plus one borderline-but-safe. **Fifth instance of the KZ-005 pattern** — a correction sweep that did not bound every axis.
+
+Amended in `src/CLAUDE.md` §9 with the Reviewer's wording, and **`src/AGENTS.md` was found already stale at `HEAD`** — missing FP-45, FP-46, FP-48, FP-49 **and** FP-50 in one contiguous block, i.e. every fixture lesson from both innovation-use specs. Not caused by this spec; resynced after verifying it held nothing `CLAUDE.md` lacked. Agents on hosts reading `AGENTS.md` had been working without the band registry that prevents fixture collisions.
+
+> **Carried, not closed:** the three at-risk line citations are **not** converted. The rule is now written; the codebase does not yet satisfy it. That is deliberate — advisory work, no behavioural effect, and it should not ride into an archive as if it were done.

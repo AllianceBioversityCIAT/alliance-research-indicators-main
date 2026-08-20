@@ -14,7 +14,18 @@
 > | **FAIL-C / FAIL-D** stale figures | **WITHHELD pending one closing run** rather than restated — they had already gone stale twice |
 > | **F-1 / F-2a / F-2b** | **FIXED** — plus a fourth the correction-closure sweep found that the finding had not cited |
 >
-> **What is NOT yet done:** the closing verification run, and the re-validation that consumes it. **Do not archive on this banner** — archive on a re-run. Trail: `execution.md` → *Remediation Round 2*. Follow-up **FR-7** is filed in `../family.md`.
+> **Closing run — done, 2026-08-20, executed by the Leader:** unit **336 suites / 2279 tests**; coverage **89.76 / 75.64 / 85.27 / 89.22** (floor 60); fixtures **14 suites / 64 tests, 0 failed** twice on the same container; `tsc` and `eslint --no-fix` clean. Recorded identically in `tasks.md` §7 and `test-report.md`.
+>
+> **Still NOT done, and neither is closable by re-running anything:**
+>
+> | Open item | Why it cannot be discharged here |
+> | --- | --- |
+> | **Security sign-off** (`requirements.md` §15) | That row declared the review *not required* because no auth path changed. **This spec's own remediation falsified it** — `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev. A **human** gate, newly created by the fix |
+> | **FR-7** (`../family.md`) | `customSaveInnovationDev` still takes a caller-supplied PK with no ownership check over the same tables, so the rows protected here remain writable by PK through the sibling endpoint. Needs its own spec |
+> | Three at-risk line citations | FP-50 is amended; the codebase does not yet satisfy it. Advisory, no behavioural effect — **not** to be counted as done |
+> | Re-validation | Has not run against this state |
+>
+> **Do not archive on this banner.** Trail: `execution.md` → *Remediation Round 2* and *Attempt 3 — PASS at the ceiling*.
 >
 > ---
 >

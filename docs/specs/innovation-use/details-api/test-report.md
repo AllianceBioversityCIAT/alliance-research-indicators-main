@@ -18,7 +18,10 @@
 | Overall status | ⚠️ **SUPERSEDED — see `validation-report.md`.** Issued as PASS with 6 gaps; actually **7** gaps and **FAIL** |
 | Suites in scope | 3 of 4 — backend unit, integration/fixtures, **E2E blocked (see gap G-3)**; frontend N/A |
 | Testers spawned | **1** (integration/fixture tier). The other suites were **cited, not re-authored** |
-| Backend unit | ⏳ **figures pending the closing run** — deliberately not restated here. This line has been stale twice (2264 → 2275 → changing again with the FAIL-B fix in flight). Per both auditors' recommendation, all figures are to be derived from **one** run that closes validation and recorded in this document and `tasks.md` §7 together |
+| Backend unit | **336 suites / 2279 tests**, all green · coverage **89.76 / 75.64 / 85.27 / 89.22** against a 60 floor |
+| Fixtures (real MySQL) | **14 suites / 64 tests, 0 failed** — run **twice** on the same scratch container |
+| Typecheck / lint | `tsc --noEmit` clean · `eslint --no-fix` clean on every touched file |
+| Provenance | **One closing run, 2026-08-20, executed by the Leader — not relayed from any worker report.** Identical figures in `tasks.md` §7. Withheld through two remediation rounds on purpose: this line had gone stale twice (2264 → 2275 → 2279), and the fix for a repeatedly-stale figure is to derive it once from one run rather than to restate it faster |
 | Integration (fixtures) | **14 suites / 54 tests** — all green, on **two consecutive runs** |
 | Coverage | 89.69 statements · 75.61 branches · 85.13 functions · 89.14 lines — all ≥ the 60% floor |
 | Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
