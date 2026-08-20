@@ -9,6 +9,7 @@ export type MappingStatus = 'mapped' | 'unmapped';
 export interface BilateralScienceProgramItem {
   code: string; // e.g. "SP09" (from CLARISA global_unit_object.smo_code)
   name: string; // CLARISA global_unit_object.name (trimmed)
+  mapping_status: string | null; // CLARISA mapping status that admitted this SP (R-PSP-002, design §4)
   category: string | null; // CLARISA cgiar_entity_type_object.name OR catalog fallback
   color: string | null; // local clarisa_science_programs fallback
   icon_key: string | null; // local clarisa_science_programs fallback

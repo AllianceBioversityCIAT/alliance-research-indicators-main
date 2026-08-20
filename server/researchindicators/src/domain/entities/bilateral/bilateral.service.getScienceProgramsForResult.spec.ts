@@ -228,6 +228,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
       {
         code: 'SP09',
         name: 'name-of-SP09',
+        mapping_status: 'Confirmed',
         category: 'Science programs',
         color: '#ec4899',
         icon_key: null, // T-15.4 hasn't landed yet
@@ -236,6 +237,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
       {
         code: 'SP10',
         name: 'name-of-SP10',
+        mapping_status: 'Confirmed',
         category: 'Science programs',
         color: '#8b5cf6',
         icon_key: null,
@@ -244,7 +246,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
     ]);
   });
 
-  it('excludes non-Confirmed mappings (R-BIL-076 scenario 4)', async () => {
+  it('R-PSP-002 AC.2: reports admitted mapping_status per item for mixed-status projects (Pending and Confirmed)', async () => {
     findContext.mockResolvedValueOnce({
       result_id: 1,
       result_official_code: 1001,
@@ -258,7 +260,36 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
       id: 1,
       short_name: 'p',
       project_mappings_array: [
-        baseProjectMapping('SP09', 50, 'P25', 'Pending'),
+        baseProjectMapping('SP01', 50, 'P25', 'Pending'),
+        baseProjectMapping('SP03', 50, 'P25', 'Confirmed'),
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.science_programs).toHaveLength(2);
+    expect(out.science_programs).toEqual([
+      expect.objectContaining({ code: 'SP01', mapping_status: 'Pending' }),
+      expect.objectContaining({ code: 'SP03', mapping_status: 'Confirmed' }),
+    ]);
+  });
+
+  it('excludes non-accepted mappings such as Rejected (R-BIL-076 scenario 4 / R-PSP-001)', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        baseProjectMapping('SP09', 50, 'P25', 'Rejected'),
         baseProjectMapping('SP10', 50, 'P25', 'Confirmed'),
       ],
     });
@@ -396,5 +427,121 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
     const out = await service.getScienceProgramsForResult(1, '1001');
 
     expect(out.science_programs.map((p) => p.code)).toEqual(['SP09']);
+  });
+
+  it('R-PSP-001 regression: accepts Pending Science Program mappings in the active portfolio', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        {
+          status: 'Pending',
+          global_unit_object: {
+            smo_code: 'SP01',
+            name: 'Multifunctional Landscapes',
+            cgiar_entity_type_object: { prefix: 'SP', code: 22 },
+            portfolio_object: { acronym: 'P25' },
+          },
+        },
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.science_programs.map((p) => p.code)).toEqual(['SP01']);
+  });
+
+  it('R-PSP-001 AC.3: excludes Rejected SP row while admitting sibling Pending SP row', async () => {
+    findContext.mockResolvedValueOnce({
+      result_id: 1,
+      result_official_code: 1001,
+      agresso_agreement_id: 'D527',
+    });
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 1,
+      clarisa_project_short_name: 'p',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 1,
+      short_name: 'p',
+      project_mappings_array: [
+        {
+          status: 'Rejected',
+          global_unit_object: {
+            smo_code: 'SP02',
+            name: 'Rejected Program',
+            cgiar_entity_type_object: { prefix: 'SP', code: 22 },
+            portfolio_object: { acronym: 'P25' },
+          },
+        },
+        {
+          status: 'Pending',
+          global_unit_object: {
+            smo_code: 'SP01',
+            name: 'Multifunctional Landscapes',
+            cgiar_entity_type_object: { prefix: 'SP', code: 22 },
+            portfolio_object: { acronym: 'P25' },
+          },
+        },
+      ],
+    });
+
+    const out = await service.getScienceProgramsForResult(1, '1001');
+
+    expect(out.mapping_status).toBe('mapped');
+    expect(out.science_programs.map((p) => p.code)).toEqual(['SP01']);
+  });
+
+  it('R-PSP-001 AC.4 falsifiability pin: forcing accepted set to Confirmed alone returns empty for Pending-only project', async () => {
+    const originalEnv = process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+    try {
+      process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = 'Confirmed';
+
+      findContext.mockResolvedValueOnce({
+        result_id: 1,
+        result_official_code: 1001,
+        agresso_agreement_id: 'D527',
+      });
+      findActiveByAgreementId.mockResolvedValueOnce({
+        clarisa_project_id: 1,
+        clarisa_project_short_name: 'p',
+      });
+      findProjectById.mockResolvedValueOnce({
+        id: 1,
+        short_name: 'p',
+        project_mappings_array: [
+          {
+            status: 'Pending',
+            global_unit_object: {
+              smo_code: 'SP01',
+              name: 'Multifunctional Landscapes',
+              cgiar_entity_type_object: { prefix: 'SP', code: 22 },
+              portfolio_object: { acronym: 'P25' },
+            },
+          },
+        ],
+      });
+
+      const out = await service.getScienceProgramsForResult(1, '1001');
+
+      expect(out.mapping_status).toBe('mapped');
+      expect(out.science_programs).toEqual([]);
+    } finally {
+      if (originalEnv === undefined) {
+        delete process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES;
+      } else {
+        process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = originalEnv;
+      }
+    }
   });
 });

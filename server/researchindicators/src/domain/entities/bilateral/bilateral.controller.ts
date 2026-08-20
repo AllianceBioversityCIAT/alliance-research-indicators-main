@@ -89,7 +89,9 @@ export class BilateralController {
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076)',
+      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076, R-PSP-002)',
+    description:
+      'Returns admitted Science Programs (Confirmed or Pending) with per-item mapping_status for the mapped bilateral project.',
   })
   async getScienceProgramsForResult() {
     return this.bilateralService

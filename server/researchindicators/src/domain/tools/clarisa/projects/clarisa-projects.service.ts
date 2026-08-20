@@ -15,6 +15,8 @@ import {
   matchesPhase,
   normalizeToken,
 } from './utils/project-selector.util';
+import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
+import { ENV } from '../../../shared/utils/env.utils';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
@@ -53,14 +55,16 @@ export class ClarisaProjectsService {
   }
 
   /**
-   * Checks whether a project carries at least one Confirmed Science Program mapping (R-BAS-004).
+   * Checks whether a project carries at least one accepted Science Program mapping (R-BAS-004, R-PSP-003).
    * Computed once here and used by both the opt-in filter and the controller DTO mapping.
+   * Preserves code === 22 narrowing per D-PSP-8.
    */
   hasSciencePrograms(project: ClarisaProject): boolean {
+    const acceptedStatuses = ENV.BILATERAL_ACCEPTED_SP_STATUSES;
     return (
       project.project_mappings_array?.some(
         (m) =>
-          m.status === 'Confirmed' &&
+          isAcceptedSpStatus(m.status, acceptedStatuses) &&
           m.global_unit_object?.cgiar_entity_type_object?.code === 22,
       ) ?? false
     );

@@ -70,6 +70,7 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     science_programs: codes.map((code) => ({
       code,
       name: `name-of-${code}`,
+      mapping_status: 'Confirmed',
       category: 'Science programs',
       color: null,
       icon_key: null,

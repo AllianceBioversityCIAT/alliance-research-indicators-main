@@ -130,7 +130,7 @@ describe('ClarisaProjectsService', () => {
       expect(service.hasSciencePrograms(project)).toBe(true);
     });
 
-    it('returns false when mapping is Pending or Draft even if entity code is 22', () => {
+    it('returns true when mapping is Pending and entity code is 22 (R-PSP-003)', () => {
       const project: ClarisaProject = {
         id: 2,
         short_name: 'P-PENDING-SP',
@@ -142,6 +142,34 @@ describe('ClarisaProjectsService', () => {
             program_id: 20,
             allocation: 50,
             status: 'Pending',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(true);
+    });
+
+    it('returns false when mapping is Draft or Rejected even if entity code is 22', () => {
+      const project: ClarisaProject = {
+        id: 2,
+        short_name: 'P-REJECTED-SP',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 11,
+            project_id: 2,
+            program_id: 20,
+            allocation: 50,
+            status: 'Rejected',
             global_unit_object: {
               id: 20,
               name: 'Plant Health',

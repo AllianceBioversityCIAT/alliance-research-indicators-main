@@ -231,7 +231,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
         { provide: PolicyChangeBilateralIndicatorTypeHandler, useValue: {} },
         {
           provide: ClarisaScienceProgramsService,
-          useValue: { findAll: jest.fn() },
+          useValue: { findAll: jest.fn().mockResolvedValue([]) },
         },
         { provide: ClarisaProjectsService, useValue: { findProjectById } },
         {
@@ -274,6 +274,26 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
       catalogs: [],
     });
     expect(findActiveByAgreementId).not.toHaveBeenCalled();
+    expect(getTocResultsForSps).not.toHaveBeenCalled();
+  });
+
+  it('returns "unmapped" when no active bilateral_project_mapping exists', async () => {
+    findContext.mockResolvedValueOnce(context());
+    findActiveByAgreementId.mockResolvedValueOnce(null);
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out).toEqual({
+      result_code: '19792',
+      mapping_status: 'unmapped',
+      clarisa_project: null,
+      result_type: 'capacity_sharing',
+      allowed_levels: ['OUTPUT'],
+      version_locked: false,
+      catalogs: [],
+    });
+    expect(findActiveByAgreementId).toHaveBeenCalledWith('D527');
+    expect(findProjectById).not.toHaveBeenCalled();
     expect(getTocResultsForSps).not.toHaveBeenCalled();
   });
 
@@ -521,5 +541,57 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
     expect(out.version_locked).toBe(true);
+  });
+
+  it('R-PSP-002: ToC catalog resolves the exact same non-empty SP set as getScienceProgramsForResult for Pending-only project', async () => {
+    const project = {
+      id: 22,
+      short_name: 'DESIRA',
+      project_mappings_array: [
+        sp(1, 'SP01', 'P25', 'Pending'),
+        sp(2, 'SP02', 'P25', 'Pending'),
+      ],
+    };
+
+    findContext.mockResolvedValueOnce(
+      context({
+        indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      }),
+    );
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: 'DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce(project);
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([
+        ['SP01', []],
+        ['SP02', []],
+      ]),
+    );
+
+    const hlosOut = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    findContext.mockResolvedValueOnce(
+      context({
+        indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      }),
+    );
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: 'DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce(project);
+
+    const spOut = await service.getScienceProgramsForResult(19792, '19792');
+
+    const hlosSpCodes = hlosOut.catalogs.map((c) => c.sp_code);
+    const pickerSpCodes = spOut.science_programs.map((p) => p.code);
+
+    // Blind spot 1: assert non-emptiness first
+    expect(hlosSpCodes.length).toBeGreaterThan(0);
+    expect(pickerSpCodes.length).toBeGreaterThan(0);
+    expect(hlosSpCodes).toEqual(['SP01', 'SP02']);
+    expect(pickerSpCodes).toEqual(hlosSpCodes);
   });
 });
