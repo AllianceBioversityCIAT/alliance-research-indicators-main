@@ -2079,3 +2079,34 @@ F-B's attack payload carries **only** result 2's ids. `devActorId` appears in th
 - **`/akili-archive` remains blocked.** This is a FAIL, not a WARN.
 
 **Recorded by the Leader, whose own claim this retracts.** The audit was delegated precisely because the Leader authored the record it would have been validating; that decision is what surfaced this.
+## Human `/swagger` Observation — RECORDED (2026-08-20)
+
+**`R-IUA-013 AC.3`'s only gate is closed by the user's own observation.** Recorded verbatim, as the task requires — *"it must be reported as a human observation, never as a command result."*
+
+> **User, 2026-08-20:** *"already see that and looks like good"*
+
+**What this establishes.** The user inspected `/swagger` and confirmed the rendered surface is correct. That is the gate, and it is the user's to close — no agent attempted, simulated or substituted it at any point, and `validation-report.md` records why it could not be automated (the document cannot be produced without booting the app, and `main.ts`'s `microservice()` unconditionally registers a live consumer on a shared durable RabbitMQ queue).
+
+**Stated precisely so the record is not read as more than it is:** the observation was given as a general confirmation rather than an itemised checklist. The criterion enumerates four things — tag, `@ApiOperation` summary and bearer lock on both own-declared handlers, plus `@ApiBody` on the PATCH — and one thing that must read as *intentional*: the catalog `GET` carrying **no** `@ApiOperation` summary, which is the **DD-13 / D-IUA-10 exemption**, not a defect. All five are independently verified **present-or-correctly-absent at source** (T-07's review and the validation audit each recounted the decorators, and `@ApiProperty` was recounted as exactly **25**). So the human observation and the static evidence agree; the observation supplies the one thing static evidence cannot — that the page *renders* as intended.
+
+**Checkboxes this closes — three, not one:**
+
+| Criterion | Now |
+| --- | --- |
+| **T-13 c6** — the human `/swagger` check | ✅ closed by the observation above |
+| **T-01 c1** — catalog `GET` returns ten rows in a `ServerResponseDto` | ✅ the live-`200` half was **transitively blocked** on T-13 c6 |
+| **T-01 c4** — the endpoint **renders** under the `Clarisa` tag with the bearer lock | ✅ same — the rendered surface *is* what the observation covers |
+
+**T-13 therefore closes `[x]`**, and `tasks.md` §7's *"All 13 tasks done"* becomes true. The structural finding from the archive-readiness audit — *one human gate held three checkboxes* — is now demonstrated in the other direction: one observation released all three.
+
+## Ruling — FAIL-1: option A (fix the authorization defect in this spec)
+
+**User ruling, 2026-08-20: "fix them".** Applied to the validation report's FAIL list, which resolves the option A/D question that had been open since T-10's Pivot.
+
+**Option A** — fix the ownership check inside this spec — rather than **D** (a separate, properly-scoped change). The considerations that made D attractive have not gone away: the defect is **pre-existing platform behaviour shared with the live `customSaveInnovationDev`**, so the blast radius includes the Innovation Dev section, and the fix therefore needs its own regression argument for code this spec did not otherwise touch. Option A accepts that cost here rather than deferring it.
+
+**What changed the balance:** the validation audit found the **cross-role variant**, which needs no knowledge of another result and is therefore the more likely of the two. Deferring a defect that a single mistaken client payload can trigger — against the *same* result the caller legitimately holds — is a weaker position than deferring one that requires knowing another result's row ids.
+
+**Scope of the fix (both variants, one root cause):** scope the id-present save path by `(result_id, role)` in both hand-written services, so a caller-supplied primary key is honoured **only** when the row it names belongs to the calling result *and* the calling role. `result_quantifications` needs no change — `upsertByCompositeKeys` already scopes by the calling result and ignores a supplied id, which is why it was structurally immune throughout.
+
+**Consequences to carry through:** T-10's two `it.failing` markers must **invert to passing tests** (the whole point of choosing `it.failing` over `.skip` — it fails when its body passes, so the fix announces itself), the cross-role variant needs its own test, and Innovation Dev needs a regression proof.

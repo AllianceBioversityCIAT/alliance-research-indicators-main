@@ -8,7 +8,7 @@
 - **Linked TRD sections:** [`docs/trd/trd.md`](../../../trd/trd.md) §4.1, §5.2, §6.1–6.2, §7.1, §12, §2.4 (ADR-2, ADR-4, **ADR-11**, ADR-12)
 - **Parent spec:** [`../family.md`](../family.md) — chunk 2 of 3
 - **Depth:** Full
-- **Last updated:** 2026-08-19
+- **Last updated:** 2026-08-20
 
 ---
 
@@ -203,6 +203,7 @@ No `@OpenSearchProperty` decoration is added — family D-8, and ADR-6's amendme
 | `400` | duplicate actor type | `['actor_type_id: duplicate actor type in payload — <type>']` |
 | `400` | missing justification at `level >= 6` | `['innovation_use_level_explanation: required when the innovation use level is 6 or above']` |
 | `400` | `innovation_use_level_id` resolves to no catalog row | `['innovation_use_level_id: unknown innovation use level']` — added T-06 attempt 2. Raised **before `BEGIN`** (DD-3); without it an unknown id reached the FK constraint and surfaced as a `500` carrying TypeORM's raw SQL and constraint name, since `GlobalExceptions` has no `QueryFailedError` branch |
+| `400` | a submitted `result_actors_id` or `result_institution_type_id` does not belong to a row already scoped to BOTH the calling `result_id` AND `actor_role_id`/`institution_type_role_id = INNOVATION_USE` (wrong result, wrong role, or unknown) | `['result_actors_id: unknown or unauthorized actor row — <id>']` or `['result_institution_type_id: unknown or unauthorized organization row — <id>']` — added 2026-08-20, `validation-report.md` FAIL-1. Raised inside `customSaveInnovationUse` on each shared child service, **before that method's own writes**, but **inside `BEGIN`** rather than before it: unlike the rules above, this one needs a DB read scoped by the calling result and role, and the two child services only ever receive an already-open transaction `manager` — moving the check earlier would require the orchestrating service to duplicate it before dispatching to the child services, out of scope for this fix. A thrown exception here still rolls back everything already written in steps 6+ (DD-3's "a failure persists nothing" holds as a property of the whole transaction, not of statement order alone). Without this check, a caller-supplied primary key reached `tempRepo.save(...)` unchecked and could silently rewrite another result's Innovation Use row (cross-result) or this same result's own Innovation Dev row (cross-role) — see R-IUA-009 |
 | `400` | `ResultStatusGuard` rejection | the guard's fixed status-list message |
 | `404` | no `result_innovation_use` row | `Result with ID <id> not found` |
 
@@ -221,7 +222,7 @@ No `@OpenSearchProperty` decoration is added — family D-8, and ADR-6's amendme
 
 ### 5.1 The write transaction — exact order
 
-Order is load-bearing. Validation runs **entirely before** any write, so R-IUA-003 AC.2 ("a failure persists nothing") holds without relying on rollback.
+Order is load-bearing. Validation runs before any write **for the payload-shape and cross-field rules (steps 3–4)**, so R-IUA-003 AC.2 ("a failure persists nothing") holds for those **by ordering**. **The ownership check (steps 7a/8a) is the one exception and holds by rollback** — see **DD-3**'s recorded exception. *(Corrected 2026-08-20: this sentence previously read "Validation runs **entirely before** any write … without relying on rollback", which the FAIL-1 remediation made **false** — the ownership gate runs after step 6 has executed inside the transaction. Two other sections asserted the correct thing while this one did not; the sweep is what found it.)*
 
 ```
 1  ValidationPipe            per-field + per-row rules (DD-8)
@@ -238,7 +239,16 @@ Order is load-bearing. Validation runs **entirely before** any write, so R-IUA-0
 5  BEGIN TRANSACTION
 6    UPDATE result_innovation_use  SET level_id, explanation, audit(UPDATE)
 7    ResultActorsService.customSaveInnovationUse(resultId, actors, manager)
+7a     └─ assertInnovationUseOwnership  FIRST statement, before any write here.
+                                        Every payload result_actors_id must name a row
+                                        already scoped to (result_id = this result,
+                                        actor_role_id = INNOVATION_USE). Anything else
+                                        → 400, whole transaction rolled back.
+                                        Holds by ROLLBACK, not ordering — DD-3's one
+                                        recorded exception.
 8    ResultInstitutionTypesService.customSaveInnovationUse(resultId, orgs, manager)
+8a     └─ assertInnovationUseOwnership  same rule on result_institution_type_id against
+                                        (result_id, institution_type_role_id = INNOVATION_USE)
 9    ResultQuantificationsService.upsertByCompositeKeys(
          resultId, quantifications,
          ['quantification_number','unit','description'],
@@ -249,6 +259,8 @@ Order is load-bearing. Validation runs **entirely before** any write, so R-IUA-0
 ```
 
 Steps 7–9 each carry their role discriminator in **every** predicate — the `find`, the `save`, and above all the deactivating `update`.
+
+> **This sentence was FALSE for the `save` until 2026-08-20, and that was the defect.** The id-present branch of steps 7 and 8 built a PK-keyed `save` that carried **no `result_id`** and **assigned** the role rather than filtering by it — so it named no discriminator in that predicate at all. The sentence asserted exactly the property the code violated, sat in the section that enumerates the write order, and survived 24 review rounds. It is true now, enforced by steps 7a/8a. *Recorded because a design document asserting a property the code does not have is the most expensive kind of error in this methodology: every reader downstream, human and agent, treats it as verified.*
 
 ### 5.2 Actor reconciliation — `customSaveInnovationUse`
 
@@ -439,7 +451,7 @@ Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions
 | --- | --- | --- |
 | **DD-1** | Mirror `result-innovation-dev`'s module shape, route depth and `@Get`/`@Patch` pair | The client's section-save pattern works unchanged; the reference is the only working analogue. *(Rejected: granular sub-resource CRUD — proposal Option B — which produces partial-save states that directly contradict R-IUA-003 AC.2.)* |
 | **DD-2** | One transaction for the whole section | Green checks read on demand; a torn section would be observable as a wrong completeness boolean |
-| **DD-3** | Validate **before** `BEGIN`, not inside it | Makes "a failure persists nothing" a property of the order of operations rather than of rollback correctness |
+| **DD-3** | Validate **before** `BEGIN`, not inside it | Makes "a failure persists nothing" a property of the order of operations rather than of rollback correctness. **⚠️ ONE RECORDED EXCEPTION, added 2026-08-20:** the **ownership check** (`assertInnovationUseOwnership`, the FAIL-1 remediation) runs **inside** the transaction, as the first statement of each `customSaveInnovationUse`, so R-IUA-003 AC.2 holds for *that* rule **by rollback** rather than by ordering. *Reviewed and ruled the better option:* hoisting it into `update()`'s pre-`BEGIN` block would move an **authorization** rule out of the method that performs the write it guards, and duplicate both the role constant and the child table's repository access in the orchestrator — a tighter coupling than the one DD-3 avoids. The compensating properties are that it is the **first statement** of each child method (before any write that method performs), the only statement already executed is step 6's idempotent scalar `UPDATE` on the same result's own detail row, and a throw propagates out of `dataSource.transaction` to roll the whole thing back. **Recorded as an amendment rather than left as a sentence in §4's error table**, because a decision contradicted by two other sections of its own document is drift, not nuance |
 | **DD-4** | Ship **zero** migrations | Chunk 1's schema is complete for this contract. A discovered need is an escalation — it would change the rollout story and re-open the shared-DB risk (family FR-3) |
 | **DD-5** | No `@Roles(...)` on any of the three endpoints | Verified 2026-08-19: **no result-section controller in this repo uses `@Roles`**. Section access is JWT + `ResultStatusGuard`. `proposal.md` item 7 contradicts itself ("`@Roles` … matching the Innovation Dev section"); matching the reference means none. Adding roles would make Innovation Use the only section with a rule the client does not mirror — an AC-Role-Correctness hazard, not a hardening |
 | **DD-6** | Override `findAll()` on the catalog service to add `order: { level: 'ASC' }` | `ControlListBaseService.findAll()` has no order clause. Seeding `id = level + 1` makes PK order *coincidentally* right — which is exactly why relying on it is unsafe (chunk 1 §4) |
@@ -536,7 +548,9 @@ Each PR description follows `cognitive-doc-design` review-empathy: what to read 
 
 | Date | Change |
 | --- | --- |
+| 2026-08-20 | **FAIL-1 remediation + DD-3 amended.** `/akili-validate` found the T-10 authorization defect had a **second, un-gated variant** — same-result cross-role, needing no knowledge of another result and therefore likelier than the quarantined one — which falsified **R-IUA-009 AC.1/AC.2/AC.4 and R-IUA-007 AC.4**, all four recorded as PROVEN. User ruled **option A**. `assertInnovationUseOwnership` added to both `customSaveInnovationUse` paths, scoped by `(result_id, role)`; §4 gained two error rows; the two `it.failing` quarantine markers **inverted to passing**. **DD-3 gained its first recorded exception** (the gate runs inside the transaction and holds by rollback — reviewed and ruled better than hoisting an authorization rule into the orchestrator), §5.1's preamble was corrected from a now-false "without relying on rollback", and steps **7a/8a** were added because the gate was live in code before it was listed in the step order. **`customSaveInnovationDev` deliberately retains the defect** — a different surface with unspecified ACs and live data; the platform exposure is now **asymmetric** and needs its own ticket |
 | 2026-08-19 | Created. Reversion challenge run on DD-12 → design narrowed (§11.1). **`requirements.md` R-IUA-003 AC.5 corrected `403` → `400`** to match `ResultStatusGuard`'s actual `BadRequestException`; swept forward across both documents in the same edit |
 | 2026-08-19 | **DD-14 added** — the PATCH `undefined`/`null` contract, previously unwritten. T-06 attempt 1's review (Lens C) found that payload-only validation plus partial-merge writes let an accepted request persist a level ≥ 6 row with no justification. User ruled: validate the **effective post-write row**. §5.1 steps 3–4 amended; **`requirements.md` R-IUA-006 AC.5 narrowed** to apply only when no level is stored either; swept across both documents in the same edit |
 | 2026-08-19 | T-01 attempt 1 Pivot resolved (T-01 attempt 2): `@ApiOperation` exempted on handlers inherited unchanged from `BaseController` — no override on the catalog controller (**DD-13**). §4's catalog entry corrected; `requirements.md` R-IUA-013 AC.3 and §5.3, and `tasks.md` T-01's Implementation notes and T-13's done criterion, amended to match; swept forward across all three documents in the same edit |
 | 2026-08-19 | **T-07 attempt 1 Pivot — DD-15 and DD-16 added.** Both lens Reviewers FAILed; Lens A found `ResultInnovationUseModule` absent from `entities.module.ts`, and the Leader's KZ-005 two-direction sweep found the **same defect already shipped in T-01** (`ClarisaInnovationUseLevelsModule` absent from `clarisa.module.ts`), which was closed `[x]` with four endpoints returning `404`. Root cause was in this document: **§2.1's composition table enumerated the two route files and omitted the two module-graph files**, so no Implementer had a file to touch and no Reviewer had a criterion to check. §2.1 gained both rows and its stale catalog-import claim was corrected; **`requirements.md` R-IUA-013 AC.5 was corrected** — its original wording named only the route files and is what the defect came through; `tasks.md` gained **trap 4**, T-01 was **reopened `[~]`**, and T-07's *Files touched* and Done criteria were amended. **DD-16** rules R-IUA-002 AC.7 (`401`) discharged at T-07 by the `JwtMiddleware` exclude-list assertion, with the residual stated. Swept two-directionally across all four documents in the same edit |
+| 2026-08-20 | **FAIL-1 remediation (`validation-report.md`).** §4's PATCH error table gained a new `400` row: a caller-supplied `result_actors_id` / `result_institution_type_id` is honoured only when it names a row already scoped to BOTH the calling `result_id` AND the calling role — otherwise the whole save is rejected, never silently ignored or overwritten. Implemented as a new `assertInnovationUseOwnership` method on each of `ResultActorsService` and `ResultInstitutionTypesService`, called only from their `customSaveInnovationUse`, deliberately **not** touching the helpers `buildUpdateData`/`processInstitution` shared with `customSaveInnovationDev`. Closes both the cross-result variant (T-10's `it.failing` quarantine, now un-quarantined and passing) and the cross-role variant (found un-gated at `/akili-validate`, now covered by a new fixture case). `customSaveInnovationDev` is unmodified and its existing specs pass unmodified — see this task's report for the regression evidence |

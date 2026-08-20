@@ -267,7 +267,7 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 - [ ] AC.4 — The response `data` reflects the post-save state, not the request body.
 - [ ] AC.5 — A save on a result whose status forbids editing is rejected by `ResultStatusGuard` with `400` and changes nothing. *(Corrected 2026-08-19 from `403`: the guard throws `BadRequestException`. Changing the guard would alter every result-mutation endpoint in the platform and is out of scope — `design.md` §4.)*
 - [ ] AC.6 — Audit columns are written from `request.user` on both inserted and updated rows.
-- [ ] AC.7 — `results.last_updated_date` (via `UpdateDataUtil`) advances on a successful save.
+- [ ] AC.7 — `results.updated_at` (via `UpdateDataUtil`) advances on a successful save. *(**column name corrected 2026-08-20 at `/akili-validate`.** The AC named `results.last_updated_date`, which **does not exist** — `AuditableEntity` declares only `@UpdateDateColumn name: 'updated_at'`, and `UpdateDataUtil.updateLastUpdatedDate` writes only `updated_by`. F-A had **silently re-mapped** the requirement to `updated_at` in the test rather than flagging it, which is why 24 review rounds never surfaced it. Product-observable residual, separately recorded: `updated_at` advances only at **second** granularity, because TypeORM emits a bare `CURRENT_TIMESTAMP` against a `timestamp(6)` column.)*
 
 #### Scenario: A partial failure leaves nothing behind
 
