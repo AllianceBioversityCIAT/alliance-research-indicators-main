@@ -604,3 +604,89 @@ Two consequences:
 
 - **The boundary of what the double proves.** `where` remains a plain stub, so the mock does not simulate the `IN (:...ids)` filter; the shape assertion covers the clause and its ids instead. The double proves the `is_active` semantics and **not** the IN-list semantics — that is the honest description of it.
 - **One spot where the double is more permissive than reality:** the mock filters `r.is_active !== false`, keeping `undefined`, whereas SQL `is_active = true` drops NULL. Unreachable — the column is `NOT NULL DEFAULT true` and the row helper always sets it. Recorded only because the Leader asked precisely where mock and reality can diverge.
+
+### T-04 — Coverage computation — **PASS (attempt 1)**
+
+- **Date:** 2026-08-20 · **Effort:** `medium` · **Requirements:** R-CAM-004 AC.1–AC.3 + its `BUT it must NOT`
+- **Files:** `automapper.service.ts` (+`AutomapperCoverage`, `coverage()`), `automapper.service.spec.ts` (7 new tests)
+- **Reviewer verdict:** `STATUS: PASS`, attempt 1. **No review round consumed.**
+
+**Shape:** `{ mapped, pending, reachable }`. `reachable` = `listBilateralProjects({ phase }).length` — the
+character-identical call `resolve()` makes, no local filtering (AC.1). `mapped` = active
+`bilateral_project_mapping` rows keyed on `clarisa_project_id IN (cohort ids)`, deduped via
+`new Set(...).size`. `pending = reachable − mapped`, never queried.
+
+**Placement** on `AutomapperService` rather than a sibling was ruled sound: a sibling would need the
+identical two dependencies and would restate the cohort-call contract in a second place — the K-005 /
+KZ-013 shape this spec exists to avoid.
+
+#### The Leader's central question — answered, and the Leader's argument refuted again
+
+The Leader asked whether project-keyed `mapped` was **forced by AC.2** (`mapped + pending = reachable`).
+**It is not.** Because `pending = reachable − mapped`, the invariant is an **arithmetic tautology** and
+holds under any keying — contract-keyed would satisfy AC.2 exactly and merely drive `pending` negative.
+AC.2 cannot discriminate the two readings.
+
+**The argument that does hold is better, and it is R-CAM-003's `divergent` case.** An eligible 2026 project
+whose derived contract already carries an active `MANUAL` row pointing at project 22: contract-keyed calls
+it *mapped*. It is not — the row points elsewhere and R-CAM-003 requires a human to adjudicate it. It is
+unambiguously outstanding work. **Contract-keyed would understate `pending` at exactly the point the spec
+says work remains.** Two lines make the keying structurally sound rather than conventional: the
+`IN (:...ids)` cohort scope and the `Set` dedupe together guarantee `mapped ≤ reachable`, hence
+`pending ≥ 0`. **The keying protects the invariant's *soundness*, not its arithmetic** — the correct
+version of the Leader's claim.
+
+*(Third time this run a Leader argument reasoned from the design's own frame was wrong and the Reviewer
+substituted a better one. The pattern is consistent enough to be the run's main Kaizen candidate.)*
+
+#### The `4 / 198` question — not stale, already governed by D-7
+
+R-CAM-004's scenario and design §6.1's mockup say `4 / 198`; §4.4's measured data yields **1**. The Leader
+suspected a stale figure needing correction. **It does not:** §7 **D-7** already states *"the spec's
+numbers are a baseline for tests, never a runtime expectation."* The scenario is a **conditional** —
+*GIVEN 4 are mapped … THEN coverage reads 4 / 198* — and the code satisfies it exactly when fed such a
+cohort. No contradiction exists to resolve.
+
+The "count rows instead of projects" reading also fails: §4.4 names 4 out-of-phase ids plus 1 in-phase = **5**
+rows, while R-CAM-003 AC.2 names only **3** as divergent. No reading of the measured data produces "4
+mapped in the current phase". The figure is illustrative, full stop.
+
+**Action taken — annotation, not correction, and no round consumed.** Both `requirements.md` R-CAM-004 and
+`design.md` §6.1 now carry a note that the figures are illustrative per D-7 and that the live strip will
+read ≈ `1 / 198`. Correcting the number would have been *worse*: the scenario is conditional and the code
+meets it. What was missing was not accuracy but a guard against someone filing a bug against sound code.
+
+**Tests do not encode the stale 4:** `buildFullCohort(198)` generates synthetic ids 2001–2198 with
+synthetic codes, zero contact with live ids 22/25/138/246/1516, and the file header labels the 198 as
+synthetic. D-7 compliant.
+
+#### Falsifiers — all observed, none predicted
+
+| # | Mutation | Observed |
+| --- | --- | --- |
+| F1 | `pending = 3348 − mapped` | invariant red: `Expected: 198, Received: 3348` |
+| F2 | cohort call replaced by a hardcoded `[]` | 3 red, incl. the delegation assertion at **0 calls** |
+| F3 | added a 4th key `unpairedContracts: 1377` | the "exactly three keys" test reds on the `Object.keys` diff |
+
+#### The advisory that was acted on — the fourth instance of one blind spot
+
+The Reviewer found that `where('bpm.clarisa_project_id IN (:...ids)')` — **the very clause the keying
+question turns on** — was unfalsifiable: `makeMappingQb`'s `where` is a pure pass-through, there was no
+argument-shape corroboration either, and deleting the clause left all five tests green while live
+behaviour changed to counting every active mapping, including out-of-cohort rows.
+
+It was filed as **advisory, not a gate**, on substantive grounds (production correct; no AC or done-check
+item covers cohort scoping; D-4's *named* failing input is covered and was observed as F1) — with the
+budget noted only as a secondary consideration. **The Leader closed it anyway**, because this is the
+**fourth** instance of the same shape in one spec: T-02's AGRESSO `is_active`, T-03's mapping `is_active`,
+T-03's no-op `andWhere` stub, and now this.
+
+The Implementer closed it better than asked: **both** a shape assertion and a *behavioural* test using a
+hand-rolled query builder that actually filters — and deliberately **did not** touch the shared
+`makeMappingQb` helper, to avoid changing the scaffold underneath T-02's and T-03's already-passed
+fixtures. Observed RED on both, with the behavioural failure showing exactly the predicted mode:
+
+    mapped: 1 → 2   ·   pending: 0 → -1
+
+**Leader's measurement (quiet window):** `npm test -- --silent` → **330 suites / 2386 tests green**;
+`npm run build` → **exit 0**.

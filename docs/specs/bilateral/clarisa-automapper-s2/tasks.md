@@ -220,7 +220,7 @@ npx eslint <files>
 - **Dependencies:** T-02
 - **Files:** `…/automapper.service.ts` or a sibling, + spec
 - **Skills:** `nestjs-expert`, `api-design-principles`
-- **Effort:** S · **Status:** todo
+- **Effort:** S → run at `medium` · **Status:** ✅ **done** — Reviewer `STATUS: PASS` on attempt 1 (see `execution.md`)
 
 **Scope.** Return `mapped`, `pending`, `reachable`. `reachable` = the eligible-project count from the **shipped** predicates.
 
@@ -232,10 +232,12 @@ npx eslint <files>
 **What disqualifies this evidence.** Asserting the three numbers individually against a fixture does **not** prove the denominator is right — three hard-coded values agree with themselves. **The invariant is the gate**, and it must be asserted as an invariant.
 
 **Done check.**
-- [ ] `mapped + pending = reachable` asserted as an invariant, not as three constants
-- [ ] `reachable` derives from the shipped predicates
-- [ ] No contract count appears in any returned figure
-- [ ] Zero-cohort case returns `reachable: 0` without dividing
+- [x] `mapped + pending = reachable` asserted as an invariant (the three constants sit *after* it as corroboration, never as the gate) — F1 observed reddening it. **Note:** the invariant is an arithmetic tautology given `pending = reachable − mapped`; what makes it *sound* is the cohort-scoped, deduped `mapped`, which guarantees `mapped ≤ reachable`
+- [x] `reachable` derives from the shipped predicates — the call is character-identical to `resolve()`'s, with no local filtering between it and the count
+- [x] No contract count in any returned figure, and no fourth figure exists (DD-6) — F3 observed. `AgressoContract` is never reached from `coverage()`
+- [x] **The cohort-scoping `IN (:...ids)` clause is falsifiable** — shape *and* behavioural assertions; deleting the clause drives `pending` to `-1`. Fourth instance of this blind-spot class in the spec, closed rather than recorded
+- [x] Zero-cohort returns `reachable: 0` before any query — the test additionally asserts the mapping table is **never queried**, stronger than the done-check asked
+- [x] Full server suite **330 suites / 2386 tests green**; `npm run build` **exit 0** (Leader, quiet window)
 
 ---
 
@@ -386,7 +388,8 @@ Clause-level. Each row quotes the clause it claims.
 | RB-6 | 2026-08-19 | The 5-minute CLARISA cache makes a fresh run read stale projects (**K-016**) | The run report states the feed fetch timestamp | open |
 | RB-7 | 2026-08-20 | **Concurrent applies are not serialized.** The step-6 classification SELECT takes no lock, while the sibling `BilateralProjectMappingService.create()` deliberately takes `setLock('pessimistic_write')`. Two concurrent applies — or an apply racing an admin create — can both classify a contract `toCreate`; `uk_bpm_active_agreement` then rejects the second insert with a raw 1062 and **rolls back the entire bulk apply** (a 500 envelope, where the sibling returns a clean 409) | **No data corruption** — the unique index is the backstop — and R-CAM-002's *"running twice in a row"* is sequential and proven. Accepted for v1; the matcher is admin-triggered, not scheduled (R-CAM-002 forbids a cron), so concurrent runs require two admins acting simultaneously | open — accepted |
 | RB-8 | 2026-08-20 | **Apply re-resolves rather than replaying the preview.** T-05's apply endpoint must derive `resolved` server-side (otherwise a caller could POST arbitrary pairs and bypass R-CAM-001), so under the 5-minute CLARISA cache the applied set can differ from the previewed one | The correct trade — a stale preview must never be able to write. **T-06's UI must not promise "apply exactly what you saw"**; it states the feed timestamp instead (RB-6) | open — binds T-05 and T-06 |
-
+| RB-9 | 2026-08-20 | **The coverage strip can be up to 5 minutes stale with nothing on screen saying so.** `coverage()` inherits `ClarisaProjectsService`'s 5-minute cache exactly as `resolve()` does. Design §7 requires the *run report* to carry a fetch timestamp; §6.1's strip has no freshness indicator and `AutomapperCoverage` carries no timestamp field. An admin who applies a run and immediately reloads may see a pre-apply `reachable` | **K-016 is explicit that a UI must never imply a save took effect immediately.** Decide at T-06 while the DTO is still one field wide: either add a `measuredAt` to the coverage shape and print it, or state the cache window on the strip | open — binds T-06 |
+| RB-10 | 2026-08-20 | **Unbounded `IN` list, now at three occurrences** (T-02 AGRESSO lookup, T-03 mapping read, T-04 coverage read). Recorded as one row rather than three isolated advisories so the recurrence is visible | Fine at 198 ids. The cohort denominator moved 299 → 377 → 911 in five days (RB-2); at a few thousand this risks `max_allowed_packet` and a planner regression. Chunking is ~6 lines **per site** — if it is ever done it should be one shared helper, not three copies (K-005) | open — accepted |
 ---
 
 ## 6. Done definition

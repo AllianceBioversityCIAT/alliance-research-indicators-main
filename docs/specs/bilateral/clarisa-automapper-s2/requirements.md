@@ -202,6 +202,17 @@ The one mapping created against the current feed — `D514 → 1516` — is **ex
 - **BUT it must NOT** present coverage against the AGRESSO contract total. `4 / 3348` and `4 / 1545` are both true and both misleading: the 1377 `BLR` contracts without a counterpart are **not** pending work
 - **AND IT MUST** state the denominator on screen, so the number cannot be quoted without it
 
+> **The figures in this scenario are illustrative, per D-7 — annotated 2026-08-20 during T-04 review.**
+> §7 D-7 already governs them: *"the spec's numbers are a baseline for tests, never a runtime
+> expectation."* The scenario is a **conditional** — *GIVEN 4 are mapped … THEN coverage reads 4 / 198* —
+> and the shipped code satisfies it exactly when fed such a cohort.
+> **But against §4.4's measured 2026-08-19 feed the live strip will read ≈ `1 / 198`, not `4 / 198`**,
+> because only `D514 → 1516` points into the 2026 cohort; ids 22, 25, 138 and 246 predate the phase and
+> are therefore outside the denominator. No reading of the measured data yields "4 mapped in the current
+> phase" — counting rows gives 5, and R-CAM-003 AC.2 names only 3 as divergent. **This is correct
+> behaviour, not a defect.** Recorded here so the first person to open the screen does not file a bug
+> against sound code.
+
 **Acceptance criteria:**
 - [ ] AC.1 — The reachable figure equals the eligible-project count, computed with the **shipped** predicates and not a reimplementation.
 - [ ] AC.2 — mapped + pending = reachable, asserted as an invariant.

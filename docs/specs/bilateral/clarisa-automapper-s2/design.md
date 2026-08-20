@@ -125,6 +125,10 @@ Sits above the existing table on Bilateral Mapping. **Three cards, all actionabl
         Coverage 4 / 198 · 2%   (eligible CLARISA projects, phase 2026)
 ```
 
+> **The `4 / 198` in the mockup above is illustrative, not a prediction** (D-7; annotated 2026-08-20).
+> Against the measured 2026-08-19 feed the live strip reads ≈ `1 / 198` — only `D514 → 1516` is in the
+> 2026 cohort. See the note under `requirements.md` R-CAM-004.
+
 **The denominator is printed on screen**, so the figure cannot be quoted without it (R-CAM-004). The 1377 unpaired `BLR` contracts do not appear at all — they are not pending work, and a fourth grey card would invite exactly the misreading the requirement forbids.
 
 States: loading (skeleton, no zeros — a flashed `0` reads as "nothing to do"), error (the strip reports unavailability and the table still renders), empty (reachable `0` → the strip explains the feed has no eligible projects rather than showing `0/0`).

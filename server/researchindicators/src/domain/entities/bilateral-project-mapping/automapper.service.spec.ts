@@ -416,6 +416,155 @@ describe('AutomapperService', () => {
   });
 
   // ---------------------------------------------------------------------
+  // T-04 — coverage() = design §4 GET .../coverage, R-CAM-004.
+  // ---------------------------------------------------------------------
+  describe('R-CAM-004 — coverage()', () => {
+    it('AC.1/AC.2 — mapped + pending = reachable, asserted as an invariant (not three constants)', async () => {
+      const cohort = buildFullCohort(198); // ids 2001..2198
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      // 4 of the 198 eligible projects already carry an active mapping row.
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({ id: 1, clarisa_project_id: 2001, is_active: true }),
+          mappingRow({ id: 2, clarisa_project_id: 2002, is_active: true }),
+          mappingRow({ id: 3, clarisa_project_id: 2003, is_active: true }),
+          mappingRow({ id: 4, clarisa_project_id: 2004, is_active: true }),
+        ]),
+      );
+
+      const result = await service.coverage(2026);
+
+      // THE GATE — this must hold no matter how mapped/pending were computed.
+      expect(result.mapped + result.pending).toBe(result.reachable);
+      expect(result).toEqual({ mapped: 4, pending: 194, reachable: 198 });
+    });
+
+    it('scopes the mapped-row read to the cohort ids — the IN-list clause that guarantees mapped <= reachable', async () => {
+      // Argument-shape corroboration, mirroring the T-03 pattern (KZ-001
+      // recurrence 8: makeMappingQb's `where` is a pure no-op pass-through,
+      // so THIS assertion — not the fixture's returned rows — is what
+      // catches the IN-list clause being dropped.
+      const cohort = buildFullCohort(3); // ids 2001, 2002, 2003
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      const qb = makeMappingQb([]);
+      mockMappingRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.coverage();
+
+      expect(qb.where).toHaveBeenCalledWith(
+        'bpm.clarisa_project_id IN (:...ids)',
+        { ids: [2001, 2002, 2003] },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith('bpm.is_active = :isActive', {
+        isActive: true,
+      });
+    });
+
+    it('does NOT count an active mapping row for a project outside the cohort (IN-list scoping, behavioural)', async () => {
+      // makeMappingQb's `where` never filters (it is a pure pass-through —
+      // see its definition above), so it cannot expose the IN-list clause
+      // being dropped. This test uses a hand-rolled queryBuilder that DOES
+      // apply the clause, so deleting `.where('bpm.clarisa_project_id IN
+      // (:...ids)', ...)` in production stops filtering row id 51 out,
+      // mapped grows from 1 to 2, and the assertion below reds.
+      const cohort = [project({ id: 5001, external_code: 'C-Q1' })]; // reachable = 1
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+
+      const rows = [
+        mappingRow({ id: 50, clarisa_project_id: 5001, is_active: true }), // in cohort
+        mappingRow({ id: 51, clarisa_project_id: 22, is_active: true }), // OUT of cohort — must not count
+      ];
+      let filtered = rows;
+      const qb: Record<string, jest.Mock> = {};
+      qb.where = jest.fn((clause: string, params?: { ids?: number[] }) => {
+        if (clause === 'bpm.clarisa_project_id IN (:...ids)' && params?.ids) {
+          const idSet = new Set(params.ids);
+          filtered = filtered.filter((r) => idSet.has(r.clarisa_project_id));
+        }
+        return qb;
+      });
+      qb.andWhere = jest.fn(
+        (clause: string, params?: { isActive?: boolean }) => {
+          if (
+            clause === 'bpm.is_active = :isActive' &&
+            params?.isActive === true
+          ) {
+            filtered = filtered.filter((r) => r.is_active !== false);
+          }
+          return qb;
+        },
+      );
+      qb.getMany = jest.fn(async () => filtered);
+      mockMappingRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 1, pending: 0, reachable: 1 });
+    });
+
+    it('AC.1 — reachable derives from listBilateralProjects (the shipped predicates), passing phase through', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([]);
+
+      await service.coverage(2026);
+
+      expect(
+        mockClarisaProjectsService.listBilateralProjects,
+      ).toHaveBeenCalledWith({ phase: 2026 });
+    });
+
+    it('zero-cohort — reachable 0 returned without dividing, mapping table never queried', async () => {
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([]);
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 0, pending: 0, reachable: 0 });
+      expect(result.mapped + result.pending).toBe(result.reachable);
+      expect(mockMappingRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
+    it('mapped excludes an inactive row for an otherwise-eligible project (is_active gate)', async () => {
+      const cohort = [project({ id: 3001, external_code: 'C-Z1' })];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({ id: 9, clarisa_project_id: 3001, is_active: false }),
+        ]),
+      );
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+    });
+
+    it('AC.3/DD-6 — no figure is derived from the AGRESSO contract table, and no fourth figure exists', async () => {
+      const cohort = buildFullCohort(5);
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb([]));
+
+      const result = await service.coverage();
+
+      expect(mockDataSource.getRepository).not.toHaveBeenCalledWith(
+        AgressoContract,
+      );
+      expect(Object.keys(result).sort()).toEqual([
+        'mapped',
+        'pending',
+        'reachable',
+      ]);
+    });
+  });
+
+  // ---------------------------------------------------------------------
   // T-03 — classify() = design §5 step 6. Preview only, never writes.
   // ---------------------------------------------------------------------
   describe('classify (step 6) — no existing row', () => {

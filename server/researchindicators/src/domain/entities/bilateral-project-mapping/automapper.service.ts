@@ -86,6 +86,17 @@ export interface AutomapperApplyResult {
   superseded: number;
 }
 
+// design.md §4 GET .../coverage, R-CAM-004. `reachable` is the eligible-
+// project count (the shipped predicates, same call resolve() makes);
+// `mapped` + `pending` partition it exactly — never a fourth figure, and
+// never a figure computed against the AGRESSO contract table (DD-6, the
+// requirement's own `BUT it must NOT`).
+export interface AutomapperCoverage {
+  mapped: number;
+  pending: number;
+  reachable: number;
+}
+
 @Injectable()
 export class AutomapperService {
   private readonly logger = new LoggerUtil({ name: AutomapperService.name });
@@ -275,6 +286,63 @@ export class AutomapperService {
 
       return result;
     });
+  }
+
+  /**
+   * design.md §4 GET .../coverage, R-CAM-004. Returns the dashboard's three
+   * figures — mapped, pending, reachable — never a fourth (DD-6).
+   *
+   * `reachable` MUST come from the exact same call resolve() makes
+   * (ClarisaProjectsService.listBilateralProjects) — this is R-CAM-004 AC.1
+   * and NFR-CAM-003's sibling rule: no local reimplementation of "which
+   * projects count" (K-005, KZ-013).
+   *
+   * `mapped` is a direct project-id lookup against bilateral_project_mapping
+   * — NOT resolve()/classify()'s derived-AGRESSO-contract-id round trip.
+   * Those answer "does this project's derived contract id already have an
+   * active mapping row"; coverage answers the simpler question the
+   * requirement actually asks — "is this eligible project already mapped" —
+   * which is R-CAM-004's own framing ("of which 4 are mapped").
+   *
+   * `pending` is ALWAYS `reachable - mapped`. It is never queried or derived
+   * from any contract-table count (R-CAM-004's `BUT it must NOT`; D-4) — the
+   * 1377 unpaired BLR contracts are not pending work and never enter this
+   * method at all.
+   *
+   * NOT BilateralMappingCoverageService.getCoverageReport() — that is S1's
+   * contract-first measurement instrument in this same folder, and it reports
+   * against the contract table, the denominator R-CAM-004 explicitly forbids.
+   * The two coexist; do not extend or call one from the other.
+   */
+  async coverage(phase?: number | string): Promise<AutomapperCoverage> {
+    const cohort = await this.clarisaProjectsService.listBilateralProjects({
+      phase,
+    });
+    const reachable = cohort.length;
+
+    // Zero-cohort case: nothing to query, nothing to divide.
+    if (reachable === 0) {
+      return { mapped: 0, pending: 0, reachable: 0 };
+    }
+
+    const cohortProjectIds = cohort.map((p) => p.id);
+    const mappedRows = await this.dataSource
+      .getRepository(BilateralProjectMapping)
+      .createQueryBuilder('bpm')
+      .where('bpm.clarisa_project_id IN (:...ids)', {
+        ids: cohortProjectIds,
+      })
+      .andWhere('bpm.is_active = :isActive', { isActive: true })
+      .getMany();
+
+    const mapped = new Set(mappedRows.map((r) => r.clarisa_project_id)).size;
+    const pending = reachable - mapped;
+
+    this.logger._log(
+      `coverage: reachable=${reachable}, mapped=${mapped}, pending=${pending}`,
+    );
+
+    return { mapped, pending, reachable };
   }
 
   /**
