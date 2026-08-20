@@ -389,11 +389,40 @@ describe('resolveDuplicateGroup — non-conflicts', () => {
 });
 
 describe('resolveDuplicateGroup — report-year scope (R-RES-006)', () => {
-  it('flags a cross-year group for review and deletes nothing', () => {
+  // R-CYD-001 AC.1 / R-CYD-002 — regression for the exemplar defect.
+  //
+  // Exemplar: PRMS official 7154 (result_id 23584, year 2023) and TIP official
+  // 27277 (result_id 29308, year 2022) share handle hdl.handle.net/10568/129634.
+  // Audit-log id 180 left both UNTOUCHED under the old flagCrossYear veto.
+  //
+  // CORRECTED behavior: same-identity cross-year groups resolve under Rules 1–3;
+  // `report_year_id` difference MUST NOT veto rule evaluation (R-CYD-001).
+  //
+  // RED before T-02: current code returns CROSS_YEAR_REVIEW because the
+  // flagCrossYear early-return fires first. Test fails as required (KZ-001 /
+  // R-CYD-002 AC.3 disqualifier clause: we DO pass flagCrossYear: true).
+  it('cross-year TIP+PRMS same-handle pair resolves under Rule 1 — TIP winner (R-CYD-001 AC.1 / R-CYD-002)', () => {
     expectPartition(
-      [row(1, TIP, KP, 2025), row(2, AICCRA, KP, 2024)],
+      [row(29308, TIP, KP, 2022), row(23584, PRMS, KP, 2023)],
       {
-        classification: DuplicateGroupClassification.CROSS_YEAR_REVIEW,
+        classification: DuplicateGroupClassification.RESOLVED,
+        winner: 29308,
+        losers: [23584],
+        untouched: [29308],
+        rule: DuplicateRule.RULE_1_TIP,
+      },
+      { flagCrossYear: true },
+    );
+  });
+
+  // R-CYD-001 AC.3 — same-platform rows spanning years are never auto-deleted
+  // regardless of the sweep option. The SAME_SYSTEM_IGNORED gate fires before any
+  // year logic and must remain intact after the flagCrossYear veto is removed.
+  it('same-platform rows spanning years are always SAME_SYSTEM_IGNORED (R-CYD-001 AC.3)', () => {
+    expectPartition(
+      [row(1, PRMS, KP, 2022), row(2, PRMS, KP, 2023)],
+      {
+        classification: DuplicateGroupClassification.SAME_SYSTEM_IGNORED,
         winner: null,
         losers: [],
         untouched: [1, 2],

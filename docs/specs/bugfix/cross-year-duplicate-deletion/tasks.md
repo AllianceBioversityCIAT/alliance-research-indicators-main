@@ -3,7 +3,7 @@
 - **Module:** results
 - **Spec id:** 2026-08-cross-year-duplicate-deletion
 - **Depth:** Lite · **Bug Mode**
-- **Status:** approved — not started (awaiting `/akili-execute`)
+- **Status:** in-progress (T-01 done; next T-02)
 - **Owner:** ARI server squad
 - **Linked requirements:** `./requirements.md`
 - **Linked design:** `./design.md` (DD-1, DD-2, DD-3; budget 2–3 tasks / ~80–150 LOC)
@@ -45,7 +45,7 @@ graph TD
 
 ### T-01 — Add failing regression for cross-year same-handle resolve
 
-- **Status:** todo
+- **Status:** [x] done
 - **Size:** S
 - **Dependencies:** none
 - **Requirements covered:** R-CYD-002 (all ACs); R-CYD-001 Scenario Exemplar + AC.3 negative shape
@@ -63,9 +63,9 @@ graph TD
   - **Disqualifier:** if the suite is green on unfixed code, the regression does not encode the bug — rewrite until it fails for the right reason.
   - **Fail input:** current util with `flagCrossYear: true` + two platforms + two years → must fail an assertion that expects `RESOLVED`.
 - **Done criteria:**
-  - [ ] Cross-year TIP+PRMS fixture exists and fails on HEAD of AC-1641 before T-02.
-  - [ ] Same-platform multi-year still expects `SAME_SYSTEM_IGNORED`.
-  - [ ] Failure output saved/cited in execution notes (or commit message body) as red-before proof.
+  - [x] Cross-year TIP+PRMS fixture exists and fails on HEAD of AC-1641 before T-02.
+  - [x] Same-platform multi-year still expects `SAME_SYSTEM_IGNORED`.
+  - [x] Failure output saved/cited in execution notes (or commit message body) as red-before proof.
 
 ---
 
