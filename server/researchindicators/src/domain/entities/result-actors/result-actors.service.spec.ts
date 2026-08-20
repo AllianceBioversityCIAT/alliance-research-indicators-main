@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource, EntityManager, IsNull } from 'typeorm';
 import { ResultActorsService } from './result-actors.service';
@@ -174,7 +175,14 @@ describe('ResultActorsService', () => {
     it('deactivates by the role-scoped predicate — the R-IUA-009 AC.4 falsifying input is removing actor_role_id from this object', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation (2026-08-20): `customSaveInnovationUse` now runs
+      // `assertInnovationUseOwnership` first, which calls `tempRepo.find(...)`
+      // to confirm a submitted `result_actors_id` belongs to this
+      // `(result_id, role)` before proceeding. Resolving a matching row here
+      // simulates ownership being confirmed, so the id-present branch below
+      // still executes as it did before the fix.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 50 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -249,7 +257,9 @@ describe('ResultActorsService', () => {
     it('aggregate mode (sex_age_disaggregation_not_apply === true) writes actors_count and nulls the four disaggregated columns, on the update-path', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 50 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -281,7 +291,9 @@ describe('ResultActorsService', () => {
     it('disaggregated mode (sex_age_disaggregation_not_apply falsy) writes the four counts and nulls actors_count, on the update-path', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 51 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -316,7 +328,9 @@ describe('ResultActorsService', () => {
     it('treats a truthy-but-not-true sex_age_disaggregation_not_apply (e.g. 1) as disaggregated, never as aggregate', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 52 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -344,7 +358,16 @@ describe('ResultActorsService', () => {
     it('keeps actor_type_custom_name only when actor_type_id is OTHER, nulling it otherwise, on the update-path', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      // Both rows below carry a `result_actors_id`, so both must resolve as
+      // owned.
+      const find = jest
+        .fn()
+        .mockResolvedValue([
+          { result_actors_id: 60 },
+          { result_actors_id: 61 },
+        ]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -388,7 +411,9 @@ describe('ResultActorsService', () => {
     it('populates audit fields via CurrentUserUtil on the update path (existing result_actors_id)', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 70 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -417,7 +442,9 @@ describe('ResultActorsService', () => {
     it('regression: an update-path row with NO sex_age_disaggregation_not_apply key writes the flag as false (never undefined), consistent with the disaggregated counts it also writes — a stale-TRUE flag from a prior aggregate save would otherwise survive untouched and desync from innovation_use_validation', async () => {
       const update = jest.fn().mockResolvedValue({});
       const save = jest.fn().mockResolvedValue([]);
-      const tempRepo = { findOne: jest.fn(), update, save };
+      // FAIL-1 remediation: ownership check — see comment on the first test.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 80 }]);
+      const tempRepo = { find, findOne: jest.fn(), update, save };
       const manager = {
         getRepository: jest.fn().mockReturnValue(tempRepo),
       } as unknown as EntityManager;
@@ -621,6 +648,125 @@ describe('ResultActorsService', () => {
           }),
         ]),
       );
+    });
+  });
+
+  // FAIL-1 remediation, attempt 2 (2026-08-20, `validation-report.md`).
+  // Attempt 1 shipped `assertInnovationUseOwnership` proven only at the
+  // fixture tier (needs a live MySQL container) — `npm test` alone never
+  // exercised its throw branch. These tests close that gap directly against
+  // this service, with no DB involved.
+  describe('customSaveInnovationUse — assertInnovationUseOwnership (FAIL-1 remediation, attempt 2)', () => {
+    it('rejects with BadRequestException carrying the design.md §4 error string, and persists nothing, when a submitted result_actors_id resolves to no owned row', async () => {
+      const find = jest.fn().mockResolvedValue([]);
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = { find, findOne: jest.fn(), update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row = {
+        result_actors_id: 999,
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 1,
+      } as InnovationUseActorDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(3, [row], manager);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_actors_id: unknown or unauthorized actor row — 999',
+      ]);
+      // "Persists nothing in this method" made falsifiable, not narrated.
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    // Mutation-survivor pair. Unlike the test above (find() resolves an
+    // unconditional value), `find` here re-implements real WHERE-clause
+    // semantics against ONE seeded row: a condition present in the query
+    // narrows the match; a condition ABSENT from the query (as it would be
+    // if a future edit deleted it from `assertInnovationUseOwnership`)
+    // matches unconditionally — mirroring how dropping a clause from a real
+    // SQL WHERE widens the result set instead of narrowing it. Each test
+    // seeds a row that fails exactly one of the two guard columns, so if
+    // that column's condition is ever removed from the query, the row
+    // wrongly resolves as owned, no exception is thrown, and
+    // `.rejects.toThrow(...)` below fails — turning the falsification-table
+    // finding in this task's report into something the suite re-proves.
+    const buildRealisticFindMock = (seededRow: {
+      result_actors_id: number;
+      result_id: number;
+      actor_role_id: ActorRolesEnum;
+    }) =>
+      jest.fn().mockImplementation(({ where }) => {
+        const resultIdOk =
+          !('result_id' in where) || where.result_id === seededRow.result_id;
+        const roleOk =
+          !('actor_role_id' in where) ||
+          where.actor_role_id === seededRow.actor_role_id;
+        return Promise.resolve(resultIdOk && roleOk ? [seededRow] : []);
+      });
+
+    it('mutation-survivor: a row belonging to a DIFFERENT result_id (correct role) is rejected — proves result_id is load-bearing in the ownership predicate', async () => {
+      const find = buildRealisticFindMock({
+        result_actors_id: 50,
+        result_id: 999,
+        actor_role_id: ActorRolesEnum.INNOVATION_USE,
+      });
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = { find, findOne: jest.fn(), update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row = {
+        result_actors_id: 50,
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 1,
+      } as InnovationUseActorDto;
+
+      await expect(
+        service.customSaveInnovationUse(3, [row], manager),
+      ).rejects.toThrow(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('mutation-survivor: a row belonging to the SAME result but a DIFFERENT role (Innovation Dev) is rejected — proves actor_role_id is load-bearing in the ownership predicate', async () => {
+      const find = buildRealisticFindMock({
+        result_actors_id: 51,
+        result_id: 3,
+        actor_role_id: ActorRolesEnum.INNOVATION_DEV,
+      });
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = { find, findOne: jest.fn(), update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row = {
+        result_actors_id: 51,
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 1,
+      } as InnovationUseActorDto;
+
+      await expect(
+        service.customSaveInnovationUse(3, [row], manager),
+      ).rejects.toThrow(BadRequestException);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
     });
   });
 });

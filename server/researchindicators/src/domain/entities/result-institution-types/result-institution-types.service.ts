@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultInstitutionType } from './entities/result-institution-type.entity';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
 import {
   CurrentUserUtil,
   SetAuditEnum,
@@ -165,6 +165,24 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
    * only on `InnovationUseOrganizationDto` (T-02) — `resolveOrganizationCount`
    * below is the single place that decides whether the column is written at
    * all, so an Innovation Dev row can never carry it.
+   *
+   * **FIXED 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`
+   * FAIL-1).** `buildUpdateData` (reached via `processInstitution`, below)
+   * used to build its save object straight from a caller-supplied
+   * `result_institution_type_id`, in both its branches, with no `result_id`
+   * and no ownership check — a plain PK-keyed UPDATE that could rewrite any
+   * `result_institution_types` row the caller named: another result's
+   * (cross-result, formerly quarantined under `it.failing` in
+   * `innovation-use-role-isolation.fixture-spec.ts`), or this same result's
+   * own Innovation Dev organization row (cross-role, un-gated until this
+   * fix). `buildUpdateData`/`processInstitution` are **shared** with
+   * `customSaveInnovationDev` and are deliberately left untouched — adding
+   * the check there would change Dev's behaviour as a side effect, which is
+   * out of scope for this fix. Instead, `assertInnovationUseOwnership` below
+   * is a NEW method, local to this call path only, that rejects the whole
+   * save with a `400` before `processInstitution` runs for any row, the
+   * moment a submitted id does not resolve to a row already scoped to BOTH
+   * the calling `result_id` AND `institution_type_role_id = INNOVATION_USE`.
    */
   async customSaveInnovationUse(
     resultId: number,
@@ -173,6 +191,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
   ) {
     const tempRepo = manager.getRepository(ResultInstitutionType);
     const uniqueData = this.removeDuplicates(data);
+    await this.assertInnovationUseOwnership(uniqueData, resultId, tempRepo);
     const dataToSave: Partial<ResultInstitutionType>[] = [];
 
     for (const institution of uniqueData) {
@@ -191,6 +210,63 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       InstitutionTypeRoleEnum.INNOVATION_USE,
     );
     return tempRepo.save(dataToSave);
+  }
+
+  /**
+   * Ownership guard for the Innovation Use save path (FAIL-1 remediation,
+   * 2026-08-20 — `docs/specs/innovation-use/details-api/validation-report.md`).
+   * Runs BEFORE `processInstitution` (and therefore `buildUpdateData`) is
+   * called for any row, and before `deactivateExistingRecords`/`save` below
+   * execute, so a rejected payload writes nothing in this method. A
+   * caller-supplied `result_institution_type_id` is honoured only when a row
+   * already exists scoped to BOTH the calling `result_id` AND
+   * `institution_type_role_id = INNOVATION_USE` — scoping by either alone is
+   * not enough (see the falsification table in this task's report):
+   * `result_id` alone would still let a same-result Innovation Dev
+   * organization row be rewritten (the cross-role variant), and role alone
+   * would still let a different result's Innovation Use organization row be
+   * rewritten (the cross-result variant). Deliberately implemented as a
+   * standalone method rather than inside `buildUpdateData`/`processInstitution`,
+   * which are **shared** with `customSaveInnovationDev` — editing those would
+   * change Dev's behaviour as a side effect, out of scope for this fix. Not
+   * called from `customSaveInnovationDev`, which is therefore unaffected.
+   */
+  private async assertInnovationUseOwnership(
+    data: InstitutionRow[],
+    resultId: number,
+    tempRepo: Repository<ResultInstitutionType>,
+  ): Promise<void> {
+    const idsPresent = data
+      .filter((institution) => institution?.result_institution_type_id)
+      .map((institution) => institution.result_institution_type_id);
+    if (idsPresent.length === 0) {
+      return;
+    }
+
+    const ownedRows = await tempRepo.find({
+      where: {
+        result_institution_type_id: In(idsPresent),
+        result_id: resultId,
+        institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_USE,
+      },
+    });
+    // `result_institution_type_id` is `@PrimaryGeneratedColumn({ type: 'bigint' })`
+    // (see `result-innovation-use.service.ts:210-216` on the same `bigint`
+    // hazard: the driver can hydrate it as either a JS `number` or a
+    // `string`, depending on `supportBigNumbers`/`bigNumberStrings`). Both
+    // sides are normalised to `String(...)` before the membership test so
+    // this check does not silently start rejecting every legitimate save the
+    // moment that driver configuration changes.
+    const ownedIds = new Set(
+      ownedRows.map((row) => String(row.result_institution_type_id)),
+    );
+    const unauthorized = idsPresent.filter((id) => !ownedIds.has(String(id)));
+
+    if (unauthorized.length > 0) {
+      throw new BadRequestException([
+        `result_institution_type_id: unknown or unauthorized organization row — ${unauthorized.join(', ')}`,
+      ]);
+    }
   }
 
   private async processInstitution(

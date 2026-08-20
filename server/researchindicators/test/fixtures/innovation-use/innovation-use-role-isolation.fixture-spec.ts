@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   createInnovationUseHarness,
@@ -36,7 +37,20 @@ import { QuantificationRolesEnum } from '../../../src/domain/entities/quantifica
  * being saved. **Shared with `customSaveInnovationDev`, so this is
  * pre-existing platform behaviour, not something this chunk introduced.**
  * This fixture's job is to gate it, honestly, in either direction — see
- * the second `it` below for the outcome actually observed.
+ * the second `it` below for the outcome actually observed, and see
+ * **FIXED, 2026-08-20** at the bottom of this header for the current state.
+ *
+ * **Two attack shapes, not one (added 2026-08-20 — FAIL-1 remediation,
+ * `docs/specs/innovation-use/details-api/validation-report.md`).** The
+ * `"save #2"` block below is the CROSS-RESULT shape: result 1's payload
+ * carries result 2's row ids. A THIRD block, `"save #3"`, exercises the
+ * CROSS-ROLE shape an independent auditor found un-gated: result 1's
+ * payload carries **result 1's own** Innovation *Dev* actor and
+ * organization row ids inside an Innovation Use save. It needs no
+ * knowledge of a second result, so it is the more likely of the two — and
+ * until this fix, nothing in this spec exercised it. `devActorId` /
+ * `devOrgId` previously appeared in this file **only inside assertions**;
+ * save #3 is the first place either is placed inside a payload.
  *
  * **Quantifications are structurally different, and immune to this
  * specific attack shape.** `ResultQuantificationsService.upsertByCompositeKeys`
@@ -111,33 +125,73 @@ import { QuantificationRolesEnum } from '../../../src/domain/entities/quantifica
  * other two (`result-institution-types.service.ts`'s
  * `deactivateExistingRecords`, and the quantification role scoping).
  *
- * **QUARANTINE, 2026-08-19 (T-10 Pivot Record, option B —
- * `docs/specs/innovation-use/details-api/execution.md` → *T-10* +
- * *Pivot Record*).** The two `it`s inside the `"save #2 — a payload for
+ * **FIXED, 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`
+ * FAIL-1; supersedes the 2026-08-19 T-10 Pivot Record quarantine below,
+ * kept for history).** The two `it`s inside the `"save #2 — a payload for
  * result 1 that submits result 2's row ids"` block that assert result 2's
- * ACTOR row and ORGANIZATION row are byte-identical are marked
- * `it.failing(...)`, not `it.skip(...)` and not deleted. **They fail
- * because the product has a confirmed defect, not because the test is
- * wrong.** Against real MySQL: result 2's `result_actors` row went
+ * ACTOR row and ORGANIZATION row are byte-identical are **no longer**
+ * `it.failing(...)` — they are plain `it`s again, and they pass because the
+ * product defect they gated is fixed.
+ *
+ * **The mechanism.** `ResultActorsService.customSaveInnovationUse` and
+ * `ResultInstitutionTypesService.customSaveInnovationUse` each now run a
+ * new `assertInnovationUseOwnership` check, first, before either method
+ * builds or writes anything: a caller-supplied `result_actors_id` /
+ * `result_institution_type_id` is honoured only when a row already exists
+ * scoped to BOTH the calling `result_id` AND the calling role
+ * (`actor_role_id` / `institution_type_role_id` = `INNOVATION_USE`).
+ * Neither half alone is sufficient — see this task's report for the
+ * falsification table proving both are load-bearing. An id that fails the
+ * check throws `BadRequestException` **before** `dataToSave.push(...)` for
+ * that row, inside the same `dataSource.transaction(...)` the write path
+ * already runs in (`result-innovation-use.service.ts`'s `update()`), so the
+ * thrown error rolls the whole transaction back — nothing from steps 6–10
+ * persists, matching design.md DD-3's "a failure persists nothing" even
+ * though this particular check cannot run before `BEGIN` (these two
+ * services only ever receive an already-open `manager`; moving the check
+ * earlier would require touching the orchestrating service, out of scope
+ * for this fix).
+ *
+ * **Save #2's shape changed as a direct consequence, and is now stronger
+ * evidence, not weaker.** Before the fix, result 1's save partially
+ * executed and silently corrupted result 2's actor/organization rows in
+ * place while the rest of the transaction committed. After the fix, the
+ * SAME payload is rejected in full — `ResultActorsService`'s ownership
+ * check fires on the first offending id (`useR2ActorId`, in `actors`) and
+ * throws before `ResultInstitutionTypesService.customSaveInnovationUse`
+ * (step 8) or the quantification upsert (step 9) ever run, so the entire
+ * save #2 transaction rolls back. `save #2`'s `beforeAll` now catches that
+ * rejection (`save2Error`) instead of letting it fail the block, and a new
+ * first `it` asserts the rejection itself — `BadRequestException`, `400`,
+ * `errors` naming `result_actors_id` and the unauthorized id. Every
+ * byte-identical assertion below (Dev's rows, the non-Innovation-Use
+ * quantification rows, result 2's quantification row, and now result 2's
+ * actor/organization rows) holds for the same reason: **nothing was
+ * written at all**, not because each collection was independently proven
+ * safe on a partially-committed save. `result_quantifications` remains the
+ * structurally-immune reference point (see above) even though, post-fix,
+ * this particular payload never reaches it.
+ *
+ * **`R-IUA-009 AC.3` is now satisfied by the product.** `R-IUA-009
+ * AC.1/AC.2/AC.4` and `R-IUA-007 AC.4`, retracted from PROVEN to FALSE at
+ * `/akili-validate` (`execution.md` → *RETRACTION*) because they held only
+ * for the deactivate predicates and the empty-array save, now hold for the
+ * id-present save path too — proven here for both the cross-result shape
+ * (save #2) and the cross-role shape (save #3, below).
+ *
+ * **Historical record — QUARANTINE, 2026-08-19 (T-10 Pivot Record, option
+ * B — `docs/specs/innovation-use/details-api/execution.md` → *T-10* +
+ * *Pivot Record*), kept for context, NOT current.** The two `it`s above
+ * were marked `it.failing(...)`, not `it.skip(...)` and not deleted,
+ * because they failed for a confirmed product defect rather than a test
+ * error: against real MySQL, result 2's `result_actors` row went
  * `actor_type_id` 900853 → 900854, `actors_count` 900882 → 900883, with
- * `result_id` unchanged (still result 2's) — result 1's save silently
- * rewrote it in place. Same shape for `result_institution_types`. Root
- * cause: a caller-supplied primary key reaching the save payload with no
- * `result_id` and no ownership check, in `result-actors.service.ts`'s
- * `result_actors_id`-present branch and `result-institution-types.service.ts`'s
- * `buildUpdateData`. It is **shared with `customSaveInnovationDev`** and is
- * therefore pre-existing platform behaviour, not something this spec
- * introduced. **R-IUA-009 AC.3 is NOT satisfied by the product** — the
- * requirement stands; the code does not meet it. `result_quantifications`
- * is structurally immune (see above) and is the contrast that shows the
- * generic `upsertByCompositeKeys` algorithm is safe while the two
- * hand-written branches are not. `it.failing` keeps both assertions
- * executing: the suite is green *because* they fail as expected, and if
- * the ownership check is ever added, both turn **RED** — signalling
- * "remove `.failing`, this quarantine is obsolete" rather than silently
- * passing forever. When the defect is fixed: remove `.failing` from both
- * and expect them to pass unmodified. See each `it`'s own comment below
- * for the per-assertion detail.
+ * `result_id` unchanged — result 1's save silently rewrote it in place.
+ * Same shape for `result_institution_types`. `it.failing` kept both
+ * assertions executing so the suite was green *because* they failed as
+ * documented, and so that fixing the ownership check would turn them
+ * **RED** — the signal that has now fired, and that is why `.failing` is
+ * gone.
  */
 describe('Innovation Use reconciliation never crosses a role or a result boundary (T-10, F-B)', () => {
   const uniqueSuffix = Date.now();
@@ -150,12 +204,14 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
   const actorTypeCodeUseR1 = 900_852; // result 1's Innovation Use actor row (deactivated by save #1)
   const actorTypeCodeUseR2 = 900_853; // result 2's Innovation Use actor row — the attack TARGET
   const actorTypeCodeAttack = 900_854; // the value save #2's payload tries to overwrite the target with
+  const actorTypeCodeCrossRoleAttack = 900_856; // save #3's attempted overwrite value (added 2026-08-20)
 
   // --- Private `clarisa_institution_types` codes (band 900_86x) ---
   const institutionTypeCodeDev = 900_861;
   const institutionTypeCodeUseR1 = 900_862;
   const institutionTypeCodeUseR2 = 900_863; // result 2's org row — attack TARGET
   const institutionTypeCodeAttack = 900_864;
+  const institutionTypeCodeCrossRoleAttack = 900_866; // save #3's attempted overwrite value (added 2026-08-20)
 
   // --- `result_quantifications` composite keys (band 900_87x). No FK, so
   // no private catalog row is needed for these — the sentinel values
@@ -276,6 +332,10 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       [actorTypeCodeUseR1, 'T-10 F-B actor type (result 1, Innovation Use)'],
       [actorTypeCodeUseR2, 'T-10 F-B actor type (result 2, attack TARGET)'],
       [actorTypeCodeAttack, 'T-10 F-B actor type (attacker-submitted value)'],
+      [
+        actorTypeCodeCrossRoleAttack,
+        'T-10 F-B actor type (save #3 cross-role attacker-submitted value)',
+      ],
     ] as [number, string][]) {
       const [existing] = await dataSource.query(
         `SELECT code FROM clarisa_actor_types WHERE code = ?`,
@@ -306,6 +366,10 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       [
         institutionTypeCodeAttack,
         'T-10 F-B institution type (attacker-submitted value)',
+      ],
+      [
+        institutionTypeCodeCrossRoleAttack,
+        'T-10 F-B institution type (save #3 cross-role attacker-submitted value)',
       ],
     ] as [number, string][]) {
       const [existing] = await dataSource.query(
@@ -705,57 +769,84 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
 
   /**
    * Save #2 — the attack. Each assertion below gets its OWN `it` rather
-   * than sharing one, deliberately: a `PRODUCT_BUG`-class finding must be
-   * observable in FULL (which of the three tables — Dev rows, the
-   * structurally-immune quantification, the actor row, the organization
-   * row — is actually affected), not truncated at whichever assertion a
-   * shared `it` happens to throw on first. The mutating save itself runs
-   * exactly ONCE, in `beforeAll`, satisfying the Scope's "save the section
-   * on result 1 TWICE" — never once per `it`.
+   * than sharing one, deliberately: a finding must be observable in FULL
+   * (which of the three tables — Dev rows, the structurally-immune
+   * quantification, the actor row, the organization row — is actually
+   * affected), not truncated at whichever assertion a shared `it` happens
+   * to throw on first. The mutating save itself runs exactly ONCE, in
+   * `beforeAll`, satisfying the Scope's "save the section on result 1
+   * TWICE" — never once per `it`.
+   *
+   * **FIXED 2026-08-20 — mechanism note.** Before the fix, this `beforeAll`
+   * could simply `await` the save: it partially succeeded (corrupting
+   * result 2's rows) while the rest of the transaction committed. After
+   * the fix, `ResultActorsService.assertInnovationUseOwnership` rejects the
+   * WHOLE payload the moment it sees `useR2ActorId` does not belong to
+   * `(result1Id, INNOVATION_USE)` — before organizations (step 8) or
+   * quantifications (step 9) ever run, and before any row in this
+   * transaction is written. The `beforeAll` below now catches that
+   * rejection into `save2Error` rather than letting it fail the block (a
+   * beforeAll rejection would otherwise fail every `it` in this describe,
+   * including the ones that were already passing), and the first `it`
+   * below asserts the rejection itself.
    */
   describe("save #2 — a payload for result 1 that submits result 2's row ids (R-IUA-009 AC.3 second half; the single most important falsifying input in the spec)", () => {
+    let save2Error: unknown;
+
     beforeAll(async () => {
       // The attack payload: result 1's second save carries result 2's
       // ACTOR and ORGANIZATION primary keys, with different sentinel
-      // values, in its OWN `actors`/`organizations` arrays. If
-      // `buildUpdateData`/the `result_actors_id`-present branch have no
-      // ownership check (the confirmed exposure at T-09's review),
-      // `tempRepo.save(...)` performs a plain PK-keyed UPDATE and
-      // overwrites result 2's row in place — its `result_id` column is
-      // simply never touched by either branch, so the row keeps pointing
-      // at result 2 while every other column becomes result 1's submitted
-      // values.
+      // values, in its OWN `actors`/`organizations` arrays. Caught rather
+      // than awaited bare — see the block comment above for why.
       //
       // The quantification item below ALSO carries result 2's row's `id`,
-      // paired with a brand-new composite key — `upsertByCompositeKeys`
-      // never reads `item.id` for matching (see file header), so this is
-      // expected to land as a NEW row for result 1, never touching result
-      // 2's row at all.
-      await harness.service.update(result1Id, {
-        actors: [
-          {
-            result_actors_id: useR2ActorId,
-            actor_type_id: actorTypeCodeAttack,
-            sex_age_disaggregation_not_apply: true,
-            actors_count: actorsCountAttackAttempt,
-          },
-        ],
-        organizations: [
-          {
-            result_institution_type_id: useR2OrgId,
-            institution_type_id: institutionTypeCodeAttack,
-            organization_count: orgCountAttackAttempt,
-          },
-        ],
-        quantifications: [
-          {
-            id: useR2QuantId,
-            quantification_number: quantNumberAttack,
-            unit: 'attacker-unit-T10FB',
-            description: 'attacker-description-T10FB',
-          },
-        ],
-      } as any);
+      // paired with a brand-new composite key. `upsertByCompositeKeys`
+      // never reads `item.id` for matching (see file header) and is
+      // structurally immune regardless — but post-fix this item is never
+      // even reached, because the actor check above rejects the payload
+      // first.
+      try {
+        await harness.service.update(result1Id, {
+          actors: [
+            {
+              result_actors_id: useR2ActorId,
+              actor_type_id: actorTypeCodeAttack,
+              sex_age_disaggregation_not_apply: true,
+              actors_count: actorsCountAttackAttempt,
+            },
+          ],
+          organizations: [
+            {
+              result_institution_type_id: useR2OrgId,
+              institution_type_id: institutionTypeCodeAttack,
+              organization_count: orgCountAttackAttempt,
+            },
+          ],
+          quantifications: [
+            {
+              id: useR2QuantId,
+              quantification_number: quantNumberAttack,
+              unit: 'attacker-unit-T10FB',
+              description: 'attacker-description-T10FB',
+            },
+          ],
+        } as any);
+      } catch (error) {
+        save2Error = error;
+      }
+    });
+
+    it('rejects the whole save with a 400 naming the unauthorized actor id, persisting nothing (FIXED 2026-08-20 — FAIL-1)', () => {
+      expect(save2Error).toBeInstanceOf(BadRequestException);
+      expect(
+        (
+          (save2Error as BadRequestException).getResponse() as {
+            message: string[];
+          }
+        ).message,
+      ).toEqual(
+        expect.arrayContaining([expect.stringContaining('result_actors_id')]),
+      );
     });
 
     it('leaves the Innovation Dev actor row byte-identical (a second save must not newly expose it either)', async () => {
@@ -783,99 +874,182 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       ).toEqual(devQuantRole2Before);
     });
 
-    it("leaves result 2's quantification row byte-identical — structurally immune, since upsertByCompositeKeys never reads a caller-supplied id", async () => {
+    it("leaves result 2's quantification row byte-identical — structurally immune, since upsertByCompositeKeys never reads a caller-supplied id (and, post-fix, is never even reached — see block comment above)", async () => {
       expect(
         await fetchRowByPk('result_quantifications', 'id', useR2QuantId),
       ).toEqual(r2QuantBefore);
     });
 
     /**
-     * QUARANTINED 2026-08-19 — T-10 Pivot Record, option B
-     * (`docs/specs/innovation-use/details-api/execution.md` → *T-10* +
-     * *Pivot Record*). `it.failing`, not `.skip`, and no assertion below is
-     * weakened.
+     * FIXED 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`
+     * FAIL-1). Formerly `it.failing` under the 2026-08-19 T-10 Pivot Record
+     * (option B) — history kept in the file header. Now a plain `it` that
+     * passes unmodified, per that quarantine's own stated exit condition
+     * ("when the defect is fixed: remove `.failing` and expect this test to
+     * pass unmodified").
      *
-     * **This fails because the product has a defect, not because the test
-     * is wrong.** Observed against real MySQL: result 2's `result_actors`
-     * row went `actor_type_id` 900853 → 900854, `actors_count` 900882 →
-     * 900883, with `result_id` UNCHANGED — still pointing at result 2.
-     * Result 1's save silently overwrote result 2's row in place.
+     * **Why it passes now.** `ResultActorsService.customSaveInnovationUse`
+     * runs `assertInnovationUseOwnership` first: `useR2ActorId` belongs to
+     * `(result2Id, INNOVATION_USE)`, not `(result1Id, INNOVATION_USE)`, so
+     * the check throws `BadRequestException` before `dataToSave.push(...)`
+     * ever runs for this row. The whole transaction rolls back, so result
+     * 2's actor row was never touched — this is the same row-level fact the
+     * previous comment described happening by luck of the previous test's
+     * write path; now it happens by design of the check.
      *
-     * **Root cause:** `result-actors.service.ts`'s `customSaveInnovationUse`,
-     * in its `result_actors_id`-present branch, builds the save payload
-     * from a caller-supplied primary key with no `result_id` and no
-     * ownership check anywhere in the method — `tempRepo.save(...)` then
-     * issues a plain PK-keyed UPDATE that cannot know, and never asks,
-     * whether that PK belongs to the result being saved.
+     * **Root cause, historical:** the `result_actors_id`-present branch used
+     * to build its save payload from a caller-supplied primary key with no
+     * `result_id` and no ownership check anywhere in the method —
+     * `tempRepo.save(...)` then issued a plain PK-keyed UPDATE that could
+     * not know, and never asked, whether that PK belonged to the result
+     * being saved.
      *
-     * **Shared with `customSaveInnovationDev`** — pre-existing platform
-     * behaviour, not something this spec introduced.
+     * **Shared with `customSaveInnovationDev`?** No — `assertInnovationUseOwnership`
+     * is a new method called only from `customSaveInnovationUse`.
+     * `customSaveInnovationDev` keeps its own, separate, unmodified
+     * id-present branch, and is unaffected by this fix (see the Innovation
+     * Dev regression evidence in this task's report).
      *
-     * **R-IUA-009 AC.3 is NOT satisfied by the product** — the requirement
-     * stands, the code does not meet it. Contrast with
-     * `result_quantifications`, which is structurally immune: the sibling
-     * `it` two below shows `upsertByCompositeKeys` ignoring the same
-     * caller-supplied `id` and landing the row as a new insert scoped to
-     * the calling result instead — the generic algorithm is safe, this
-     * hand-written one is not.
-     *
-     * **When the defect is fixed:** remove `.failing` and expect this test
-     * to pass unmodified.
+     * **`R-IUA-009 AC.3` is now satisfied by the product.**
      */
-    it.failing(
-      "leaves result 2's ACTOR row byte-identical — the load-bearing assertion. If customSaveInnovationUse's result_actors_id-present branch has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften",
-      async () => {
-        expect(
-          await fetchRowByPk('result_actors', 'result_actors_id', useR2ActorId),
-        ).toEqual(r2ActorBefore);
-      },
-    );
+    it("leaves result 2's ACTOR row byte-identical — the load-bearing assertion, now passing because the save is rejected outright rather than partially applied", async () => {
+      expect(
+        await fetchRowByPk('result_actors', 'result_actors_id', useR2ActorId),
+      ).toEqual(r2ActorBefore);
+    });
 
     /**
-     * QUARANTINED 2026-08-19 — T-10 Pivot Record, option B
-     * (`docs/specs/innovation-use/details-api/execution.md` → *T-10* +
-     * *Pivot Record*). `it.failing`, not `.skip`, and no assertion below is
-     * weakened.
+     * FIXED 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`
+     * FAIL-1). Formerly `it.failing` under the 2026-08-19 T-10 Pivot Record
+     * (option B) — history kept in the file header. Now a plain `it` that
+     * passes unmodified, per that quarantine's own stated exit condition.
      *
-     * **This fails because the product has a defect, not because the test
-     * is wrong.** Same shape as the ACTOR-row sibling above: result 2's
-     * `result_institution_types` row's `institution_type_id` and
-     * `organization_count` were overwritten by result 1's save (sentinels
-     * 900863/900892 → 900864/900893 in this fixture's seed), with
-     * `result_id` unchanged — still pointing at result 2.
+     * **Why it passes now.** In this run, `ResultActorsService`'s ownership
+     * check (above) already rejects the whole payload before
+     * `ResultInstitutionTypesService.customSaveInnovationUse` (step 8) ever
+     * executes, so this row was never reached at all in either save #2 or
+     * save #3 (both submit a bad actor id alongside the bad organization
+     * id, so the actors check always fires first). This file therefore does
+     * not carry a live passing test that reaches
+     * `ResultInstitutionTypesService.assertInnovationUseOwnership` on its
+     * own — that half of the fix is proven instead by the mandatory
+     * falsification table in this task's report (the "scope by role only,
+     * omitting `result_id`" and "scope by `result_id` only, omitting role"
+     * mutations, applied independently to each service and reverted).
      *
-     * **Root cause:** `result-institution-types.service.ts`'s
-     * `buildUpdateData` (reached from `processInstitution`'s
-     * `result_institution_type_id`-present check, both branches) builds the
-     * save payload from a caller-supplied primary key with no `result_id`
-     * and no ownership check anywhere in `customSaveInnovationUse` /
-     * `processInstitution`.
+     * **Root cause, historical:** `buildUpdateData` (reached from
+     * `processInstitution`'s `result_institution_type_id`-present check,
+     * both branches) used to build the save payload from a caller-supplied
+     * primary key with no `result_id` and no ownership check anywhere in
+     * `customSaveInnovationUse` / `processInstitution`.
      *
-     * **Shared with `customSaveInnovationDev`** — pre-existing platform
-     * behaviour, not something this spec introduced.
+     * **Shared with `customSaveInnovationDev`?** `buildUpdateData` and
+     * `processInstitution` ARE shared with `customSaveInnovationDev` (both
+     * call through them, parameterised by role) and were deliberately left
+     * unmodified — adding the check there would have changed Dev's
+     * behaviour as a side effect, out of scope for this fix. The check
+     * instead lives in a new method, `assertInnovationUseOwnership`, called
+     * only from `customSaveInnovationUse`.
      *
-     * **R-IUA-009 AC.3 is NOT satisfied by the product** — the requirement
-     * stands, the code does not meet it. Contrast with
-     * `result_quantifications` (the sibling `it` two above), which is
-     * structurally immune: `upsertByCompositeKeys` ignores the same
-     * caller-supplied `id` and lands the row as a new insert scoped to the
-     * calling result instead — the generic algorithm is safe, this
-     * hand-written one is not.
-     *
-     * **When the defect is fixed:** remove `.failing` and expect this test
-     * to pass unmodified.
+     * **`R-IUA-009 AC.3` is now satisfied by the product.**
      */
-    it.failing(
-      "leaves result 2's ORGANIZATION row byte-identical — the load-bearing assertion. If processInstitution's buildUpdateData has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften",
-      async () => {
-        expect(
-          await fetchRowByPk(
-            'result_institution_types',
-            'result_institution_type_id',
-            useR2OrgId,
-          ),
-        ).toEqual(r2OrgBefore);
-      },
-    );
+    it("leaves result 2's ORGANIZATION row byte-identical — the load-bearing assertion, now passing because the save is rejected outright rather than partially applied", async () => {
+      expect(
+        await fetchRowByPk(
+          'result_institution_types',
+          'result_institution_type_id',
+          useR2OrgId,
+        ),
+      ).toEqual(r2OrgBefore);
+    });
+  });
+
+  /**
+   * Save #3 — the CROSS-ROLE variant (added 2026-08-20, FAIL-1 remediation).
+   * `devActorId` / `devOrgId` are result 1's OWN Innovation Dev rows,
+   * seeded in this file's `beforeAll` and, until this save, referenced only
+   * inside assertions (`devActorBefore` / `devOrgBefore`) — never inside a
+   * payload. That gap is exactly what let an independent auditor find this
+   * variant un-gated after T-10 had already "proven" role isolation: F-B's
+   * attack payload carried only result 2's ids, so a same-result,
+   * cross-role attack was never attempted here.
+   *
+   * This variant needs no knowledge of a second result — only a client
+   * that ever places an Innovation Dev row id inside an Innovation Use
+   * payload — so it is the MORE LIKELY of the two shapes this file gates.
+   *
+   * **Why the attack values ARE seeded (unlike an earlier draft of this
+   * block).** `actorTypeCodeCrossRoleAttack` / `institutionTypeCodeCrossRoleAttack`
+   * are real, seeded `clarisa_actor_types`/`clarisa_institution_types` rows
+   * (declared with the file's other private codes, band 900_85x/900_86x),
+   * not placeholders. With the fix in place they are never written — the
+   * ownership check rejects both rows first — but the falsification
+   * exercise in this task's report temporarily reverts that check, and at
+   * that point this payload DOES reach `tempRepo.save(...)`. A placeholder,
+   * non-existent code would then fail on the `clarisa_actor_types` FK
+   * constraint instead of actually overwriting the Dev row — a
+   * `QueryFailedError` that would falsely look like protection. Seeding
+   * real codes makes the mutated-code run demonstrate the actual
+   * corruption, exactly like save #2's `actorTypeCodeAttack` already does.
+   */
+  describe("save #3 — a payload for result 1 that submits result 1's OWN Innovation Dev row ids (the cross-role variant; R-IUA-009 AC.1/AC.2/AC.4, R-IUA-007 AC.4)", () => {
+    const actorsCountCrossRoleAttempt = 900_885;
+    const orgCountCrossRoleAttempt = 900_895;
+
+    let save3Error: unknown;
+
+    beforeAll(async () => {
+      try {
+        await harness.service.update(result1Id, {
+          actors: [
+            {
+              result_actors_id: devActorId,
+              actor_type_id: actorTypeCodeCrossRoleAttack,
+              sex_age_disaggregation_not_apply: true,
+              actors_count: actorsCountCrossRoleAttempt,
+            },
+          ],
+          organizations: [
+            {
+              result_institution_type_id: devOrgId,
+              institution_type_id: institutionTypeCodeCrossRoleAttack,
+              organization_count: orgCountCrossRoleAttempt,
+            },
+          ],
+          quantifications: [],
+        } as any);
+      } catch (error) {
+        save3Error = error;
+      }
+    });
+
+    it('rejects the whole save with a 400 naming the unauthorized actor id, persisting nothing', () => {
+      expect(save3Error).toBeInstanceOf(BadRequestException);
+      expect(
+        (
+          (save3Error as BadRequestException).getResponse() as {
+            message: string[];
+          }
+        ).message,
+      ).toEqual(
+        expect.arrayContaining([expect.stringContaining('result_actors_id')]),
+      );
+    });
+
+    it("leaves result 1's own Innovation Dev ACTOR row byte-identical — the cross-role variant this file did not gate before this fix", async () => {
+      expect(
+        await fetchRowByPk('result_actors', 'result_actors_id', devActorId),
+      ).toEqual(devActorBefore);
+    });
+
+    it("leaves result 1's own Innovation Dev ORGANIZATION row byte-identical", async () => {
+      expect(
+        await fetchRowByPk(
+          'result_institution_types',
+          'result_institution_type_id',
+          devOrgId,
+        ),
+      ).toEqual(devOrgBefore);
+    });
   });
 });

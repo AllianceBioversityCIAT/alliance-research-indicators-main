@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { BaseServiceSimple } from '../../shared/global-dto/base-service';
 import { ResultActor } from './entities/result-actor.entity';
 import {
   DataSource,
   EntityManager,
   FindOptionsWhere,
+  In,
   IsNull,
   Repository,
 } from 'typeorm';
@@ -182,6 +183,25 @@ export class ResultActorsService extends BaseServiceSimple<
    * (R-IUA-009's highest-severity risk). The four legacy booleans
    * (`men_youth`, `men_not_youth`, `women_youth`, `women_not_youth`) are
    * never written here — Innovation Dev owns them exclusively.
+   *
+   * **FIXED 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`
+   * FAIL-1).** The id-present branch below used to push a save object built
+   * directly from `institution.result_actors_id` — a caller-supplied primary
+   * key, with no `result_id` in the predicate and no check that the row
+   * belongs to this result or this role. `tempRepo.save(...)` then performed
+   * a plain PK-keyed UPDATE that could rewrite ANY `result_actors` row the
+   * caller named: another result's Innovation Use row (the cross-result
+   * variant, formerly quarantined under `it.failing` in
+   * `innovation-use-role-isolation.fixture-spec.ts`), or this same result's
+   * own Innovation Dev row (the cross-role variant — un-gated until this
+   * fix, and the more likely one, since it needs no knowledge of another
+   * result). `assertInnovationUseOwnership` now runs first and rejects the
+   * whole save with a `400` the moment any submitted `result_actors_id`
+   * does not resolve to a row already scoped to `(result_id, actor_role_id
+   * = INNOVATION_USE)` — never silently ignoring the id and inserting, never
+   * silently overwriting. This method is NOT shared with
+   * `customSaveInnovationDev` (that method keeps its own, separate id-present
+   * branch above), so `customSaveInnovationDev` is untouched by this fix.
    */
   async customSaveInnovationUse(
     resultId: number,
@@ -189,6 +209,7 @@ export class ResultActorsService extends BaseServiceSimple<
     manager: EntityManager,
   ) {
     const tempRepo = manager.getRepository(ResultActor);
+    await this.assertInnovationUseOwnership(data, resultId, tempRepo);
     const dataToSave: Partial<ResultActor>[] = [];
     for (const institution of data) {
       // Derived once per row and fed to both the flag write below and
@@ -260,6 +281,60 @@ export class ResultActorsService extends BaseServiceSimple<
       { is_active: false },
     );
     return tempRepo.save(dataToSave);
+  }
+
+  /**
+   * Ownership guard for the Innovation Use save path (FAIL-1 remediation,
+   * 2026-08-20 — `docs/specs/innovation-use/details-api/validation-report.md`).
+   * Runs BEFORE the id-present branch above builds any save payload, and
+   * before the deactivating `update`/`save` below execute, so a rejected
+   * payload writes nothing in this method. A caller-supplied
+   * `result_actors_id` is honoured only when a row already exists scoped to
+   * BOTH the calling `result_id` AND `actor_role_id = INNOVATION_USE` —
+   * scoping by either alone is not enough (see the falsification table in
+   * this task's report): `result_id` alone would still let a same-result
+   * Innovation Dev row be rewritten (the cross-role variant), and role alone
+   * would still let a different result's Innovation Use row be rewritten
+   * (the cross-result variant). Local to this method only — NOT called from
+   * `customSaveInnovationDev`, which keeps its own unmodified id-present
+   * branch and is therefore unaffected by this fix.
+   */
+  private async assertInnovationUseOwnership(
+    data: InnovationUseActorDto[],
+    resultId: number,
+    tempRepo: Repository<ResultActor>,
+  ): Promise<void> {
+    const idsPresent = data
+      .filter((institution) => institution?.result_actors_id)
+      .map((institution) => institution.result_actors_id);
+    if (idsPresent.length === 0) {
+      return;
+    }
+
+    const ownedRows = await tempRepo.find({
+      where: {
+        result_actors_id: In(idsPresent),
+        result_id: resultId,
+        actor_role_id: ActorRolesEnum.INNOVATION_USE,
+      },
+    });
+    // `result_actors_id` is `@PrimaryGeneratedColumn({ type: 'bigint' })`
+    // (see `result-innovation-use.service.ts:210-216` on the same `bigint`
+    // hazard: the driver can hydrate it as either a JS `number` or a
+    // `string`, depending on `supportBigNumbers`/`bigNumberStrings`). Both
+    // sides are normalised to `String(...)` before the membership test so
+    // this check does not silently start rejecting every legitimate save the
+    // moment that driver configuration changes.
+    const ownedIds = new Set(
+      ownedRows.map((row) => String(row.result_actors_id)),
+    );
+    const unauthorized = idsPresent.filter((id) => !ownedIds.has(String(id)));
+
+    if (unauthorized.length > 0) {
+      throw new BadRequestException([
+        `result_actors_id: unknown or unauthorized actor row — ${unauthorized.join(', ')}`,
+      ]);
+    }
   }
 
   /**
