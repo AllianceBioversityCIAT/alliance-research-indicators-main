@@ -1354,3 +1354,31 @@ The chip artifact confirms what jsdom could not: the badge renders with the exis
 The clean alternative — repointing `ARI_CLARISA_HOST` at CLARISA **production**, which per the archived R-1 publishes no `external_code`, so every key would fail to resolve — was offered and **declined**: it means read traffic against another team's production API for a low-marginal-value screenshot. Recorded as an accepted gap rather than paid for at that price.
 
 **F-16 closed. DC-9 satisfied for the two new empty states and the chip; `stale` carried as the spec's one declared visual gap.**
+
+---
+
+### F-9 resolved — 2026-08-20, post-archive
+
+Provisioned the missing environment (MySQL 8 on `127.0.0.1:33107`, db `ari_t13`, `T13_MYSQL_PASSWORD` set) and ran `npm run test:integration`. It is no longer *unrunnable* — it runs:
+
+```
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 6 passed, 9 total
+```
+
+All three failures are the same error: `QueryFailedError: Table 'ari_t13.clarisa_levers' doesn't exist`.
+
+**Not attributable to this spec.** Evidence:
+
+| Check | Result |
+| --- | --- |
+| Did any of this spec's 13 commits touch `test/support/t13-schema.ts`? | **No** |
+| Did any touch lever / science-program entity files? | **No** |
+| Which tests fail? | The three **R-BIL-126** cases (`sp_role = NULL` legacy read-back) — a `primary-contributing-sp` feature, not this one |
+| Where does `clarisa_levers` come from? | Migrations only; the T13 builder deliberately constructs a **minimal** schema from six named migration classes plus a hand-written `results` stub, and never creates it |
+
+*Not run:* a pre-spec baseline at `a239dd9e`. The attribution rests on file provenance and on which feature the failing tests belong to, not on a re-run of the old tree.
+
+**The real finding:** `t13-schema.ts` builds only what the suite needed when it was written. A later spec added an entity relation reaching `clarisa_levers`, and nobody noticed, because `test:integration` is a **third** jest config that no habitual command runs — `npm test` is `rootDir: "src"`, `test:e2e` matches `.e2e-spec.ts$`. This is **KZ-017** in the wild, found by the lesson it produced. Fixing it belongs to whoever owns `primary-contributing-sp`, not to this spec.
+
+**F-9 status: closed as *runs, pre-existing failures unrelated to this spec*** — an improvement on *blocked, unverifiable*, and no longer a reason to hold the merge.

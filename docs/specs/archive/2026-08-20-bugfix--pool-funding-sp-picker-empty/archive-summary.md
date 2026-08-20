@@ -107,7 +107,7 @@ RC-A answers **OQ-5**, carried unanswered through `clarisa-automapper-s1` and `s
 
 | # | Item | Why accepted |
 | --- | --- | --- |
-| **F-9** | `npm run test:integration` unverified — needs `T13_MYSQL_PASSWORD` and a MySQL container on `127.0.0.1:33107` | The suite was already unrunnable in this environment before it was touched. Its **types** are verified (`tsc` spans `test/`); its behaviour is not. **Run before merging.** |
+| **F-9** | ~~unverified~~ **Resolved 2026-08-20 (post-archive):** the suite now runs — **6/9 pass**. The 3 failures are `Table 'ari_t13.clarisa_levers' doesn't exist`, in R-BIL-126 cases belonging to `primary-contributing-sp` | **Not attributable to this spec** — `t13-schema.ts` untouched by all 13 commits, no lever/SP entity file touched. A later spec added a relation the minimal schema builder never creates, unnoticed because `test:integration` is a third jest config no habitual command runs (**KZ-017**). Belongs to that spec's owner |
 | **F-15** | The backfill's `down()` nulls every non-null key, not only the rows `up()` set | A backfill cannot identify its own rows without a marker; the realistic revert path drops the column anyway |
 | **DC-9 / `stale`** | The `stale` state is verified by test, not by view | Producing it needs a key the feed cannot resolve, which the admin UI cannot express. The clean alternative — repointing at CLARISA **production** — was declined rather than send read traffic to another team's production API for one screenshot |
 | **OQ-1** | May a reporter *submit* an alignment built on `Pending` SPs, or should submit warn? | Product + PRMS. Visibility was settled (DEC-1); submission was not |
