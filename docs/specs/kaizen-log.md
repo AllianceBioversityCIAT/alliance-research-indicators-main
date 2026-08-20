@@ -17,15 +17,17 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **Critical** | **11** (+5 in one spec: two `is_active` guards, an `IN`-list scope, a feed timestamp that survived `return Date.now()`, and — one level up — a shared mock whose `andWhere` was a **no-op stub**, so a correctly-written test still could not redden) | Product | Proposed |
-| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note | **High** | 1 (3 false Leader arguments in one spec, one exactly backwards; 2 reached committed test descriptions) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **12** (+5 in one spec: two `is_active` guards, an `IN`-list scope, a feed timestamp that survived `return Date.now()`, and — one level up — a shared mock whose `andWhere` was a **no-op stub**; +1 in `pool-funding-sp-picker-empty`, a mock whose **model of the query language** differed from the language, hiding `A OR (B AND C)`) | Product | Proposed |
+| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note. **A red that would pass with the defect reintroduced is not evidence** | **High** | **2** (+5 in `pool-funding-sp-picker-empty`: an unrun comparison claimed verbatim; an assertion inverted against its own title; behavioural tests green with the defect restored; a mutated *assertion* offered as a code mutation; prose offered as screenshots) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
 | **KZ-015** | **A component fixture must arrange the TRANSITION the product performs, not the end state.** Setting an input before the first `detectChanges()` tests a state the product may never reach | **High** | 1 | Product + Methodology | **Applied** — `client/.../src/CLAUDE.md` (+ upstream owed) |
-| **KZ-016** | **A design document can contradict its own requirements and instruct what the code already forbids.** Cross-check §2 against every `AND IT MUST`/`BUT it must NOT` clause *and* against the constraints written into the modules it touches | Medium | 1 (2 occurrences in one spec) | Methodology + Product | **Applied** — `general-setup/design.md` §2 (+ upstream owed) |
+| **KZ-017** | **A verification must declare what it CANNOT reach.** K-014 governs a command's output; this governs its **scope**. A check narrower than its claim returns a confident green | **High** | 1 (**5 instances in one spec**, 2 of them the auditor's) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
 | **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
 | **KZ-012** | **The `numeric ⟺ STAR` invariant is assumed in three layers and validated in none**, and `platform_code` is `nullable: true` — a NULL renders bare-numeric and is classified STAR. Answer with `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` | Medium | 1 | Product | **Open — carries OQ-1 out of `archive/`** |
 | **KZ-013** | **Archiving a spec silently breaks every document that cites its path.** `/akili-archive` sweeps *forward* (factual claims in the root guides) but never *backward* — who pointed at the folder it just moved. Grep the spec path across `docs/` before the move | Medium | 1 | Product + Methodology | **Applied** — 6 dead references repointed (+ upstream owed) |
+
+> **Retired 2026-08-20** (to admit KZ-017): `KZ-016` — its rule lives in `docs/specs/general-setup/design.md` §2 and **held this cycle**: `pool-funding-sp-picker-empty`'s design carried the mandated cross-check against every `AND IT MUST`/`BUT it must NOT` clause and against the modules it touched (notably `AutomapperService`'s DI ban), and no design/requirements contradiction surfaced.
 
 ### Queued for upstream (Methodology — no local edit owed)
 
@@ -71,6 +73,44 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-20 — bugfix/pool-funding-sp-picker-empty
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 9 | tasks.md |
+| Reviewer FAIL rework attempts | **3** (T-02, T-06, T-08 — one each) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 1 (R-PSP-007 re-scoped: repair the fixture → delete the stub) | archive-summary.md §8 |
+| PRODUCT_BUGs | n/a — `/akili-test` not run; per-task adversarial audit substituted | archive-summary.md §5 |
+| Validation FAIL / WARN | n/a — `/akili-validate` not run; 16 auditor findings (F-1…F-16) raised and resolved | execution.md |
+| Budget | 9 tasks · ~700 LOC · **2** rework rounds budgeted vs **3** actual — overrun escalated, not absorbed | design.md §13 |
+| **Defects found by the test suite** | **0 of 3** — all three came from auditor mutation | execution.md |
+
+**Lessons**
+
+- **KZ-017 — A verification must declare what it cannot reach.** (Product + Methodology, High)
+  - Root cause: five separate checks were scoped narrower than the claim they backed, and each returned a confident green. Every one named *what* to look for and never *where it could not look*.
+  - Evidence: `execution.md` — F-2 (`grep "'Confirmed'"` cannot match `'Confirmed,Pending'`); T-08 audit (`--include="*.ts"` blind to `.tsx`); F-6/F-7 (`grep` over `src` blind to `test/`, hiding an orphaned e2e spec); F-9 (three jest configs, one habitually run); F-12 (a mocked query builder cannot represent SQL precedence). **Two of the five were the auditor's own**, including the one that authorized deleting an entire module.
+  - Standardization: rule added to root `CLAUDE.md` §4.3 beside K-014. → **Applied 2026-08-20 (user-approved)**. Upstream owed — the root cause is generic to any agent that verifies with a scoped instrument.
+
+- **KZ-001 — recurrence 11 → 12, and the sharpest instance yet.** (Product, Critical)
+  - Root cause: the mock in `automapper.service.spec.ts` applies `is_active` filtering whenever `.andWhere(...)` is called, treating every clause as conjunctive. Its **model of the query language** differs from the query language, so `A OR B AND C` — which SQL binds as `A OR (B AND C)` — was structurally invisible. Its own comment says it exists *"to make the is_active gate testable"*: the double built to protect the property is why the property broke silently.
+  - Evidence: `execution.md` — Auditor verdict T-06, F-12.
+  - Standardization: digest row extended — a property that lives in generated output must be asserted there. → **Applied 2026-08-20 (user-approved)**
+
+- **KZ-014 — recurrence 1 → 2, five fresh instances.** (Product + Methodology, High)
+  - Root cause: evidence was submitted that proves something other than the claim it backs — the failure mode is not laziness but *a falsifier authored from the wrong frame*.
+  - Evidence: `execution.md` — T-01 (a comparison claimed verbatim but never run); F-13 (`does NOT resolve X-A1676` asserting that it **does**); F-14 (behavioural tests green with the defect reintroduced); T-09 M1 (the *assertion* mutated, not the code); F-16 (prose supplied where screenshots were the gate).
+  - Standardization: digest row extended — a red that would pass with the defect reintroduced is not evidence. → **Applied 2026-08-20 (user-approved)**
+
+**Also surfaced (repo defects, not lessons)**
+
+- `migration:show` is **not** an npm script, yet root `CLAUDE.md` instructed using it in two places. Corrected to the typeorm passthrough. → **Applied 2026-08-20**
+- `migration:scan` (`package.json:34`) points at `./scripts/scan-migration-placeholders.js`; the `scripts/` directory does not exist, so it exits non-zero and would fail any pipeline step invoking it. Consistent with K-006 recording the scanner as withdrawn — the file went, the npm entry stayed. **Not fixed; needs an owner.**
+
 
 ### 2026-08-20 — bilateral/clarisa-automapper-s2
 
