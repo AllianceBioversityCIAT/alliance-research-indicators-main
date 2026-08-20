@@ -1,9 +1,11 @@
+import { BadRequestException } from '@nestjs/common';
 import { DataSource, Logger } from 'typeorm';
 import {
   createInnovationUseHarness,
   InnovationUseHarness,
 } from './nest-harness';
 import { ResultInnovationUseService } from '../../../src/domain/entities/result-innovation-use/result-innovation-use.service';
+import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/result-innovation-use/dto/create-result-innovation-use.dto';
 
 /**
  * T-09 (`docs/specs/innovation-use/details-api`) — **F-A**, `design.md`
@@ -84,6 +86,50 @@ import { ResultInnovationUseService } from '../../../src/domain/entities/result-
  * boot is needed. Cleanup is automatic -- this file's own `afterAll`
  * already deletes every `result_actors` row `WHERE result_id = ?` with no
  * further column filter.
+ *
+ * **Tester extension (AKILI `/akili-test`) -- closes two properties three
+ * Reviewers (T-09, T-11, T-12) independently confirmed unowned at every
+ * tier.**
+ *
+ * **Hole 1 -- `design.md` DD-14's partial-PATCH contract, behaviourally.**
+ * T-06 proved the `!== undefined` (never `??`) resolution of the
+ * *effective post-write row* only over MOCKED repositories; F-A's own save
+ * DTOs (above) and F-C (`innovation-use-level-boundary.fixture-spec.ts`)
+ * both send every key on every call, so neither ever exercises an OMITTED
+ * key or an explicit `null` against a REAL stored row. The five `it`s
+ * below reuse the SAME `resultId` this file already owns: by the time they
+ * run, the "edits actor A..." `it` above has left the stored row at
+ * `innovation_use_level_id = 7` (level 6, catalog `id = level + 1`, trap 2)
+ * with a non-blank `innovation_use_level_explanation` --
+ * `innovationUseLevelExplanation` -- and the NFR-IUA-001 `it` is read-only
+ * (swaps a `Logger`, never writes), so that precondition is undisturbed
+ * entering this block. Three cases send the key PRESENT with an explicit
+ * `null` / `''` / `'   '` and must be REJECTED `400` (the level ≥ 6 rule
+ * re-fires against the cleared value); the fourth OMITS the key entirely
+ * while changing an unrelated field and must be ACCEPTED with the stored
+ * justification preserved, read back by raw SQL after the save -- the pair
+ * of accept/reject on the SAME stored precondition is what a `??` operator
+ * cannot produce, because `??` cannot distinguish an explicit `null` from
+ * an omitted key (`design.md` DD-14; `requirements.md` R-IUA-006 AC.3-AC.5).
+ *
+ * **Hole 2 -- T-08 advisory B-4.** Nothing at any tier proves
+ * `ResultInnovationUseService.create(resultId, manager)` honors a PASSED
+ * transaction manager rather than falling back to its own repository
+ * (`selectManager`, `orm.util.ts`) -- T-05's unit test calls `create(42)`
+ * with no manager, and T-12's F-E calls `createResultType(id, indicator)`
+ * with two arguments, so `manager` is `undefined` there and the transaction
+ * arm is never entered (T-12's Reviewer noted F-E *structurally cannot*
+ * bind it). The final `it` below binds it directly: a real
+ * `dataSource.transaction()` callback calls `create()` with the
+ * transaction's OWN manager, then deliberately throws to force a rollback.
+ * If `create()` honors the manager, the insert rolls back with everything
+ * else in the callback and no `result_innovation_use` row survives; if it
+ * ignored the manager (using its own repository, bound to the pool outside
+ * this transaction), the row would commit immediately and survive the
+ * rollback -- that divergence is the failure mode this assertion exists to
+ * catch. Uses this file's own `nextOfficialCode()` counter (already inside
+ * its reserved `900_700` band, no new band needed) and cleans its own
+ * `results` row up in a `finally`, independent of this file's `afterAll`.
  */
 describe('Innovation Use section round trip via the real ResultInnovationUseService (T-09, F-A)', () => {
   const uniqueSuffix = Date.now();
@@ -806,5 +852,204 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
     // read (52 total: 50 seeded here + A and C surviving the prior `it`)
     // did not add a 6th query.
     expect(queryCount).toBeLessThanOrEqual(5);
+  });
+
+  // -----------------------------------------------------------------------
+  // Hole 1 — DD-14's partial-PATCH contract, behaviourally (see this file's
+  // header comment for the full rationale and the precondition this block
+  // relies on: resultId's stored row already carries level 6 / catalog
+  // id 7 and a non-blank explanation, undisturbed by the read-only
+  // NFR-IUA-001 `it` immediately above).
+  // -----------------------------------------------------------------------
+
+  it('DD-14 — PATCH {innovation_use_level_explanation: null} (key PRESENT, explicit null) against the stored level-6 row is REJECTED 400, proving `!== undefined` and NOT `??` (R-IUA-006 AC.3/AC.5 as narrowed by DD-14)', async () => {
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    // Precondition sanity: stored level is still catalog id 7 (level 6)
+    // with a non-blank justification — required for this case to be
+    // discriminating at all.
+    expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    let caughtError: unknown;
+    try {
+      await harness.service.update(resultId, {
+        innovation_use_level_explanation: null,
+      } as unknown as CreateResultInnovationUseDto);
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(BadRequestException);
+    expect(
+      (
+        (caughtError as BadRequestException).getResponse() as {
+          message: string[];
+        }
+      ).message,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('innovation_use_level_explanation'),
+      ]),
+    );
+
+    // Validation runs entirely before BEGIN (design.md §5.1) — a rejected
+    // call must leave the stored row byte-identical to what it was before.
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(Number(after.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(after.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+  });
+
+  it('DD-14 — PATCH {innovation_use_level_explanation: \'\'} (empty string, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.4)', async () => {
+    await expect(
+      harness.service.update(resultId, {
+        innovation_use_level_explanation: '',
+      } as unknown as CreateResultInnovationUseDto),
+    ).rejects.toThrow(BadRequestException);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+  });
+
+  it('DD-14 — PATCH {innovation_use_level_explanation: \'   \'} (whitespace-only, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.3)', async () => {
+    await expect(
+      harness.service.update(resultId, {
+        innovation_use_level_explanation: '   ',
+      } as unknown as CreateResultInnovationUseDto),
+    ).rejects.toThrow(BadRequestException);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+  });
+
+  it('DD-14 — a PATCH OMITTING the explanation key entirely, while changing an unrelated actor count, is ACCEPTED and the stored justification survives byte-identical, read back by raw SQL (R-IUA-006 AC.5 as narrowed by DD-14 — the half `??` cannot produce)', async () => {
+    const dto = {
+      innovation_use_level_id: innovationUseLevelId, // present, unchanged
+      // innovation_use_level_explanation: deliberately OMITTED — this is
+      // the case under test.
+      actors: [
+        {
+          result_actors_id: actorAId,
+          actor_type_id: actorTypeCodeA,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: 241, // "changing something else"
+        },
+        {
+          result_actors_id: actorCId,
+          actor_type_id: actorTypeCodeC,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: 99,
+        },
+      ],
+      organizations: [
+        {
+          result_institution_type_id: organizationId,
+          institution_type_id: institutionTypeCode,
+          organization_count: 17,
+        },
+      ],
+      quantifications: [
+        {
+          quantification_number: 55,
+          unit: 'sentinel-unit-F-A',
+          description: 'sentinel-description-F-A',
+        },
+      ],
+    };
+
+    const result = await harness.service.update(resultId, dto);
+
+    // The stored justification survived the omission — proving "omitted
+    // key preserves the scalar" reached the VALIDATOR too, not only the
+    // final UPDATE statement.
+    expect(result.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const actorA = result.actors.find(
+      (a: any) => Number(a.result_actors_id) === actorAId,
+    );
+    expect(actorA).toBeDefined();
+    expect(Number(actorA.actors_count)).toBe(241);
+
+    // Row 5 of the assignment: read back via raw SQL — the stored
+    // explanation is unchanged IN THE DATABASE, not merely in the
+    // service's in-memory return value.
+    const [row] = await dataSource.query(
+      `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(row.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+  });
+
+  // -----------------------------------------------------------------------
+  // Hole 2 — T-08 advisory B-4: `create()` honors a PASSED transaction
+  // manager (see this file's header comment for the full rationale).
+  // -----------------------------------------------------------------------
+
+  it('create() honors a PASSED transaction manager — a throw after create() inside dataSource.transaction() leaves NO result_innovation_use row behind (T-08 advisory B-4)', async () => {
+    const officialCode = nextOfficialCode();
+    const txResult = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, ?, ?, 0, NULL)`,
+      [officialCode, platformCode, reportYear],
+    );
+    const txResultId = txResult.insertId;
+
+    try {
+      await expect(
+        dataSource.transaction(async (manager) => {
+          await harness.service.create(txResultId, manager);
+          throw new Error('deliberate rollback probe — B-4');
+        }),
+      ).rejects.toThrow('deliberate rollback probe — B-4');
+
+      // If create() had ignored `manager` and used its own repository
+      // (bound to the pool outside this transaction), this INSERT would
+      // have committed immediately and survived the rollback above. Its
+      // absence is the falsifiable proof that `create()` honored the
+      // passed manager.
+      const [row] = await dataSource.query(
+        `SELECT result_id FROM result_innovation_use WHERE result_id = ?`,
+        [txResultId],
+      );
+      expect(row).toBeUndefined();
+    } finally {
+      // Defensive cleanup independent of whether the assertion above held:
+      // if `create()` did NOT honor the manager, the row asserted absent
+      // above would in fact survive the rollback, and deleting `results`
+      // first would fail its own FK constraint
+      // (`FK_result_innovation_use_result_id`). Deleting the child row
+      // first makes teardown succeed either way, matching this file's own
+      // `afterAll` ordering (children before parent).
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [txResultId],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
+        txResultId,
+      ]);
+    }
   });
 });
