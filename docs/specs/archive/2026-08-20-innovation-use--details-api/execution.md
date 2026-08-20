@@ -2207,7 +2207,7 @@ On that last row: `requirements.md`'s AC boxes were **never** part of this spec'
 
 ### FR-7 filed outside this folder
 
-`customSaveInnovationDev` retains the defect. Filed as **FR-7** in [`../../innovation-use/family.md`](../../innovation-use/family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
+`customSaveInnovationDev` retains the defect. Filed as **FR-7** (→ [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718)) in [`../../innovation-use/family.md`](../../innovation-use/family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
 
 The framing is the load-bearing part: the new guard is a property of the **endpoint, not the data**. These rows are protected when written through this endpoint and **not otherwise** — any authenticated principal who can edit some indicator-2 result can still rewrite any `result_actors` / `result_institution_types` row by PK through the Innovation Dev endpoint, **including the Innovation Use rows just protected**. Exposure is now **asymmetric**, and that asymmetry is what makes *"authorization fixed"* the likely mis-summary of this archive. FR-7 says so in those words.
 

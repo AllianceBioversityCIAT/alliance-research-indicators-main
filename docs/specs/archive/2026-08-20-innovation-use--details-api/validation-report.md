@@ -102,7 +102,7 @@ PATCH /api/v1/results/innovation-use/:resultCode
 
 ### Scope beyond this endpoint
 
-`constructWhereClause` is **shared with Innovation Dev**, and `CreateResultInstitutionTypeDto` (`:4-38`) is equally permissive — so the helper hole is inherited, not introduced. What this spec introduced is a **public endpoint over it**, with `organization_count` as the one field a user types first. This widens **FR-7** (see FAIL-7).
+`constructWhereClause` is **shared with Innovation Dev**, and `CreateResultInstitutionTypeDto` (`:4-38`) is equally permissive — so the helper hole is inherited, not introduced. What this spec introduced is a **public endpoint over it**, with `organization_count` as the one field a user types first. This widens **FR-7** (→ [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718)) (see FAIL-7).
 
 **Requirements violated:** `R-IUA-007 AC.1`, `R-IUA-007 AC.3`, and `R-IUA-003`'s *"Removing a row removes exactly that row"* scenario — *"A and C remain `is_active = TRUE` with their ids preserved"*.
 

@@ -1,6 +1,6 @@
 # Archive Summary — Results (Innovation Use) / Details API
 
-> **Delivered and archived with two human gates open, both filed and scoped.** The Innovation Use section is readable, writable and submittable through three new endpoints. **Four product defects were found across three validation rounds and all four are fixed** on this endpoint. The gates that remain are a security sign-off and **FR-7** — the sibling Innovation Dev endpoint over the same tables, which has none of the four protections built here.
+> **Delivered and archived with two human gates open, both filed and scoped.** The Innovation Use section is readable, writable and submittable through three new endpoints. **Four product defects were found across three validation rounds and all four are fixed** on this endpoint. The gates that remain are a security sign-off and **FR-7** (→ [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718)) — the sibling Innovation Dev endpoint over the same tables, which has none of the four protections built here.
 >
 > **The one thing this archive must not be summarised as: "authorization fixed" or "organizations fixed."** Both are fixed on **one of two endpoints over the same tables**. The asymmetry is what makes the short summary tempting and wrong.
 
