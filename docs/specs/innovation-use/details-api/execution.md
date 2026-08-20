@@ -1977,3 +1977,15 @@ Reviewers across T-09…T-12 recorded cleanup candidates and repeatedly suggeste
 
 **Budget status:** **12 of 13 tasks `[x]`; T-13 `[~]` with one human criterion outstanding.** **24 of ~24 review rounds consumed — exactly on the re-baselined budget, with zero rework spent on T-13.** The LOC axis remains breached at ~2.8× on the fixture tier (T-12's escalation, unchanged and intrinsic).
 
+#### Why criterion 6 cannot be automated — a stronger reason than the spec records
+
+The Leader attempted to find a **safe** path to the OpenAPI document, so the user's observation would be a quick confirmation rather than an investigation. There is none, and the reason is worth recording because the next person to run this task will ask the same question.
+
+- **No generation script exists.** `package.json` has no `swagger`/`openapi`/`doc` script. The document is built only inside `main.ts` (`SwaggerModule.createDocument(app, config)` at `:72`), so it requires a real `INestApplication`.
+- **Booting the app attaches a consumer to shared infrastructure.** `main.ts`'s `microservice()` is **unconditional**: it calls `NestFactory.createMicroservice` with `transport: Transport.RMQ`, `urls: [amqps://…@${ARI_MQ_HOST}]`, `queue: env.ARI_QUEUE`, `queueOptions: { durable: true }`, then `.listen()`. A boot therefore registers a **live consumer on a shared, durable queue** — where it can consume messages intended for another instance, and those messages are then gone.
+
+Per root `CLAUDE.md`'s boundary rule, shared remote services are **governed**, not disposable: an agent may freely restart local containers, but side effects on shared infrastructure are a human decision. Consuming another instance's queue messages to satisfy a documentation check is exactly the trade this spec should not make.
+
+**So the spec's stated reason for the human gate — "ESLint has no Swagger rule, and `/swagger` renders an undecorated handler without complaint" — is true but incomplete.** The stronger reason is that **the artifact cannot be produced without a side effect on shared infrastructure.** `tasks.md` T-13's *Verification & its limits* is worth amending with this at archive time, so a future reader does not spend the effort the Leader just spent rediscovering it. *(A future automated path does exist in principle — `Test.createTestingModule(...).createNestApplication()` against the scratch container, using T-09's harness pattern, then `SwaggerModule.createDocument`. That is a new gate the spec deliberately declined in favour of the human check, so it is recorded as an option for a future spec, not adopted here.)*
+
+**Criterion 6 remains `[ ]` and remains the user's.** It was not attempted, not simulated, and not substituted.
