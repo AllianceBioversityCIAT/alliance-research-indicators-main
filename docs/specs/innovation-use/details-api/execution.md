@@ -2341,3 +2341,52 @@ The first review of this fix **died on an API session limit** before producing f
 The record's own conclusion after the third rework round was that *"this spec's residual risk lives outside the logic."* **That was wrong, and this is the evidence.** Three rounds of comment-accuracy failures made prose look like the only remaining risk, and a reachable data-corruption path was sitting in the same method the whole time — in code this spec authored, invisible to every tier, on the most ordinary payload a user can send.
 
 > **The transferable lesson:** a run of low-severity findings is not evidence that the high-severity ones are gone. It is evidence about **where the last reviewer was looking.** Both real product defects here were found by an auditor reading code against a claim, and neither by a suite that was green at the time.
+
+---
+
+## ▶ RESUME HERE — state at the 2026-08-20 context boundary
+
+Written deliberately so a fresh session needs **nothing** from the previous session's context. Everything below is verifiable from the repo.
+
+### Where the code stands
+
+| | |
+| --- | --- |
+| Branch | `AC-1679-Create-the-innovation-use-section`, working tree **clean** |
+| Unit | **336 suites / 2285 tests** green |
+| Coverage | **89.79 / 75.75 / 85.30 / 89.26** — floor is 60 (NFR-IUA-003) |
+| Fixtures | **15 suites / 66 tests** green, **twice** on the same scratch container |
+| Innovation Dev gate | all three `innovation-dev-*` fixtures green |
+| `tsc --noEmit` | clean |
+
+Every figure re-run by the Leader, not relayed. Recorded identically in `tasks.md` §7 and `test-report.md`.
+
+### The one owed item — do this first
+
+**A fixture case proving the duplicate-PK `400` end to end, and that nothing persisted.** The unit tier *is* mutation-proven (disabling the check reddens 4 tests on `npm test` alone, two per service); the fixture tier is not. The agent adding it was interrupted, so the fixture count is unchanged at 66.
+
+- File: `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`, band `902_000` — take an unused sub-band and record it in the header (**FP-45**: grep every sibling header, there is no written registry).
+- Payload: two id-present rows sharing one **genuinely owned** PK with different `actor_type_id`s. Expect `400` naming the repeated id, and **nothing persisted**.
+- Falsify it: disable the check, confirm red, restore, confirm `git diff` clean.
+
+### Then, in order
+
+1. **`/akili-validate docs/specs/innovation-use/details-api`** — has **not** run against the current state. The last run predates the PK-collision fix, the duplicate-PK rejection, and the second AC.4 amendment. Delegate it to auditors on a **different** model than the implementers; that choice is what surfaced both real product defects.
+2. **`/akili-archive docs/specs/innovation-use/details-api`** — only after a clean re-validation. `validation-report.md`'s banner says do not archive on the banner.
+
+### Two gates no agent can close — these are the human's
+
+| Gate | Where |
+| --- | --- |
+| **Security review** | `requirements.md` §15. It declared the review *not required* because no auth path changed. **This spec's own remediation falsified that** — `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev. Marked ⚠️ REQUIRED |
+| **FR-7** | [`../family.md`](../family.md) → *Cross-cutting Risks*. `customSaveInnovationDev` shares the same collision-prone helpers and has **none** of this spec's three protections — ownership guard, adopted-PK reconcile, duplicate-PK rejection. Needs its own spec. **Do not summarise this archive as "authorization fixed"** |
+
+### Carried, declared, not silently dropped
+
+Three at-risk line citations still unconverted under the amended **FP-50** (rule written, codebase not yet conforming) · `R-IUA-010 AC.3/AC.4` ordering has no behavioural gate at any tier · `R-IUA-005 AC.2`'s exclusive falsifier never run · `R-IUA-011`'s *"submit transition is permitted"* owned by no task · `OQ-IUA-2` unstruck · the child guide's §4 `@Roles` recipe contradicts **DD-5** (pre-existing, for `/akili-audit`) · an unknown catalog FK on `actor_type_id`/`institution_type_id`/`sub_institution_type_id`/`institution_id` still returns a **`500` carrying raw MySQL** — `design.md` §4 documents that exact hazard as its reason for validating the *level* field, applied to one FK and not the other four · `R-IUA-009 AC.4` deliberately **unticked** after being amended twice · all 73 AC boxes unticked by decision, with the signpost in `requirements.md` §7.
+
+### The two things worth carrying forward as judgement, not data
+
+**A run of low-severity findings is not evidence that the severe ones are gone — it is evidence about where the last reviewer was looking.** After three rework rounds spent entirely on comment accuracy, this trail concluded the residual risk lived outside the logic. That was wrong: a reachable, silent data-corruption path was in the same method the whole time. **Both** genuine product defects in this spec were found by an auditor reading code against a claim, and **neither** by a suite that was green at the time.
+
+**A cosmetic fix can hide a severe one.** The `[...new Set(...)]` accepted two rounds earlier to tidy a `400` message collapsed the duplicate id before the ownership guard could count it — concealing a corruption path for two rounds. Cosmetic advisories deserve the question *"does this remove information something else relies on?"*
