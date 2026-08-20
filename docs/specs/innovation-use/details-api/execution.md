@@ -2110,3 +2110,36 @@ F-B's attack payload carries **only** result 2's ids. `devActorId` appears in th
 **Scope of the fix (both variants, one root cause):** scope the id-present save path by `(result_id, role)` in both hand-written services, so a caller-supplied primary key is honoured **only** when the row it names belongs to the calling result *and* the calling role. `result_quantifications` needs no change — `upsertByCompositeKeys` already scopes by the calling result and ignores a supplied id, which is why it was structurally immune throughout.
 
 **Consequences to carry through:** T-10's two `it.failing` markers must **invert to passing tests** (the whole point of choosing `it.failing` over `.skip` — it fails when its body passes, so the fix announces itself), the cross-role variant needs its own test, and Innovation Dev needs a regression proof.
+## SUPERSESSION — the T-10 defect is FIXED, and the carve-out is retired (2026-08-20)
+
+**This section supersedes every earlier statement in this log that records `R-IUA-009 AC.3` as unmet.** Those statements are **not edited** — the Pivot Record, the RULING, the RETRACTION and the *"What is true of the product after T-10"* table are append-only history and were true when written. This is the pointer that makes the current state unambiguous, which is the same convention T-01's Pivot used.
+
+### Current state
+
+| Property | State |
+| --- | --- |
+| `R-IUA-009 AC.3` — cross-result | ✅ **MET.** `assertInnovationUseOwnership` scopes the id-present save by `(result_id, role)` in both services |
+| `R-IUA-009 AC.1/AC.2/AC.4`, `R-IUA-007 AC.4` — the **cross-role** variant the RETRACTION named | ✅ **MET** by the same change. This is the variant `/akili-validate` found un-gated, and the likelier of the two |
+| Quarantine | ✅ **Retired.** Both `it.failing` markers inverted to plain passing tests; **zero `it.failing` remain** under the package. Assertions in F-B went **18 → 24** |
+| Coverage of the guards | ✅ Six unit tests, no DB. **Deleting either guard now reddens `npm test`** — it stayed green before attempt 2 |
+| Both halves of the predicate | ✅ Proven **permanently**: four unit tests whose `find` mock re-implements WHERE-clause semantics, so deleting either the `result_id` or the role clause fails the suite. The attempt-1 falsification table was a report claim; this is an artifact |
+| **`customSaveInnovationDev`** | ❌ **STILL EXPOSED, deliberately.** Different surface, unspecified ACs, live data. **The platform exposure is now asymmetric** — Use is guarded, Dev is not — which is arguably worse to leave undocumented than uniform exposure. **Needs its own ticket** |
+
+### The unflipped-checkbox count is now genuinely zero
+
+All four carved-out criteria closed, each **on its own terms**:
+
+| Criterion | Closed by |
+| --- | --- |
+| **T-10 c5** | The **defect was fixed**, not the criterion softened |
+| **T-13 c6** | The **user's own `/swagger` observation**, recorded verbatim |
+| **T-01 c1** | Released by T-13 c6 — the live-`200` half was transitively blocked on it |
+| **T-01 c4** | Released by T-13 c6 — the rendered surface *is* what that observation covers |
+
+**A methodology note worth keeping.** The carve-out was added on 2026-08-19 because §7 demanded a count of zero that was then **unachievable**, and the pressure to satisfy an impossible definition is exactly what produces a false tick — KZ-002's mechanism. It looked like a workaround. It was not: it was a **holding structure** that let the count stay honest during the window when zero was impossible, and it retired itself the moment each item could be closed properly. **The right response to an unsatisfiable gate is to name the exceptions, not to lower the gate or fake the pass** — and the evidence that this was right is that the count reached zero anyway, three days of work later, without anyone ticking something untrue.
+
+### What the fix cost, and what found it
+
+The defect was recorded as an advisory **three times** (T-03, T-04, and twice at T-09) before T-10 proved one variant of it, and the **second variant survived T-10's proof, 24 review rounds, and a green fixture suite** — because F-B's attack payload never carried a Dev id, so its "role isolation PROVEN" conclusion was green for a reason unrelated to the property it named. It was found by an **auditor reading code against a claim**, which is what `/akili-validate` exists for, and it was delegated precisely because the Leader had authored the record it would otherwise have been validating.
+
+**The transferable lesson:** two advisories predicting a defect are worth less than one test that would fail if it were real. Both T-03's and T-04's advisories described this exact attack in words, and neither was ever reconciled against the conclusion that contradicted them.

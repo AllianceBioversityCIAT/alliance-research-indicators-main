@@ -21,7 +21,7 @@
 | Backend unit | **336 suites / 2264 tests** — all green |
 | Integration (fixtures) | **14 suites / 54 tests** — all green, on **two consecutive runs** |
 | Coverage | 89.69 statements · 75.61 branches · 85.13 functions · 89.14 lines — all ≥ the 60% floor |
-| Product defects found | **1** — `R-IUA-009 AC.3`, quarantined under `it.failing`, **unfixed** |
+| Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
 | Gaps requiring a human | **1** — the `/swagger` observation (`R-IUA-013 AC.3`) |
 
 ---
@@ -84,7 +84,7 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | Fixture | Proves |
 | --- | --- |
 | **F-A** section round trip *(+ this run's 5 tests)* | Save→read equality, edit preserving row id, selective removal soft-deleting **exactly** that row across all three collections, the four-way audit branch structure, `results.updated_at` advancing, NFR-IUA-001's query bound, **DD-14**, **B-4** |
-| **F-B** role isolation | Innovation Dev rows byte-identical by whole-row `SELECT *` diff (ADR-11) across both saves, against a result deliberately holding **both** indicators' rows. **2 tests quarantined — see G-1** |
+| **F-B** role isolation | Innovation Dev rows byte-identical by whole-row `SELECT *` diff (ADR-11) across both saves, against a result deliberately holding **both** indicators' rows. **The 2 formerly-quarantined tests now pass**, plus a third for the cross-role variant — assertions 18 → 24 |
 | **F-C** level boundary | The `id 6`/`id 7` discriminating pair in one test body against the real seeded catalog — the family's signature `id = level + 1` trap |
 | **F-D** catalog order | Levels read `0…9`. **Declared weak on the record — see G-5** |
 | **F-E** creation + green checks | Both child rows land, `created_by` from the acting user, the `innovation_use` key present for indicator 6 and absent for indicator 2 (exact 9-key set), `completness` **both ways** |
@@ -130,7 +130,7 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 
 ## Gaps — all 7, with reasons *(the heading said "6"; the list always had seven)*
 
-### G-1 · `R-IUA-009 AC.3` is not satisfied by the product — **PRODUCT DEFECT, unfixed**
+### G-1 · ✅ **CLOSED 2026-08-20** — was: `R-IUA-009 AC.3` is not satisfied by the product
 
 A payload for result 1 submitting **result 2's row ids** overwrites result 2's rows. Reproduced against real MySQL: `actor_type_id` 900853→900854, `actors_count` 900882→900883 *(this report originally said `900893`, which is the **organization** row's post-value — two rows' sentinels conflated; `execution.md`, `tasks.md` and the fixture's own comment all say `900883`)*, **`result_id` still pointing at result 2**. Root cause: both hand-written id-present branches build their save payload from a **caller-supplied primary key with no `result_id` and no ownership check**. `result_quantifications` is structurally immune — `upsertByCompositeKeys` matches on the composite key scoped to the calling result and ignores a supplied id.
 
@@ -176,7 +176,7 @@ A **stronger reason than the spec records** was found while looking for a safe a
 
 | Gap | Owner | Action |
 | --- | --- | --- |
-| **G-1** | **User** | Rule A (fix here) or D (own spec). Quarantine reverses itself when fixed |
+| **G-1** | ✅ **CLOSED** | User ruled **A**. `assertInnovationUseOwnership` scopes the id-present save by `(result_id, role)` in both services; both halves proven load-bearing by four permanent unit tests; deleting either guard now reddens `npm test`. **Dev's exposure remains — separate ticket** |
 | **G-7** | **User** | Run the `/swagger` observation — unblocks 3 checkboxes |
 | G-3 | Follow-up spec | An e2e project pointed at the scratch container |
 | G-6 | Optional | Run the one unrun mutation, or accept the stated residual |
