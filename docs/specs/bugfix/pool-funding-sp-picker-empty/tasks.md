@@ -36,8 +36,10 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 | PR | Tasks | LOC | What it delivers |
 | --- | --- | --- | --- |
 | **PR 1 — RC-A + RC-C** | T-01, T-02, T-03, T-08 | ~420 (T-08 now mostly deletions) | **Unblocks the 198 on its own.** The picker populates without any client change |
-| **PR 2 — RC-B identity** | T-05, T-06, T-07 | ~180 | Stable key, `stale` resolution, two migrations (human-applied) |
-| **PR 3 — copy + UI** | T-04, T-09 | ~140 | Third empty state end-to-end, `Pending` qualifier |
+| **PR 2 — RC-B identity + `stale`** | T-05, **T-04**, T-06, T-07 | ~240 | Stable key, `stale` status, two migrations (human-applied) |
+| **PR 3 — client** | T-09 | ~120 | Three distinct empty states, `Pending` qualifier |
+
+> **Corrected 2026-08-20 after PR 1 shipped.** T-04 was originally placed in PR 3 while T-06 — which **depends on it** (§1 graph) — sat in PR 2. That ordering was unbuildable. T-04 is server-side `stale` resolution and belongs with the identity work; PR 3 is now client-only.
 
 **PR 1 is what the user is waiting for.** T-04/T-09 improve messages that PR 1 already stops showing for the cohort. Follow `cognitive-doc-design` review-empathy in each description: what to review first, what is out of scope, link previous/next PR.
 
