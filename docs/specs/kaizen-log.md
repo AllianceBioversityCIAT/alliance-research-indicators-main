@@ -74,6 +74,25 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 
 ## Entries
 
+### 2026-08-20 — changes/bilateral-mapping-ui-improvements
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 2 | tasks.md |
+| Reviewer FAIL rework attempts | 0 (clean run) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 0 | execution.md |
+| Validation FAIL / WARN | 0 | execution.md |
+| Budget | 2 tasks · ~120 LOC · 1 review round budgeted vs 1 actual | design.md §7 |
+| **Defects found by the test suite** | 0 | execution.md |
+
+*Clean run — all 2 tasks passed on first attempt, 104 unit tests green, linter clean.*
+
+---
+
 ### 2026-08-20 — bugfix/pool-funding-sp-picker-empty
 
 **Metrics**

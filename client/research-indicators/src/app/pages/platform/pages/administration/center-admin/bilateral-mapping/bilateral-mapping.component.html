@@ -3,21 +3,60 @@
     <div class="content-section w-full">
       <div class="bilateral-mapping flex w-full min-w-0 flex-col abc-white-2 p-[30px] mb-10 rounded-[10px] gap-6">
 
-        <!-- Page title + New Mapping button (T-BIL-CAM-05) -->
+        <!-- Page title, Help Popover + Action Buttons (T-BIL-CAM-05, R-BIL-UI-001, R-BIL-UI-002) -->
         <div class="flex flex-wrap items-center justify-between gap-4 px-2">
-          <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
-            Bilateral Mapping
-          </h1>
-          <p-button
-            label="New mapping"
-            icon="pi pi-plus !text-[12px]"
-            severity="primary"
-            size="small"
-            styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
-            (onClick)="openCreateDialog()"
-            data-testid="new-mapping-btn"
-            aria-label="Create a new bilateral mapping">
-          </p-button>
+          <div class="flex items-center gap-2">
+            <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
+              Bilateral Project Mapping
+            </h1>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-question-circle"
+              class="p-button-text p-button-sm !p-0 !w-[22px] !h-[22px] atc-grey-700 hover:atc-primary-blue-600 cursor-pointer"
+              (click)="helpOp.toggle($event)"
+              data-testid="help-popover-btn"
+              aria-label="About Bilateral Project Mapping">
+            </button>
+            <p-popover #helpOp [style]="{ width: '380px' }" appendTo="body">
+              <div class="flex flex-col gap-3 p-2 text-sm atc-grey-800" data-testid="help-popover-content">
+                <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
+                  <span class="font-semibold text-sm atc-primary-blue-600">About Bilateral Project Mapping</span>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
+                    Phase 2026
+                  </span>
+                </div>
+                <p class="m-0 leading-relaxed text-[13px]">
+                  In this module, bilateral projects from CLARISA (filtered by the active phase, e.g., Phase 2026) are mapped and reconciled against AGRESSO agreements and contracts.
+                </p>
+                <p class="m-0 leading-relaxed text-[13px]">
+                  This mapping ensures that Science Program alignments, Pool Funding contributions, and indicator reporting reflect active bilateral agreements accurately in STAR.
+                </p>
+              </div>
+            </p-popover>
+          </div>
+          <div class="flex items-center gap-2">
+            <p-button
+              label="Auto-map"
+              icon="pi pi-bolt !text-[12px]"
+              severity="secondary"
+              size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
+              (onClick)="openAutomapperDialog()"
+              data-testid="header-automap-btn"
+              aria-label="Open auto-mapper run preview">
+            </p-button>
+            <p-button
+              label="New mapping"
+              icon="pi pi-plus !text-[12px]"
+              severity="primary"
+              size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
+              (onClick)="openCreateDialog()"
+              data-testid="new-mapping-btn"
+              aria-label="Create a new bilateral mapping">
+            </p-button>
+          </div>
         </div>
 
         <!-- Mapping Coverage strip (T-06 / R-CAM-004 AC.4) -->
@@ -122,10 +161,10 @@
               <ng-template pTemplate="header">
                 <tr>
                   <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Agreement ID</div>
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Agreement ID (AGRESSO)</div>
                   </th>
                   <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">CLARISA Project</div>
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">CLARISA Project (Bilateral)</div>
                   </th>
                   <th class="!text-[#112F5C]" scope="col">
                     <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Source</div>

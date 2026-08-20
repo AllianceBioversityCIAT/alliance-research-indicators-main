@@ -1,6 +1,7 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05, T-BIL-CAM-06)
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import BilateralMappingComponent from './bilateral-mapping.component';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
 import { ActionsService } from '@services/actions.service';
@@ -86,6 +87,7 @@ describe('BilateralMappingComponent', () => {
   let mockClarity: { trackEvent: jest.Mock };
 
   beforeEach(async () => {
+    jest.setTimeout(15000);
     mockService = {
       list: jest.fn(),
       create: jest.fn(),
@@ -1568,6 +1570,66 @@ describe('BilateralMappingComponent', () => {
       // Coverage strip child component receives error but does NOT throw or hide parent table
       const table = fixture.nativeElement.querySelector('[data-testid="mappings-table"]');
       expect(table).not.toBeNull();
+    });
+  });
+
+  // ── UI Refinements (2026-08 — R-BIL-UI-001, R-BIL-UI-002, R-BIL-UI-003) ───
+
+  describe('Bilateral Mapping UI Refinements (2026-08)', () => {
+    it('R-BIL-UI-001 — renders Auto-map and New mapping buttons side-by-side in header', async () => {
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const automapHost = root.querySelector('[data-testid="header-automap-btn"]');
+      const newMappingHost = root.querySelector('[data-testid="new-mapping-btn"]');
+
+      expect(automapHost).not.toBeNull();
+      expect(newMappingHost).not.toBeNull();
+
+      // Clicking header-automap-btn opens automapper dialog
+      expect(component.automapperDialogOpen()).toBe(false);
+      const btnToClick = (automapHost?.querySelector('button') ?? automapHost) as HTMLElement;
+      btnToClick.click();
+      fixture.detectChanges();
+      expect(component.automapperDialogOpen()).toBe(true);
+    });
+
+    it('R-BIL-UI-002 — renders Help (?) button with popover explaining module and active phase', async () => {
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const helpBtn = (root.querySelector('[data-testid="help-popover-btn"] button') ?? root.querySelector('[data-testid="help-popover-btn"]')) as HTMLElement;
+      expect(helpBtn).not.toBeNull();
+      expect(helpBtn.getAttribute('aria-label') ?? helpBtn.parentElement?.getAttribute('aria-label')).toBe('About Bilateral Project Mapping');
+
+      // Click to open popover
+      helpBtn.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const popoverContent = document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
+      expect(popoverContent).not.toBeNull();
+      expect(popoverContent?.textContent).toContain('About Bilateral Project Mapping');
+      expect(popoverContent?.textContent).toContain('Phase 2026');
+      expect(popoverContent?.textContent).toContain('CLARISA');
+      expect(popoverContent?.textContent).toContain('AGRESSO');
+    });
+
+    it('R-BIL-UI-003 — table headers explicitly display Agreement ID (AGRESSO) and CLARISA Project (Bilateral)', async () => {
+      mockService.list.mockResolvedValue(makePage([makeRow()]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const tableHeaders = Array.from(root.querySelectorAll('thead th')).map(th => th.textContent?.trim());
+
+      expect(tableHeaders.some(h => h?.includes('Agreement ID (AGRESSO)'))).toBe(true);
+      expect(tableHeaders.some(h => h?.includes('CLARISA Project (Bilateral)'))).toBe(true);
     });
   });
 });

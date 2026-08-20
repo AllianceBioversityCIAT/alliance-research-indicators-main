@@ -10,6 +10,7 @@ import { SelectModule } from 'primeng/select';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { TextareaModule } from 'primeng/textarea';
+import { PopoverModule } from 'primeng/popover';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from '@services/clarity.service';
@@ -69,6 +70,7 @@ const SOURCE_OPTIONS: SelectOption<SourceFilter>[] = [
     ButtonModule,
     DialogModule,
     TextareaModule,
+    PopoverModule,
     BilateralMappingCoverageComponent,
     AutomapperDialogComponent
   ],

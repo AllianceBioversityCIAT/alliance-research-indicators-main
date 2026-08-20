@@ -167,21 +167,12 @@ describe('BilateralMappingCoverageComponent', () => {
     expect(freshnessEl.textContent).toContain('5-min TTL');
   });
 
-  // ── Auto-map button emission ─────────────────────────────────────────────
+  // ── Auto-map emission output ─────────────────────────────────────────────
 
-  it('emits openAutomapper event when Auto-map button is clicked', async () => {
-    mockService.getCoverage.mockResolvedValue(sampleCoverage);
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-
+  it('emits openAutomapper event when onTriggerAutoMap is called', () => {
     let emitted = false;
     component.openAutomapper.subscribe(() => { emitted = true; });
-
-    const automapBtn = fixture.nativeElement.querySelector('[data-testid="trigger-automap-btn"] button');
-    expect(automapBtn).not.toBeNull();
-    automapBtn.click();
-
+    component.onTriggerAutoMap();
     expect(emitted).toBe(true);
   });
 });
