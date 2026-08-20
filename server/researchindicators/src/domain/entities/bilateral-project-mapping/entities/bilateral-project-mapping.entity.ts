@@ -19,6 +19,7 @@ import { MappingSourceEnum } from '../enum/mapping-source.enum';
 @Entity('bilateral_project_mapping')
 @Index('idx_bpm_agreement', ['agresso_agreement_id'])
 @Index('idx_bpm_clarisa_project', ['clarisa_project_id'])
+@Index('idx_bpm_clarisa_external_code', ['clarisa_external_code'])
 export class BilateralProjectMapping extends AuditableEntity {
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id!: number;
@@ -45,6 +46,15 @@ export class BilateralProjectMapping extends AuditableEntity {
     comment: 'Snapshot of CLARISA short_name at mapping time (D-PI-11)',
   })
   clarisa_project_short_name?: string | null;
+
+  @Column('varchar', {
+    name: 'clarisa_external_code',
+    length: 100,
+    nullable: true,
+    comment:
+      'Normalized CLARISA external_code; feed-stable resolution key (D-PSP-10)',
+  })
+  clarisa_external_code?: string | null;
 
   @Column({
     name: 'source',

@@ -162,9 +162,10 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 - **What disqualifies this evidence:** reading `migration:show` output without checking for an error first, or `grep`-ing it for `[ ]` — it emits **ANSI escapes**, and that grep has already reported a confident zero over a pending migration (**K-014**).
 - **K-015:** CI/CD deploys code only. Applying this is a **separate human step** against the shared Dev DB.
 - **Done:**
-  - [ ] Forward + revert + re-apply all clean
-  - [ ] Entity column matches the migration exactly
-  - [ ] Generated column and unique index untouched
+  - [x] Forward + revert + re-apply all clean — *executed on a scratch MySQL against the real DDL, through `namedPlaceholders: true`*
+  - [~] Entity column matches the migration exactly — **F-11:** the `comment` strings differ (`(D-PSP-10)` suffix on the entity only); align in T-07
+  - [x] Generated column and unique index untouched — both survived up/down/up
+  - [x] **Applied to Dev** 2026-08-20 under explicit user authorization; `migration:show` → `[X] 381`; coverage held at 195/198
 - **Dependencies:** none · **Effort:** S · **Status:** todo
 
 ---

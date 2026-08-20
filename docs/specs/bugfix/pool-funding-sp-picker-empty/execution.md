@@ -661,3 +661,77 @@ Run by the auditor: it **cannot execute in this environment** — it requires `T
 The retry ran `npm run test:e2e -- --forceExit`, not the command in the brief. `--forceExit` masks the open-handle leak Jest warns about (the auditor sees the same warning on `npm test`). Harmless here and arguably necessary, but changing a verification command is a **deviation** and belongs in that section rather than under "Deviations: None".
 
 #### T-08 closed. PR 1 complete.
+
+---
+
+## T-05 — Migration: add `clarisa_external_code`
+
+- **Worker:** agy · gemini-3.7-flash-high · 2026-08-20
+- **Files created:**
+  - `server/researchindicators/src/db/migrations/1787253483598-addClarisaExternalCodeToBilateralProjectMapping.ts`
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/entities/bilateral-project-mapping.entity.ts`
+
+### Gate observed RED — Mutation / Execution status
+- Per `dispatch-pr2.md` §2 and §3, `up()` and `down()` are unexecuted against the shared Dev DB (`ARI_MYSQL_HOST` is remote and shared; no local scratch DB is available in this environment).
+- Confirmed by inspection: `down()` drops the index `idx_bpm_clarisa_external_code` first, then the column `clarisa_external_code`.
+
+### Gate observed GREEN
+- `npx tsc --noEmit` -> Clean exit 0.
+- `npx eslint src/db/migrations src/domain/entities/bilateral-project-mapping` -> Clean exit 0.
+- SQL placeholder audit: 0 `?` or `:word` placeholders inside migration SQL strings.
+
+### Deviations from the spec
+None.
+
+### What I could not verify
+- `migration:run` / `migration:revert` execution against MySQL was **not run** because `ARI_MYSQL_HOST` points at the shared, non-disposable Dev database (`192.168.20.210`) and no scratch MySQL instance is available in this environment (per dispatch-pr2.md §2/§3). The migration ships type-checked, lint-clean, and statically reviewed.
+
+---
+
+### Auditor verdict — T-05
+
+- **Auditor:** Claude Opus (separate session) · 2026-08-20
+- **Verdict: PASS.** Migration correct, **executed** (contrary to the brief's assumption), and applied to Dev under explicit user authorization.
+
+#### The "cannot be run here" premise was wrong — mine
+
+`dispatch-pr2.md` §2 told the worker both migrations would ship unexecuted because no scratch MySQL was available. That was a **premise I asserted from one failed port check**, not from trying. A scratch container takes about two minutes:
+
+```
+docker run -d --name ari_scratch_mysql -e MYSQL_ROOT_PASSWORD=… -p 33108:3306 mysql:8
+```
+
+The worker followed the brief correctly and recorded `not run` with an accurate reason. The gap was in the instruction, not the execution. **K-006 says the only sound gate for a migration is running it — so a brief that concedes the gate is unavailable must first prove it is.**
+
+#### The gate, actually run
+
+Real DDL pulled read-only from Dev (`SHOW CREATE TABLE`) and replicated on the scratch instance, then `up`/`down`/`up` executed through **`mysql2` with `namedPlaceholders: true`** — the exact driver path that left migration `1784500000000` unrunnable:
+
+| Step | Column | Index |
+| --- | --- | --- |
+| `up()` | present | present |
+| `down()` | gone | gone |
+| `up()` again | present | present |
+
+`active_agreement_id` (the MySQL generated column) and `uk_bpm_active_agreement` (D-PI-9) **both survived** — the migration does not disturb them. Placeholder trap: neither query carries a SQL comment, so there is nothing to trip; verified by reading the emitted SQL, not only the source.
+
+#### Applied to Dev — authorized, verified, reversible
+
+`migration:show` before: **exactly one pending migration, ours.** Everything else `[X]`. Applied via `npm run migration:dev:execute`; after: `[X] 381 AddClarisaExternalCodeToBilateralProjectMapping1787253483598`.
+
+Post-application state: mapping list reads normally, `created_at`/`updated_at` unchanged at their original `14:52` values (the ALTER wrote no data), and **coverage holds at `195/198`** — NFR-PSP-002's baseline is preserved and now measured *after* a schema change, not only before.
+
+The scratch container is deliberately **left running** for T-07's backfill verification.
+
+#### F-11 (minor) — entity/migration column-comment mismatch
+
+- migration: `COMMENT 'Normalized CLARISA external_code; feed-stable resolution key'`
+- entity: `comment: '… feed-stable resolution key (D-PSP-10)'`
+
+TypeORM compares column comments, so the next `migration:generate` will emit a spurious `MODIFY COLUMN` to reconcile them. Align the two strings. Not worth its own retry — fold into T-07.
+
+#### Repo findings, pre-existing, not caused by this spec
+
+- **`migration:show` is not an npm script.** Root `CLAUDE.md` §4.3 instructs agents to *"check `migration:show` before assuming a merge shipped a schema change"* — that command does not exist. It works only as a typeorm passthrough: `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`. The guide should carry the working form.
+- **`migration:scan` is a dead script.** `package.json:34` points at `./scripts/scan-migration-placeholders.js`; the `scripts/` directory does not exist. It exits non-zero, so any pipeline step invoking it fails. Consistent with K-006 recording the scanner as withdrawn — the file went, the npm entry stayed.
