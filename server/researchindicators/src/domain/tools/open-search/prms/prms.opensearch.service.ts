@@ -756,17 +756,8 @@ export class PrmsOpenSearchService
       // field written here: `public_link`/`external_link` stay
       // `pdf_link`/`prms_link` and `dto.knowledgeProduct` stays `undefined`.
       // See execution.md -> "Pivot Record: T-13 — RESOLVED BY OBSERVATION".
-      if (
-        indicator === IndicatorsEnum.KNOWLEDGE_PRODUCT &&
-        !isEmpty(item?.knowledge_product_summary?.handle)
-      ) {
-        result.evidence = {
-          ...result.evidence,
-          evidence: [
-            { evidence_url: item.knowledge_product_summary.handle },
-          ] as ResultEvidence[],
-        };
-      }
+      // Applied after `mapEvidence` below so staging's PRMS evidences are not
+      // wiped, and the KP handle remains available to the identity resolver.
 
       result.createResult = {
         year: parseInt(item.year),
@@ -828,6 +819,25 @@ export class PrmsOpenSearchService
       result.geoScope = await this.mapGeoScope(item);
       result.partners = await this.mapPartners(item);
       result.evidence = this.mapEvidence(item);
+
+      // KP publication handle → evidence carrier for duplicate identity (T-13).
+      // Must run after `mapEvidence` so PRMS evidence rows are preserved.
+      if (
+        indicator === IndicatorsEnum.KNOWLEDGE_PRODUCT &&
+        !isEmpty(item?.knowledge_product_summary?.handle)
+      ) {
+        const handle = item.knowledge_product_summary.handle;
+        const existing = result.evidence?.evidence ?? [];
+        const alreadyHasHandle = existing.some(
+          (el) => el.evidence_url === handle,
+        );
+        result.evidence = {
+          ...result.evidence,
+          evidence: alreadyHasHandle
+            ? existing
+            : ([{ evidence_url: handle }, ...existing] as ResultEvidence[]),
+        };
+      }
 
       if (indicator === IndicatorsEnum.POLICY_CHANGE) {
         result.policyChange = await this.mapPolicyChange(

@@ -19,6 +19,13 @@ import {
 } from '../utils/array.util';
 import { ResultLever } from '../../entities/result-levers/entities/result-lever.entity';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
+import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
+import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
+import { ResultsUtil } from '../utils/results.util';
+import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import {
   DuplicateGroupClassification,
@@ -28,13 +35,6 @@ import {
   resolveDuplicateGroup,
 } from '../utils/duplicate-result-priority.util';
 import { isEmpty } from '../utils/object.utils';
-import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
-import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
-import { ResultsUtil } from '../utils/results.util';
-import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
-import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
-import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
-import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 import { QueryService, ResultDeleteStatus } from '../utils/query.service';
 import {
   DuplicateCandidate,

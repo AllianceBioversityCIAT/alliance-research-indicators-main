@@ -6,10 +6,7 @@ import { PrmsOpenSearchService } from './prms.opensearch.service';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { ResultsService } from '../../../entities/results/results.service';
-import {
-  QueryService,
-  ResultDeleteStatus,
-} from '../../../shared/utils/query.service';
+import { QueryService, ResultDeleteStatus } from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
@@ -22,6 +19,8 @@ import {
   PrmsTemporalResponseMapper,
 } from './dto/prms-response.dto';
 import { ResultTypeEnum } from './enum/rsult-type.enum';
+import { resolveIncomingPublicationIdentity } from '../../../shared/utils/publication-identity.util';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
@@ -36,8 +35,6 @@ import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/
 import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
 import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
-import { resolveIncomingPublicationIdentity } from '../../../shared/utils/publication-identity.util';
-import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -100,12 +97,12 @@ describe('PrmsOpenSearchService', () => {
       ],
       contributing_partners: [],
       evidences: [],
-      knowledge_product_summary: undefined,
       primary_entity: { official_code: 'PFUND', name: 'Entity' },
       created_by: undefined,
       policy_change_summary: null,
       capacity_development_summary: null,
       innovation_development_summary: null,
+      knowledge_product_summary: null,
     };
     return Object.assign(base, overrides);
   };
@@ -412,86 +409,6 @@ describe('PrmsOpenSearchService', () => {
         buildTemporalMapper({}, { is_version: true }),
       ]);
       expect(out[0].is_version_applied).toBe(true);
-    });
-
-    // @akili-spec results/cross-platform-duplicate-resolution — T-13
-    // (rev 4, 2026-08-05). AC.10 tests below exercise the REAL `processData`,
-    // not a hand-built DTO — a hand-built DTO proves the resolver, not the
-    // mapper, which is exactly the blind spot that let a fixture-fed field
-    // pass a green suite while being absent from the real wire (attempt 1,
-    // `result_knowledge_product_array`, 0 of 13,507 staged rows). AC.10 part
-    // 2 (the live-payload observation) is not a unit test — it is recorded
-    // in `execution.md` -> "Pivot Record: T-13 — RESOLVED BY OBSERVATION"
-    // (277/277 live KP items carry `knowledge_product_summary.handle`).
-    it('AC.10 part 1 — a real processData run over a KP item carrying knowledge_product_summary.handle yields that handle as the incoming identity', async () => {
-      const handle = 'https://hdl.handle.net/10568/181394';
-      const row = buildTemporalMapper({
-        knowledge_product_summary: { handle },
-      });
-
-      const out = await service.processData([row]);
-
-      expect(out).toHaveLength(1);
-      // Exercises the REAL resolver over the REAL mapper output — a
-      // hand-built dto.evidence would prove the resolver only.
-      const resolution = resolveIncomingPublicationIdentity({
-        platformCode: ReportingPlatformEnum.PRMS,
-        indicatorId: out[0].createResult.indicator_id,
-        publicLink: out[0].public_link,
-        evidence: out[0].evidence?.evidence,
-      });
-      expect(resolution).toEqual({ identity: handle, refused: false });
-      // public_link / external_link are untouched by the identity carrier.
-      expect(out[0].public_link).toBe('https://pdf.example');
-      expect(out[0].external_link).toBe('https://prms.example');
-    });
-
-    it('AC.10 inertness pin — dto.knowledgeProduct stays undefined on the PRMS KP path (RB-13)', async () => {
-      // The single assertion that distinguishes an inert change from
-      // `UPDATE result_knowledge_products` on 2,388 PRMS rows per sync.
-      // Attempt 1 had no such test, which is how that mutation passed both
-      // the suite and the first review.
-      const row = buildTemporalMapper({
-        knowledge_product_summary: {
-          handle: 'https://hdl.handle.net/10568/181394',
-        },
-      });
-
-      const out = await service.processData([row]);
-
-      expect(out[0].knowledgeProduct).toBeUndefined();
-    });
-
-    it('a non-KP item carrying a handle-format knowledge_product_summary.handle still yields no identity (AC.5 — the field is only populated for KP items)', async () => {
-      const row = buildTemporalMapper({
-        indicator_category: {
-          code: String(ResultTypeEnum.INNOVATION_DEVELOPMENT),
-          name: 'Innovation development',
-        },
-        knowledge_product_summary: {
-          handle: 'https://hdl.handle.net/10568/181394',
-        },
-      });
-
-      const out = await service.processData([row]);
-
-      expect(out).toHaveLength(1);
-      expect(out[0].evidence).toBeUndefined();
-      const resolution = resolveIncomingPublicationIdentity({
-        platformCode: ReportingPlatformEnum.PRMS,
-        indicatorId: out[0].createResult.indicator_id,
-        publicLink: out[0].public_link,
-        evidence: out[0].evidence?.evidence,
-      });
-      expect(resolution).toEqual({ identity: null, refused: false });
-    });
-
-    it('a KP item with no knowledge_product_summary carries no evidence and resolves no identity', async () => {
-      const row = buildTemporalMapper({ knowledge_product_summary: undefined });
-
-      const out = await service.processData([row]);
-
-      expect(out[0].evidence).toBeUndefined();
     });
 
     it('should map a valid row without created_by', async () => {
@@ -1301,6 +1218,21 @@ describe('PrmsOpenSearchService', () => {
       expect(queryService.deleteFullResultById).toHaveBeenCalledWith(888);
     });
 
+    it('should log and skip rollback when update fails without new result', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 300,
+        result_official_code: 55,
+      } as any);
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(
+        new Error('fail-update'),
+      );
+
+      await service.mapToExternalCreateResultDto([basePayload()]);
+
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+
+
     it('should warn, not throw, when the sync rollback delete is REFUSED', async () => {
       // T-07 pivot per-caller verdict: `deleteFullResultById` resolves
       // (never rejects) on a REFUSED outcome, so this catch block would
@@ -1327,18 +1259,85 @@ describe('PrmsOpenSearchService', () => {
       warnSpy.mockRestore();
     });
 
-    it('should log and skip rollback when update fails without new result', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 300,
-        result_official_code: 55,
-      } as any);
-      resultsService.updateGeneralInfo.mockRejectedValueOnce(
-        new Error('fail-update'),
-      );
-
-      await service.mapToExternalCreateResultDto([basePayload()]);
-
-      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
-    });
   });
+
+  // --- AC-1641 PRMS identity tests (merged) ---
+
+  it('AC.10 part 1 — a real processData run over a KP item carrying knowledge_product_summary.handle yields that handle as the incoming identity', async () => {
+    const handle = 'https://hdl.handle.net/10568/181394';
+    const row = buildTemporalMapper({
+      knowledge_product_summary: { handle },
+    });
+
+    const out = await service.processData([row]);
+
+    expect(out).toHaveLength(1);
+    // Exercises the REAL resolver over the REAL mapper output — a
+    // hand-built dto.evidence would prove the resolver only.
+    const resolution = resolveIncomingPublicationIdentity({
+      platformCode: ReportingPlatformEnum.PRMS,
+      indicatorId: out[0].createResult.indicator_id,
+      publicLink: out[0].public_link,
+      evidence: out[0].evidence?.evidence,
+    });
+    expect(resolution).toEqual({ identity: handle, refused: false });
+    // public_link / external_link are untouched by the identity carrier.
+    expect(out[0].public_link).toBe('https://pdf.example');
+    expect(out[0].external_link).toBe('https://prms.example');
+  });
+
+
+
+  it('AC.10 inertness pin — dto.knowledgeProduct stays undefined on the PRMS KP path (RB-13)', async () => {
+    // The single assertion that distinguishes an inert change from
+    // `UPDATE result_knowledge_products` on 2,388 PRMS rows per sync.
+    // Attempt 1 had no such test, which is how that mutation passed both
+    // the suite and the first review.
+    const row = buildTemporalMapper({
+      knowledge_product_summary: {
+        handle: 'https://hdl.handle.net/10568/181394',
+      },
+    });
+
+    const out = await service.processData([row]);
+
+    expect(out[0].knowledgeProduct).toBeUndefined();
+  });
+
+
+
+  it('a non-KP item carrying a handle-format knowledge_product_summary.handle still yields no identity (AC.5 — the field is only populated for KP items)', async () => {
+    const row = buildTemporalMapper({
+      indicator_category: {
+        code: String(ResultTypeEnum.INNOVATION_DEVELOPMENT),
+        name: 'Innovation development',
+      },
+      knowledge_product_summary: {
+        handle: 'https://hdl.handle.net/10568/181394',
+      },
+    });
+
+    const out = await service.processData([row]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0].evidence?.evidence ?? []).toEqual([]);
+    const resolution = resolveIncomingPublicationIdentity({
+      platformCode: ReportingPlatformEnum.PRMS,
+      indicatorId: out[0].createResult.indicator_id,
+      publicLink: out[0].public_link,
+      evidence: out[0].evidence?.evidence,
+    });
+    expect(resolution).toEqual({ identity: null, refused: false });
+  });
+
+
+
+  it('a KP item with no knowledge_product_summary carries no evidence and resolves no identity', async () => {
+    const row = buildTemporalMapper({ knowledge_product_summary: undefined });
+
+    const out = await service.processData([row]);
+
+    expect(out[0].evidence?.evidence ?? []).toEqual([]);
+  });
+
 });

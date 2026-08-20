@@ -252,8 +252,9 @@ export class DuplicateCandidateRepository extends Repository<Result> {
    * never hold one transaction across the whole run (NFR-RES-002).
    *
    * @returns Group keys with member, platform and report-year counts. A group
-   *          whose `reportYears > 1` is classified `CROSS_YEAR_REVIEW` by the
-   *          resolver and is never auto-deleted.
+   *          whose `reportYears > 1` spans multiple report years; as of
+   *          R-CYD-001, cross-year same-handle groups resolve under Rules 1–3
+   *          like same-year groups and are eligible for auto-deletion.
    */
   async findCrossPlatformGroupKeys(filters: {
     reportYearId?: number;
