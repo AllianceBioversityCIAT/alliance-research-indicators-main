@@ -174,6 +174,67 @@
             }
           </section>
 
+          <!--
+            R-BIL-127 / design.md §6.3 — the Primary designation is a SEPARATE,
+            single-choice control over the already-selected set (D-C2-7): not a
+            second multiselect, not a mode toggle on app-multiselect above.
+            Renders once there is something to designate a Primary among.
+          -->
+          @if (formData().selected_sps.length >= 1) {
+            <section class="mb-6" data-testid="pf-alignment-primary-section">
+              <p id="pf-alignment-primary-question" class="label inline-block mb-2">
+                {{ PRIMARY_SP_LABEL }}<span class="text-red-500" aria-hidden="true">*</span>
+              </p>
+              <div role="radiogroup"
+                   aria-labelledby="pf-alignment-primary-question"
+                   aria-required="true"
+                   class="flex flex-col gap-2"
+                   data-testid="pf-alignment-primary-radio-group">
+                @for (sp of formData().selected_sps; track sp.official_code) {
+                  @let primarySp = findScienceProgram(sp.official_code);
+                  <div class="pf-primary-row flex items-center gap-3"
+                       [attr.data-testid]="'pf-alignment-primary-row-' + sp.official_code">
+                    <p-radioButton
+                      name="pf-alignment-primary"
+                      [inputId]="'pf-alignment-primary-' + sp.official_code"
+                      [value]="sp.official_code"
+                      [ngModel]="primarySpCode()"
+                      (ngModelChange)="onPrimaryChange($event)"
+                      [disabled]="primaryControlDisabled()"
+                      [attr.data-testid]="'pf-alignment-primary-radio-' + sp.official_code"></p-radioButton>
+                    <label [for]="'pf-alignment-primary-' + sp.official_code"
+                           class="option-label flex items-center gap-2 min-w-0 flex-wrap">
+                      <span class="truncate">
+                        <strong>{{ sp.official_code }} — {{ primarySp?.allocation ?? '—' }}%</strong> - {{ sp.name }}
+                      </span>
+                      <!--
+                        AC.6 — non-colour-only cue: a text label ("Primary"/"Contributing")
+                        always present, plus an icon on the Primary role only. Colour
+                        alone never carries the distinction (WCAG 2.1 AA 1.4.1, PRD C-4).
+                      -->
+                      @if (isPrimary(sp.official_code)) {
+                        <span class="pf-role-badge pf-role-badge--primary"
+                              [attr.data-testid]="'pf-alignment-role-primary-' + sp.official_code">
+                          <i class="pi pi-star-fill" aria-hidden="true"></i>
+                          {{ PRIMARY_ROLE_LABEL }}
+                        </span>
+                      } @else {
+                        <span class="pf-role-badge pf-role-badge--contributing"
+                              [attr.data-testid]="'pf-alignment-role-contributing-' + sp.official_code">
+                          {{ CONTRIBUTING_ROLE_LABEL }}
+                        </span>
+                      }
+                    </label>
+                  </div>
+                }
+              </div>
+              @if (primaryRequiredMessage() ?? inlineErrors()?.['primary_sp_code']; as msg) {
+                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                       data-testid="pf-alignment-error-primary_sp_code">{{ msg }}</small>
+              }
+            </section>
+          }
+
           @if (showHloSection() && hloSectionVisible()) {
             <section class="mb-6" data-testid="pf-alignment-hlo-section">
               <p class="label inline-block mb-3">
@@ -212,32 +273,64 @@
                 </div>
               }
 
-              <!-- AC-08.4 — stale saved alignments render read-only from their snapshot. -->
-              @for (stale of staleSnapshots(); track stale.sp_code) {
+              <!--
+                AC-08.4 / R-BIL-129 — read-only summary for every saved ToC row
+                that is no longer editable here: explicitly stale (toc_result_id
+                no longer resolves), no longer the Primary's row (orphaned by a
+                role change, R-BIL-125), or both at once. `readOnlyTocSummaries`
+                unions the two reasons by sp_code (component.ts), so a row that
+                qualifies as both renders in this ONE loop iteration, not two
+                (R-BIL-129 AC.5). Display-only: excluded from canSave()/isDirty()/
+                the PATCH body by construction — this loop reads only
+                `alignment()?.toc_alignments` (server data), never `formData()`.
+              -->
+              @for (row of readOnlyTocSummaries(); track row.alignment.sp_code) {
                 <div class="pf-stale-snapshot flex flex-col gap-2 p-4 rounded-[8px] mb-4"
-                     [attr.data-testid]="'pf-alignment-stale-' + stale.sp_code">
+                     [attr.data-orphaned]="row.isOrphaned ? 'true' : null"
+                     [attr.data-stale]="row.isStale ? 'true' : null"
+                     [attr.data-testid]="(row.isStale ? 'pf-alignment-stale-' : 'pf-alignment-orphaned-') + row.alignment.sp_code">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <strong class="text-[14px] text-[var(--ac-grey-800)]">{{ stale.sp_code }}</strong>
-                    <span class="pf-stale-tag" role="status" aria-live="polite"
-                          [attr.data-testid]="'pf-alignment-stale-tag-' + stale.sp_code">
-                      {{ STALE_SNAPSHOT_TAG }}
-                    </span>
+                    <strong class="text-[14px] text-[var(--ac-grey-800)]">{{ row.alignment.sp_code }}</strong>
+                    @if (row.isStale) {
+                      <span class="pf-stale-tag" role="status" aria-live="polite"
+                            [attr.data-testid]="'pf-alignment-stale-tag-' + row.alignment.sp_code">
+                        {{ STALE_SNAPSHOT_TAG }}
+                      </span>
+                    }
+                    @if (row.isOrphaned) {
+                      <span class="pf-stale-tag" role="status" aria-live="polite"
+                            [attr.data-testid]="'pf-alignment-orphaned-tag-' + row.alignment.sp_code">
+                        {{ ORPHANED_TOC_TAG }}
+                      </span>
+                    }
                   </div>
                   <div class="text-[13px] text-[var(--ac-grey-700)] flex flex-col gap-1">
-                    <span>{{ stale.toc_result_title }}</span>
-                    <span>{{ stale.indicator_description }}</span>
-                    <span>
-                      {{ stale.unit_of_measurement || '—' }} ·
-                      Target ({{ stale.target_year }}): {{ stale.target_value ?? '—' }} ·
-                      Contribution: {{ stale.quantitative_contribution ?? '—' }}
-                    </span>
+                    @if (row.alignment.aligns_with_toc) {
+                      <span>{{ row.alignment.toc_result_title }}</span>
+                      <span>{{ row.alignment.indicator_description }}</span>
+                      <span>
+                        {{ row.alignment.unit_of_measurement || '—' }} ·
+                        Target ({{ row.alignment.target_year }}): {{ row.alignment.target_value ?? '—' }} ·
+                        Contribution: {{ row.alignment.quantitative_contribution ?? '—' }}
+                      </span>
+                    } @else {
+                      <span>{{ NO_TOC_ALIGNMENT_MESSAGE }}</span>
+                    }
                   </div>
                 </div>
               }
 
-              <!-- One independent block per selected SP (AC-02.2/03.1). -->
-              <div class="flex flex-col gap-4">
-                @for (sp of formData().selected_sps; track sp.official_code) {
+              <!--
+                R-BIL-128 AC.1/AC.4/AC.5 — the ToC block renders for the Primary
+                SP ALONE (design.md §6.2 — sp-toc-alignment-block itself is not
+                modified; gating is this @if in the parent). No Primary chosen ⇒
+                no block (AC.5); changing the Primary re-evaluates this signal and
+                the block follows (AC.4). Contributing SPs render nothing here —
+                their saved rows, if any, are covered by the read-only summary
+                loop above (R-BIL-129).
+              -->
+              @if (primarySelectedSp(); as sp) {
+                <div class="flex flex-col gap-4">
                   <app-sp-toc-alignment-block
                     [sp]="sp"
                     [catalog]="catalogForSp(sp.official_code)"
@@ -251,8 +344,8 @@
                     (retryCatalog)="retryCatalog()"
                     [attr.data-testid]="'pf-alignment-block-' + sp.official_code">
                   </app-sp-toc-alignment-block>
-                }
-              </div>
+                </div>
+              }
               }
             </section>
           }

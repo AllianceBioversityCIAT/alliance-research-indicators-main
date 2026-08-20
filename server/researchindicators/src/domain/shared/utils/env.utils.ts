@@ -36,6 +36,16 @@ export class ENV {
   }
 
   /**
+   * @sdd-spec bugfix/bilateral-alliance-selector — T-02 / R-BAS-003
+   *
+   * Fallback phase for CLARISA project mapping when app_config has no value.
+   * Empty string when unset; MappingPhaseResolver treats empty/unset as fallthrough to default 2026.
+   */
+  static get CLARISA_PROJECTS_PHASE(): string {
+    return process.env.ARI_CLARISA_PROJECTS_PHASE?.trim() || '';
+  }
+
+  /**
    * @sdd-spec bilateral-module/pending-items — T-15.12 / R-BIL-077
    *
    * Base host for the PRMS public-results-framework ToC integration. The

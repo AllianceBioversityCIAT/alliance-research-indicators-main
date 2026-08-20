@@ -209,7 +209,7 @@
       @if (d.toc_result_id !== null) {
         <div class="flex flex-col gap-1">
           <label [for]="'sp-toc-indicator-' + spCode()" class="label inline-block">
-            {{ INDICATOR_LABEL }}<span class="sp-toc-block__required" aria-hidden="true">*</span>
+            {{ INDICATOR_LABEL }}
           </label>
           @if (showEmptyIndicators()) {
             <div
@@ -238,7 +238,6 @@
                 [disabled]="disabled()"
                 [ngModel]="d.indicator_id"
                 (onChange)="onIndicatorChange($event.value)"
-                [attr.aria-required]="true"
                 styleClass="sp-toc-block__select"
                 panelStyleClass="sp-toc-select-panel"
                 [panelStyle]="selectPanelStyle()"
@@ -311,7 +310,7 @@
 
           <div class="flex flex-col gap-1">
             <label [for]="'sp-toc-contribution-input-' + spCode()" class="label inline-block">
-              {{ CONTRIBUTION_LABEL }}<span class="sp-toc-block__required" aria-hidden="true">*</span>
+              {{ CONTRIBUTION_LABEL }}
             </label>
             <div class="sp-toc-block__contribution-input">
               <p-inputNumber
@@ -321,7 +320,6 @@
                 [min]="0"
                 [useGrouping]="false"
                 [disabled]="disabled()"
-                [attr.aria-required]="true"
                 placeholder="Enter amount"
                 [attr.data-testid]="'sp-toc-contribution-input-' + spCode()">
               </p-inputNumber>
