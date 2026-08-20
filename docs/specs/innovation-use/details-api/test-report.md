@@ -1,5 +1,9 @@
 # Test Report — Results (Innovation Use) / Details API
 
+> ## ⚠️ This document is **LIVE, not frozen** — read this first
+>
+> It was issued as a point-in-time record and has since been **selectively edited** (2026-08-20) as remediation closed findings. That mixture is itself a defect: a reader could not tell which rows were frozen and which were current, and an audit found **ten stale figure sites and two stale ❌ verdicts** surviving inside it *after* its header figures had been corrected — the same "verify deletion, not just insertion" failure this spec had logged one round earlier, recurring in the document `execution.md` names as the coverage authority. **Every figure and verdict in this file is now current as of the 2026-08-20 closing run.** Historical claims are marked as such inline.
+>
 > **Overall: FAIL — 5 unresolved failures. Superseded by `validation-report.md` (2026-08-20).** Originally issued as *PASS with 6 recorded gaps*; both the verdict and the count were wrong. There are **7** gaps, not 6 — the enumeration below always ran G-1…G-7 while three headings said "6", in a document whose own thesis is that counts must be grepped rather than asserted. And `/akili-validate` found a **second, un-gated variant** of G-1 that falsifies four ACs this report marked ✅. Retained as a point-in-time record; read `validation-report.md` for the current verdict. Original summary followed: PASS with 6 recorded gaps — one of which is a confirmed product defect and one of which needs a human.** No test was rewritten to hide a failure. Every gap below is a decision with a reason, not an omission.
 
 - **Module:** results (`innovation-use`) · **Spec id:** 2026-08-innovation-use-details-api
@@ -22,10 +26,8 @@
 | Fixtures (real MySQL) | **14 suites / 64 tests, 0 failed** — run **twice** on the same scratch container |
 | Typecheck / lint | `tsc --noEmit` clean · `eslint --no-fix` clean on every touched file |
 | Provenance | **One closing run, 2026-08-20, executed by the Leader — not relayed from any worker report.** Identical figures in `tasks.md` §7. Withheld through two remediation rounds on purpose: this line had gone stale twice (2264 → 2275 → 2279), and the fix for a repeatedly-stale figure is to derive it once from one run rather than to restate it faster |
-| Integration (fixtures) | **14 suites / 54 tests** — all green, on **two consecutive runs** |
-| Coverage | 89.69 statements · 75.61 branches · 85.13 functions · 89.14 lines — all ≥ the 60% floor |
 | Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
-| Gaps requiring a human | **1** — the `/swagger` observation (`R-IUA-013 AC.3`) |
+| Gaps requiring a human | **0** — the `/swagger` observation (`R-IUA-013 AC.3`) was **performed and recorded** on 2026-08-20 (`execution.md` → *Human `/swagger` Observation*), closing G-7 |
 
 ---
 
@@ -35,8 +37,8 @@
 
 | Suite | Disposition | Detail |
 | --- | --- | --- |
-| Backend unit | **Cited** | 336 suites / 2264 tests **repo-wide**; this spec authored **8** of those suite files (T-01…T-08) — the original wording "authored T-01…T-08" wrongly attributed the whole repo's suite count to this spec. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
-| Integration / fixtures | **Cited + extended by 1 Tester** | F-A…F-E authored T-09…T-13 (49 tests). The Tester added **5 tests** closing the two unowned properties → 54 |
+| Backend unit | **Cited** | 336 suites / **2279** tests **repo-wide** *(closing run, 2026-08-20)*; this spec authored **8** of those suite files (T-01…T-08) — the original wording "authored T-01…T-08" wrongly attributed the whole repo's suite count to this spec. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
+| Integration / fixtures | **Cited + extended by 1 Tester** | F-A…F-E authored T-09…T-13 (49 tests). The Tester added **5 tests** closing the two unowned properties → 54; the two 2026-08-20 remediation rounds added **10 more** → **64** |
 | Frontend unit | **N/A — not a gap** | `design.md` scopes this chunk **server-only**; the STAR client is chunk 3 (`details-page`). Recorded so the absence reads as a decision |
 | E2E | **BLOCKED — gap G-3** | Infrastructure exists but cannot be used without writing to a **shared** database. See G-3 |
 
@@ -74,13 +76,13 @@ Closed with a rolled-back transaction: `create(id, m)` inside `dataSource.transa
 
 ## Suites
 
-### Backend unit — 336 suites / 2264 tests, green
+### Backend unit — 336 suites / 2279 tests, green
 
 Authored during execute; cited here. The mutation discipline is why they are credible rather than merely numerous: T-07 ran a **two-axis, 16-mutation** sweep (7 wiring + 9 DTO-rule); T-03 a 12-mutation sweep; T-04 M1–M9 **up front**, which is the change that turned T-03's three review rounds into T-04's one.
 
 **What this tier structurally cannot prove** (`design.md` §10.1): anything about persistence, HTTP, auth, the envelope on the wire, or Swagger.
 
-### Integration / fixtures — 14 suites / 54 tests, green on two consecutive runs
+### Integration / fixtures — 14 suites / 64 tests, green on two consecutive runs
 
 Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, not a courtesy** — T-13's C-4 cleanup risked orphaning a `reporting_platforms` row that only a *second* run would collide with.
 
@@ -117,16 +119,16 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | R-IUA-008 | other quantitative measures | unit + F-A | T-05/T-06; F-A | ✅ |
 | R-IUA-009 AC.1/AC.2 | role isolation | **F-B** | ✅ **CLOSED 2026-08-20** — `assertInnovationUseOwnership` rejects before any write; save #3 asserts the Dev row byte-identical after a payload carrying its id | ✅ |
 | R-IUA-009 **AC.4** | *"every deactivate/update predicate names the role column"* | **F-B** | ⚠️ **NARROWED, not satisfied as written.** Every *deactivate* predicate names the role. The *id-present save*'s predicate is still the primary key — pre-validated against `(result_id, role)`, which is rejection-before-write rather than a role-bearing predicate. ✅ **AC text amended 2026-08-20** — recorded as a narrowing in `requirements.md`, not as a satisfaction |
-| R-IUA-009 **AC.3** | no cross-result write | **F-B** | 2 tests **`it.failing`** | ❌ **G-1 — PRODUCT DEFECT** |
+| R-IUA-009 **AC.3** | no cross-result write | **F-B** | 2 tests, **formerly `it.failing`** | ✅ **G-1 CLOSED 2026-08-20** — the defect was **fixed** (option A), not the criterion softened; both quarantine markers inverted to passing. **Zero `it.failing` remain anywhere under `test/`** |
 | R-IUA-010 AC.3 | catalog order `0…9` | **F-D** | F-D green | ⚠️ **G-5** — cannot falsify |
 | R-IUA-011 | IP Rights row; `completness` both ways | unit + **F-E** | F-E | ✅ |
 | R-IUA-011 scenario | *"the submit transition is permitted"* | — | — | ⚠️ **G-2** — unowned |
 | R-IUA-012 | green checks reflect the save; no push (DD-7) | unit + F-E | F-E | ✅ |
 | R-IUA-013 AC.1/AC.2/AC.4/AC.5/AC.6/AC.7 | envelope, exceptions, decorators, registration, no `console`, audit | unit + F-A/F-E | T-07 suite; `entities.module.spec.ts` | ✅ |
-| R-IUA-013 **AC.3** | Swagger surface | **human** | — | ❌ **G-7 — awaits the user** |
+| R-IUA-013 **AC.3** | Swagger surface | **human** | user's own observation, recorded verbatim | ✅ **G-7 CLOSED 2026-08-20** |
 | NFR-IUA-001 | ≤ 5 queries at 50 actor rows | **F-A** | measured **exactly 5** with 52 active rows | ✅ at the ceiling |
-| NFR-IUA-002 | fixtures collected & green from a fresh bootstrap | F-A…F-E | 54 tests, twice | ✅ |
-| NFR-IUA-003 | coverage ≥ 60% | `test:cov` | 89.69/75.61/85.13/89.14 | ✅ |
+| NFR-IUA-002 | fixtures collected & green from a fresh bootstrap | F-A…F-E | **64** tests, twice | ✅ |
+| NFR-IUA-003 | coverage ≥ 60% | `test:cov` | **89.76/75.64/85.27/89.22** | ✅ |
 
 **Negative constraints (`BUT it must NOT`) explicitly asserted:** no hard-delete (F-A, unfiltered id read-back) · no cross-role deactivation (F-B, 3 falsifications) · `total` not rejected when client-sent, and stripped (T-07 Case 9) · no `GreenChecksRepository` call on the write path (DD-7, grep = 0) · neither `innovation_use` nor `ip_rights` in `VISUAL_ONLY_GREEN_CHECKS` (F-E + grep) · no `@Roles` on the controller (DD-5) · level never resolved by FK or by name (F-C + grep).
 
@@ -181,7 +183,7 @@ A **stronger reason than the spec records** was found while looking for a safe a
 | Gap | Owner | Action |
 | --- | --- | --- |
 | **G-1** | ✅ **CLOSED** | User ruled **A**. `assertInnovationUseOwnership` scopes the id-present save by `(result_id, role)` in both services; both halves proven load-bearing by four permanent unit tests; deleting either guard now reddens `npm test`. **Dev's exposure remains — separate ticket** |
-| **G-7** | **User** | Run the `/swagger` observation — unblocks 3 checkboxes |
+| ~~**G-7**~~ | ~~**User**~~ | ✅ **DONE 2026-08-20** — observation performed and recorded; the 3 dependent checkboxes released |
 | G-3 | Follow-up spec | An e2e project pointed at the scratch container |
 | G-6 | Optional | Run the one unrun mutation, or accept the stated residual |
 | G-2, G-4, G-5 | Accepted | Recorded with reasons; each is structurally bounded |
@@ -190,4 +192,4 @@ A **stronger reason than the spec records** was found while looking for a safe a
 
 **G-2, G-4, G-5** are accepted as recorded. Each is a *stated limit of a tier*, not missing work: the submit transition is structurally implied and outside this spec's authorization surface; AC.7's mechanism is proven and DD-16 scoped the claim deliberately; and F-D's weakness is documented in three places rather than dressed up.
 
-**Not accepted, and not to be read as accepted:** G-1 is an open product defect and G-7 is an unperformed gate. Neither is a limitation of testing.
+**Both formerly-unaccepted gaps are now CLOSED (2026-08-20):** G-1's defect was fixed rather than accepted, and G-7's observation was performed. The original text read *"G-1 is an open product defect and G-7 is an unperformed gate"* — true when written, false now. Neither is a limitation of testing.
