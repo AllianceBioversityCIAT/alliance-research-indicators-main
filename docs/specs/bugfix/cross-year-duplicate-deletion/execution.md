@@ -65,3 +65,37 @@ Tests: 1 failed, 42 passed, 43 total
 - Reviewer: **PASS**
 - Forward note for T-03: enum `CROSS_YEAR_REVIEW` docstring still says "never auto-deleted"
 
+
+### T-03 — Amend parent R-RES-006 / design / runbook language
+
+| Field | Value |
+| --- | --- |
+| **Final status** | PASS |
+| **Date** | 2026-08-20 |
+| **Attempts** | 2 |
+| **Requirements** | R-CYD-001 AC.4 |
+| **Implementer** | attempt1 [cd766215](cd766215-b25e-4a53-bd1c-a9f29d7ffac9) · attempt2 [9a1d97b3](9a1d97b3-cb23-4839-9855-0edba16e2154) |
+| **Reviewer** | attempt1 FAIL [e8220e2a](e8220e2a-d6b0-4920-965a-54bcbf54095a) · attempt2 PASS [bc9817cb](bc9817cb-052d-408e-b237-c4c4f6af17e5) |
+
+#### Attempt 1
+- Amended R-RES-006, design bullets, runbook checklist, enum docstring
+- Reviewer **FAIL**: design.md §13 OQ-3 still open; DC-2 still called CROSS_YEAR a permanent non-resolution; narrow grep missed alternate phrasing
+
+#### Attempt 2 (effort high)
+- Closed design OQ-3; amended DC-2; fixed R-RES-006 index title; broader phrasing sweep
+- Reviewer **PASS** (MEL sign-off checkbox listing OQ-3 judged non-blocking)
+
+---
+
+## Summary (all tasks complete)
+
+| Task | Status | Attempts | Commit |
+| --- | --- | --- | --- |
+| T-01 | PASS | 1 | `c26dcfe0` |
+| T-02 | PASS | 2 | `894a556d` |
+| T-03 | PASS | 2 | _(this commit)_ |
+
+**Outcome:** Sweep no longer vetoes same-handle cross-year duplicates; exemplar regression green; parent R-RES-006 / OQ-3 / runbook aligned with R-CYD-001 Option A.
+
+**Push:** left to the user (branch ahead of origin).
+

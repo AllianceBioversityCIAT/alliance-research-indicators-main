@@ -3,7 +3,7 @@
 - **Module:** results
 - **Spec id:** 2026-08-cross-year-duplicate-deletion
 - **Depth:** Lite · **Bug Mode**
-- **Status:** in-progress (T-02 done; next T-03)
+- **Status:** completed (all tasks [x])
 - **Owner:** ARI server squad
 - **Linked requirements:** `./requirements.md`
 - **Linked design:** `./design.md` (DD-1, DD-2, DD-3; budget 2–3 tasks / ~80–150 LOC)
@@ -103,7 +103,7 @@ graph TD
 
 ### T-03 — Amend parent R-RES-006 / design / runbook language
 
-- **Status:** todo
+- **Status:** [x] done
 - **Size:** S
 - **Dependencies:** T-02
 - **Requirements covered:** R-CYD-001 AC.4
@@ -122,9 +122,9 @@ graph TD
   - **Disqualifier:** only editing one file while sibling docs still instruct operators to treat all cross-year as review-only.
   - **Fail input:** a sentence that still tells operators cross-year same-handle groups are never deleted.
 - **Done criteria:**
-  - [ ] R-RES-006 text amended.
-  - [ ] Design + runbook aligned.
-  - [ ] Forward grep of superseded veto language is clean or explicitly historical.
+  - [x] R-RES-006 text amended.
+  - [x] Design + runbook aligned.
+  - [x] Forward grep of superseded veto language is clean or explicitly historical.
 
 ---
 

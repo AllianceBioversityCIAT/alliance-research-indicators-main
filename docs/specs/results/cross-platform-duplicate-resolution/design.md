@@ -431,7 +431,7 @@ The corrected resolver evaluates **pairwise over the group and requires a rule t
 6. Several never-loses rows can survive together. If they are **same-platform**, that is same-system ambiguity: those rows are left untouched, **but cross-platform losers the group unambiguously produced are still deleted** — a row that lost to every survivor lost regardless of which survivor prevails, so its deletion is authorized (rev 1 froze the whole group and left genuine duplicates stored — JD-03/F-3). If never-loses rows span **platforms**, the rule set failed to decide a cross-platform pair: `UNRESOLVED_CONFLICT`, nothing deleted. The current rules decide every cross-platform pair, so this cannot fire today; it exists so a future rule change surfaces as a report rather than as arbitrary deletion.
 
    **Every row's fate must be asserted in tests, not only the row a prior revision got wrong.** Both defects above survived because the test and the narrative checked one row and left the others untraced (see §10).
-7. Groups spanning >1 `report_year_id` in the sweep → `CROSS_YEAR_REVIEW`, reported, never auto-deleted (**56 groups today**; rev 2 measured 11).
+7. ~~Groups spanning >1 `report_year_id` in the sweep → `CROSS_YEAR_REVIEW`, reported, never auto-deleted (**56 groups today**; rev 2 measured 11).~~ **Amended 2026-08-20 (R-CYD-001 / OQ-3 Option A):** cross-year same-identity groups now resolve under Rules 1–3 exactly like same-year groups. `report_year_id` is shown in the plan `participants` list and usable as a filter; it is not a deletion veto. `CROSS_YEAR_REVIEW` is retained for historical audit rows only.
 8. **Multi-identity refusal (rev 3, R-RES-010) — the PARTICIPANT is refused, not the group.** A result that resolves to more than one identity is classified `UNRESOLVED_CONFLICT` **for itself**: never deleted, never counted as an omission, reported in full. **Every other member of each group it touches resolves normally and is still deleted if it lost.**
 
    The pairwise resolver assumes membership is a **partition** — each row in exactly one group, so "this row lost" is a complete statement about its fate. Multi-identity turns membership into a **graph**, and the approved rules were never given a meaning over that shape. Refusing the ambiguous row is the same move as D-dup-13.
@@ -655,7 +655,7 @@ Two deploys, not three — the backfill step is gone with the column.
 
 **Rev 3 — `apply` is batched, not one sweep (OQ-11).** The reviewable artifact grew 20× with the group count, and a 2,359-group document reviewed in one sitting is a gate in name only. `apply` runs **filtered by `report-year`**, one year per confirmed plan, which the existing query filters already support with **no code change** — the digest and TTL apply per batch, so each batch is separately reviewed and separately confirmed. Order the batches oldest-year-first: the oldest data is the most settled, so the first batch is the cheapest place to discover a surprise.
 
-The **56 cross-year groups** are never auto-deleted (R-RES-006) and form a standing manual queue, five times rev 2's 11.
+~~The **56 cross-year groups** are never auto-deleted (R-RES-006) and form a standing manual queue, five times rev 2's 11.~~ **Amended 2026-08-20 (R-CYD-001 / OQ-3 Option A):** those 56 groups now resolve under Rules 1–3 and their losers enter `toDelete`. Year is shown in the plan and usable as a `reportYear` filter; it does not veto deletion.
 
 **Feature flag, fully specified** (rev 1 left the off-behavior undefined, so the shipped default could have been indistinguishable from the bug — JD-W-06): key `duplicate_resolution.hard_delete_enabled`, default `false`. When **off**, the sync path resolves, counts `OMITTED_DUPLICATE`, writes the audit row, and **skips deletion entirely** — it does *not* fall back to a soft delete, because a soft delete is the reported bug. Off is therefore "detect and report, don't delete", the state is visible in the audit table, and the flag state is recorded on every audit row.
 
@@ -689,7 +689,7 @@ Rollout order is therefore **Deploy 1 (schema) → Deploy 2 (code, including T-1
 | **D-dup-5** | 08-04 | **No persisted normalized column, no index, no backfill.** Normalization computed symmetrically in SQL. | **Measured: six normalization levels all find the same 116 groups; one key has multiple raw variants.** Removes 3 tasks, 2 migrations, the TEXT-index impossibility, and most of RK-1. Reverses rev 1's D-dup-5. |
 | D-dup-6 | 08-04 | Complete the delete function for 7 tables + the cross-result mapping columns, derived from `information_schema` | 7 uncovered `NO ACTION` FKs. Zero blocking rows today; correctness for the schema, not for one snapshot. |
 | D-dup-7 | 08-04 | Deletion after the winner commits, per-row error boundary outside the `try` | The `catch` deletes the just-created winner. |
-| D-dup-8 | 08-04 | Auto-deletion same-year; cross-year reported | 11 of 116 groups span 2 years. |
+| D-dup-8 | 08-04 | ~~Auto-deletion same-year; cross-year reported~~ Year-based veto on sweep deletion | 11 of 116 groups span 2 years (now 56 of 2,359). **Superseded 2026-08-20 by `bugfix/cross-year-duplicate-deletion` (R-CYD-001 Option A):** cross-year same-identity groups resolve under Rules 1–3; year is informational/filterable only. |
 | D-dup-9 | 08-04 | Same-platform ambiguity freezes **those rows only**, not the group | Rev 1 froze whole groups, leaving genuine cross-platform duplicates stored. |
 | D-dup-10 | 08-04 | Family deletion is year-scoped, guard-checked per member, transactional, snapshots first | Three defects in a component rev 1 certified as correct. |
 | D-dup-11 | 08-04 | An explicit machine-token block on both endpoints, with a `403` test | The control rev 1 asserted does not exist, and the exposure is live. |
@@ -737,7 +737,7 @@ D-dup-18 **takes away** behavior the shipped code has: PRMS rows currently parti
 
 | id | Question | Owner | Needed by |
 | --- | --- | --- | --- |
-| OQ-3 | Report-year scope: **56** groups span >1 year and are reported, not deleted (rev 2 measured 11). Confirm. | MEL / product | before `apply` |
+| ~~OQ-3~~ | **CLOSED 2026-08-20 — `bugfix/cross-year-duplicate-deletion` (R-CYD-001 / Option A approved).** Cross-year same-identity groups now resolve under Rules 1–3 and enter `toDelete`; year is informational/filterable, not a deletion veto. *(Historical: R-RES-006 originally kept auto-deletion same-year only; the 56 cross-year groups were classified `CROSS_YEAR_REVIEW` and not deleted — that behavior is superseded.)* | MEL / product owner | ✅ closed |
 | **OQ-10** | **370 detectable PRMS duplicates left unresolved** by the KP scope (D-dup-19). Extend to non-KP indicators, at the price of 154 multi-identity rows, 132 multi-group refusals and DC-10 exposure? Recommend **hold at KP**, revisit as a separate spec once the KP sweep has run. | MEL / product | before rollout (non-blocking for `plan`) |
 | **OQ-11** | **Blast radius grew 22×.** `apply` now targets 2,254 PRMS-involving groups. Batching by `report-year` is the design's answer (D-dup-21) — confirm the operator accepts per-year confirmation, and note that AICCRA's irreversible rows are spread across every batch. | ARI ops | **blocks `apply`** |
 | OQ-4 | The 21 AICCRA rows already soft-deleted by the buggy path: leave, or hard-delete in the sweep? Assumed **leave**, excluded from matching. | ARI ops | before rollout |
@@ -745,7 +745,7 @@ D-dup-18 **takes away** behavior the shipped code has: PRMS rows currently parti
 | **OQ-8** | The live machine-token exposure (`app_secret_id 8` → `System Admin`, zero host restrictions) is a finding **independent of this spec**. Who owns remediating it? | Security / eng lead | before Deploy 2 |
 | **OQ-9** | **R-RES-002 AC.2 and AC.5 are mutually inconsistent** for any group holding an AICCRA Capacity-Sharing row, a PRMS/TIP Knowledge Product, and a PRMS/TIP non-KP row. AC.5 gives AICCRA the win; AC.2 gives TIP the win; both apply. MEL must either declare an explicit precedence, or confirm the composition is unresolvable-by-machine. **Resolved for now as option (b)** — `UNRESOLVED_CONFLICT`, reported, nothing deleted (D-dup-13) — on the owner's instruction to proceed. **This is a safe default, not the answer**: it never deletes wrongly, but it also never resolves such a group, so an explicit precedence would strictly increase what gets cleaned. Zero live groups are affected today. | MEL / product owner | before a composition of this shape appears in data |
 
-Closed: OQ-1 (Rule 3 = KP only), OQ-2 (manual sweep), OQ-5 (hard delete), OQ-6 (**answered by measurement — no live drift; the live function matches `1783029013035`**).
+Closed: OQ-1 (Rule 3 = KP only), OQ-2 (manual sweep), OQ-3 (**R-CYD-001 / Option A — cross-year groups now resolve and enter `toDelete`**), OQ-5 (hard delete), OQ-6 (**answered by measurement — no live drift; the live function matches `1783029013035`**).
 
 ---
 

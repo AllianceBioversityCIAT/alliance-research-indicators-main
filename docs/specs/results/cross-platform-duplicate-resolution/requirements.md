@@ -44,7 +44,7 @@ This spec **deletes production data**. The defect classes are asymmetric: under-
 | # | Defect class | Gate that catches it | Automated? |
 | --- | --- | --- | --- |
 | DC-1 | **Over-deletion** — a row deleted that the rules never authorized (wrong winner, wrong indicator scope) | `duplicate-result-priority.util.spec.ts` table-driven cases over the full platform × indicator matrix, incl. every AC-negative case | ✅ `npm test -- --silent` |
-| DC-2 | **Under-deletion** — duplicate survives the run (year scope, normalization miss, soft-delete) | Regression specs for D1–D4 + D9; post-run verification query must return zero groups classified `RESOLVED` that still have a stored loser. **It must NOT assert "zero unresolved cross-platform groups"** — `CROSS_YEAR_REVIEW` (11 groups today) and `SAME_SYSTEM_IGNORED` are *correct* permanent non-resolutions, so that assertion could only ever fail, and a gate that can only fail is a gate that gets waived | ✅ `npm test`, ⚠️ verification query needs a populated DB |
+| DC-2 | **Under-deletion** — duplicate survives the run (year scope, normalization miss, soft-delete) | Regression specs for D1–D4 + D9; post-run verification query must return zero groups classified `RESOLVED` that still have a stored loser. **It must NOT assert "zero unresolved cross-platform groups"** — ~~`CROSS_YEAR_REVIEW` (11 groups today) and~~ `SAME_SYSTEM_IGNORED` (and `UNRESOLVED_CONFLICT`) are *correct* permanent non-resolutions, so that assertion could only ever fail, and a gate that can only fail is a gate that gets waived. *(2026-08-20: `CROSS_YEAR_REVIEW` removed from this list — R-CYD-001 / Option A means the sweep now resolves cross-year same-identity groups; they are no longer a correct permanent non-resolution.)* | ✅ `npm test`, ⚠️ verification query needs a populated DB |
 | DC-3 | **Blocked legitimate sync** — an inactive/deleted row keeps `shouldOmit` true forever | Regression spec: candidate with `is_active = false` MUST NOT block an incoming result | ✅ `npm test` |
 | DC-4 | **Referential breakage** — deleting a row a STAR result points at | `StarRelationshipGuard` specs (both link directions × platform of counterpart) + e2e on the `TEST` datasource | ✅ `npm test`, `npm run test:e2e` |
 | DC-5 | **Normalization false positive** — two genuinely different publications collapse to one key and one is destroyed | Adversarial table tests on the normalizer **plus** the mandatory **dry-run report reviewed by a human** before any destructive sweep | ⚠️ partially unautomatable → HITL gate (R-RES-008). **Blast radius measured as near-zero — see below.** |
@@ -263,21 +263,23 @@ This spec **deletes production data**. The defect classes are asymmetric: under-
 
 ---
 
-### R-RES-006 — Report-year scope is explicit and conservative
+### R-RES-006 — Report-year is informational; same-identity groups resolve regardless of year
+
+> **Amended 2026-08-20 — `bugfix/cross-year-duplicate-deletion` (R-CYD-001 / OQ-3 resolved by Option A).** The original requirement classified cross-year same-identity sweep groups as `CROSS_YEAR_REVIEW` — reported, never auto-deleted (D-dup-8). MEL/ops approved Option A: year is informational/filterable, not a deletion veto for same-identity groups.
 
 - **As a** MEL data steward
-- **I want** automatic deletion confined to duplicates within the same report year, while cross-year duplicates are surfaced for review
-- **So that** a publication legitimately re-reported in a later year is never destroyed by an automated run
+- **I want** duplicate-resolution Rules 1–3 to decide cross-platform same-identity groups even when participants have different `report_year_id` values
+- **So that** a PRMS loser (e.g. PRMS 2023 vs TIP 2022 on the same normalized handle) enters `toDelete` rather than a permanent manual-review queue
 
 **Details:**
-- The **automatic sync path** matches within the same `report_year_id` (preserving today's conservative scope).
-- The **reconciliation sweep** (R-RES-008) additionally detects **cross-year** groups but classifies them `CROSS_YEAR_REVIEW` — reported, never auto-deleted.
-- The boundary is a named constant/config, not a literal, so widening it later is a one-line reversible change.
+- The **reconciliation sweep** (R-RES-008) applies Rules 1–3 to all cross-platform same-identity groups, including those spanning multiple `report_year_id` values. `report_year_id` appears in the plan `participants` list for operator review and is available as a filter on `GET …/plan`; it is not a deletion veto.
+- The **sync path** is already year-agnostic for cross-platform deduplication purposes and is unchanged.
+- `CROSS_YEAR_REVIEW` is retained in the enum for reading historical audit rows only; the live sweep no longer assigns this classification to same-identity cross-year groups.
 
 **Acceptance criteria:**
-- [ ] AC.1 — A PRMS 2024 row and a TIP 2025 row on one normalized link are NOT auto-deleted by the sync path.
-- [ ] AC.2 — The same pair appears in the sweep report as `CROSS_YEAR_REVIEW` with both years shown.
-- [ ] AC.3 — Same-year cross-platform groups are resolved and deleted normally.
+- [ ] AC.1 — A PRMS result and a TIP result sharing the same normalized publication handle, with different `report_year_id` values, ARE resolved by the sweep under Rule 1 (TIP wins); PRMS enters `toDelete`. *(Amended 2026-08-20 — original required NOT auto-deleted; superseded by R-CYD-001 Option A.)*
+- [ ] AC.2 — `report_year_id` values of all participants appear in the plan `participants` list for operator review; year filtering (`reportYear` query param) remains available on `GET …/plan`. *(Amended 2026-08-20 — original required `CROSS_YEAR_REVIEW` classification; superseded by R-CYD-001 Option A.)*
+- [ ] AC.3 — Same-year cross-platform groups are resolved and deleted normally (unchanged).
 
 ---
 
@@ -573,7 +575,7 @@ Both REQUIRE `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiQuery`/`@ApiBod
 | ~~OQ-1~~ | **CLOSED 2026-08-04 — Rule 3 scope = Knowledge Product only.** Owner decision at the Phase 1 gate. AICCRA Capacity Sharing prevails only when the PRMS/TIP counterpart is a Knowledge Product; against any other PRMS/TIP indicator, Rule 1 applies and TIP prevails. This **narrows** the behavior shipped in `21f61a44`. → design decision D-dup-1. | MEL / product owner | ✅ closed |
 | ~~OQ-2~~ | **CLOSED 2026-08-04 — Sweep is manual, admin-only.** No cron in this spec: an unattended destructive sweep has no human gate for DC-5. A scheduled variant may be proposed as a separate spec after the dry-run has been exercised on real data. → design decision D-dup-4. | ARI ops | ✅ closed |
 | ~~OQ-5~~ | **CLOSED 2026-08-04 — Losers are hard-deleted, with a preceding audit record.** Confirms R-RES-003. → design decision D-dup-2, challenged in design.md §12.1. | Engineering lead | ✅ closed |
-| OQ-3 | **Report-year scope.** R-RES-006 keeps auto-deletion same-year and reports cross-year as `CROSS_YEAR_REVIEW`. ~~Measured: 11 of the 116 live groups span 2 years.~~ **RECOUNTED rev 3: 56 of the 2,359 groups span >1 year** (the all-indicator variant would have been 260). Same business question, five times the manual-review queue. Confirm this is the intended reading. Non-blocking: the assumed default preserves today's behavior. | MEL / product owner | before `apply` |
+| ~~OQ-3~~ | **CLOSED 2026-08-20 — `bugfix/cross-year-duplicate-deletion` (R-CYD-001 / Option A approved).** Cross-year same-identity groups now resolve under Rules 1–3 and enter `toDelete`; year is informational/filterable, not a deletion veto. R-RES-006 amended accordingly. *(Historical: R-RES-006 originally kept auto-deletion same-year only and classified the 56 cross-year groups as `CROSS_YEAR_REVIEW`; that behavior is superseded.)* | MEL / product owner | ✅ closed |
 | OQ-4 | **Retroactive cleanup.** Soft-deleted duplicates created by the current buggy path — **measured: 21 AICCRA rows** (`is_active = 0`, `result_status_id = 8`): leave, or hard-delete them in the sweep? Assumed **leave as-is** and excluded from matching. | ARI ops | before rollout |
 | **OQ-7** | **7 inactive STAR link rows** would be destroyed by a hard delete of their mirror — the live delete function clears `link_results` with no `is_active` predicate, and R-RES-004 protects only active links. Extend protection to inactive links, or accept the loss? Recommend **extend**: a soft-deleted link is recoverable today and would stop being so. | Engineering lead | **blocks `apply`** |
 | **OQ-8** | **Live machine-token exposure, independent of this spec.** All 4 `app_secrets` rows have zero `app_secret_host_list` entries (so the origin check is skipped), and `app_secret_id 8` resolves to a user holding `System Admin`. Who owns remediating this? | Security / eng lead | before Deploy 2 |
@@ -602,7 +604,7 @@ Both REQUIRE `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiQuery`/`@ApiBod
 | R-RES-003 | The non-prevailing result is not stored | **D1** |
 | R-RES-004 | Deletion requires no STAR relationship | D6 |
 | R-RES-005 | Same-platform duplicates untouched | — (guard against regression) |
-| R-RES-006 | Explicit, conservative report-year scope | D3 |
+| R-RES-006 | Report-year is informational; same-identity groups resolve regardless of year | D3 |
 | R-RES-007 | Idempotent and re-runnable | — |
 | R-RES-008 | AICCRA reconciliation sweep | **D7** |
 | R-RES-009 | Auditable decisions | D10 (no evidence trail) |

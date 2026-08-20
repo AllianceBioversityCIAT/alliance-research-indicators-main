@@ -85,7 +85,7 @@ Read, at minimum:
 
 - [ ] **`status`** — `INCONCLUSIVE` means the scan matched nothing. That is **not** proof there are no duplicates; check the filter before concluding the data is clean.
 - [ ] **`rowsToDelete` against `groupCount`** — on dev these were 105 and 116. A number far from your expectation is a reason to stop.
-- [ ] **`byClassification`** — `CROSS_YEAR_REVIEW` groups are reported and never auto-deleted (11 on dev). `UNRESOLVED_CONFLICT` groups are where the approved rules contradict each other and nothing is deleted (see OQ-9).
+- [ ] **`byClassification`** — ~~`CROSS_YEAR_REVIEW` groups are reported and never auto-deleted (11 on dev).~~ **Amended 2026-08-20 (R-CYD-001 Option A):** cross-year same-identity groups now resolve as `RESOLVED` and their losers appear in `toDelete`; `CROSS_YEAR_REVIEW` is no longer assigned by the live sweep (retained for historical audit rows). `UNRESOLVED_CONFLICT` groups are where the approved rules contradict each other and nothing is deleted (see OQ-9).
 - [ ] **A sample of `groups[].toDelete`** — spot-check that the `groupKey` really is the same publication in each participant. This is where a normalization false positive would show.
 - [ ] **How many losers are AICCRA rows** — see §0. Each one is permanent.
 
@@ -165,7 +165,7 @@ PATCH /api/configuration/duplicate_resolution.hard_delete_enabled   { "simple_va
 | --- | --- | --- |
 | **OQ-7** | 7 inactive STAR `link_results` rows would be destroyed by a hard delete of their mirror. Extend protection to inactive links, or accept the loss? The flag currently **protects** them. | `apply` |
 | **OQ-8** | All four `app_secrets` rows have zero `app_secret_host_list` entries, so the origin check is skipped, and one resolves to a `System Admin`. Independent of this spec; the route-level block is in place, the underlying exposure is not fixed. | Deploy 2 sign-off |
-| OQ-3 | Cross-year groups are reported, never auto-deleted (11 on dev). Confirm this is the intended business reading. | `apply` |
+| ~~OQ-3~~ | **CLOSED 2026-08-20 (R-CYD-001 / Option A).** Cross-year same-identity groups now resolve under Rules 1–3 and enter `toDelete`. Year is informational/filterable, not a deletion veto. *(Historical: 11 groups on dev were reported as `CROSS_YEAR_REVIEW`; that classification is no longer assigned by the live sweep.)* | ✅ closed |
 | OQ-4 | 21 AICCRA rows were already soft-deleted by the previous buggy path. Leave them, or hard-delete them? Currently **left**, and excluded from matching. | rollout |
 | OQ-9 | `R-RES-002` AC.2 and AC.5 contradict each other for groups holding an AICCRA Capacity-Sharing row, a PRMS/TIP Knowledge Product **and** a PRMS/TIP non-KP row. Such groups are reported and nothing is deleted. **Zero on dev.** MEL may supply an explicit precedence, which would strictly increase what gets cleaned. | nothing today |
 

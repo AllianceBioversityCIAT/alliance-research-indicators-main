@@ -117,7 +117,13 @@ export enum DuplicateGroupClassification {
   SAME_SYSTEM_IGNORED = 'SAME_SYSTEM_IGNORED',
   /** The approved rules contradict each other here. Report, delete nothing. */
   UNRESOLVED_CONFLICT = 'UNRESOLVED_CONFLICT',
-  /** Rows span report years. Reported for review, never auto-deleted. */
+  /**
+   * Historical — superseded by `bugfix/cross-year-duplicate-deletion`
+   * (R-CYD-001 / OQ-3 resolved by Option A, 2026-08-20).
+   * Same-identity cross-year groups now resolve under Rules 1–3; year is
+   * informational/filterable, not a deletion veto. Retained for reading
+   * historical audit rows only; the live sweep no longer assigns this value.
+   */
   CROSS_YEAR_REVIEW = 'CROSS_YEAR_REVIEW',
 }
 
