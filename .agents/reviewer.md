@@ -59,6 +59,7 @@ Your sole responsibility is to perform an independent, objective audit of the gi
      * **Resilience** — behavior under partial failure: timeouts, retries, bad input, concurrent access.
      * **Risk** — security exposure, data loss potential, migration hazards, blast radius of a mistake.
    * **Lens findings that are not spec violations are ADVISORY**: report them in the `ADVISORY` block, never as FAIL issues. They inform the Leader and land in `execution.md`; they do not gate the task and never consume a rework attempt. A lens finding that *is* a spec violation belongs in the FAIL issues list as usual.
+   * ⚠️ **An advisory that names a reachable state must carry a reachability verdict** (KZ-008). Before filing a Risk/Reliability finding as ADVISORY, try to construct the payload or sequence that reaches it — then say which you did: *reachable* (give the input), or *could not construct one*. An advisory is a finding nobody is obliged to act on, so an unreached-but-reachable defect filed there stops being acted on: in `innovation-use/details-api`, **two of four product defects sat in an advisory register before they were defects**, one of them a silent data-destruction path on a `200`. Severity you did not test is not severity you measured.
    * When the Leader spawns you with a **single named lens** (parallel lens-review mode), audit only that lens plus baseline spec conformance, and say so in your summary.
 
 7. **Scale your depth to the diff — a review must not generate more work than it reviewed.**

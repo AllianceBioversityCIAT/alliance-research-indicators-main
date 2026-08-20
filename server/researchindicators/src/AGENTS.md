@@ -101,7 +101,7 @@ Naming:
 2. **Service** method in `<module>.service.ts` — populate audit fields, respect status workflow, throw Nest HTTP exceptions for failures.
 3. **Controller** handler in `<module>.controller.ts`:
    - Decorate with `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery` / `@ApiBody`.
-   - Use `@Roles(...)` + ensure `RolesGuard` is on the controller (or the handler).
+   - `@Roles(...)` + `RolesGuard` **only where the endpoint genuinely has a role rule.** ⚠️ **Result *section* controllers do NOT use `@Roles`** — section access is JWT + `ResultStatusGuard`, and adding roles makes your section the only one with an access rule the STAR client does not mirror (an AC-Role-Correctness hazard, not hardening). Verified by grep 2026-08-20: of the 15 controllers carrying `RESULT_CODE`, **zero** declare `@Roles`; the only `@Roles` under `entities/results/` are on `results.controller.ts`, the aggregate controller, not on a section. Precedent: `docs/specs/archive/2026-08-20-innovation-use--details-api/` **DD-5**.
    - For result mutations, add `@UseGuards(ResultStatusGuard)` and use the `RESULT_CODE` path token + `@GetResultVersion()`.
    - Return the service promise wrapped in `ResponseUtils.format({ description, status, data })`.
 4. **Route registration — two steps, and the second is the one people miss.** If it is a new sub-resource path, add a node under `domain/routes/main.routes.ts` **and** register the module in the module-graph file that instantiates it. If it is a new endpoint on an existing controller, no route change is needed.
