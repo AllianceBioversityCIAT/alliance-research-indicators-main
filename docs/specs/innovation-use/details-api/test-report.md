@@ -1,6 +1,6 @@
 # Test Report — Results (Innovation Use) / Details API
 
-> **Overall: PASS, with 6 recorded gaps — one of which is a confirmed product defect and one of which needs a human.** No test was rewritten to hide a failure. Every gap below is a decision with a reason, not an omission.
+> **Overall: FAIL — 5 unresolved failures. Superseded by `validation-report.md` (2026-08-20).** Originally issued as *PASS with 6 recorded gaps*; both the verdict and the count were wrong. There are **7** gaps, not 6 — the enumeration below always ran G-1…G-7 while three headings said "6", in a document whose own thesis is that counts must be grepped rather than asserted. And `/akili-validate` found a **second, un-gated variant** of G-1 that falsifies four ACs this report marked ✅. Retained as a point-in-time record; read `validation-report.md` for the current verdict. Original summary followed: PASS with 6 recorded gaps — one of which is a confirmed product defect and one of which needs a human.** No test was rewritten to hide a failure. Every gap below is a decision with a reason, not an omission.
 
 - **Module:** results (`innovation-use`) · **Spec id:** 2026-08-innovation-use-details-api
 - **Spec path:** `docs/specs/innovation-use/details-api/`
@@ -15,7 +15,7 @@
 
 | Field | Value |
 | --- | --- |
-| Overall status | **PASS** with 6 recorded gaps |
+| Overall status | ⚠️ **SUPERSEDED — see `validation-report.md`.** Issued as PASS with 6 gaps; actually **7** gaps and **FAIL** |
 | Suites in scope | 3 of 4 — backend unit, integration/fixtures, **E2E blocked (see gap G-3)**; frontend N/A |
 | Testers spawned | **1** (integration/fixture tier). The other suites were **cited, not re-authored** |
 | Backend unit | **336 suites / 2264 tests** — all green |
@@ -32,7 +32,7 @@
 
 | Suite | Disposition | Detail |
 | --- | --- | --- |
-| Backend unit | **Cited** | 336 suites / 2264 tests, authored T-01…T-08. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
+| Backend unit | **Cited** | 336 suites / 2264 tests **repo-wide**; this spec authored **8** of those suite files (T-01…T-08) — the original wording "authored T-01…T-08" wrongly attributed the whole repo's suite count to this spec. `tdd` was assigned at T-08; its red→green files are cited, not rewritten |
 | Integration / fixtures | **Cited + extended by 1 Tester** | F-A…F-E authored T-09…T-13 (49 tests). The Tester added **5 tests** closing the two unowned properties → 54 |
 | Frontend unit | **N/A — not a gap** | `design.md` scopes this chunk **server-only**; the STAR client is chunk 3 (`details-page`). Recorded so the absence reads as a decision |
 | E2E | **BLOCKED — gap G-3** | Infrastructure exists but cannot be used without writing to a **shared** database. See G-3 |
@@ -109,9 +109,10 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | R-IUA-005 | duplicate actor types rejected | unit | T-06 suite | ⚠️ **G-6** — one case's falsifier unrun |
 | R-IUA-006 AC.1–AC.4 | level ≥ 6 justification; the off-by-one pair | unit + **F-C** | T-06 suite; F-C | ✅ |
 | R-IUA-006 AC.5 / DD-14 | effective-row validation | unit + **F-A (this run)** | 5 new tests + the bypass-reproducing falsification | ✅ **closed this run** |
-| R-IUA-007 | organizations carry a count; removal soft-deletes | unit + F-A | T-04 suite; F-A | ✅ |
+| R-IUA-007 AC.1–AC.3, AC.5 | organizations carry a count; removal soft-deletes | unit + F-A | T-04 suite; F-A | ✅ |
+| R-IUA-007 **AC.4** | no Dev row read, **written** or deactivated | F-B | deactivate path only | ❌ **FAIL** — the *written* half is unprotected (same root cause) |
 | R-IUA-008 | other quantitative measures | unit + F-A | T-05/T-06; F-A | ✅ |
-| R-IUA-009 AC.1/AC.2/AC.4 | role isolation | **F-B** | whole-row diffs; 3 role-key falsifications all red | ✅ |
+| R-IUA-009 AC.1/AC.2/AC.4 | role isolation | **F-B** | whole-row diffs; 3 role-key falsifications all red — **but only on the DEACTIVATE path** | ❌ **FAIL — see the retraction.** The id-present save path is PK-keyed, carries no `result_id`, and **assigns** the role rather than filtering by it. AC.4's "every predicate names the role column" is false there |
 | R-IUA-009 **AC.3** | no cross-result write | **F-B** | 2 tests **`it.failing`** | ❌ **G-1 — PRODUCT DEFECT** |
 | R-IUA-010 AC.3 | catalog order `0…9` | **F-D** | F-D green | ⚠️ **G-5** — cannot falsify |
 | R-IUA-011 | IP Rights row; `completness` both ways | unit + **F-E** | F-E | ✅ |
@@ -127,11 +128,11 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 
 ---
 
-## Gaps — all 6, with reasons
+## Gaps — all 7, with reasons *(the heading said "6"; the list always had seven)*
 
 ### G-1 · `R-IUA-009 AC.3` is not satisfied by the product — **PRODUCT DEFECT, unfixed**
 
-A payload for result 1 submitting **result 2's row ids** overwrites result 2's rows. Reproduced against real MySQL: `actor_type_id` 900853→900854, `actors_count` 900882→900893, **`result_id` still pointing at result 2**. Root cause: both hand-written id-present branches build their save payload from a **caller-supplied primary key with no `result_id` and no ownership check**. `result_quantifications` is structurally immune — `upsertByCompositeKeys` matches on the composite key scoped to the calling result and ignores a supplied id.
+A payload for result 1 submitting **result 2's row ids** overwrites result 2's rows. Reproduced against real MySQL: `actor_type_id` 900853→900854, `actors_count` 900882→900883 *(this report originally said `900893`, which is the **organization** row's post-value — two rows' sentinels conflated; `execution.md`, `tasks.md` and the fixture's own comment all say `900883`)*, **`result_id` still pointing at result 2**. Root cause: both hand-written id-present branches build their save payload from a **caller-supplied primary key with no `result_id` and no ownership check**. `result_quantifications` is structurally immune — `upsertByCompositeKeys` matches on the composite key scoped to the calling result and ignores a supplied id.
 
 **Shared with `customSaveInnovationDev`** — pre-existing platform behaviour, not introduced by this spec.
 

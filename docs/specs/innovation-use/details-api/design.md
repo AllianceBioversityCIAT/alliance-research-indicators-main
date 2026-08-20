@@ -20,7 +20,7 @@
 | Approval Mode | gated |
 | Migrations shipped | **zero** (DD-4) |
 | New Nest modules | 2 — `ResultInnovationUseModule`, `ClarisaInnovationUseLevelsModule` |
-| Existing files modified | **6** — `results.service.ts`, `main.routes.ts`, `clarisa.routes.ts`, `result-actors.service.ts` + `result-institution-types.service.ts` (additive methods), **and the two module-graph files `entities.module.ts` + `clarisa.module.ts`** *(count corrected 2026-08-19, T-07 Pivot — the two module-graph files were missing from §2.1, which is the defect DD-15 records)* |
+| Existing files modified | **8** *(corrected 2026-08-20 at `/akili-validate`: the cell said **6** while already enumerating **seven**, and the tree has **eight** — `results.module.ts` is modified for T-08's DI edge and appeared in neither the count nor §2.1. Third correction of this one figure: 4 → 6 → 8, each time by a different reader. A count nobody can restate correctly twice is a symptom that it should be derived, not asserted)* — `results.service.ts`, `main.routes.ts`, `clarisa.routes.ts`, `result-actors.service.ts` + `result-institution-types.service.ts` (additive methods), **and the two module-graph files `entities.module.ts` + `clarisa.module.ts`** *(count corrected 2026-08-19, T-07 Pivot — the two module-graph files were missing from §2.1, which is the defect DD-15 records)* |
 | Budget | see §12 — **13 tasks · ~2,400 LOC · ~24 review rounds** *(re-baselined from 6–8 at execution time, 2026-08-19, user ruling — see §12)* |
 | Reversion challenge run | 1 (DD-12, the C-4 cleanup) — **found a concrete breakage; design narrowed** (§11.1) |
 
@@ -110,6 +110,7 @@ The riskiest surface is not the new module — it is the three **deactivate** pr
 | `domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.{service,controller,module}.ts` | Catalog control list | new |
 | `domain/routes/main.routes.ts` | `+ { path: 'innovation-use', module: ResultInnovationUseModule }` in `ResultsChildren` | modified |
 | `domain/entities/entities.module.ts` | `+ ResultInnovationUseModule` in `imports` — **mandatory and distinct from the route node** (DD-15) | modified |
+| `domain/entities/results/results.module.ts` | `+ ResultInnovationUseModule` in `imports` — a **DI edge**, because T-08 makes `ResultsService` inject `ResultInnovationUseService`. Distinct in purpose from the `entities.module.ts` row above: that one instantiates the module, this one resolves a dependency *(row added 2026-08-20 at `/akili-validate` — omitted from this table even after DD-15 re-audited it for exactly this class of omission)* | modified |
 | `domain/tools/clarisa/routes/clarisa.routes.ts` | `+ { path: 'innovation-use-levels', module: ClarisaInnovationUseLevelsModule }` | modified |
 | `domain/tools/clarisa/clarisa.module.ts` | `+ ClarisaInnovationUseLevelsModule` in `imports` — **mandatory and distinct from the route node** (DD-15) | modified |
 | `domain/entities/result-actors/result-actors.service.ts` | `+ customSaveInnovationUse()` | modified, additive |

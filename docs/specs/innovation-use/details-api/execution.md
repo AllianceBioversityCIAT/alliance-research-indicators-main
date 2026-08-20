@@ -1045,7 +1045,7 @@ Three FAIL issues, all in-scope and all cheap:
 2. **R-IUA-004 AC.3 is proven for one of four fields.** AC.3 is universally quantified over the four disaggregated counts; removing the decorator from the other three leaves the suite green. Since T-07 is by design the only committed gate for R-IUA-004, 75% of AC.3 is untested here and untested anywhere. **Remediation:** `it.each` over the `disaggregatedFields` array already declared in the spec. Three assertions, no new fixtures. **KZ-002 verbatim — one field is a convenient proxy for the real thing.**
 3. **Scenario 2's clause `AND errors names the conflict between the mode flag and the disaggregated field` has no covering assertion** — the current match on the field path would also be satisfied by a `@Min(0)` message. **Remediation:** additionally assert some message names `sex_age_disaggregation_not_apply`.
 
-Plus one item Lens B explicitly referred to the Leader for adjudication, recorded as **DD-15** below: **R-IUA-002 AC.7 (`401`) is claimed by T-07 and delivered by nothing.**
+Plus one item Lens B explicitly referred to the Leader for adjudication, recorded as **DD-16** below *(this line originally cited **DD-15**, which is the route-node/registration decision; the AC.7 adjudication is **DD-16** — corrected 2026-08-20 at `/akili-validate`)*: **R-IUA-002 AC.7 (`401`) is claimed by T-07 and delivered by nothing.**
 
 ##### Scope ruling — `main.routes.spec.ts` is IN SCOPE (both lenses concur, independently)
 
@@ -2034,3 +2034,48 @@ Run because `/akili-archive`'s readiness gate failed and §7's own second item d
 
 **KZ-002's standardization did not prevent its recurrence.** The lesson was applied to `.agents/leader.md`, and the Leader still inherited six `[x]` tasks without grepping. That is the **same root cause KZ-005 already identified** — *"a lesson applied to the orchestrator does not reach the agent that performs the action"* — except here the orchestrator **is** the actor, and the failure was one of routine rather than knowledge. The durable fix is not more persona text: it is that §7's item **already prescribed the grep** and nothing enforced it. **A checkbox that says "verify by grepping" is a checkbox, not a gate.** Candidate lesson: an aggregate criterion whose own text names its verification method should be machine-checkable (a hook, as `/akili-constitution` Step 8F does for the `[x]`-without-PASS case), or it will be satisfied by assertion.
 
+## RETRACTION — "role isolation is PROVEN" was too broad (2026-08-20, `/akili-validate`)
+
+**An independent auditor found a second, un-gated variant of the T-10 defect, and three ACs this log recorded as PROVEN are falsified by it. The Leader verified it at source and retracts the claim.**
+
+### What is actually true
+
+`result-actors.service.ts`'s id-present branch pushes a save object built from a **caller-supplied primary key**, with **no `result_id`**, and — decisively — it does not *filter* by role, it **assigns** it:
+
+```
+if (institution?.result_actors_id) {
+  dataToSave.push({
+    result_actors_id: institution?.result_actors_id,   // caller-supplied PK
+    actor_role_id: ActorRolesEnum.INNOVATION_USE,      // ASSIGNED, not filtered
+    is_active: true,                                   // ...and no result_id
+    ...
+```
+
+`tempRepo.save(dataToSave)` then performs a **PK-keyed UPDATE**. `result-institution-types.service.ts`'s `buildUpdateData` has the same shape in **both** branches.
+
+**So a payload for result 1 carrying result 1's own Innovation *Dev* row id rewrites that Dev row** — flipping `actor_role_id` to `INNOVATION_USE`, overwriting its data columns, setting `is_active: true`, and stranding the four legacy Innovation Dev booleans on a row the Dev section can no longer see.
+
+**This needs no knowledge of another result.** It requires only a client that puts a Dev row id in an Innovation Use payload — so it is **more likely** than the cross-result variant already quarantined.
+
+### The claims being retracted
+
+| Claim, as recorded | Where | Correction |
+| --- | --- | --- |
+| **R-IUA-009 AC.1/AC.2 — PROVEN** ("every Innovation Dev row byte-identical") | this log's § *What is true of the product after T-10*; `tasks.md` T-10 status; `test-report.md` traceability | **Proven for the deactivate path and the empty-array save only.** Falsified for the id-present save path |
+| **R-IUA-009 AC.4 — PROVEN** ("every deactivate/update predicate names the role column") | same | **False as written.** The id-present save's predicate is the **primary key**; it does not name the role column, it **assigns** it |
+| **R-IUA-007 AC.4 — PROVEN** ("no Dev row is read, **written** or deactivated") | same | **False.** The written half is not protected |
+| "Role isolation **HOLDS**" / "**PROVEN**" | `tasks.md` T-10 status line, and the Leader's reports to the user | **Overstated.** Role isolation holds on the *deactivate predicates* — which is what T-10's three falsifications tested, and they genuinely went red. It does **not** hold on the id-present save path |
+
+### Why the F-B fixture passes anyway — and why that is the KZ-002 shape again
+
+F-B's attack payload carries **only** result 2's ids. `devActorId` appears in the file **only inside assertions**, never inside a payload. So its save-#2 test *"leaves the Innovation Dev actor row byte-identical (a second save must not newly expose it either)"* passes **because the payload contains no Dev id** — a proxy assertion, green for a reason unrelated to the property it names.
+
+**This was foreseen twice and then lost.** T-04's Lens A advisory says verbatim: *"A payload naming an Innovation Dev row's id would save it with `institution_type_role_id: INNOVATION_USE` and blank its type columns."* T-03's carries the actor twin. **Neither was reconciled against T-10's "role isolation PROVEN" conclusion** — the advisories were recorded, the conclusion was written, and nothing checked one against the other. Two advisories predicting a defect are worth less than one test, and this is the demonstration.
+
+### Consequences
+
+- **The T-10 quarantine is too narrow.** It documents AC.3 (cross-result) at three sites and says nothing about the cross-role variant. **The quarantine note must be widened, and R-IUA-009 AC.1/AC.2/AC.4 and R-IUA-007 AC.4 must move from PASS to FAIL** in `test-report.md`'s matrix.
+- **The remediation is the same fix.** Scoping the id-present branch by `(result_id, role)` closes both variants — so options **A** and **D** are unchanged in substance, and the case for acting on them is stronger: the variant reachable without cross-result knowledge is the more likely one.
+- **`/akili-archive` remains blocked.** This is a FAIL, not a WARN.
+
+**Recorded by the Leader, whose own claim this retracts.** The audit was delegated precisely because the Leader authored the record it would have been validating; that decision is what surfaced this.
