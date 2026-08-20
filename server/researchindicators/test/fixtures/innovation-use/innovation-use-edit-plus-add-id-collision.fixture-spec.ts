@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import {
   createInnovationUseHarness,
   InnovationUseHarness,
@@ -7,13 +8,29 @@ import { InstitutionTypeRoleEnum } from '../../../src/domain/entities/institutio
 import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/result-innovation-use/dto/create-result-innovation-use.dto';
 
 /**
- * `docs/specs/innovation-use/details-api` — REPRODUCTION-ONLY fixture, not
- * tied to a `tasks.md` line item. Dispatched directly by the Leader to
- * PROVE (or disprove) a defect an independent auditor derived by reading
- * code alone — nobody had executed it. **No fix is applied here. This test
- * is deliberately left RED and un-skipped**, per the dispatch brief's
- * explicit instruction; a Reviewer/Implementer reading this file for the
- * fix task should not "clean it up" by adjusting the expectation.
+ * `docs/specs/innovation-use/details-api` — PK-collision fixture, not tied
+ * to a `tasks.md` line item. Dispatched directly by the Leader to PROVE (or
+ * disprove) defects an independent auditor derived by reading code alone —
+ * nobody had executed them.
+ *
+ * **Status, corrected 2026-08-20.** This file was authored under a brief
+ * that said "no fix is applied here; leave this test RED and un-skipped",
+ * and its first two cases were red on arrival. The fix landed the same day
+ * (`ResultActorsService.customSaveInnovationUse`'s `idsAlreadyClaimed`
+ * exclusion and `ResultInstitutionTypesService`'s
+ * `reconcileAdoptedPrimaryKey`, both of which cite this file by name), so
+ * those two cases are now GREEN and this file is a regression guard, not a
+ * reproduction. **Every case in this file is expected to pass.** A red run
+ * here is a real regression, not the intended state — the earlier
+ * "deliberately RED" instruction is spent and no longer describes this file.
+ *
+ * **Two collision shapes, one file.** Scenario 1 (the original pair of
+ * cases) is the ID-LESS shape: an added row's lookup adopts a primary key
+ * an earlier id-present row already claimed. Scenario 2 (the nested
+ * `describe` at the bottom, added 2026-08-20) is the ID-PRESENT shape: two
+ * rows both *submit* the same primary key. They reach the same corruption
+ * — two PK-keyed `UPDATE`s against one row — through different code paths,
+ * and are guarded by different code, so they are proven separately.
  *
  * **The hypothesis, verified at source before this file was written.**
  * `ResultActorsService.customSaveInnovationUse`'s id-present branch pushes
@@ -62,12 +79,15 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * (`original`) distinct keys, same shape as the actor duplicate check
  * above.
  *
- * **What this fixture does NOT exercise.** `assertInnovationUseOwnership`
- * in either service — untouched, unmocked, genuinely satisfied by both
- * scenarios below. No cross-result or cross-role id is submitted anywhere
- * in this file; that shape is already gated by
- * `innovation-use-role-isolation.fixture-spec.ts` (F-B) and is not this
- * hypothesis.
+ * **What scenario 1 does NOT exercise.** `assertInnovationUseOwnership`'s
+ * *unauthorized-id* rejection in either service — untouched, unmocked,
+ * genuinely satisfied by both of scenario 1's payloads. No cross-result or
+ * cross-role id is submitted anywhere in this file; that shape is already
+ * gated by `innovation-use-role-isolation.fixture-spec.ts` (F-B) and is not
+ * this hypothesis. Scenario 2 *does* reach
+ * `assertInnovationUseOwnership` — its duplicate-id branch specifically,
+ * which is a different rejection with a deliberately different message; see
+ * that `describe`'s own header.
  *
  * **Band.** Read every sibling `*.fixture-spec.ts` header directly
  * (FP-45): `900_000`-`900_900` are taken (sp-versioning-objective-blocks,
@@ -80,7 +100,16 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * `results.result_official_code` plus the `901_0xx` band for its private
  * catalog ids. This file reserves the next unused top-level band,
  * `902_000`, for `results.result_official_code`, and the `902_0xx` band for
- * every private CLARISA code below. Reserves report year **2113** (distinct
+ * every private CLARISA code below. **Sub-bands within it** (scenario 2 took
+ * the next unused ones, re-checked by grepping every sibling header —
+ * FP-45 — which confirmed `902_` appears in no other fixture at all, so the
+ * whole band is this file's to subdivide): `902_00x` scenario-1 actor types
+ * · `902_01x` scenario-1 institution types · `902_02x` scenario-2 actor
+ * types · `902_03x` scenario-2 institution types · `902_1xx` sentinel
+ * counts, `902_10x`/`902_11x` scenario 1, `902_12x`/`902_13x`/`902_14x`
+ * scenario 2. Scenario 2 reuses this file's platform code and report year
+ * rather than reserving more of a registry that does not exist.
+ * Reserves report year **2113** (distinct
  * from every reserved year read at source: 2094, 2096, 2097, 2098, 2101,
  * 2102, 2103, 2109, 2110, 2111, 2112) and platform code `T99IUAC` (distinct
  * from every reserved code read at source: T09IUFA, T10IUFB, T11IULB,
@@ -114,6 +143,13 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
   const institutionTypeCodeOriginal = 902_011;
   const institutionTypeCodeChangedTo = 902_012;
 
+  // --- Scenario 2 (duplicate submitted PK) private catalog codes. ---
+  const actorTypeCodeDupSeeded = 902_021; // the seeded row's type, and payload row 1's
+  const actorTypeCodeDupConflict = 902_022; // payload row 2's type — same PK, different type
+  const actorTypeCodeRollbackWitness = 902_023; // Result D's actor row, never named by any payload
+  const institutionTypeCodeDupSeeded = 902_031;
+  const institutionTypeCodeDupConflict = 902_032;
+
   // --- Sentinel counts (band 902_1xx), maximally distinct (FP-48). ---
   const actorsCountOriginal = 902_101; // seeded row's ORIGINAL actors_count, before update()
   const actorsCountRow1 = 902_102; // row 1 (id-present, changed type) submits this
@@ -121,6 +157,31 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
   const organizationCountOriginal = 902_111;
   const organizationCountRow1 = 902_112;
   const organizationCountRow2 = 902_113;
+
+  // --- Scenario 2 sentinel counts. Distinct from every scenario-1 count
+  // above, so a byte-identical assertion that fails cannot be misread as
+  // scenario 1's data leaking in. ---
+  const dupActorsCountSeeded = 902_121;
+  const dupActorsCountRow1 = 902_122;
+  const dupActorsCountRow2 = 902_123;
+  const dupOrganizationCountSeeded = 902_131;
+  const dupOrganizationCountRow1 = 902_132;
+  const dupOrganizationCountRow2 = 902_133;
+  const rollbackWitnessActorsCount = 902_141;
+
+  // Canary written by `update()` step 6 (`result_innovation_use`'s
+  // `innovation_use_level_explanation`) INSIDE the transaction, before
+  // either duplicate-PK rejection fires in step 7/8. `create()` leaves this
+  // column NULL, so if the rejection did not roll the transaction back this
+  // string would be sitting in the detail row. It is the load-bearing
+  // "nothing persisted" evidence for scenario 2's actor case, where the
+  // guard throws at the very top of step 7 and therefore no `result_actors`
+  // write is attempted at all. Safe to submit with no
+  // `innovation_use_level_id`: the effective level resolves to the stored
+  // `NULL`, so R-IUA-006's level >= 6 justification rule never fires and
+  // this payload cannot be rejected before `BEGIN` for an unrelated reason.
+  const rollbackCanaryExplanation =
+    'rollback canary 902_150 — must never be persisted';
 
   let harness: InnovationUseHarness;
   let dataSource: InnovationUseHarness['dataSource'];
@@ -140,8 +201,57 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
   let existingActorId: number;
   let existingOrgId: number;
 
-  let actorsUpdateResponse: Awaited<ReturnType<InnovationUseHarness['service']['update']>>;
-  let orgsUpdateResponse: Awaited<ReturnType<InnovationUseHarness['service']['update']>>;
+  let actorsUpdateResponse: Awaited<
+    ReturnType<InnovationUseHarness['service']['update']>
+  >;
+  let orgsUpdateResponse: Awaited<
+    ReturnType<InnovationUseHarness['service']['update']>
+  >;
+
+  // --- Scenario 2 state. ---
+  let dupActorsResultId: number;
+  let dupOrgsResultId: number;
+  let dupActorId: number;
+  let dupOrgId: number;
+  let rollbackWitnessActorId: number;
+
+  let dupActorRowBefore: Record<string, unknown>;
+  let dupOrgRowBefore: Record<string, unknown>;
+  let rollbackWitnessActorRowBefore: Record<string, unknown>;
+  let dupActorsDetailRowBefore: Record<string, unknown>;
+  let dupOrgsDetailRowBefore: Record<string, unknown>;
+
+  let dupActorsError: unknown;
+  let dupOrgsError: unknown;
+
+  /**
+   * Re-selects the SAME row by its own immutable primary key at two points
+   * in time (the technique `innovation-use-role-isolation.fixture-spec.ts`
+   * documents at length): the primary key cannot legitimately differ
+   * between the two reads, so there is no identity column to strip —
+   * `SELECT *` before, `SELECT *` after, deep `toEqual`. Every column the
+   * table has today is compared, including any a future migration adds.
+   */
+  async function fetchRowByPk(
+    table: string,
+    pkColumn: string,
+    pkValue: number,
+  ): Promise<Record<string, unknown>> {
+    const rows: Record<string, unknown>[] = await dataSource.query(
+      `SELECT * FROM ${table} WHERE ${pkColumn} = ?`,
+      [pkValue],
+    );
+    expect(rows).toHaveLength(1);
+    return rows[0];
+  }
+
+  async function countRows(table: string, resultId: number): Promise<number> {
+    const [row]: Array<{ total: number }> = await dataSource.query(
+      `SELECT COUNT(*) AS total FROM ${table} WHERE result_id = ?`,
+      [resultId],
+    );
+    return Number(row.total);
+  }
 
   beforeAll(async () => {
     harness = await createInnovationUseHarness(actingUserId);
@@ -174,6 +284,18 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
     for (const [code, label] of [
       [actorTypeCodeOriginal, 'edit-plus-add fixture actor type (original)'],
       [actorTypeCodeChangedTo, 'edit-plus-add fixture actor type (changed-to)'],
+      [
+        actorTypeCodeDupSeeded,
+        'duplicate-PK fixture actor type (seeded / payload row 1)',
+      ],
+      [
+        actorTypeCodeDupConflict,
+        'duplicate-PK fixture actor type (payload row 2, conflicting)',
+      ],
+      [
+        actorTypeCodeRollbackWitness,
+        'duplicate-PK fixture actor type (rollback witness)',
+      ],
     ] as [number, string][]) {
       const [existing] = await dataSource.query(
         `SELECT code FROM clarisa_actor_types WHERE code = ?`,
@@ -196,6 +318,14 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
       [
         institutionTypeCodeChangedTo,
         'edit-plus-add fixture institution type (changed-to)',
+      ],
+      [
+        institutionTypeCodeDupSeeded,
+        'duplicate-PK fixture institution type (seeded / payload row 1)',
+      ],
+      [
+        institutionTypeCodeDupConflict,
+        'duplicate-PK fixture institution type (payload row 2, conflicting)',
       ],
     ] as [number, string][]) {
       const [existing] = await dataSource.query(
@@ -305,7 +435,174 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
       ],
       quantifications: [],
     };
-    orgsUpdateResponse = await harness.service.update(orgsResultId, orgsPayload);
+    orgsUpdateResponse = await harness.service.update(
+      orgsResultId,
+      orgsPayload,
+    );
+
+    // ================= SCENARIO 2 — duplicate submitted PK =================
+    // Two id-present rows sharing ONE genuinely-owned primary key, with
+    // different type ids. Each table gets its own `results` row and its own
+    // single `update()` call carrying only its own collection (same FP-42
+    // isolation as scenario 1), so a rejection in one table can never be
+    // read as evidence about the other.
+
+    // --- Result C: one active Innovation Use actor row, whose PK both
+    // payload rows will submit. ---
+    const resultC = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, ?, ?, 0, NULL)`,
+      [nextOfficialCode(), platformCode, reportYear],
+    );
+    dupActorsResultId = resultC.insertId;
+    await harness.service.create(dupActorsResultId);
+
+    const dupSeededActor = await dataSource.query(
+      `INSERT INTO result_actors (
+         result_id, actor_type_id, actor_role_id, sex_age_disaggregation_not_apply,
+         actors_count, is_active, created_by, updated_by
+       ) VALUES (?, ?, ?, TRUE, ?, 1, ?, ?)`,
+      [
+        dupActorsResultId,
+        actorTypeCodeDupSeeded,
+        ActorRolesEnum.INNOVATION_USE,
+        dupActorsCountSeeded,
+        actingUserId,
+        actingUserId,
+      ],
+    );
+    dupActorId = dupSeededActor.insertId;
+
+    // --- Result D: one active Innovation Use organization row (the target
+    // of the duplicate ids), PLUS one active Innovation Use ACTOR row that
+    // no payload ever names. That actor row is the rollback WITNESS: with
+    // `actors: []`, step 7's `customSaveInnovationUse` returns early from
+    // the ownership guard but still runs its deactivating `update(...)`
+    // sweep — a real write — before step 8's organization guard throws. If
+    // the transaction did not roll back, the witness would come back
+    // `is_active = 0`. It is deliberately given its own type code so it can
+    // never be confused with a row either payload submitted. ---
+    const resultD = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, ?, ?, 0, NULL)`,
+      [nextOfficialCode(), platformCode, reportYear],
+    );
+    dupOrgsResultId = resultD.insertId;
+    await harness.service.create(dupOrgsResultId);
+
+    const dupSeededOrg = await dataSource.query(
+      `INSERT INTO result_institution_types (
+         result_id, institution_type_id, institution_type_role_id,
+         is_organization_known, organization_count, is_active, created_by, updated_by
+       ) VALUES (?, ?, ?, FALSE, ?, 1, ?, ?)`,
+      [
+        dupOrgsResultId,
+        institutionTypeCodeDupSeeded,
+        InstitutionTypeRoleEnum.INNOVATION_USE,
+        dupOrganizationCountSeeded,
+        actingUserId,
+        actingUserId,
+      ],
+    );
+    dupOrgId = dupSeededOrg.insertId;
+
+    const witnessActor = await dataSource.query(
+      `INSERT INTO result_actors (
+         result_id, actor_type_id, actor_role_id, sex_age_disaggregation_not_apply,
+         actors_count, is_active, created_by, updated_by
+       ) VALUES (?, ?, ?, TRUE, ?, 1, ?, ?)`,
+      [
+        dupOrgsResultId,
+        actorTypeCodeRollbackWitness,
+        ActorRolesEnum.INNOVATION_USE,
+        rollbackWitnessActorsCount,
+        actingUserId,
+        actingUserId,
+      ],
+    );
+    rollbackWitnessActorId = witnessActor.insertId;
+
+    // --- Pre-state, captured AFTER seeding and BEFORE either rejected
+    // save, so the `toEqual` comparisons below are genuine before/after
+    // snapshots of the same rows rather than restatements of the literals
+    // that seeded them. ---
+    dupActorRowBefore = await fetchRowByPk(
+      'result_actors',
+      'result_actors_id',
+      dupActorId,
+    );
+    dupOrgRowBefore = await fetchRowByPk(
+      'result_institution_types',
+      'result_institution_type_id',
+      dupOrgId,
+    );
+    rollbackWitnessActorRowBefore = await fetchRowByPk(
+      'result_actors',
+      'result_actors_id',
+      rollbackWitnessActorId,
+    );
+    dupActorsDetailRowBefore = await fetchRowByPk(
+      'result_innovation_use',
+      'result_id',
+      dupActorsResultId,
+    );
+    dupOrgsDetailRowBefore = await fetchRowByPk(
+      'result_innovation_use',
+      'result_id',
+      dupOrgsResultId,
+    );
+
+    // --- Act #3: two id-present actor rows submitting the SAME
+    // `result_actors_id` with different `actor_type_id`s, plus the
+    // explanation canary. Expected to throw. ---
+    try {
+      const dupActorsPayload: CreateResultInnovationUseDto = {
+        innovation_use_level_explanation: rollbackCanaryExplanation,
+        actors: [
+          {
+            result_actors_id: dupActorId,
+            actor_type_id: actorTypeCodeDupSeeded,
+            sex_age_disaggregation_not_apply: true,
+            actors_count: dupActorsCountRow1,
+          },
+          {
+            result_actors_id: dupActorId,
+            actor_type_id: actorTypeCodeDupConflict,
+            sex_age_disaggregation_not_apply: true,
+            actors_count: dupActorsCountRow2,
+          },
+        ],
+        organizations: [],
+        quantifications: [],
+      };
+      await harness.service.update(dupActorsResultId, dupActorsPayload);
+    } catch (error) {
+      dupActorsError = error;
+    }
+
+    // --- Act #4: the same shape against Result D's organizations. ---
+    try {
+      const dupOrgsPayload: CreateResultInnovationUseDto = {
+        innovation_use_level_explanation: rollbackCanaryExplanation,
+        actors: [],
+        organizations: [
+          {
+            result_institution_type_id: dupOrgId,
+            institution_type_id: institutionTypeCodeDupSeeded,
+            organization_count: dupOrganizationCountRow1,
+          },
+          {
+            result_institution_type_id: dupOrgId,
+            institution_type_id: institutionTypeCodeDupConflict,
+            organization_count: dupOrganizationCountRow2,
+          },
+        ],
+        quantifications: [],
+      };
+      await harness.service.update(dupOrgsResultId, dupOrgsPayload);
+    } catch (error) {
+      dupOrgsError = error;
+    }
   });
 
   afterAll(async () => {
@@ -336,6 +633,35 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
       );
       await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
         orgsResultId,
+      ]);
+    }
+    if (dupActorsResultId !== undefined) {
+      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
+        dupActorsResultId,
+      ]);
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [dupActorsResultId],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
+        dupActorsResultId,
+      ]);
+    }
+    if (dupOrgsResultId !== undefined) {
+      await dataSource.query(
+        `DELETE FROM result_institution_types WHERE result_id = ?`,
+        [dupOrgsResultId],
+      );
+      // Result D also carries the rollback-witness ACTOR row.
+      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
+        dupOrgsResultId,
+      ]);
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [dupOrgsResultId],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
+        dupOrgsResultId,
       ]);
     }
 
@@ -486,6 +812,145 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
         organization_count: organizationCountRow2,
         is_active: 1,
       },
+    });
+  });
+
+  /**
+   * ==================== SCENARIO 2 — duplicate submitted PK ==============
+   *
+   * **The shape.** Two id-present rows in ONE payload submitting the same
+   * primary key with different type ids. Both ids genuinely belong to this
+   * result and this Innovation Use role, so this is neither of the shapes
+   * already gated elsewhere: not scenario 1's id-LESS adoption above, and
+   * not `innovation-use-role-isolation.fixture-spec.ts`'s cross-result /
+   * cross-role unauthorized id.
+   *
+   * **Why nothing else catches it.** `ResultInnovationUseService
+   * .validateNoDuplicateActorTypes` keys identity on `TYPE:<actor_type_id>`
+   * — `TYPE:902_021` and `TYPE:902_022` are two distinct identities, so it
+   * has nothing to flag. `ResultInstitutionTypesService.removeDuplicates`
+   * keys on `type_<institution_type_id>`, giving the organization pair
+   * distinct keys for the same reason. `assertInnovationUseOwnership`'s
+   * *unauthorized-id* branch has nothing to reject either: the id is owned.
+   * Only the duplicate-PK branch stands between this payload and
+   * `save()` receiving two objects keyed on one primary key — two PK-keyed
+   * `UPDATE`s against one row, leaving a column-level hybrid of both
+   * payload rows and silently losing one of them.
+   *
+   * **Why the message text is asserted in full, not by substring.** The
+   * duplicate rejection and the unauthorized-id rejection both name the
+   * same field, so `stringContaining('result_actors_id')` would pass even
+   * if the guard rejected for the wrong reason. `design.md` §15 made the two
+   * messages deliberately distinct; these assertions hold the product to
+   * that, and to naming the repeated id.
+   *
+   * **How "nothing persisted" is made falsifiable.** Both payloads also
+   * submit `innovation_use_level_explanation` — a canary written by step 6
+   * INSIDE the transaction, before either guard throws. Disable the
+   * duplicate-PK check and each case reddens twice over: no `400`, and the
+   * canary sitting in a detail row that should still read `NULL`.
+   */
+  describe('scenario 2 — two id-present rows submitting the same, genuinely owned primary key', () => {
+    it('actors: rejects the whole save with a 400 naming the field and the repeated id, in the duplicate-specific message', () => {
+      expect(dupActorsError).toBeInstanceOf(BadRequestException);
+      expect((dupActorsError as BadRequestException).getStatus()).toBe(400);
+      expect(
+        (
+          (dupActorsError as BadRequestException).getResponse() as {
+            message: string[];
+          }
+        ).message,
+      ).toEqual([
+        `result_actors_id: same id submitted by more than one row — ${dupActorId}`,
+      ]);
+    });
+
+    it('actors: persists nothing — the submitted row is byte-identical, no second row was inserted, and the transaction rolled the step-6 canary back', async () => {
+      expect({
+        submittedRow: await fetchRowByPk(
+          'result_actors',
+          'result_actors_id',
+          dupActorId,
+        ),
+        rowCountForResult: await countRows('result_actors', dupActorsResultId),
+        detailRow: await fetchRowByPk(
+          'result_innovation_use',
+          'result_id',
+          dupActorsResultId,
+        ),
+      }).toEqual({
+        submittedRow: dupActorRowBefore,
+        rowCountForResult: 1,
+        detailRow: dupActorsDetailRowBefore,
+      });
+    });
+
+    it('organizations: rejects the whole save with a 400 naming the field and the repeated id, in the duplicate-specific message', () => {
+      expect(dupOrgsError).toBeInstanceOf(BadRequestException);
+      expect((dupOrgsError as BadRequestException).getStatus()).toBe(400);
+      expect(
+        (
+          (dupOrgsError as BadRequestException).getResponse() as {
+            message: string[];
+          }
+        ).message,
+      ).toEqual([
+        `result_institution_type_id: same id submitted by more than one row — ${dupOrgId}`,
+      ]);
+    });
+
+    it('organizations: persists nothing — the submitted row is byte-identical, no second row was inserted, and the transaction rolled the step-6 canary back', async () => {
+      expect({
+        submittedRow: await fetchRowByPk(
+          'result_institution_types',
+          'result_institution_type_id',
+          dupOrgId,
+        ),
+        rowCountForResult: await countRows(
+          'result_institution_types',
+          dupOrgsResultId,
+        ),
+        detailRow: await fetchRowByPk(
+          'result_innovation_use',
+          'result_id',
+          dupOrgsResultId,
+        ),
+      }).toEqual({
+        submittedRow: dupOrgRowBefore,
+        rowCountForResult: 1,
+        detailRow: dupOrgsDetailRowBefore,
+      });
+    });
+
+    /**
+     * The strongest single piece of rollback evidence in this file, and it
+     * only exists on the organization path. Act #4 submits `actors: []`, so
+     * step 7's `ResultActorsService.customSaveInnovationUse` returns early
+     * from its ownership guard and then executes its deactivating
+     * `tempRepo.update({ result_id, is_active: true, actor_role_id:
+     * INNOVATION_USE }, { is_active: false })` sweep — a real write against a
+     * real row — BEFORE step 8's organization guard throws. This row is that
+     * write's target. Byte-identical here means the `ROLLBACK` genuinely
+     * undid a committed-in-transaction row change, not merely that no write
+     * was attempted.
+     *
+     * This is evidence about the TRANSACTION, not about either table's
+     * guard: the row is never named by any payload, and the `400` that
+     * caused the rollback names `result_institution_type_id`, so there is no
+     * ambiguity about which service rejected the save. Scenario 2's actor
+     * case has no equivalent witness by construction — its guard throws at
+     * the very top of step 7, so step 8 never runs and a surviving
+     * organization row would prove nothing.
+     */
+    it('organizations: the deactivation sweep step 7 ran before the rejection is rolled back — an actor row no payload named is still byte-identical and still active', async () => {
+      const witnessAfter = await fetchRowByPk(
+        'result_actors',
+        'result_actors_id',
+        rollbackWitnessActorId,
+      );
+
+      expect(witnessAfter).toEqual(rollbackWitnessActorRowBefore);
+      expect(Number(witnessAfter.is_active)).toBe(1);
     });
   });
 });

@@ -2344,6 +2344,62 @@ The record's own conclusion after the third rework round was that *"this spec's 
 
 ---
 
+## The duplicate-PK `400` gains a fixture tier (2026-08-20, post-boundary)
+
+The one item the resume section below carried as **owed**. The duplicate-PK rejection was mutation-proven at the unit tier only; the fixture tier had never watched it happen against real MySQL. Now closed.
+
+### What was added
+
+Five cases in `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`, as a nested `describe` under sub-bands `902_02x`/`902_03x` (catalog codes) and `902_12x`/`902_13x`/`902_14x` (sentinel counts). **FP-45 discharged by grep, not by trust:** `902_` appears in no other fixture in the repo at all, so the whole band was already this file's to subdivide — the sub-bands need no registry entry, and the two new results reuse this file's existing platform code and report year rather than reserving more of a registry that does not exist.
+
+Two results, each receiving one `update()` carrying only its own collection (scenario 1's FP-42 isolation, unchanged), each with two id-present rows submitting **one genuinely owned primary key** with different type ids:
+
+| # | Proves |
+| --- | --- |
+| 1 | actors: `BadRequestException`, status **400**, message equal to `result_actors_id: same id submitted by more than one row — <id>` |
+| 2 | actors: nothing persisted — submitted row byte-identical, row count still 1, detail row byte-identical |
+| 3 | organizations: the mirror `400`, `result_institution_type_id: same id submitted by more than one row — <id>` |
+| 4 | organizations: nothing persisted, same three properties |
+| 5 | organizations: an actor row **no payload names** survives byte-identical and still active |
+
+### Three deliberate choices, each because the cheap version would have passed vacuously
+
+**The message is asserted in full, not by substring.** The sibling `innovation-use-role-isolation.fixture-spec.ts` asserts `stringContaining('result_actors_id')`, which is right for its own shape but wrong here: the duplicate rejection and the unauthorized-id rejection name the *same field*, so a substring assertion would pass even if the guard rejected for the wrong reason. `design.md` §15 made the two messages deliberately distinct; these cases hold the product to that and to naming the repeated id.
+
+**"Nothing persisted" needed a canary, because the actor guard throws before any actor write is attempted.** Both payloads also submit `innovation_use_level_explanation` — written by step 6 *inside* the transaction, before either guard fires, against a column `create()` leaves `NULL`. Without it, "the row is unchanged" would be true whether or not a transaction existed. Safe to submit with no level id: the effective level resolves to the stored `NULL`, so R-IUA-006's justification rule never fires and the payload cannot be rejected before `BEGIN` for an unrelated reason.
+
+**Case 5 exists because the organization path — and only it — has a real write to roll back.** With `actors: []`, step 7's `customSaveInnovationUse` returns early from its ownership guard but still runs its deactivating `update({ result_id, is_active: true, actor_role_id: INNOVATION_USE }, { is_active: false })` sweep before step 8 throws. That witness row is the sweep's target, given its own type code so it can never be confused with a submitted row. Byte-identical there means `ROLLBACK` genuinely undid a row change — not merely that no write was attempted. It is evidence about the **transaction**, not about either guard, and the `400` that caused it names `result_institution_type_id`, so there is no ambiguity about which service rejected. The actor case has no equivalent witness *by construction*: its guard throws at the top of step 7, so step 8 never runs and a surviving organization row would prove nothing.
+
+### Falsified, and the falsification taught something the assertions had not
+
+`if (rawIdsPresent.length !== idsPresent.length)` replaced with `if (false)` in **both** services simultaneously:
+
+- **All 5 new cases red. Both scenario-1 cases stayed green.** That second half is the load-bearing part: it attributes the new cases to the duplicate-PK branch specifically, not to scenario 1's already-landed `idsAlreadyClaimed`/`reconcileAdoptedPrimaryKey` fix.
+- The diff printed the corruption verbatim: **`rowCountForResult` stayed 1** — one payload row silently lost, never created — and the survivor carried `actor_type_id: 902022` / `actors_count: 902123`, i.e. **row 2's values over row 1's primary key**, last-write-wins. Plus the canary sitting in the detail row.
+
+Restored by `git checkout` of the two service files only; `git status` confirmed the sole remaining modification was the fixture.
+
+> This is the same **silent loss plus column hybrid** the id-less shape produced — reached through a third payload shape, and now watched happening at the fixture tier rather than inferred. Worth noting against the resume section's own lesson: this shape was originally a *Reviewer advisory*, verified by hand-constructed payload, and it is now the second time in this spec that an advisory turned out to sit on a reachable corruption path.
+
+### Two documentation corrections in the same file, stated rather than slipped in
+
+1. **The header claimed the file was "deliberately left RED and un-skipped"** and told future readers not to "clean it up by adjusting the expectation." That instruction was discharged the same day the fix landed — the file has been green since — so it had become an active trap: a stale directive telling a reader that a red run is the intended state. Corrected to say every case is expected to pass and a red run is a real regression. Left uncorrected, it would have sat directly above five new green cases contradicting it.
+2. **Scope of "what this fixture does NOT exercise"** narrowed from the whole of `assertInnovationUseOwnership` to its *unauthorized-id* branch, which is what was ever true — scenario 2 reaches the guard's duplicate branch deliberately.
+
+### Verification (Leader-run, not relayed)
+
+| | |
+| --- | --- |
+| Fixtures | **15 suites / 71 tests** (66 + 5) green, **twice consecutively** on the same scratch container — the second run proves the new seeding cleans up idempotently |
+| Unit | **336 suites / 2285 tests** green |
+| `tsc --noEmit` | clean |
+| Lint | `npm run lint -- --quiet` clean; it carries `--fix` and reformatted the fixture, so `git status` was re-checked and `tsc` + the fixture re-run after it |
+| Working tree | one modified file, the fixture |
+
+Coverage was **not** re-run: the change is test-only and adds no production lines, so the recorded `89.79 / 75.75 / 85.30 / 89.26` still describes the same `src/`. Stated rather than silently omitted.
+
+---
+
 ## ▶ RESUME HERE — state at the 2026-08-20 context boundary
 
 Written deliberately so a fresh session needs **nothing** from the previous session's context. Everything below is verifiable from the repo.
@@ -2355,21 +2411,19 @@ Written deliberately so a fresh session needs **nothing** from the previous sess
 | Branch | `AC-1679-Create-the-innovation-use-section`, working tree **clean** |
 | Unit | **336 suites / 2285 tests** green |
 | Coverage | **89.79 / 75.75 / 85.30 / 89.26** — floor is 60 (NFR-IUA-003) |
-| Fixtures | **15 suites / 66 tests** green, **twice** on the same scratch container |
+| Fixtures | **15 suites / 71 tests** green, **twice** on the same scratch container |
 | Innovation Dev gate | all three `innovation-dev-*` fixtures green |
 | `tsc --noEmit` | clean |
 
 Every figure re-run by the Leader, not relayed. Recorded identically in `tasks.md` §7 and `test-report.md`.
 
-### The one owed item — do this first
+### The one owed item — CLOSED 2026-08-20
 
-**A fixture case proving the duplicate-PK `400` end to end, and that nothing persisted.** The unit tier *is* mutation-proven (disabling the check reddens 4 tests on `npm test` alone, two per service); the fixture tier is not. The agent adding it was interrupted, so the fixture count is unchanged at 66.
+**A fixture case proving the duplicate-PK `400` end to end, and that nothing persisted.** Delivered as five cases in the same file and band the brief named — see *"The duplicate-PK `400` gains a fixture tier"* immediately above for the shape, the three assertion choices, and the falsification. Fixtures **66 → 71**, green twice on the same container. Falsified by disabling the check in both services: all 5 red, both scenario-1 cases still green, services restored, tree clean but for the fixture.
 
-- File: `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`, band `902_000` — take an unused sub-band and record it in the header (**FP-45**: grep every sibling header, there is no written registry).
-- Payload: two id-present rows sharing one **genuinely owned** PK with different `actor_type_id`s. Expect `400` naming the repeated id, and **nothing persisted**.
-- Falsify it: disable the check, confirm red, restore, confirm `git diff` clean.
+Nothing is owed to an agent any more. **The next step is the re-validation below.**
 
-### Then, in order
+### Now, in order
 
 1. **`/akili-validate docs/specs/innovation-use/details-api`** — has **not** run against the current state. The last run predates the PK-collision fix, the duplicate-PK rejection, and the second AC.4 amendment. Delegate it to auditors on a **different** model than the implementers; that choice is what surfaced both real product defects.
 2. **`/akili-archive docs/specs/innovation-use/details-api`** — only after a clean re-validation. `validation-report.md`'s banner says do not archive on the banner.

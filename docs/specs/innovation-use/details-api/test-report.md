@@ -23,9 +23,9 @@
 | Suites in scope | 3 of 4 — backend unit, integration/fixtures, **E2E blocked (see gap G-3)**; frontend N/A |
 | Testers spawned | **1** (integration/fixture tier). The other suites were **cited, not re-authored** |
 | Backend unit | **336 suites / 2285 tests**, all green · coverage **89.79 / 75.75 / 85.30 / 89.26** against a 60 floor |
-| Fixtures (real MySQL) | **15 suites / 66 tests, 0 failed** — run **twice** on the same scratch container |
+| Fixtures (real MySQL) | **15 suites / 71 tests, 0 failed** — run **twice** on the same scratch container. Was 66; the duplicate-PK `400` gained a fixture tier later on 2026-08-20 (`execution.md` → *The duplicate-PK `400` gains a fixture tier*) |
 | Typecheck / lint | `tsc --noEmit` clean · `eslint --no-fix` clean on every touched file |
-| Provenance | **One closing run, 2026-08-20, executed by the Leader — not relayed from any worker report.** Identical figures in `tasks.md` §7. Withheld through two remediation rounds on purpose: this line had gone stale twice (2264 → 2275 → 2279), and the fix for a repeatedly-stale figure is to derive it once from one run rather than to restate it faster |
+| Provenance | **One closing run, 2026-08-20, executed by the Leader — not relayed from any worker report.** Identical figures in `tasks.md` §7. **Amended:** the fixture row alone was re-derived from a later run the same day (66 → 71), under the same two-consecutive-run discipline; coverage was deliberately not re-run, the change being test-only with no production lines added. Withheld through two remediation rounds on purpose: this line had gone stale twice (2264 → 2275 → 2279), and the fix for a repeatedly-stale figure is to derive it once from one run rather than to restate it faster |
 | Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
 | Gaps requiring a human | **0** — the `/swagger` observation (`R-IUA-013 AC.3`) was **performed and recorded** on 2026-08-20 (`execution.md` → *Human `/swagger` Observation*), closing G-7 |
 
