@@ -1326,3 +1326,31 @@ Compounding it, the report **omits the Deviations / What was not run section ent
 **Consequence:** DC-9 is **unverified**. Nothing in this cycle has established that the three states are reachable in a browser, that the copy is legible, or that the `Pending` chip is visible against its background. The tests assert rendered `textContent` and `data-testid` — better than asserting constants — but jsdom does not lay out or paint.
 
 **This does not require a code retry.** It requires the artifacts. DC-9's substitute is defined in `requirements.md` §11 as *"a human check at the HITL pause"* — so it belongs to the user or to the auditor with a real browser, and it must happen **before archive**.
+
+---
+
+### F-16 closed — DC-9 visual verification at the HITL pause
+
+- **2026-08-20** · auditor screenshots + user verification. `requirements.md` §11 defines DC-9's substitute as *"a human check at the HITL pause"*; this is that check.
+
+**Artifacts** — `docs/specs/bugfix/pool-funding-sp-picker-empty/evidence/`:
+
+| # | Artifact | Shows |
+| --- | --- | --- |
+| 01 | `01-picker-populated-STAR-2227.png` | **The fix.** The same result the user opened this ticket with — previously *"The linked CLARISA project has no Science Programs defined"* — now renders the SP picker |
+| 02 | `02-empty-state-no-sps-available.png` | The empty state with the revised copy, *"…has no Science Programs available for alignment."* |
+| 03 | `Pending` chip — **verified by the user** at the HITL pause | `SP02 — 30% - Sustainable Farming` carrying the orange **`Pending`** badge beside the grey **`Contributing`** role badge, on `STAR-3403` |
+
+Artifact 02 was produced by setting `ARI_BILATERAL_ACCEPTED_SP_STATUSES=Confirmed` and restarting — which **re-proved R-PSP-001 AC.4 at integration level**: the original bug reproduces exactly when the accepted set is narrowed, and disappears when it is restored. Config-only; the server was returned to its default and coverage re-measured at `198/198`.
+
+The chip artifact confirms what jsdom could not: the badge renders with the existing `.pf-stale-tag` tokens, coexists with the role badge without breaking the row layout, and communicates that the alignment rests on a status CLARISA has not confirmed.
+
+#### Declared gap — the `stale` state was not verified visually
+
+`stale` is **verified by test, not by view.** Both endpoints assert it alongside the snapshot ref, and the auditor's mutation confirmed it cannot leak into the other two branches. But no rendered view of it exists.
+
+**Why not, honestly:** the auditor's first instruction for producing it was **wrong**. It directed editing the mapping through the admin panel to point at a different CLARISA project — but that picker only offers projects **the feed can resolve**, so the result would render `mapped` with the other project's SPs, never `stale`. The state requires a stored key the feed cannot resolve, which the admin UI cannot express by construction. Caught before the user saved; the `A1676` mapping was verified intact (`1403 / B-A1676 / ext A1676`) afterwards.
+
+The clean alternative — repointing `ARI_CLARISA_HOST` at CLARISA **production**, which per the archived R-1 publishes no `external_code`, so every key would fail to resolve — was offered and **declined**: it means read traffic against another team's production API for a low-marginal-value screenshot. Recorded as an accepted gap rather than paid for at that price.
+
+**F-16 closed. DC-9 satisfied for the two new empty states and the chip; `stale` carried as the spec's one declared visual gap.**

@@ -282,7 +282,7 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
   - [x] `showSpPicker` false on `stale` — *auditor mutation removed the gate from the code; the test reddens*
   - [x] TypeScript compiles — the union widening surfaced and handled every consumer
   - [x] `Pending` chip renders, using existing tokens only (`.pf-stale-tag`, `var(--ac-orange-1)`)
-  - [ ] **Screenshots of all three states attached — NOT DONE (F-16).** The report supplied prose descriptions, not rendered views. **DC-9 is unverified**; per `requirements.md` §11 its substitute is a human check at the HITL pause, and it blocks archive
+  - [x] Visual verification done at the HITL pause (**F-16 closed**) — `evidence/01` picker populated, `evidence/02` empty state, and the `Pending` chip confirmed by the user on `STAR-3403`. **Declared gap:** the `stale` state is verified by test, not by view — see `execution.md`
 - **Dependencies:** T-04 · **Effort:** M · **Status:** todo
 
 ---
