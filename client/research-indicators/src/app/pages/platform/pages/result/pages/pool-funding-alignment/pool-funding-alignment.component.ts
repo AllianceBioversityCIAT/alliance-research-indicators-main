@@ -139,7 +139,10 @@ export default class PoolFundingAlignmentComponent {
   readonly CONTRIBUTING_ROLE_LABEL = 'Contributing';
   readonly UNMAPPED_SP_MESSAGE =
     "This result isn't linked to a CLARISA project yet. Contact the bilateral operations team to register the project mapping.";
-  readonly NO_SP_DEFINED_MESSAGE = 'The linked CLARISA project has no Science Programs defined.';
+  readonly STALE_SP_MESSAGE =
+    'The linked CLARISA project could not be found in the current feed. Contact the bilateral operations team to reconcile the project mapping.';
+  readonly NO_SP_DEFINED_MESSAGE = 'The linked CLARISA project has no Science Programs available for alignment.';
+  readonly PENDING_SP_TAG = 'Pending';
   // REQ-BIL-ASR-03 — AC-03.3 inline message naming the rejected SP codes.
   readonly REJECTED_SP_MESSAGE_PREFIX = 'These Science Programs are no longer valid for this result: ';
   readonly REJECTED_SP_MESSAGE_SUFFIX = '. Remove them and save again.';
@@ -183,20 +186,22 @@ export default class PoolFundingAlignmentComponent {
     return null;
   });
 
-  // Per-result SP picker source + empty-state discriminators (REQ-BIL-ASR-01).
+  // Per-result SP picker source + empty-state discriminators (REQ-BIL-ASR-01, R-PSP-004).
   readonly sciencePrograms = this.bilateralService.sciencePrograms;
   readonly mappingStatus = this.bilateralService.mappingStatus;
   readonly loadingSciencePrograms = this.bilateralService.loadingSciencePrograms;
   // AC-01.2 — unmapped: picker empty + contact-ops message; no 13-SP fallback.
   readonly isUnmapped = computed(() => this.mappingStatus() === 'unmapped');
+  // R-PSP-004 / D-PSP-5 — stale: active mapping exists but CLARISA project unresolvable in feed.
+  readonly isStale = computed(() => this.mappingStatus() === 'stale');
   // AC-01.3 — mapped but the CLARISA project carries no SPs (distinct message).
   readonly hasNoSciencePrograms = computed(() => this.mappingStatus() === 'mapped' && this.sciencePrograms().length === 0);
   // Single named gate for the picker (used directly in the template). Renders only
   // once the per-result source has resolved (mappingStatus non-null) AND the
-  // project is mapped with ≥1 SP. The null guard prevents an empty-picker flash
+  // project is mapped with ≥1 SP and not stale. The null guard prevents an empty-picker flash
   // while getSciencePrograms is still in flight.
   readonly showSpPicker = computed(
-    () => this.mappingStatus() !== null && !this.isUnmapped() && !this.hasNoSciencePrograms()
+    () => this.mappingStatus() !== null && !this.isUnmapped() && !this.isStale() && !this.hasNoSciencePrograms()
   );
 
   readonly showHloSection = computed(() => {

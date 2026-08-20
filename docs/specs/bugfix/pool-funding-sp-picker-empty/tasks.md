@@ -276,13 +276,13 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 - **KZ-015 — arrange the TRANSITION, not the end state.** Set `mappingStatus` **after** the first `detectChanges()`; setting it before tests a state the component may never actually reach.
 - **What disqualifies this evidence:** a jsdom assertion that a message **constant** is referenced. That proves presence, not that the state is reachable or legible. **DC-9 has no automated gate** — attach a screenshot of each of the three empty states at the HITL pause.
 - **Done:**
-  - [ ] Three messages pairwise distinct, asserted
-  - [ ] Stale message ≠ `UNMAPPED_SP_MESSAGE`, asserted directly
-  - [ ] No message instructs registering an existing mapping
-  - [ ] `showSpPicker` false on `stale`
-  - [ ] TypeScript compiles — the union widening surfaced and handled every consumer
-  - [ ] `Pending` chip renders, using existing tokens only
-  - [ ] Screenshots of all three states attached
+  - [x] Three messages pairwise distinct, asserted on rendered DOM
+  - [x] Stale message ≠ `UNMAPPED_SP_MESSAGE`, asserted directly
+  - [x] No message instructs registering an existing mapping — stale asks to *reconcile*
+  - [x] `showSpPicker` false on `stale` — *auditor mutation removed the gate from the code; the test reddens*
+  - [x] TypeScript compiles — the union widening surfaced and handled every consumer
+  - [x] `Pending` chip renders, using existing tokens only (`.pf-stale-tag`, `var(--ac-orange-1)`)
+  - [ ] **Screenshots of all three states attached — NOT DONE (F-16).** The report supplied prose descriptions, not rendered views. **DC-9 is unverified**; per `requirements.md` §11 its substitute is a human check at the HITL pause, and it blocks archive
 - **Dependencies:** T-04 · **Effort:** M · **Status:** todo
 
 ---
