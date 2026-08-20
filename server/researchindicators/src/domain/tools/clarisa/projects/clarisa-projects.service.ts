@@ -181,6 +181,18 @@ export class ClarisaProjectsService {
     return { all, slice, phaseUsed: targetPhase };
   }
 
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / §7, K-016
+  //
+  // Read-only accessor for the current cache's fetch timestamp (ms epoch),
+  // or null on a cold cache. Consumed by AutomapperService's run report so
+  // an admin can tell whether a run read a fresh CLARISA cohort or one up
+  // to 5 minutes stale (the TTL above) — a run immediately after a feed
+  // change can still read the cached cohort. Purely additive: does not
+  // touch getCachedAll()'s cache/refresh/staleness logic.
+  getCacheFetchedAt(): number | null {
+    return this.cache?.fetchedAt ?? null;
+  }
+
   /**
    * Test-only seam — lets specs reset cache between cases without
    * waiting 5 minutes. Not part of the public contract; do not call

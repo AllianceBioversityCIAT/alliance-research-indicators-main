@@ -27,16 +27,16 @@ Other AKILI commands read only the `## Active Lessons` table below.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
-| **K-016** | **A latency/TTL NFR without a paired UI-signal requirement is a trap.** Config saved through a TTL cache is *not in effect when saved*; the user cannot distinguish "not yet" from "broken", and re-saving restarts the window and makes it look permanent | **High** | **2** (filed Methodology-only with no local edit — recurred within 24 h on the next spec in the same family) | **Product** (was Methodology) | **Applied** — root `CLAUDE.md` §4.3 |
-| **K-009** | **A worker that does not deliver is not a worker that found nothing** — now with a **mechanism**: a worker emitted its verdict as **plain text instead of calling `SendMessage`**, so it reached nobody. And the reviewer wrapper grants no `Write`, so the durable-report-file mitigation is **unavailable to the role most prone to the failure** | **High** | **6** (+3 in one spec: two Reviewers, one Implementer twice) | Product | **Applied** — `.agents/reviewer.md` (mechanism named) |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **High** | **6** (+1: widening a predicate made a fidelity cohort 198-of-198, so the count would also pass against a predicate returning `true` unconditionally) | Product | Proposed |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **Critical** | **11** (+5 in one spec: two `is_active` guards, an `IN`-list scope, a feed timestamp that survived `return Date.now()`, and — one level up — a shared mock whose `andWhere` was a **no-op stub**, so a correctly-written test still could not redden) | Product | Proposed |
+| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note | **High** | 1 (3 false Leader arguments in one spec, one exactly backwards; 2 reached committed test descriptions) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
+| **KZ-015** | **A component fixture must arrange the TRANSITION the product performs, not the end state.** Setting an input before the first `detectChanges()` tests a state the product may never reach | **High** | 1 | Product + Methodology | **Applied** — `client/.../src/CLAUDE.md` (+ upstream owed) |
+| **KZ-016** | **A design document can contradict its own requirements and instruct what the code already forbids.** Cross-check §2 against every `AND IT MUST`/`BUT it must NOT` clause *and* against the constraints written into the modules it touches | Medium | 1 (2 occurrences in one spec) | Methodology + Product | **Applied** — `general-setup/design.md` §2 (+ upstream owed) |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
 | **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
-| **K-018** | **The authoritative site list for an expectation-realignment task is the failing suite, not a grep.** Grep enumerates *mentions*; only the run enumerates *breakages*. A grep-built list names already-green sites, misses genuinely red ones, and can skip a whole file — all three happened in one spec | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
-| **KZ-011** | **A multi-clause table cell can be retired in half.** When one clause is retired on new evidence, its siblings inherit the retirement silently and the worker is blamed for the omission. One clause per row | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §3 (+ upstream owed) |
-| **KZ-010** | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands | Medium | 1 | Product + Methodology | Proposed |
+| **KZ-012** | **The `numeric ⟺ STAR` invariant is assumed in three layers and validated in none**, and `platform_code` is `nullable: true` — a NULL renders bare-numeric and is classified STAR. Answer with `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` | Medium | 1 | Product | **Open — carries OQ-1 out of `archive/`** |
+| **KZ-013** | **Archiving a spec silently breaks every document that cites its path.** `/akili-archive` sweeps *forward* (factual claims in the root guides) but never *backward* — who pointed at the folder it just moved. Grep the spec path across `docs/` before the move | Medium | 1 | Product + Methodology | **Applied** — 6 dead references repointed (+ upstream owed) |
 
 ### Queued for upstream (Methodology — no local edit owed)
 
@@ -52,6 +52,15 @@ Other AKILI commands read only the `## Active Lessons` table below.
 
 > **Retired 2026-08-18 (institutionalized and still in force):** `K-001`, `K-002`, `K-006`,
 > `K-010` (guides), `KZ-004`, `KZ-005`, `KZ-006` (templates). They no longer need a digest slot.
+>
+> **Retired 2026-08-19 (fourth sweep, to admit KZ-013):** `K-018` (applied to
+> `general-setup/task.md` §5, where its rule now sits directly beside K-019's in the same section).
+>
+> **Retired 2026-08-19 (third sweep, to admit K-019, K-020 and KZ-012):** `K-016` (applied to
+> root `CLAUDE.md` §4.3; no TTL-cached config touched this cycle, rule stands) · `K-009` (applied to
+> `.agents/reviewer.md`; **both workers delivered on every one of the four dispatches this session**,
+> rule held) · `KZ-010` (held — the verification command was pre-flighted before the fix existed and
+> the pre-flight is what found K-020; its client-specific form now lives in the child guide).
 >
 > **Retired 2026-08-19 (second sweep, to admit K-018 and KZ-011):** `K-014` (applied to root
 > `CLAUDE.md` §4.3 and **observed holding this run** — totals checked before counting, no
@@ -73,6 +82,181 @@ Other AKILI commands read only the `## Active Lessons` table below.
 ---
 
 ## Entries
+
+### 2026-08-20 — bilateral/clarisa-automapper-s2
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 7 (all PASS) | tasks.md |
+| Reviewer FAIL rework rounds | **4** (T-02, T-03, T-05, T-06) | execution.md |
+| In-place corrections after PASS (no round consumed) | 3 (T-01, T-04, T-05) | execution.md |
+| HALTs / FATAL_FAILs / Pivots | **0 / 0 / 0** | execution.md |
+| Behaviour defects | **1** (T-06, shipped past a green suite) | execution.md — T-06 attempt 1 |
+| Budget (design §14) | **exceeded**: 6 review rounds vs 2; LOC ~1,100 server vs ≈620 | design.md §14 |
+| Spec docs contradicting their own requirements | **2** (design §2 DI ban, §4 bucket count) | execution.md — T-02, T-05 |
+| `/akili-test` · `/akili-validate` | **never run** — absence user-accepted 2026-08-20 | archive-summary.md §5 |
+
+**MUDA hunted.** Nearly all rework was **defect-of-evidence**, not defect-of-code: in 5 of 6 rounds the
+production code was already correct and what was missing was a gate that could go red. **Jidoka held** —
+no HALT was needed because every FAIL was caught at the review gate before it compounded.
+
+**Lessons**
+
+- **KZ-001 — recurrence 6 → 11, severity raised to Critical.** (Product)
+  - Five more instances in one spec, and the failure mode **escalated three levels, each invisible to the one below**: a fixture that does not discriminate (T-02's AGRESSO `is_active`, T-04's `IN` cohort scope) → a **scaffold** that cannot (T-03's shared mock had a no-op `andWhere`, so even a correct test could not redden) → a fixture testing a state the product never reaches (T-06).
+  - Evidence: `execution.md` — T-02 attempt 1, T-03 attempts 1–2, T-04 advisory, T-05 issue 1.
+  - No new standardization: the rule exists and is being followed; what recurs is the *inventiveness* of the failure mode.
+
+- **KZ-014 — K-004 binds the argument as tightly as the command.** (Product + Methodology, High)
+  - Root cause: K-004 was applied to *commands* (falsifiers were run) but never to *claims*. Three Leader falsifier arguments written from the design's own frame were false — one exactly backwards, asserting `C-D-514` catches a repeat-while-prefix bug that `C-C-A1` actually catches and it does not. Two reached committed test descriptions.
+  - Evidence: `execution.md` — T-01 "Leader error, found by the Reviewer"; T-02 H2 refuted; T-04 "the Leader's argument refuted again".
+  - Standardization: root `CLAUDE.md` §4.3. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+- **KZ-015 — a fixture can assert a state the product never reaches.** (Product + Methodology, High)
+  - Root cause: the parent renders the dialog always, with `visible=false`, and flips the signal later; `ngOnInit` therefore never saw `true`. Every test set `visible=true` *before* the first `detectChanges()`, so the only sequence production uses was never exercised. **The suite was green and the feature was broken** — opening the dialog never loaded its preview.
+  - Evidence: `execution.md` — T-06 attempt 1, Issue 1.
+  - Standardization: `client/research-indicators/src/CLAUDE.md` tests section. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+- **KZ-016 — a design can contradict its own requirements and instruct what the code forbids.** (Methodology + Product, Medium)
+  - Root cause: `/akili-specify` writes `design.md` from `requirements.md`, but nothing reads it back against them or against constraints already written into the target modules. §2 instructed injecting `AgressoContractRepository`, which the module header explicitly bans (REQUEST-scope cascade, NFR-BAS-001); §4 described four report buckets when R-CAM-003 and R-CAM-005 need six as **data**, not counts.
+  - Evidence: `execution.md` — T-02 "the design document is wrong on one point"; T-05 "Design §4 amended by the Leader".
+  - Standardization: `docs/specs/general-setup/design.md` §2. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+**Cross-host note, not a lesson.** T-06 was dispatched to Antigravity (Gemini 3.7 Flash) to save context
+and reviewed on Claude/opus. **The spec's only behaviour defect was written by one model family and caught
+by another** — five same-family rounds had never needed to catch one. `author ≠ auditor` held on *family*,
+not just instance. Worth remembering when a task is high-risk, independent of token cost.
+
+**Estimating note.** §14 predicted the overrun would come from scope growth. It came from evidence
+discharge instead — budget review rounds for *proving correct code is correct*, not only for fixing wrong
+code, on a codebase whose shipped pattern is guard clauses and shared query-builder mocks.
+
+
+### 2026-08-19 — bilateral/mapping-adjustments (splitter close-out)
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 0 — a splitter produces no diff | proposal.md §13 |
+| Chunks delivered / descoped | 2 / 2 — all terminal | archive-summary.md §3 |
+| Reviewer FAILs · HALTs · Pivots | 0 · 0 · 0 (held by the chunks) | — |
+| **Days the splitter stayed active after its last child archived** | **6** | children archived 2026-08-13; this archive 2026-08-19 |
+| **Inbound references broken by the children's archive** | **6**, across 2 files | grep over `docs/` |
+
+**MUDA identified:** not rework — *stale inventory*. A closed umbrella advertising a next step that had
+already been taken, plus six dead paths in documents that are read as authority. Both are the same
+waste: a reader acting on a record that stopped being true and nothing signalling it.
+
+**Lessons**
+
+- **KZ-013 — Archiving sweeps forward but never backward.** (Product + Methodology, Medium)
+  - Root cause: `/akili-archive` Step 3 mandates a *factual-claims sweep of the root guides* — it asks
+    "what did this cycle make false?" It never asks the inverse: **"who was pointing at the folder I am
+    about to move?"** Moving a spec into `archive/` changes its path, and every citation of the old path
+    dies silently. Nothing in the command greps for them.
+  - Evidence: C1 and C2 archived 2026-08-13. Six days later `docs/ux-ui/design.md` — a **constitutional**
+    document — still cited `docs/specs/bilateral/toc-optional-mapping` and
+    `docs/specs/bilateral/primary-contributing-sp` four times, and `docs/specs/drift-report.md` twice.
+    The splitter's own §13 pointed at an archived child and read as live work; it surfaced only because
+    a `/akili-resume` briefing followed the link and found nothing there.
+  - Why it matters beyond broken links: `docs/ux-ui/design.md` is where an agent goes to learn how this
+    platform is supposed to look and behave. A decision entry whose evidence path 404s is a claim that
+    cannot be checked, in the one place claims are supposed to be checkable.
+  - Same family as `/akili-specify`'s **Correction Closure**, which already mandates a two-direction
+    sweep on every Adjust round. Archiving moves an entire folder and applies neither direction.
+  - Standardization: the 6 references were repointed to their `archive/` paths.
+    → **Applied 2026-08-19 (user-approved).** The Methodology half — a backward-reference sweep step in
+    `/akili-archive` before the move — is **owed upstream**; no local edit can carry it.
+  - Deliberately NOT fixed: the splitter's own `proposal.md` §13. An archived spec is a point-in-time
+    record, and the stale pointer is now documented in its `archive-summary.md` §6 instead.
+
+**What the splitter got right, recorded because it is the reusable part.** It rejected one-spec-for-the-
+whole-ticket (couples a one-line copy change to two unspecified integrations; nothing ships until a
+missing PRMS contract exists) and rejected split-by-layer (no layer independently shippable; the module
+sits half-migrated between merges). The constraint it chose — **each chunk leaves the module fully
+working** — held: C1 and C2 shipped independently with no broken intermediate state.
+
+**Still open, and not closed by this archive:** C3/C4 (PRMS submission and review sync, adjustments
+A8/A9) were descoped by PM agreement on 2026-08-12 to a separate user story. `reviewDecision()` still
+throws *"Bilateral review decision is not implemented yet"*.
+
+
+### 2026-08-19 — bugfix/pool-funding-source-gate
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 1 | tasks.md |
+| Reviewer FAIL rework attempts | **1** (T-01) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 0 | `/akili-test` not run (accepted) |
+| Validation FAIL / WARN | — | `/akili-validate` not run (accepted) |
+| Advisories recorded | 5 | execution.md |
+| Budget: LOC | **≈ 90 budgeted → 238 actual** | design.md §14 |
+| Budget: review rounds | **1 → 2** | design.md §14 |
+
+**MUDA identified:** one rework round, caused by a refactor stepping outside "refactor only". The LOC
+overrun is **not** waste — production landed on budget (~51 vs ~37) and the excess is test code, most
+of it the coverage the FAIL correctly demanded.
+
+**Lessons**
+
+- **K-019 — The safety net could not see the property that moved.** (Product + Methodology, Medium)
+  - Root cause: the DD-4 interceptor refactor was authorised to move the *derivation* into a shared
+    util; it also replaced the URL matcher, widening its acceptance set (`/result/FOO-123` null→STAR,
+    `/result/tip-123` null→TIP, case-sensitivity lost). Its designated safety net,
+    `result.interceptor.spec.ts`, enumerates `PLATFORM_CODES` and is therefore **structurally
+    incapable** of exercising an unrecognized or differently-cased prefix — 29/29 green certified
+    nothing about the two cases that changed.
+  - Evidence: execution.md — T-01 attempt 1, Reviewer FAIL; design.md §14 predicted this leak by
+    name ("most likely the interceptor refactor growing").
+  - The fix that worked, and why it is the lesson: the Leader made an **old-vs-new comparison over
+    nine URLs at zero divergences** the pass condition. It paid twice — the remediation's own first
+    draft skipped STAR in the prefix loop and introduced a *new* divergence on `/result/STAR-31288`,
+    which no unit suite would have surfaced.
+  - Standardization: one line in `docs/specs/general-setup/task.md` §5.
+    → **Applied 2026-08-19 (user-approved)**. Upstream to AKILI owed.
+
+- **K-020 — The verification command lies about its own result.** (Product, Medium)
+  - Root cause: the client's coverage floors are **project-wide**, so a targeted single-file run
+    trips them and exits `1` with every test passing. Measured before any fix existed:
+    `npx jest …/bilateral.service.spec.ts --silent` → exit 1 on 63/63 green; with `--coverage=false`
+    → exit 0. Under Bug Mode's red-before/green-after protocol this makes "green after" unreachable,
+    and an agent reading the exit code would report a healthy suite as red.
+  - Evidence: execution.md — Leader pre-flight. The child guide documented the floors but not this
+    consequence.
+  - Standardization: one line in `client/research-indicators/src/CLAUDE.md`.
+    → **Applied 2026-08-19 (user-approved)**.
+
+- **KZ-012 — An invariant three layers depend on, and none validates.** (Product, Medium, **OPEN**)
+  - `numeric ⟺ STAR` is assumed by `result.interceptor.ts`, by the new `platform-code.util.ts`, and
+    by the server's digits-only `RESULT_CODE` route. Nothing checks it. The database stores
+    `result_official_code` as a **number** and `platform_code` as a separate `varchar(50)` that is
+    **`nullable: true`** — the prefix is composed for display, never stored. A row with NULL or empty
+    `platform_code` therefore renders bare-numeric and is classified STAR.
+  - Evidence: `result.entity.ts:177-182`; archived spec `requirements.md` §8 OQ-1.
+  - **Recorded here deliberately so it survives the archive.** It was that spec's OQ-1, merge-blocking
+    for production, and burying it in `archive/` is how an open question stops being asked.
+  - Answer it with: `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` — any NULL
+    or `''` with a non-zero count falsifies the invariant.
+  - Bounded: if false, behaviour for such a result equals today's, so the archived fix does not
+    worsen it. No local edit proposed — this is an open finding, not a rule.
+
+**Jidoka held.** The Reviewer stopped the line on a change with **nil user impact** — the server maps
+absent / `'STAR'` / unknown all to STAR — and explicitly offered a recorded waiver. The Leader upheld
+the FAIL instead: an unauthorised, untested behaviour change in an interceptor on every HTTP request,
+where the next code shape added to the router would inherit a classification nobody chose.
+
+**The Step 2.3 reversion challenge earned its keep before any code existed.** It found that
+`BilateralService` is root-scoped, `currentAlignment` has no reset on navigation, and the failing 404
+was *load-bearing* — both the bug and the only thing clearing stale state. A guard that merely skipped
+would have passed AC.1 and AC.2, shipped, and shown the pool-funding tab on a TIP result.
+
 
 ### 2026-08-19 — bugfix/w3-bilateral-funding-filter
 

@@ -20,6 +20,12 @@
           </p-button>
         </div>
 
+        <!-- Mapping Coverage strip (T-06 / R-CAM-004 AC.4) -->
+        <app-bilateral-mapping-coverage
+          [phase]="phase()"
+          (openAutomapper)="openAutomapperDialog()">
+        </app-bilateral-mapping-coverage>
+
         <!-- Search + filters bar (AC-04.1 / AC-04.2 / AC-04.3) -->
         <div class="flex flex-wrap items-center gap-3 px-2">
           <!-- Search input -->
@@ -454,3 +460,12 @@
   </ng-template>
 
 </p-dialog>
+
+<!-- Automapper Dialog (T-06 / R-CAM-002, R-CAM-003) -->
+<app-automapper-dialog
+  [(visible)]="automapperDialogOpen"
+  [phase]="phase()"
+  (applied)="onAutomapperApplied()">
+</app-automapper-dialog>
+
+

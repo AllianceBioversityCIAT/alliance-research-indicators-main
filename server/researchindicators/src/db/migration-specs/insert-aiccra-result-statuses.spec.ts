@@ -35,7 +35,9 @@ describe('AICCRA result statuses compensating migration (R-ARS-002, R-ARS-004)',
     await migration.up(queryRunner);
 
     const sql = query.mock.calls.map((call) => String(call[0]));
-    const params = query.mock.calls.map((call) => call[1] as unknown[] | undefined);
+    const params = query.mock.calls.map(
+      (call) => call[1] as unknown[] | undefined,
+    );
 
     expect(sql[0]).toMatch(/UPDATE[\s\S]*is_active` = 0/i);
     expect(params[0]).toEqual([21]);

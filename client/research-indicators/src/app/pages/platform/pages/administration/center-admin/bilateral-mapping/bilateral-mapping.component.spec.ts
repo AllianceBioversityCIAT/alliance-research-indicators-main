@@ -78,6 +78,9 @@ describe('BilateralMappingComponent', () => {
     deactivate: jest.Mock;
     loadAgressoOptions: jest.Mock;
     loadClarisaProjectOptions: jest.Mock;
+    getCoverage: jest.Mock;
+    previewAutoMap: jest.Mock;
+    applyAutoMap: jest.Mock;
   };
   let mockActions: { showToast: jest.Mock; showGlobalAlert: jest.Mock };
   let mockClarity: { trackEvent: jest.Mock };
@@ -89,7 +92,10 @@ describe('BilateralMappingComponent', () => {
       update: jest.fn(),
       deactivate: jest.fn(),
       loadAgressoOptions: jest.fn().mockResolvedValue(AGRESSO_OPTIONS),
-      loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS)
+      loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS),
+      getCoverage: jest.fn().mockResolvedValue({ mapped: 4, pending: 194, reachable: 198 }),
+      previewAutoMap: jest.fn().mockResolvedValue(null),
+      applyAutoMap: jest.fn().mockResolvedValue({ ok: true, data: null })
     };
     mockActions = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
     mockClarity = { trackEvent: jest.fn() };
@@ -1511,7 +1517,61 @@ describe('BilateralMappingComponent', () => {
       expect(component.clarisaOptionLabel(undefined as any)).toBe('');
     });
   });
+
+  // ── Automapper & DERIVED source tests (S2 — T-06) ──────────────────────────
+
+  describe('Automapper integration (T-06)', () => {
+    it('supports DERIVED source in SOURCE_OPTIONS and sourceLabel', () => {
+      const derivedOpt = component.sourceOptions.find(opt => opt.value === 'DERIVED');
+      expect(derivedOpt).toEqual({ label: 'Derived', value: 'DERIVED' });
+      expect(component.sourceLabel('DERIVED')).toBe('Derived');
+    });
+
+    it('opens automapper dialog when openAutomapperDialog is called', () => {
+      expect(component.automapperDialogOpen()).toBe(false);
+      component.openAutomapperDialog();
+      expect(component.automapperDialogOpen()).toBe(true);
+    });
+
+    it('reloads mapping list and refreshes coverage strip when automapper run is applied (Issue 2)', async () => {
+      mockService.list.mockResolvedValue(makePage([makeRow()]));
+      mockService.getCoverage.mockResolvedValue({ mapped: 6, pending: 192, reachable: 198 });
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      mockService.getCoverage.mockClear();
+
+      component.onAutomapperApplied();
+      await fixture.whenStable();
+
+      expect(mockService.list).toHaveBeenCalled();
+      expect(mockService.getCoverage).toHaveBeenCalled();
+    });
+
+    it('renders the mapping list table successfully even when coverage service errors (Hard Requirement 4)', async () => {
+      // Coverage returns null (error state)
+      mockService.getCoverage.mockResolvedValue(null);
+      // Main table list succeeds
+      const rows = [makeRow({ id: 10, agresso_agreement_id: 'A511' })];
+      mockService.list.mockResolvedValue(makePage(rows));
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+      fixture.detectChanges();
+
+      // Main table data loaded and rendered
+      expect(component.rows().length).toBe(1);
+      expect(component.loadError()).toBe(false);
+      expect(mockService.list).toHaveBeenCalled();
+
+      // Coverage strip child component receives error but does NOT throw or hide parent table
+      const table = fixture.nativeElement.querySelector('[data-testid="mappings-table"]');
+      expect(table).not.toBeNull();
+    });
+  });
 });
+
 
 
 

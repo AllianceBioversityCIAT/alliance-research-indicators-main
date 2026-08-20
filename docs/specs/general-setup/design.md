@@ -29,6 +29,15 @@ Do NOT restate requirements. Link to them.
 
 ---
 
+> **Before this section is considered done, cross-check it in two directions (Kaizen KZ-016).** A design
+> can contradict the requirements it derives from, and it can instruct something the code already forbids —
+> neither is caught by writing it. In one 2026-08-20 spec, §2 told the implementer to inject a repository
+> the target module's own header explicitly bans (a REQUEST-scope cascade), and §4 described four report
+> buckets when two requirements needed six as *data*, not counts. Both were caught downstream by a Leader
+> and a Reviewer, not by any authoring gate. **Read the design back against (a) every `AND IT MUST` /
+> `BUT it must NOT` clause in `requirements.md`, and (b) the constraints already written into the modules
+> it touches** — module headers, DI notes, and route-ordering comments are constitution too.
+
 ## 2. Architecture
 
 Describe the slice of the system this feature changes.

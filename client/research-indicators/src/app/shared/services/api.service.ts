@@ -74,6 +74,10 @@ import { Initiative } from '@shared/interfaces/initiative.interface';
 import { FindContractsResponse } from '../interfaces/find-contracts.interface';
 import { PoolFundingTagPatchBody, PoolFundingTagPatchResponse } from '@interfaces/bilateral/agresso-contract.interface';
 import {
+  AutomapperApplyResponse,
+  AutomapperCoverage,
+  AutomapperPreviewResponse,
+  AutomapperRunRequest,
   BilateralMappingListPage,
   BilateralMappingListQuery,
   BilateralProjectMapping,
@@ -845,6 +849,24 @@ export class ApiService {
   PATCH_BilateralProjectMappingDeactivate = (id: number): Promise<MainResponse<BilateralProjectMapping>> => {
     const url = () => `bilateral-project-mappings/${id}/deactivate`;
     return this.TP.patch(url(), {}, { useResultInterceptor: true });
+  };
+
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / T-06
+  GET_BilateralMappingCoverage = (phase?: number): Promise<MainResponse<AutomapperCoverage>> => {
+    const url = () => `bilateral-project-mappings/coverage`;
+    const params: Record<string, string> = {};
+    if (phase !== undefined) params['phase'] = String(phase);
+    return this.TP.getWithParams(url(), params);
+  };
+
+  POST_AutomapperPreview = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperPreviewResponse>> => {
+    const url = () => `bilateral-project-mappings/auto-map/preview`;
+    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
+  };
+
+  POST_AutomapperApply = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperApplyResponse>> => {
+    const url = () => `bilateral-project-mappings/auto-map/apply`;
+    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
   };
 
   GET_ClarisaBilateralProjects = (search?: string): Promise<MainResponse<ClarisaBilateralProjectOption[]>> => {

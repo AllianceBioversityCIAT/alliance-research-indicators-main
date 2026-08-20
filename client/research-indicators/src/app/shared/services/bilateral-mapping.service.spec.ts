@@ -19,6 +19,9 @@ describe('BilateralMappingService', () => {
     PATCH_BilateralProjectMappingDeactivate: jest.Mock;
     GET_ClarisaBilateralProjects: jest.Mock;
     GET_FindContracts: jest.Mock;
+    GET_BilateralMappingCoverage: jest.Mock;
+    POST_AutomapperPreview: jest.Mock;
+    POST_AutomapperApply: jest.Mock;
   };
 
   beforeEach(() => {
@@ -29,7 +32,10 @@ describe('BilateralMappingService', () => {
       PATCH_BilateralProjectMapping: jest.fn(),
       PATCH_BilateralProjectMappingDeactivate: jest.fn(),
       GET_ClarisaBilateralProjects: jest.fn(),
-      GET_FindContracts: jest.fn()
+      GET_FindContracts: jest.fn(),
+      GET_BilateralMappingCoverage: jest.fn(),
+      POST_AutomapperPreview: jest.fn(),
+      POST_AutomapperApply: jest.fn()
     };
     TestBed.configureTestingModule({
       providers: [BilateralMappingService, { provide: ApiService, useValue: mockApi }]
@@ -272,4 +278,103 @@ describe('BilateralMappingService', () => {
       expect(await service.loadClarisaProjectOptions()).toEqual([]);
     });
   });
+
+  describe('getCoverage', () => {
+    it('returns coverage data on success', async () => {
+      const coverageData = { mapped: 4, pending: 194, reachable: 198 };
+      mockApi.GET_BilateralMappingCoverage.mockResolvedValue(ok(coverageData));
+
+      const result = await service.getCoverage(2026);
+
+      expect(result).toEqual(coverageData);
+      expect(mockApi.GET_BilateralMappingCoverage).toHaveBeenCalledWith(2026);
+    });
+
+    it('returns null on failure', async () => {
+      mockApi.GET_BilateralMappingCoverage.mockResolvedValue(
+        err(500, { errors: 'coverage error' })
+      );
+
+      const result = await service.getCoverage();
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('previewAutoMap', () => {
+    it('returns preview report on success', async () => {
+      const previewData = {
+        feedFetchedAt: '2026-08-19T21:10:00.000Z',
+        counts: {
+          toCreate: 190,
+          alreadyMapped: 4,
+          ambiguous: 0,
+          unresolved: 0,
+          divergent: 3,
+          supersede: 1
+        },
+        toCreate: [],
+        alreadyMapped: [],
+        ambiguous: [],
+        unresolved: [],
+        divergent: [],
+        supersede: []
+      };
+      mockApi.POST_AutomapperPreview.mockResolvedValue(ok(previewData));
+
+      const result = await service.previewAutoMap(2026);
+
+      expect(result).toEqual(previewData);
+      expect(mockApi.POST_AutomapperPreview).toHaveBeenCalledWith({ phase: 2026 });
+    });
+
+    it('returns null on failure', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValue(
+        err(500, { errors: 'preview failed' })
+      );
+
+      const result = await service.previewAutoMap();
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('applyAutoMap', () => {
+    it('returns { ok: true, data } on success', async () => {
+      const applyData = {
+        feedFetchedAt: '2026-08-19T21:10:00.000Z',
+        counts: {
+          created: 190,
+          alreadyMapped: 4,
+          ambiguous: 0,
+          unresolved: 0,
+          divergent: 3,
+          superseded: 1
+        },
+        ambiguous: [],
+        unresolved: []
+      };
+      mockApi.POST_AutomapperApply.mockResolvedValue(ok(applyData));
+
+      const result = await service.applyAutoMap(2026);
+
+      expect(result).toEqual({ ok: true, data: applyData });
+      expect(mockApi.POST_AutomapperApply).toHaveBeenCalledWith({ phase: 2026 });
+    });
+
+    it('returns { ok: false, status, message } on failure', async () => {
+      mockApi.POST_AutomapperApply.mockResolvedValue(
+        err(422, { errors: 'No external codes in cohort' })
+      );
+
+      const result = await service.applyAutoMap();
+
+      expect(result).toEqual({
+        ok: false,
+        status: 422,
+        message: 'No external codes in cohort'
+      });
+    });
+  });
 });
+
