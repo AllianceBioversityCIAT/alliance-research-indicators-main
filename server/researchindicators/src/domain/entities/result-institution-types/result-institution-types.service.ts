@@ -269,11 +269,11 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
    * adopted PK — a row that submitted its OWN id (the `institution?.result_institution_type_id`
    * guard below) is never touched, since claiming your own PK is not a
    * collision. Resolution turns the adoption back into a plain insert: drop
-   * the adopted PK and re-derive the audit stamp as `NEW` — `buildUpdateData`/
-   * `buildDataTemplate` had stamped it `UPDATE` (`updated_by` only) on the
-   * belief the row already existed; once the PK is disowned here, that
-   * belief no longer holds, and leaving `updated_by` on a row `save()` is
-   * about to INSERT would carry a stale audit column with no `created_by`.
+   * the adopted PK and re-derive the audit stamp as `NEW` — `buildDataTemplate`
+   * had stamped it `UPDATE` (`updated_by` only) on the belief the row
+   * already existed; once the PK is disowned here, that belief no longer
+   * holds, and leaving `updated_by` on a row `save()` is about to INSERT
+   * would carry a stale audit column with no `created_by`.
    */
   private reconcileAdoptedPrimaryKey(
     institution: InstitutionRow,
@@ -312,21 +312,55 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
    * which are **shared** with `customSaveInnovationDev` — editing those would
    * change Dev's behaviour as a side effect, out of scope for this fix. Not
    * called from `customSaveInnovationDev`, which is therefore unaffected.
+   *
+   * **Duplicate-PK remediation, added 2026-08-20 (Reviewer advisory,
+   * verified: `[{result_institution_type_id: 77, institution_type_id: 5},
+   * {result_institution_type_id: 77, institution_type_id: 6}]`).** This is
+   * the organizations mirror of the same-named fix in
+   * `ResultActorsService.assertInnovationUseOwnership` — the id-PRESENT
+   * counterpart of the id-less PK-collision fix in `customSaveInnovationUse`
+   * above, and the same silent-loss, column-hybrid corruption, reached
+   * through a third payload shape. Two id-present rows sharing one
+   * `result_institution_type_id` both genuinely belong to this result and
+   * role, so the ownership check below has nothing to reject on its own —
+   * and `idsPresent`'s dedup (added for message cleanliness) meant the id
+   * was only ever counted once. `removeDuplicates` in `customSaveInnovationUse`
+   * cannot catch it either — it keys on identity columns
+   * (`institution_type_id`/etc.), never on `result_institution_type_id`, so
+   * `type_5`/`type_6` are distinct keys to it. Checked against the RAW,
+   * non-deduplicated `data` this method already receives, before the DB
+   * round-trip below: there is no correct merge for "one row asked to
+   * become two different things" (unlike the id-less case), so the whole
+   * save is rejected with a message distinct from the unauthorized-id one
+   * below (design.md §15, mirrors R-IUA-005's duplicate-identity rule).
    */
   private async assertInnovationUseOwnership(
     data: InstitutionRow[],
     resultId: number,
     tempRepo: Repository<ResultInstitutionType>,
   ): Promise<void> {
-    const idsPresent = [
-      ...new Set(
-        data
-          .filter((institution) => institution?.result_institution_type_id)
-          .map((institution) => institution.result_institution_type_id),
-      ),
-    ];
+    const rawIdsPresent = data
+      .filter((institution) => institution?.result_institution_type_id)
+      .map((institution) => institution.result_institution_type_id);
+    const idsPresent = [...new Set(rawIdsPresent)];
     if (idsPresent.length === 0) {
       return;
+    }
+
+    if (rawIdsPresent.length !== idsPresent.length) {
+      const seen = new Set<string>();
+      const duplicated = new Set<string>();
+      for (const id of rawIdsPresent) {
+        const key = String(id);
+        if (seen.has(key)) {
+          duplicated.add(key);
+        } else {
+          seen.add(key);
+        }
+      }
+      throw new BadRequestException([
+        `result_institution_type_id: same id submitted by more than one row — ${[...duplicated].join(', ')}`,
+      ]);
     }
 
     const ownedRows = await tempRepo.find({
@@ -337,12 +371,13 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       },
     });
     // `result_institution_type_id` is `@PrimaryGeneratedColumn({ type: 'bigint' })`
-    // (see `result-innovation-use.service.ts:210-216` on the same `bigint`
-    // hazard: the driver can hydrate it as either a JS `number` or a
-    // `string`, depending on `supportBigNumbers`/`bigNumberStrings`). Both
-    // sides are normalised to `String(...)` before the membership test so
-    // this check does not silently start rejecting every legitimate save the
-    // moment that driver configuration changes.
+    // (see `result-innovation-use.service.ts`'s `resolveInnovationUseLevel`
+    // doc comment on the same `bigint` hazard: the driver can hydrate it as
+    // either a JS `number` or a `string`, depending on
+    // `supportBigNumbers`/`bigNumberStrings`). Both sides are normalised to
+    // `String(...)` before the membership test so this check does not
+    // silently start rejecting every legitimate save the moment that driver
+    // configuration changes.
     const ownedIds = new Set(
       ownedRows.map((row) => String(row.result_institution_type_id)),
     );

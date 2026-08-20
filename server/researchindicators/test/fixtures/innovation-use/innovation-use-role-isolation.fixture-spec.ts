@@ -117,12 +117,11 @@ import { QuantificationRolesEnum } from '../../../src/domain/entities/quantifica
  * mistakable for one another in a failure message.
  *
  * **Falsifying input (the single most important one in the spec, per
- * `tasks.md` T-10):** remove `actor_role_id: ActorRolesEnum.INNOVATION_DEV`
- * — sorry, `actor_role_id` from `result-actors.service.ts`'s
- * `customSaveInnovationUse` deactivate predicate → the Innovation Dev
- * actor row flips to `is_active = FALSE` and this fixture's first `it`
- * goes red. See the falsification table in this task's report for the
- * other two (`result-institution-types.service.ts`'s
+ * `tasks.md` T-10):** remove `actor_role_id: ActorRolesEnum.INNOVATION_USE`
+ * from `result-actors.service.ts`'s `customSaveInnovationUse` deactivate
+ * predicate → the Innovation Dev actor row flips to `is_active = FALSE`
+ * and this fixture's first `it` goes red. See the falsification table in
+ * this task's report for the other two (`result-institution-types.service.ts`'s
  * `deactivateExistingRecords`, and the quantification role scoping).
  *
  * **FIXED, 2026-08-20 (`docs/specs/innovation-use/details-api/validation-report.md`

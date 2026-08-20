@@ -24,11 +24,20 @@ import { ResultInnovationUseModule } from './result-innovation-use/result-innova
  *
  * Membership only, no transitive reachability walk: unlike `ClarisaModule`
  * (itself reached from `AppModule` through one further hop), `EntitiesModule`
- * is imported directly by `AppModule`, and after this change
- * `ResultInnovationUseModule` has exactly one incoming graph edge — this
- * assertion. A reachability walk would be marginal work proving the same
- * single edge a membership check already covers (per the Leader's brief:
- * "membership is sufficient and load-bearing... do not gold-plate it").
+ * is imported directly by `AppModule`.
+ *
+ * **Correction, false since T-08.** This originally claimed
+ * `ResultInnovationUseModule` had exactly one incoming graph edge — this
+ * assertion — with a reachability walk dismissed as marginal work proving
+ * the same single edge a membership check already covers. That is no
+ * longer true: `results.module.ts` also imports `ResultInnovationUseModule`
+ * (T-08's DI edge), so there are at least two incoming edges, not one. That
+ * makes this gate **over-strict, not under-strict** — deleting the
+ * `entities.module.ts` entry this assertion checks would redden this spec
+ * while `ResultInnovationUseModule`'s endpoints still resolve, reached
+ * through `ResultsModule`'s edge instead. The assertion itself is
+ * unchanged: membership through `EntitiesModule` is still real and worth
+ * asserting, it is just no longer the module's only route into the graph.
  *
  * This does not boot Nest's DI container or a `TestingModule` — it only
  * reads the static `@Module()` metadata Nest's compiler attaches to each

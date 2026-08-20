@@ -75,10 +75,16 @@ export class ResultInnovationUseService {
    * logs only from rejection points inside its own body. Adding such
    * wrapping here would invent a call-style the reference does not use, to
    * cover two rejections whose owning files this task must not edit; (3)
-   * operationally the loss is bounded the same way §9 itself bounds it for
-   * every other 4xx in this chunk: `ResponseInterceptor` already logs a
-   * `400` at `warn` with no extra code (§9), so the rule-name/service-scope
-   * detail is the only signal lost, not all signal.
+   * operationally the loss is bounded, just not for the reason once claimed
+   * here. **Corrected 2026-08-20 (`design.md` §9):** a thrown
+   * `BadRequestException` never reaches `ResponseInterceptor` — that
+   * interceptor only runs inside `next.handle().pipe(map(...))` and has no
+   * `catchError`. It is `GlobalExceptions` that handles it, and that
+   * filter's only log call is `_logger._error(...)`, unconditional on
+   * status — so every thrown `400` in this codebase lands at `ERROR`, not
+   * `warn`, platform-wide. Signal is not lost, only mis-levelled: the
+   * rule-name/service-scope detail this closure's own `warn` calls add is
+   * still the only thing these two rejections would otherwise be missing.
    */
   private readonly logger = new CgiarLogger(ResultInnovationUseService.name);
   constructor(

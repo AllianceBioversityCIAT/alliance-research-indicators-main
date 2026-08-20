@@ -776,9 +776,20 @@ describe('ResultActorsService', () => {
     // block; `ResultActorsService` has no such dedup). Without a
     // `[...new Set(...)]` on `idsPresent` itself, a payload that repeats the
     // SAME unauthorized id twice produced a `400` message listing it twice
-    // (`— 999, 999`), which this test would catch as a mismatch against the
-    // single-occurrence string below.
-    it('lists a repeated unauthorized result_actors_id only once in the 400 message', async () => {
+    // (`— 999, 999`).
+    //
+    // **Superseded 2026-08-20 (item 1, the data-corruption defect closed
+    // below by the duplicate-PK check).** This exact payload shape — the
+    // same `result_actors_id` on two id-present rows — is now caught by
+    // that NEW check BEFORE `assertInnovationUseOwnership` ever runs the
+    // `find()` this test's mock stubs to `[]`. `expect(find).not.toHaveBeenCalled()`
+    // below makes that ordering falsifiable: reverting the duplicate check
+    // (or moving it after the `find()` call) sends this payload back
+    // through the old unauthorized-row path, `find` gets called, and both
+    // this assertion and the message assertion redden. The single-occurrence
+    // guarantee this test always protected still holds — now backed by the
+    // duplicate-PK message's own `Set`, not `idsPresent`'s.
+    it('rejects two id-present rows sharing one result_actors_id as a duplicate-PK collision, naming it once, before the ownership check ever runs', async () => {
       const find = jest.fn().mockResolvedValue([]);
       const update = jest.fn();
       const save = jest.fn();
@@ -809,8 +820,64 @@ describe('ResultActorsService', () => {
 
       expect(caught).toBeInstanceOf(BadRequestException);
       expect((caught.getResponse() as { message: string[] }).message).toEqual([
-        'result_actors_id: unknown or unauthorized actor row — 999',
+        'result_actors_id: same id submitted by more than one row — 999',
       ]);
+      expect(find).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    // The actual reproduction shape for item 1's data-corruption defect
+    // (Reviewer advisory, verified): unlike the test above, `50` genuinely
+    // IS owned — `buildRealisticFindMock` (declared above in this describe
+    // block) seeds a row scoped to `(result_id: 3, actor_role_id:
+    // INNOVATION_USE)` that a real WHERE clause would match. Before this
+    // fix, `assertInnovationUseOwnership`'s `idsPresent` counted id `50`
+    // ONCE (`[...new Set(...)]`), found it genuinely owned, and returned
+    // normally — the ownership check has nothing to reject when the id is
+    // legitimately owned by both rows. `dataToSave` would then carry two
+    // `Partial<ResultActor>` objects both keyed on `result_actors_id: 50`,
+    // and `save()` below would never run in this test because the
+    // assertion below expects it not to — the falsification for "what
+    // happens if it did" lives in this task's report and the fixture file.
+    it('rejects two id-present rows sharing one GENUINELY OWNED result_actors_id — the id-less fix does not cover this, since both rows already submit their own id', async () => {
+      const find = buildRealisticFindMock({
+        result_actors_id: 50,
+        result_id: 3,
+        actor_role_id: ActorRolesEnum.INNOVATION_USE,
+      });
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = { find, findOne: jest.fn(), update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row1 = {
+        result_actors_id: 50,
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 1,
+      } as InnovationUseActorDto;
+      const row2 = {
+        result_actors_id: 50,
+        actor_type_id: 2,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 2,
+      } as InnovationUseActorDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(3, [row1, row2], manager);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_actors_id: same id submitted by more than one row — 50',
+      ]);
+      expect(find).not.toHaveBeenCalled();
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });
