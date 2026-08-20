@@ -1,6 +1,24 @@
 # Validation Report — Results (Innovation Use) / Details API
 
-> ## ❌ NOT ARCHIVE-READY — 5 FAIL, 21 WARN
+> ## ⏳ SUPERSEDED IN PART — remediation round 2 applied 2026-08-20; **re-validation still required**
+>
+> **This report's verdict below is preserved verbatim as the point-in-time finding. It is no longer the current state.** Every FAIL has been acted on:
+>
+> | Finding | Disposition |
+> | --- | --- |
+> | **FAIL-1** cross-role authorization variant | **FIXED** — `assertInnovationUseOwnership` in both services, `(result_id, role)`-scoped, rejects `400` before any write |
+> | **FAIL-B** org guard bypassed by `removeDuplicates` | **FIXED** — the guard now sees raw `data`; an unauthorized id can no longer be dropped before it is checked |
+> | **FAIL-2** §9 observability never delivered | **DELIVERED** — logger + 4 `warn` sites, payload-audited; §9's false `ResponseInterceptor` claim corrected |
+> | **FAIL-5** creation-path green-check transition | **ALREADY PASSING** — the two auditors disagreed; A was right. B was misled by a stale comment, now fixed |
+> | **FAIL-A** R-IUA-009 AC.4 false as written | **AC AMENDED as an explicit NARROWING** — both auditors' wording, recorded as not-satisfied-as-originally-written |
+> | **FAIL-C / FAIL-D** stale figures | **WITHHELD pending one closing run** rather than restated — they had already gone stale twice |
+> | **F-1 / F-2a / F-2b** | **FIXED** — plus a fourth the correction-closure sweep found that the finding had not cited |
+>
+> **What is NOT yet done:** the closing verification run, and the re-validation that consumes it. **Do not archive on this banner** — archive on a re-run. Trail: `execution.md` → *Remediation Round 2*. Follow-up **FR-7** is filed in `../family.md`.
+>
+> ---
+>
+> ### Point-in-time verdict (2026-08-20, preserved) — ❌ NOT ARCHIVE-READY, 5 FAIL, 21 WARN
 >
 > **The blocking finding is new, and it falsifies a claim this spec recorded as proven.** The cross-result authorization defect found at T-10 has a **second, un-gated variant** that needs no knowledge of another result — so it is *more likely* — and it falsifies **four ACs** that `execution.md`, `tasks.md` and `test-report.md` all recorded as PASS. Three of the other four FAILs are documentation defects about counts, in a spec whose own thesis is that counts must be grepped rather than asserted. One is an entire design section that was never delivered and never noticed across 24 review rounds.
 >

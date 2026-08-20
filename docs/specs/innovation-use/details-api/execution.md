@@ -2144,3 +2144,64 @@ All four carved-out criteria closed, each **on its own terms**:
 The defect was recorded as an advisory **three times** (T-03, T-04, and twice at T-09) before T-10 proved one variant of it, and the **second variant survived T-10's proof, 24 review rounds, and a green fixture suite** — because F-B's attack payload never carried a Dev id, so its "role isolation PROVEN" conclusion was green for a reason unrelated to the property it named. It was found by an **auditor reading code against a claim**, which is what `/akili-validate` exists for, and it was delegated precisely because the Leader had authored the record it would otherwise have been validating.
 
 **The transferable lesson:** two advisories predicting a defect are worth less than one test that would fail if it were real. Both T-03's and T-04's advisories described this exact attack in words, and neither was ever reconciled against the conclusion that contradicted them.
+
+---
+
+## Remediation Round 2 — closing `/akili-validate`'s re-run (2026-08-20)
+
+The re-run returned 4–5 FAIL. **Zero of them were code defects in the delivered feature.** One was a real product defect the first round's fix did not reach (FAIL-B), and three were defects the **first round's own documentation corrections introduced**. That ratio is the finding: by this point the record was a larger source of error than the code.
+
+### FAIL-2 — §9 observability (no prior entry; recorded here)
+
+Closed before the re-run but never written down — an omission worth naming, because a closure with no entry is indistinguishable from a closure that never happened.
+
+| Item | Evidence |
+| --- | --- |
+| Logger | `result-innovation-use.service.ts:83` — `private readonly logger = new CgiarLogger(ResultInnovationUseService.name)` |
+| Four `warn` sites | `:143` (no detail row), `:274` (level resolves to no catalog row), `:305` (level ≥ 6 justification missing, R-IUA-006), `:340` (duplicate actor identity, R-IUA-005) |
+| Payload audit | All four hand-read: `result_id` + a rule identifier only. **No payload field, no user id, no free text from the request.** |
+| §9 bullet 4 was **factually false** and is corrected (`83ef9393`) | It claimed `ResponseInterceptor` logs a thrown `400` at `warn`. That interceptor has **zero `catchError`**, so a thrown exception never reaches it — it reaches `GlobalExceptions`, which calls `_logger._error` **unconditionally**. Every thrown `400` lands at ERROR platform-wide. The design document asserted a logging level the platform does not produce |
+
+### FAIL-5 — creation-path green-check transition (no prior entry; recorded here)
+
+The two auditors **disagreed** on this one: B reported it unaddressed, A reported it PASS. **A was right**, verified at source: `innovation-use-result-creation.fixture-spec.ts:767` `create()`, `:777` `update()`, green-check reads at `:769`/`:788`, and the `updated_by` assertion at `:810-813`.
+
+**B was misled by a stale comment at `:162`** which still read that `harness.innovationUseService.update()` *"was never called anywhere in this"* file — untrue since the FAIL-5 test was added. A stale comment produced a **false FAIL in an audit of a spec whose recurring defect is stale comments.** It is fixed in the same round as FAIL-B.
+
+Worth recording *why* the obvious assertion was not enough: the green-check transition **did not redden** when the save was reverted to raw SQL, because `innovation_use_validation` reads no audit column. The gate is `updated_by` — NULL by default, no `ON UPDATE`, written only by `audit(UPDATE)`.
+
+### The three defects the corrections created
+
+| # | Defect | Where |
+| --- | --- | --- |
+| F-1 | Modified-file count said **8**, enumerated **7** — the **fourth** touch of this one figure. `results.module.ts` was added to §2.1 and omitted from the very cell being corrected for that omission | `design.md` Doc Control |
+| F-2a | My annotation asserted *"It is true now, enforced by steps 7a/8a"* of a sentence claiming every predicate carries the role. **7a/8a are a precondition check, not a predicate.** I asserted a property the code lacks **in the paragraph confessing that exact error class** | `design.md` §5.1 |
+| F-2b | DD-3's amendment claimed step 6 is *"the only statement already executed"* when the gate fires. False for **step 8a**, where step 7's full actor reconciliation has run. Rollback covers both, so the decision stands — but the amendment's only quantitative claim was wrong | `design.md` DD-3 |
+
+A fourth was found by the **correction-closure sweep**, not by the finding: `test-report.md`'s AC.4 row had been **garbled by my own edit** — the replacement landed, the superseded tail stayed attached, and the row asserted the fix and the defect in one sentence. My verification had confirmed the new text was *present*, never that the old text was *gone*.
+
+> **KZ candidate — verify deletion, not just insertion.** A string-replacement check that greps for the new value passes identically whether the old value was replaced or merely preceded. Both halves need asserting, and only the sweep caught it.
+
+### R-IUA-009 AC.4 — AMENDED, and the amendment is a narrowing
+
+Both auditors independently proposed the same wording; it is applied in their words. AC.4 now reads: *every deactivate predicate names the role column, **or** — for the id-present `save`, whose predicate is the primary key — that key is pre-validated against `(result_id, role)` before the write executes.*
+
+**Recorded as a narrowing, not a satisfaction.** The delivered mechanism is reject-before-write, which is different from and arguably stronger than a role-bearing predicate — it returns `400` rather than silently matching zero rows — but it is **not the property AC.4 described**, and a structural criterion must never sit marked MET on a compensating control. This entry's own earlier table (*"the cross-role variant"*, above) had AC.4 folded into a row marked ✅ MET; that row is corrected and AC.4 now carries its own.
+
+### Checkbox counts — stated, because the earlier "genuinely zero" claim is scoped and did not say so
+
+That claim is true **of `tasks.md` §2's four carved-out Done criteria** and of nothing else. Current true counts:
+
+| File | Unticked | Status |
+| --- | --- | --- |
+| `tasks.md` §2 (task Done criteria) | **0** | The claim above, correctly scoped |
+| `tasks.md` §7 | **1 `[ ]` + 1 `[~]`** | Both deliberate and both mine. `[ ]` *"Every scenario clause in §3 owned and discharged"* — genuinely open (R-IUA-011's *"submit transition is permitted"* is owned by no task). `[~]` — the suite figures, **withheld pending the closing run** |
+| `requirements.md` AC boxes | **76** | **A documentation inconsistency, not a coverage gap** — and it is being named rather than fixed by mass-ticking |
+
+On that last row: `requirements.md`'s AC boxes were **never** part of this spec's evidence chain. Coverage authority is `test-report.md`'s requirement-to-test matrix, which carries per-AC verdicts with test-file citations. Ticking 76 boxes from that matrix would add no evidence while creating 76 new opportunities for exactly the drift this round spent its whole budget correcting — and this spec has already shipped **four** wrong counts and one false "it is true now". **The boxes are left as authored state.** Carried to the archive as an accepted WARN with that reasoning, not as an oversight.
+
+### FR-7 filed outside this folder
+
+`customSaveInnovationDev` retains the defect. Filed as **FR-7** in [`../family.md`](../family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
+
+The framing is the load-bearing part: the new guard is a property of the **endpoint, not the data**. These rows are protected when written through this endpoint and **not otherwise** — any authenticated principal who can edit some indicator-2 result can still rewrite any `result_actors` / `result_institution_types` row by PK through the Innovation Dev endpoint, **including the Innovation Use rows just protected**. Exposure is now **asymmetric**, and that asymmetry is what makes *"authorization fixed"* the likely mis-summary of this archive. FR-7 says so in those words.
