@@ -22,7 +22,10 @@ const fakeUser = { sec_user_id: 77 } as User;
 
 describe('AutomapperService', () => {
   let service: AutomapperService;
-  let mockClarisaProjectsService: { listBilateralProjects: jest.Mock };
+  let mockClarisaProjectsService: {
+    listBilateralProjects: jest.Mock;
+    getCacheFetchedAt: jest.Mock;
+  };
   let mockAgressoRepo: { createQueryBuilder: jest.Mock };
   let mockMappingRepo: { createQueryBuilder: jest.Mock };
   let txMappingRepo: {
@@ -129,6 +132,7 @@ describe('AutomapperService', () => {
   beforeEach(async () => {
     mockClarisaProjectsService = {
       listBilateralProjects: jest.fn(),
+      getCacheFetchedAt: jest.fn().mockReturnValue(null),
     };
     mockAgressoRepo = {
       createQueryBuilder: jest.fn().mockReturnValue(makeContractQb()),
@@ -983,6 +987,27 @@ describe('AutomapperService', () => {
       // count is unchanged after the first apply (R-CAM-002 AC.2).
       expect(txMappingRepo.save).toHaveBeenCalledTimes(1);
       expect(txMappingRepo.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 rework /
+  // design.md §7, K-016. getFeedFetchedAt() is a thin passthrough to
+  // ClarisaProjectsService.getCacheFetchedAt() — this is the ONLY thing
+  // it does, so the gate is pure delegation, both branches.
+  describe('getFeedFetchedAt (§7, K-016)', () => {
+    it('returns whatever clarisaProjectsService.getCacheFetchedAt() returns', () => {
+      mockClarisaProjectsService.getCacheFetchedAt.mockReturnValue(
+        1_700_000_000_000,
+      );
+
+      expect(service.getFeedFetchedAt()).toBe(1_700_000_000_000);
+      expect(mockClarisaProjectsService.getCacheFetchedAt).toHaveBeenCalled();
+    });
+
+    it('returns null when the underlying cache is cold', () => {
+      mockClarisaProjectsService.getCacheFetchedAt.mockReturnValue(null);
+
+      expect(service.getFeedFetchedAt()).toBeNull();
     });
   });
 });

@@ -81,7 +81,23 @@ Three endpoints under the existing bilateral mapping module. All `@Roles`-guarde
 | `POST` | `…/auto-map/apply` | Perform the writes the preview described |
 | `GET` | `…/coverage` | The dashboard figures |
 
-**The run report is the same shape for preview and apply** — four buckets: `created` (or `toCreate`), `alreadyMapped`, `ambiguous`, `unresolved`. Each entry carries the project's `external_code`, derived contract id, `full_name` and `id`, so the review surface never has to show a bare number (R-5).
+**The run report** carries, per entry, the project's `external_code`, derived contract id, `full_name`, `short_name` and `id`, so the review surface never has to show a bare number (R-5), plus the CLARISA feed's fetch timestamp (§7, K-016).
+
+> **Amended 2026-08-20 at T-05 review — this paragraph originally said "four buckets" and "the same shape for preview and apply". Both were wrong about what the requirements demand.**
+>
+> **Six buckets, not four.** AC.3's four counts (`toCreate`/`created`, `alreadyMapped`, `ambiguous`,
+> `unresolved`) are all present, but R-CAM-003's *"AND IT MUST report the divergence"* and R-CAM-005's
+> supersession clause require `divergent` and `supersede` as **data, not just counts** — §6.2 says
+> *"`ambiguous` and `divergent` are listed with both candidates"*. Four buckets could not satisfy the
+> requirements this design is derived from.
+>
+> **The two shapes differ, deliberately.** Preview returns six entry arrays. Apply returns counts, plus
+> full entries only for `ambiguous` and `unresolved` — because `apply()` **re-classifies inside its
+> transaction** (that is where R-CAM-002's idempotency comes from) and its result type carries counts.
+> **Consequence worth stating:** an admin who applies sees `divergent: 3` without knowing *which* three,
+> and after a write the authoritative divergent list is apply's, not the preview's — they can differ under
+> the 5-minute cache (RB-8). Closing that means having `apply()` return its in-transaction classification;
+> recorded as a follow-up, not done here.
 
 ---
 
@@ -226,6 +242,39 @@ Per the Lite skip rule this challenge was optional at Standard depth for a purel
 **Above the ~400 LOC single-PR threshold → two PRs**, split at the API boundary (see `tasks.md` §4).
 
 `/akili-execute` trips on this budget. A third PR, a fourth review round, or a diff materially past ~620 LOC means something leaked in — most likely the review surface growing into a full queue UI, or ambiguity handling expanding beyond DD-4's branch.
+
+> **⚠️ Budget exceeded, measured 2026-08-20 at T-05. Tripped, escalated, and the user elected to continue.**
+>
+> | Signal | Estimate | Actual |
+> | --- | --- | --- |
+> | Tasks | 7 | **7 — on budget** |
+> | PRs | 2 | **2 — on budget** |
+> | Review rounds | **2** | **3 at T-05** (T-02, T-03, T-05), T-06 still to run |
+> | LOC | ≈ 620 | **≈ 1,100 server-side alone** |
+>
+> **Neither cause this paragraph predicted occurred.** The review surface had not been built when the
+> budget blew, and ambiguity handling is exactly DD-4's branch — nothing leaked in, and scope never grew.
+>
+> **What actually consumed the rounds was one defect class, five times:** a gate that could not go red.
+> The AGRESSO `is_active` filter (T-02), the mapping-table `is_active` filter (T-03), a **no-op `andWhere`
+> stub in the shared mock** so a correctly-written test still would not have reddened (T-03), the
+> `IN (:...ids)` cohort scope whose removal drove `pending` negative in silence (T-04), and the feed
+> timestamp that stays green under `return Date.now()` (T-05).
+>
+> **Every one was correct production code with undischarged evidence.** Not one was a behaviour defect, a
+> design error, or scope creep. The estimate assumed review rounds get spent on implementation error; here
+> they were spent almost entirely on *proving that already-correct code was correct*. Three Leader
+> arguments reasoned from the design's own frame were also wrong — one exactly backwards — which is the
+> same family: **a claim asserted without being observed.**
+>
+> **The estimating lesson, for the next spec:** on a codebase where the shipped pattern is
+> `.andWhere(...)`-style guards and shared query-builder mocks, budget review rounds for **evidence
+> discharge**, not just for implementation error. The LOC estimate was also low by ~75% because it counted
+> production lines and the falsifier discipline roughly doubles test volume.
+>
+> **The Kaizen candidate this spec produces is narrower and sharper than "write better tests":**
+> **K-004 binds the argument as tightly as it binds the command.** If the red has not been seen, it may not
+> be asserted — not in a code comment, not in a dispatch brief, not in a review verdict.
 
 ---
 

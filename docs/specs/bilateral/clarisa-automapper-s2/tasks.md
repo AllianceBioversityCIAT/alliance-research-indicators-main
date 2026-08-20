@@ -248,7 +248,7 @@ npx eslint <files>
 - **Dependencies:** T-03, T-04
 - **Files:** `…/automapper.controller.ts` (+ spec), `dto/automapper-run.dto.ts`
 - **Skills:** `nestjs-expert`, `api-design-principles`
-- **Effort:** M · **Status:** todo
+- **Effort:** M → raised to `xhigh` · **Status:** ✅ **done** — Reviewer `STATUS: PASS` on attempt 2 (see `execution.md`)
 
 **Scope.** Three endpoints, `@Roles`-guarded to the existing centre-admin gate, Swagger-annotated, standard envelope. The run report carries `external_code`, derived contract id, `full_name` and project id per entry.
 
@@ -263,11 +263,16 @@ npx eslint <files>
 **What disqualifies this evidence.** A `200` from `preview` proves the route exists, not that it wrote nothing. **The gate is a row count taken before and after**, not the status code.
 
 **Done check.**
-- [ ] Row count identical before and after `preview`
-- [ ] Allowed-role and denied-role cases both asserted
-- [ ] All three endpoints in `/swagger` with `@ApiTags`, `@ApiOperation`, `@ApiBearerAuth`
-- [ ] `grep` finds no `@Cron` in the module
-- [ ] Report includes the four counts and the feed timestamp
+- [x] **Preview writes nothing** — asserted as `expect(service.apply).not.toHaveBeenCalled()`, observed red when preview calls apply. ⚠️ **This is a substitution, recorded rather than glossed:** no test in this spec takes a literal row count, which is structurally unavailable in a DB-less suite. What makes it sound is that `preview`'s entire call graph contains **no write method at all**, and the one method that writes is asserted never invoked; T-03 carries the write-side count assertions
+- [x] Allowed-role and denied-role both asserted against a **real `Reflector` + real `RolesGuard`** reading the controller's actual decorators — not a double. Removing `@Roles` flips both denied cases
+- [x] All three carry `@ApiTags`, `@ApiOperation`, `@ApiBearerAuth` (+ `@ApiBody`/`@ApiQuery`) — statically verified. ⚠️ **The `/swagger` render itself is OUTSTANDING**, not claimed: unverifiable in-sandbox. And until the `@ApiResponse` follow-up is taken, a human opening it will see three endpoints with a bearer lock and **no response schemas**
+- [x] No `@Cron` in the module — the gate was widened from a 3-file hardcoded list to a directory scan over every non-spec `.ts`, with a `productionFiles.length > 3` assertion so the widening itself is checked
+- [x] Report includes the four counts (plus `divergent`/`supersede` as **data**, which R-CAM-003 and R-CAM-005 require and design §4 wrongly described as four — §4 amended) and the feed timestamp
+- [x] **`apply` cannot be handed a candidate list** — one-property DTO, `forbidNonWhitelisted`, and `resolved` reaches `apply()` by **object identity** from the in-handler `resolve()`. Observed red when the handler reads a forged body
+- [x] **`GET coverage` resolves above `@Get(':id')`** — the test now reads the **real module's** `controllers` array via `Reflect.getMetadata`; swapping the real array was observed returning **400**
+- [x] **A client-submitted `source: 'DERIVED'` is rejected** by both create and update DTOs (`@IsNotIn`), observed red with the decorator removed
+- [x] **Design §9's log line implemented** — it reached T-05 unassigned, since `tasks.md` §3's coverage table is clause-level for requirements only
+- [x] Full server suite **333 suites / 2421 tests green**; `npm run build` **exit 0** (Leader, quiet window)
 
 ---
 

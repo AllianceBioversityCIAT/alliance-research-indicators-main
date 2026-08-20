@@ -1186,6 +1186,50 @@ describe('ClarisaProjectsService', () => {
     });
   });
 
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 rework /
+  // design.md §7, K-016. The falsifier this whole block exists to kill:
+  // `getCacheFetchedAt() { return Date.now(); }` — every run report would
+  // then claim a perfectly fresh feed regardless of the real cache age,
+  // exactly the staleness lie K-016/RB-6 exist to surface. A Date.now()
+  // stand-in also passes a naive "returns a number" test, so the gate here
+  // is that the SAME stored value comes back across repeated calls (a
+  // live Date.now() would drift), and that it is a timestamp from the
+  // PAST relative to a later real Date.now() call.
+  describe('getCacheFetchedAt (T-05 §7, K-016)', () => {
+    it('returns null on a cold cache', () => {
+      expect(service.getCacheFetchedAt()).toBeNull();
+    });
+
+    it('returns the recorded fetch time after the cache fills, unchanged across repeated calls within the TTL, and strictly before a later real Date.now()', async () => {
+      const fetchTime = 1_700_000_000_000;
+      connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+
+      // Pin Date.now() ONLY for the duration of the cache-filling call, so
+      // both listBilateralProjects()'s own Date.now() read and any ambient
+      // phase-resolution Date.now() read see the same fixed instant —
+      // avoids coupling this test to which of the two calls Date.now()
+      // first internally. try/finally: if the awaited call ever throws
+      // while the spy is installed, Date.now must not stay pinned for
+      // every later test in this file (T-05 rework, closer #3).
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(fetchTime);
+      try {
+        await service.listBilateralProjects();
+      } finally {
+        nowSpy.mockRestore();
+      }
+
+      const first = service.getCacheFetchedAt();
+      const second = service.getCacheFetchedAt();
+
+      // A live Date.now() stand-in would return a DIFFERENT value on each
+      // call (real wall-clock time keeps advancing); the real cache-backed
+      // getter returns the SAME stored fetchedAt both times.
+      expect(first).toBe(fetchTime);
+      expect(second).toBe(fetchTime);
+      expect(second).toBeLessThan(Date.now());
+    });
+  });
+
   describe('Observability & Branch Logging (R-BAS-006, §7.3)', () => {
     it('logs debug with branch counts on cache refresh', async () => {
       const debugSpy = jest

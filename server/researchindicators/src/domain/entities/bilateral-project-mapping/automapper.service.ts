@@ -457,6 +457,15 @@ export class AutomapperService {
     };
   }
 
+  /**
+   * design.md §7, K-016 — read-only passthrough to the CLARISA cache's
+   * fetch timestamp, for the run report (T-05). Not a resolve()/classify()/
+   * apply()/coverage() concern; those methods are unchanged by this getter.
+   */
+  getFeedFetchedAt(): number | null {
+    return this.clarisaProjectsService.getCacheFetchedAt();
+  }
+
   private hasExternalCode(project: ClarisaProject): boolean {
     return (
       project.external_code !== null &&

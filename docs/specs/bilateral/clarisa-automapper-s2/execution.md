@@ -690,3 +690,139 @@ fixtures. Observed RED on both, with the behavioural failure showing exactly the
 
 **Leader's measurement (quiet window):** `npm test -- --silent` → **330 suites / 2386 tests green**;
 `npm run build` → **exit 0**.
+
+### T-05 — Controller: preview, apply, coverage — **FAIL attempt 1 · BUDGET TRIPWIRE, execution paused**
+
+- **Date:** 2026-08-20 · **Effort:** `xhigh` · **Reviewer verdict:** `STATUS: FAIL`, 2 issues, **both test-only — production code correct**
+
+**Cleared on audit:** the three carried-forward findings are all closed. **Finding 1 (security)** — the
+Reviewer could find no path, obvious or otherwise, by which a caller influences which pairs get written:
+`@Body()` only, a one-property DTO, `forbidNonWhitelisted` 400s extras, transform coercion can only yield a
+number or a 400, and `resolved` reaches `apply()` by **object identity** from the in-handler `resolve()`
+call. It also found that there is **no global `ValidationPipe`** in `src/` — so the per-handler `@UsePipes`
+is not decoration, it is the only validation. **Finding 2** closed; the sibling `confidence_score` trap
+neither fixed nor worsened, correctly. **Finding 3** — Nest's controller-array order *is* the registration
+order and is stable (`RoutesResolver` walks a Map whose insertion order is the array's).
+
+**The out-of-scope touch to `clarisa-projects.service.ts` was ruled justified.** A pure read of a private
+scalar, no injection change, inert for the other seven consumers, and it cannot violate NFR-BAS-001 (that
+constraint is about *injecting* REQUEST-scoped providers). Every alternative was worse: timestamping in
+`AutomapperService` records the **request** time — precisely the misleading value §7 exists to replace;
+widening the return type hits eight consumers; a local copy is a second cache (K-005).
+
+#### The two FAIL issues
+
+**1. Two new public methods, zero test coverage — and the §7/K-016 timestamp is provable only by reading.**
+`ClarisaProjectsService.getCacheFetchedAt()` and `AutomapperService.getFeedFetchedAt()` are both new, both
+public, and neither sibling spec was extended. The controller spec proves the controller formats *whatever
+its mock returns*; nothing proves the value is the cache's fetch time.
+**The falsifier that settles it:** change `getCacheFetchedAt()` to `return Date.now()` — **the entire suite
+stays green** and every run report starts claiming a perfectly fresh feed. That is the exact staleness lie
+K-016 and RB-6 exist to prevent, made invisible.
+
+**2. The F4 route-order test cannot detect the regression its own comment claims it detects.** The spec
+builds `Test.createTestingModule({ controllers: [AutomapperController, BilateralProjectMappingController] })`
+— **a literal array retyped in the spec file**, never importing the real module. Its comment says *"swap the
+order in bilateral-project-mapping.module.ts's controllers array and this test must redden."* **False.**
+Reordering the real array leaves the test green while `GET …/coverage` breaks in production — and the false
+comment is worse than none, because the next developer reads it, reorders, sees green, and ships.
+Fix is two lines: read the order off the real module via `Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, …)`
+instead of retyping it, which also makes the existing comment true.
+
+#### ⚠️ BUDGET TRIPWIRE — design §14 exceeded, execution paused for the user
+
+| Signal | Budgeted (§14) | Actual |
+| --- | --- | --- |
+| Tasks | 7 | 7 — on budget |
+| Review rounds | **2** | **3** (T-02, T-03, T-05) — **exceeded**, with T-06 still to run |
+| LOC | ≈ 620 | ≈ 1,100+ server-side already |
+| PRs | 2 | 2 — on budget |
+
+§14's own tripwire text: *"A third PR, a fourth review round, or a diff materially past ~620 LOC means
+something leaked in — most likely the review surface growing into a full queue UI, or ambiguity handling
+expanding beyond DD-4's branch."*
+
+**Neither predicted cause occurred.** The review surface has not been built yet and the ambiguity branch is
+exactly DD-4's. Escalated to the user rather than absorbed — `pre-approved` mode covers routine progress,
+never a budget exception.
+
+#### The actual cause — five instances of one defect class, and not the one §14 anticipated
+
+| # | Task | The gate that could not go red |
+| --- | --- | --- |
+| 1 | T-02 | AGRESSO `is_active` filter — deleting it reddened nothing |
+| 2 | T-03 | mapping-table `is_active` filter — same |
+| 3 | T-03 | the mock's `andWhere` was a **no-op stub**, so a correctly-written test still would not have reddened |
+| 4 | T-04 | the `IN (:...ids)` cohort scope — deleting it drove `pending` negative, silently |
+| 5 | T-05 | the feed timestamp — `return Date.now()` keeps the whole suite green |
+
+**Every one was correct production code with undischarged evidence. Not one was a behaviour defect, a
+design error, or scope creep.** §14 estimated review rounds on the assumption they would be spent on
+implementation error; they were spent almost entirely on proving that already-correct code was correct.
+Three Leader arguments reasoned from the design's own frame were also wrong, one exactly backwards — same
+family: **a claim asserted without being observed.**
+
+The methodology lesson is narrower and sharper than "write better tests": **K-004 binds the argument as
+tightly as the command.** If the red has not been seen, it may not be asserted — not in a comment, not in a
+brief, not in a review. That is the Kaizen candidate for this spec's archive.
+
+#### T-05 — attempt 2: Reviewer verdict `STATUS: PASS`
+
+Both gates genuinely closed. The Reviewer verified several things it was not asked to, and two are worth
+keeping:
+
+- **It independently confirmed the real module array is back to `[AutomapperController, BilateralProjectMappingController]`** after the falsifier swap — explicitly flagging that it checked *"because a swap-and-swap-back is exactly the operation that ships a bug when the second half is forgotten."* It was not forgotten.
+- **It traced `resolve()` to validate the `cohort` derivation** rather than accepting it: every cohort project becomes exactly one candidate, and the three buckets are **disjoint and exhaustive** — a candidate cannot land in none or in two.
+
+**On the Leader's question about partial `Date.now()` pinning:** it is not less faithful — **it is the only
+version that works**, for a reason neither the Leader nor the Implementer stated. Pinning across the whole
+test would make the assertion's *own* `Date.now()` return `fetchTime`, so `toBeLessThan` would compare
+`1700000000000 < 1700000000000` and fail. The restore is load-bearing, not stylistic. `getCachedAll()` was
+checked and reads the clock **once at entry**, so the window is exactly the right width.
+
+**And the mutant is killed structurally, not by timing.** `fetchTime` is a hardcoded 2023 constant, so the
+gap to a real `Date.now()` is years — the discrimination comes from `toBe(fetchTime)` asserted twice, and
+`toBeLessThan` is documentation of intent. No flake surface.
+
+**The §9 log line was ruled correct, and the controller the right owner** — it is the only layer that knows
+preview from apply; threading a mode flag into the service would be worse coupling for no gain.
+
+**On the Leader's contradictory instruction.** The brief said *"do not change a single line of production
+code"* and then asked for the §9 log line, which inherently requires one. **The Implementer surfaced the
+contradiction instead of resolving it silently**, and both the Leader and the Reviewer confirmed its
+reading was right. Recorded because the failure mode here is a worker that quietly picks one horn and the
+Leader never learns the brief was self-contradictory.
+
+**Three closers applied before commit** (in-place, no round consumed): `superseded`/`divergent` added to the
+apply log line — RB-3's purpose is *"the answer to 'why do I have 194 new rows'"*, and each supersede
+deactivates one row and inserts another, so `created=N` alone undercounts; the log's `feedFetchedAt=.+`
+assertion tightened to the exact ISO string, since `.+` matches the literal `unknown` and a hardcoded
+constant would have survived it; and three `mockRestore()` calls moved into `try/finally` — they ran only
+on the success path, so a failure between install and restore would pin `Date.now` to 2023 for the rest of
+the file and **turn one real failure into a page of noise that hides it.**
+
+#### Design §4 amended by the Leader (documentation fix, no round consumed)
+
+§4 said *"four buckets"* and *"the same shape for preview and apply"*. **Both were wrong about what the
+requirements demand.** Four buckets cannot satisfy R-CAM-003's *"AND IT MUST report the divergence"* or
+R-CAM-005, which need `divergent` and `supersede` as **data**, not counts — §6.2 lists both candidates.
+And the two shapes differ deliberately: apply re-classifies inside its transaction, which is where
+R-CAM-002's idempotency comes from. Amended to describe what ships, with the consequence stated: after a
+write, the authoritative divergent list is apply's, not the preview's, and they can differ under the
+5-minute cache (RB-8).
+
+#### Follow-ups carried out of this spec — recorded, NOT turned into work
+
+Per the advisory-never-grows-scope rule. Each is real; none is in the approved `tasks.md`:
+
+| # | Item | Why it is not done here |
+| --- | --- | --- |
+| 1 | No `@ApiResponse` on any handler, so **none of the output DTOs reaches the Swagger schema** — despite `automapper-run.dto.ts` stating they exist *"purely so @nestjs/swagger can generate a schema"*. `AutomapperCoverageResponseDto` is dead code | New scope. Also means a human opening `/swagger` sees three endpoints with a bearer lock and **no response schemas** |
+| 2 | `apply()` could return its in-transaction classification, letting T-06 render post-apply divergence without a second round trip | Changes a PASSed service contract |
+| 3 | `classify()` has no explicit `save`/`create`/`update` no-write assertion | Would make preview-writes-nothing hold at the service layer too, not only the controller |
+| 4 | `apply(resolved, request.user)` passes `User \| undefined` into a `User` parameter | Unreachable (`RolesGuard` rejects when absent) and identical to the sibling controller's shipped pattern |
+| 5 | The `@Cron` scan is top-level only — `readdirSync` without `{ recursive: true }` skips `dto/`, `entities/`, `enum/`, `repositories/`, `utils/` | Confirmed by grep that no scheduler exists there today; still strictly better than the 3-file list it replaced |
+| 6 | §9's *"one summary"* is now one summary plus two service step lines — same values, double grep hits | Cosmetic |
+
+**Outstanding, not a finding:** the `/swagger` render is unverified in-sandbox. **Recorded outstanding**
+alongside T-06's visual check rather than claimed — the decorators are statically verified, the render is not.
