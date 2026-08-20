@@ -3,7 +3,7 @@
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
 - **Spec path:** `docs/specs/innovation-use/details-api/`
-- **Parent spec:** [`../family.md`](../family.md) — chunk 2 of 3
+- **Parent spec:** [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 2 of 3
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
 - **Linked tasks:** [`./tasks.md`](./tasks.md)
@@ -2207,7 +2207,7 @@ On that last row: `requirements.md`'s AC boxes were **never** part of this spec'
 
 ### FR-7 filed outside this folder
 
-`customSaveInnovationDev` retains the defect. Filed as **FR-7** in [`../family.md`](../family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
+`customSaveInnovationDev` retains the defect. Filed as **FR-7** in [`../../innovation-use/family.md`](../../innovation-use/family.md) → *Cross-cutting Risks*, deliberately **outside** this spec folder so it survives the archive.
 
 The framing is the load-bearing part: the new guard is a property of the **endpoint, not the data**. These rows are protected when written through this endpoint and **not otherwise** — any authenticated principal who can edit some indicator-2 result can still rewrite any `result_actors` / `result_institution_types` row by PK through the Innovation Dev endpoint, **including the Innovation Use rows just protected**. Exposure is now **asymmetric**, and that asymmetry is what makes *"authorization fixed"* the likely mis-summary of this archive. FR-7 says so in those words.
 
@@ -2433,7 +2433,7 @@ Nothing is owed to an agent any more. **The next step is the re-validation below
 | Gate | Where |
 | --- | --- |
 | **Security review** | `requirements.md` §15. It declared the review *not required* because no auth path changed. **This spec's own remediation falsified that** — `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev. Marked ⚠️ REQUIRED |
-| **FR-7** | [`../family.md`](../family.md) → *Cross-cutting Risks*. `customSaveInnovationDev` shares the same collision-prone helpers and has **none** of this spec's three protections — ownership guard, adopted-PK reconcile, duplicate-PK rejection. Needs its own spec. **Do not summarise this archive as "authorization fixed"** |
+| **FR-7** | [`../../innovation-use/family.md`](../../innovation-use/family.md) → *Cross-cutting Risks*. `customSaveInnovationDev` shares the same collision-prone helpers and has **none** of this spec's three protections — ownership guard, adopted-PK reconcile, duplicate-PK rejection. Needs its own spec. **Do not summarise this archive as "authorization fixed"** |
 
 ### Carried, declared, not silently dropped
 

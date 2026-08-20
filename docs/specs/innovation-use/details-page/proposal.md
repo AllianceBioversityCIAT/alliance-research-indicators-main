@@ -13,7 +13,7 @@
 | Slug | `details-page` — derived from the free-text `/akili-propose` argument |
 | Type | Change |
 | Approval Mode | gated |
-| Depends on | `docs/specs/innovation-use/details-api` |
+| Depends on | `docs/specs/innovation-use/details-api` — **archived 2026-08-20** → [`docs/specs/archive/2026-08-20-innovation-use--details-api/`](../../archive/2026-08-20-innovation-use--details-api/). Its `design.md` §4 is chunk 3's interface contract; read that table, **including its `400` rows** (two were added at archive-time validation) |
 | Parallel-safe | no |
 | Tier | client (`client/research-indicators`) |
 | Branch in flight | `AC-1679-Create-the-innovation-use-section` |

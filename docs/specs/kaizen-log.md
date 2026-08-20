@@ -9,16 +9,56 @@ Continuous-improvement record across AKILI-SPECS specs. One entry per archived s
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | **High** | 4 | Product | proposed |
-| KZ-002 | Enumerating scope by a convenient proxy misses what the proxy stands in for. Enumerate by **the real thing**. **Recurred 2026-08-18** (live schema table list derived from source code: 3 of 64). **Recurred 2026-08-19** at the orchestration layer — the Leader's own finalize write marked a spec-wide *"every AC is checked"* item `[x]` while all 59 checkboxes were unflipped; "the tasks are done" was substituted for "the checkboxes are checked". | **High** | 5 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved): grep-falsify any aggregate before flipping it. Methodology upstream pending |
+| KZ-002 | Enumerating scope by a convenient proxy misses what the proxy stands in for. Enumerate by **the real thing**. **Recurred 2026-08-18** (live schema table list derived from source code: 3 of 64). **Recurred 2026-08-19** at the orchestration layer — the Leader's own finalize write marked a spec-wide *"every AC is checked"* item `[x]` while all 59 checkboxes were unflipped. **Recurred 2026-08-20** (`innovation-use/details-api` T-01 c1): a Done criterion asserting a live `200` in a `ServerResponseDto` was ticked because a human `/swagger` observation "released" it — but that observation covers the page **rendering**, and the wire envelope is proven at no tier. **The proxy was a human's answer to a different question**, which is the hardest variant to see. | **High** | 6 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved): grep-falsify any aggregate before flipping it. Methodology upstream pending |
 | KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | Medium | 1 | Product | proposed |
 | KZ-004 | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands. **Recurred 2026-08-18** (`bugfix/sp-versioning-roles-id` T-01): the named verification script did not exist and the "TEST" datasource was unreachable from any script. | **High** | 2 | Product + Methodology | proposed |
-| **KZ-005** | A correction sweep must bound its search space on **every axis** — phrasing, token, **file set**, and exemption criterion — not only the axis that last failed; and must re-grep any *new* value the correction introduces. **Recurred 4× in `innovation-use/data-model-and-catalog` alone** (phrasing → token → file set → exemption-by-citation). **Root cause of the recurrence identified 2026-08-19: the lesson had been standardized into `.agents/leader.md` only, while every recurrence occurred in a *worker* executing a Leader-mandated sweep.** A lesson applied to the orchestrator does not reach the agent that performs the action. | **High** | 5 | Product + Methodology | **applied** → `.agents/leader.md` (2026-08-18) **+ `.agents/implementer.md` §Correction sweeps (2026-08-19, user-approved) — the edit that closes the role gap.** Methodology upstream pending |
+| **KZ-005** | A correction sweep must bound its search space on **every axis** — phrasing, token, **file set**, and exemption criterion — not only the axis that last failed; and must re-grep any *new* value the correction introduces. **Recurred 2026-08-20** (`innovation-use/details-api`, validation round 2 FAIL-5): a figure correction updated two documents' **header rows** and asserted *"recorded identically"* in both, while **13 body sites** across five files kept the old values — a correction *relocated*, not applied, committed by the agent that had just invoked the closure rule. **Escalation this recurrence forces: the durable fix is not a better sweep, it is fewer sites asserting the same derived figure.** That cell has now been restated five times (2264 → 2275 → 2279 → 2285 → 2296); no sweep discipline survives a figure that goes stale whenever the tree changes. **Recurred 4× in `innovation-use/data-model-and-catalog` alone** (phrasing → token → file set → exemption-by-citation). **Root cause of the recurrence identified 2026-08-19: the lesson had been standardized into `.agents/leader.md` only, while every recurrence occurred in a *worker* executing a Leader-mandated sweep.** A lesson applied to the orchestrator does not reach the agent that performs the action. | **High** | 6 | Product + Methodology | **applied** → `.agents/leader.md` (2026-08-18) **+ `.agents/implementer.md` §Correction sweeps (2026-08-19, user-approved) — the edit that closes the role gap.** Methodology upstream pending |
 | **KZ-006** | A task delivering a harness, fixture, or verification mechanism needs **one end-to-end criterion**. Every per-piece check can pass while the mechanism cannot run at all. | **High** | 1 | Product + Methodology | **applied** → `docs/specs/general-setup/task.md` §*A task is NOT done until* (2026-08-18, user-approved). Methodology upstream pending |
 | **KZ-007** | A brief that is locally correct in every bullet can still leave the worker's search space unbounded on the next axis down. Require a **per-unit completeness line that includes units with zero findings**, and require every claimed exemption to **quote the clause granting it**. | **High** | 1 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved). Methodology upstream pending |
+| **KZ-008** | **An advisory that names a reachable state is not an advisory — it is an unfiled defect.** The advisory register has no owner and no gate, so a finding placed there stops being acted on. In `innovation-use/details-api`, **two of four product defects were sitting in the previous validation round's advisory register before they were defects** — the missing ownership check was *"recorded as an advisory three times"*, and the line immediately below it in the same register (*"identity-less organization rows binding `findOne` to an arbitrary existing row … but live"*) became a HIGH-severity silent data-destruction path. Require every advisory naming a reachable state to carry a **reachability verdict** — construct the payload, or say plainly that you could not. | **High** | 2 (both within one spec) | Product + Methodology | proposed |
 
 ---
 
 ## Entries
+
+### 2026-08-20 — innovation-use/details-api
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 13 | `tasks.md` |
+| Reviewer FAIL rework attempts | **≥ 8** — T-01 ×2 (incl. a reopen from `[x]`), T-03 ×2, T-06 ×2, T-07 ×1 + Pivot, T-09 ×2, T-11 ×1 | `execution.md` |
+| **Pivot Records** | **3** — T-01, T-07, T-10 | `execution.md` |
+| **Product defects** | **4**, all fixed on this endpoint; **plus 2 defects inside the remediations themselves** | `validation-report.md`, `execution.md` |
+| Validation rounds | **2** — round 1: 5 FAIL / 21 WARN · round 2: 7 FAIL / 22 WARN, **6 closed in-session** | `validation-report.md` |
+| Review rounds vs budget | **≥ 26 vs ~24** — stated as a floor, because the exact figure is not derivable from the tree | `tasks.md` §7 |
+| Fixture tier LOC vs estimate | **4,619** vs ~920 (**~5×**), escalated at T-12 and re-measured at archive | `tasks.md` §7 |
+| Human gates left open | **2** — security sign-off, FR-7 | `requirements.md` §15, `../family.md` |
+
+**MUDA identified.** The rework is *defect waste*, but its distribution is the finding: **not one of the four product defects was caught by a test run** — every one produced a `200`, and all four were found by an auditor reading code against a claim. Meanwhile three rework rounds were spent entirely on **comment accuracy**, after which the record concluded that *"this spec's residual risk lives outside the logic."* A reachable data-corruption path was in the same method the whole time. **Jidoka held** — every FAIL stopped the line, no defect was waived, and two quarantines were inverted by fixing the defect rather than softening the criterion.
+
+**Lessons**
+
+- **KZ-008 — NEW, High. The advisory register is where findings go to stop being acted on.** (Product + Methodology)
+  - Root cause: an advisory has no owner, no gate and no reachability verdict, so severity is never tested. Two of this spec's four product defects lived there first.
+  - Evidence: `validation-report.md` round 1 *Advisory register* — the ownership check *"recorded as an advisory three times before becoming a proven defect"*, and the adjacent line on identity-less organization rows, which round 2 promoted to **FAIL-1**.
+  - Standardization proposed: `.agents/reviewer.md` — an advisory naming a reachable state must carry a reachability verdict.
+
+- **KZ-002 — recurrence 5 → 6, and this variant is the hardest to see.** (Product + Methodology, High)
+  - Root cause: the proxy was **a human's answer to a different question**. T-01 c1 asserts a live `200` in a `ServerResponseDto`; it was ticked because a human `/swagger` observation "released" it, and that observation covers rendering.
+  - Evidence: `tasks.md` T-01 c1 · `execution.md` *Human `/swagger` Observation* · `test-report.md` G-3 · `validation-report.md` FAIL-3.
+  - Standardization proposed: `docs/specs/general-setup/task.md` — a criterion discharged by a human observation must quote what the observation covered.
+
+- **KZ-005 — recurrence 5 → 6, and the recurrence forces an escalation.** (Product + Methodology, High)
+  - Root cause: the sweep updated **header rows** and asserted cross-document identity without grepping the bodies — 13 stale sites across five files. Committed by the agent that had just invoked the correction-closure rule.
+  - Evidence: `validation-report.md` FAIL-5 · the trajectory 2264 → 2275 → 2279 → 2285 → 2296.
+  - **Escalation: the durable fix is fewer sites asserting one derived figure, not a better sweep.** A figure that goes stale whenever the tree changes will outlive any discipline applied to the people restating it.
+  - Standardization proposed: `.agents/leader.md` — derive-once, cite-the-deriving-command, and cap the number of documents allowed to state a measured figure.
+
+**Standardization status:** 4 edits proposed (3 lessons + 1 constitution sync), **awaiting user approval** — presented at archive. Nothing outside this log was edited.
+
+---
 
 ### 2026-08-19 — innovation-use/data-model-and-catalog
 

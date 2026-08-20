@@ -6,7 +6,7 @@
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked TRD sections:** [`docs/trd/trd.md`](../../../trd/trd.md) §4.1, §5.2, §6.1–6.2, §7.1, §12, §2.4 (ADR-2, ADR-4, **ADR-11**, ADR-12)
-- **Parent spec:** [`../family.md`](../family.md) — chunk 2 of 3
+- **Parent spec:** [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 2 of 3
 - **Depth:** Full
 - **Last updated:** 2026-08-20
 
@@ -539,8 +539,8 @@ Each PR description follows `cognitive-doc-design` review-empathy: what to read 
 
 ## 14. References
 
-- [`./requirements.md`](./requirements.md) · [`./proposal.md`](./proposal.md) · [`../family.md`](../family.md)
-- Chunk 1 archive: [`../../archive/2026-08-19-innovation-use--data-model-and-catalog/`](../../archive/2026-08-19-innovation-use--data-model-and-catalog/) — `design.md` §3 (data model), §6.4 (validation logic), `routine-transcript.md`
+- [`./requirements.md`](./requirements.md) · [`./proposal.md`](./proposal.md) · [`../../innovation-use/family.md`](../../innovation-use/family.md)
+- Chunk 1 archive: [`../2026-08-19-innovation-use--data-model-and-catalog/`](../2026-08-19-innovation-use--data-model-and-catalog/) — `design.md` §3 (data model), §6.4 (validation logic), `routine-transcript.md`
 - TRD [`docs/trd/trd.md`](../../../trd/trd.md) §2.4 ADR-11 (stored-routine completeness), ADR-12 (non-replayable history), §6.2, §12
 - Server guide [`server/researchindicators/src/CLAUDE.md`](../../../../server/researchindicators/src/CLAUDE.md) §4 (endpoint recipe), §9 (FP-45 bands, FP-48 seeding, FP-49 bootstrap, FP-50 citations), §11 (harness commands)
 - Reference implementations: `result-innovation-dev/`, `result-oicr.service.ts:234-249` (quantifications), `clarisa-innovation-readiness-levels/` (control list), `impact-outcomes.controller.ts:56-62` (ValidationPipe pattern)

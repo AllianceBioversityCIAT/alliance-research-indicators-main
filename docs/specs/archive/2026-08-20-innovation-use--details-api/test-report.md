@@ -8,7 +8,7 @@
 
 - **Module:** results (`innovation-use`) · **Spec id:** 2026-08-innovation-use-details-api
 - **Spec path:** `docs/specs/innovation-use/details-api/`
-- **Parent spec:** [`../family.md`](../family.md) — chunk 2 of 3
+- **Parent spec:** [`../../innovation-use/family.md`](../../innovation-use/family.md) — chunk 2 of 3
 - **Package:** `server/researchindicators` (server-only chunk)
 - **Branch:** `AC-1679-Create-the-innovation-use-section`
 - **Report date:** 2026-08-20
