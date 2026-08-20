@@ -197,7 +197,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     // and is last-write-wins, so a payload pairing an unauthorized id with a
     // later row sharing the same identity key had the unauthorized row
     // silently dropped before this guard ever saw it (a `200`, not the `400`
-    // design.md §15 promises). Validating `data` makes every submitted id
+    // design.md §4's PATCH error table promises). Validating `data` makes every submitted id
     // visible to the guard, matching design.md's "otherwise the whole save is
     // rejected, never silently ignored" literally rather than nearly.
     await this.assertInnovationUseOwnership(data, resultId, tempRepo);
@@ -206,16 +206,38 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
 
     // PK-collision remediation (2026-08-20,
     // `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
-    // Every `result_institution_type_id` this RAW payload supplies explicitly
-    // (mirrors `assertInnovationUseOwnership`'s own raw-payload read, above —
-    // FAIL-B taught this file that reading `uniqueData` here instead would
-    // let an id-less row's identity-key collision in `removeDuplicates` hide
-    // an explicitly-submitted id from this set too). Consumed by
-    // `reconcileAdoptedPrimaryKey`, below, wholly inside this method — never
-    // by `buildWhereClause`/`constructWhereClause`, which stay shared with
+    // Every `result_institution_type_id` that a row **surviving
+    // `removeDuplicates`** submits explicitly — i.e. every PK this call is
+    // actually going to write. Consumed by `reconcileAdoptedPrimaryKey`,
+    // below, wholly inside this method — never by
+    // `buildWhereClause`/`constructWhereClause`, which stay shared with
     // `customSaveInnovationDev` and untouched.
-    const idsAlreadyClaimed = new Set(
-      data
+    //
+    // **CORRECTED 2026-08-20 (`validation-report.md` FAIL-2).** This set was
+    // originally derived from the RAW `data`, on the reasoning — written into
+    // this very comment — that FAIL-B had taught the file to prefer raw over
+    // `uniqueData`. That inference was wrong, because it conflated two
+    // different questions asked by two different consumers:
+    //
+    //   * `assertInnovationUseOwnership` (above) must read **raw** `data`, so
+    //     that no explicitly-submitted id can be hidden from the ownership
+    //     check by an identity-key collision. That is FAIL-B's lesson and it
+    //     still holds — the guard does its own raw read and is untouched.
+    //   * This set must read **surviving** rows, because the question it
+    //     answers is not "did some row claim this PK?" but "will some row
+    //     that is still going to be written claim this PK?"
+    //
+    // The two diverge exactly when `removeDuplicates` drops an id-present row
+    // (last-write-wins on the identity key). Against raw `data`, the reconcile
+    // then fired on a **phantom** collision: it disowned a PK that nothing
+    // else was going to write, so the row the caller had explicitly named by
+    // id was left permanently `is_active = FALSE` by
+    // `deactivateExistingRecords` while a brand-new row was inserted in its
+    // place — violating R-IUA-003's "A and C remain active with their ids
+    // preserved", and doing so **order-dependently**: swapping the two payload
+    // elements produced the opposite outcome for the same two rows.
+    const idsClaimedBySurvivingRows = new Set(
+      uniqueData
         .filter((institution) => institution?.result_institution_type_id)
         .map((institution) => String(institution.result_institution_type_id)),
     );
@@ -230,7 +252,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       this.reconcileAdoptedPrimaryKey(
         institution,
         institutionData,
-        idsAlreadyClaimed,
+        idsClaimedBySurvivingRows,
       );
       dataToSave.push(institutionData);
     }
@@ -265,7 +287,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
    * is never created, and X ends up a column-level hybrid of both payload
    * rows.
    *
-   * Detection is exactly `idsAlreadyClaimed.has(...)` on an id-LESS row's
+   * Detection is exactly `idsClaimedBySurvivingRows.has(...)` on an id-LESS row's
    * adopted PK — a row that submitted its OWN id (the `institution?.result_institution_type_id`
    * guard below) is never touched, since claiming your own PK is not a
    * collision. Resolution turns the adoption back into a plain insert: drop
@@ -278,13 +300,16 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
   private reconcileAdoptedPrimaryKey(
     institution: InstitutionRow,
     institutionData: Partial<ResultInstitutionType>,
-    idsAlreadyClaimed: Set<string>,
+    idsClaimedBySurvivingRows: Set<string>,
   ): void {
     if (institution?.result_institution_type_id) {
       return;
     }
     const adoptedId = institutionData.result_institution_type_id;
-    if (adoptedId === undefined || !idsAlreadyClaimed.has(String(adoptedId))) {
+    if (
+      adoptedId === undefined ||
+      !idsClaimedBySurvivingRows.has(String(adoptedId))
+    ) {
       return;
     }
     delete institutionData.result_institution_type_id;
@@ -332,7 +357,7 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
    * round-trip below: there is no correct merge for "one row asked to
    * become two different things" (unlike the id-less case), so the whole
    * save is rejected with a message distinct from the unauthorized-id one
-   * below (design.md §15, mirrors R-IUA-005's duplicate-identity rule).
+   * below (design.md §4's PATCH error table, mirrors R-IUA-005's duplicate-identity rule).
    */
   private async assertInnovationUseOwnership(
     data: InstitutionRow[],

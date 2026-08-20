@@ -840,7 +840,7 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
    * **Why the message text is asserted in full, not by substring.** The
    * duplicate rejection and the unauthorized-id rejection both name the
    * same field, so `stringContaining('result_actors_id')` would pass even
-   * if the guard rejected for the wrong reason. `design.md` §15 made the two
+   * if the guard rejected for the wrong reason. `design.md` §4's PATCH error table made the two
    * messages deliberately distinct; these assertions hold the product to
    * that, and to naming the repeated id.
    *

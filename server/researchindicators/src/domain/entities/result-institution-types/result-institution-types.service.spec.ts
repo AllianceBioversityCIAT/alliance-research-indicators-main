@@ -682,6 +682,117 @@ describe('ResultInstitutionTypesService', () => {
     });
   });
 
+  /**
+   * FAIL-2 remediation (2026-08-20, `validation-report.md`). The counterpart
+   * of the FAIL-B tests below, and a warning about how their lesson was
+   * over-applied.
+   *
+   * `reconcileAdoptedPrimaryKey`'s claimed-id set used to be derived from the
+   * RAW payload, on the stated reasoning that FAIL-B had taught this file to
+   * prefer raw over `uniqueData`. That conflated two different questions:
+   * the ownership GUARD must read raw `data` (FAIL-B, still true, still
+   * tested below), but the RECONCILE must read the rows that will actually
+   * be written. The two diverge exactly when `removeDuplicates` drops an
+   * id-present row.
+   *
+   * Against the raw set the reconcile fired on a PHANTOM collision: it
+   * disowned a primary key nothing else was going to write, so the row the
+   * caller had named by id was left deactivated by
+   * `deactivateExistingRecords` while a brand-new row was inserted in its
+   * place — violating R-IUA-003's "ids preserved", and doing so
+   * order-dependently.
+   */
+  describe('customSaveInnovationUse — the reconcile must not disown a PK that no surviving row will write (FAIL-2 remediation)', () => {
+    const ownedRow = {
+      result_institution_type_id: 77,
+      result_id: 10,
+      institution_type_role_id: InstitutionTypeRoleEnum.INNOVATION_USE,
+    };
+
+    it('updates row 77 in place when an id-less row of the SAME identity dedupes the id-present row away — the collision is phantom', async () => {
+      const find = jest.fn().mockResolvedValue([ownedRow]);
+      const findOne = jest.fn().mockResolvedValue(ownedRow);
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const save = jest.fn().mockResolvedValue([]);
+      const tempRepo = buildTempRepo({ find, findOne, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      // Both rows key to `type_5`; last-write-wins keeps only the second,
+      // id-less row. Row 77 is therefore NOT going to be written by any
+      // surviving row, so its adopted PK is not a collision.
+      await service.customSaveInnovationUse(
+        10,
+        [
+          {
+            result_institution_type_id: 77,
+            institution_type_id: 5,
+            organization_count: 10,
+          },
+          { institution_type_id: 5, organization_count: 99 },
+        ] as InnovationUseOrganizationDto[],
+        mockManager,
+      );
+
+      expect(save).toHaveBeenCalledTimes(1);
+      const saved = save.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(saved).toHaveLength(1);
+
+      // The load-bearing assertion: the adopted PK SURVIVES, so `save` issues
+      // an UPDATE of row 77 rather than an INSERT that orphans it. Against
+      // the pre-fix code this key was deleted and the row was lost.
+      expect(saved[0].result_institution_type_id).toBe(77);
+      // No audit-shape assertion here on purpose: this file's `audit` double
+      // returns `{ updated_by, created_by }` unconditionally, so an
+      // audit-shape expectation would pass for either branch and prove
+      // nothing. The PK's survival is the falsifiable property.
+    });
+
+    it('still disowns the PK when the id-present row SURVIVES dedup — a genuine collision, which is what the reconcile exists for', async () => {
+      const find = jest.fn().mockResolvedValue([ownedRow]);
+      const findOne = jest.fn().mockResolvedValue(ownedRow);
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const save = jest.fn().mockResolvedValue([]);
+      const tempRepo = buildTempRepo({ find, findOne, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      // Distinct identity keys (`type_5` and `type_6`), so BOTH rows survive
+      // `removeDuplicates`. The id-less row's lookup adopts 77, which the
+      // id-present row is also going to write — a real collision.
+      await service.customSaveInnovationUse(
+        10,
+        [
+          {
+            result_institution_type_id: 77,
+            institution_type_id: 5,
+            organization_count: 10,
+          },
+          { institution_type_id: 6, organization_count: 99 },
+        ] as InnovationUseOrganizationDto[],
+        mockManager,
+      );
+
+      const saved = save.mock.calls[0][0] as Array<Record<string, unknown>>;
+      expect(saved).toHaveLength(2);
+      // Exactly one object may carry PK 77 — the row that submitted it.
+      expect(
+        saved.filter((r) => r.result_institution_type_id === 77),
+      ).toHaveLength(1);
+      // The adopted one was converted back into a genuine insert.
+      const insertRow = saved.find(
+        (r) => r.result_institution_type_id === undefined,
+      );
+      expect(insertRow).toBeDefined();
+      // `updated_by` is the one audit key this double does NOT hand back for
+      // free after the reconcile runs — it is explicitly `delete`d there, so
+      // its absence is a real observation about the reconcile firing.
+      expect(insertRow).not.toHaveProperty('updated_by');
+    });
+  });
+
   // FAIL-B remediation (2026-08-20, `validation-report.md`). Independent
   // auditor finding: `customSaveInnovationUse` used to run
   // `assertInnovationUseOwnership` against `removeDuplicates`'s OUTPUT
@@ -735,7 +846,7 @@ describe('ResultInstitutionTypesService', () => {
         'result_institution_type_id: unknown or unauthorized organization row — 999',
       ]);
       // The whole save is rejected — never silently ignored or overwritten
-      // (design.md §15) — so nothing downstream of the guard ever runs.
+      // (design.md §4's PATCH error table) — so nothing downstream of the guard ever runs.
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });

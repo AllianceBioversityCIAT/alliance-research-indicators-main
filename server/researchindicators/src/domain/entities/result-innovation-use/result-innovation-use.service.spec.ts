@@ -306,6 +306,126 @@ describe('ResultInnovationUseService', () => {
     });
   });
 
+  /**
+   * `validation-report.md` **FAIL-1** (2026-08-20). An organization row with
+   * no identity field at all reached
+   * `ResultInstitutionTypesService.constructWhereClause`, where all three
+   * `if` branches are false, so the predicate degenerated to
+   * `{ result_id, institution_type_role_id }` — `findOne` returned an
+   * ARBITRARY existing organization row of this result, its primary key was
+   * adopted, and it was overwritten with nulls while every sibling row was
+   * deactivated. A `200`, unrecoverable.
+   *
+   * All three id-keyed protections were structurally inert (the payload
+   * submits no id), so the gate has to be the identity rule itself. These
+   * tests pin it BEFORE `BEGIN` — zero child-service calls — which is what
+   * makes R-IUA-003 AC.2 hold by ordering rather than by rollback.
+   */
+  describe('update — an organization row must identify its organization (R-IUA-007 AC.6, FAIL-1)', () => {
+    const resultId = 42;
+
+    const expectRejectedBeforeBegin = async (
+      organizations: unknown[],
+    ): Promise<BadRequestException> => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      });
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.update(resultId, {
+          organizations,
+        } as CreateResultInnovationUseDto);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      // Nothing was written — the whole point of running before BEGIN.
+      expect(transaction).not.toHaveBeenCalled();
+      expect(
+        mockResultInstitutionTypes.customSaveInnovationUse,
+      ).not.toHaveBeenCalled();
+      expect(mockResultActors.customSaveInnovationUse).not.toHaveBeenCalled();
+      expect(
+        mockResultQuantifications.upsertByCompositeKeys,
+      ).not.toHaveBeenCalled();
+      expect(mockUpdateDataUtil.updateLastUpdatedDate).not.toHaveBeenCalled();
+      return caught;
+    };
+
+    it('rejects the exact reported payload — a count with no identity field — naming the offending row index', async () => {
+      const caught = await expectRejectedBeforeBegin([
+        { organization_count: 12 },
+      ]);
+
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'organizations.0.institution_type_id: an organization row must identify its organization — supply institution_type_id, or is_organization_known together with institution_id',
+      ]);
+    });
+
+    it('rejects a wholly empty organization row', async () => {
+      await expectRejectedBeforeBegin([{}]);
+    });
+
+    it('rejects is_organization_known: true with no institution_id — the known-organization branch of the same lookup', async () => {
+      await expectRejectedBeforeBegin([{ is_organization_known: true }]);
+    });
+
+    it('rejects institution_id supplied WITHOUT the known flag — buildWhereClause only takes the institution_id branch on `=== true`, so this row would fall through to the degenerate predicate', async () => {
+      await expectRejectedBeforeBegin([{ institution_id: 123 }]);
+    });
+
+    it('rejects a sub_institution_type_id with no parent institution_type_id — which would otherwise emit `institution_type_id: undefined` into the where clause', async () => {
+      await expectRejectedBeforeBegin([{ sub_institution_type_id: 7 }]);
+    });
+
+    it('names the offending row index when a valid row precedes an invalid one', async () => {
+      const caught = await expectRejectedBeforeBegin([
+        { institution_type_id: 5 },
+        { organization_count: 3 },
+      ]);
+
+      expect(
+        (caught.getResponse() as { message: string[] }).message[0],
+      ).toContain('organizations.1.');
+    });
+
+    const expectAccepted = async (organizations: unknown[]) => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true }) // step 2
+        .mockResolvedValueOnce({ result_id: resultId }); // step 12 re-read
+      mockResultActors.find.mockResolvedValueOnce([]);
+      mockResultInstitutionTypes.find.mockResolvedValueOnce([]);
+      mockResultQuantifications.findByResultIdAndRoles.mockResolvedValueOnce(
+        [],
+      );
+
+      await service.update(resultId, {
+        organizations,
+      } as CreateResultInnovationUseDto);
+
+      expect(
+        mockResultInstitutionTypes.customSaveInnovationUse,
+      ).toHaveBeenCalled();
+    };
+
+    it('ACCEPTS institution_type_id alone — the rule must not reject a legitimate draft-save', async () => {
+      await expectAccepted([{ institution_type_id: 5 }]);
+    });
+
+    it('ACCEPTS a known organization carrying its institution_id', async () => {
+      await expectAccepted([
+        { is_organization_known: true, institution_id: 123 },
+      ]);
+    });
+
+    it('ACCEPTS an empty organizations array — clearing the collection is not an unidentified row', async () => {
+      await expectAccepted([]);
+    });
+  });
+
   describe('update — duplicate actor identity (R-IUA-005)', () => {
     const resultId = 42;
 
@@ -656,8 +776,15 @@ describe('ResultInnovationUseService', () => {
       const dto: CreateResultInnovationUseDto = {
         innovation_use_level_id: 6,
         actors: [{ actor_type_id: 1 }] as InnovationUseActorDto[],
+        // `is_organization_known: true` added 2026-08-20 alongside the FAIL-1
+        // fix. `{ institution_id: 5 }` alone is now rejected by
+        // `validateOrganizationsAreIdentified`, and rightly so: `buildWhereClause`
+        // takes its `institution_id` branch only on `=== true`, so this payload
+        // used to fall through to the degenerate `constructWhereClause` predicate
+        // — i.e. this test was itself written in one of the vulnerable shapes,
+        // and passed only because the organization service is mocked here.
         organizations: [
-          { institution_id: 5 },
+          { is_organization_known: true, institution_id: 5 },
         ] as unknown as CreateResultInnovationUseDto['organizations'],
         quantifications: [
           { quantification_number: 3, unit: 'ha' },

@@ -1,43 +1,16 @@
 # Validation Report — Results (Innovation Use) / Details API
 
-> ## ⏳ SUPERSEDED IN PART — remediation round 2 applied 2026-08-20; **re-validation still required**
+> ## ❌ NOT ARCHIVE-READY — 7 FAIL · 22 WARN · 1 BLOCKED
 >
-> **This report's verdict below is preserved verbatim as the point-in-time finding. It is no longer the current state.** Every FAIL has been acted on:
+> **Two of the seven are product defects, and one of them is reachable, silent, and destroys data on a `200`.** The other five are record defects, in a spec whose own thesis is that claims must be derived rather than asserted.
 >
-> | Finding | Disposition |
-> | --- | --- |
-> | **FAIL-1** cross-role authorization variant | **FIXED** — `assertInnovationUseOwnership` in both services, `(result_id, role)`-scoped, rejects `400` before any write |
-> | **FAIL-B** org guard bypassed by `removeDuplicates` | **FIXED** — the guard now sees raw `data`; an unauthorized id can no longer be dropped before it is checked |
-> | **FAIL-2** §9 observability never delivered | **DELIVERED** — logger + 4 `warn` sites, payload-audited; §9's false `ResponseInterceptor` claim corrected |
-> | **FAIL-5** creation-path green-check transition | **ALREADY PASSING** — the two auditors disagreed; A was right. B was misled by a stale comment, now fixed |
-> | **FAIL-A** R-IUA-009 AC.4 false as written | **AC AMENDED as an explicit NARROWING** — both auditors' wording, recorded as not-satisfied-as-originally-written |
-> | **FAIL-C / FAIL-D** stale figures | **WITHHELD pending one closing run** rather than restated — they had already gone stale twice |
-> | **F-1 / F-2a / F-2b** | **FIXED** — plus a fourth the correction-closure sweep found that the finding had not cited |
+> **The finding that matters most was already in this document.** The previous round's advisory register carried, verbatim: *"identity-less organization rows binding `findOne` to an arbitrary existing row (forward-pointed to T-06, never implemented — correct under the never-widen rule, but live)."* That is not an advisory. It is **FAIL-1** below: a two-field payload that overwrites an arbitrary organization row with nulls and deactivates every other row in the section. It was filed as advisory, and it stayed filed as advisory, for the same reason the ownership defect did — **an advisory is a finding nobody has to act on.**
 >
-> **Closing run — done, 2026-08-20, executed by the Leader:** unit **336 suites / 2279 tests**; coverage **89.76 / 75.64 / 85.27 / 89.22** (floor 60); fixtures **14 suites / 64 tests, 0 failed** twice on the same container; `tsc` and `eslint --no-fix` clean. Recorded identically in `tasks.md` §7 and `test-report.md`.
->
-> **Still NOT done, and neither is closable by re-running anything:**
->
-> | Open item | Why it cannot be discharged here |
-> | --- | --- |
-> | **Security sign-off** (`requirements.md` §15) | That row declared the review *not required* because no auth path changed. **This spec's own remediation falsified it** — `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev. A **human** gate, newly created by the fix |
-> | **FR-7** (`../family.md`) | `customSaveInnovationDev` still takes a caller-supplied PK with no ownership check over the same tables, so the rows protected here remain writable by PK through the sibling endpoint. Needs its own spec |
-> | Three at-risk line citations | FP-50 is amended; the codebase does not yet satisfy it. Advisory, no behavioural effect — **not** to be counted as done |
-> | Re-validation | Has not run against this state |
->
-> **Do not archive on this banner.** Trail: `execution.md` → *Remediation Round 2* and *Attempt 3 — PASS at the ceiling*.
->
-> ---
->
-> ### Point-in-time verdict (2026-08-20, preserved) — ❌ NOT ARCHIVE-READY, 5 FAIL, 21 WARN
->
-> **The blocking finding is new, and it falsifies a claim this spec recorded as proven.** The cross-result authorization defect found at T-10 has a **second, un-gated variant** that needs no knowledge of another result — so it is *more likely* — and it falsifies **four ACs** that `execution.md`, `tasks.md` and `test-report.md` all recorded as PASS. Three of the other four FAILs are documentation defects about counts, in a spec whose own thesis is that counts must be grepped rather than asserted. One is an entire design section that was never delivered and never noticed across 24 review rounds.
->
-> **Nothing here was found by re-running a test.** Every FAIL came from reading an artifact against the document that claims it.
+> This is the **fourth** occurrence of that pattern in this spec. The record now reads: *the missing ownership check was recorded as an advisory three times before becoming a proven defect* — and the sentence immediately below it in the same register was the next one.
 
 - **Spec:** `docs/specs/innovation-use/details-api/` · **Module:** results (`innovation-use`) · chunk 2 of 3
-- **Package:** `server/researchindicators` · **Branch:** `AC-1679-Create-the-innovation-use-section`
-- **Validated:** 2026-08-20 · **Tier:** T3 Auditor, **delegated to two independent auditors**
+- **Package:** `server/researchindicators` · **Branch:** `AC-1679-Create-the-innovation-use-section` · **HEAD** `941b0260`
+- **Validated:** 2026-08-20 (second run) · **Tier:** T3 Auditor, **delegated to three independent auditors** on distinct lenses
 
 ---
 
@@ -46,148 +19,438 @@
 | Field | Value |
 | --- | --- |
 | Verdict | ❌ **NOT ARCHIVE-READY** |
-| FAIL | **5** |
-| WARN | **21** |
-| BLOCKED | **1 requirement / 3 checkboxes** — `R-IUA-013 AC.3`, the human `/swagger` gate |
-| Build integrity | ✅ **`npm run build` passes clean** — the first build ever run on this spec |
-| Independence | The Leader authored every `execution.md` entry, spec correction and adjudication here. **Model identity satisfies `author ≠ auditor`; investment in the narrative does not** — so Phases 1/2/4 and 5/6 were delegated to two auditors with fresh context. **That decision is what surfaced FAIL-1** |
+| FAIL | **7** — 2 product defects, 5 record defects |
+| WARN | **22** — enumerated in the register below; the total is the row count of that enumeration, not an asserted figure (3 task · 1 file-existence · 11 coverage · 4 design-conformance · 2 commit-review · 1 agent-guide) |
+| BLOCKED | **1** — review-round actual cannot be derived from the tree |
+| Build integrity | ✅ `npm run build` · `tsc --noEmit` · `npm run lint -- --quiet` all clean |
+| Unit | **336 suites / 2285 tests** green · coverage **89.79 / 75.75 / 85.30 / 89.26** (floor 60) |
+| Fixtures | **15 suites / 71 tests** green, twice on the same scratch container |
+| Independence | **The Leader authored the commit under audit (`941b0260`), every `execution.md` entry, and every spec correction in this and the previous round.** Model identity satisfies `author ≠ auditor`; investment in the narrative does not. Phases 1/2/4, 5, and 6 were delegated to three auditors with fresh context and disjoint lenses. **That decision is what surfaced FAIL-1, FAIL-2 and FAIL-3 — none of which any green run would have shown.** |
+
+### What the three auditors were pointed at, and what each found
+
+| Auditor | Lens | Headline |
+| --- | --- | --- |
+| **A** | Phases 1/2/4 — task completion, file existence, coverage at **clause** granularity | **FAIL-3** — a Done criterion closed by an adjacent satisfied thing, which is what made the spec's "unflipped count is zero" claim false |
+| **B** | Phase 5 — adversarial defect hunt in the implementation, told explicitly not to trust the green suite | **FAIL-1** and **FAIL-2** — two reachable corruption paths, one of them inside this spec's own remediation |
+| **C** | Phase 6 — cross-document figure integrity, citation resolution, and an independent review of commit `941b0260` | **FAIL-5** — 13 stale figure sites under two headers that claim currency, including two cross-document identity claims the Leader wrote in the audited commit |
 
 ---
 
 ## Summary
 
-**Build integrity — the one thing this validation added by running rather than reading.** `npm run build` had never been run on this spec. It passes: `nest build` with no type errors plus the admin Vite bundle. That closes T-02's standing advisory that `npm test` was weak evidence of compilation for files nothing imported yet.
+**What is genuinely good, stated first because it is load-bearing.** The build passes. Coverage is 89/76/85/89 against a floor of 60, and re-running it today reproduced the recorded figures to the digit. Zero `it.failing` remain. Every read predicate on the write path names both `result_id` and its role — Auditor B verified all eleven at source and ruled out cross-role and cross-result leakage entirely. `design.md` §9's observability, a whole design section the previous round found undelivered, is now delivered (`result-innovation-use.service.ts:89` plus four `warn` sites). The previous round's FAIL-5 is genuinely closed: `R-IUA-012 AC.1` now has a test that drives *this* section's own save, asserts both sides of the transition, and pins non-vacuity. And the five fixture cases added in `941b0260` are real evidence — four of five survive adversarial review intact.
 
-**Everything else of consequence came from cross-reading.** The auditors verified at source what is statically verifiable — both DD-15 registrations, all three deactivate predicates, DD-14's `!== undefined`, the pipe options, `total`'s absence from the DTO, the `order` override, the `it.failing` count, the C-4 file arithmetic — and it held. What did not hold was the *record*.
+**What fails is, again, almost entirely the record — with two exceptions that are not.** FAIL-1 and FAIL-2 are code. Both were found by reading code against a claim. Neither would ever have been shown by a test run, because both produce a `200`.
 
 | Phase | Verdict |
 | --- | --- |
-| 1 · Task completion | 11 PASS · 3 WARN · 0 FAIL |
-| 2 · File existence | All expected files present · **WARN** — §2.1 still incomplete (3 spec files in no task's *Files touched*) |
-| 3 · Build integrity | ✅ build · tsc · lint · 336/2264 unit · 14/54 fixtures ×2 · coverage 89.69/75.61/85.13/89.14 |
-| 4 · Requirement coverage | **1 FAIL** (+ the retraction below promotes 4 more ACs to FAIL) · 1 BLOCKED · 10 WARN |
-| 5 · Quality | **2 FAIL** (authorization, observability) · advisory register consolidated |
-| 6 · Design conformance | **2 FAIL** (both figure defects) · 7 WARN |
+| 1 · Task completion | 10 PASS · 3 WARN · 0 FAIL |
+| 2 · File existence | All `design.md` §2.1 paths present · **WARN** — 4 files hold gates and appear in no task's *Files touched* |
+| 3 · Build integrity | ✅ build · tsc · lint · 336/2285 unit · 15/71 fixtures ×2 · coverage 89.79/75.75/85.30/89.26 |
+| 4 · Requirement coverage | **1 FAIL** (FAIL-3) · 11 WARN · 116 clause instances checked, 102 pass |
+| 5 · Quality / defect hunt | **2 FAIL** (both product defects) · advisory register updated |
+| 6 · Design conformance | **4 FAIL** (contract gap + 3 record-integrity) · 4 WARN |
 
 ---
 
-## FAIL-1 · The authorization defect is wider than recorded, and four "PROVEN" ACs are false
+## FAIL-1 · HIGH · An identity-less organization row overwrites an arbitrary sibling and deactivates the rest of the section
 
-**Root cause, verified at source by the Leader after the auditor raised it.** `result-actors.service.ts`'s id-present branch:
+**Severity: the highest in this spec's history.** Silent, reachable by a two-field payload, destroys data that no other code path can restore, and returns `200 OK`.
+
+### Reach
 
 ```
-if (institution?.result_actors_id) {
-  dataToSave.push({
-    result_actors_id: institution?.result_actors_id,   // caller-supplied PK
-    actor_role_id: ActorRolesEnum.INNOVATION_USE,      // ASSIGNED, not filtered
-    is_active: true,                                    // ...and no result_id
+PATCH /api/v1/results/innovation-use/:resultCode
+{ "organizations": [ { "organization_count": 12 } ] }
 ```
 
-`tempRepo.save(dataToSave)` then performs a **PK-keyed UPDATE**. `result-institution-types.service.ts`'s `buildUpdateData` is the same shape in **both** branches.
+`{"organizations":[{}]}` and `{"organizations":[{"institution_id":123}]}` (flag omitted) reach it identically.
 
-**Two distinct variants, one root cause:**
+### Mechanism, verified at source by the Leader after the auditor raised it
 
-| Variant | Status |
-| --- | --- |
-| **Cross-result** — result 1's payload carries result 2's row id | Known. Reproduced against real MySQL at T-10. Quarantined under `it.failing`. `R-IUA-009 AC.3` = FAIL |
-| **Same-result, cross-role** — result 1's payload carries result 1's own Innovation **Dev** row id | ❌ **NEW, un-gated.** Rewrites the Dev row: role flipped to `INNOVATION_USE`, data columns overwritten, `is_active: true`, and the four legacy Dev booleans stranded on a row the Dev section can no longer see |
-
-**The new variant is the more likely of the two** — it requires no knowledge of another result, only a client that ever puts a Dev row id in an Innovation Use payload.
-
-**ACs promoted from PASS to FAIL:**
-
-| AC | Text | Why it fails |
+| Step | Site | What happens |
 | --- | --- | --- |
-| R-IUA-009 **AC.1/AC.2** | *"leaves every Innovation Dev row's `is_active`, ids and column values unchanged"* | False for the id-present save path |
-| R-IUA-009 **AC.4** | *"Every deactivate/update predicate in the write path names the role column"* | **False as written.** The id-present save's predicate is the **primary key**. It does not name the role column — it **assigns** it |
-| R-IUA-007 **AC.4** | *"No `result_institution_types` row with role `INNOVATION_DEV` is read, **written** or deactivated"* | The *written* half is unprotected |
+| 1 | `create-result-innovation-use.dto.ts:135-170` | **Every** field of `InnovationUseOrganizationDto` is `@IsOptional()`. The row passes `ValidationPipe`. |
+| 2 | `result-institution-types.service.ts:346` | Ownership guard **returns early** — `rawIdsPresent` is empty, no id was submitted. |
+| 3 | `:204` → `:549-559` | `removeDuplicates` leaves `key` **unassigned** — none of its four branches match an identity-less row. |
+| 4 | `:471-478` | `buildWhereClause`: `is_organization_known === true` is false → falls to `constructWhereClause`. |
+| 5 | **`:574`, `:580`, `:586`** | **All three `if` branches are false.** The emitted predicate is `{ result_id, institution_type_role_id }` **and nothing else**. |
+| 6 | `:449` → `:459-461` | `findOne` returns an **arbitrary** existing Innovation Use organization row of this result. Its PK is **adopted**. |
+| 7 | `:505-526` | The else-branch of `buildDataTemplate` writes `institution_type_id: null`, `sub_institution_type_id: null`, `institution_type_custom_name: null`, `institution_id: null`, `is_organization_known: false`, `organization_count: null`. |
+| 8 | `:238` then `:243` | `deactivateExistingRecords` deactivates every **other** Use org row; `save` issues the PK-keyed UPDATE on the victim. |
 
-**Why F-B passes anyway, and why that matters more than the defect.** F-B's attack payload carries **only** result 2's ids; `devActorId` appears in the file **only inside assertions**, never inside a payload. So its test *"leaves the Innovation Dev actor row byte-identical (a second save must not newly expose it either)"* is green **because the payload contains no Dev id** — a proxy assertion, passing for a reason unrelated to the property it names. **KZ-002 again, in the fixture built to prove role isolation.**
+### Observable result
 
-**And it was foreseen twice and lost.** T-04's Lens A advisory says verbatim: *"A payload naming an Innovation Dev row's id would save it with `institution_type_role_id: INNOVATION_USE` and blank its type columns."* T-03's carries the actor twin. **Neither was ever reconciled against T-10's "role isolation PROVEN" conclusion.** Two advisories predicting a defect were worth less than one test.
+`200 OK`. A row that read `{institution_type_id: 42, organization_count: 10}` comes back as `{result_institution_type_id: 77, institution_type_id: null, sub_institution_type_id: null, institution_type_custom_name: null, institution_id: null, is_organization_known: false, organization_count: null}`, and every sibling organization row is `is_active = FALSE`. The persisted row is in a state **no other code path can produce or render**, and the original values are unrecoverable.
 
-**Remediation:** the fix already open as options **A**/**D** closes both variants — scope the id-present branch by `(result_id, role)`. The case for acting is now stronger, not weaker. **The retraction is recorded in `execution.md` → *RETRACTION*, and `tasks.md` T-10's status line and `test-report.md`'s matrix have been corrected.**
+### Why all three protections are inert — this is the part that matters
 
-## FAIL-2 · `design.md` §9 (Observability) is entirely undelivered, and nothing noticed
+| Protection | Why it does not fire |
+| --- | --- |
+| `assertInnovationUseOwnership` | Inspects `result_institution_type_id` only. The payload supplies none, so it returns at `:346`. |
+| `reconcileAdoptedPrimaryKey` | Fires only when **another row in the same payload** claimed the adopted PK. `idsAlreadyClaimed` is empty, so it returns at `:287`. It was built for payload-internal collisions, not for a PK adopted by an unscoped lookup. |
+| `removeDuplicates` | Sees one row. |
 
-§9 states imperatively: a `CgiarLogger` instance on the service *"matching `ResultInnovationDevService`"*, and a `warn` on a rejected save carrying `result_id` and the rule that fired.
+**The three protections this spec added are all keyed on a submitted id. This payload submits none.** They are guards on the id-present door; this is the id-less door, and the lookup behind it has no identity predicate at all.
 
-**Grep over the whole `result-innovation-use/` directory for `CgiarLogger|LoggerUtil|logger`: zero matches.** The comparison target is real — `result-innovation-dev.service.ts` instantiates `CgiarLogger` and calls `this.logger.warn` at four sites — so §9's claim is checkable and false.
+### The asymmetry is this spec's own authorship
 
-**No DD supersedes it. No Done criterion carries it. No execution entry, advisory or correction mentions it across 2,037 log lines.** R-IUA-013 AC.6 only forbids `console.*`, which is satisfied vacuously. **This is a section of the approved design that fell entirely outside the traceability net and survived 24 review rounds unnoticed** — the purest instance of design drift in the spec, and the one the clause-level matrix structurally could not catch, because §9 has no requirement id.
+`R-IUA-004 AC.6` required `actor_type_id` on every actor row, and T-02 delivered it: `create-result-innovation-use.dto.ts:80-83` makes it `@IsNotEmpty()`, so `{"actors":[{}]}` is a clean `400`. **There is no organization equivalent of AC.6 in `requirements.md`, and no server-side "at least one identity field" rule anywhere on the organization path.** The actor half of the same DTO, written by the same task, is immune.
 
-Mitigation on record: §9 itself notes `ResponseInterceptor` already logs a `400` at `warn`, so the operational loss is the rule name and the service-scoped logger, not all signal. **Closure: ~6 lines of code, or a DD recording the omission deliberately.** Lowest-severity FAIL — but a spec violation, not an advisory.
+### Scope beyond this endpoint
 
-## FAIL-3 · `test-report.md` said "6 gaps" and listed seven
+`constructWhereClause` is **shared with Innovation Dev**, and `CreateResultInstitutionTypeDto` (`:4-38`) is equally permissive — so the helper hole is inherited, not introduced. What this spec introduced is a **public endpoint over it**, with `organization_count` as the one field a user types first. This widens **FR-7** (see FAIL-7).
 
-Three places said **6**; the enumeration always ran **G-1…G-7**, and the Remediation table accounted for all seven. **Authored by the Leader, in a document whose thesis is that counts must be grepped rather than asserted.** Corrected.
+**Requirements violated:** `R-IUA-007 AC.1`, `R-IUA-007 AC.3`, and `R-IUA-003`'s *"Removing a row removes exactly that row"* scenario — *"A and C remain `is_active = TRUE` with their ids preserved"*.
 
-## FAIL-4 · `design.md`'s modified-file count has now been wrong three times
-
-The cell said **6** while *already enumerating seven*, and the tree has **eight** — `results.module.ts` is modified for T-08's DI edge and appeared in neither the count nor §2.1's table, **after DD-15 re-audited that exact table for exactly this omission class**.
-
-Trajectory: **4 → 6 → 8**, each correction by a different reader. **A count nobody can restate correctly twice is a symptom that it should be derived, not asserted.** Corrected, and §2.1 gained the missing row.
-
-## FAIL-5 · `R-IUA-012 AC.1`'s "section save" is discharged by a different section's save
-
-F-E's save is `ipRightsService.update` — **IP Rights**. The Innovation Use section's own completeness is seeded by **raw SQL**; `harness.innovationUseService.update()` is **never called in F-E**, and F-A never reads green checks. **No test at any tier drives this spec's section save → green-check read.**
-
-Literally satisfiable, since IP Rights is a section. Against R-IUA-012's own user story it is not — and it is exactly the shape `/akili-validate` warns about: *the clearance substitutes an adjacent satisfied thing rather than quoting the clause*.
-
----
-
-## WARN register — 22, grouped
-
-### WARN-1 · DD-3's rollback dependency was asserted by no test *(labelled during remediation round 2, not in the original audit)*
-
-> **Provenance, stated because the label's absence caused a real problem.** `WARN-1` was **not** a label in this report as originally written — the string appeared nowhere in it, and neither did the word *rollback*. It was coined by the **Leader's dispatch brief** during remediation round 2, and the Implementer, correctly using the label it was given, cited `WARN-1 (validation-report.md)` at **five** sites in `innovation-use-role-isolation.fixture-spec.ts`. Those five citations therefore named a finding this document did not contain. Caught by the round-2 Reviewer as an advisory. The row is added here to make the label resolvable rather than rewriting five in-code comments to point elsewhere — but the defect was **the Leader inventing an identifier in a brief and not registering it**, and that is what the entry records.
-
-**The finding itself.** `design.md` DD-3's 2026-08-20 exception states that the ownership gate (§5.1 steps 7a/8a) satisfies *"a failure persists nothing"* **by rollback**, not by validating before `BEGIN`: step 6's `UPDATE result_innovation_use SET innovation_use_level_id, innovation_use_level_explanation, audit(UPDATE)` has already executed when the gate throws. **No test asserted that the rollback actually occurs.** The design document's own exception was the only evidence for its most load-bearing claim.
-
-**Closed** by before/after `result_innovation_use` snapshots on both rejected saves (#3 and #4) in `innovation-use-role-isolation.fixture-spec.ts`, each proven to redden under a temporary catch-and-swallow of the ownership rejection. Note the trap that made the obvious version of this assertion useless: comparing `updated_at` alone does **not** discriminate, because TypeORM's `UpdateQueryBuilder` writes `@UpdateDateColumn` as bare `CURRENT_TIMESTAMP` (whole-second precision) into a `timestamp(6)` column, so two writes inside one wall-clock second are byte-identical. The assertion only has teeth because a real data column (`innovation_use_level_id`) is part of the mutation.
-
-### The original 21, grouped
-
-**Requirement-level (10):** R-IUA-002 AC.7 mechanism-only (DD-16, bounded) · R-IUA-003 AC.5 guard unproven through the real pipeline · **R-IUA-003 AC.7 names `results.last_updated_date`, a column that does not exist** — `AuditableEntity` has only `updated_at`, and the fixture **silently re-mapped the requirement** rather than flagging it (seventh instance of the criterion-text-defect class — **corrected 2026-08-20 in `requirements.md`, and its inheriting site in `tasks.md` T-09 corrected 2026-08-20 second pass**; this parenthetical previously read *"and the only one uncorrected"*) · R-IUA-003 S1's *"level unchanged in the database"* thin · R-IUA-004 S2's clause mis-assigned to T-02, a task whose own verification says it is unverifiable in isolation (fourth occurrence of the mis-assignment pattern) · R-IUA-005 AC.2's exclusive falsifier never run · R-IUA-009 AC.4's third table has no unit-tier owner · R-IUA-010 AC.3/AC.4 ordering has **no behavioural gate at any tier** · R-IUA-011's *"submit transition is permitted"* owned by no task · R-IUA-013 AC.1's envelope unproven on the wire.
-
-**Figure defects (5):** LOC budget — measured fixture tier **3,225 (~3.5×)**, spec-wide **~6,450 (~2.7×)**, and **no document records a top-line actual** *(§7 item 9 un-ticked accordingly)* · `900893` where `900883` was meant, conflating two rows' sentinels *(corrected)* · "336 suites authored T-01…T-08" — the spec authored **8** suite files *(corrected)* · §7's stale "14 suites / 49 tests" — against the current **64** *(this register said "54" until 2026-08-20; it is a live document, not a frozen one, so its "current" had itself gone stale)* · `execution.md` citing **DD-15** for the AC.7 adjudication, which is **DD-16** *(corrected)*.
-
-**Documentation / process (6):** §7 item 2 named `requirements.md` §14, which **has no checkboxes**, while all **73** ACs in §7 remain unflipped *(wording corrected; ticking those 73 is separate, unstarted work)* · T-01 `[x]` with two open criteria while T-13 is `[~]` for the same reason, citing Step 2.3.0 — one status is wrong under the rule the spec quotes · three spec files in no task's *Files touched* · the child guide's §4 step 3 still prescribes `@Roles` + `RolesGuard`, which **DD-5 forbids** — an agent following it literally adds the one thing this spec ruled out (pre-existing; for `/akili-audit`) · `requirements.md` OQ-IUA-2 unstruck · §13's rollout table never absorbed DD-14's deployment consequence.
+**Remediation is a user ruling, not an agent's call** — the fix touches a helper shared with a live sibling feature. Options in Remediation below.
 
 ---
 
-## Advisory register (non-gating)
+## FAIL-2 · MED · `reconcileAdoptedPrimaryKey` fires on a phantom collision and destroys the row the caller named by id
 
-**Standing, verified against the current tree:** the missing ownership check recorded as an advisory **three times** before becoming a proven defect · identity-less organization rows binding `findOne` to an arbitrary existing row (forward-pointed to T-06, never implemented — correct under the never-widen rule, but live) · four DTO typing gaps · the surviving aggregate-mode mutant (accept direction unproven) · **six** instances of the baseline capturing DDL without seed rows · unguarded `afterAll` deletes in four fixtures · `results.updated_at` advancing only at **second** granularity, so AC.7 is product-observably unreliable · **no `@MaxLength` on any free-text field and no `QueryFailedError` branch in `GlobalExceptions`**, so an over-long value returns a `500` carrying raw SQL — the identical class T-06 closed for one field only · six false-or-drifted comments in shipped code, including `entities.module.spec.ts`'s "exactly one incoming graph edge", falsified by T-08's DI edge.
+A defect **inside this spec's own PK-collision remediation**, landed the same day.
 
-**Checked and cleared:** `deriveActorTotal`'s `?? 0` would concatenate on `bigint` columns — they are `int`, verified. Safe.
+### Reach — order-dependent, which is itself the tell
+
+DB has Use organization row `77`, `institution_type_id = 5`, count 10.
+
+```
+{ "organizations": [
+    { "result_institution_type_id": 77, "institution_type_id": 5, "organization_count": 10 },
+    { "institution_type_id": 5, "organization_count": 99 }
+] }
+```
+
+### Mechanism
+
+| Step | Site | What happens |
+| --- | --- | --- |
+| 1 | `:337-369` | Ownership guard passes — 77 is genuinely owned — and the duplicate-PK branch does not fire, because only **one** id was submitted. |
+| 2 | `:217-221` | `idsAlreadyClaimed` is built from the **raw** `data` → `{"77"}`. |
+| 3 | `:204` → `:555-561` | `removeDuplicates` keys **both** rows `type_5` and is last-write-wins → keeps only the second, **id-less** row. **Row 77 is gone from `uniqueData`.** |
+| 4 | `:449` → `:459-461` | The surviving row's `findOne` matches row 77 on identity and **adopts its PK**. |
+| 5 | **`:283-294`** | `reconcileAdoptedPrimaryKey` sees `adoptedId = 77 ∈ idsAlreadyClaimed` → **deletes the PK**, deletes `updated_by`, stamps `created_by`. The row becomes an INSERT. |
+| 6 | `:238` | Row 77 was already flagged inactive by `deactivateExistingRecords`, and **nothing re-saves it**. |
+
+### The bug, stated precisely
+
+`idsAlreadyClaimed` is computed over **raw `data`** (correct for the FAIL-B guard, and its comment at `:207-216` says exactly why) but **consumed against `uniqueData`** at `:230-234`. The two sets diverge exactly when `removeDuplicates` drops an id-present row. The reconcile's predicate asks *"did some row in the raw payload claim this PK?"* when the question it must ask is *"will some **surviving** row write this PK?"*
+
+The collision is **phantom**: nothing else is going to write PK 77, so disowning it is wrong.
+
+### Observable result
+
+`200 OK`; row 77 left permanently `is_active = FALSE`; a new row inserted with a new id. The caller named row 77 explicitly and it did not survive with its id preserved — against `R-IUA-003`'s scenario clause directly. **Swap the two payload elements and row 77 is updated in place instead**, so one pair of rows produces two different persisted outcomes depending on array order.
+
+### Why the actors path is immune, and why that is instructive
+
+Actors exclude claimed ids **inside the where clause** (`result-actors.service.ts:467-469`, `Not(In(excludeIds))`) rather than post-hoc, so no adoption happens to reconcile. And `validateNoDuplicateActorTypes` rejects this payload shape pre-`BEGIN` (`result-innovation-use.service.ts:330-355`). **There is no organizations equivalent of that rule** — the same missing-rule asymmetry as FAIL-1.
+
+The unit suite already has this payload shape at `result-institution-types.service.spec.ts:706-712`, but with an **unauthorized** id (`999`), which short-circuits at the guard. Substituting an owned id is untested.
+
+---
+
+## FAIL-3 · A Done criterion was closed by an adjacent satisfied thing, and it is the tick that made "zero" false
+
+**T-01 criterion c1** (`tasks.md:97`): *"the catalog `GET` returns ten rows in a `ServerResponseDto`."*
+
+**Ticked on the strength of** the user's `/swagger` observation (`execution.md:2086`), released at `execution.md:2097`.
+
+**What that observation actually covers**, in `execution.md`'s own words at `:2090`: *"the observation supplies the one thing static evidence cannot — that the page **renders** as intended."* And `test-report.md:153` (G-3) states that *"the `ServerResponseDto` envelope on the wire"* is proven at **no tier**.
+
+**A rendered Swagger page is not a live `200` carrying ten rows.** The criterion's own task limits say *"No live `200`."*
+
+**Why this is the most expensive record defect here.** `tasks.md` §7 states: *"ALL FOUR ARE NOW CLOSED. The unflipped count is zero, reached honestly rather than by a forced tick."* Two of those four (T-01 c1, T-01 c4) were released by this single observation. c4 — *"the endpoint **renders** under the `Clarisa` tag with the bearer lock"* — is genuinely discharged by it; **c1 is not**, and it is precisely the substitution `/akili-validate` exists to catch: *the clearance substitutes an adjacent satisfied thing rather than quoting the clause.* The count is not zero. It is one.
+
+---
+
+## FAIL-4 · The duplicate-PK `400` shipped with no contract row, no AC, and a citation that resolves to nothing
+
+Two user-observable rejections ship in production code, are unit-proven, and are now fixture-proven:
+
+```
+result_actors_id: same id submitted by more than one row — <id>
+result_institution_type_id: same id submitted by more than one row — <id>
+```
+
+| Where it should be | Present? |
+| --- | --- |
+| `design.md` §4's PATCH error table (`:200-208`) — the contract chunk 3 consumes | ❌ **No row.** The FAIL-1 remediation, by contrast, explicitly *"gave §4 two error rows"* (`design.md:554`) |
+| `requirements.md` — any AC | ❌ **None.** The behaviour has no requirement to regress against |
+| `test-report.md`'s coverage matrix | ❌ **No row** |
+| `execution.md` | ✅ only here |
+
+**And the citation offered for it does not resolve.** Six sites claim *"`design.md` §15 made the two messages deliberately distinct"* — including **two shipped `src/` doc comments** (`result-actors.service.ts:340`, `result-institution-types.service.ts:335`), the new fixture (`:843-845`), and `execution.md:2367`. `design.md` §15 is the **Revision Log**; it contains no such statement, and `execution.md:1128` itself tabulates §15 as *"Revision-log entry."* The section that *should* carry the promise is §4 — which does not have the row.
+
+This is **FP-50's own corollary** — *"an anchor is only an anchor if it resolves"* — violated by the round that amended FP-50, in shipped code.
+
+---
+
+## FAIL-5 · 13 stale figure sites, under two headers that claim currency — and the Leader wrote two of the false claims in the audited commit
+
+`test-report.md:5` states: *"**Every figure and verdict in this file is now current** as of the 2026-08-20 closing run."* It is not.
+
+| file:line | asserted | correct |
+| --- | --- | --- |
+| `test-report.md:36` | *"336 unit suites … and **five** real-MySQL fixtures"* | The spec authored **8** suite files and **6** fixtures. This is the *exact* wording `:40` records as corrected — the correction was applied at `:40` and never swept to `:36` |
+| `test-report.md:40` | `336 / **2279**` | 336 / **2285** |
+| `test-report.md:41` | `→ **64**` | → **71**. And the chain is broken: `49→54→64` here vs. `:26`'s *"Was 66"* — nothing records the 64→66 step |
+| `test-report.md:79` | `336 suites / **2279** tests` | 336 / **2285** |
+| `test-report.md:85` | `**14 suites / 64 tests**` | **15 / 71** |
+| `test-report.md:89-95` | fixture table lists **F-A…F-E only** | **No row for the sixth fixture** — the one gating two product defects — while the header count was raised to 71. The authority now records a total whose contents it does not enumerate |
+| `test-report.md:92` | F-B *"assertions 18 → 24"* | Unresolvable under any reading (16 `it(`, 30 `expect(`) |
+| `test-report.md:130` | NFR-IUA-002 `**64** tests` | **71** |
+| `test-report.md:131` | NFR-IUA-003 `**89.76/75.64/85.27/89.22**` | **89.79/75.75/85.30/89.26** |
+| `validation-report.md:17` (previous) | `336/2279` · `89.76/…` · `14 suites/64` · *"Recorded identically in `tasks.md` §7 and `test-report.md`"* | All three wrong; the identity clause **false in both directions** |
+| `validation-report.md:153` (previous) | *"against the current **64**"* | **71** — the third time this cell has gone stale, **inside the parenthetical that exists to note it going stale** |
+| `validation-report.md:191` (previous) | *"**14** fixture suites"* | **15** |
+| `validation-report.md:117` (previous) | *"across **2,037** log lines"* | `execution.md` is **2,446** lines |
+| `family.md:45` | chunk 2 *"not executed … T-01, T-02, T-03 done"* | All 13 tasks `[x]`. `family.md` has not been swept since T-03 |
+| `tasks.md:621` | C-4 *"enumerated by grep over all **14** files and ruled conclusive"* | **15** files. Two further live `*Seeded` guards now sit outside that enumeration — correctly live, so no regression, but the enumeration no longer covers the tree |
+| `tasks.md:5` / `:765` | *"**24** consumed — exactly on budget"* / *"24 of ~24 (**exact**)"* | **≥ 26** — a review died on a session limit and a Reviewer was re-dispatched after the closing run, and two later commits each carry a round. Exact value **BLOCKED** (not derivable from the tree) |
+| `tasks.md:765` | fixture tier **3,225** LOC | **4,619** LOC measured today (this spec's six fixtures + harness). The multiple must be recomputed, not carried |
+
+**Ownership, stated plainly.** `tasks.md:760` says *"recorded identically in `test-report.md`"* and `test-report.md:28` says *"Identical figures in `tasks.md` §7."* **The Leader wrote both of those sentences in commit `941b0260`, while updating only the two header rows** — and both were false the moment they were written, because the bodies of both documents still held the pre-71 values. Under this spec's own **correction-closure** rule, that correction was **relocated, not applied**. The rule exists because of this exact failure, and it was skipped by the agent that had just invoked it.
+
+---
+
+## FAIL-6 · `tasks.md` contradicts its own body on the two most severity-laden facts in the spec
+
+**`tasks.md:691`** states the §3 clause matrix has *"22 `BUT`/`AND IT MUST` clauses — **all owned**."* The clause count of 22 is correct. *"All owned"* is **false**, and three other documents say so: `test-report.md:147-149` (G-2), the previous `validation-report.md:151`, and `execution.md:2440` all record `R-IUA-011`'s *"the submit transition is permitted"* as owned by no task. `tasks.md:759` is the honest checkbox; `:691` is the false sentence.
+
+**`tasks.md:5`** — the header `**Status:**` line, the first thing `/akili-archive` and any resuming session reads — carries five stale or retracted claims:
+
+| Claim at `:5` | Reality |
+| --- | --- |
+| T-13 `[~]` | `[x]` DONE 2026-08-20 (`:621`, `execution.md:2100`) |
+| *"quarantined via `it.failing` under option B"* | **Zero remain** — grep confirms only prose references |
+| *"Options A/D remain open"* | **A was ruled and delivered** (`execution.md:2102`) |
+| *"role isolation itself is proven"* | The **exact phrase retracted** at `:494` |
+| *"T-12 carries a known blocker … decide seed ownership before it starts"* | T-12 closed |
+
+`tasks.md:10` still reads *Last updated: 2026-08-19*.
+
+---
+
+## FAIL-7 · `family.md` FR-7 understates the live Innovation Dev exposure — and FAIL-1 widens it further
+
+FR-7 (`family.md:98`) is the row **both** previous auditors independently recommended gating the archive on. It is now the least accurate description of residual risk in the spec.
+
+| FR-7 says | Actual |
+| --- | --- |
+| Chunk 2 fixed this via `assertInnovationUseOwnership` — **one** protection | The Use path has **three** the Dev path lacks: ownership guard, adopted-PK reconcile, duplicate-PK rejection (`execution.md:2436`) |
+| — | **FAIL-1 adds a fourth shape**, and this one the Use path does **not** have either: `constructWhereClause` is shared, and `CreateResultInstitutionTypeDto` is equally permissive, so **both** endpoints are exposed to the identity-less overwrite |
+
+FR-7's remediation note says the fix *"needs a migration-grade human review gate rather than a copy-paste."* That is still right, and the scope is now larger than the row states.
+
+---
+
+## Requirement coverage — Phase 4
+
+**116 clause instances checked** (all 73 ACs for ownership, plus 43 assertive scenario clauses, plus at-source evidence for the ~30 ACs carrying declared risk). **102 pass.**
+
+### The structural cause of every orphan
+
+`tasks.md` §3's clause column is scoped by its own preamble (`:670`) to *"every `BUT it must NOT` and `AND IT MUST`"* — **22 of the 43** assertive clauses. The other 21 (`THEN`, plain `AND`) are **invisible to it by construction.** That is the mechanism, not an oversight in any one row.
+
+### `tasks.md:759` — *"Every scenario clause in §3 owned and discharged"* — is open for four reasons, not one
+
+| # | Clause | Status |
+| --- | --- | --- |
+| 1 | `R-IUA-011` — *"AND the submit transition is permitted"* (`requirements.md:542`) | **OPEN — accepted as G-2.** No owner, no assertion anywhere; accepted as structurally implied. Not a new FAIL — what fails is `tasks.md:691`'s claim that it *is* owned (FAIL-6) |
+| 2 | `R-IUA-001` — *"AND a subsequent PATCH … succeeds rather than returning 404"* (`:215`) | **WARN — newly found.** F-E runs the real `createResultType` on `result1Id` and never `update()`s it; the only `update()` is on `result4Id`, whose detail row came from a direct `create()`. Proven as two separate links, never composed |
+| 3 | `R-IUA-003` S1 — *"AND the level is unchanged in the database"* (`:285`) | **WARN — newly found.** Unit tier only (mocked). The property *is* watched at the DB tier — but for a **different** rejection cause (the new fixture's canary), never for the negative-count case the scenario specifies |
+| 4 | `R-IUA-010` — *"BUT it must NOT achieve that order by inheriting default primary-key ordering"* (`:512`) | **OPEN — accepted as G-5.** Owned but **undischargeable at any tier**; §7 demands "owned **and** discharged", so the checkbox correctly stays open |
+
+### WARN register — requirement level
+
+| Requirement / clause | Verdict | Why |
+| --- | --- | --- |
+| `R-IUA-010 AC.3/AC.4` ordering | **WARN** (G-5, unchanged) | Order clause exists at `clarisa-innovation-use-levels.service.ts:53`; F-D stays green with it deleted, and the unit gate is a presence assertion over a mock |
+| `R-IUA-010 AC.1` | **WARN** | See FAIL-3 — ticked via a render observation |
+| `R-IUA-002` AC.2/AC.3/AC.4 + *"must NOT return any row belonging to another role"* | **WARN** | Proven only over mocked repositories. F-B holds the exact both-roles DB state and **discards** the section `update()` returns (`innovation-use-role-isolation.fixture-spec.ts:702`) — the DB-tier read assertion was one line away. Contrast `R-IUA-009`, whose scenario *demands* fixture proof for the write side |
+| `R-IUA-002 AC.7` | **WARN** (G-4) | Mechanism only — **and** its own comment overstates it: `app.module.spec.ts:20-24` promises *"a future change that widened the exclude list … would be caught"*, while the check is `path.includes('innovation-use')` (`:46`), which any wildcard exclude (`results(.*)`) passes untouched |
+| `R-IUA-005 AC.2` | **WARN** (G-6) | `execution.md:906` records the exclusive falsifier as **not run**; no later entry records it running |
+| `R-IUA-009 AC.4` clause (c) | **WARN — correctly unticked** | Clause (c) is **accurate**: `base-service.ts:348-360` scopes the `find`, `:429-434` keys the update on PKs alone, and `roleKey` is genuinely set (`result-quantifications.service.ts:28`). **No test gates it** — all four F-B saves pass `quantifications: []`, taking the role-named early return at `:341` and never the bulk update at `:429` |
+| `R-IUA-003 AC.7` | **WARN** | `updated_at` advances only at **second** granularity (bare `CURRENT_TIMESTAMP` into `timestamp(6)`), so the AC is product-observably unreliable |
+| Declared coverage authority | **WARN** | `requirements.md:184` leaves all 73 AC boxes unticked on the grounds that `test-report.md`'s matrix *"carries a per-AC verdict"*. It does not — **8 of 13** requirements are single requirement-level rows, and `R-IUA-010 AC.1/AC.2/AC.5/AC.6` and `R-IUA-006 AC.6` have **no row at all**. The argument for 73 unticked boxes depends on granularity the substitute lacks |
+| `test-report.md:112` | **WARN** | Still reads `last_updated_date` — the column that **does not exist** — an 11th surviving site of a correction applied at `requirements.md:278` and `tasks.md:474` |
+
+### Genuinely closed since the last round
+
+| Finding | Disposition |
+| --- | --- |
+| **FAIL-5** (prev) · `R-IUA-012 AC.1` discharged by IP Rights' save | ✅ **FIXED.** `innovation-use-result-creation.fixture-spec.ts:771-824` drives `ResultInnovationUseService.update` at `:787`, asserts both sides at `:802-803`, pins non-vacuity via `updated_by` at `:819-823` |
+| **FAIL-2** (prev) · `design.md` §9 observability undelivered | ✅ **DELIVERED.** `result-innovation-use.service.ts:89` + four `warn` sites — verified by the Leader |
+| **FAIL-4** (prev) · `results.module.ts` missing from §2.1 | ✅ **CLOSED.** `design.md:113` carries the row; the file genuinely imports the module |
+| **FAIL-1** (prev) · cross-role authorization variant | ✅ **FIXED** and now fixture-gated |
+| **WARN-1** (prev) · DD-3's rollback dependency unasserted | ✅ **CLOSED**, and independently re-confirmed this round |
+
+---
+
+## Phase 2 · File existence
+
+Every path in `design.md` §2.1 **exists**. Four files hold gates and appear in **no** task's *Files touched* and no §2.1 row:
+
+| File | Holds |
+| --- | --- |
+| `src/app.module.spec.ts` | The **sole** gate for `R-IUA-002 AC.7` (T-07 c11) |
+| `src/domain/entities/entities.module.spec.ts` | T-07's DD-15 gate |
+| `src/domain/tools/clarisa/clarisa.module.spec.ts` | T-01 c6's DD-15 gate |
+| `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts` | Two product defects. **Owned by no task**, while `design.md:119` still describes the fixture set as *"F-A … F-E"* |
+
+**Why this is more than bookkeeping.** DD-15's entire lesson is that a file omitted from §2.1 gets no Implementer to touch it and no Reviewer criterion. The omission class is **unclosed — and now includes the file that gates the DD-15 fix itself.**
+
+---
+
+## Phase 5 · Quality audit — what was ruled out, and the advisory register
+
+**Ruled out at source** (Auditor B, each with file:line): writes outside the transaction (every write threaded through the callback `manager`, DD-10 honoured); throw paths that could commit; Dev-path behaviour change from the shared helpers (`resolveOrganizationCount` returns `{}` off the Use path, so no property is added — verified by reading, not by the insertion count); cross-role and cross-result leakage (all eleven read predicates name `result_id` + role); mode-exclusivity states that would make `innovation_use_validation` permanently FALSE; the four legacy Dev booleans being strandable; `total` ever being stored; the read path returning or missing a row; quantifications as a PK-write vector (a caller-supplied `id` cannot reach a write — `setOtherAttributes` yields `{}`).
+
+### Advisory register — non-gating, carried forward
+
+| Advisory | Note |
+| --- | --- |
+| **Four unvalidated catalog FKs → `500` carrying raw MySQL** | `actor_type_id`, `institution_type_id`, `sub_institution_type_id`, `institution_id` have real FKs and no validation; only `innovation_use_level_id` is protected. `GlobalExceptions` has **zero** `QueryFailedError` handling (verified: `global.exception.ts:22,29`), so the client gets `status: 500`, `description: "QueryFailedError"`, and `errors` = the driver text **including the database name and the FK constraint name**. `design.md:205` documents this exact hazard as its reason for protecting the level field, and the reasoning was not applied to the four fields sharing the failure mode. **Now also an input to the security review** — it discloses schema internals to any authenticated caller |
+| Free-text overflow → the same raw `500` | No `@MaxLength` on five `text` columns; a 64–100 KB body reaches MySQL and raises `ER_DATA_TOO_LONG` |
+| Collection semantics contradict the verb | `?? []` means `PATCH {"innovation_use_level_explanation":"x"}` **wipes all three collections**, while scalars follow partial-merge (DD-14). Correct per `R-IUA-003`'s *"full section"* title — but **belongs in `design.md` §4 before chunk 3 is written** |
+| `?reportYear=` retargets the write to a snapshot row | Platform-wide, inherited from the Dev controller. `ResultStatusGuard` normally blocks it, but `SYSTEM_ADMIN`/`TECHNICAL_SUPPORT`/`CENTER_ADMIN` bypass. Recorded so it is not mistaken for a Use-specific guarantee |
+| Custom names not trimmed | `"ACME"` and `"ACME "` are distinct identities in three places. Consistent, so no corruption |
+| Duplicate quantification rows insertable | Two identical composite keys produce two INSERTs; self-healing next save. No AC forbids it |
+| Unguarded `afterAll` deletes — now **five** fixtures | A throw skips `harness.close()` and leaks the connection |
+| Three FP-50 citations still unconverted | Plus the `execution.md` table documenting their rot has itself rotted (see WARN table below) |
+
+---
+
+## Phase 6 · Design conformance
+
+### Contract and step-order drift
+
+| Item | Verdict |
+| --- | --- |
+| `design.md` §4 PATCH error table | **FAIL-4** — no row for the duplicate-PK `400`; and no `500` row despite four reachable `500` paths |
+| `design.md` §5.1 step order | **WARN** — steps 7a/8a describe only the guard's *unauthorized-id* half. Neither `reconcileAdoptedPrimaryKey` nor the duplicate-PK branch appears in the step list, though both are shipped and one is user-observable |
+| `design.md` §10.3 fixture table | **WARN** — lists F-A…F-E; the tree has six spec-owned fixtures, and the missing one is cited **by name** in two production service comments |
+| `design.md` §15 revision log | **WARN** — no row for the duplicate-PK `400` or today's fixture tier |
+| `design.md:369` cleanup item | **WARN** — carries a cleanup item for work already done, pointing at `result-innovation-use.service.ts:78-81`, which now contains the **correction itself**, not the stale claim |
+
+### Broken citations — 15 sites, verified at HEAD
+
+| file:line | claims | actually |
+| --- | --- | --- |
+| `innovation-use-section-round-trip.fixture-spec.ts:498` | `result-actors.service.ts:244` = an audit spread | Doc-comment prose; spreads at **139**, **288** |
+| `…:709` | `result-institution-types.service.ts:240` = an audit spread | `tempRepo,`; spreads at **421**, **437** |
+| `execution.md:2243` | *"the spread is at 138 and 265"* | **139 and 288** — the table documenting citation rot has itself rotted |
+| `execution.md:2244` | line 240 is *"inside the new guard's doc comment"* | It is `tempRepo,` |
+| `execution.md:2221` | dedup at actors `:308` / inst-types `:250` | **350** and **345** |
+| `execution.md:2160` | logger declaration at `:83` | **89** |
+| `execution.md:1513` | audit spread at inst-types `:240` | **421/437** |
+| `tasks.md:174` | `customSaveInnovationDev` at `:88-152` | **91-158** — `design.md:267` records converting this exact citation; the sweep never reached `tasks.md` |
+| `tasks.md:217` | `customSaveInnovationDev` at `:115-135` | **127-152** — same un-swept correction |
+| `requirements.md:100` | `case INNOVATION_USE` **ABSENT**, `:531-548` | Switch is **533-554**; the case is **present** at 546-548 |
+| `requirements.md:101` | `INNOVATION_USE in ipAvailables` **ABSENT**, `:550-553` | `ipAvailables` at **556-560**; **present** at 559 |
+| `requirements.md:38` | `createResultType()` at `:526-558` | **528-565** |
+| 6 sites incl. 2 shipped `src/` comments | *"`design.md` §15 made the two messages deliberately distinct"* | §15 is the Revision Log and says no such thing — **FAIL-4** |
+
+`requirements.md` §4.1's *"ABSENT"* rows are point-in-time records of pre-implementation state, so their **verdict** is historically correct; their **line ranges** have drifted and now point at present-tense code.
+
+---
+
+## Independent review of commit `941b0260` — the Leader's own work
+
+Audited by Auditor C against the services, because the Leader authored it.
+
+| # | Item | Verdict |
+| --- | --- | --- |
+| 1 | Do the 5 new tests prove what they claim? | **4 PASS · 1 WARN** — see below |
+| 2 | Is the "nothing persisted" canary real? | ✅ **PASS** — step 6 writes at `:193-199` inside the transaction opened at `:188`, before step 7 at `:202`; `create()` leaves the column NULL; no pre-`BEGIN` rejection is possible for the payload used. All three sub-checks verified at source |
+| 3 | The rollback-witness sequence, and *"no equivalent witness by construction"* | ✅ **PASS** — both halves confirmed at source |
+| 4 | Message assertions, em-dash included | ✅ **PASS** — one `Grep` for the literal matched code and assertions in the same pass, so the U+2014 is identical; the strings genuinely discriminate from `unknown or unauthorized …` |
+| 5 | Band and sentinel hygiene | ✅ **PASS** — `902_`/`2113`/`T99IUAC` appear in exactly one file; the reserved-year and platform-code lists match the tree 11-for-11 and 7-for-7 |
+| 6 | Cleanup / second-run safety | ✅ **PASS** — all four results, both actor sets **including the witness row**, both org sets, all 9 catalog codes, and the guarded year/platform rows are removed; child deletes precede parents |
+| 7 | Header accuracy | ⚠️ **WARN** — see below |
+| 8 | Doc edits + correction closure | ⚠️ **WARN** — edits accurate **as written**; the sweep did not run → **FAIL-5** |
+
+**Item 1 WARN — test 5 is weaker than its name and its own doc comment.** The rollback-witness assertion is a pure **end-state** comparison. It cannot distinguish *"the sweep ran and was rolled back"* from *"the sweep never ran"*: delete `result-actors.service.ts:298-305` and **the test stays green** while its name becomes false. The doc comment states the stronger claim as established — *"Byte-identical here **means** the `ROLLBACK` genuinely undid a committed-in-transaction row change"* — but that inference rests on source ordering the assertion never touches. The ordering **does** hold (verified independently), so the claim is *true*; it is simply not *proven here*. `execution.md:2371` calling it *"the strongest single piece of rollback evidence in this file"* is a mild overclaim — the step-6 canary is at least as strong and covers both cases.
+
+**Item 7 WARN — the rewritten header still describes two fixed defects in the present tense**, in the commit whose stated purpose was to remove a stale directive from that same header:
+- `:39-43` claims `constructWhereClauseInnovationUse` has *"no exclusion of a `result_actors_id` already claimed earlier in the same payload."* The exclusion **exists** at `result-actors.service.ts:467-469`. Partly excused by the *"verified at source before this file was written"* framing.
+- `:69-80` (*"The organizations mirror"*) describes the call chain with *"the same two gaps"*, carries **no** historical framing, and **omits `reconcileAdoptedPrimaryKey`** — which now sits between `processInstitution` and `dataToSave.push`. A maintainer reading this header concludes the organization collision is still open.
+
+**Process note.** The `execution.md` section this commit added (`:2347-2399`) records a Leader-run verification block and **no Reviewer**, unlike its neighbours — `:2337` documents a re-dispatch specifically to preserve `author ≠ auditor`. The five tests, the header rewrite and three doc edits went in without an independent round. **That is why items 1 and 7 survived to this phase**, and it is the same shortcut, one level down, that FAIL-5 records.
 
 ---
 
 ## Agent Guide / Constitution Impact
 
-`src/CLAUDE.md` and `src/AGENTS.md` both carry the DD-15 block **identically at all three amended sites**, and the auditor verified the mechanism description is **accurate against the code**, not merely plausible. Not stale. **WARN** only for the pre-existing `@Roles` recipe three bullets above it. CodeGraph re-index and the TRD §4.1/§6.1 check remain pending for `/akili-archive`.
+`src/CLAUDE.md` and `src/AGENTS.md` carry the DD-15 block identically at all three amended sites; the previous round verified the mechanism description against the code. Not stale.
+
+**WARN, unchanged and pre-existing:** the child guide's §4 step-3 recipe still prescribes `@Roles` + `RolesGuard`, which **DD-5 forbids** — an agent following it literally adds the one thing this spec ruled out. For `/akili-audit`.
+
+CodeGraph re-index and the TRD §4.1/§6.1 check remain pending for `/akili-archive`.
+
+---
+
+## Test evidence summary
+
+| Tier | Figure | Provenance |
+| --- | --- | --- |
+| Unit | **336 suites / 2285 tests** green | Re-run by the Leader today |
+| Coverage | **89.79 / 75.75 / 85.30 / 89.26** | Re-run today; reproduced the recorded figures to the digit |
+| Fixtures | **15 suites / 71 tests** green, twice consecutively | Re-run today, same scratch container |
+| Build | `npm run build` clean (`nest build` + admin Vite bundle) | Run today |
+| `tsc --noEmit` | clean | Run today |
+| Lint | `npm run lint -- --quiet` clean | Run today; it carries `--fix`, `git status` re-checked after |
+| `it.failing` | **0** live; 7 textual references, all historical comments | Grepped today |
+| Fixture-tier LOC | **4,619** (six fixtures + harness) | Measured today; supersedes the recorded 3,225 |
+
+**None of the seven FAILs was found by running any of the above.** Every one came from reading an artifact against the document that claims it — the third consecutive round in which that is true.
 
 ---
 
 ## Remediation
 
-| # | Finding | Owner | Action |
-| --- | --- | --- | --- |
-| 1 | **FAIL-1** authorization, both variants | **User** | Rule **A** or **D**. One fix — scope the id-present branch by `(result_id, role)` — closes both. Widen the quarantine to name the cross-role variant |
-| 2 | **BLOCKED** `/swagger` | **User** | Run the observation. Unblocks **3** checkboxes |
-| 3 | FAIL-2 §9 observability | Follow-up | ~6 lines, or a DD recording the omission |
-| 4 | FAIL-5 · R-IUA-012 AC.1 | Follow-up | One F-A/F-E test driving the Innovation Use section's own save → green-check read |
-| 5 | ~~WARN · R-IUA-003 AC.7's nonexistent column~~ | ✅ **DONE 2026-08-20** | ~~Correct the AC to `updated_at`~~ — done in `requirements.md`, **and** in `tasks.md` T-09's inheriting criterion (second pass, 2026-08-20); the fixture already tested the real column |
-| 6 | WARN · LOC actual | Bookkeeping | Record the measured figures |
-| 7 | FAIL-3, FAIL-4, 5 figure/wording defects | — | ✅ **Corrected during this validation** |
+### Requires a user ruling — both are code, both touch a shared helper
+
+| # | Finding | The decision |
+| --- | --- | --- |
+| **1** | **FAIL-1** identity-less organization overwrite | Three options. **(a)** Mirror `R-IUA-004 AC.6`: add a new AC requiring at least one identity field on an organization row, enforce it in `InnovationUseOrganizationDto`, reject `400`. Narrowest blast radius, Use-path only, no shared helper touched — **recommended**. **(b)** Make `constructWhereClause` return a never-matching predicate when no identity field is present, so an identity-less row always inserts. Fixes Dev too, and therefore carries Dev's risk. **(c)** File as its own spec with FR-7. Note **(a) leaves the Dev endpoint exposed**, exactly as the ownership fix did — the asymmetry is the cost of the narrow option, and it must be recorded, not glossed |
+| **2** | **FAIL-2** phantom-collision reconcile | Compute `idsAlreadyClaimed` from the **surviving** rows, or check the adopted PK against ids that a surviving row will actually write. One-line class of fix, Use-path only. Add the owned-id variant of `result-institution-types.service.spec.ts:706-712`, plus a fixture case — the payload is already written in this report |
+
+### The Leader's own to fix, and mandated by correction closure
+
+| # | Finding | Action |
+| --- | --- | --- |
+| 3 | **FAIL-5** 13 stale figure sites | One sweep, all sites, from the table above. **Do not** update the two header rows again without the bodies |
+| 4 | **FAIL-4** contract gap | Add the duplicate-PK `400` row to `design.md` §4; add an AC to `requirements.md`; add the matrix row to `test-report.md`; **repoint the six `design.md` §15` citations at §4**, including the two in shipped `src/` |
+| 5 | **FAIL-6** `tasks.md:5` and `:691` | Rewrite the header status line; correct *"all owned"* to name the R-IUA-011 orphan |
+| 6 | **FAIL-7** FR-7 | Restate as three protections plus FAIL-1's fourth shape, and record that FAIL-1 exposes **both** endpoints |
+| 7 | **FAIL-3** T-01 c1 | Un-tick, restore it to the carve-out with *"blocked on a live HTTP seam (G-3)"* as its class, and correct §7's *"the unflipped count is zero"* |
+| 8 | Test 5's name / comment | Either assert a precondition that the sweep is reachable, or add the delete-the-sweep mutation to the falsification set. Fix the two present-tense header paragraphs |
+| 9 | 15 broken citations | Convert to anchors per FP-50 |
+| 10 | `test-report.md:89-95` | Add the sixth fixture's row; record the missing 64→66 arithmetic step |
+
+### Accepted, unchanged
+
+**G-2** (submit transition, structurally implied) · **G-3** (HTTP tier needs a shared DB — a follow-up spec) · **G-4** (`401` mechanism-only per DD-16) · **G-5** (catalog ordering has no behavioural gate) · **G-6** (one unrun mutation). Each is a stated limit of a tier, not missing work.
+
+### The two human gates, unchanged and still open
+
+| Gate | Status |
+| --- | --- |
+| **Security review** (`requirements.md` §15) | ⚠️ **REQUIRED.** `assertInnovationUseOwnership` is an authorization control on two tables shared with Innovation Dev. **This round adds a second input:** the unvalidated-FK `500` discloses the database name and FK constraint name to any authenticated caller |
+| **FR-7** (`family.md`) | **OPEN**, and wider than the row states — see FAIL-7 |
 
 ---
 
 ## Archive Readiness Recommendation
 
-**Do not archive.** Two blockers require the user (FAIL-1's ruling, the `/swagger` observation); two require small follow-up work (FAIL-2, FAIL-5). The corrections this validation could make itself are made.
+**Do not archive.** FAIL-1 is a reachable, silent data-destruction path on a `200`, and FAIL-2 is a defect inside the remediation shipped to close the previous one. Neither is closable without a user ruling, because both live next to a helper shared with a live sibling feature. The five record defects are the Leader's to sweep, and one of them — FAIL-5 — is a correction-closure rule the Leader invoked and then skipped.
 
-**What this spec got right is worth stating alongside the failures**, because the failures are what a good process looks like when it works: 336 unit suites and 14 fixture suites green, a production build clean, coverage at 89/76/85/89, **two genuine product defects found and neither hidden**, DD-14's operator proven load-bearing by a falsification that *reproduced the bypass*, and a quarantine that inverts so a green suite proves the defect is still open. The five FAILs are four documentation defects and one design section — and the authorization defect was found by an auditor reading code against a claim, which is precisely what this phase exists to do.
+**What this spec got right is worth stating beside that**, because the failures are what a working process looks like: 336 unit suites and 15 fixture suites green, a clean production build, coverage at 89/76/85/89 reproduced to the digit, four genuine product defects found across three rounds and **none hidden**, a falsification that reproduced an actual bypass rather than merely reddening an assertion, and a fixture tier that now catches two corruption shapes a `200` would otherwise have concealed.
 
-**The pattern worth carrying to Kaizen:** every FAIL here is a **claim–artifact mismatch**, not a code defect. Counts asserted rather than derived; an AC naming a column that does not exist; a design section with no requirement id and therefore no row in any matrix; a fixture green because its payload omitted the thing it claimed to test. The code was audited hard by 24 review rounds. **The record was not audited at all until now.**
+**The pattern worth carrying to Kaizen — and it is now measurable.** Every FAIL in three consecutive validation rounds has been a **claim–artifact mismatch**, and the two product defects in this round were both sitting in the **advisory register** of the previous one. The register is where findings go to stop being acted on. This spec's own lesson was written after the third such instance: *"a run of low-severity findings is not evidence that the severe ones are gone — it is evidence about where the last reviewer was looking."* The advisory register **is** that run of low-severity findings, in written form.
+
+**The concrete process change this suggests:** an advisory that names a reachable state — not a style or a comment — is not an advisory. It is an unfiled defect awaiting someone with the budget to construct its payload. Auditor B was given that budget for the first time this round, and it converted two of them in one pass.

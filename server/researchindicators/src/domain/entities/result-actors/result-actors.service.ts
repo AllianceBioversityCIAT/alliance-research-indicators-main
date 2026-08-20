@@ -337,7 +337,7 @@ export class ResultActorsService extends BaseServiceSimple<
    * round-trip below: there is no correct merge for "one row asked to
    * become two different things" (unlike the id-less case), so the whole
    * save is rejected with a message distinct from the unauthorized-id one
-   * below (design.md §15, mirrors R-IUA-005's duplicate-identity rule).
+   * below (design.md §4's PATCH error table, mirrors R-IUA-005's duplicate-identity rule).
    */
   private async assertInnovationUseOwnership(
     data: InnovationUseActorDto[],

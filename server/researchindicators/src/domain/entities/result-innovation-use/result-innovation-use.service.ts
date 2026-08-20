@@ -23,6 +23,7 @@ import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-acto
 import {
   CreateResultInnovationUseDto,
   InnovationUseActorDto,
+  InnovationUseOrganizationDto,
 } from './dto/create-result-innovation-use.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 
@@ -182,6 +183,13 @@ export class ResultInnovationUseService {
     this.validateLevelExplanation(level, effectiveExplanation, resultId);
     this.validateNoDuplicateActorTypes(
       createResultInnovationUseDto?.actors ?? [],
+      resultId,
+    );
+    // Step 4 (cont'd) — c) every organization row must identify its
+    // organization (R-IUA-007 AC.6, `validation-report.md` FAIL-1). Before
+    // `BEGIN`, for the reasons in the method's own doc comment.
+    this.validateOrganizationsAreIdentified(
+      createResultInnovationUseDto?.organizations ?? [],
       resultId,
     );
 
@@ -351,6 +359,86 @@ export class ResultInnovationUseService {
         ]);
       }
       seenIdentities.add(identity);
+    }
+  }
+
+  /**
+   * **R-IUA-007 AC.6 — the organization counterpart of R-IUA-004 AC.6.**
+   * Added 2026-08-20 (`validation-report.md` **FAIL-1**, user ruling: close it
+   * on the Use path only, without touching the helpers shared with
+   * `customSaveInnovationDev`).
+   *
+   * **The defect this closes.** An organization row carrying no identity
+   * field at all — `{"organizations":[{"organization_count":12}]}`, or
+   * literally `{}` — passed every gate and reached
+   * `ResultInstitutionTypesService.constructWhereClause`, where **all three**
+   * of its `if` branches are false, so the emitted predicate degenerates to
+   * `{ result_id, institution_type_role_id }`. `findOne` then returns an
+   * **arbitrary** existing Innovation Use organization row of this result,
+   * `buildNewData` adopts its primary key, and `buildDataTemplate`'s
+   * else-branch overwrites it with `institution_type_id: null`,
+   * `sub_institution_type_id: null`, `institution_type_custom_name: null`,
+   * `institution_id: null`, `organization_count: null` — while
+   * `deactivateExistingRecords` deactivates every *other* row in the
+   * section. A `200`, and the victim's values are unrecoverable.
+   *
+   * **Why none of the three existing protections caught it.** All three are
+   * keyed on a *submitted* id: `assertInnovationUseOwnership` returns early
+   * when the payload names none; `reconcileAdoptedPrimaryKey` returns early
+   * because its claimed-id set is empty (it exists for payload-internal
+   * collisions, not for a PK adopted by an unscoped lookup); and
+   * `removeDuplicates` sees a single row. This payload submits no id, so it
+   * walks past all three.
+   *
+   * **Why this lives here and not on the DTO**, which is where the ruling's
+   * wording put it. A class-validator rule on `InnovationUseOrganizationDto`
+   * only runs where a `ValidationPipe` runs, and **DD-8** records that this
+   * repo has no global pipe — it is applied per handler. The rule would then
+   * be inert for any future caller of `update()` that skips the pipe (DC-10,
+   * the failure mode `requirements.md` §5.2 enumerates), and — decisively —
+   * the fixture tier calls this service directly, so a DTO-only rule **could
+   * not be proven against real MySQL at the tier where the defect was
+   * found**. Placed here it runs for every caller, and — like R-IUA-005 above
+   * and unlike `assertInnovationUseOwnership` — it runs **before `BEGIN`**, so
+   * R-IUA-003 AC.2 holds for it by *ordering* rather than by rollback
+   * (**DD-3**, whose one recorded exception this therefore does not widen).
+   *
+   * **The identity rule mirrors what the lookup actually keys on.** A known
+   * organization is identified by `institution_id` — and `buildWhereClause`
+   * takes that branch only on `is_organization_known === true`, so the flag is
+   * part of the identity, not decoration. Anything else is identified by
+   * `institution_type_id`, with `sub_institution_type_id` and the `OTHER`
+   * custom name as refinements of it, never substitutes: a sub-type without
+   * its parent would leave `constructWhereClause`'s second branch emitting
+   * `institution_type_id: undefined`.
+   *
+   * **Not closed here:** the same hole in `customSaveInnovationDev`, which
+   * shares `constructWhereClause` and whose own DTO is equally permissive.
+   * The exposure is asymmetric exactly as `assertInnovationUseOwnership`'s
+   * is — recorded in `../family.md` **FR-7**, not fixed by this method.
+   */
+  private validateOrganizationsAreIdentified(
+    organizations: InnovationUseOrganizationDto[],
+    resultId: number,
+  ): void {
+    for (const [index, organization] of organizations.entries()) {
+      const identified =
+        organization?.is_organization_known === true
+          ? organization?.institution_id !== undefined &&
+            organization?.institution_id !== null
+          : organization?.institution_type_id !== undefined &&
+            organization?.institution_type_id !== null;
+
+      if (!identified) {
+        // §9 — result_id, the rule and the offending row index; never the
+        // payload values.
+        this.logger.warn(
+          `Innovation use save rejected for result ${resultId}: organization row ${index} carries no identity field (R-IUA-007 AC.6)`,
+        );
+        throw new BadRequestException([
+          `organizations.${index}.institution_type_id: an organization row must identify its organization — supply institution_type_id, or is_organization_known together with institution_id`,
+        ]);
+      }
     }
   }
 
