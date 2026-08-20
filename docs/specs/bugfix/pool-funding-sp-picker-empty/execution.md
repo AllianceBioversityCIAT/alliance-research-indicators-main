@@ -1060,3 +1060,106 @@ expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*is_active/);
 Cheap, needs no database, and reddens on exactly the defect. Folded into T-07 as a rider.
 
 **Note on process:** the worker's own SQL evidence in this retry was correct and verbatim — that part of the report is sound and matches what the auditor reproduced. The overstatement is confined to what the added tests prove.
+
+---
+
+## T-07 — Migration: backfill `clarisa_external_code` from `agresso_agreement_id`
+
+- **Worker:** agy · gemini-3.7-flash-high · 2026-08-20
+- **Files created/modified:**
+  - `server/researchindicators/src/db/migrations/1787253483599-backfillClarisaExternalCodeInBilateralProjectMapping.ts` (created idempotent backfill migration with `updated_at = updated_at` preservation)
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/automapper.service.spec.ts` (Rider F-14 SQL regex test asserting `/WHERE \(.*OR.*\) AND .*is_active/`)
+
+### Rider F-14 Observed RED (flat `.where(A).orWhere(B).andWhere(C)` without Brackets)
+```
+FAIL src/domain/entities/bilateral-project-mapping/automapper.service.spec.ts (5.269 s)
+  ● AutomapperService › R-CAM-004 — coverage() › generates SQL with parentheses wrapping the OR condition before AND is_active (Rider F-14)
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /WHERE \(.*OR.*\) AND .*is_active/
+    Received string:  "SELECT ... FROM bilateral_project_mapping bpm WHERE bpm.clarisa_project_id IN (:...ids) OR bpm.clarisa_external_code IN (:...codes) AND bpm.is_active = :isActive"
+
+      734 |
+      735 |       const sql = qb.getQuery();
+    > 736 |       expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*is_active/);
+          |                   ^
+      737 |     });
+      738 |   });
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 36 passed, 38 total
+Snapshots:   0 total
+Time:        5.315 s, estimated 6 s
+```
+
+### Rider F-14 Observed GREEN (with `new Brackets(...)`)
+`Test Suites: 1 passed, 1 total; Tests: 38 passed, 38 total; Snapshots: 0 total; Time: 5.681 s`
+
+### Scratch MySQL Execution & Explicit Diff (`127.0.0.1:33108`, `ari_scratch`)
+- DDL replicated from Dev via `SHOW CREATE TABLE bilateral_project_mapping`.
+- Seeded with 199 active rows cloned from Dev.
+- First execution (`up`):
+  `affectedRows: 199, changedRows: 199, info: 'Rows matched: 199  Changed: 199  Warnings: 0'`
+- **Explicit Row-by-Row Diff:**
+  - Total rows compared: 199
+  - Rows where `clarisa_external_code` moved (`null` -> value): 199
+  - Rows where ANY OTHER column (`id`, `created_at`, `updated_at`, `clarisa_project_id`, `source`, `agresso_agreement_id`) changed: **0**
+- Second execution (Idempotency check):
+  `affectedRows: 0, changedRows: 0, info: 'Rows matched: 0  Changed: 0  Warnings: 0'`
+- Reversion (`down`):
+  `After down(), null count: 199`
+
+### Gate verifications
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent bilateral` | 19 passed, 19 total; 344 passed, 344 total; 29.753 s |
+| `npx tsc --noEmit` | Clean exit 0 |
+| `npx eslint src/db/migrations src/domain/entities/bilateral src/domain/entities/bilateral-project-mapping` | Clean exit 0 |
+| `grep -nE "(\?|:[a-zA-Z])" src/db/migrations/1787253483599-backfillClarisaExternalCodeInBilateralProjectMapping.ts` | 0 matches (exit 1) |
+
+### Deviations from the spec
+None.
+
+### What I could not verify
+None.
+
+---
+
+### Auditor verdict — T-07 (and rider F-14)
+
+- **Auditor:** Claude Opus (separate session) · 2026-08-20
+- **Verdict: PASS.** Migration correct, executed on scratch by the worker, applied to Dev by the auditor, and verified end-to-end against real CLARISA. One minor finding (F-15).
+
+**F-14 rider closed.** `automapper.service.spec.ts:725` now asserts the generated SQL:
+`expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*is_active/)`. The worker's red — the flat form producing an unparenthesised WHERE — is verbatim and matches the shape the auditor reproduced in the T-06 audit. This is the guard the behavioural tests could not be.
+
+**Applied to Dev**, one pending migration beforehand, ours. Verified afterwards:
+
+| Check | Result |
+| --- | --- |
+| Key populated | `agresso_agreement_id: "S303"` → `clarisa_external_code: "S303"` |
+| **Audit timestamps** | `created_at` / `updated_at` unchanged at their original `14:52:00.185Z` — the `updated_at = updated_at` assignment defeated MySQL's `ON UPDATE CURRENT_TIMESTAMP`, on Dev and not only on scratch |
+| `STAR-2227` | `mapped` · `SP01`, and each item now reports `mapping_status: "Pending"` |
+| `STAR-3403` | `mapped` · `SP02` + `SP06`, both `Pending` |
+| Suites | **21 suites / 410 tests green**; `tsc` clean |
+
+#### Coverage moved 195/198 → **198/198**, and the increase is real
+
+NFR-PSP-002 required no regression below 195. It rose to 198. Cause: three cohort projects hold an active mapping row whose stored `clarisa_project_id` is **not** the cohort project's id, so the id-based count never saw them. Their `clarisa_external_code` matches, so the stable key does.
+
+This is RC-B sitting in live data — three mappings the id path was silently mis-counting, and would have mis-*resolved*: `findProjectById` on a stale id either returns the wrong project or none. The stable key resolves them correctly. **`pending: 0` now means every eligible project is mapped, which was true all along and unmeasurable.**
+
+Not a precedence artifact: the bracketed SQL was verified in the T-06 audit, so `is_active` gates both branches and inactive rows cannot inflate the count. No drift warns appeared for `2227`/`3403` — their stored ids do match, which is consistent.
+
+#### F-15 (minor) — `down()` over-reverts
+
+```sql
+UPDATE bilateral_project_mapping SET clarisa_external_code = NULL … WHERE clarisa_external_code IS NOT NULL
+```
+
+`up()` touched only rows that were NULL and active; `down()` nulls **every** non-null row — including keys written after the fact by `AutomapperService.newDerivedRow`. Reverting T-07 alone would strip keys `up()` never set, degrading those rows to the `clarisa_project_id` fallback.
+
+Impact is small: the realistic revert path is T-07 then T-05, which drops the column anyway, and the fallback still resolves. A backfill cannot know which rows it touched without a marker, so a broad reset is the common shape — but the asymmetry should be stated in the migration's own comment rather than left implicit. **Not worth a retry; note it and move on.**
+
+#### PR 2 complete — T-05, T-04, T-06, T-07 all PASS.

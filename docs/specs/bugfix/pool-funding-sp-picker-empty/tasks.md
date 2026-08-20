@@ -191,7 +191,7 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
   - [x] Dev coverage measured before and after; no regression — 195/198 throughout
   - [x] `AutomapperService` constructor unchanged — `ClarisaProjectsService` + `DataSource` only (NFR-BAS-001)
   - [x] Coverage query groups the OR so `is_active` gates both branches (F-12) — verified on generated SQL
-  - [ ] **Rider from F-14:** add a `getQuery()` assertion pinning the parenthesised WHERE — the behavioural tests pass with the defect reintroduced. Fold into T-07
+  - [x] **Rider from F-14:** `getQuery()` assertion pinning the parenthesised WHERE — added in T-07, observed red on the flat form
 - **Dependencies:** T-04, T-05 · **Effort:** L · **Status:** todo
 
 ---
@@ -212,10 +212,11 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 - **What disqualifies this evidence:** a row count that matches by coincidence. Snapshot `id`, `created_at`, `updated_at`, `clarisa_project_id` and `source` for all rows before and after and **diff them explicitly** — "the count is the same" does not prove no column moved.
 - **K-015:** human-applied, like T-05.
 - **Done:**
-  - [ ] Zero active rows left with a NULL key
-  - [ ] Before/after snapshot diff shows changes to `clarisa_external_code` **only**
-  - [ ] Second run affects zero rows
-  - [ ] No row deactivated, deleted or recreated
+  - [x] Zero active rows left with a NULL key — applied to Dev 2026-08-20
+  - [x] Before/after snapshot diff shows changes to `clarisa_external_code` **only** — 199 rows on scratch, 0 other columns moved; audit timestamps also verified intact on Dev
+  - [x] Second run affects zero rows
+  - [x] No row deactivated, deleted or recreated
+  - [~] `down()` over-reverts (**F-15**, minor) — nulls every non-null key, not only the rows `up()` set. Accepted; note it in the migration comment
 - **Dependencies:** T-05 · **Effort:** S · **Status:** todo
 
 ---

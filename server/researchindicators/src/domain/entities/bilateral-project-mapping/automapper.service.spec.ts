@@ -58,11 +58,14 @@ describe('AutomapperService', () => {
     let codeFilter: string[] | null = null;
     let agreementFilter: string[] | null = null;
     let activeFilter: boolean | null = null;
+    const sqlClauses: string[] = [];
 
     const executeBrackets = (brackets: Brackets) => {
+      const innerClauses: string[] = [];
       const innerQb: Record<string, jest.Mock> = {};
       innerQb.where = jest.fn(
         (clause: string, params?: Record<string, unknown>) => {
+          innerClauses.push(clause);
           if (
             clause === 'bpm.clarisa_project_id IN (:...ids)' &&
             Array.isArray(params?.ids)
@@ -74,6 +77,7 @@ describe('AutomapperService', () => {
       );
       innerQb.orWhere = jest.fn(
         (clause: string, params?: Record<string, unknown>) => {
+          innerClauses.push(`OR ${clause}`);
           if (
             clause === 'bpm.clarisa_external_code IN (:...codes)' &&
             Array.isArray(params?.codes)
@@ -84,6 +88,7 @@ describe('AutomapperService', () => {
         },
       );
       brackets.whereFactory(innerQb as any);
+      sqlClauses.push(`(${innerClauses.join(' ')})`);
     };
 
     qb.where = jest.fn(
@@ -94,6 +99,7 @@ describe('AutomapperService', () => {
         if (clauseOrBrackets instanceof Brackets) {
           executeBrackets(clauseOrBrackets);
         } else if (typeof clauseOrBrackets === 'string') {
+          sqlClauses.push(clauseOrBrackets);
           if (
             clauseOrBrackets === 'bpm.clarisa_project_id IN (:...ids)' &&
             Array.isArray(params?.ids)
@@ -111,6 +117,7 @@ describe('AutomapperService', () => {
     );
 
     qb.orWhere = jest.fn((clause: string, params?: Record<string, unknown>) => {
+      sqlClauses.push(`OR ${clause}`);
       if (
         clause === 'bpm.clarisa_external_code IN (:...codes)' &&
         Array.isArray(params?.codes)
@@ -122,6 +129,7 @@ describe('AutomapperService', () => {
 
     qb.andWhere = jest.fn(
       (clause: string, params?: Record<string, unknown>) => {
+        sqlClauses.push(`AND ${clause}`);
         if (
           clause === 'bpm.is_active = :isActive' &&
           params?.isActive === true
@@ -130,6 +138,11 @@ describe('AutomapperService', () => {
         }
         return qb;
       },
+    );
+
+    qb.getQuery = jest.fn(
+      () =>
+        `SELECT ... FROM bilateral_project_mapping bpm WHERE ${sqlClauses.join(' ')}`,
     );
 
     qb.getMany = jest.fn(async () => {
@@ -707,6 +720,20 @@ describe('AutomapperService', () => {
       const result = await service.coverage();
 
       expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+    });
+
+    it('generates SQL with parentheses wrapping the OR condition before AND is_active (Rider F-14)', async () => {
+      const cohort = [project({ id: 2001, external_code: 'C-P001' })];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      const qb = makeMappingQb([]);
+      mockMappingRepo.createQueryBuilder.mockReturnValue(qb);
+
+      await service.coverage();
+
+      const sql = qb.getQuery();
+      expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*is_active/);
     });
   });
 
