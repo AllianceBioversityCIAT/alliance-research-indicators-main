@@ -176,7 +176,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
     expect(findProjectById).not.toHaveBeenCalled();
   });
 
-  it('returns mapping_status="unmapped" when mapping points at a project CLARISA no longer exposes', async () => {
+  it('returns mapping_status="stale" carrying the snapshot project ref when mapping points at a project CLARISA no longer exposes (R-PSP-004)', async () => {
     findContext.mockResolvedValueOnce({
       result_id: 1,
       result_official_code: 1001,
@@ -190,7 +190,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
 
     const out = await service.getScienceProgramsForResult(1, '1001');
 
-    expect(out.mapping_status).toBe('unmapped');
+    expect(out.mapping_status).toBe('stale');
     expect(out.clarisa_project).toEqual({
       id: 999,
       short_name: 'snapshot-name',

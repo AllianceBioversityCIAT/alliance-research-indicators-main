@@ -110,12 +110,18 @@ interface TocAlignmentValidationError {
     | 'contribution_without_indicator';
 }
 
-// @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / D-PSP-1
+// @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / D-PSP-1 / D-PSP-5
 export type MappedProjectResolution =
   | {
       status: 'unmapped';
       context: PoolFundingAlignmentContext;
-      clarisa_project: { id: number; short_name: string } | null;
+      clarisa_project: null;
+    }
+  | {
+      status: 'stale';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: { id: number; short_name: string };
+      mapping: BilateralProjectMapping;
     }
   | {
       status: 'mapped';
@@ -212,15 +218,16 @@ export class BilateralService {
 
     if (!project) {
       // Mapping points at a project CLARISA no longer exposes — treat as
-      // unmapped from the picker's perspective, but surface the snapshot
-      // we have so ops can spot the drift.
+      // stale from the picker's perspective, but surface the snapshot
+      // we have so ops can spot the drift (R-PSP-004, D-PSP-5).
       return {
-        status: 'unmapped',
+        status: 'stale',
         context,
         clarisa_project: {
           id: mapping.clarisa_project_id,
           short_name: mapping.clarisa_project_short_name ?? '',
         },
+        mapping,
       };
     }
 
@@ -258,10 +265,10 @@ export class BilateralService {
       result_code: String(context.result_official_code ?? resultCode),
     };
 
-    if (resolution.status === 'unmapped') {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
+        mapping_status: resolution.status,
         clarisa_project: resolution.clarisa_project,
         science_programs: [],
       };
@@ -343,10 +350,10 @@ export class BilateralService {
       version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
     };
 
-    if (resolution.status === 'unmapped') {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
+        mapping_status: resolution.status,
         clarisa_project: resolution.clarisa_project,
         catalogs: [],
       };

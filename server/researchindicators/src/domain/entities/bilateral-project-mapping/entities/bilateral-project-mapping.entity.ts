@@ -51,8 +51,7 @@ export class BilateralProjectMapping extends AuditableEntity {
     name: 'clarisa_external_code',
     length: 100,
     nullable: true,
-    comment:
-      'Normalized CLARISA external_code; feed-stable resolution key (D-PSP-10)',
+    comment: 'Normalized CLARISA external_code; feed-stable resolution key',
   })
   clarisa_external_code?: string | null;
 

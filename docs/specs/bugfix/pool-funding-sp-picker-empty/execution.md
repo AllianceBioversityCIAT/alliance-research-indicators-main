@@ -735,3 +735,112 @@ TypeORM compares column comments, so the next `migration:generate` will emit a s
 
 - **`migration:show` is not an npm script.** Root `CLAUDE.md` §4.3 instructs agents to *"check `migration:show` before assuming a merge shipped a schema change"* — that command does not exist. It works only as a typeorm passthrough: `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`. The guide should carry the working form.
 - **`migration:scan` is a dead script.** `package.json:34` points at `./scripts/scan-migration-placeholders.js`; the `scripts/` directory does not exist. It exits non-zero, so any pipeline step invoking it fails. Consistent with K-006 recording the scanner as withdrawn — the file went, the npm entry stayed.
+
+---
+
+## T-04 — `stale` as a third `mapping_status` (server)
+
+- **Worker:** agy · gemini-3.7-flash-high · 2026-08-20
+- **Files modified:**
+  - `server/researchindicators/src/domain/entities/bilateral/dto/bilateral-science-programs.response.dto.ts` (widened `MappingStatus` union to include `'stale'`)
+  - `server/researchindicators/src/domain/entities/bilateral/dto/bilateral-hlos-indicators.response.dto.ts` (widened `BilateralTocMappingStatus` union and `@ApiProperty` to include `'stale'`)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.ts` (updated `MappedProjectResolution` and `resolveMappedProject` project-missing branch to return `status: 'stale'`)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.controller.ts` (updated `@ApiOperation` documentation for both endpoints)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.getScienceProgramsForResult.spec.ts` (asserted `mapping_status === 'stale'` and snapshot project ref present)
+  - `server/researchindicators/src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts` (asserted `mapping_status === 'stale'` and snapshot project ref present)
+  - `server/researchindicators/src/domain/entities/bilateral-project-mapping/entities/bilateral-project-mapping.entity.ts` (Rider F-11 comment alignment)
+
+### Gate observed RED — Named red input (unresolvable project returns `stale`)
+Command: `npm test -- --silent bilateral`
+Input:   Changed implementation to return `status: 'stale'` while existing tests asserted `'unmapped'`.
+Output:
+```
+FAIL src/domain/entities/bilateral/bilateral.service.getScienceProgramsForResult.spec.ts (41.812 s)
+  ● BilateralService.getScienceProgramsForResult (T-15.11) › returns mapping_status="unmapped" when mapping points at a project CLARISA no longer exposes
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "unmapped"
+    Received: "stale"
+
+      191 |     const out = await service.getScienceProgramsForResult(1, '1001');
+      192 |
+    > 193 |     expect(out.mapping_status).toBe('unmapped');
+          |                                ^
+      194 |     expect(out.clarisa_project).toEqual({
+      195 |       id: 999,
+      196 |       short_name: 'snapshot-name',
+
+      at Object.<anonymous> (domain/entities/bilateral/bilateral.service.getScienceProgramsForResult.spec.ts:193:32)
+
+FAIL src/domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts (42.413 s)
+  ● BilateralService.getHlosIndicatorsForResult (T-03/T-04) › returns "unmapped" with the snapshot project ref when CLARISA no longer exposes the mapped project
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "unmapped"
+    Received: "stale"
+
+      308 |     const out = await service.getHlosIndicatorsForResult(19792, '19792');
+      309 |
+    > 310 |     expect(out.mapping_status).toBe('unmapped');
+          |                                ^
+      311 |     expect(out.clarisa_project).toEqual({ id: 999, short_name: 'snapshot' });
+      312 |     expect(out.catalogs).toEqual([]);
+      313 |     expect(getTocResultsForSps).not.toHaveBeenCalled();
+
+      at Object.<anonymous> (domain/entities/bilateral/bilateral.service.getHlosIndicatorsForResult.spec.ts:310:32)
+
+Test Suites: 2 failed, 17 passed, 19 total
+Tests:       2 failed, 336 passed, 338 total
+Snapshots:   0 total
+Time:        43.305 s
+```
+
+### Gate observed GREEN (after updating test assertions to expect `stale` with snapshot ref)
+Command: `npm test -- --silent bilateral`
+Output:  Test Suites: 19 passed, 19 total; Tests: 338 passed, 338 total; Snapshots: 0 total; Time: 34.723 s
+
+### Other verifications
+| Command | Result |
+| --- | --- |
+| `npx tsc --noEmit` | Clean exit 0 |
+| `npx eslint src/domain/entities/bilateral` | Clean exit 0 |
+
+### Deviations from the spec
+None.
+
+### What I could not verify
+None.
+
+---
+
+### Auditor verdict — T-04
+
+- **Auditor:** Claude Opus (separate session) · 2026-08-20
+- **Verdict: PASS.** No findings.
+
+**Independently verified:**
+
+| Check | Result |
+| --- | --- |
+| `stale` confined to the unresolvable-project branch | Yes — it is a distinct union member in `resolveMappedProject`; the no-agreement and no-mapping-row branches still return `unmapped` |
+| Both endpoints inherit it via the T-01 seam | Yes — each handles `unmapped \|\| stale` and passes `resolution.status` through rather than hardcoding a literal. No second decision site |
+| Snapshot asserted alongside `stale` (the stated disqualifier) | Yes on **both** endpoints — `{id: 999, short_name: 'snapshot-name'}` / `{id: 999, short_name: 'snapshot'}`. The branch cannot return `stale` with a null project and pass |
+| Swagger | Both `@ApiOperation` descriptions name all three states |
+| F-11 rider | Applied — the `(D-PSP-10)` suffix is gone; entity `comment` now matches the migration `COMMENT` exactly |
+| `npm test -- --silent bilateral`, re-measured | **19 suites / 338 tests green** |
+| `npx tsc --noEmit` | clean |
+
+**Auditor mutation — is `stale` pinned to its branch, or could it leak?**
+
+The worker's red proves `stale` *appears*; it does not prove it cannot spread. Mutated the **no-mapping-row** branch to also return `stale`:
+
+```
+Test Suites: 2 failed, 2 total
+Tests:       2 failed, 23 passed, 25 total
+```
+
+Both endpoints redden. The three states are pinned independently. Service restored byte-identical (`diff` clean) and re-measured green.
+
+**Note on the worker's red:** it is the K-018 shape — two pre-existing assertions of `unmapped` broke, and the site list came from the failing suite rather than from a grep. That is the correct way to realign existing expectations, and it was done without being told.

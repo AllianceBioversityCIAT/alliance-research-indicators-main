@@ -141,9 +141,9 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 - **Named red input:** a mapping row whose `clarisa_project_id` is absent from the feed — the endpoint must return `stale`, not `unmapped`. Asserting `unmapped` must now fail.
 - **What disqualifies this evidence:** a test that asserts only `mapping_status === 'stale'`. It must **also** assert the snapshot is present, or the branch can return `stale` with a null project and still pass.
 - **Done:**
-  - [ ] All three `mapping_status` values reachable and covered
-  - [ ] `stale` carries `clarisa_project` snapshot, never null
-  - [ ] Swagger describes the third state
+  - [x] All three `mapping_status` values reachable and covered — *auditor mutation confirmed each is pinned to its own branch*
+  - [x] `stale` carries `clarisa_project` snapshot, never null — asserted on both endpoints
+  - [x] Swagger describes the third state
 - **Dependencies:** T-01 · **Effort:** S · **Status:** todo
 
 ---

@@ -297,7 +297,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).not.toHaveBeenCalled();
   });
 
-  it('returns "unmapped" with the snapshot project ref when CLARISA no longer exposes the mapped project', async () => {
+  it('returns "stale" with the snapshot project ref when CLARISA no longer exposes the mapped project (R-PSP-004)', async () => {
     findContext.mockResolvedValueOnce(context());
     findActiveByAgreementId.mockResolvedValueOnce({
       clarisa_project_id: 999,
@@ -307,7 +307,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
-    expect(out.mapping_status).toBe('unmapped');
+    expect(out.mapping_status).toBe('stale');
     expect(out.clarisa_project).toEqual({ id: 999, short_name: 'snapshot' });
     expect(out.catalogs).toEqual([]);
     expect(getTocResultsForSps).not.toHaveBeenCalled();

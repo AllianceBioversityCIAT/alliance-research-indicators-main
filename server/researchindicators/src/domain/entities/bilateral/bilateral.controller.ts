@@ -89,9 +89,9 @@ export class BilateralController {
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076, R-PSP-002)',
+      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076, R-PSP-002, R-PSP-004)',
     description:
-      'Returns admitted Science Programs (Confirmed or Pending) with per-item mapping_status for the mapped bilateral project.',
+      'Returns admitted Science Programs (Confirmed or Pending) with per-item mapping_status for the mapped bilateral project. Top-level mapping_status is mapped, unmapped, or stale.',
   })
   async getScienceProgramsForResult() {
     return this.bilateralService
@@ -120,7 +120,9 @@ export class BilateralController {
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090)',
+      'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090, R-PSP-004)',
+    description:
+      'Returns ToC catalogs for the mapped bilateral project. Top-level mapping_status is mapped, unmapped, or stale.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
