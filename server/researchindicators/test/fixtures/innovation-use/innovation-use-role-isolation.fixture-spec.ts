@@ -929,13 +929,23 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
      * `ResultInstitutionTypesService.customSaveInnovationUse` (step 8) ever
      * executes, so this row was never reached at all in either save #2 or
      * save #3 (both submit a bad actor id alongside the bad organization
-     * id, so the actors check always fires first). This file therefore does
-     * not carry a live passing test that reaches
-     * `ResultInstitutionTypesService.assertInnovationUseOwnership` on its
-     * own — that half of the fix is proven instead by the mandatory
-     * falsification table in this task's report (the "scope by role only,
-     * omitting `result_id`" and "scope by `result_id` only, omitting role"
-     * mutations, applied independently to each service and reverted).
+     * id, so the actors check always fires first).
+     *
+     * **Corrected 2026-08-20 (FAIL-B remediation).** This paragraph
+     * previously read "This file therefore does not carry a live passing
+     * test that reaches `ResultInstitutionTypesService.assertInnovationUseOwnership`
+     * on its own — that half of the fix is proven instead by the mandatory
+     * falsification table in this task's report", which stopped being true
+     * the moment `"save #4"` (below, added the same day for the FAIL-B
+     * fix — the ownership guard was validating `removeDuplicates`'s output
+     * rather than the raw payload) was added: save #4's `actors: []` lets
+     * `ResultActorsService`'s check short-circuit without throwing, so
+     * `ResultInstitutionTypesService.assertInnovationUseOwnership` is the
+     * one that rejects that payload, on its own, end to end. The
+     * falsification table remains the evidence for the "scope by role
+     * only"/"scope by `result_id` only" mutations specifically — a
+     * different claim than "no test reaches this method at all", which
+     * save #4 now falsifies.
      *
      * **Root cause, historical:** `buildUpdateData` (reached from
      * `processInstitution`'s `result_institution_type_id`-present check,
@@ -997,10 +1007,43 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
     const orgCountCrossRoleAttempt = 900_895;
 
     let save3Error: unknown;
+    // WARN-1 (validation-report.md, 2026-08-20). Label assigned during
+    // remediation round 2, not the original audit — `validation-report.md`
+    // was updated to carry this finding under it (§ WARN register,
+    // "WARN-1 · DD-3's rollback dependency was asserted by no test").
+    // `design.md` DD-3's exception records that the ownership gate (steps
+    // 7a/8a) holds "a failure persists nothing" BY ROLLBACK, not by
+    // running before `BEGIN`
+    // — step 6 (`UPDATE result_innovation_use SET level_id, explanation,
+    // audit(UPDATE)`) already executed by the time the gate throws. Nothing
+    // in this file asserted that property before now. Captured here, before
+    // `update()` runs below, so the `it` at the bottom of this block proves
+    // the rollback actually reverted step 6's write rather than the design
+    // document merely claiming it does.
+    let innovationUseBefore: Record<string, unknown>;
 
     beforeAll(async () => {
+      innovationUseBefore = await fetchRowByPk(
+        'result_innovation_use',
+        'result_id',
+        result1Id,
+      );
       try {
         await harness.service.update(result1Id, {
+          // WARN-1 (validation-report.md). A real column value, not just
+          // audit metadata: catalog id `1` → level `0` (below 6, no
+          // explanation required — same safe id `innovation-use-result-
+          // creation.fixture-spec.ts:787` already uses against the same
+          // real, migration-seeded `clarisa_innovation_use_levels` catalog).
+          // Step 6 writes this BEFORE the ownership gate throws; the
+          // byte-identical assertion below is only a meaningful rollback
+          // proof if a real data column — not merely `updated_at`, which
+          // TypeORM's `UpdateQueryBuilder` sets via bare `CURRENT_TIMESTAMP`
+          // (`UpdateQueryBuilder.js:401-403`, truncated to whole seconds
+          // even though the column is `timestamp(6)`) and so cannot be
+          // relied on to differ between two writes inside the same wall-
+          // clock second — would visibly persist if the rollback failed.
+          innovation_use_level_id: 1,
           actors: [
             {
               result_actors_id: devActorId,
@@ -1050,6 +1093,118 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
           devOrgId,
         ),
       ).toEqual(devOrgBefore);
+    });
+
+    it('leaves the result_innovation_use detail row byte-identical, proving the rollback actually reverted step 6 (level_id/explanation/audit) rather than the design merely claiming it does (WARN-1, validation-report.md)', async () => {
+      expect(
+        await fetchRowByPk('result_innovation_use', 'result_id', result1Id),
+      ).toEqual(innovationUseBefore);
+    });
+  });
+
+  /**
+   * Save #4 — FAIL-B (added 2026-08-20, `validation-report.md`, independent
+   * auditor finding). Unlike save #2/#3, this payload carries NO
+   * unauthorized actor id — `actors: []` — so `ResultActorsService`'s
+   * ownership check short-circuits without throwing and
+   * `ResultInstitutionTypesService.customSaveInnovationUse` (step 8) is the
+   * one that has to reject this payload on its own. That is deliberate:
+   * save #2 and save #3 each pair a bad actor id with a bad organization
+   * id, so the actors check always fires first and
+   * `ResultInstitutionTypesService.assertInnovationUseOwnership` was never
+   * exercised end-to-end by any earlier save in this file (see the "Why it
+   * passes now" note on save #2's organization assertion, above).
+   *
+   * The organizations array pairs `devOrgId` — result 1's OWN Innovation
+   * Dev row, unauthorized for an Innovation Use save for the same reason as
+   * save #3 — with a SECOND row that shares its `institution_type_id`
+   * (`institutionTypeCodeDev`) and carries no id at all. Both rows key to
+   * the same `type_${institutionTypeCodeDev}` bucket in
+   * `removeDuplicates` (`result-institution-types.service.ts`), which is
+   * last-write-wins keyed on identity columns only — never on
+   * `result_institution_type_id`. Before the FAIL-B fix,
+   * `customSaveInnovationUse` ran `assertInnovationUseOwnership` against
+   * `removeDuplicates`'s OUTPUT, so the second row silently overwrote the
+   * first before the guard ever ran, and `devOrgId` was never checked at
+   * all — a `200`, not the `400` `design.md` §15 promises ("otherwise the
+   * whole save is rejected, never silently ignored"). The falsification
+   * exercise in this task's report temporarily restores that pre-fix
+   * behaviour to confirm this block reddens.
+   */
+  describe('save #4 — an unauthorized organization id paired with a same-institution-type sibling row that would dedupe it away before the ownership guard could see it (validation-report.md FAIL-B)', () => {
+    const orgCountFailBSibling = 900_896;
+
+    let save4Error: unknown;
+    let innovationUseBeforeSave4: Record<string, unknown>;
+
+    beforeAll(async () => {
+      innovationUseBeforeSave4 = await fetchRowByPk(
+        'result_innovation_use',
+        'result_id',
+        result1Id,
+      );
+      try {
+        await harness.service.update(result1Id, {
+          // WARN-1 (validation-report.md) — see save #3's identical-purpose
+          // comment. A different real catalog id (`2` → level `1`, still
+          // below 6) than save #3's, so this block's own rollback proof
+          // does not depend on save #3's having already run correctly.
+          innovation_use_level_id: 2,
+          actors: [],
+          organizations: [
+            {
+              result_institution_type_id: devOrgId,
+              institution_type_id: institutionTypeCodeDev,
+            },
+            {
+              institution_type_id: institutionTypeCodeDev,
+              organization_count: orgCountFailBSibling,
+            },
+          ],
+          quantifications: [],
+        } as any);
+      } catch (error) {
+        save4Error = error;
+      }
+    });
+
+    it('rejects the whole save with a 400 naming the unauthorized organization id, persisting nothing (FAIL-B remediation)', () => {
+      expect(save4Error).toBeInstanceOf(BadRequestException);
+      expect(
+        (
+          (save4Error as BadRequestException).getResponse() as {
+            message: string[];
+          }
+        ).message,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('result_institution_type_id'),
+        ]),
+      );
+    });
+
+    it("leaves result 1's own Innovation Dev ORGANIZATION row byte-identical — the row `removeDuplicates` used to drop before the guard ever saw it", async () => {
+      expect(
+        await fetchRowByPk(
+          'result_institution_types',
+          'result_institution_type_id',
+          devOrgId,
+        ),
+      ).toEqual(devOrgBefore);
+    });
+
+    it('leaves the result_innovation_use detail row byte-identical (WARN-1 property, reproven for this independently-rejected save)', async () => {
+      expect(
+        await fetchRowByPk('result_innovation_use', 'result_id', result1Id),
+      ).toEqual(innovationUseBeforeSave4);
+    });
+
+    it('never persists a result_institution_types row for the id-less sibling, closing the insert direction (FAIL-B remediation)', async () => {
+      const rows: Record<string, unknown>[] = await dataSource.query(
+        'SELECT * FROM result_institution_types WHERE organization_count = ?',
+        [orgCountFailBSibling],
+      );
+      expect(rows).toHaveLength(0);
     });
   });
 });

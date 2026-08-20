@@ -768,5 +768,51 @@ describe('ResultActorsService', () => {
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });
+
+    // Rework attempt 3 (2026-08-20). `assertInnovationUseOwnership` derives
+    // `idsPresent` straight off the raw payload (the identity-keyed-dedup
+    // variant of this hazard is `result-institution-types.service.spec.ts`'s
+    // "sees the RAW payload, not the deduplicated one (FAIL-B remediation)"
+    // block; `ResultActorsService` has no such dedup). Without a
+    // `[...new Set(...)]` on `idsPresent` itself, a payload that repeats the
+    // SAME unauthorized id twice produced a `400` message listing it twice
+    // (`— 999, 999`), which this test would catch as a mismatch against the
+    // single-occurrence string below.
+    it('lists a repeated unauthorized result_actors_id only once in the 400 message', async () => {
+      const find = jest.fn().mockResolvedValue([]);
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = { find, findOne: jest.fn(), update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row1 = {
+        result_actors_id: 999,
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 1,
+      } as InnovationUseActorDto;
+      const row2 = {
+        result_actors_id: 999,
+        actor_type_id: 2,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 2,
+      } as InnovationUseActorDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(3, [row1, row2], manager);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_actors_id: unknown or unauthorized actor row — 999',
+      ]);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
   });
 });

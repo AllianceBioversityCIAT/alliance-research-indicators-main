@@ -570,6 +570,166 @@ describe('ResultInstitutionTypesService', () => {
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
     });
+
+    // Rework attempt 2 (2026-08-20). `assertInnovationUseOwnership` derives
+    // `idsPresent` straight off the raw payload with no identity-keyed
+    // dedup (that dedup — `removeDuplicates`/`uniqueData` — is deliberately
+    // NOT what this guard reads; see the FAIL-B block below). Without a
+    // `[...new Set(...)]` on `idsPresent` itself, a payload that repeats the
+    // SAME unauthorized id twice produced a `400` message listing it twice
+    // (`— 999, 999`), which this test would catch as a mismatch against the
+    // single-occurrence string below.
+    it('lists a repeated unauthorized result_institution_type_id only once in the 400 message', async () => {
+      const find = jest.fn().mockResolvedValue([]);
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = buildTempRepo({ find, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      const row1 = {
+        result_institution_type_id: 999,
+        institution_type_id: 5,
+        is_organization_known: false,
+      } as InnovationUseOrganizationDto;
+      const row2 = {
+        result_institution_type_id: 999,
+        institution_type_id: 3,
+        sub_institution_type_id: 9,
+        is_organization_known: false,
+      } as InnovationUseOrganizationDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(10, [row1, row2], mockManager);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_institution_type_id: unknown or unauthorized organization row — 999',
+      ]);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  // FAIL-B remediation (2026-08-20, `validation-report.md`). Independent
+  // auditor finding: `customSaveInnovationUse` used to run
+  // `assertInnovationUseOwnership` against `removeDuplicates`'s OUTPUT
+  // (`uniqueData`), not the raw payload. `removeDuplicates` keys on identity
+  // columns only — never on `result_institution_type_id` — and is
+  // last-write-wins, so a payload pairing an unauthorized id with a LATER
+  // row sharing the same identity key had the unauthorized row silently
+  // dropped before the guard ever saw it: a `200`, not the `400` design.md
+  // §15 promises. These tests seed exactly that shape and assert the
+  // rejection — they fail red against the pre-fix code (guarding
+  // `uniqueData`) because the unauthorized row never reaches the check.
+  describe('customSaveInnovationUse — assertInnovationUseOwnership sees the RAW payload, not the deduplicated one (FAIL-B remediation)', () => {
+    it('rejects an unauthorized result_institution_type_id even when a later row in the same payload shares its institution_type_id and would dedupe it away', async () => {
+      const find = jest.fn().mockResolvedValue([]);
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = buildTempRepo({ find, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      // Both rows key to `type_5` in `removeDuplicates` (neither is OTHER,
+      // neither carries `sub_institution_type_id`) — last-write-wins keeps
+      // only the second, id-less row. If the guard ran against that
+      // deduplicated array, the unauthorized id (999) would never be
+      // checked at all and this save would silently succeed.
+      const victimRow = {
+        result_institution_type_id: 999,
+        institution_type_id: 5,
+        is_organization_known: false,
+      } as InnovationUseOrganizationDto;
+      const sameKeySibling = {
+        institution_type_id: 5,
+        is_organization_known: false,
+        organization_count: 1,
+      } as InnovationUseOrganizationDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(
+          10,
+          [victimRow, sameKeySibling],
+          mockManager,
+        );
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_institution_type_id: unknown or unauthorized organization row — 999',
+      ]);
+      // The whole save is rejected — never silently ignored or overwritten
+      // (design.md §15) — so nothing downstream of the guard ever runs.
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it('names every unauthorized row dropped by dedup, across two different identity-key shapes in one payload', async () => {
+      const find = jest.fn().mockResolvedValue([]);
+      const update = jest.fn();
+      const save = jest.fn();
+      const tempRepo = buildTempRepo({ find, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      // Pair 1 keys to `type_5` (plain `institution_type_id`); pair 2 keys
+      // to `sub_9` (`sub_institution_type_id` set). Each victim is followed
+      // by a same-key, id-less sibling that overwrites it in
+      // `removeDuplicates`'s last-write-wins `Map` — so BOTH ids below are
+      // absent from `uniqueData`, and only the raw-payload guard can see
+      // either one.
+      const victim1 = {
+        result_institution_type_id: 111,
+        institution_type_id: 5,
+        is_organization_known: false,
+      } as InnovationUseOrganizationDto;
+      const sibling1 = {
+        institution_type_id: 5,
+        is_organization_known: false,
+        organization_count: 1,
+      } as InnovationUseOrganizationDto;
+      const victim2 = {
+        result_institution_type_id: 222,
+        institution_type_id: 3,
+        sub_institution_type_id: 9,
+        is_organization_known: false,
+      } as InnovationUseOrganizationDto;
+      const sibling2 = {
+        institution_type_id: 3,
+        sub_institution_type_id: 9,
+        is_organization_known: false,
+        organization_count: 2,
+      } as InnovationUseOrganizationDto;
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.customSaveInnovationUse(
+          10,
+          [victim1, sibling1, victim2, sibling2],
+          mockManager,
+        );
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect((caught.getResponse() as { message: string[] }).message).toEqual([
+        'result_institution_type_id: unknown or unauthorized organization row — 111, 222',
+      ]);
+      expect(update).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+    });
   });
 
   // T-04 role-parameterisation leak checks. `resolveOrganizationCount`

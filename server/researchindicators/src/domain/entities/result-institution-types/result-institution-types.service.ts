@@ -190,8 +190,18 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     manager: EntityManager,
   ) {
     const tempRepo = manager.getRepository(ResultInstitutionType);
+    // FAIL-B remediation (2026-08-20, validation-report.md). Guard the RAW
+    // payload, not `removeDuplicates`'s output: `removeDuplicates` keys on
+    // identity columns only (`institution_type_id`/`sub_institution_type_id`/
+    // `institution_id`/custom name) — never on `result_institution_type_id` —
+    // and is last-write-wins, so a payload pairing an unauthorized id with a
+    // later row sharing the same identity key had the unauthorized row
+    // silently dropped before this guard ever saw it (a `200`, not the `400`
+    // design.md §15 promises). Validating `data` makes every submitted id
+    // visible to the guard, matching design.md's "otherwise the whole save is
+    // rejected, never silently ignored" literally rather than nearly.
+    await this.assertInnovationUseOwnership(data, resultId, tempRepo);
     const uniqueData = this.removeDuplicates(data);
-    await this.assertInnovationUseOwnership(uniqueData, resultId, tempRepo);
     const dataToSave: Partial<ResultInstitutionType>[] = [];
 
     for (const institution of uniqueData) {
@@ -236,9 +246,13 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     resultId: number,
     tempRepo: Repository<ResultInstitutionType>,
   ): Promise<void> {
-    const idsPresent = data
-      .filter((institution) => institution?.result_institution_type_id)
-      .map((institution) => institution.result_institution_type_id);
+    const idsPresent = [
+      ...new Set(
+        data
+          .filter((institution) => institution?.result_institution_type_id)
+          .map((institution) => institution.result_institution_type_id),
+      ),
+    ];
     if (idsPresent.length === 0) {
       return;
     }

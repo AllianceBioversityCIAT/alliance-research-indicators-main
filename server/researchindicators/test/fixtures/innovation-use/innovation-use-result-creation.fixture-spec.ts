@@ -154,15 +154,25 @@ import { StubCurrentUserUtil } from './nest-harness';
  *
  * **FAIL-5 remediation (`validation-report.md`, 2026-08-20;
  * `docs/specs/innovation-use/details-api` R-IUA-012 AC.1).** The
- * "completness: false ... true" `it` below discharges AC.1's "a green-check
- * read issued after a section save reflects the saved data" through
- * `ipRightsService.update` — a *different* section's save — while
+ * "completness: false ... true" `it` (`result1Id`, above) discharges AC.1's
+ * "a green-check read issued after a section save reflects the saved data"
+ * through `ipRightsService.update` — a *different* section's save — while
  * completing Innovation Use's OWN detail row by raw SQL
  * (`UPDATE result_innovation_use ...` / `INSERT INTO result_actors ...`).
- * `harness.innovationUseService.update()` was never called anywhere in this
- * file. Literally satisfiable (IP Rights is a section too), but not
- * R-IUA-012's own user story, which is about the section the client just
- * saved reflecting immediately — this spec's own Innovation Use section.
+ * At the time this defect was found, `harness.innovationUseService.update()`
+ * was never called anywhere in this file. Literally satisfiable (IP Rights
+ * is a section too), but not R-IUA-012's own user story, which is about the
+ * section the client just saved reflecting immediately — this spec's own
+ * Innovation Use section. **Corrected 2026-08-20:** this sentence is no
+ * longer true of the file as a whole — the FAIL-5 remediation below is
+ * exactly the fix, and its own `it` (`R-IUA-012 AC.1 — a green-check read
+ * issued after THIS section's own save …`) now calls
+ * `harness.innovationUseService.create(result4Id)` and
+ * `harness.innovationUseService.update(result4Id, …)` directly, closing the
+ * gap this paragraph describes. An earlier audit round read this sentence,
+ * found no code contradicting it nearby, and reported FAIL-5 as
+ * unaddressed — a stale comment producing a false finding in an audit of a
+ * spec whose recurring defect is stale comments.
  * **A fourth result (`result4Id`), added rather than rewriting the existing
  * arrangement** (replacing the raw SQL on `result1Id` would destabilise the
  * exact 9-key set assertion, both `completness` directions, and the

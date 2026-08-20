@@ -304,9 +304,13 @@ export class ResultActorsService extends BaseServiceSimple<
     resultId: number,
     tempRepo: Repository<ResultActor>,
   ): Promise<void> {
-    const idsPresent = data
-      .filter((institution) => institution?.result_actors_id)
-      .map((institution) => institution.result_actors_id);
+    const idsPresent = [
+      ...new Set(
+        data
+          .filter((institution) => institution?.result_actors_id)
+          .map((institution) => institution.result_actors_id),
+      ),
+    ];
     if (idsPresent.length === 0) {
       return;
     }

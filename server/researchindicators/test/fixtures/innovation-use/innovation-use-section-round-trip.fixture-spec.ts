@@ -909,7 +909,7 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
     );
   });
 
-  it('DD-14 — PATCH {innovation_use_level_explanation: \'\'} (empty string, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.4)', async () => {
+  it("DD-14 — PATCH {innovation_use_level_explanation: ''} (empty string, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.4)", async () => {
     await expect(
       harness.service.update(resultId, {
         innovation_use_level_explanation: '',
@@ -925,7 +925,7 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
     );
   });
 
-  it('DD-14 — PATCH {innovation_use_level_explanation: \'   \'} (whitespace-only, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.3)', async () => {
+  it("DD-14 — PATCH {innovation_use_level_explanation: '   '} (whitespace-only, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.3)", async () => {
     await expect(
       harness.service.update(resultId, {
         innovation_use_level_explanation: '   ',
