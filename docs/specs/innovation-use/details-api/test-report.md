@@ -18,7 +18,7 @@
 | Overall status | ⚠️ **SUPERSEDED — see `validation-report.md`.** Issued as PASS with 6 gaps; actually **7** gaps and **FAIL** |
 | Suites in scope | 3 of 4 — backend unit, integration/fixtures, **E2E blocked (see gap G-3)**; frontend N/A |
 | Testers spawned | **1** (integration/fixture tier). The other suites were **cited, not re-authored** |
-| Backend unit | **336 suites / 2264 tests** — all green |
+| Backend unit | ⏳ **figures pending the closing run** — deliberately not restated here. This line has been stale twice (2264 → 2275 → changing again with the FAIL-B fix in flight). Per both auditors' recommendation, all figures are to be derived from **one** run that closes validation and recorded in this document and `tasks.md` §7 together |
 | Integration (fixtures) | **14 suites / 54 tests** — all green, on **two consecutive runs** |
 | Coverage | 89.69 statements · 75.61 branches · 85.13 functions · 89.14 lines — all ≥ the 60% floor |
 | Product defects found | **1 — `R-IUA-009 AC.3`, FIXED 2026-08-20** (option A). Plus a **second variant** `/akili-validate` found un-gated (same-result cross-role), fixed by the same change. Both quarantine markers inverted to passing; **zero `it.failing` remain**. ⚠️ **`customSaveInnovationDev` deliberately retains the defect** — the platform exposure is now *asymmetric* and needs its own ticket |
@@ -110,9 +110,10 @@ Real MySQL, scratch container at `127.0.0.1:3307`. The **double run is a gate, n
 | R-IUA-006 AC.1–AC.4 | level ≥ 6 justification; the off-by-one pair | unit + **F-C** | T-06 suite; F-C | ✅ |
 | R-IUA-006 AC.5 / DD-14 | effective-row validation | unit + **F-A (this run)** | 5 new tests + the bypass-reproducing falsification | ✅ **closed this run** |
 | R-IUA-007 AC.1–AC.3, AC.5 | organizations carry a count; removal soft-deletes | unit + F-A | T-04 suite; F-A | ✅ |
-| R-IUA-007 **AC.4** | no Dev row read, **written** or deactivated | F-B | deactivate path only | ❌ **FAIL** — the *written* half is unprotected (same root cause) |
+| R-IUA-007 **AC.4** | no Dev row read, **written** or deactivated | F-B | ✅ **CLOSED 2026-08-20** — the written half is protected by rejection-before-write; the guard's own `find` is role-scoped, so it reads no Dev row either | ✅ |
 | R-IUA-008 | other quantitative measures | unit + F-A | T-05/T-06; F-A | ✅ |
-| R-IUA-009 AC.1/AC.2/AC.4 | role isolation | **F-B** | whole-row diffs; 3 role-key falsifications all red — **but only on the DEACTIVATE path** | ❌ **FAIL — see the retraction.** The id-present save path is PK-keyed, carries no `result_id`, and **assigns** the role rather than filtering by it. AC.4's "every predicate names the role column" is false there |
+| R-IUA-009 AC.1/AC.2 | role isolation | **F-B** | ✅ **CLOSED 2026-08-20** — `assertInnovationUseOwnership` rejects before any write; save #3 asserts the Dev row byte-identical after a payload carrying its id | ✅ |
+| R-IUA-009 **AC.4** | *"every deactivate/update predicate names the role column"* | **F-B** | ⚠️ **NARROWED, not satisfied as written.** Every *deactivate* predicate names the role. The *id-present save*'s predicate is still the primary key — pre-validated against `(result_id, role)`, which is rejection-before-write rather than a role-bearing predicate. **Awaiting the user's ruling on amending the AC text** The id-present save path is PK-keyed, carries no `result_id`, and **assigns** the role rather than filtering by it. AC.4's "every predicate names the role column" is false there |
 | R-IUA-009 **AC.3** | no cross-result write | **F-B** | 2 tests **`it.failing`** | ❌ **G-1 — PRODUCT DEFECT** |
 | R-IUA-010 AC.3 | catalog order `0…9` | **F-D** | F-D green | ⚠️ **G-5** — cannot falsify |
 | R-IUA-011 | IP Rights row; `completness` both ways | unit + **F-E** | F-E | ✅ |
@@ -162,7 +163,7 @@ F-D is green and that green **proves nothing about ordering**: because `id = lev
 
 T-06 attempt 1 recorded: *"the mutation that actually reds N4 — exempt `OTHER` from the dedup set entirely — **was not run**."* No later entry records it running, so closure is inferable only from a passing round — **KZ-002's substitution**. The behaviour *is* asserted by a committed test. **Remediation:** run that one mutation and record it (~10 minutes), or accept with the residual stated, as `tasks.md` now does.
 
-### G-7 · `R-IUA-013 AC.3` — the `/swagger` human check, outstanding
+### G-7 · ✅ **CLOSED 2026-08-20** — was: `R-IUA-013 AC.3`, the `/swagger` human check
 
 The **only** gate this AC has. ESLint has no Swagger rule, `/swagger` renders an undecorated handler without complaint, and the reference controller carries neither decorator — so "matches the neighbours" is not evidence either. **No substitute was authored, simulated, or grepped**; doing so would have fabricated the gate.
 
