@@ -904,7 +904,22 @@ rows had no hover feedback at all.
 | Full client suite | **310/311 suites · 6465/6468 tests** |
 | The 3 failures | **PROVEN pre-existing**: stashed the client changes, re-ran, same 3 red. `to-promise.service.spec.ts`, `managementApiUrl`/`mainApiUrl` env values, unrelated to the automapper. Not fixed — unapproved scope |
 
-#### ⚠️ OUTSTANDING — the only uncovered obligation on this task
+#### ✅ RESOLVED — the visual check was performed by the user (2026-08-20)
+
+**The user ran the visual check and reports the surface working correctly on screen.** This closes the
+task's last obligation and it is recorded as *performed*, not as accepted-outstanding.
+
+**What it could not cover, recorded so the archive does not overstate it:** the `ambiguous` bucket renders
+**nothing** against today's data — the measured feed has **zero collisions**, 198/198 unique after the
+prefix strip (`requirements.md` §4.1). So the two-row collision layout the Reviewer flagged as a
+legibility question — *"two ungrouped rows sharing one contract id, with nothing guaranteeing the server
+returns them adjacently"* — **remains visually unobserved, by absence of data rather than by omission.**
+It becomes observable the first time the feed produces a collision, which DD-4 built the branch for
+precisely because today's zero is a property of today's feed and not of the design.
+
+The original outstanding text is kept below as the point-in-time record of what was owed.
+
+#### ⚠️ (superseded by the entry above) OUTSTANDING — the only uncovered obligation on this task
 
 **The visual check is NOT done and is not claimed.** jsdom cannot evaluate rendered layout or contrast.
 The worker's first report said *"None"* outstanding; that was wrong and was corrected. **Issue 3 and the

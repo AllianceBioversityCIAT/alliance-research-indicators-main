@@ -319,7 +319,7 @@ npm run build
 - [x] **The dialog loads its preview when opened** — the production defect found in attempt 1. Observed red against the unfixed code with a test that reproduces the real sequence (construct `visible=false`, then open)
 - [x] **The coverage strip refreshes after a successful apply** — observed red before the fix
 - [x] `npm run build` **exit 0**, measured by the Leader — the only type gate new client code has (K-002). Full client suite **310/311 suites, 6465/6468 tests**; the 3 failures are in `to-promise.service.spec.ts` and were **proven pre-existing** by stashing the client changes and re-running
-- [x] Visual check **explicitly recorded as OUTSTANDING** — not performed, not claimed. jsdom cannot evaluate rendered layout or contrast, and the inert `atc-green-800` plus six dead `hover:` classes found in attempt 1 were exactly that class of defect, caught by reading code rather than by any test. The human look is load-bearing here
+- [x] Visual check **PERFORMED by the user, 2026-08-20** — reported working correctly on screen. ⚠️ **One half it structurally could not cover:** the `ambiguous` bucket renders nothing today, because the measured feed has **zero collisions** (198/198 unique after the strip, §4.1). Its two-row collision layout therefore remains visually unobserved — by absence of data, not by omission. jsdom cannot evaluate rendered layout or contrast, and the inert `atc-green-800` plus six dead `hover:` classes found in attempt 1 were exactly that class of defect, caught by reading code rather than by any test. The human look is load-bearing here
 
 ---
 
@@ -403,10 +403,11 @@ Clause-level. Each row quotes the clause it claims.
 
 ## 6. Done definition
 
-- [ ] T-00 … T-06 all `done`
-- [ ] Every R-CAM AC checked; §3 coverage table closed at clause level
-- [ ] Migration observed applying **and** reverting against a scratch schema
-- [ ] Server suite green (`npx eslint`, not `npm run lint`); client suite green with `--coverage=false`; `npm run build` exit 0
-- [ ] Visual check on the coverage strip performed or explicitly recorded as outstanding
-- [ ] OQ-5 (PRMS science-program status) carried forward, not dropped
-- [ ] **Release gate acknowledged:** not runnable against production until PRMS promotes `external_code`
+- [x] T-00 … T-06 all `done` — every one Reviewer-PASSed
+- [x] Every R-CAM AC checked; §3 coverage table closed at clause level
+- [x] Migration observed applying **and** reverting — ⚠️ **against the shared on-prem Dev DB, not a scratch schema.** No scratch schema exists in this project (the user corrected the Leader's container proposal mid-run). Sequence was forward → revert → re-apply, all three observed, Dev left applied. K-006 satisfied: it was **run**
+- [x] Server suite green (333 suites / 2421 tests, `npx eslint` not `npm run lint`); client suite green with `--coverage=false` (6465/6468 — 3 failures **proven pre-existing** by stashing and re-running); `npm run build` exit 0 on **both** packages
+- [x] Visual check **PERFORMED by the user, 2026-08-20** — reported working correctly on screen. ⚠️ **One half it structurally could not cover:** the `ambiguous` bucket renders nothing today, because the measured feed has **zero collisions** (198/198 unique after the strip, §4.1). Its two-row collision layout therefore remains visually unobserved — by absence of data, not by omission
+- [x] OQ-5 (PRMS science-program status) carried forward, not dropped — still open in `requirements.md` §11, unaffected by the join
+- [x] **Release gate acknowledged:** not runnable against production until PRMS promotes `external_code`. NFR-CAM-001 makes the matcher abort there rather than report "nothing to do", so the code ships safely ahead of the promotion — the guard *is* the flag (DD-8)
+- [x] ⚠️ **Accepted at archive:** no `test-report.md` and no `validation-report.md` — `/akili-test` and `/akili-validate` were never run. Test evidence is per-task in `execution.md`. **User accepted this absence explicitly on 2026-08-20**

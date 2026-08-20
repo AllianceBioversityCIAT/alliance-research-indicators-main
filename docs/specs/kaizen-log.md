@@ -17,15 +17,15 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **High** | **6** (+1: widening a predicate made a fidelity cohort 198-of-198, so the count would also pass against a predicate returning `true` unconditionally) | Product | Proposed |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes | **Critical** | **11** (+5 in one spec: two `is_active` guards, an `IN`-list scope, a feed timestamp that survived `return Date.now()`, and — one level up — a shared mock whose `andWhere` was a **no-op stub**, so a correctly-written test still could not redden) | Product | Proposed |
+| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note | **High** | 1 (3 false Leader arguments in one spec, one exactly backwards; 2 reached committed test descriptions) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
+| **KZ-015** | **A component fixture must arrange the TRANSITION the product performs, not the end state.** Setting an input before the first `detectChanges()` tests a state the product may never reach | **High** | 1 | Product + Methodology | **Applied** — `client/.../src/CLAUDE.md` (+ upstream owed) |
+| **KZ-016** | **A design document can contradict its own requirements and instruct what the code already forbids.** Cross-check §2 against every `AND IT MUST`/`BUT it must NOT` clause *and* against the constraints written into the modules it touches | Medium | 1 (2 occurrences in one spec) | Methodology + Product | **Applied** — `general-setup/design.md` §2 (+ upstream owed) |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
 | **KZ-007** | A **correction record** is the highest-risk artifact class in a spec, not bookkeeping. It reads as settled fact, is rarely re-verified, and propagates. Verify a correction against its source before writing it | **High** | **2** (+1: a Leader correction record was itself corrected before reaching this log) | Product | Proposed |
 | **KZ-008** | A derived map labelled "verified" will be trusted while wrong. Record **what was executed** to verify each row, or do not call it verified | **High** | 1 | Product | Proposed |
-| **K-019** | **A refactor declared behaviour-preserving needs an explicit old-vs-new comparison over a fixed input set as its pass condition.** The existing suite was written for the old behaviour's *known* inputs and is structurally blind to a change in what the code **accepts** — it reports green while the acceptance set moves | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §5 (+ upstream owed) |
-| **K-020** | **A targeted client `jest` run trips the project-wide coverage floors and exits `1` with every test passing.** Under red-before/green-after that makes "green after" unreachable. Use `--coverage=false` on targeted runs | Medium | 1 | Product | **Applied** — `client/.../src/CLAUDE.md` |
 | **KZ-012** | **The `numeric ⟺ STAR` invariant is assumed in three layers and validated in none**, and `platform_code` is `nullable: true` — a NULL renders bare-numeric and is classified STAR. Answer with `SELECT platform_code, COUNT(*) FROM result GROUP BY platform_code;` | Medium | 1 | Product | **Open — carries OQ-1 out of `archive/`** |
 | **KZ-013** | **Archiving a spec silently breaks every document that cites its path.** `/akili-archive` sweeps *forward* (factual claims in the root guides) but never *backward* — who pointed at the folder it just moved. Grep the spec path across `docs/` before the move | Medium | 1 | Product + Methodology | **Applied** — 6 dead references repointed (+ upstream owed) |
-| **KZ-011** | **A multi-clause table cell can be retired in half.** When one clause is retired on new evidence, its siblings inherit the retirement silently and the worker is blamed for the omission. One clause per row | Medium | 1 | Product + Methodology | **Applied** — `general-setup/task.md` §3 (+ upstream owed) |
 
 ### Queued for upstream (Methodology — no local edit owed)
 
@@ -71,6 +71,57 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-20 — bilateral/clarisa-automapper-s2
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 7 (all PASS) | tasks.md |
+| Reviewer FAIL rework rounds | **4** (T-02, T-03, T-05, T-06) | execution.md |
+| In-place corrections after PASS (no round consumed) | 3 (T-01, T-04, T-05) | execution.md |
+| HALTs / FATAL_FAILs / Pivots | **0 / 0 / 0** | execution.md |
+| Behaviour defects | **1** (T-06, shipped past a green suite) | execution.md — T-06 attempt 1 |
+| Budget (design §14) | **exceeded**: 6 review rounds vs 2; LOC ~1,100 server vs ≈620 | design.md §14 |
+| Spec docs contradicting their own requirements | **2** (design §2 DI ban, §4 bucket count) | execution.md — T-02, T-05 |
+| `/akili-test` · `/akili-validate` | **never run** — absence user-accepted 2026-08-20 | archive-summary.md §5 |
+
+**MUDA hunted.** Nearly all rework was **defect-of-evidence**, not defect-of-code: in 5 of 6 rounds the
+production code was already correct and what was missing was a gate that could go red. **Jidoka held** —
+no HALT was needed because every FAIL was caught at the review gate before it compounded.
+
+**Lessons**
+
+- **KZ-001 — recurrence 6 → 11, severity raised to Critical.** (Product)
+  - Five more instances in one spec, and the failure mode **escalated three levels, each invisible to the one below**: a fixture that does not discriminate (T-02's AGRESSO `is_active`, T-04's `IN` cohort scope) → a **scaffold** that cannot (T-03's shared mock had a no-op `andWhere`, so even a correct test could not redden) → a fixture testing a state the product never reaches (T-06).
+  - Evidence: `execution.md` — T-02 attempt 1, T-03 attempts 1–2, T-04 advisory, T-05 issue 1.
+  - No new standardization: the rule exists and is being followed; what recurs is the *inventiveness* of the failure mode.
+
+- **KZ-014 — K-004 binds the argument as tightly as the command.** (Product + Methodology, High)
+  - Root cause: K-004 was applied to *commands* (falsifiers were run) but never to *claims*. Three Leader falsifier arguments written from the design's own frame were false — one exactly backwards, asserting `C-D-514` catches a repeat-while-prefix bug that `C-C-A1` actually catches and it does not. Two reached committed test descriptions.
+  - Evidence: `execution.md` — T-01 "Leader error, found by the Reviewer"; T-02 H2 refuted; T-04 "the Leader's argument refuted again".
+  - Standardization: root `CLAUDE.md` §4.3. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+- **KZ-015 — a fixture can assert a state the product never reaches.** (Product + Methodology, High)
+  - Root cause: the parent renders the dialog always, with `visible=false`, and flips the signal later; `ngOnInit` therefore never saw `true`. Every test set `visible=true` *before* the first `detectChanges()`, so the only sequence production uses was never exercised. **The suite was green and the feature was broken** — opening the dialog never loaded its preview.
+  - Evidence: `execution.md` — T-06 attempt 1, Issue 1.
+  - Standardization: `client/research-indicators/src/CLAUDE.md` tests section. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+- **KZ-016 — a design can contradict its own requirements and instruct what the code forbids.** (Methodology + Product, Medium)
+  - Root cause: `/akili-specify` writes `design.md` from `requirements.md`, but nothing reads it back against them or against constraints already written into the target modules. §2 instructed injecting `AgressoContractRepository`, which the module header explicitly bans (REQUEST-scope cascade, NFR-BAS-001); §4 described four report buckets when R-CAM-003 and R-CAM-005 need six as **data**, not counts.
+  - Evidence: `execution.md` — T-02 "the design document is wrong on one point"; T-05 "Design §4 amended by the Leader".
+  - Standardization: `docs/specs/general-setup/design.md` §2. → **Applied 2026-08-20 (user-approved)**. Upstream owed.
+
+**Cross-host note, not a lesson.** T-06 was dispatched to Antigravity (Gemini 3.7 Flash) to save context
+and reviewed on Claude/opus. **The spec's only behaviour defect was written by one model family and caught
+by another** — five same-family rounds had never needed to catch one. `author ≠ auditor` held on *family*,
+not just instance. Worth remembering when a task is high-risk, independent of token cost.
+
+**Estimating note.** §14 predicted the overrun would come from scope growth. It came from evidence
+discharge instead — budget review rounds for *proving correct code is correct*, not only for fixing wrong
+code, on a codebase whose shipped pattern is guard clauses and shared query-builder mocks.
+
 
 ### 2026-08-19 — bilateral/mapping-adjustments (splitter close-out)
 
