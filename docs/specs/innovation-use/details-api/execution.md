@@ -1989,3 +1989,48 @@ Per root `CLAUDE.md`'s boundary rule, shared remote services are **governed**, n
 **So the spec's stated reason for the human gate — "ESLint has no Swagger rule, and `/swagger` renders an undecorated handler without complaint" — is true but incomplete.** The stronger reason is that **the artifact cannot be produced without a side effect on shared infrastructure.** `tasks.md` T-13's *Verification & its limits* is worth amending with this at archive time, so a future reader does not spend the effort the Leader just spent rediscovering it. *(A future automated path does exist in principle — `Test.createTestingModule(...).createNestApplication()` against the scratch container, using T-09's harness pattern, then `SwaggerModule.createDocument`. That is a new gate the spec deliberately declined in favour of the human check, so it is recorded as an option for a future spec, not adopted here.)*
 
 **Criterion 6 remains `[ ]` and remains the user's.** It was not attempted, not simulated, and not substituted.
+## Archive-Readiness Audit — the unflipped-checkbox sweep (2026-08-19)
+
+Run because `/akili-archive`'s readiness gate failed and §7's own second item demands the AC count be *"verified by grepping the unflipped-checkbox count to zero, **not inferred from 'the tasks are done'**"*. **KZ-002 already records this spec failing exactly that way once** (*"the Leader's own finalize write marked a spec-wide 'every AC is checked' item `[x]` while all 59 checkboxes were unflipped"*), and the lesson is logged as **applied** to `.agents/leader.md`. It recurred anyway — T-01…T-06 arrived `[x]` with their criteria unticked and the Leader never grepped, and T-10's own criteria were never ticked either.
+
+**Verification was deliberately separated from ticking.** A read-only agent audited all 61 criteria against the evidence and reported per-criterion verdicts; the Leader applied only the ticks it could quote evidence for. Ticking on the strength of "the task passed" is the KZ-002 substitution itself.
+
+| Verdict | Count |
+| --- | --- |
+| Total unflipped task-level criteria | **61** *(the Leader's earlier estimate of ~54 was low)* |
+| **BACKED** — evidence quoted in `execution.md` | 43 |
+| **BACKED-ELSEWHERE** — committed spec/fixture, or another task's closed criterion | 15 |
+| **UNBACKED** | **2** |
+| **QUARANTINED / OUTSTANDING-BY-DESIGN** | 1 + 1 |
+| **Applied: ticked** | **57** |
+| **Applied: kept open** | **4** |
+
+### The two UNBACKED findings — the reason this sweep was worth running
+
+**1. T-05 c1 was a criterion-text defect, and the evidence contradicted it.** It read *"`findOne` returns the section object **exactly** as shaped in `design.md` §4"*. T-05's own Reviewer advisory had found the payload is a **superset** — audit columns, `is_active` and the role discriminator ship on every row — and ruled it *"pre-existing platform pattern, not drift"*. So the criterion as written was false while the work was correct. **Ticking it would have filed a false claim; leaving it unticked would have blamed the work.** Corrected to "a superset of §4's field list" with the reasoning inline, then ticked. Sixth instance of this class after T-04, T-05, T-07, T-08 and T-11.
+
+**2. T-06 c8's exclusive falsifier was never run, and nothing records it being run.** T-06 attempt 1's Lens B stated plainly: *"M4 is misrecorded, so N4's exclusive falsifier was never run… The mutation that actually reds N4 — exempt `OTHER` from the dedup set entirely — **was not run**; N4's green rests on an incidental `transaction` assertion."* **No later entry records that mutation being performed.** Its closure is inferable only from a subsequent passing round — which is KZ-002's substitution in miniature. Ticked **with the residual named in the criterion itself**, and carried as a coverage gap for `test-report.md` rather than smoothed away.
+
+### The structural finding — §7's Done definition was unachievable, and that is a KZ-002 generator
+
+§7 item 2 demanded the unflipped count reach **zero**. **Four criteria must not be ticked**, so the definition could only ever be satisfied by a false tick — and the pressure to zero a count is precisely the mechanism that substitutes "the tasks are done" for "the checkboxes are checked". Left as written, it would have produced KZ-002's **fourth** recurrence, by design rather than by oversight.
+
+**Amended to a named exception list rather than a zero**, enumerating all four with the reason each must stay open:
+
+| Criterion | Class | Why |
+| --- | --- | --- |
+| **T-10 c5** | QUARANTINED | `R-IUA-009 AC.3` is **not satisfied by the product** — a confirmed cross-result corruption defect under `it.failing`, in code shared with the live `customSaveInnovationDev`. Ticking it asserts the opposite of a proven defect |
+| **T-13 c6** | OUTSTANDING-BY-DESIGN | The human `/swagger` observation. Not attempted, not simulated, not substituted |
+| **T-01 c1** | BLOCKED ON T-13 c6 | Ten rows and four columns proven; the **live `200`** is not — T-01's own limits say *"No live `200`"* |
+| **T-01 c4** | BLOCKED ON T-13 c6 | Decorators proven at source; the **rendered** surface is exactly what T-13 c6 observes |
+
+**That two T-01 criteria are transitively gated on the one criterion outstanding by design is itself the finding** — a single human gate holds three checkboxes, and nothing in the spec made that visible until the sweep drew it out.
+
+### §7 status after the audit
+
+**5 of 9 ticked** (AC count with its carve-out · the three test/coverage gates · lint · no-migration · OQ-IUA-2 · budget variance). **4 remain open:** all-13-tasks-done (T-13 is `[~]`), every-scenario-clause-discharged (three clauses still unowned — DD-14 behaviourally and the `manager` property are being closed now by `/akili-test`; R-IUA-011's `AND the submit transition is permitted` is owned by no task), the `/swagger` human check, and — implicitly — whatever those two closures leave.
+
+### Kaizen input
+
+**KZ-002's standardization did not prevent its recurrence.** The lesson was applied to `.agents/leader.md`, and the Leader still inherited six `[x]` tasks without grepping. That is the **same root cause KZ-005 already identified** — *"a lesson applied to the orchestrator does not reach the agent that performs the action"* — except here the orchestrator **is** the actor, and the failure was one of routine rather than knowledge. The durable fix is not more persona text: it is that §7's item **already prescribed the grep** and nothing enforced it. **A checkbox that says "verify by grepping" is a checkbox, not a gate.** Candidate lesson: an aggregate criterion whose own text names its verification method should be machine-checkable (a hook, as `/akili-constitution` Step 8F does for the `[x]`-without-PASS case), or it will be satisfied by assertion.
+

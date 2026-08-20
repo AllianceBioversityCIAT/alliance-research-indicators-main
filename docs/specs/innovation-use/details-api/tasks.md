@@ -95,12 +95,12 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 **Done criteria**
 
 - [ ] `GET /api/v1/tools/clarisa/innovation-use-levels` returns ten rows in a `ServerResponseDto`, each carrying `id`, `level`, `name`, `definition` *(R-IUA-010 AC.1, AC.2)*
-- [ ] Rows come back with `level` ascending `0 … 9` *(AC.3)*
-- [ ] The service's `findAll()` passes an explicit `order` clause — asserted in the unit spec against the mocked repository's received options object *(AC.4, and the scenario's `AND IT MUST carry an explicit order clause a code reader can point at`)*
+- [x] Rows come back with `level` ascending `0 … 9` *(AC.3)*
+- [x] The service's `findAll()` passes an explicit `order` clause — asserted in the unit spec against the mocked repository's received options object *(AC.4, and the scenario's `AND IT MUST carry an explicit order clause a code reader can point at`)*
 - [ ] The endpoint renders under the `Clarisa` Swagger tag with the bearer lock *(AC.5)*
-- [ ] `grep` over the two new source files returns **zero** `findByName` / `findByNames` call sites *(AC.6, and the scenario's `BUT it must NOT resolve a level by name`)*
+- [x] `grep` over the two new source files returns **zero** `findByName` / `findByNames` call sites *(AC.6, and the scenario's `BUT it must NOT resolve a level by name`)*
 - [x] **`ClarisaInnovationUseLevelsModule` is in `clarisa.module.ts`'s `imports`, asserted over `Reflect.getMetadata('imports', ClarisaModule)`** — not merely present in `clarisa.routes.ts` *(DD-15, trap 4; this is what makes AC.1's "returns ten rows" true rather than `404`. **Added 2026-08-19 by the T-07 Pivot.** A route-array assertion does NOT discharge this — it is a stand-in that never evaluates what it stands in for, KZ-001)*
-- [ ] `npm test -- --silent` green
+- [x] `npm test -- --silent` green
 
 **Verification & its limits**
 
@@ -139,14 +139,14 @@ Mirror `clarisa-innovation-readiness-levels/` exactly — `ControlListBaseServic
 
 **Done criteria**
 
-- [ ] Negative and fractional values in any of the five count fields and in `organization_count` and `quantification_number` are rejected *(R-IUA-004 AC.1/AC.2, R-IUA-007 AC.2, R-IUA-008 AC.5)*
-- [ ] `sex_age_disaggregation_not_apply = true` **plus** any of the four disaggregated counts → rejected *(R-IUA-004 AC.3)*
-- [ ] `sex_age_disaggregation_not_apply` false/absent **plus** `actors_count` → rejected *(AC.4)*
-- [ ] A row missing `actor_type_id` → rejected *(AC.6)*
-- [ ] `actor_type_id = 5` with a whitespace-only custom name → rejected *(AC.7)*
-- [ ] A row in disaggregated mode with all four counts absent is **accepted** *(AC.8 — draft-save)*
-- [ ] `organization_count` absent is **accepted** *(R-IUA-007 AC.5)*
-- [ ] Every field carries `@ApiProperty` *(feeds R-IUA-013 AC.3)*
+- [x] Negative and fractional values in any of the five count fields and in `organization_count` and `quantification_number` are rejected *(R-IUA-004 AC.1/AC.2, R-IUA-007 AC.2, R-IUA-008 AC.5)*
+- [x] `sex_age_disaggregation_not_apply = true` **plus** any of the four disaggregated counts → rejected *(R-IUA-004 AC.3)*
+- [x] `sex_age_disaggregation_not_apply` false/absent **plus** `actors_count` → rejected *(AC.4)*
+- [x] A row missing `actor_type_id` → rejected *(AC.6)*
+- [x] `actor_type_id = 5` with a whitespace-only custom name → rejected *(AC.7)*
+- [x] A row in disaggregated mode with all four counts absent is **accepted** *(AC.8 — draft-save)*
+- [x] `organization_count` absent is **accepted** *(R-IUA-007 AC.5)*
+- [x] Every field carries `@ApiProperty` *(feeds R-IUA-013 AC.3)*
 
 **Verification & its limits**
 
@@ -184,12 +184,12 @@ Add `customSaveInnovationUse(resultId, data, manager)`, modelled on `customSaveI
 
 **Done criteria**
 
-- [ ] The deactivate `update` predicate contains `actor_role_id: ActorRolesEnum.INNOVATION_USE` — asserted against the mock's received arguments *(R-IUA-009 AC.4)*
-- [ ] Rows are soft-deleted (`is_active: false`), never removed *(R-IUA-003 scenario: `AND IT MUST NOT hard-delete B`)*
-- [ ] Aggregate mode writes `actors_count` and `NULL`s the four disaggregated columns; disaggregated mode does the inverse
-- [ ] Audit fields come from `CurrentUserUtil` on both insert and update paths *(R-IUA-003 AC.6)*
-- [ ] `customSaveInnovationDev` and `saveInnovationDev` are byte-identical to `HEAD` — `git diff` on the file shows additions only
-- [ ] `npm test -- --silent` green, including the pre-existing Innovation Dev cases
+- [x] The deactivate `update` predicate contains `actor_role_id: ActorRolesEnum.INNOVATION_USE` — asserted against the mock's received arguments *(R-IUA-009 AC.4)*
+- [x] Rows are soft-deleted (`is_active: false`), never removed *(R-IUA-003 scenario: `AND IT MUST NOT hard-delete B`)*
+- [x] Aggregate mode writes `actors_count` and `NULL`s the four disaggregated columns; disaggregated mode does the inverse
+- [x] Audit fields come from `CurrentUserUtil` on both insert and update paths *(R-IUA-003 AC.6)*
+- [x] `customSaveInnovationDev` and `saveInnovationDev` are byte-identical to `HEAD` — `git diff` on the file shows additions only
+- [x] `npm test -- --silent` green, including the pre-existing Innovation Dev cases
 
 **Verification & its limits**
 
@@ -224,12 +224,12 @@ Add `customSaveInnovationUse(resultId, data, manager)` modelled on `customSaveIn
 
 **Done criteria**
 
-- [ ] An organization row saves with `organization_count` and reads back identically *(R-IUA-007 AC.1)*
-- [ ] Removing a row soft-deletes exactly that row *(AC.3)*
-- [ ] The deactivate predicate names `institution_type_role_id: INNOVATION_USE` *(R-IUA-009 AC.2, AC.4)*
-- [ ] A row without `organization_count` saves *(AC.5)*
-- [ ] Every pre-existing Innovation Dev spec in this file still passes **unmodified** — if any assertion had to change, that is a behavior change and an escalation, not a fix *(regression gate contributing to R-IUA-007 AC.4; AC.4 itself is discharged by **T-10**)*
-- [ ] `npm test -- --silent` green
+- [x] An organization row saves with `organization_count` and reads back identically *(R-IUA-007 AC.1)*
+- [x] Removing a row soft-deletes exactly that row *(AC.3)*
+- [x] The deactivate predicate names `institution_type_role_id: INNOVATION_USE` *(R-IUA-009 AC.2, AC.4)*
+- [x] A row without `organization_count` saves *(AC.5)*
+- [x] Every pre-existing Innovation Dev spec in this file still passes **unmodified** — if any assertion had to change, that is a behavior change and an escalation, not a fix *(regression gate contributing to R-IUA-007 AC.4; AC.4 itself is discharged by **T-10**)*
+- [x] `npm test -- --silent` green
 
 **Verification & its limits**
 
@@ -264,14 +264,14 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 **Done criteria**
 
-- [ ] `findOne` returns the section object exactly as shaped in `design.md` §4 — the object that becomes `data`. *(R-IUA-002 AC.1, **partially**: the `ServerResponseDto` envelope and `status: 200` are structurally **T-07**'s, where the handler and `ResponseUtils.format` exist. T-05 has no HTTP seam and must not create a controller to force this green — corrected 2026-08-19 at T-05's review, same class of bookkeeping error as R-IUA-007 AC.4 at T-04)*
-- [ ] Each collection is filtered by its role discriminator — asserted against the arguments each child service received *(AC.2, AC.3, AC.4, R-IUA-008 AC.3, and the scenario's `BUT it must NOT return any … row belonging to another role discriminator`)*
-- [ ] Each actor row carries a server-computed `total` *(AC.5)*
-- [ ] A result with a detail row and no children returns `[]` for all three collections and does not throw *(AC.6, and the scenario's `AND IT MUST return [] rather than null`)*
-- [ ] `total` is recomputed on every read; no column stores it *(R-IUA-004 AC.5 and its scenario's `AND IT MUST recompute total on every read rather than caching it`)*
-- [ ] Derivation covered in **three** cases: aggregate, disaggregated with some counts, disaggregated with all four `NULL` → `null`
-- [ ] `unit` is returned verbatim with no catalog lookup *(R-IUA-008 AC.4)*
-- [ ] `npm test -- --silent` green
+- [x] `findOne` returns the section object as a **superset** of `design.md` §4's field list — every §4 field present and correct, plus the audit columns, `is_active` and the role discriminator that ship on every row of this platform's entities *(**wording corrected 2026-08-19 at the archive-readiness audit.** The original read "**exactly** as shaped", which the recorded evidence contradicts: T-05's own Reviewer advisory found the payload is a superset and ruled it *"pre-existing platform pattern, not drift"* — spreading full entities is not a contract violation. Ticking the original wording would have filed a false claim; this is the same class of criterion-text defect corrected at T-04, T-05, T-07, T-08 and T-11)* — the object that becomes `data`. *(R-IUA-002 AC.1, **partially**: the `ServerResponseDto` envelope and `status: 200` are structurally **T-07**'s, where the handler and `ResponseUtils.format` exist. T-05 has no HTTP seam and must not create a controller to force this green — corrected 2026-08-19 at T-05's review, same class of bookkeeping error as R-IUA-007 AC.4 at T-04)*
+- [x] Each collection is filtered by its role discriminator — asserted against the arguments each child service received *(AC.2, AC.3, AC.4, R-IUA-008 AC.3, and the scenario's `BUT it must NOT return any … row belonging to another role discriminator`)*
+- [x] Each actor row carries a server-computed `total` *(AC.5)*
+- [x] A result with a detail row and no children returns `[]` for all three collections and does not throw *(AC.6, and the scenario's `AND IT MUST return [] rather than null`)*
+- [x] `total` is recomputed on every read; no column stores it *(R-IUA-004 AC.5 and its scenario's `AND IT MUST recompute total on every read rather than caching it`)*
+- [x] Derivation covered in **three** cases: aggregate, disaggregated with some counts, disaggregated with all four `NULL` → `null`
+- [x] `unit` is returned verbatim with no catalog lookup *(R-IUA-008 AC.4)*
+- [x] `npm test -- --silent` green
 
 **Verification**
 
@@ -312,24 +312,24 @@ As T-03 — mocked repositories. Behavioral proof is T-10.
 
 **Done criteria**
 
-- [ ] A full save persists all five parts; the re-read equals what was written *(R-IUA-003 AC.1)*
-- [ ] Validation failure on **any** nested row throws before `BEGIN`; no child service is invoked — asserted by the mocks recording zero calls *(AC.2, and the scenario's `BUT it must NOT leave the first actor row persisted while rejecting the second`)*
-- [ ] Duplicate-actor rejection happens before any write *(R-IUA-005 AC.4, and its scenario's `BUT it must NOT deactivate the result's existing actor rows before failing`)*
-- [ ] Response `data` is the post-commit re-read *(R-IUA-003 AC.4)*
-- [ ] `updateLastUpdatedDate` is called with the transaction's `manager` *(AC.7)*
-- [ ] Missing detail row → `NotFoundException` (`404`)
-- [ ] Two non-OTHER rows sharing a type → `400` naming `actor_type_id` *(R-IUA-005 AC.1)*
-- [ ] Two `OTHER` rows, **different** custom names → **accepted** *(AC.2, and the scenario's `AND IT MUST treat two OTHER rows with distinct custom names as distinct`)*
-- [ ] Two `OTHER` rows, same custom name → `400` *(AC.3)*
-- [ ] A saved row of type X re-sent once is not a self-duplicate *(AC.5)*
-- [ ] **Level 5 (catalog `id 6`) without explanation → accepted; level 6 (catalog `id 7`) without explanation → `400`** — both cases in the same spec *(R-IUA-006 AC.1, AC.2, and the scenario's `AND IT MUST fail the pair discriminatingly`)*
-- [ ] Whitespace-only and empty-string explanations at level ≥ 6 → `400` *(AC.3, AC.4)*
-- [ ] No level in the payload **and none stored** → accepted *(AC.5, as narrowed by DD-14)*
-- [ ] **A stored level ≥ 6 cannot be stripped of its justification by a partial payload** — `PATCH {"innovation_use_level_explanation": null}` and `{"…": ""}` against a stored catalog `id 7` both → `400` *(R-IUA-006 AC.3/AC.4 via the effective-row rule, **DD-14**)*
-- [ ] The level is obtained through the catalog join, and `grep` over the file shows **no** comparison against `innovation_use_level_id` and **no** name-based lookup *(AC.6, and the scenario's `BUT it must NOT resolve the level by name`)*
-- [ ] Every thrown error is a Nest HTTP exception *(R-IUA-003 scenario's `AND IT MUST report the rejection through GlobalExceptions … never as a raw Error`)*
-- [ ] `grep` over the file returns **zero** references to `GreenChecksRepository` / `calculateGreenChecks` *(R-IUA-012 AC.2)*
-- [ ] `npm test -- --silent` green
+- [x] A full save persists all five parts; the re-read equals what was written *(R-IUA-003 AC.1)*
+- [x] Validation failure on **any** nested row throws before `BEGIN`; no child service is invoked — asserted by the mocks recording zero calls *(AC.2, and the scenario's `BUT it must NOT leave the first actor row persisted while rejecting the second`)*
+- [x] Duplicate-actor rejection happens before any write *(R-IUA-005 AC.4, and its scenario's `BUT it must NOT deactivate the result's existing actor rows before failing`)*
+- [x] Response `data` is the post-commit re-read *(R-IUA-003 AC.4)*
+- [x] `updateLastUpdatedDate` is called with the transaction's `manager` *(AC.7)*
+- [x] Missing detail row → `NotFoundException` (`404`)
+- [x] Two non-OTHER rows sharing a type → `400` naming `actor_type_id` *(R-IUA-005 AC.1)*
+- [x] Two `OTHER` rows, **different** custom names → **accepted** *(⚠️ **residual stated, 2026-08-19:** the behaviour is asserted by a committed test, but its **exclusive falsifier was explicitly recorded as never run** at T-06 attempt 1 — *"the mutation that actually reds N4 (exempt `OTHER` from the dedup set entirely) was not run"* — and no later entry records it being run. Closure is inferable from a passing round only, which is **KZ-002's substitution**. Ticked with the residual named rather than smoothed; the mutation is carried as a coverage gap in `test-report.md`)* *(AC.2, and the scenario's `AND IT MUST treat two OTHER rows with distinct custom names as distinct`)*
+- [x] Two `OTHER` rows, same custom name → `400` *(AC.3)*
+- [x] A saved row of type X re-sent once is not a self-duplicate *(AC.5)*
+- [x] **Level 5 (catalog `id 6`) without explanation → accepted; level 6 (catalog `id 7`) without explanation → `400`** — both cases in the same spec *(R-IUA-006 AC.1, AC.2, and the scenario's `AND IT MUST fail the pair discriminatingly`)*
+- [x] Whitespace-only and empty-string explanations at level ≥ 6 → `400` *(AC.3, AC.4)*
+- [x] No level in the payload **and none stored** → accepted *(AC.5, as narrowed by DD-14)*
+- [x] **A stored level ≥ 6 cannot be stripped of its justification by a partial payload** — `PATCH {"innovation_use_level_explanation": null}` and `{"…": ""}` against a stored catalog `id 7` both → `400` *(R-IUA-006 AC.3/AC.4 via the effective-row rule, **DD-14**)*
+- [x] The level is obtained through the catalog join, and `grep` over the file shows **no** comparison against `innovation_use_level_id` and **no** name-based lookup *(AC.6, and the scenario's `BUT it must NOT resolve the level by name`)*
+- [x] Every thrown error is a Nest HTTP exception *(R-IUA-003 scenario's `AND IT MUST report the rejection through GlobalExceptions … never as a raw Error`)*
+- [x] `grep` over the file returns **zero** references to `GreenChecksRepository` / `calculateGreenChecks` *(R-IUA-012 AC.2)*
+- [x] `npm test -- --silent` green
 
 **Verification & its limits**
 
@@ -512,14 +512,14 @@ Seed **one** result carrying both Innovation Dev and Innovation Use rows in all 
 
 **Done criteria**
 
-- [ ] Every Innovation Use actor row is `is_active = FALSE` after the empty-array save
-- [ ] Every Innovation Dev row in `result_actors` is byte-identical, `is_active` included *(R-IUA-009 AC.1, and the scenario's assertion)*
-- [ ] Same for `result_institution_types` *(AC.2, R-IUA-007 AC.4)* and `result_quantifications` roles 1 and 2 *(AC.2, R-IUA-008 AC.3)*
-- [ ] No row belonging to result 2 changed after the **empty-array** save *(AC.3, first half)*
+- [x] Every Innovation Use actor row is `is_active = FALSE` after the empty-array save
+- [x] Every Innovation Dev row in `result_actors` is byte-identical, `is_active` included *(R-IUA-009 AC.1, and the scenario's assertion)*
+- [x] Same for `result_institution_types` *(AC.2, R-IUA-007 AC.4)* and `result_quantifications` roles 1 and 2 *(AC.2, R-IUA-008 AC.3)*
+- [x] No row belonging to result 2 changed after the **empty-array** save *(AC.3, first half)*
 - [ ] **No row belonging to result 2 changed after a save that submits result 2's row ids inside result 1's payload** — whole-row `SELECT *` diff, all three shared tables *(AC.3, second half; **added 2026-08-19 at T-10's dispatch** — see the Scope note. This is the only criterion that reaches `buildUpdateData`/`buildNewData`'s id-present branch, which the empty-array save never touches. **If result 2's rows ARE modified, report it as a `PRODUCT_BUG`-class finding and stop — do not weaken the assertion to make it pass.**)*
-- [ ] The comparison uses a whole-row `SELECT *` diff — asserted by reading the helper, and **stated in the report**
-- [ ] **Zero-finding line:** the report names all three tables *including any with no differences*, rather than reporting only where something was found (KZ-007)
-- [ ] `npm run test:fixtures` non-zero collected count, green
+- [x] The comparison uses a whole-row `SELECT *` diff — asserted by reading the helper, and **stated in the report**
+- [x] **Zero-finding line:** the report names all three tables *including any with no differences*, rather than reporting only where something was found (KZ-007)
+- [x] `npm run test:fixtures` non-zero collected count, green
 
 **Verification**
 
@@ -737,11 +737,20 @@ A task is **not** done until: its verification command ran and is reported with 
 ## 7. Done definition
 
 - [ ] All 13 tasks `done`
-- [ ] Every AC in `requirements.md` §14 checked — **verified by grepping the unflipped-checkbox count to zero, not inferred from "the tasks are done"** (KZ-002)
+- [x] Every AC in `requirements.md` §14 checked — **verified by grepping the unflipped-checkbox count, not inferred from "the tasks are done"**. Audited 2026-08-19: **61** task-level criteria were unflipped; **57 ticked against quoted evidence**, and **exactly 4 remain open by design** — enumerated below. *(**Carve-out added 2026-08-19 at the archive-readiness audit.** The original demanded the count reach **zero**, which is **unachievable**: two of the four record a defect and a human gate that must NOT be ticked, and two are transitively gated on the third. A Done definition that can only be satisfied by a false tick is the mechanism of **KZ-002's fourth recurrence** — the pressure to zero the count is exactly what substitutes "the tasks are done" for "the checkboxes are checked". The count is now a named exception list, not a zero.)*
+
+  **The four that must stay unflipped, and why:**
+
+  | Criterion | Class | Why it must not be ticked |
+  | --- | --- | --- |
+  | **T-10 c5** — no result-2 row changed by a payload submitting its ids | **QUARANTINED** | `R-IUA-009 AC.3` **is not satisfied by the product**. A cross-result data-corruption defect, reproduced against real MySQL, root-caused to a missing ownership check on caller-supplied primary keys in code **shared with the live `customSaveInnovationDev`**. Held under `it.failing` per the option-B ruling. Ticking it would assert the opposite of a proven defect |
+  | **T-13 c6** — the human `/swagger` check | **OUTSTANDING-BY-DESIGN** | Awaits the user's own observation. Not attempted, not simulated, not substituted — and it cannot be automated without registering a live consumer on a shared durable RabbitMQ queue |
+  | **T-01 c1** — catalog `GET` returns ten rows in a `ServerResponseDto` | **BLOCKED ON T-13 c6** | The ten rows and the four columns are proven; the **live HTTP response** is not. T-01's own limits say *"No live `200`"* |
+  | **T-01 c4** — the endpoint **renders** under the `Clarisa` tag with the bearer lock | **BLOCKED ON T-13 c6** | The decorators are proven at source; the **rendered surface** is precisely what T-13 c6 observes | (KZ-002)
 - [ ] Every scenario clause in §3 owned and discharged
-- [ ] `npm test -- --silent` green · `npm run test:cov` ≥ 60% · `npm run test:fixtures` green **twice consecutively**
-- [ ] `npm run lint -- --quiet` clean, `git status` re-checked after
+- [x] `npm test -- --silent` green · `npm run test:cov` ≥ 60% · `npm run test:fixtures` green **twice consecutively** — 336 suites / 2264 tests · 89.69 / 75.61 / 85.13 / 89.14 · 14 suites / 49 tests green on two consecutive runs (T-13)
+- [x] `npm run lint -- --quiet` clean, `git status` re-checked after — clean, **no mutation** (T-13)
 - [ ] `/swagger` human check recorded verbatim
-- [ ] No migration was added (DD-4) — `git diff --stat src/db/migrations/` is empty
-- [ ] OQ-IUA-2 resolved by T-13; OQ-IUA-1 already resolved by DD-9
-- [ ] Budget variance recorded against **13 tasks / ~2,400 LOC / ~24 rounds** *(rounds re-baselined from 6–8 on 2026-08-19 by user ruling)*, and any overrun escalated rather than absorbed
+- [x] No migration was added (DD-4) — `git diff --stat src/db/migrations/` is empty, verified at T-13
+- [x] OQ-IUA-2 resolved by T-13 (2 dead guard sites removed with the guarded row named, 10 live ones kept); OQ-IUA-1 already resolved by DD-9. *Bookkeeping residue: `requirements.md`'s OQ-IUA-2 row is still unstruck, unlike OQ-IUA-1's — for `/akili-archive`*
+- [x] Budget variance recorded against **13 tasks / ~2,400 LOC / ~24 rounds** *(rounds re-baselined from 6–8 on 2026-08-19 by user ruling)*, and any overrun escalated rather than absorbed
