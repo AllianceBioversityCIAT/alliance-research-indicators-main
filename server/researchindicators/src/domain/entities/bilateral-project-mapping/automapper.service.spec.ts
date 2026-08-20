@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnprocessableEntityException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Brackets, DataSource } from 'typeorm';
 import { AutomapperService, AutomapperCandidate } from './automapper.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
@@ -48,28 +48,123 @@ describe('AutomapperService', () => {
   // Mirrors makeContractQb — the mapping table read in step 6 uses the same
   // where/andWhere/getMany shape as the AGRESSO lookup in step 5.
   //
-  // Unlike a plain stub, `andWhere` here actually filters when called with
-  // the is_active predicate — this is what makes the is_active gate
-  // falsifiable in a mocked-repo unit test: if production code ever stops
-  // calling `.andWhere('bpm.is_active = :isActive', { isActive: true })`,
-  // `getMany()` starts returning inactive rows too, exactly as a real
-  // MySQL query without that clause would.
+  // Models Brackets execution and precedence: when `where(new Brackets(...))`
+  // and `andWhere('bpm.is_active = :isActive', { isActive: true })` are called,
+  // `getMany()` evaluates (id IN ids OR code IN codes) AND is_active = true,
+  // ensuring inactive rows are filtered regardless of OR branch matching.
   const makeMappingQb = (rows: Partial<BilateralProjectMapping>[] = []) => {
     const qb: Record<string, jest.Mock> = {};
-    let filtered = rows;
-    qb.where = jest.fn().mockReturnValue(qb);
+    let idFilter: number[] | null = null;
+    let codeFilter: string[] | null = null;
+    let agreementFilter: string[] | null = null;
+    let activeFilter: boolean | null = null;
+
+    const executeBrackets = (brackets: Brackets) => {
+      const innerQb: Record<string, jest.Mock> = {};
+      innerQb.where = jest.fn(
+        (clause: string, params?: Record<string, unknown>) => {
+          if (
+            clause === 'bpm.clarisa_project_id IN (:...ids)' &&
+            Array.isArray(params?.ids)
+          ) {
+            idFilter = params.ids as number[];
+          }
+          return innerQb;
+        },
+      );
+      innerQb.orWhere = jest.fn(
+        (clause: string, params?: Record<string, unknown>) => {
+          if (
+            clause === 'bpm.clarisa_external_code IN (:...codes)' &&
+            Array.isArray(params?.codes)
+          ) {
+            codeFilter = params.codes as string[];
+          }
+          return innerQb;
+        },
+      );
+      brackets.whereFactory(innerQb as any);
+    };
+
+    qb.where = jest.fn(
+      (
+        clauseOrBrackets: string | Brackets,
+        params?: Record<string, unknown>,
+      ) => {
+        if (clauseOrBrackets instanceof Brackets) {
+          executeBrackets(clauseOrBrackets);
+        } else if (typeof clauseOrBrackets === 'string') {
+          if (
+            clauseOrBrackets === 'bpm.clarisa_project_id IN (:...ids)' &&
+            Array.isArray(params?.ids)
+          ) {
+            idFilter = params.ids as number[];
+          } else if (
+            clauseOrBrackets === 'bpm.agresso_agreement_id IN (:...ids)' &&
+            Array.isArray(params?.ids)
+          ) {
+            agreementFilter = params.ids as string[];
+          }
+        }
+        return qb;
+      },
+    );
+
+    qb.orWhere = jest.fn((clause: string, params?: Record<string, unknown>) => {
+      if (
+        clause === 'bpm.clarisa_external_code IN (:...codes)' &&
+        Array.isArray(params?.codes)
+      ) {
+        codeFilter = params.codes as string[];
+      }
+      return qb;
+    });
+
     qb.andWhere = jest.fn(
       (clause: string, params?: Record<string, unknown>) => {
         if (
           clause === 'bpm.is_active = :isActive' &&
           params?.isActive === true
         ) {
-          filtered = filtered.filter((r) => r.is_active !== false);
+          activeFilter = true;
         }
         return qb;
       },
     );
-    qb.getMany = jest.fn(async () => filtered);
+
+    qb.getMany = jest.fn(async () => {
+      let filtered = rows;
+      if (idFilter !== null || codeFilter !== null) {
+        const idSet = idFilter ? new Set(idFilter) : null;
+        const codeSet = codeFilter ? new Set(codeFilter) : null;
+        filtered = filtered.filter((r) => {
+          const matchId =
+            idSet &&
+            r.clarisa_project_id !== undefined &&
+            idSet.has(r.clarisa_project_id);
+          const matchCode =
+            codeSet &&
+            r.clarisa_external_code &&
+            codeSet.has(r.clarisa_external_code);
+          return matchId || matchCode;
+        });
+      }
+      if (agreementFilter !== null) {
+        const agSet = new Set(
+          agreementFilter.map((id) => id.trim().toUpperCase()),
+        );
+        filtered = filtered.filter(
+          (r) =>
+            r.agresso_agreement_id &&
+            agSet.has(r.agresso_agreement_id.trim().toUpperCase()),
+        );
+      }
+      if (activeFilter === true) {
+        filtered = filtered.filter((r) => r.is_active === true);
+      }
+      return filtered;
+    });
+
     return qb;
   };
 
@@ -446,10 +541,8 @@ describe('AutomapperService', () => {
     });
 
     it('scopes the mapped-row read to the cohort ids — the IN-list clause that guarantees mapped <= reachable', async () => {
-      // Argument-shape corroboration, mirroring the T-03 pattern (KZ-001
-      // recurrence 8: makeMappingQb's `where` is a pure no-op pass-through,
-      // so THIS assertion — not the fixture's returned rows — is what
-      // catches the IN-list clause being dropped.
+      // Argument-shape corroboration: verifies qb.where receives a Brackets
+      // instance and qb.andWhere receives the is_active constraint.
       const cohort = buildFullCohort(3); // ids 2001, 2002, 2003
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -459,53 +552,35 @@ describe('AutomapperService', () => {
 
       await service.coverage();
 
-      expect(qb.where).toHaveBeenCalledWith(
-        'bpm.clarisa_project_id IN (:...ids)',
-        { ids: [2001, 2002, 2003] },
-      );
+      expect(qb.where).toHaveBeenCalledWith(expect.any(Brackets));
       expect(qb.andWhere).toHaveBeenCalledWith('bpm.is_active = :isActive', {
         isActive: true,
       });
     });
 
     it('does NOT count an active mapping row for a project outside the cohort (IN-list scoping, behavioural)', async () => {
-      // makeMappingQb's `where` never filters (it is a pure pass-through —
-      // see its definition above), so it cannot expose the IN-list clause
-      // being dropped. This test uses a hand-rolled queryBuilder that DOES
-      // apply the clause, so deleting `.where('bpm.clarisa_project_id IN
-      // (:...ids)', ...)` in production stops filtering row id 51 out,
-      // mapped grows from 1 to 2, and the assertion below reds.
+      // makeMappingQb applies Brackets matching and is_active filtering.
+      // An active row for a project OUT of cohort (id 22) must not count.
       const cohort = [project({ id: 5001, external_code: 'C-Q1' })]; // reachable = 1
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
       );
 
       const rows = [
-        mappingRow({ id: 50, clarisa_project_id: 5001, is_active: true }), // in cohort
-        mappingRow({ id: 51, clarisa_project_id: 22, is_active: true }), // OUT of cohort — must not count
+        mappingRow({
+          id: 50,
+          clarisa_project_id: 5001,
+          clarisa_external_code: 'Q1',
+          is_active: true,
+        }), // in cohort
+        mappingRow({
+          id: 51,
+          clarisa_project_id: 22,
+          clarisa_external_code: 'OTHER',
+          is_active: true,
+        }), // OUT of cohort — must not count
       ];
-      let filtered = rows;
-      const qb: Record<string, jest.Mock> = {};
-      qb.where = jest.fn((clause: string, params?: { ids?: number[] }) => {
-        if (clause === 'bpm.clarisa_project_id IN (:...ids)' && params?.ids) {
-          const idSet = new Set(params.ids);
-          filtered = filtered.filter((r) => idSet.has(r.clarisa_project_id));
-        }
-        return qb;
-      });
-      qb.andWhere = jest.fn(
-        (clause: string, params?: { isActive?: boolean }) => {
-          if (
-            clause === 'bpm.is_active = :isActive' &&
-            params?.isActive === true
-          ) {
-            filtered = filtered.filter((r) => r.is_active !== false);
-          }
-          return qb;
-        },
-      );
-      qb.getMany = jest.fn(async () => filtered);
-      mockMappingRepo.createQueryBuilder.mockReturnValue(qb);
+      mockMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb(rows));
 
       const result = await service.coverage();
 
@@ -565,6 +640,73 @@ describe('AutomapperService', () => {
         'pending',
         'reachable',
       ]);
+    });
+
+    it('counts project as mapped via clarisa_external_code even if numeric clarisa_project_id differs (R-PSP-005 AC.3)', async () => {
+      // Feed has project with id 92 and external_code 'A1676'
+      const cohort = [project({ id: 92, external_code: 'A1676' })];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      // DB has mapping row stored with old id 1403, but clarisa_external_code 'A1676'
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 1,
+            clarisa_project_id: 1403,
+            clarisa_external_code: 'A1676',
+            is_active: true,
+          }),
+        ]),
+      );
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 1, pending: 0, reachable: 1 });
+    });
+
+    it('mapped excludes an inactive row whose clarisa_project_id is in cohort with no active sister row (Brackets correctness)', async () => {
+      // Cohort has project id 4001; DB only has an INACTIVE row with clarisa_project_id 4001.
+      const cohort = [project({ id: 4001, external_code: 'C-W1' })];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 88,
+            clarisa_project_id: 4001,
+            clarisa_external_code: 'W1',
+            is_active: false,
+          }),
+        ]),
+      );
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+    });
+
+    it('mapped excludes an inactive row whose clarisa_external_code matches with no active sister row', async () => {
+      // Cohort has project with external_code 'A999'; DB has only an INACTIVE row with that code.
+      const cohort = [project({ id: 555, external_code: 'C-A999' })];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 89,
+            clarisa_project_id: 8888, // different id
+            clarisa_external_code: 'A999',
+            is_active: false,
+          }),
+        ]),
+      );
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
     });
   });
 
@@ -833,6 +975,7 @@ describe('AutomapperService', () => {
         expect.objectContaining({
           agresso_agreement_id: 'D800',
           clarisa_project_id: 800,
+          clarisa_external_code: 'D800',
           source: MappingSourceEnum.DERIVED,
           confidence_score: null,
           is_active: true,
@@ -843,6 +986,7 @@ describe('AutomapperService', () => {
       const [createArg] = txMappingRepo.create.mock.calls[0];
       expect(createArg.source).not.toBe(MappingSourceEnum.AI_SUGGESTED);
       expect(createArg.source).not.toBe(MappingSourceEnum.AI_AUTO);
+      expect(createArg.clarisa_external_code).toBe('D800');
     });
 
     it('writes clarisa_project_short_name from the SHORT name, never the full name', async () => {

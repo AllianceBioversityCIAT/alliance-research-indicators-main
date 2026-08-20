@@ -185,11 +185,13 @@ No cycles. **T-01 → T-02 is the unblock path**; everything else can follow.
 - **NFR-PSP-002 — capture the before-value first.** Record Dev coverage **before** any change; a post-only reading cannot detect a regression. Pass condition: Dev coverage ≥ `mapped: 195 / reachable: 198`.
 - **What disqualifies this evidence:** measuring Dev coverage while a delegated worker is active, or while two full-suite runs are in flight — that produces a **wrong** number, not a slow one (root guide §4.3). Measure in the window after a worker reports.
 - **Done:**
-  - [ ] Stub-backed stack resolves result `3403` — the local reproduction in `proposal.md` no longer occurs
-  - [ ] Non-matching key returns `stale`
-  - [ ] Id divergence emits exactly one warn naming both ids and the agreement
-  - [ ] Dev coverage measured before and after; no regression
-  - [ ] `AutomapperService` constructor unchanged
+  - [x] A feed numbering projects differently still resolves result `3403` — *the stub is gone (T-08); driven by a mocked feed, per the revised R-PSP-005 AC.2*
+  - [x] Non-matching key returns `stale` — auditor mutation (`X-` added to the closed prefix set) reddens the guard
+  - [x] Id divergence emits exactly one warn naming both ids and the agreement
+  - [x] Dev coverage measured before and after; no regression — 195/198 throughout
+  - [x] `AutomapperService` constructor unchanged — `ClarisaProjectsService` + `DataSource` only (NFR-BAS-001)
+  - [x] Coverage query groups the OR so `is_active` gates both branches (F-12) — verified on generated SQL
+  - [ ] **Rider from F-14:** add a `getQuery()` assertion pinning the parenthesised WHERE — the behavioural tests pass with the defect reintroduced. Fold into T-07
 - **Dependencies:** T-04, T-05 · **Effort:** L · **Status:** todo
 
 ---

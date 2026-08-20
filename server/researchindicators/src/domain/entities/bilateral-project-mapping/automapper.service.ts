@@ -1,5 +1,5 @@
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, Repository } from 'typeorm';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
@@ -326,16 +326,48 @@ export class AutomapperService {
     }
 
     const cohortProjectIds = cohort.map((p) => p.id);
-    const mappedRows = await this.dataSource
+    const cohortExternalCodes = cohort
+      .map((p) => normalizeExternalCode(p.external_code).normalized)
+      .filter(Boolean);
+
+    const qb = this.dataSource
       .getRepository(BilateralProjectMapping)
       .createQueryBuilder('bpm')
-      .where('bpm.clarisa_project_id IN (:...ids)', {
-        ids: cohortProjectIds,
-      })
-      .andWhere('bpm.is_active = :isActive', { isActive: true })
-      .getMany();
+      .where(
+        new Brackets((innerQb) => {
+          innerQb.where('bpm.clarisa_project_id IN (:...ids)', {
+            ids: cohortProjectIds,
+          });
+          if (cohortExternalCodes.length > 0) {
+            innerQb.orWhere('bpm.clarisa_external_code IN (:...codes)', {
+              codes: cohortExternalCodes,
+            });
+          }
+        }),
+      )
+      .andWhere('bpm.is_active = :isActive', { isActive: true });
 
-    const mapped = new Set(mappedRows.map((r) => r.clarisa_project_id)).size;
+    const mappedRows = await qb.getMany();
+
+    const mappedProjectIds = new Set(
+      mappedRows.map((r) => r.clarisa_project_id),
+    );
+    const mappedExternalCodes = new Set(
+      mappedRows
+        .map((r) => r.clarisa_external_code?.trim().toUpperCase())
+        .filter(Boolean),
+    );
+
+    let mapped = 0;
+    for (const p of cohort) {
+      const normCode = normalizeExternalCode(p.external_code).normalized;
+      if (
+        mappedProjectIds.has(p.id) ||
+        (normCode && mappedExternalCodes.has(normCode))
+      ) {
+        mapped++;
+      }
+    }
     const pending = reachable - mapped;
 
     this.logger._log(
@@ -448,6 +480,9 @@ export class AutomapperService {
       agresso_agreement_id: entry.derivedContractId,
       clarisa_project_id: entry.clarisaProjectId,
       clarisa_project_short_name: entry.clarisaProjectShortName ?? null,
+      clarisa_external_code: entry.externalCode
+        ? normalizeExternalCode(entry.externalCode).normalized || null
+        : null,
       source: MappingSourceEnum.DERIVED,
       confidence_score: null,
       notes: null,

@@ -51,6 +51,7 @@ import {
   isProjectScienceProgramMapping,
   SpMappingRowLike,
 } from './utils/sp-mapping.predicate';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -144,6 +145,8 @@ export type MappedProjectResolution =
  */
 @Injectable()
 export class BilateralService {
+  private readonly logger = new LoggerUtil({ name: BilateralService.name });
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly resultRepository: ResultRepository,
@@ -166,7 +169,7 @@ export class BilateralService {
   ) {}
 
   /**
-   * @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / D-PSP-1 / design §5.1
+   * @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / T-06 / D-PSP-1 / D-PSP-6 / design §5.1
    *
    * Single mapping-resolution seam shared between `getScienceProgramsForResult`
    * and `getHlosIndicatorsForResult`.
@@ -175,9 +178,13 @@ export class BilateralService {
    *   1. findPoolFundingAlignmentContext(resultId) → 404 if absent.
    *   2. No agresso_agreement_id ⇒ unmapped, clarisa_project: null.
    *   3. No active mapping row ⇒ unmapped, clarisa_project: null.
-   *   4. findProjectById(mapping.clarisa_project_id):
-   *      missing ⇒ unmapped (carrying snapshot project ref).
-   *   5. Return mapped + project + mapping row.
+   *   4. Resolve project:
+   *      a. Stable key first (clarisa_external_code normalized via normalizeExternalCode).
+   *      b. Numeric clarisa_project_id fallback.
+   *      c. Missing in both ⇒ stale (carrying snapshot project ref).
+   *   5. Drift signal: if resolved via external code with a different numeric id,
+   *      emit a warn log naming both ids and the agreement id.
+   *   6. Return mapped + project + mapping row.
    */
   private async resolveMappedProject(
     resultId: number,
@@ -212,14 +219,28 @@ export class BilateralService {
       };
     }
 
-    const project = await this.clarisaProjectsService.findProjectById(
-      mapping.clarisa_project_id,
-    );
+    let project: ClarisaProject | null = null;
+    let resolvedViaExternalCode = false;
+
+    if (mapping.clarisa_external_code?.trim()) {
+      project = await this.clarisaProjectsService.findProjectByExternalCode(
+        mapping.clarisa_external_code,
+      );
+      if (project) {
+        resolvedViaExternalCode = true;
+      }
+    }
+
+    if (!project) {
+      project = await this.clarisaProjectsService.findProjectById(
+        mapping.clarisa_project_id,
+      );
+    }
 
     if (!project) {
       // Mapping points at a project CLARISA no longer exposes — treat as
       // stale from the picker's perspective, but surface the snapshot
-      // we have so ops can spot the drift (R-PSP-004, D-PSP-5).
+      // we have so ops can spot the drift (R-PSP-004, D-PSP-5, D-PSP-6).
       return {
         status: 'stale',
         context,
@@ -229,6 +250,14 @@ export class BilateralService {
         },
         mapping,
       };
+    }
+
+    if (resolvedViaExternalCode && project.id !== mapping.clarisa_project_id) {
+      this.logger._warn(
+        `[BilateralService] CLARISA project id divergence for agreement "${agreementId}": ` +
+          `stored clarisa_project_id=${mapping.clarisa_project_id} != resolved project.id=${project.id} ` +
+          `(clarisa_external_code="${mapping.clarisa_external_code}")`,
+      );
     }
 
     return {

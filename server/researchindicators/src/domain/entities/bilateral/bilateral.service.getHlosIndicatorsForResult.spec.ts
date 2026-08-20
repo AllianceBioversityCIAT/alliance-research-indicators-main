@@ -194,6 +194,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
   const findContext = jest.fn();
   const findActiveByAgreementId = jest.fn();
   const findProjectById = jest.fn();
+  const findProjectByExternalCode = jest.fn();
   const getTocResultsForSps = jest.fn();
 
   beforeEach(async () => {
@@ -233,7 +234,10 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
           provide: ClarisaScienceProgramsService,
           useValue: { findAll: jest.fn().mockResolvedValue([]) },
         },
-        { provide: ClarisaProjectsService, useValue: { findProjectById } },
+        {
+          provide: ClarisaProjectsService,
+          useValue: { findProjectById, findProjectByExternalCode },
+        },
         {
           provide: ClarisaCgiarEntitiesService,
           useValue: { getAreasOfWorkBySp: jest.fn() },

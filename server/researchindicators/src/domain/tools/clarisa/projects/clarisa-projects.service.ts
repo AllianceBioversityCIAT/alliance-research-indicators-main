@@ -16,6 +16,7 @@ import {
   normalizeToken,
 } from './utils/project-selector.util';
 import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
+import { normalizeExternalCode } from '../../../entities/bilateral-project-mapping/utils/external-code.util';
 import { ENV } from '../../../shared/utils/env.utils';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
@@ -154,6 +155,20 @@ export class ClarisaProjectsService {
     if (!Number.isFinite(id)) return null;
     const all = await this.getCachedAll();
     return all.find((p) => p.id === id) ?? null;
+  }
+
+  // @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-06 / R-PSP-005 (D-PSP-6)
+  async findProjectByExternalCode(
+    externalCode: string | null | undefined,
+  ): Promise<ClarisaProject | null> {
+    const { normalized } = normalizeExternalCode(externalCode);
+    if (!normalized) return null;
+    const all = await this.getCachedAll();
+    return (
+      all.find(
+        (p) => normalizeExternalCode(p.external_code).normalized === normalized,
+      ) ?? null
+    );
   }
 
   // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-02 / R-CPA-002

@@ -34,6 +34,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
   const findContext = jest.fn();
   const findActiveByAgreementId = jest.fn();
   const findProjectById = jest.fn();
+  const findProjectByExternalCode = jest.fn();
   const findAllCatalog = jest.fn();
 
   const baseProjectMapping = (
@@ -103,7 +104,7 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
         },
         {
           provide: ClarisaProjectsService,
-          useValue: { findProjectById },
+          useValue: { findProjectById, findProjectByExternalCode },
         },
         {
           provide: ClarisaCgiarEntitiesService,
@@ -543,5 +544,84 @@ describe('BilateralService.getScienceProgramsForResult (T-15.11)', () => {
         process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES = originalEnv;
       }
     }
+  });
+
+  describe('R-PSP-005 — Feed-stable key resolution & drift observability', () => {
+    it('resolves project via clarisa_external_code and emits warn log on id divergence (R-PSP-005 AC.2)', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, '_warn');
+
+      findContext.mockResolvedValueOnce({
+        result_id: 3403,
+        result_official_code: 3403,
+        agresso_agreement_id: 'A1676',
+      });
+      findActiveByAgreementId.mockResolvedValueOnce({
+        agresso_agreement_id: 'A1676',
+        clarisa_project_id: 1403, // stored id in DB
+        clarisa_project_short_name: 'Snapshot Name',
+        clarisa_external_code: 'A1676',
+      });
+      // Mock feed returns project with id 92 (different from stored 1403)
+      findProjectByExternalCode.mockResolvedValueOnce({
+        id: 92,
+        short_name: 'Resolved Short Name',
+        project_mappings_array: [
+          baseProjectMapping('SP02', 40),
+          baseProjectMapping('SP06', 60),
+        ],
+      });
+
+      const out = await service.getScienceProgramsForResult(3403, '3403');
+
+      expect(out.mapping_status).toBe('mapped');
+      expect(out.clarisa_project).toEqual({
+        id: 92,
+        short_name: 'Resolved Short Name',
+      });
+      expect(out.science_programs).toHaveLength(2);
+      expect(out.science_programs.map((s) => s.code)).toEqual(['SP02', 'SP06']);
+      expect(findProjectByExternalCode).toHaveBeenCalledWith('A1676');
+      expect(findProjectById).not.toHaveBeenCalled();
+
+      // Observability: warn log emitted for id divergence
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'CLARISA project id divergence for agreement "A1676"',
+        ),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('stored clarisa_project_id=1403'),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('resolved project.id=92'),
+      );
+    });
+
+    it('falls back to clarisa_project_id when clarisa_external_code matches no project', async () => {
+      findContext.mockResolvedValueOnce({
+        result_id: 1,
+        result_official_code: 1001,
+        agresso_agreement_id: 'D527',
+      });
+      findActiveByAgreementId.mockResolvedValueOnce({
+        agresso_agreement_id: 'D527',
+        clarisa_project_id: 10,
+        clarisa_project_short_name: 'Project 10',
+        clarisa_external_code: 'UNKNOWN_CODE',
+      });
+      findProjectByExternalCode.mockResolvedValueOnce(null);
+      findProjectById.mockResolvedValueOnce({
+        id: 10,
+        short_name: 'Project 10',
+        project_mappings_array: [baseProjectMapping('SP09', 100)],
+      });
+
+      const out = await service.getScienceProgramsForResult(1, '1001');
+
+      expect(out.mapping_status).toBe('mapped');
+      expect(out.clarisa_project).toEqual({ id: 10, short_name: 'Project 10' });
+      expect(findProjectByExternalCode).toHaveBeenCalledWith('UNKNOWN_CODE');
+      expect(findProjectById).toHaveBeenCalledWith(10);
+    });
   });
 });
