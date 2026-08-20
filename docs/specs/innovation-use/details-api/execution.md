@@ -2119,7 +2119,8 @@ F-B's attack payload carries **only** result 2's ids. `devActorId` appears in th
 | Property | State |
 | --- | --- |
 | `R-IUA-009 AC.3` — cross-result | ✅ **MET.** `assertInnovationUseOwnership` scopes the id-present save by `(result_id, role)` in both services |
-| `R-IUA-009 AC.1/AC.2/AC.4`, `R-IUA-007 AC.4` — the **cross-role** variant the RETRACTION named | ✅ **MET** by the same change. This is the variant `/akili-validate` found un-gated, and the likelier of the two |
+| `R-IUA-009 AC.1/AC.2`, `R-IUA-007 AC.4` — the **cross-role** variant the RETRACTION named | ✅ **MET** by the same change. This is the variant `/akili-validate` found un-gated, and the likelier of the two |
+| `R-IUA-009 **AC.4**` | ⚠️ **NOT met as originally written — AC.4 was AMENDED on 2026-08-20 to a narrower criterion.** *(Corrected here 2026-08-20: this row previously folded AC.4 into the MET row above, which asserted a structural property the code does not have. Both `/akili-validate` auditors flagged it independently.)* The delivered mechanism is reject-before-write, not a role-bearing predicate. See `requirements.md` → R-IUA-009 AC.4's amendment note |
 | Quarantine | ✅ **Retired.** Both `it.failing` markers inverted to plain passing tests; **zero `it.failing` remain** under the package. Assertions in F-B went **18 → 24** |
 | Coverage of the guards | ✅ Six unit tests, no DB. **Deleting either guard now reddens `npm test`** — it stayed green before attempt 2 |
 | Both halves of the predicate | ✅ Proven **permanently**: four unit tests whose `find` mock re-implements WHERE-clause semantics, so deleting either the `result_id` or the role clause fails the suite. The attempt-1 falsification table was a report claim; this is an artifact |

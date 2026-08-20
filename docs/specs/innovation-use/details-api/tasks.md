@@ -757,7 +757,7 @@ A task is **not** done until: its verification command ran and is reported with 
   | **T-01 c1** — catalog `GET` returns ten rows in a `ServerResponseDto` | **BLOCKED ON T-13 c6** | The ten rows and the four columns are proven; the **live HTTP response** is not. T-01's own limits say *"No live `200`"* |
   | **T-01 c4** — the endpoint **renders** under the `Clarisa` tag with the bearer lock | **BLOCKED ON T-13 c6** | The decorators are proven at source; the **rendered surface** is precisely what T-13 c6 observes | (KZ-002)
 - [ ] Every scenario clause in §3 owned and discharged
-- [x] `npm test -- --silent` green · `npm run test:cov` ≥ 60% · `npm run test:fixtures` green **twice consecutively** — 336 suites / 2264 tests · 89.69 / 75.61 / 85.13 / 89.14 · 14 suites / 49 tests green on two consecutive runs (T-13)
+- [~] `npm test -- --silent` green · `npm run test:cov` ≥ 60% · `npm run test:fixtures` green **twice consecutively** — ⏳ **figures deliberately withheld pending the closing run.** The previous values (336 suites / 2264 tests · 89.69 / 75.61 / 85.13 / 89.14 · 14 suites / 49 tests) were stale on two successive validations, and a fix is in flight. Per both auditors, every figure is to be derived from **one** run and recorded here and in `test-report.md` together *(2026-08-20)*
 - [x] `npm run lint -- --quiet` clean, `git status` re-checked after — clean, **no mutation** (T-13)
 - [x] `/swagger` human check recorded verbatim — `execution.md` → *Human `/swagger` Observation* (2026-08-20)
 - [x] No migration was added (DD-4) — `git diff --stat src/db/migrations/` is empty, verified at T-13

@@ -11,7 +11,7 @@
 - **Depends on:** [`docs/specs/archive/2026-08-19-innovation-use--data-model-and-catalog/`](../../archive/2026-08-19-innovation-use--data-model-and-catalog/) — **satisfied**, status `done` in the family manifest
 - **Linked tickets:** AC-1679 (branch `AC-1679-Create-the-innovation-use-section`)
 - **Depth:** **Full** — new public API surface, an edit to the shared result-creation path, and transactional reconciliation of three nested collections
-- **Last updated:** 2026-08-19
+- **Last updated:** 2026-08-20
 
 ---
 
@@ -444,7 +444,7 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 
 **Details**
 
-- Behavior: every read, every `save`, and — critically — every **deactivate** query on `result_actors`, `result_institution_types` and `result_quantifications` MUST carry its role predicate.
+- Behavior: every read and every **deactivate** query on `result_actors`, `result_institution_types` and `result_quantifications` MUST carry its role predicate. The **id-present `save`** is the one exception — its predicate is the caller-supplied primary key — and it is therefore required to **pre-validate that key against `(result_id, role)` and reject with `400` before writing** *(amended 2026-08-20; the original text asserted the `save` carries a role predicate, which the implementation does not do — see AC.4's amendment note)*.
 - This is the spec's highest-severity risk (proposal R-1). `ResultActorsService.customSaveInnovationDev` deactivates by `{ result_id, is_active, actor_role_id }`; the Innovation Use equivalent must not drop that third key.
 
 **Acceptance criteria**
@@ -452,7 +452,8 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 - [ ] AC.1 — Saving the Innovation Use section on a result that also carries Innovation Dev actor rows leaves every Innovation Dev row's `is_active`, ids and column values unchanged.
 - [ ] AC.2 — The same holds for `result_institution_types` and `result_quantifications`.
 - [ ] AC.3 — Saving the section on result A does not touch any row belonging to result B.
-- [ ] AC.4 — Every deactivate/update predicate in the write path names the role column.
+- [x] AC.4 — Every **deactivate** predicate in the write path names the role column, **or** — for the id-present `save`, whose predicate is the primary key — that key is **pre-validated against `(result_id, role)` before the write executes**.
+  > ⚠️ **AMENDED 2026-08-20 — this is a NARROWING of the original criterion, not a demonstration that it held.** The original text read *"Every deactivate/update predicate in the write path names the role column"*, and the implementation **does not satisfy it as written**: the id-present `save` is a PK-keyed `UPDATE` in which `actor_role_id` is **assigned**, not filtered. Two independent auditors converged on this same amendment. It is recorded here rather than silently ticked because the delivered mechanism — reject-before-write via a role-and-result-scoped authorization read (`assertInnovationUseOwnership`) — is **different from, and arguably stronger than**, a role-bearing predicate: it returns `400` instead of silently matching zero rows. **The residual risk it does not cover** is that the guard is a property of *this endpoint*, not of the data: `customSaveInnovationDev` shares the same tables and has no such guard (see the follow-up ticket). Revert this amendment and the AC fails.
 
 #### Scenario: Innovation Dev is untouched
 

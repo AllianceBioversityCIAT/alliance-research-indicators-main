@@ -268,7 +268,7 @@ Mirrors `customSaveInnovationDev` (`result-actors.service.ts:88-152`) with three
 
 | Aspect | Innovation Dev (reference) | Innovation Use (this design) |
 | --- | --- | --- |
-| Role | `ActorRolesEnum.INNOVATION_DEV` | `ActorRolesEnum.INNOVATION_USE` **in every predicate** |
+| Role | `ActorRolesEnum.INNOVATION_DEV` | `ActorRolesEnum.INNOVATION_USE` **in every read and deactivate predicate**; on the id-present `save` the role is *assigned*, and the caller's PK is pre-validated against `(result_id, role)` instead *(corrected 2026-08-20 — said "in every predicate", which the save does not do)* |
 | Data columns | four booleans | five `int` counts |
 | `OTHER` handling | `actor_type_custom_name` kept only when `actor_type_id == OTHER` | **identical** — kept verbatim |
 | Deactivate step | `update({ result_id, is_active: true, actor_role_id: INNOVATION_DEV }, { is_active: false })` then `save` | same shape, role 2 |
