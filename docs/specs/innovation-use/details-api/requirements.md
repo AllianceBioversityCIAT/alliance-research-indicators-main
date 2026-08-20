@@ -179,6 +179,14 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 
 ## 7. Functional Requirements
 
+> ### ⚠️ The `- [ ]` boxes below are NOT the coverage record — read this before drawing a conclusion from them
+>
+> **All 73 acceptance-criteria checkboxes in this section are unticked, and that is deliberate.** *(Grepped, not asserted: `grep -c '^\s*- \[ \] AC\.'` = 73, `- [x] AC.` = 0. An earlier draft of this very paragraph said "72 of 73" — correct for the hour in which AC.4 was ticked, wrong the moment it was untickd. **A wrong count inside the paragraph arguing that counts must be grepped**, which is the sixth instance in this spec and is left on the record rather than quietly fixed.)* They are **authored state**, not verification state. The coverage authority for this spec is [`test-report.md`](./test-report.md)'s *Coverage & Traceability* matrix, which carries a per-AC verdict **with the test file that proves it** — evidence a checkbox cannot hold.
+>
+> **Why they were not ticked.** Ticking 72 boxes from that matrix would add no evidence while creating 72 new sites that can drift out of step with it. This spec has shipped **five** wrong counts and **five** documents asserting a property the code lacked; its measured failure mode is exactly *"the number gets corrected and the sentence does not."* An independent auditor ruled the decision **defensible in principle** and required this signpost, so that a reader seeing 73 unchecked boxes is not left to infer that 73 ACs are unverified.
+>
+> **No box is ticked, and the near-exception is instructive.** `R-IUA-009 AC.4` *was* ticked when first amended, and has since been **unticked**, because it was amended **twice** and still describes code that never changed. Had it stayed ticked it would have been the only tick in the section — so a reader scanning the column would have concluded AC.4 was the one *verified* criterion when it was the one *rewritten* criterion. It carries its own amendment note. Do not read the checkbox column as a quality signal in either direction.
+
 ### R-IUA-001 — Every Innovation Use result has a detail row from creation
 
 - **As a** Result Contributor
@@ -452,7 +460,16 @@ The second blind spot is inherited: **SQL logic sits outside the Jest coverage f
 - [ ] AC.1 — Saving the Innovation Use section on a result that also carries Innovation Dev actor rows leaves every Innovation Dev row's `is_active`, ids and column values unchanged.
 - [ ] AC.2 — The same holds for `result_institution_types` and `result_quantifications`.
 - [ ] AC.3 — Saving the section on result A does not touch any row belonging to result B.
-- [x] AC.4 — Every **deactivate** predicate in the write path names the role column, **or** — for the id-present `save`, whose predicate is the primary key — that key is **pre-validated against `(result_id, role)` before the write executes**.
+- [ ] AC.4 — Every **deactivate** predicate in the write path either (a) names the role column, (b) — for the id-present `save`, whose predicate is the primary key — has that key **pre-validated against `(result_id, role)` before the write executes**, or (c) — for **step 9's bulk deactivate** in `BaseServiceSimple.upsertByCompositeKeys` — draws its primary keys from a read **already scoped to `(result_id, role)`**.
+  > ⚠️ **AMENDED TWICE, 2026-08-20, and deliberately left UNTICKED.** *(First amendment: added clause (b). Second, same day: added clause (c) — because the first amendment was **still** false.)*
+  >
+  > **What the original said:** *"Every deactivate/update predicate in the write path names the role column."* The implementation does not do that, and never did.
+  >
+  > **What clause (b) missed.** An independent auditor found a **third** deactivate predicate that fits neither original text nor clause (b): step 9 dispatches to `BaseServiceSimple.upsertByCompositeKeys`, whose deactivation is `entityManager.update({ [this.primaryKey]: In(idsToDeactivate) }, { is_active: false })`. It names **no role column** and it is **not** the id-present `save` — it is a bulk update. I verified this at source.
+  >
+  > **Why it is nevertheless safe — and this is the part a future reader needs.** `idsToDeactivate` derives from `existingRecords`, read under `{ result_id, quantification_role_id: dataRole }` (the role key is applied because `QuantificationRolesEnum.INNOVATION_USE = 3` is truthy, so the `dataRole && this.roleKey` guard holds). **The safety rests on the scoping of the read that produced the ids, not on the `update`'s own predicate.** Delete the role key from that `find` and the deactivation silently widens with **no local sign of it** at the `update` site.
+  >
+  > **Left `[ ]` on purpose.** AC.4 has now been rewritten twice to match code that did not change, which makes a tick a claim about the *text* rather than about the *behaviour*. It is also this spec's **fifth** instance of asserting a property the code lacks — committed by the amendment written specifically to end that class. It stays unticked until a behavioural gate exists for clause (c), and until then the honest reading is: the property holds, and no test would notice if it stopped holding.
   > ⚠️ **AMENDED 2026-08-20 — this is a NARROWING of the original criterion, not a demonstration that it held.** The original text read *"Every deactivate/update predicate in the write path names the role column"*, and the implementation **does not satisfy it as written**: the id-present `save` is a PK-keyed `UPDATE` in which `actor_role_id` is **assigned**, not filtered. Two independent auditors converged on this same amendment. It is recorded here rather than silently ticked because the delivered mechanism — reject-before-write via a role-and-result-scoped authorization read (`assertInnovationUseOwnership`) — is **different from, and arguably stronger than**, a role-bearing predicate: it returns `400` instead of silently matching zero rows. **The residual risk it does not cover** is that the guard is a property of *this endpoint*, not of the data: `customSaveInnovationDev` shares the same tables and has no such guard (see the follow-up ticket). Revert this amendment and the AC fails.
 
 #### Scenario: Innovation Dev is untouched

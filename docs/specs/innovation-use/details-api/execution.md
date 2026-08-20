@@ -2164,6 +2164,8 @@ Closed before the re-run but never written down — an omission worth naming, be
 
 ### FAIL-5 — creation-path green-check transition (no prior entry; recorded here)
 
+> ⚠️ **Read this with the closure: FAIL-5's only gate is the fixture tier, and `design.md` §10.5.3 records that CI does not run it.** So "closed" here means *closed under a gate no automation executes* — a regression is caught only when a human runs `npm run test:fixtures`. FAIL-1 and FAIL-B are independently gated by `npm test` and do not share this exposure; **FAIL-5 does.** Raised by Auditor A at re-validation, and recorded at the closure rather than only in an advisory register, because a closure that omits the tier of its own gate overstates itself.
+
 The two auditors **disagreed** on this one: B reported it unaddressed, A reported it PASS. **A was right**, verified at source: `innovation-use-result-creation.fixture-spec.ts:767` `create()`, `:777` `update()`, green-check reads at `:769`/`:788`, and the `updated_by` assertion at `:810-813`.
 
 **B was misled by a stale comment at `:162`** which still read that `harness.innovationUseService.update()` *"was never called anywhere in this"* file — untrue since the FAIL-5 test was added. A stale comment produced a **false FAIL in an audit of a spec whose recurring defect is stale comments.** It is fixed in the same round as FAIL-B.
