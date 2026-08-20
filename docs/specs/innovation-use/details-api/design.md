@@ -385,7 +385,9 @@ New directory members under `test/fixtures/innovation-use/`. **Bands 900_000 …
 
 | # | File | Proves | Falsifying input |
 | --- | --- | --- | --- |
-| **F-A** | `innovation-use-section-round-trip.fixture-spec.ts` | Full save → read equality; add / edit / remove of each collection; audit columns | Drop the deactivate step → the removed row is still active |
+| **F-A** | `innovation-use-section-round-trip.fixture-spec.ts` | Full save → read equality; **add** and **remove** of each collection; **edit** of each collection that *has* a non-key column; audit columns on both the insert and the update-by-id branch of each collection | Drop the deactivate step → the removed row is still active |
+
+> **"edit of each collection" narrowed 2026-08-19 at T-09's review.** It was unachievable as written for quantifications: `requirements.md` R-IUA-008 makes all three fields (`quantification_number`, `unit`, `description`) the **composite reconciliation key**, so editing any one of them is definitionally remove-plus-add, not an update — the correct analogue is the unchanged resend, which F-A asserts. Actors and organizations do carry non-key columns and are editable in the ordinary sense. The row now also states the **audit** obligation at branch granularity, because a single collection's insert branch and update-by-id branch are separate code paths in separate helpers, and asserting one does not gate the other — the defect found at T-09 attempt 2, where `result-institution-types.service.ts`'s `SetAuditEnum.UPDATE` spread had no coverage at any tier.
 | **F-B** | `innovation-use-role-isolation.fixture-spec.ts` | One result seeded with **both** Innovation Dev and Innovation Use rows in all three tables; save Innovation Use with empty arrays; every Innovation Dev row byte-identical | Omit `actor_role_id` from the deactivate predicate → Innovation Dev rows flip to inactive |
 | **F-C** | `innovation-use-level-boundary.fixture-spec.ts` | Discriminating pair: catalog `id 6` (level 5) without explanation **accepts**; `id 7` (level 6) without explanation **rejects** | Compare the FK instead of `level` → the pair inverts |
 | **F-D** | `innovation-use-catalog-order.fixture-spec.ts` | The catalog service returns `level` `0…9` in order | **Weak by construction** — see §10.5 |
@@ -402,11 +404,13 @@ F-A, F-B and F-C must exercise the **service**, not raw SQL, or they prove nothi
 **Design:** a shared helper, `test/fixtures/innovation-use/nest-harness.ts`, building
 
 ```
-Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions), ResultInnovationUseModule] })
+Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions), GlobalUtilsModule, ResultInnovationUseModule] })
     .overrideProvider(CurrentUserUtil).useValue(stub with user_id + audit())
     .overrideProvider(ResultsUtil).useValue(stub with resultId)
     .compile()
 ```
+
+> **`GlobalUtilsModule` is required, not optional — the original sketch omitted it and could not boot** *(corrected 2026-08-19 at T-09's review)*. It is `@Global()` and imported once at `AppModule`'s root, which is the only reason `CurrentUserUtil`, `ResultsUtil` and `UpdateDataUtil` resolve inside any feature module. `ResultInnovationUseService`'s constructor requires `UpdateDataUtil`, and nothing in `ResultInnovationUseModule`'s own subtree provides it. A harness omitting it is not smaller, it is broken — and importing the same global module production relies on makes the harness's DI graph *closer* to production, not a workaround. This was a **design-document defect, not grounds for the escalation clause**, which governs an unfixable boot.
 
 `CurrentUserUtil` is `Scope.REQUEST` and injects `REQUEST`; `overrideProvider` is the standard Nest answer, and the class additionally exposes `setSystemUser()` as a second escape hatch.
 

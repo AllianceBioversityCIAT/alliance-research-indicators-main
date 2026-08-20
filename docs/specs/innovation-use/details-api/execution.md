@@ -1458,3 +1458,110 @@ Every child service is a `jest.fn()` — **KZ-001's exact double**. Proven: the 
 
 **Budget status:** **8 of 13 tasks complete.** **15 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1). Five tasks remain against ~9 rounds — and **all five are the DB-dependent ones this spec has never exercised**: T-09's Nest fixture harness (never built in this repo), T-10/T-11/T-12's fixtures against the scratch schema, and T-13's full gate. Everything closed so far has been mocked unit work at ~1.9 rounds/task. The remaining margin is thinner than 5-vs-9 suggests, and the next task is the one that finds out.
 
+### T-09 — Nest fixture harness + **F-A** section round trip
+
+- **Status at the time of this entry:** **`[x]` DONE** — PASS on **attempt 3 of 3**; 3 review rounds. The mechanism worked on attempt 1; all three rounds were spent on *coverage*, not on the harness.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 3 (of 3 — the ceiling was reached and not exceeded)
+- **Requirements in scope:** R-IUA-002 scenario (behavioural) · R-IUA-003 AC.1, AC.3, AC.6, AC.7 + scenario 2 · R-IUA-007 AC.1, AC.3 · R-IUA-008 AC.1, AC.2 · NFR-IUA-002
+- **Skills assigned:** `nestjs-expert`, `systematic-debugging` · **Effort:** `xhigh` → `max` (attempts 2 and 3, per the rework rule)
+- **Review mode:** parallel lens Reviewers (2) for attempts 1 and 2; **single Reviewer for attempt 3, a recorded deviation** from `max`'s parallel-lens default — the surface was one file / +20 lines with two narrow questions, and the *Delegation Ceiling* favours one subagent there.
+
+#### Leader environment pre-check (before any spawn)
+
+This is the first task in the spec that writes to a database, so Step 2.2's environment pre-check ran first rather than inside the Implementer.
+
+| Check | Result |
+| --- | --- |
+| **F-01 safety gate** (`docs/infrastructure.md`: *"A `TEST`-named variable is not evidence of a disposable target"* — on at least one machine `ARI_TEST_MYSQL_*` resolved to the same remote RDS as `ARI_MYSQL_*`) | **PASSED.** Resolved **hosts** compared, not variable names: shared dev DB `192.168.20.210`; TEST `127.0.0.1:3307`, a distinct loopback-bound disposable container. Had they matched, `migration:test:bootstrap` would have loaded a schema over a shared database — a human decision, never the Leader's |
+| `docker info` | UP |
+| Container | `research_indicators_server_test_mysql` created; MySQL readiness confirmed with `mysqladmin ping --wait=40` (`mysqld is alive`) rather than a blind sleep |
+| **`migration:test:bootstrap` run ONCE, by the Leader** | 215 tables, 356 migrations applied. Non-idempotent (FP-49) — a second run yields `ER_TABLE_EXISTS_ERROR`, a stated **disqualifier**, so every brief instructed the Implementer *not* to re-run it |
+| `clarisa_innovation_use_levels` | 10 rows, migration-seeded |
+
+**Four facts established by the pre-check that would otherwise each have cost an attempt**, all passed into the brief:
+
+1. **`indicators` is EMPTY (0 rows) while `results.indicator_id` → `indicators` is a real FK** — the single most likely first failure. Also the full child-table FK graph (`clarisa_actor_types`, `clarisa_institutions`, `clarisa_institution_types` ×2, `quantification_roles`, `report_years`, `clarisa_geo_scope`).
+2. `actor_roles` and `institution_type_roles` each contained **only id 2** ("innovation-use") — exactly this section's discriminator; `global-setup.ts` adds id 1 via `INSERT IGNORE`.
+3. **The task's claim that no fixture in this repo had ever built this mechanism is TRUE** — grep for `createTestingModule` / `TypeOrmModule.forRoot` / `@nestjs/testing` across `test/fixtures/` returned nothing; all seven existing fixtures use the raw `mysql2` driver. **Grep-checked rather than asserted**, after three consecutive rounds in which a Leader brief's claim about repo state had to be corrected by a Reviewer.
+4. Bands `900_000`–`900_600` taken, so `900_700` was next — supplied as corroboration only, with FP-45's "read the sibling headers yourself" left binding, because a band collision had already caused a FAIL in this spec family.
+
+#### Attempt 1 — both lenses `STATUS: FAIL`
+
+**Files created:** `test/fixtures/innovation-use/nest-harness.ts` (189) · `…/innovation-use-section-round-trip.fixture-spec.ts` (543). `npm run test:fixtures` → 10 suites / 33 tests.
+
+**The mechanism was ruled real, unhedged, by both lenses — and that is the finding that mattered most, because §10.1 rules the unit tier out of persistence entirely and T-10/T-11/T-12's behavioural proofs all sit at this tier.** Verified at source: the harness overrides **exactly two** providers (`CurrentUserUtil`, `ResultsUtil`), both genuinely necessary since both are request-scoped and `moduleRef.get()` cannot resolve them otherwise; `ResultInnovationUseService`, the three child services and `UpdateDataUtil` are all the **real** classes through Nest DI, pinned by `toBeInstanceOf`. **No raw-SQL fallback crept in** — SQL appears only in seeding, teardown and read-back assertions, which is the legitimate use; raw SQL substituting for the *save* would have been the prohibited fallback in disguise. And the harness structurally **cannot fabricate its own schema**: `orm.config.ts` sets `synchronize: false, migrationsRun: false`, so an empty schema fails loudly on `ER_NO_SUCH_TABLE` rather than passing silently — the disqualifier is cleared structurally, not merely by a green run.
+
+**The FAIL, found independently by both lenses:** Done criterion 4 claims `R-IUA-003 AC.3 + scenario 2`, **`R-IUA-007 AC.3`** and **`R-IUA-008 AC.2`**, and the fixture exercised only the first. It removed **actor B** and nothing else — the organization was resent by id, the quantification resent unchanged. Those are *different algorithms*: organizations reconcile through `ResultInstitutionTypesService.deactivateExistingRecords`; quantifications through `BaseServiceSimple.upsertByCompositeKeys`, which **reactivates** a matching soft-deleted row rather than inserting. Removing an actor proves nothing about either.
+
+**Why that was a gate and not an advisory:** nothing downstream catches it. T-04 defers AC.3 to a fixture; T-10's criteria cover only Innovation Use *actor* rows and Innovation *Dev* rows; and T-10's F-B saves **empty arrays**, taking `upsertByCompositeKeys`'s early-return branch — a different statement entirely. `tasks.md` §3's matrix makes **T-09 the sole owner of R-IUA-008 AC.2**; T-06's header claims it but carries no Done criterion and defers explicitly. So both ACs had **no behavioural gate anywhere in the spec** while T-09's header claimed them — the exact failure DD-16 was minted to prevent.
+
+#### Attempt 2 — split verdict, Leader adjudicated the FAIL as in-scope
+
+Fixture 543 → 691 (+147): two organizations, two quantifications, selective removal of one of each (**not** empty-array, which would take T-10's branch), both halves asserted, plus collection-length assertions on all three collections at both save points.
+
+**Lens 1 (falsifiability): PASS.** The soft-delete assertions genuinely have teeth against a **hard delete** — both read-backs select the dropped row by primary key with **no `is_active` predicate** and gate on `toBeDefined()` before touching a field. It constructed the clean falsifying mutation itself (swap `In(idsToDeactivate)`'s `update` for a `delete`) and confirmed `expect(quant2Row).toBeDefined()` becomes the sole failure. **7 of 8 new assertion halves independently falsifiable**, and the `toBeDefined()` halves pass under the deactivate-removal mutations, so they are not riding along behind the length checks.
+
+**Lens 2 (conformance/regression): FAIL**, on a second and narrower gap — **the organization *update-by-id* audit branch was asserted nowhere in the repository.** `result-institution-types.service.ts:240` spreads `...audit(SetAuditEnum.UPDATE)` inside `buildUpdateData`'s else-branch; the fixture asserted org1's post-save id, type, count and `is_active` but not its audit columns. Lens 2 checked every other tier before calling it: the unit spec mocks `audit` as a fixed return value and contains **no** assertion naming `created_by`, `updated_by` or a `SetAuditEnum` argument; T-04's criteria never mention audit; no sibling fixture reaches the path. **Net effect: deleting that line left the entire suite green.**
+
+**Leader adjudication — in scope, attempt consumed.** Grounded in criterion 5's own corrected text (*"`updated_by` equals it on every row a subsequent save updates by id"*, with both tables named for the NEW branch, establishing table granularity) and in R-IUA-003 AC.6, which §3's matrix assigns T-03/T-09 — T-03 covers actors only, so the organizations half of "updated rows" is T-09's alone. Structurally the same shape as attempt 1's FAIL one level down: the *actor* UPDATE branch standing in for the *organization* UPDATE branch, in a different service and a different helper.
+
+#### Attempt 3 — `STATUS: PASS`
+
+Fixture 691 → 711 (+20). The required org1 update-by-id audit assertion, plus the optional loop reshape of `it` #2's org/quant audit queries (pre-blessed by Lens 2 as *"free to fold in"*), closing org2's and quant2's `created_by`.
+
+**The falsification is the evidence, and the contrast is the point:** deleting `...audit(SetAuditEnum.UPDATE)` from `result-institution-types.service.ts:240` now fails **exactly one test** — `expect(Number(org1Audit.updated_by)).toBe(actingUserId)`, `Expected: 900720, Received: 0` — where before attempt 3 it left the whole suite green. Restored byte-identically; `git diff HEAD -- src/` empty.
+
+The Reviewer verified the failure mode is the one the assertion would actually produce, rather than accepting it: `buildUpdateData`'s else-branch object carries no `created_by`, so that column survives from the `SetAuditEnum.NEW` insert, and with `:240` deleted `updated_by` stays NULL → `Number(null) === 0`. It also confirmed **no accidental green-case coercion** — `Number(900720)` is the only value satisfying the assertion; NULL→0, undefined→NaN and 0 all fail against a non-zero sentinel.
+
+**The reshape strictly widened coverage rather than narrowing it.** The four-way audit discrimination survives intact and independently located — actors and institution-types first insert (`created_by` set, `updated_by` NULL, `SetAuditEnum.NEW`); quantifications first insert (**both** columns, `SetAuditEnum.BOTH`); by-id update (both, actors and org1); untouched actor B (`updated_by` still NULL) — plus the detail row. No assertion was deleted: each reshaped query kept its two per-row expectations and now applies them to **both** rows. Vacuity is closed by `expect(orgAudits.length).toBe(2)` / `expect(quantAudits.length).toBe(2)` **before** the loop, so a missing row fails on the length rather than the loop iterating zero times — the classic vacuous-pass shape, checked for and absent.
+
+#### Spec corrections applied across this task
+
+| Document | Correction |
+| --- | --- |
+| `design.md` §10.4 + `tasks.md` T-09 implementation note | **The harness sketch could not boot as written.** `ResultInnovationUseService` requires `UpdateDataUtil`, which nothing in `ResultInnovationUseModule`'s subtree provides; only the `@Global()` `GlobalUtilsModule` does, and it is imported once at `AppModule`'s root. The Implementer added it on attempt 1 and was **right** — importing the same global module production relies on makes the harness's DI graph *closer* to production, not a workaround. Ruled a **design-document defect, not grounds for the escalation clause**, which governs an unfixable boot |
+| `tasks.md` T-09 Done criterion 5 | Rewritten. The original (*"`created_by` / `updated_by` on written rows equal the stubbed acting user"*) asserts something the code never claims for a first insert — a fresh `result_actors`/`result_institution_types` row carries `updated_by = NULL` because the insert audits `NEW`. Now states the branch structure, and notes both columns are `select: false` on `AuditableEntity` so they can only be read by raw SQL |
+| `design.md` §10.3 F-A row | *"add / edit / remove of **each** collection"* narrowed. It was unachievable as written for quantifications: R-IUA-008 makes all three fields the **composite reconciliation key**, so editing any one is definitionally remove-plus-add, and the correct analogue is the unchanged resend F-A does assert. The row now also states the audit obligation at **branch** granularity — insert branch *and* update-by-id branch of each collection — which is exactly the distinction attempt 2's FAIL turned on |
+
+#### A correction to attempt 2's own reported reasoning
+
+Attempt 2 explained its failed third mutation as *"`buildNewData`'s natural-key lookup re-finds and reattaches the same id"*. **That is wrong, and Lens 1 corrected it at source: `processInstitution` branches on the *incoming DTO's* field, not on the built payload, so `buildNewData` is never reached by that mutation.** The real cause of `Field 'result_id' doesn't have a default value` is that **neither `buildUpdateData` branch sets `result_id`**. Recorded so the next reader does not inherit a wrong model of `processInstitution`.
+
+The organization "id unchanged" residual was ruled **benign and structural**: `buildUpdateData` copies the DTO's id verbatim and a delete-and-reinsert cannot silently succeed there, so nothing well-formed can break the assertion while staying green. Accepted rather than engineered around.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+- Nothing about HTTP, auth, the `ServerResponseDto` envelope, `ResultStatusGuard`, Swagger, or the `ValidationPipe` — this fixture calls the service directly, so **no DTO validation runs at all**.
+- **`R-IUA-003 AC.7 ("advances") holds only at SECOND granularity in production.** TypeORM's `UpdateQueryBuilder` appends `@UpdateDateColumn` as bare `CURRENT_TIMESTAMP` against a `timestamp(6)` column (upstream `todo`, verified at source). Two saves inside one wall-clock second leave `results.updated_at` unchanged, and the first save after an insert can move it **backwards**. The fixture's 1.1s delay is the correct way to test the requirement — deterministic, since `floor(T+1.1) > floor(T)` for all `T` — but **the residual is a real product-observable property no gate now covers.**
+- **Owed to T-10 (F-B):** R-IUA-009 AC.1–AC.4 + scenario (no Innovation Dev row is seeded here), R-IUA-007 AC.4, R-IUA-008 AC.3.
+- **Owed to T-11 (F-C/F-D):** R-IUA-006 AC.1–AC.4 behaviourally — this fixture saves catalog `id 7` *with* a valid explanation, so it cannot discriminate the `id 6`/`id 7` pair. R-IUA-010 AC.3, declared weak by construction.
+- **Owed to T-12 (F-E):** R-IUA-001 AC.1/AC.2 behaviourally, R-IUA-011 AC.1/AC.4/AC.5 + key-set clause, R-IUA-012 AC.1/AC.3.
+- **Owed to T-13:** NFR-IUA-001, NFR-IUA-003 coverage, the human `/swagger` check, the C-4 sweep, and the mandatory **double** consecutive fixture run.
+- **Two properties still unowned at every tier** *(named, not deferred — no task carries either)*: **(a) DD-14's partial-PATCH contract behaviourally** — both DTOs here send all five keys, so neither arm of `key present ? payload : stored` is exercised, and `!== undefined` vs `??` remains gated only by mocked unit specs; **(b) that `create` honors the `manager` it receives** (T-08 advisory B-4) — `it` #1 calls `create(resultId)` with no manager, so `selectManager`'s manager arm is unasserted. Lens B noted this tier **could** have bound (b) in ~6 lines via a deliberately rolled-back transaction; it was not a T-09 criterion, so it did not gate.
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| **Risk — production code, confirmed at source by two independent Reviewers** | **`buildUpdateData` returns a caller-supplied `result_institution_type_id` with no `result_id` and no ownership check anywhere in `customSaveInnovationUse`/`processInstitution`.** A payload carrying **another result's** row id updates that foreign row in place — role, institution type, `organization_count`, `is_active: true`, `updated_by` — while its `result_id` still points elsewhere. **Shared with `customSaveInnovationDev`, so it is a pre-existing platform defect, not one this spec introduced.** Note it is the *absence* of `result_id` that also prevents any organization mutation from failing cleanly | **Recorded; dies here.** R-IUA-009 **AC.3** already covers it (*"saving the section on result A does not touch any row belonging to result B"*) and **T-10 owns it** — but T-10's Scope as written seeds two results and saves only **empty arrays**, which never reaches this branch. **Carried as a forward pointer to T-10**, and escalated to the user at the gate |
+| Resilience | `afterAll` runs 9–11 **unguarded** `DELETE`s before `harness.close()`; +147 lines added two more. One throw mid-teardown leaks the Nest-managed connection *and* orphans the private `reporting_platforms` row. The sibling `innovation-dev-lifecycle-routines-unchanged.fixture-spec.ts` already has a `tryStep` helper for exactly this; moving `close()` into a `finally` is one line | Recorded. One degree worse than attempt 1, same in kind. Natural home is T-13's cleanup |
+| Reliability | The DD-9 resolved `innovation_use_level` scalar is never asserted. This is the one fixture that could prove the family's signature `id = level + 1` trap on the **read** side against the real migration-seeded catalog (T-11 proves only the write side). One line | Recorded |
+| Readability / KZ-005 | The header's reserved-value sweep is complete on the band axis but omits `sp-versioning-objective-blocks`'s year **2094**. The chosen 2109 collides with nothing, so documentation gap, not defect — but the next author reading the header *as the registry* inherits an incomplete list, which is FP-45's failure mode restated | Recorded |
+| Readability | The two 1.1s waits and their TypeORM rationale are the clearest explanation of that trap anywhere in the repo. Worth lifting into the harness before T-10 copy-pastes it a third time | Recorded |
+| Risk | The fixture depends on intra-file `it` ordering (ids captured in #2, consumed in #3), guarded correctly — the precondition assertions redden rather than pass vacuously. Worth keeping as the documented pattern for T-10/T-11/T-12 | Recorded |
+
+**Final verification:** `npm run test:fixtures` → **10 suites / 33 tests all passing** · `git diff HEAD -- server/researchindicators/src/` **empty** · container up and bootstrapped **once** — all re-run independently by the Leader at each attempt, not relayed.
+
+**Forward pointers created by T-09**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-10 (F-B)** | **Three items.** (a) **The A-6 defect above** — R-IUA-009 AC.3 is T-10's, and T-10's Scope as written (two results, **empty-array** saves) does not reach the id-present branch. Add the case explicitly: seed result 2 with an Innovation Use organization row and submit its `result_institution_type_id` inside result 1's payload. (b) T-10's empty-array saves take `upsertByCompositeKeys`'s early-return branch — a **different statement** from the `In(idsToDeactivate)` branch T-09 now gates; do not read one as covering the other. (c) The 1.1s second-boundary guard will be needed again if T-10 asserts timestamps — lift it rather than copy it |
+| **T-11 (F-C)** | F-A saves catalog `id 7` **with** a valid explanation, so it exercises the accept side only and **cannot** discriminate the `id 6`/`id 7` pair. That discrimination is entirely T-11's, and it is the family's signature trap |
+| **T-12 (F-E)** | **A blocker to resolve before starting, not during.** `indicators` is **EMPTY** on the scratch schema while `results.indicator_id` is a real FK. F-A sidesteps it legitimately (nullable; no path it exercises reads it), but F-E **must** create an `indicator_id = 6` result through `ResultsService`. That needs `indicators` id 6 seeded — a **cross-file shared catalog row of exactly the class `global-setup.ts` owns**, so decide ownership (global-setup vs per-file) up front rather than discovering it as an `ER_NO_REFERENCED_ROW` mid-task. Also the natural owner for T-08's advisory B-4, since F-E drives `createResultType` inside its real transaction |
+| **T-13** | Candidates for the cleanup pass, none of them added criteria: the `afterAll` `tryStep`/`finally` guarding, the DD-9 read-side level assertion, the header's missing year 2094, and lifting the 1.1s helper |
+| Kaizen (archive) | Four candidates: **(a)** a Leader environment pre-check that resolves FK-graph facts up front converted the most failure-prone task in the spec into three coverage rounds with **zero** environment failures — the pre-check is the highest-leverage Leader action found so far; **(b)** *the mechanism working is not the mechanism proving anything* — all three T-09 rounds were coverage, none was the harness; **(c)** a Reviewer correcting the *Implementer's stated cause* for its own failed mutation (the `buildNewData` misattribution) is a distinct review value beyond pass/fail; **(d)** an assertion can be *structurally unfalsifiable and still correct* (the org id residual) — "unfalsified" and "weak" are not synonyms, and conflating them would have spent the last attempt on nothing |
+
+**Budget status:** **9 of 13 tasks complete.** **18 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1, T-09 ×3). Four tasks remain against ~6 rounds. **The harness risk — the single largest unknown in this spec — is now retired**, and T-10/T-11/T-12 all reuse it, which is the strongest reason to expect the remaining tasks to cost less per task than T-09 did. Against that: T-12 carries the `indicators` blocker above, and T-13 is a full-gate task with a human check. Reported at the gate, not deferred.
+

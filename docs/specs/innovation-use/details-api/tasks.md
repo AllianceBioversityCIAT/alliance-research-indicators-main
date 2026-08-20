@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` done — closed on attempt 2 after the Pivot. T-08 `[x]` done — PASS on attempt 1.** T-09 … T-13 todo — **all five remaining tasks are the DB-dependent ones this spec has not yet exercised.** Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **15 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. T-10 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **18 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -444,7 +444,7 @@ Full `npm test -- --silent`. **Falsifying input:** omit the `ipAvailables` membe
 - **Requirements covered:** R-IUA-002 scenario (behavioral) · R-IUA-003 AC.1, AC.3, AC.6, AC.7 + scenario 2 · R-IUA-007 AC.1, AC.3 · R-IUA-008 AC.1, AC.2 · NFR-IUA-002
 - **Depends on:** T-07, T-08
 - **Size:** L (~370 LOC) · **Effort:** `xhigh` — a mechanism no fixture in this repo has ever built
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — PASS on **attempt 3 of 3**; 3 review rounds. **The harness booted on attempt 1 and was ruled real by both lenses** (exactly two overrides, both request-scoped and genuinely necessary; every other class real through Nest DI; no raw-SQL fallback; `synchronize: false` means an empty schema fails loudly rather than passing) — **all three rounds were spent on coverage, not on the mechanism.** Attempt 1 removed only an actor, leaving R-IUA-007 AC.3 and R-IUA-008 AC.2 ungated **anywhere in the spec** (T-09 is the sole owner of the latter); attempt 2 closed that but left the organization *update-by-id* audit branch unasserted at every tier — deleting its `SetAuditEnum.UPDATE` spread left the whole suite green; attempt 3 closed it, and the falsification now reddens exactly one test. Three spec corrections applied at review (§10.4's sketch could not boot; criterion 5 asserted a fact the code never claims on a first insert; §10.3's "edit of each collection" was unachievable for composite-key quantifications). Fixture suite **10 suites / 33 tests**. Evidence: [`./execution.md`](./execution.md) → *T-09*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -458,7 +458,7 @@ A shared helper that boots a Nest `TestingModule` against the **TEST** datasourc
 
 **Implementation notes**
 
-- `Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions), ResultInnovationUseModule] })` with `.overrideProvider(CurrentUserUtil)` and `.overrideProvider(ResultsUtil)`. `CurrentUserUtil` is `Scope.REQUEST`; `overrideProvider` is the standard answer, and `setSystemUser()` is a second escape hatch.
+- `Test.createTestingModule({ imports: [TypeOrmModule.forRoot(testDataSourceOptions), **GlobalUtilsModule**, ResultInnovationUseModule] })` with `.overrideProvider(CurrentUserUtil)` and `.overrideProvider(ResultsUtil)`. **`GlobalUtilsModule` is mandatory** — `ResultInnovationUseService` requires `UpdateDataUtil`, which only that `@Global()` module provides; the sketch without it cannot boot *(corrected 2026-08-19 at T-09's review; `design.md` §10.4)*. `CurrentUserUtil` is `Scope.REQUEST`; `overrideProvider` is the standard answer, and `setSystemUser()` is a second escape hatch.
 - **Band:** `900_000`–`900_600` are taken. **Read every sibling `*.fixture-spec.ts` header and take the next unused band** (FP-45) — do not copy a list from this document.
 - **Seeding discipline:** this is a *copy* fixture → **maximally distinct sentinel values** on every column, so a positional transposition is visible (FP-48).
 - Never create or tear down the four rows `global-setup.ts` owns (`STAR`, `result_status` 8, `actor_roles` 1, `institution_type_roles` 1).
@@ -466,15 +466,15 @@ A shared helper that boots a Nest `TestingModule` against the **TEST** datasourc
 
 **Done criteria**
 
-- [ ] **End-to-end criterion (KZ-006):** the harness boots, resolves the real `ResultInnovationUseService`, and completes **one real save against the scratch MySQL**. Per-piece checks do not satisfy this
-- [ ] Save → read equality across level, explanation, two actors (one per mode), one organization with a count, one quantification *(R-IUA-003 AC.1, R-IUA-007 AC.1, R-IUA-008 AC.1)*
-- [ ] **Edit** an actor row and re-save; the row's id is preserved and values change
-- [ ] **Remove** actor B from a saved set A/B/C: B is `is_active = FALSE`, A and C stay active with ids intact, **B's row still exists** *(R-IUA-003 AC.3 + scenario 2's `AND IT MUST NOT hard-delete B`; R-IUA-007 AC.3; R-IUA-008 AC.2)*
-- [ ] `created_by` / `updated_by` on written rows equal the stubbed acting user *(R-IUA-003 AC.6)*
-- [ ] `results.last_updated_date` advances across the save *(AC.7)*
-- [ ] Derived `total` on the read matches the seeded parts in both modes *(R-IUA-002 scenario)*
-- [ ] `npm run test:fixtures` reports a **non-zero** collected-test count and passes from a freshly bootstrapped container *(NFR-IUA-002)*
-- [ ] The report states the container state and the collected count
+- [x] **End-to-end criterion (KZ-006):** the harness boots, resolves the real `ResultInnovationUseService`, and completes **one real save against the scratch MySQL**. Per-piece checks do not satisfy this
+- [x] Save → read equality across level, explanation, two actors (one per mode), one organization with a count, one quantification *(R-IUA-003 AC.1, R-IUA-007 AC.1, R-IUA-008 AC.1)*
+- [x] **Edit** an actor row and re-save; the row's id is preserved and values change
+- [x] **Remove** actor B from a saved set A/B/C: B is `is_active = FALSE`, A and C stay active with ids intact, **B's row still exists** *(R-IUA-003 AC.3 + scenario 2's `AND IT MUST NOT hard-delete B`; R-IUA-007 AC.3; R-IUA-008 AC.2)*
+- [x] **`created_by` equals the stubbed acting user on every row this save inserts, and `updated_by` equals it on every row a subsequent save updates by id.** A freshly-inserted `result_actors` / `result_institution_types` row carries **`updated_by = NULL`**, because `customSaveInnovationUse` audits a first insert with `SetAuditEnum.NEW`; a quantification row carries **both** columns, because `upsertByCompositeKeys` spreads `SetAuditEnum.BOTH`. Assert the branch, not a blanket value *(R-IUA-003 AC.6. **Wording corrected 2026-08-19 at T-09's review** — the original read "`created_by` / `updated_by` on written rows equal the stubbed acting user", which asserts a fact the code never claims for a first insert. Both columns are `select: false` on `AuditableEntity`, so they can only be read by raw SQL, never through the service's own read)*
+- [x] `results.last_updated_date` advances across the save *(AC.7)*
+- [x] Derived `total` on the read matches the seeded parts in both modes *(R-IUA-002 scenario)*
+- [x] `npm run test:fixtures` reports a **non-zero** collected-test count and passes from a freshly bootstrapped container *(NFR-IUA-002)*
+- [x] The report states the container state and the collected count
 
 **Verification & its limits**
 
