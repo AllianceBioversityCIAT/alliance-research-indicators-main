@@ -1,5 +1,5 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05)
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
@@ -19,6 +19,8 @@ import {
   BilateralProjectMapping,
   ClarisaBilateralProjectOption
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
+import { BilateralMappingCoverageComponent } from './components/bilateral-mapping-coverage/bilateral-mapping-coverage.component';
+import { AutomapperDialogComponent } from './components/automapper-dialog/automapper-dialog.component';
 
 type ActiveFilter = 'all' | 'active' | 'inactive';
 type DialogMode = 'create' | 'edit';
@@ -48,6 +50,7 @@ type SourceFilter = 'all' | BilateralMappingSource;
 const SOURCE_OPTIONS: SelectOption<SourceFilter>[] = [
   { label: 'All sources', value: 'all' },
   { label: 'Manual', value: 'MANUAL' },
+  { label: 'Derived', value: 'DERIVED' },
   { label: 'AI Suggested', value: 'AI_SUGGESTED' },
   { label: 'AI Auto', value: 'AI_AUTO' }
 ];
@@ -65,7 +68,9 @@ const SOURCE_OPTIONS: SelectOption<SourceFilter>[] = [
     SelectModule,
     ButtonModule,
     DialogModule,
-    TextareaModule
+    TextareaModule,
+    BilateralMappingCoverageComponent,
+    AutomapperDialogComponent
   ],
   templateUrl: './bilateral-mapping.component.html',
   styleUrl: './bilateral-mapping.component.scss',
@@ -253,9 +258,26 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   sourceLabel(source: BilateralMappingSource): string {
     switch (source) {
       case 'MANUAL': return 'Manual';
+      case 'DERIVED': return 'Derived';
       case 'AI_SUGGESTED': return 'AI Suggested';
       case 'AI_AUTO': return 'AI Auto';
     }
+  }
+
+  // ── Automapper dialog state & handlers (T-06) ─────────────────────────────
+  readonly automapperDialogOpen = signal(false);
+  readonly phase = signal(2026);
+
+  /** Child coverage strip viewChild for programmatic refresh on automapper apply. */
+  readonly coverageComponent = viewChild(BilateralMappingCoverageComponent);
+
+  openAutomapperDialog(): void {
+    this.automapperDialogOpen.set(true);
+  }
+
+  onAutomapperApplied(): void {
+    void this.load();
+    void this.coverageComponent()?.loadCoverage();
   }
 
   // ── Dialog / form (T-BIL-CAM-05) ──────────────────────────────────────────

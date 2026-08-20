@@ -275,6 +275,32 @@ Per the Lite skip rule this challenge was optional at Standard depth for a purel
 > **The Kaizen candidate this spec produces is narrower and sharper than "write better tests":**
 > **K-004 binds the argument as tightly as it binds the command.** If the red has not been seen, it may not
 > be asserted — not in a code comment, not in a dispatch brief, not in a review verdict.
+>
+> ---
+>
+> **⚠️ CORRECTION, 2026-08-20 at T-06 review — the claim above that "not one was a behaviour defect" is
+> now FALSE, and it was the basis on which the user elected to continue past the budget.**
+>
+> **T-06's review found a real production defect**, the first in the spec: opening the auto-mapper dialog
+> never loads the preview. The component mounts once with `visible() === false`, `ngOnInit` skips the
+> load, and nothing re-triggers it when the signal flips — so R-CAM-002's trigger→preview flow does not
+> run at all. The admin sees an empty dialog until they press Refresh by hand.
+>
+> **The suite was green because the fixture never reproduces the production sequence.** Every dialog test
+> sets `visible=true` *before* the first `detectChanges()`, so `ngOnInit` always observes `true`. The
+> assertions are not weak — they assert a situation that never occurs. This is the spec's recurring
+> failure mode at one level up: not a fixture that fails to discriminate, and not a scaffold that cannot
+> (T-03's no-op stub), but **a fixture that tests a state the product never reaches.**
+>
+> **The corrected estimating lesson:** four of the six rounds went to evidence discharge, and the budget
+> analysis above holds *for those*. But a review round is not only evidence bookkeeping, and sizing a
+> budget on that assumption is what made this paragraph wrong the first time.
+>
+> **One thing the overrun bought that was not planned.** T-06 was dispatched cross-host to Antigravity
+> (Gemini 3.7 Flash) to save tokens; the review ran on Claude/opus. The only behaviour defect in seven
+> tasks was written by one model family and caught by another. `author ≠ auditor` held on **family**, not
+> just instance — the strongest separation this spec had, and it is what caught the one thing five
+> same-family review rounds had not needed to.
 
 ---
 

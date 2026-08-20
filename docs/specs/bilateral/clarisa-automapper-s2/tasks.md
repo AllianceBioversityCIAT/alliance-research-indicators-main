@@ -2,7 +2,7 @@
 
 - **Module:** bilateral — server + client
 - **Spec id:** 2026-08-clarisa-automapper-s2
-- **Status:** not-started
+- **Status:** ✅ all 7 tasks done — T-00…T-05 server (PR 1), T-06 client (PR 2). Visual check outstanding
 - **Owner:** Juan Carlos Cadavid
 - **Linked requirements:** [./requirements.md](./requirements.md)
 - **Linked design:** [./design.md](./design.md)
@@ -283,7 +283,7 @@ npx eslint <files>
 - **Dependencies:** T-05
 - **Files:** `client/…/bilateral-mapping/` — coverage strip + run surface components (+ specs)
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Effort:** M · **Status:** todo
+- **Effort:** M · **Status:** ✅ **done** — Reviewer `STATUS: PASS` on attempt 2 (see `execution.md`). **Implemented cross-host on Antigravity (Gemini 3.7 Flash), reviewed on Claude/opus**
 
 **Scope.** Three-card strip above the existing table, plus the run surface: trigger, preview grouped by bucket, explicit apply.
 
@@ -309,13 +309,17 @@ npm run build
 **What disqualifies this evidence.** ⚠️ **A targeted client jest run without `--coverage=false` exits 1 with every test passing** (K-020, measured). An exit code from such a run is not a signal. And **jsdom cannot evaluate rendered layout or contrast** — the card arrangement and the visual weight of the grey/omitted treatment are **not** covered by any test here. **Substitute: a human look at the screen at the HITL pause.** Record it performed or explicitly outstanding.
 
 **Done check.**
-- [ ] The denominator string is asserted, not just the numbers
-- [ ] Exactly three cards; no unpaired-contract figure anywhere in the component
-- [ ] Loading, error and empty states each asserted
-- [ ] Labels use `short_name — full_name`; no bare id in the run surface
-- [ ] `ambiguous` and `divergent` show both candidates
-- [ ] `npm run build` exit 0 (new client code is not type-checked by jest or ng lint — K-002)
-- [ ] Visual check performed **or** explicitly recorded as outstanding
+- [x] The full denominator **sentence** is asserted — `'Coverage 4 / 198 · 2% (eligible CLARISA projects, phase 2026)'` — on both the computed signal and the rendered element, not just the numbers. Observed red with the element removed
+- [x] Exactly three cards, observed red with a fourth added. No contract total anywhere in the surface — `AutomapperCoverage` is three fields wide and no figure, label, `title` or `aria-label` exposes one (DD-6)
+- [x] Loading, error and empty each asserted and **mutually exclusive by construction** via the `@if/@else if` chain, so empty cannot be mistaken for loading. The loading test asserts **zero** card-value elements — the right shape for "never a flashed 0". Both observed red
+- [x] Labels collapse to a single name when `short_name === full_name`, which is **every project on the real feed** — asserted on both branches, including the negative `not.toContain('Project D514 — Project D514')`. A project with neither name falls back to `Project #<id>`. ⚠️ One bare id remains by necessity: the *existing* side of a divergent row, because `AutomapperReconciledEntry` carries no name for it and ids 22/138/246 sit outside the cohort. Recorded as a server-side follow-up
+- [x] `ambiguous` and `divergent` both show both candidates. The ambiguous fixture carries **two** colliding rows sharing one `derivedContractId`, each pinned individually, so the test distinguishes "renders all" from "renders the first"
+- [x] An empty derived contract id renders an explicit **"no external_code"**, never an empty cell
+- [x] The apply confirmation is **honest about re-resolution** (RB-8) — it states the run is re-evaluated against current data and never promises the previewed set; `feedFetchedAt` is shown alongside
+- [x] **The dialog loads its preview when opened** — the production defect found in attempt 1. Observed red against the unfixed code with a test that reproduces the real sequence (construct `visible=false`, then open)
+- [x] **The coverage strip refreshes after a successful apply** — observed red before the fix
+- [x] `npm run build` **exit 0**, measured by the Leader — the only type gate new client code has (K-002). Full client suite **310/311 suites, 6465/6468 tests**; the 3 failures are in `to-promise.service.spec.ts` and were **proven pre-existing** by stashing the client changes and re-running
+- [x] Visual check **explicitly recorded as OUTSTANDING** — not performed, not claimed. jsdom cannot evaluate rendered layout or contrast, and the inert `atc-green-800` plus six dead `hover:` classes found in attempt 1 were exactly that class of defect, caught by reading code rather than by any test. The human look is load-bearing here
 
 ---
 

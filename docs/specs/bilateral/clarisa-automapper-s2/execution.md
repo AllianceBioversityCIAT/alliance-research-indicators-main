@@ -826,3 +826,97 @@ Per the advisory-never-grows-scope rule. Each is real; none is in the approved `
 
 **Outstanding, not a finding:** the `/swagger` render is unverified in-sandbox. **Recorded outstanding**
 alongside T-06's visual check rather than claimed — the decorators are statically verified, the render is not.
+
+### T-06 — Client: coverage strip and run surface — **PASS (attempt 2 of 3)**
+
+- **Date:** 2026-08-20 · **Package:** `client/research-indicators` · **Reviewer verdict:** `STATUS: PASS`
+- **Dispatched CROSS-HOST to Antigravity** (Gemini 3.7 Flash, effort high) via Orca orchestration —
+  Run `run_60c349f2cab8`, Task `task_9ba5226f8c62`, Dispatch `ctx_d96bcb4bc809`. Reviewed on Claude/opus.
+
+#### Why the cross-host dispatch mattered more than the tokens it saved
+
+The user asked for agy to save context. What it also bought was **`author ≠ auditor` on model *family*,
+not just instance** — and the spec's **only behaviour defect in seven tasks** was written by one family
+and caught by the other. Five same-family review rounds had never needed to catch one.
+
+#### Dispatch mechanics — three failure modes hit, all recorded because each nearly cost a wrong conclusion
+
+1. **`worker-start --agent gemini` is disabled on this install** (`agent_unconfigured`), exactly as root `CLAUDE.md` records. The documented fallback — `terminal create` + `dispatch --inject` — is correct and preserves full Run/Task/Dispatch provenance.
+2. **agy sat on its sign-in screen for ~90 s with the buffer cursor frozen.** Dispatching into it would have hit the failure the playbook names: *a target that is not live accepts the order and produces nothing, and the failure surfaces only as silence.* Held until the user confirmed, then verified the prompt at a live `>` before injecting.
+3. **`dispatch --inject` returned `injected: true` BEFORE the prompt was accepted.** Per root `CLAUDE.md`, agy's TUI satisfies idle before it takes input. **The buffer was read back** and confirmed the whole brief landed (cursor 48 → 917) and that agy was already reading `.agents/implementer.md`. Trusting the `true` would have made a lost send indistinguishable from a worker thinking.
+
+**Two Leader errors on the orchestration path, recorded because both were near-misses:**
+- `check --wait` was called with `--from` (invalid; `check` takes `--terminal`/`--run` while `send` takes `--from`). It returned `ok: false`, and the Leader **almost read that as "no messages"** — a count over a failed command is a confident zero, **K-014** precisely. Caught by inspecting the raw error instead of the `count` field.
+- The Run is bound to the coordinator **pane**, so reads from the Leader's own shell returned `consumer_fenced`. This background job has a terminal handle but **no stable pane identity**, so it cannot itself be an Orca coordinator; an idle `zsh` in the same worktree was used as the coordinator identity. The other live Claude session's terminal was deliberately **not** used — hijacking it would have interleaved two sessions' orchestration state.
+
+**The worker did the work and under-reported it, twice.** Its first `worker_done` body was a prose summary
+claiming the falsifiers ran; the actual jest `FAIL` output with file paths and line numbers was sitting in
+its terminal buffer. *Workers reliably do the work and unreliably remember to mail it* — the evidence was
+recovered from the buffer rather than re-run. Both rework `worker_done` messages were then **rejected**
+(`Dispatch capability is revoked`) because the first had already settled the dispatch; their bodies were
+still readable as rejected-message content.
+
+#### Attempt 1 — `STATUS: FAIL`, and the first REAL behaviour defect of the spec
+
+**Issue 1 — opening the dialog never loaded the preview.** The parent renders the dialog unconditionally
+with `automapperDialogOpen = signal(false)`, so the component mounted **once** with `visible() === false`
+and `ngOnInit` skipped the load. Clicking *Auto-map* flipped the signal and showed the dialog, but nothing
+re-triggered the fetch — no `effect`, no `ngOnChanges`, no `(onShow)`. **The admin saw an empty dialog
+until pressing Refresh by hand.** R-CAM-002's trigger→preview flow did not run in production.
+
+**And the suite was green** because every dialog test called `setInput('visible', true)` **before** the
+first `detectChanges()`. The fixture never reproduced the production sequence — construct-false-then-open.
+**This is the spec's recurring failure mode one level up again:** not a fixture that fails to discriminate
+(T-02, T-04), not a scaffold that cannot (T-03's no-op stub), but **a fixture asserting a state the product
+never reaches.** The assertions were not weak; they were about a situation that does not occur.
+
+**Issue 2 — the coverage strip never refreshed after apply.** `onAutomapperApplied()` reloaded the table
+only, so after writing ~190 rows the strip still showed pre-apply figures. The dialog's own output contract
+said *"so parent can reload list **and coverage**"*. The on-screen TTL note did **not** excuse it: server-side
+`mapped`/`pending` come from a live mapping-table query, not the cached CLARISA cohort — the staleness
+explanation pointed at the wrong cause. **K-016 in its inverse form:** a UI implying the save did *not*
+take effect.
+
+**Issue 3 — `atc-green-800` does not exist.** `colors.scss` generates `.atc-*` from a map whose green scale
+stops at `green-700`. **A token that is present and does nothing** — a presence check certifying a no-op.
+Plus six inert `hover:abc-grey-100` (Tailwind cannot synthesise a variant for a plain global class), so the
+rows had no hover feedback at all.
+
+#### Attempt 2 — all three fixed, each with observed red
+
+| Issue | Fix | Observed RED |
+| --- | --- | --- |
+| 1 | `effect(() => { if (this.visible()) untracked(() => void this.loadPreview()); })`; `ngOnInit` removed entirely; `closeDialog()` now clears `preview` and `activeTab` | `toHaveBeenCalledTimes(1)` → `Received: 0` |
+| 2 | `viewChild(BilateralMappingCoverageComponent)` + `loadCoverage()` from `onAutomapperApplied()` | `getCoverage toHaveBeenCalled` → `Received: 0` |
+| 3 | `atc-green-700`; all six hovers → `hover:bg-[var(--ac-grey-100)]` | n/a — token/class correctness |
+
+**Reviewer findings on the fix that the Leader had not seen:**
+- **`untracked` is load-bearing for a reason neither the Leader nor the worker stated.** The effect's only tracked read is `visible()` — but `loadPreview()` reads `this.phase()` **synchronously**, before its `await`. Without `untracked`, that read would enter the dependency set and a phase change would re-trigger the effect. The signal *writes* were never the issue.
+- **The Leader's suspicion about `visible.set(false)` was answered cleanly:** `visible` is `model<boolean>(false)`, not `input()`, so `.set()` is part of its API and propagates through the parent's `[(visible)]` binding. Had it been a plain `input()`, that line would have been a bug.
+- **The `viewChild` is safe:** the coverage component sits directly in the always-rendered page body, not inside any `@if`/`@defer`/`@switch`. And the test's `getCoverage.mockClear()` is what makes it behavioural — the call it clears can only have come from the real child's `ngOnInit`, proving a genuine child instance is in the tree rather than a stub.
+- **The two-element ambiguous fixture now discriminates** — both rows pinned individually, and `counts.ambiguous` updated in both fixtures so no drift can mask a future count/list mismatch.
+
+#### Leader's measurements (quiet window)
+
+| Gate | Result |
+| --- | --- |
+| `npm run build` (client) | **exit 0** — the only type gate new Angular code has (K-002) |
+| Full client suite | **310/311 suites · 6465/6468 tests** |
+| The 3 failures | **PROVEN pre-existing**: stashed the client changes, re-ran, same 3 red. `to-promise.service.spec.ts`, `managementApiUrl`/`mainApiUrl` env values, unrelated to the automapper. Not fixed — unapproved scope |
+
+#### ⚠️ OUTSTANDING — the only uncovered obligation on this task
+
+**The visual check is NOT done and is not claimed.** jsdom cannot evaluate rendered layout or contrast.
+The worker's first report said *"None"* outstanding; that was wrong and was corrected. **Issue 3 and the
+six dead hovers were exactly the class jsdom cannot see** — all three were caught by reading code, not by
+any test. That makes the human look **load-bearing, not ceremonial**, and it is worth taking before the
+spec closes rather than after. One further item belongs to it: two ambiguous rows sharing a contract id
+render sequentially and **ungrouped**, with nothing guaranteeing the server returns them adjacently — whether
+that reads as a collision on screen is a judgement no test here can settle.
+
+#### ADVISORY (recorded, not work)
+
+- **Two in-flight previews are not sequenced.** Open → close → reopen faster than the round trip leaves two `previewAutoMap` promises outstanding with no cancellation, so a slow first response can land after a fast second. Not user-visible today: reopening sets `loadingPreview` synchronously so the stale value never reaches the screen, and RB-8's server-side re-resolution means a stale preview can never write. A monotonic request counter is ~4 lines if ever worth taking.
+- **The `untracked` boundary interacts with the hardcoded-`phase` follow-up.** `phase` is deliberately outside the effect's dependency set, so an open dialog will not reload if it changes. Inert today (`signal(2026)`, never written) — but whoever makes `phase` dynamic must decide whether an open dialog should refetch.
+- **The divergent panel shows a bare `Project ID 22`.** Not fixable in T-06: `AutomapperReconciledEntry` carries no name for the *existing* project, and ids 22/138/246 sit outside the 198-project cohort where `full_name` is guaranteed. Server-side follow-up — the mapping row already stores `clarisa_project_short_name`.
+- **`phase` is hardcoded to 2026 in three places** and always sent, so the surface ignores the admin-configured phase (`resolvePhase` treats the argument as an override). Design §6.1's mockup says *phase 2026*, so it is out of written scope; the fix needs a server-returned `phase_used`, which `AutomapperCoverage` does not carry.
