@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[~]` blocked (Pivot) — a confirmed cross-result data-corruption defect, pre-existing and shared with Innovation Dev; role isolation itself holds.** T-11 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **19 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[~]` blocked (Pivot) — a confirmed cross-result data-corruption defect, pre-existing and shared with Innovation Dev; role isolation itself holds.** **T-11 `[x]` done.** T-12 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **21 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -534,7 +534,7 @@ As T-09. **Falsifying input:** remove `actor_role_id` from T-03's deactivate pre
 - **Requirements covered:** R-IUA-006 AC.1, AC.2, AC.3, AC.4 + scenario (behavioral) · R-IUA-010 AC.3
 - **Depends on:** T-01, T-06
 - **Size:** M (~260 LOC) · **Effort:** `xhigh` — the family's signature trap
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — PASS on **attempt 2 of 3**; 2 review rounds. **Both fixtures were behaviourally correct on attempt 1** — the discriminating pair discriminates, FP-48's inversion was honoured, and the harness extension is purely additive with `StubCurrentUserUtil` reused unchanged. The FAIL was a **factually impossible claim in a durable comment** ("both halves go red together"), whose root cause was this document and `design.md` §10.3 — `requirements.md` had it right all along, and the Leader's own brief propagated the drift. F-D is green and **declared weak on the record**: deleting T-01's `order` override leaves it green, so **no tier behaviourally guarantees catalog ordering**. Suite 13 suites / 44 tests (the 2 failures are T-10's). Evidence: [`./execution.md`](./execution.md) → *T-11*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -556,16 +556,18 @@ F-D: the catalog service returns `level` `0…9` in order.
 
 **Done criteria**
 
-- [ ] `id 6` / level 5, no explanation → **accepted** *(R-IUA-006 AC.2)*
-- [ ] `id 7` / level 6, no explanation → **rejected `400`** *(AC.1)*
-- [ ] Both assertions live in one test body, and the test name states that inverting them is the defect being caught *(scenario's `AND IT MUST fail the pair discriminatingly`)*
-- [ ] Whitespace-only and empty-string explanations at level 6 → rejected *(AC.3, AC.4)*
-- [ ] F-D: the service returns `level` `0…9` ascending *(R-IUA-010 AC.3)*
-- [ ] `npm run test:fixtures` non-zero collected count, green
+- [x] `id 6` / level 5, no explanation → **accepted** *(R-IUA-006 AC.2)*
+- [x] `id 7` / level 6, no explanation → **rejected `400`** *(AC.1)*
+- [x] Both assertions live in one test body, and the test name states that inverting them is the defect being caught *(scenario's `AND IT MUST fail the pair discriminatingly`)*
+- [x] Whitespace-only and empty-string explanations at level 6 → rejected *(AC.3, AC.4)*
+- [x] F-D: the service returns `level` `0…9` ascending *(R-IUA-010 AC.3)*
+- [x] `npm run test:fixtures` non-zero collected count, green
 
 **Verification & its limits**
 
-As T-09. **F-C falsifying input:** compare the FK instead of `level` → the pair inverts and both assertions fail.
+As T-09. **F-C falsifying input:** compare the FK instead of `level` → the **accept** half (catalog `id 6` / level 5) goes red while the **reject** half stays green, because `7 >= 6` still throws. That asymmetry is expected and is *why* both halves live in one test body: a single `it` going red cannot be misread as two unrelated failures (`requirements.md` R-IUA-006's scenario, `AND IT MUST fail the pair discriminatingly`). **A claim that *both* halves go red is not achievable for THIS mutation class and must not be reported** — a single monotone threshold on a monotone key can only move the boundary in one direction. *(Scoped precisely 2026-08-19 at T-11 attempt 2's review: a mutation that **inverts the comparison direction** — e.g. `level < 6 → throw` — would redden both halves. The impossibility is a property of moving a monotone threshold, not of the pair. Stated because the unqualified version of this sentence was itself an over-broad claim introduced by the correction that removed the previous one.)* Half B guards the opposite mutation class instead: the rule dropped entirely, or the threshold raised to `> 6` / `>= 7`.
+
+> **Corrected 2026-08-19 at T-11's review.** The original read *"the pair inverts and both assertions fail"*, which is arithmetically impossible and contradicted `requirements.md` R-IUA-006's scenario — the only one of the three documents that stated it correctly. The false claim propagated from this line into the Leader's dispatch brief and from there into the delivered fixture's header, where it would have told the next maintainer that half A is redundant with half B; deleting half A on that reading would remove **the only assertion in the repo that catches trap 2**. Both lens Reviewers found it independently.
 
 > **F-D is declared weak, and the task must say so in its report.** Because `id = level + 1`, default PK ordering is coincidentally correct on the current seed — **F-D would pass with T-01's `findAll()` override deleted.** No input available today makes it fail. It is kept because it would catch a future re-seed that breaks the coincidence; the real gate for R-IUA-010 AC.4 is T-01's unit spec on the `order` clause, which is itself only a presence-assertion. **Report both facts; do not present F-D green as evidence that ordering is guaranteed.**
 

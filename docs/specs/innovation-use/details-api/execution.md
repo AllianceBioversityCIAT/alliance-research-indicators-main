@@ -1634,3 +1634,96 @@ Nothing about HTTP, auth, the envelope, or the `ValidationPipe` — the fixture 
 
 **Budget status:** 9 of 13 tasks complete, **T-10 `[~]`**. **19 of ~24 review rounds consumed** — this task consumed one round as a Pivot without a Reviewer spawn, since the blocker is a product defect the Implementer proved, not a conformance question a Reviewer adjudicates.
 
+### T-11 — **F-C** level boundary + **F-D** catalog order
+
+- **Status at the time of this entry:** **`[x]` DONE** — PASS on **attempt 2 of 3**; 2 review rounds. **Both fixtures were behaviourally correct on attempt 1**; the FAIL was a factually impossible claim in a durable comment, whose root cause was the spec.
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 2
+- **Requirements in scope:** R-IUA-006 AC.1–AC.4 + scenario (behavioural) · R-IUA-010 AC.3
+- **Skills assigned:** `nestjs-expert`, `systematic-debugging` · **Effort:** `xhigh` → `high` (attempt 2 was a one-paragraph comment fix)
+- **Review mode:** parallel lens Reviewers (2) for attempt 1; **single Reviewer for attempt 2, a recorded deviation** — the change was one doc-comment paragraph and both substantive lenses had already passed everything else.
+
+#### Files delivered
+
+| File | Lines | Nature |
+| --- | --- | --- |
+| `test/fixtures/innovation-use/innovation-use-level-boundary.fixture-spec.ts` | 248 | new (F-C) |
+| `test/fixtures/innovation-use/innovation-use-catalog-order.fixture-spec.ts` | 77 | new (F-D) |
+| `test/fixtures/innovation-use/nest-harness.ts` | 189 → 249 (**+60 / −0**) | extended — `createClarisaInnovationUseLevelsHarness`, because `ClarisaInnovationUseLevelsService` is exported only by the CLARISA control-list module and is **unreachable** from `ResultInnovationUseModule`'s subtree |
+
+**Suite: 13 suites / 44 tests — 2 failed, 42 passed.** The 2 failures are **T-10's** committed product-defect failures; the count was 2 before this task and 2 after, verified at every step.
+
+#### The harness extension — the risk that did not materialise
+
+`nest-harness.ts` now has **three** consumers (F-A, F-B, F-C), so a shared-file edit was the blast-radius concern (KZ-003). Lens A verified it is additive in **behaviour**, not merely in line count: `createInnovationUseHarness` unchanged (same three imports, same two overrides, same `.compile()` → `.init()`); **`StubCurrentUserUtil` reused unchanged**, its `audit()` switch still replicating the real `CurrentUserUtil` verbatim — so F-A's and F-B's audit assertions are untouched; no shared state, each entry point building and closing its own `TestingModule` and `DataSource`. It also confirmed the extension was **necessary** rather than convenient, and that the single override is not a silent no-op (`CurrentUserUtil` does reach the graph via `GlobalUtilsModule`, and the catalog controller takes no `ResultsUtil`).
+
+#### What F-C proves, and why the pair is one test body
+
+Leader-verified in the scratch catalog before dispatch: 10 rows, `id = level + 1`, **`id 6` → level 5**, **`id 7` → level 6**. *(Also `id 3` and `id 4` are both named "Partners" — adjacent levels sharing a name, which is why T-01 forbade name-based lookup.)*
+
+Half A (`id 6`, no explanation) must **accept** and is deliberately **not** wrapped in try/catch, so an inversion aborts the whole body as a **single** red. Half B (`id 7`, no explanation) must **reject**, and its assertion constrains the message to name `innovation_use_level_explanation` — so it cannot pass for the wrong reason. Lens B confirmed the only other reachable pre-`BEGIN` `400` (`unknown innovation use level`) cannot fire for `id 7` and does not contain that substring. Half B additionally asserts `innovation_use_level_id IS NULL` afterwards, an unclaimed extra discharge of §5.1's validate-before-`BEGIN` ordering.
+
+**FP-48's inversion was honoured** — the subtlest instruction in the task. Validation fixtures need **literal domain values**, not sentinels, because several predicates compare against `TRUE`/`1` and a sentinel of `2`–`6` in a boolean-ish column silently takes the false branch. Lens B swept for it and found none: level ids are the literal catalog ids, explanations are the literal `undefined` / `'   '` / `''`, and the only sentinel-shaped values (`900_900`, `2111`, `T11IULB`) are **identifiers nothing predicates on**.
+
+#### The FAIL — a falsifier stated as impossible fact, and the spec was the cause
+
+Attempt 1's header read: *"`id 7` (level 6) no longer needs one and the reject assertion fails. **Both halves go red together, which is the point.**"*
+
+**That is arithmetically impossible.** Substituting the FK for the resolved level gives `6 >= 6 → throw` (half A reddens — correct) and `7 >= 6 → still throws` (half B **stays green**). A single monotone threshold on a monotone key moves the boundary one direction only.
+
+**Both lenses found it independently**, and Lens B named the consequence that makes it a gate rather than a wording nit: the header tells a maintainer that **half B** is falsified by the FK defect. It is not. A reader trusting it could delete half A as "redundant with half B" — removing **the only assertion in the repo that catches trap 2**.
+
+**Chain of custody, recorded because it is the interesting part.** `requirements.md` R-IUA-006's scenario stated it **correctly** from specify time (*"a rule comparing the FK passes the second case and fails the first"*). `tasks.md` T-11's *Verification & its limits* and `design.md` §10.3's F-C row both drifted to *"the pair inverts / both assertions fail"*. **The Leader then repeated the drifted claim verbatim in the dispatch brief without checking the arithmetic**, and the Implementer wrote it into the fixture header as observed fact. Four documents deep, in the one task whose entire subject is an off-by-one. The Implementer's own *report* was accurate — it described one red result — so only the durable comment carried the falsehood.
+
+**Corrections applied, with the two-direction sweep (KZ-005):**
+
+| Document | Correction |
+| --- | --- |
+| `tasks.md` T-11 *Verification & its limits* | Rewritten to Lens A's exact wording: the accept half reddens, the reject half stays green because `7 >= 6` still throws, that asymmetry is *why* both halves share one body, and half B guards the opposite mutation class (rule dropped, or threshold `> 6`/`>= 7`) |
+| `design.md` §10.3 F-C row | *"the pair inverts"* → *"the accept half (`id 6`/level 5) inverts; the reject half stays green"* |
+| `innovation-use-level-boundary.fixture-spec.ts` header | Attempt 2's one-paragraph rewrite, verified factually correct against the code and consistent with both corrected documents |
+| `tasks.md` T-11, again | **The correction's own claim was itself over-broad and was scoped at attempt 2's review**: "both halves cannot redden" holds for the **threshold class**, but a mutation *inverting the comparison direction* (`level < 6 → throw`) would redden both. Recorded because an over-broad claim introduced by the fix for an over-broad claim is worth naming |
+
+The sweep also surfaced a structurally similar statement in **T-12**'s *Verification* (*"omit the `ipAvailables` edit → … both assertions fail"*). That one is **plausibly correct** — no IP Rights row and `completness` is causally downstream, so both genuinely can fail — but it will be verified rather than assumed when T-12 runs.
+
+#### F-D — green, and green proves nothing
+
+F-D is **green** and that is explicitly **not** evidence that ordering is guaranteed. The Implementer ran the mutation and reported the result honestly: **deleting T-01's `findAll()` `order: { level: 'ASC' }` override leaves F-D green**, because `id = level + 1` makes primary-key order coincidentally correct on the current seed. Both lenses verified the claim at source — `ControlListBaseService.findAll()` is the override minus the `order` key — and confirmed the honesty statement is **accurate and complete**, including that T-01's unit gate is *itself* only a presence assertion over a mocked `find(...)`. **So no tier behaviourally guarantees catalog ordering**, and both gates are presence assertions. F-D is kept as a **seed-shape tripwire**: Lens B noted its keep-reason is discharged by the `idValues` assertion rather than the `levelValues` one, so a future re-seed breaking the coincidence reddens it whether the production code is right or wrong — forcing a human to re-read the file, which is the honest value on offer rather than a correctness gate.
+
+#### Falsification table (attempt 1; attempt 2 required none)
+
+| Mutation | Expected | Observed |
+| --- | --- | --- |
+| `resolveInnovationUseLevel` returns the FK instead of `Number(row.level)` | accept half reddens; whole `it` goes red as one | **confirmed** — the whitespace/empty tests stayed green (different code path) |
+| `validateLevelExplanation`'s guard narrowed to `undefined \|\| null` | AC.3/AC.4 go red | **confirmed** — both `it`s failed; halves A/B unaffected, so the two are independently load-bearing |
+| T-01's `findAll()` `order` override deleted | **F-D stays GREEN** | **confirmed** — the direct evidence for the declared-weakness statement |
+
+`git diff HEAD -- server/researchindicators/src/` **empty** after all three, Leader-verified.
+
+#### Declared limits
+
+Both fixtures call the service/provider directly — nothing about HTTP, auth, the `ServerResponseDto` envelope, `ResultStatusGuard`, Swagger, or the per-handler `ValidationPipe` (trap 1 / DD-8). **DD-14 is neither gated nor contradicted**: halves A/B omit the explanation key so DD-14's stored-value fallback resolves to the same `null` the payload branch would supply, making the rejection invariant to the `!== undefined` vs `??` distinction; AC.3/AC.4 send the key present, so both branches are traversed incidentally. **R-IUA-006 AC.5 remains T-06's** (mocked), and the behavioural proof of DD-14 remains **unowned at every tier** — unchanged from T-09. Owed to **T-12**: R-IUA-001 AC.1/AC.2, R-IUA-011 AC.1/AC.4/AC.5 + scenario, R-IUA-012 AC.1/AC.3. Owed to **T-13**: R-IUA-010 AC.1/AC.2/AC.5 at `/swagger` by a human, C-4 cleanup, NFR-IUA-001 at 50 actor rows, NFR-IUA-003 coverage, and the full double-run gate.
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| Reliability | AC.3/AC.4 assert only `rejects.toThrow(BadRequestException)`, where half B thirty lines up additionally constrains the message. Sound today because no other reachable `400` can fire for `id 7` — but nothing pins that | **Recorded; explicitly NOT actioned.** Attempt 2's brief forbade folding it in — an advisory never widens an approved task, and doing so would have turned a one-paragraph fix into a re-review of passed work |
+| Reliability | **F-D's `Number(row.level)` coercion** — `Number(null) === 0`, exactly `expected[0]`, so a re-seed nulling the level-0 row's `level` would pass vacuously. It also makes F-D accept a string `'5'` where F-C's `toBe(5)` asserts a real number: **the two fixtures disagree about the driver contract, and F-D is the weaker one.** An *undeclared* KZ-001 instance | **Recorded; not actioned.** The strongest advisory of this round |
+| Resilience | A tab or `' '` explanation would pin `trim()` semantics against a plausible narrower reimplementation (`replace(/ /g,'')`); three spaces cannot distinguish that. *(Lens B confirmed there is no regex — the check is `explanation.trim().length === 0`, so all whitespace classes take the identical branch today)* | Recorded |
+| Reliability | F-C's `afterAll` runs unguarded `DELETE`s before `harness.close()` — the same pattern already recorded at T-09 and routed to T-13 | Recorded |
+| Risk | `resolveInnovationUseLevel`'s doc-comment claims `level` arrives as a **string** because it is `bigint`, but `orm.config.ts` sets `bigNumberStrings: false`, so mysql2 returns a JS **number**. The assertion is correct today; the comment is not — and if that flag is ever flipped, F-C's `toBe(5)` is what catches it. Pre-existing, not introduced here | Recorded — T-13 note |
+| Readability | F-D passes `901_000` as its acting-user id, outside any declared band, while its header says it reserves none. Harmless (`findAll()` persists nothing) but an undeclared magic number in an otherwise scrupulous header | Recorded |
+
+**Final verification:** `npm run test:fixtures` → **13 suites / 44 tests, 2 failed (T-10's), 42 passed** · `git diff HEAD -- src/` **empty** — both re-run independently by the Leader at each attempt.
+
+**Forward pointers created by T-11**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-12** | **Verify, do not assume, its *Verification* line** *"omit the `ipAvailables` edit → … both assertions fail"*. It is plausibly correct (the IP Rights row and `completness` are causally chained, unlike a monotone threshold) — but the identical phrasing was arithmetically false at T-11, so check it before writing it into a durable comment. Also: `indicators` is still **EMPTY** with a real FK on `results.indicator_id`, and T-12 must create an `indicator_id = 6` result — the seed-ownership question is still open |
+| **T-13** | Cleanup candidates, none of them added criteria: the `afterAll` `finally` guarding (now in three fixtures), F-D's `Number()` coercion, AC.3/AC.4's message constraints, `resolveInnovationUseLevel`'s wrong doc-comment about the driver contract, and F-D's undeclared `901_000`. Also **R-IUA-010 AC.4's ordering has no behavioural gate at any tier** — the human `/swagger` check is the last opportunity to look at it |
+| Kaizen (archive) | Two candidates: **(a)** a false claim can propagate **four documents deep** — requirements → tasks → design → Leader brief → delivered comment — while the one document that had it right sits untouched; the two-direction sweep is what finds it, and grepping the *corrected* phrase is what surfaces the drifted siblings. **(b)** The fix for an over-broad claim was itself over-broad (the "both halves cannot redden" scoping), which suggests correction wording deserves the same falsifiability check as the code it describes |
+
+**Budget status:** **11 of 13 tasks complete** (T-10 `[~]`). **21 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1, T-09 ×3, T-10 ×1, T-11 ×2). **Two tasks remain against ~3 rounds, and T-13 is a full-gate task carrying a human `/swagger` check that cannot be automated.** This is the tightest the margin has been and is reported as such at the gate, not absorbed.
+

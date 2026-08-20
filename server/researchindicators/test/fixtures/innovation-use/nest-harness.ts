@@ -10,6 +10,8 @@ import {
   SetAuditEnum,
 } from '../../../src/domain/shared/utils/current-user.util';
 import { ResultsUtil } from '../../../src/domain/shared/utils/results.util';
+import { ClarisaInnovationUseLevelsModule } from '../../../src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.module';
+import { ClarisaInnovationUseLevelsService } from '../../../src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.service';
 
 /**
  * T-09 (`docs/specs/innovation-use/details-api`) — design.md §10.4 "the
@@ -182,6 +184,64 @@ export async function createInnovationUseHarness(
     dataSource,
     service,
     currentUser,
+    close: async () => {
+      await moduleRef.close();
+    },
+  };
+}
+
+/**
+ * T-11 (`docs/specs/innovation-use/details-api`) — **minimal extension**,
+ * stated per `tasks.md` T-11's scope discipline. F-D (`design.md` §10.3's
+ * F-D row, R-IUA-010 AC.3) needs `ClarisaInnovationUseLevelsService`, which
+ * lives outside `ResultInnovationUseModule`'s subtree entirely (it is a
+ * CLARISA control-list module under `domain/tools/clarisa/`), so the
+ * existing `createInnovationUseHarness` above — which only ever compiles
+ * `ResultInnovationUseModule` — cannot resolve it. Rather than duplicating
+ * the whole harness file, this adds one sibling boot function that reuses
+ * the same `StubCurrentUserUtil` already defined above.
+ *
+ * `ClarisaInnovationUseLevelsService` depends on `CurrentUserUtil` directly
+ * (its own constructor, not merely a transitive dependency), which is
+ * `Scope.REQUEST` — the same reason `createInnovationUseHarness` overrides
+ * it. `ClarisaInnovationUseLevelsController` (instantiated as part of
+ * compiling `ClarisaInnovationUseLevelsModule`, exactly as
+ * `ResultInnovationUseModule`'s own controllers are above) depends only on
+ * the service, never on `ResultsUtil` — so no second override is needed
+ * here, unlike `createInnovationUseHarness`.
+ */
+export interface ClarisaInnovationUseLevelsHarness {
+  moduleRef: TestingModule;
+  dataSource: DataSource;
+  service: ClarisaInnovationUseLevelsService;
+  close: () => Promise<void>;
+}
+
+export async function createClarisaInnovationUseLevelsHarness(
+  actingUserId: number,
+): Promise<ClarisaInnovationUseLevelsHarness> {
+  const currentUser = new StubCurrentUserUtil(actingUserId);
+
+  const moduleRef = await Test.createTestingModule({
+    imports: [
+      TypeOrmModule.forRoot(rawTestDataSource.options),
+      GlobalUtilsModule,
+      ClarisaInnovationUseLevelsModule,
+    ],
+  })
+    .overrideProvider(CurrentUserUtil)
+    .useValue(currentUser)
+    .compile();
+
+  await moduleRef.init();
+
+  const dataSource = moduleRef.get(DataSource);
+  const service = moduleRef.get(ClarisaInnovationUseLevelsService);
+
+  return {
+    moduleRef,
+    dataSource,
+    service,
     close: async () => {
       await moduleRef.close();
     },
