@@ -5,7 +5,10 @@ import { CacheService } from './cache/cache.service';
 import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { environment } from '../../../environments/environment';
-import { HttpParams } from '@angular/common/http';
+import { HttpParams, provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
+import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 
 describe('ApiService', () => {
   let service: ApiService;
@@ -2284,5 +2287,121 @@ describe('ApiService', () => {
         useResultInterceptor: true
       });
     });
+  });
+});
+
+// T-01 c1/c2 — these three Innovation Use methods are asserted through HttpTestingController against a real
+// ApiService + real ToPromiseService, never against a mocked ApiService (KZ-001 disqualifier, design.md §10.2).
+// This proves the exact verb, path, and header/side-effect config each method builds — not merely that a method
+// on a double was invoked.
+describe('ApiService — Innovation Use Details methods (HttpTestingController)', () => {
+  let service: ApiService;
+  let httpMock: HttpTestingController;
+  let cacheServiceStub: {
+    currentResultIsLoading: ReturnType<typeof signal<boolean>>;
+    greenChecks: ReturnType<typeof signal<GreenChecks>>;
+    getCurrentNumericResultId: () => number;
+  };
+
+  beforeEach(() => {
+    cacheServiceStub = {
+      currentResultIsLoading: signal(false),
+      greenChecks: signal<GreenChecks>({}),
+      getCurrentNumericResultId: () => 123
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        ToPromiseService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CacheService, useValue: cacheServiceStub },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+          }
+        }
+      ]
+    });
+
+    service = TestBed.inject(ApiService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('GET_InnovationUseDetails hits GET results/innovation-use/:resultCode with loadingTrigger + useResultInterceptor', async () => {
+    const resultCode = 456;
+    const promise = service.GET_InnovationUseDetails(resultCode);
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}results/innovation-use/${resultCode}`);
+    expect(req.request.method).toBe('GET');
+    // useResultInterceptor -> the 'X-Use-Year' header
+    expect(req.request.headers.get('X-Use-Year')).toBe('true');
+    // loadingTrigger fires synchronously, before the response arrives
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(true);
+    expect(cacheServiceStub.greenChecks()).toEqual({});
+
+    req.flush({ data: { innovation_use_level_id: 7, actors: [], organizations: [], quantifications: [] } });
+
+    // loadingTrigger's finalize() is the ONLY mechanism that fires ToPromiseService.updateGreenChecks() —
+    // this second GET is the evidence that it did.
+    const greenChecksReq = httpMock.expectOne(`${environment.mainApiUrl}results/green-checks/123`);
+    expect(greenChecksReq.request.method).toBe('GET');
+    greenChecksReq.flush({ data: { innovation_use: 1 } });
+
+    const response = await promise;
+    expect(response.data.innovation_use_level_id).toBe(7);
+    expect(response.successfulRequest).toBe(true);
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+    expect(cacheServiceStub.greenChecks()).toEqual({ innovation_use: 1 });
+  });
+
+  it('PATCH_InnovationUseDetails hits PATCH results/innovation-use/:resultCode with useResultInterceptor and no loadingTrigger effect', async () => {
+    const resultCode = 456;
+    const body = { innovation_use_level_id: 7 };
+    const promise = service.PATCH_InnovationUseDetails(resultCode, body);
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}results/innovation-use/${resultCode}`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.headers.get('X-Use-Year')).toBe('true');
+    expect(req.request.body).toEqual(body);
+    // no loadingTrigger on the PATCH
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+
+    req.flush({ data: { innovation_use_level_id: 7 } });
+
+    // omitting loadingTrigger means no follow-up green-checks GET is ever issued by this call
+    httpMock.expectNone(`${environment.mainApiUrl}results/green-checks/123`);
+
+    const response = await promise;
+    expect(response.data.innovation_use_level_id).toBe(7);
+    expect(response.successfulRequest).toBe(true);
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+  });
+
+  it('GET_InnovationUseLevels hits GET tools/clarisa/innovation-use-levels with the default config (neither header nor loadingTrigger)', async () => {
+    const promise = service.GET_InnovationUseLevels();
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}tools/clarisa/innovation-use-levels`);
+    expect(req.request.method).toBe('GET');
+    // a catalog is not result-scoped: no X-Use-Year header
+    expect(req.request.headers.get('X-Use-Year')).toBeNull();
+    // no loadingTrigger effect
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+
+    req.flush({ data: [{ id: 1, level: 0, name: 'No use', definition: 'Innovation is not used.' }] });
+
+    // no loadingTrigger means no follow-up green-checks GET
+    httpMock.expectNone(`${environment.mainApiUrl}results/green-checks/123`);
+
+    const response = await promise;
+    expect(response.data).toHaveLength(1);
+    expect(response.successfulRequest).toBe(true);
   });
 });

@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`) — **client tier** (`client/research-indicators`)
 - **Spec id:** 2026-08-innovation-use-details-page
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -95,7 +95,7 @@ graph TD
 
 ### T-01 — Contract layer: view interfaces, `ApiService` methods, level catalog service
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-IUP-004 (AC.4), R-IUP-005 (catalog source), R-IUP-016 (AC.1/AC.2 mechanism), NFR-IUP-005, NFR-IUP-006
 - **Design references:** §2.1 *New — the contract layer*, §4.1, §4.2, §6.1 step 5
 - **Skills:** `angular-developer`
@@ -121,11 +121,11 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — All three `ApiService` methods hit the exact verb + path of §4.1, asserted through `HttpTestingController` on the `MainResponse<T>` envelope.
-- [ ] c2 — The GET's config carries `loadingTrigger: true` **and** `useResultInterceptor: true`; the PATCH carries `useResultInterceptor: true` and **no** `loadingTrigger`; the catalog GET carries neither. Asserted per-method, not once.
-- [ ] c3 — `InnovationUseLevel` has **no** `additional_guidance` member (a compile-level fact; assert by the absence of the key in a constructed instance).
-- [ ] c4 — The level service loads once and exposes a signal; a second consumer does not re-issue the request.
-- [ ] c5 — `npm test -- --silent` green; `npm run lint -- --quiet` clean and `git status` re-inspected after.
+- [x] c1 — All three `ApiService` methods hit the exact verb + path of §4.1, asserted through `HttpTestingController` on the `MainResponse<T>` envelope.
+- [x] c2 — The GET's config carries `loadingTrigger: true` **and** `useResultInterceptor: true`; the PATCH carries `useResultInterceptor: true` and **no** `loadingTrigger`; the catalog GET carries neither. Asserted per-method, not once.
+- [x] c3 — `InnovationUseLevel` has **no** `additional_guidance` member (a compile-level fact; assert by the absence of the key in a constructed instance).
+- [x] c4 — The level service loads once and exposes a signal; a second consumer does not re-issue the request.
+- [x] c5 — `npm test -- --silent` green; `npm run lint -- --quiet` clean and `git status` re-inspected after.
 
 **Falsifying input** — drop `loadingTrigger` from the GET config → **c2 must FAIL**. If it still passes, c2 is asserting the object's existence rather than its contents and is not evidence.
 
