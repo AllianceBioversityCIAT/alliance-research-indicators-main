@@ -20,9 +20,15 @@ import {
   InnovationUseActorDto,
 } from './dto/create-result-innovation-use.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 
 describe('ResultInnovationUseService', () => {
   let service: ResultInnovationUseService;
+  // FAIL-2 remediation (design.md §9, validation-report.md 2026-08-20).
+  // `logger` is instantiated directly (`new CgiarLogger(...)`), not injected
+  // via DI (mirrors `ResultInnovationDevService`), so it is spied at the
+  // prototype rather than provided as a mock.
+  let loggerWarnSpy: jest.SpyInstance;
 
   const mainFindOne = jest.fn();
   const mainSave = jest.fn();
@@ -126,6 +132,9 @@ describe('ResultInnovationUseService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    loggerWarnSpy = jest
+      .spyOn(CgiarLogger.prototype, 'warn')
+      .mockImplementation(() => undefined);
     // `clearAllMocks()` clears call history but NOT a queued
     // `mockResolvedValueOnce` implementation — a test that throws before
     // consuming a second queued value (e.g. the post-commit re-read) would
@@ -195,6 +204,10 @@ describe('ResultInnovationUseService', () => {
     service = module.get<ResultInnovationUseService>(
       ResultInnovationUseService,
     );
+  });
+
+  afterEach(() => {
+    loggerWarnSpy.mockRestore();
   });
 
   describe('create', () => {
@@ -942,6 +955,124 @@ describe('ResultInnovationUseService', () => {
       // `1 === true` is false, so this must be classified disaggregated and
       // sum the populated count rather than reading `actors_count` (null).
       expect(result.actors[0].total).toBe(6);
+    });
+  });
+
+  // FAIL-2 remediation (`design.md` §9 Observability,
+  // `validation-report.md` 2026-08-20). §9 carries no requirement id, so
+  // these are grouped by the design section rather than an R-IUA-xxx id.
+  // Each test targets one of the four rejection sites this closure
+  // instruments in `result-innovation-use.service.ts`, and each also proves
+  // the "never the payload" constraint by asserting a submitted value is
+  // ABSENT from the logged message.
+  describe('§9 Observability — warn on a rejected save, result_id and rule only, never the payload', () => {
+    const resultId = 42;
+
+    it('logs a warn with result_id and the rule when no detail row exists (NotFoundException)', async () => {
+      mainFindOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.update(resultId, {} as CreateResultInnovationUseDto),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+      const [message] = loggerWarnSpy.mock.calls[0];
+      expect(message).toEqual(expect.stringContaining(String(resultId)));
+    });
+
+    it('logs a warn with result_id and the rule when innovation_use_level_id resolves to no catalog row — the submitted level id is NOT in the message', async () => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      });
+      levelFindOne.mockResolvedValueOnce(null);
+      const unknownLevelId = 999888;
+
+      await expect(
+        service.update(resultId, {
+          innovation_use_level_id: unknownLevelId,
+        } as CreateResultInnovationUseDto),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+      const [message] = loggerWarnSpy.mock.calls[0];
+      expect(message).toEqual(expect.stringContaining(String(resultId)));
+      expect(message).toEqual(
+        expect.stringContaining('innovation_use_level_id'),
+      );
+      // Payload-leak guard: the submitted (unknown) id itself never appears.
+      expect(message).not.toEqual(
+        expect.stringContaining(String(unknownLevelId)),
+      );
+    });
+
+    it('logs a warn with result_id and R-IUA-006 when the level >= 6 justification is missing — the explanation text is NOT in the message (there is none) and the resolved level number is NOT in the message', async () => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      });
+      levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
+
+      await expect(
+        service.update(resultId, {
+          innovation_use_level_id: 7,
+        } as CreateResultInnovationUseDto),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+      const [message] = loggerWarnSpy.mock.calls[0];
+      expect(message).toEqual(expect.stringContaining(String(resultId)));
+      expect(message).toEqual(expect.stringContaining('R-IUA-006'));
+    });
+
+    it('logs a warn with result_id and R-IUA-005 when two actor rows share an identity — the actor_type_id / custom name are NOT in the message even though the thrown exception does carry them', async () => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      });
+      const secretCustomName = 'SECRET_CUSTOM_ORG_NAME_NOT_TO_BE_LOGGED';
+
+      const dto = {
+        actors: [
+          {
+            actor_type_id: ClarisaActorTypesEnum.OTHER,
+            actor_type_custom_name: secretCustomName,
+          },
+          {
+            actor_type_id: ClarisaActorTypesEnum.OTHER,
+            actor_type_custom_name: secretCustomName,
+          },
+        ],
+      } as CreateResultInnovationUseDto;
+
+      await expect(service.update(resultId, dto)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+      const [message] = loggerWarnSpy.mock.calls[0];
+      expect(message).toEqual(expect.stringContaining(String(resultId)));
+      expect(message).toEqual(expect.stringContaining('R-IUA-005'));
+      // Payload-leak guard: the custom name reaches the thrown exception's
+      // message array (client-facing 400), never the log.
+      expect(message).not.toEqual(expect.stringContaining(secretCustomName));
+    });
+
+    it('does NOT log a warn on a successful save', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: null,
+          innovation_use_level_explanation: null,
+          innovation_use_level: null,
+        });
+
+      await expect(
+        service.update(resultId, {} as CreateResultInnovationUseDto),
+      ).resolves.toBeDefined();
+
+      expect(loggerWarnSpy).not.toHaveBeenCalled();
     });
   });
 });

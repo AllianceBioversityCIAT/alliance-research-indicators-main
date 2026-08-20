@@ -7,6 +7,7 @@ import { CurrentUserUtil } from '../../../src/domain/shared/utils/current-user.u
 import { ResultsUtil } from '../../../src/domain/shared/utils/results.util';
 import { ResultInnovationUseModule } from '../../../src/domain/entities/result-innovation-use/result-innovation-use.module';
 import { ResultInnovationUseService } from '../../../src/domain/entities/result-innovation-use/result-innovation-use.service';
+import { CreateResultInnovationUseDto } from '../../../src/domain/entities/result-innovation-use/dto/create-result-innovation-use.dto';
 import { ResultIpRightsModule } from '../../../src/domain/entities/result-ip-rights/result-ip-rights.module';
 import { ResultIpRightsService } from '../../../src/domain/entities/result-ip-rights/result-ip-rights.service';
 import { ResultsService } from '../../../src/domain/entities/results/results.service';
@@ -150,6 +151,32 @@ import { StubCurrentUserUtil } from './nest-harness';
  * `results.service.ts` → no `result_ip_rights` row is created for
  * `result1Id`, and `completness` never reaches `true` even after the
  * "complete IP Rights" step, because the update silently affects zero rows.
+ *
+ * **FAIL-5 remediation (`validation-report.md`, 2026-08-20;
+ * `docs/specs/innovation-use/details-api` R-IUA-012 AC.1).** The
+ * "completness: false ... true" `it` below discharges AC.1's "a green-check
+ * read issued after a section save reflects the saved data" through
+ * `ipRightsService.update` — a *different* section's save — while
+ * completing Innovation Use's OWN detail row by raw SQL
+ * (`UPDATE result_innovation_use ...` / `INSERT INTO result_actors ...`).
+ * `harness.innovationUseService.update()` was never called anywhere in this
+ * file. Literally satisfiable (IP Rights is a section too), but not
+ * R-IUA-012's own user story, which is about the section the client just
+ * saved reflecting immediately — this spec's own Innovation Use section.
+ * **A fourth result (`result4Id`), added rather than rewriting the existing
+ * arrangement** (replacing the raw SQL on `result1Id` would destabilise the
+ * exact 9-key set assertion, both `completness` directions, and the
+ * indicator-2 control, all of which read `result1Id`/`result2Id` at fixed
+ * points in this file's sequential `it` execution) — isolated on its own
+ * result so it needs no other section complete and cannot perturb any
+ * existing assertion. Its own `it` drives `innovation_use_level_id` +
+ * one aggregate actor row through the REAL, unmodified
+ * `ResultInnovationUseService.update()` (`create()` first, mirroring
+ * `ResultInnovationDevService.create`, to seed the bare detail row — no raw
+ * SQL) and asserts BOTH sides of the `innovation_use` green-check
+ * transition, not just the post-save value (KZ-001: a post-save-only
+ * assertion cannot distinguish "the save did it" from "it was already
+ * true").
  */
 describe('Creating an indicator-6 result wires both child rows and makes the green-check gate genuinely reachable (T-12, F-E)', () => {
   const uniqueSuffix = Date.now();
@@ -179,6 +206,7 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
   let result1Id: number; // indicator 6 — full creation + false/true completeness
   let result2Id: number; // indicator 2 — control, key-set-unchanged only
   let result3Id: number; // indicator 6 — everything complete EXCEPT innovation_use
+  let result4Id: number; // indicator 6 — FAIL-5: isolates innovation_use's OWN save → green-check transition
 
   let platformSeeded = false;
   let reportYearSeeded = false;
@@ -519,6 +547,24 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
       )
     ).insertId;
 
+    // --- result4Id: indicator 6, FAIL-5 — deliberately minimal. Only
+    // `innovation_use` itself is exercised here (via the real
+    // `ResultInnovationUseService.update()`, see the file header), so none
+    // of `seedCompletableSections`'s other-section rows are needed — the
+    // new `it` below never reads `completness` for this result. ---
+    result4Id = (
+      await dataSource.query(
+        `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id, indicator_id)
+         VALUES (1, ?, ?, ?, 0, NULL, ?)`,
+        [
+          nextOfficialCode(),
+          platformCode,
+          reportYear,
+          IndicatorsEnum.INNOVATION_USE,
+        ],
+      )
+    ).insertId;
+
     await seedCompletableSections(result1Id);
     await seedCompletableSections(result3Id);
 
@@ -539,42 +585,41 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
     }
 
     await dataSource.query(
-      `DELETE FROM result_actors WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_actors WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_evidences WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_evidences WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_contracts WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_contracts WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_levers WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_levers WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_sdgs WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_sdgs WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_users WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_users WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_innovation_use WHERE result_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_innovation_use WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
     await dataSource.query(
-      `DELETE FROM result_ip_rights WHERE result_ip_rights_id IN (?, ?, ?)`,
-      [result1Id, result2Id, result3Id],
+      `DELETE FROM result_ip_rights WHERE result_ip_rights_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
     );
-    await dataSource.query(`DELETE FROM results WHERE result_id IN (?, ?, ?)`, [
-      result1Id,
-      result2Id,
-      result3Id,
-    ]);
+    await dataSource.query(
+      `DELETE FROM results WHERE result_id IN (?, ?, ?, ?)`,
+      [result1Id, result2Id, result3Id, result4Id],
+    );
 
     if (contractSeeded) {
       await dataSource.query(
@@ -711,5 +756,60 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
     expect(greenChecks.ip_rights).toBeTruthy();
     expect(greenChecks.innovation_use).toBeFalsy();
     expect(greenChecks.completness).toBeFalsy();
+  });
+
+  it("R-IUA-012 AC.1 — a green-check read issued after THIS section's own save (ResultInnovationUseService.update, not IP Rights) reflects the saved data: innovation_use flips false -> true across the save", async () => {
+    // Arrange — the bare detail row, via the real service's own `create()`
+    // (mirrors `ResultInnovationDevService.create`; no raw SQL). No level,
+    // no actors yet: `innovation_use_validation` requires
+    // `innovation_use_level_id IS NOT NULL` (commonFields) and at least one
+    // actor row (`tempFullActors > 0`), so this state is `false`.
+    await harness.innovationUseService.create(result4Id);
+
+    const before = await readGreenChecks(result4Id);
+    expect(before.innovation_use).toBeFalsy();
+
+    // Act — THE section's own save. Level 1 (below 6, no justification
+    // required) plus one aggregate-mode actor row, the same minimal
+    // `innovation_use_validation`-satisfying shape the pre-existing
+    // (result1Id) arrangement seeds by raw SQL — here seeded through the
+    // real, unmodified `ResultInnovationUseService.update()` instead.
+    await harness.innovationUseService.update(result4Id, {
+      innovation_use_level_id: 1,
+      actors: [
+        {
+          actor_type_id: clarisaActorTypeCode,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: 5,
+        },
+      ],
+    } as CreateResultInnovationUseDto);
+
+    const after = await readGreenChecks(result4Id);
+
+    // Both sides of the transition (KZ-001) — a post-save-only assertion
+    // cannot distinguish "the save did it" from "it was already true".
+    expect(before.innovation_use).toBeFalsy();
+    expect(after.innovation_use).toBeTruthy();
+
+    // A SECOND, independent signal that THIS call is what produced the
+    // state — not merely "the same data arrived by some means". Raw SQL
+    // setting `innovation_use_level_id` and inserting the actor row (the
+    // arrangement FAIL-5 flags, and what `result1Id`'s pre-existing `it`
+    // above still does) reaches the identical `innovation_use_validation`
+    // TRUE state without ever touching `updated_by` —
+    // `innovation_use_validation` reads only the detail/actor columns, not
+    // audit columns, so the green-check transition alone cannot tell "went
+    // through `ResultInnovationUseService.update()`" apart from "the same
+    // columns got the same values by raw SQL". `update()`'s step 6 writes
+    // `...this._currentUser.audit(SetAuditEnum.UPDATE)` into the SAME
+    // statement that sets `innovation_use_level_id` (R-IUA-013 AC.7) — a
+    // raw-SQL revert of the Act step above never sets this column, so this
+    // assertion is what actually reddens under that mutation.
+    const [detailRow] = await dataSource.query(
+      `SELECT updated_by FROM result_innovation_use WHERE result_id = ? AND is_active = TRUE`,
+      [result4Id],
+    );
+    expect(Number(detailRow.updated_by)).toBe(actingUserId);
   });
 });

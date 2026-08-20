@@ -24,6 +24,7 @@ import {
   CreateResultInnovationUseDto,
   InnovationUseActorDto,
 } from './dto/create-result-innovation-use.dto';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 
 /**
  * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
@@ -49,6 +50,37 @@ import {
 @Injectable()
 export class ResultInnovationUseService {
   private readonly mainRepo: Repository<ResultInnovationUse>;
+  /**
+   * `design.md` §9 (Observability), matching
+   * `ResultInnovationDevService.logger`
+   * (`result-innovation-dev.service.ts:49`) in instantiation shape and call
+   * style. FAIL-2 remediation (`validation-report.md`, 2026-08-20): §9
+   * carries no requirement id, so this closure enumerates the rejection
+   * sites at source rather than from the design prose — see `update()` and
+   * its three private validators below. Every `warn` call logs `result_id`
+   * and a rule identifier only, **never the payload** (§9's binding
+   * constraint) — no DTO, no actor/organization rows, no counts, no custom
+   * names, no submitted id beyond what the rule identifier needs.
+   *
+   * **Scope decision — the two `assertInnovationUseOwnership` rejections in
+   * `ResultActorsService`/`ResultInstitutionTypesService` are OUT of scope
+   * for this logger,** even though both surface through this class's
+   * `update()` via `customSaveInnovationUse` (steps 7–8 below). Reasoning:
+   * (1) `assertInnovationUseOwnership` and its call sites are FAIL-1
+   * remediation, closed and reviewed 2026-08-20 — this closure's brief
+   * explicitly excludes touching them, and the ownership check's own file is
+   * off-limits, not just the method; (2) the mirror target,
+   * `ResultInnovationDevService`, never wraps a child-service call in
+   * try/catch to intercept and re-log an error that originates there — it
+   * logs only from rejection points inside its own body. Adding such
+   * wrapping here would invent a call-style the reference does not use, to
+   * cover two rejections whose owning files this task must not edit; (3)
+   * operationally the loss is bounded the same way §9 itself bounds it for
+   * every other 4xx in this chunk: `ResponseInterceptor` already logs a
+   * `400` at `warn` with no extra code (§9), so the rule-name/service-scope
+   * detail is the only signal lost, not all signal.
+   */
+  private readonly logger = new CgiarLogger(ResultInnovationUseService.name);
   constructor(
     private readonly dataSource: DataSource,
     private readonly _currentUser: CurrentUserUtil,
@@ -108,6 +140,9 @@ export class ResultInnovationUseService {
     });
 
     if (!existingResult) {
+      this.logger.warn(
+        `Innovation use save rejected for result ${resultId}: no detail row found`,
+      );
       throw new NotFoundException(`Result with ID ${resultId} not found`);
     }
 
@@ -130,14 +165,18 @@ export class ResultInnovationUseService {
 
     // Step 3 (cont'd) — resolve the catalog's `level` scalar (trap 2),
     // against the effective level id, not the raw payload.
-    const level = await this.resolveInnovationUseLevel(effectiveLevelId);
+    const level = await this.resolveInnovationUseLevel(
+      effectiveLevelId,
+      resultId,
+    );
 
     // Step 4 — a) level rule against the effective row, then b)
     // duplicate-actor rule over the incoming payload. Any throw here
     // happens before `BEGIN`; no child service below has been invoked yet.
-    this.validateLevelExplanation(level, effectiveExplanation);
+    this.validateLevelExplanation(level, effectiveExplanation, resultId);
     this.validateNoDuplicateActorTypes(
       createResultInnovationUseDto?.actors ?? [],
+      resultId,
     );
 
     await this.dataSource.transaction(async (manager) => {
@@ -217,6 +256,7 @@ export class ResultInnovationUseService {
    */
   private async resolveInnovationUseLevel(
     levelId?: number,
+    resultId?: number,
   ): Promise<number | undefined> {
     if (levelId === null || levelId === undefined) {
       return undefined;
@@ -227,6 +267,13 @@ export class ResultInnovationUseService {
       .findOne({ where: { id: levelId } });
 
     if (!row) {
+      // §9 — result_id and the rule that fired, never the payload (the
+      // submitted level id is not logged: it is not needed to identify the
+      // rule, and it is exactly the kind of submitted-id-beyond-the-rule
+      // the closure brief rules out).
+      this.logger.warn(
+        `Innovation use save rejected for result ${resultId}: innovation_use_level_id resolves to no catalog row`,
+      );
       throw new BadRequestException([
         'innovation_use_level_id: unknown innovation use level',
       ]);
@@ -245,13 +292,19 @@ export class ResultInnovationUseService {
    */
   private validateLevelExplanation(
     level: number | undefined,
-    explanation?: string,
+    explanation: string | undefined,
+    resultId: number,
   ): void {
     if (level === undefined || level === null || level < 6) {
       return;
     }
 
     if (!explanation || explanation.trim().length === 0) {
+      // §9 — result_id and the rule (R-IUA-006), never the explanation text
+      // itself or the resolved level.
+      this.logger.warn(
+        `Innovation use save rejected for result ${resultId}: level >= 6 justification missing (R-IUA-006)`,
+      );
       throw new BadRequestException([
         'innovation_use_level_explanation: required when the innovation use level is 6 or above',
       ]);
@@ -268,7 +321,10 @@ export class ResultInnovationUseService {
    * a previously-saved row of type X re-sent once is never a duplicate of
    * itself (AC.5).
    */
-  private validateNoDuplicateActorTypes(actors: InnovationUseActorDto[]): void {
+  private validateNoDuplicateActorTypes(
+    actors: InnovationUseActorDto[],
+    resultId: number,
+  ): void {
     const seenIdentities = new Set<string>();
 
     for (const actor of actors) {
@@ -278,6 +334,12 @@ export class ResultInnovationUseService {
           : `TYPE:${actor?.actor_type_id}`;
 
       if (seenIdentities.has(identity)) {
+        // §9 — result_id and the rule (R-IUA-005), never the payload: no
+        // actor_type_id, no custom name, even though the thrown exception
+        // (a client-facing 400, not a log) does carry the id.
+        this.logger.warn(
+          `Innovation use save rejected for result ${resultId}: duplicate actor identity in payload (R-IUA-005)`,
+        );
         throw new BadRequestException([
           `actor_type_id: duplicate actor type in payload — ${actor?.actor_type_id}`,
         ]);
