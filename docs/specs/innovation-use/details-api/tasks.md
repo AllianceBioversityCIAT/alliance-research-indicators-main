@@ -2,7 +2,7 @@
 
 - **Module:** results (`innovation-use`)
 - **Spec id:** 2026-08-innovation-use-details-api
-- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[~]` blocked (Pivot) — a confirmed cross-result data-corruption defect, pre-existing and shared with Innovation Dev; role isolation itself holds.** **T-11 `[x]` done.** T-12 … T-13 todo. **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **21 consumed**
+- **Status:** in-progress — T-01 … T-06 `[x]` done (2026-08-19; **T-01 was reopened and re-closed the same day** by the T-07 Pivot — DD-15 / trap 4, a route node without a module-graph registration). **T-07 `[x]` · T-08 `[x]` · T-09 `[x]` done** — T-09 closed on attempt 3 of 3, retiring the Nest fixture-harness risk that T-10/T-11/T-12 all reuse. **T-10 `[~]` blocked (Pivot) — a confirmed cross-result data-corruption defect, pre-existing and shared with Innovation Dev; role isolation itself holds.** **T-11 `[x]` done.** **T-12 `[x]` done.** T-13 todo — **and its double-green fixture gate collides with T-10's deliberate red; carve out at dispatch.** **T-12 carries a known blocker: `indicators` is empty on the scratch schema while `results.indicator_id` is a real FK — decide seed ownership before it starts** (`execution.md` → T-09 forward pointers). Review-round budget re-baselined to ~24 on 2026-08-19 by user ruling (review depth unchanged); **22 consumed**
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -578,7 +578,7 @@ As T-09. **F-C falsifying input:** compare the FK instead of `level` → the **a
 - **Requirements covered:** R-IUA-001 AC.1, AC.2 (behavioral) · R-IUA-011 AC.1, AC.4, AC.5 + scenario · R-IUA-012 AC.1, AC.3
 - **Depends on:** T-08
 - **Size:** M (~200 LOC) · **Effort:** `xhigh`
-- **Status:** `[ ]` todo
+- **Status:** ~~todo~~ → **`[x]` DONE 2026-08-19** — **PASS on attempt 1, zero rework**; 1 review round (2 parallel lens Reviewers, both PASS). `completness` asserted **both ways** and the `true` half proven non-vacuous: the composite is a **JS fold**, not a SQL function, so the two stored-function bypasses cannot short-circuit it, and a third scenario is a positive counter-witness. Route (a) (real `indicators` rows 2 and 6) was **not merely better but necessary** — `general_information_validation` carries `AND r.indicator_id IS NOT NULL`, so a NULL indicator can never reach `completness: true`. The `Object.create` partials were ruled legitimate by mechanism (`ResultsService`'s constructor body is **empty**; the method reads exactly the two populated real collaborators; omissions fail loudly). **718 LOC against a ~200 estimate — an intrinsic overrun, escalated.** Suite 14 suites / 48 tests (the 2 failures are T-10's). Evidence: [`./execution.md`](./execution.md) → *T-12*
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
 **Files touched**
@@ -597,15 +597,15 @@ Create an indicator-6 result; assert both child rows land. Then drive `calculate
 
 **Done criteria**
 
-- [ ] Exactly one active `result_innovation_use` row exists after creating an indicator-6 result *(R-IUA-001 AC.1)*
-- [ ] Its `created_by` matches the acting user *(AC.2)*
-- [ ] Exactly one active `result_ip_rights` row exists *(R-IUA-011 AC.1)*
-- [ ] Green checks for that result expose an `innovation_use` key *(R-IUA-012 AC.3)*
-- [ ] The key set for an indicator-2 control result is **unchanged** *(R-IUA-011 scenario's `AND IT MUST leave the green-check key set for every other indicator identical`; R-IUA-012 AC.3's "and for no other indicator")*
-- [ ] Complete everything **except** IP Rights → `completness: false` *(R-IUA-011 AC.5)*
-- [ ] Complete everything **including** IP Rights → `completness: true` *(AC.4, and the scenario)*
-- [ ] A green-check read issued after a section save reflects the saved data *(R-IUA-012 AC.1)*
-- [ ] `npm run test:fixtures` non-zero collected count, green
+- [x] Exactly one active `result_innovation_use` row exists after creating an indicator-6 result *(R-IUA-001 AC.1)*
+- [x] Its `created_by` matches the acting user *(AC.2)*
+- [x] Exactly one active `result_ip_rights` row exists *(R-IUA-011 AC.1)*
+- [x] Green checks for that result expose an `innovation_use` key *(R-IUA-012 AC.3)*
+- [x] The key set for an indicator-2 control result is **unchanged** *(R-IUA-011 scenario's `AND IT MUST leave the green-check key set for every other indicator identical`; R-IUA-012 AC.3's "and for no other indicator")*
+- [x] Complete everything **except** IP Rights → `completness: false` *(R-IUA-011 AC.5)*
+- [x] Complete everything **including** IP Rights → `completness: true` *(AC.4, and the scenario)*
+- [x] A green-check read issued after a section save reflects the saved data *(R-IUA-012 AC.1)*
+- [x] `npm run test:fixtures` non-zero collected count, green
 
 **Verification**
 

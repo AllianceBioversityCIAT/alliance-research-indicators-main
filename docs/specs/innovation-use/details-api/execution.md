@@ -1727,3 +1727,119 @@ Both fixtures call the service/provider directly — nothing about HTTP, auth, t
 
 **Budget status:** **11 of 13 tasks complete** (T-10 `[~]`). **21 of ~24 review rounds consumed** (T-01 ×3, T-02 ×1, T-03 ×3, T-04 ×1, T-05 ×1, T-06 ×3, T-07 ×2, T-08 ×1, T-09 ×3, T-10 ×1, T-11 ×2). **Two tasks remain against ~3 rounds, and T-13 is a full-gate task carrying a human `/swagger` check that cannot be automated.** This is the tightest the margin has been and is reported as such at the gate, not absorbed.
 
+### T-12 — **F-E** result creation + green-check reachability
+
+- **Status at the time of this entry:** **`[x]` DONE** — **PASS on attempt 1, zero rework**; 1 review round (2 parallel lens Reviewers, both PASS).
+- **Date:** 2026-08-19
+- **Implementer attempts run:** 1
+- **Requirements in scope:** R-IUA-001 AC.1, AC.2 (behavioural) · R-IUA-011 AC.1, AC.4, AC.5 + scenario · R-IUA-012 AC.1, AC.3
+- **Skills assigned:** `nestjs-expert`, `systematic-debugging` · **Effort:** `xhigh`
+- **File created:** `test/fixtures/innovation-use/innovation-use-result-creation.fixture-spec.ts` (**718 lines**), band `901_000`, year `2112`, platform `T12IURC`
+- **Suite:** 13/44 → **14 suites / 48 tests — 2 failed, 46 passed.** The 2 are **T-10's** committed product-defect failures; count unchanged, verified before and after.
+
+#### Leader environment research that shaped the task (before dispatch)
+
+Three findings, none of them in the spec, each of which would have cost an attempt:
+
+1. **There is no `green_checks` table.** Green checks are computed by **stored SQL functions** — `SELECT intellectual_property_validation(?)` and siblings. A query for `%green%` tables returns nothing, so an Implementer discovering this mid-task would first conclude the schema was broken. Chunk 1's `green-check-ip-rights.fixture-spec.ts` was pointed at as the working exemplar.
+2. **Seeding an indicator is a two-level FK chain, both levels empty:** `indicators` (0 rows) needs a NOT-NULL `indicator_type_id` → `indicator_types` (0 rows).
+3. **Chunk 1 had already documented the tension and taken a shortcut that would not transfer** — it left `indicator_id` NULL because *its* function never branches on it. T-12's criterion is a claim about how the key set **varies by indicator**, so the shortcut had to be re-examined rather than inherited. Both routes were given with the deciding test (read `green-checks.repository.ts` at source) and the decision required in the report.
+
+**On the seed-ownership question the user left open, the Leader took the established pattern rather than stalling:** idempotent `INSERT IGNORE`, never torn down, exactly as T-10 did for `quantification_roles` 1–2 and as `global-setup.ts` itself does for the role tables. `global-setup.ts` untouched.
+
+#### The doubles — legitimate, and the Reviewer supplied a reusable test rather than a verdict
+
+`ResultsService` has ~36 constructor dependencies reaching live RabbitMQ, CLARISA, Agresso and OpenSearch. Full Nest DI was impractical; raw inserts would have left the two mandated `createResultType` mutations biting nothing. The Implementer used `Object.create(ResultsService.prototype)` populated with only the two collaborators the indicator-6 path reads (`_resultInnovationUseService`, `_resultIpRightsService`), both **real, DB-backed** instances from a genuine `TestingModule`, so the unmodified method body executes verbatim. Same technique for a `GreenChecksService` partial calling the real `findByResultId`.
+
+**Lens A ruled it legitimate by mechanism, not by report**, and the decisive facts are worth keeping:
+
+- **`ResultsService`'s constructor body is EMPTY** (38 parameter properties, `) {}`). There is no initialisation to lose by bypassing it.
+- `createResultType` reads **exactly two** members of `this` on the indicator-6 path; `ipAvailables` is a function-local `const`, not a field. The ~36 absent members are **unreachable for this input**, not merely unused.
+- The failure mode of a future edit is **loud**: `this._x.create(...)` on `undefined` throws `TypeError` and reddens. No branch on that path can silently no-op.
+- `findByResultId` reads only `this.greenCheckRepository`; that constructor's body builds only submission-history repositories the method never touches, so `undefined as never` is honest rather than lucky.
+
+**The reusable rule, recorded because it is the transferable part and not the trick:** a constructor-bypassing partial is legitimate exactly when three conditions are **checked at source** — (a) the constructor performs no initialisation the target method depends on; (b) the set of `this` members the method reads on the exercised input is enumerable, finite, and every one populated with a **real** instance; (c) an omission fails loudly rather than no-opping. When any cannot be shown, the partial degrades into KZ-001's stand-in.
+
+#### `completness` both ways, and why the `true` half is not vacuous
+
+This was the Leader's central worry: reaching `completness: true` needs **five other validation functions** to pass, none Innovation-Use-specific, and two were satisfied by **built-in bypasses** (`geo_scope_id IN (1,50)`, `is_partner_not_applicable`). A `true` reached by bypasses without the Innovation Use term ever being consulted would satisfy the assertion while proving nothing — the exact "the gate is gone" failure the task names.
+
+**Lens B closed it at source.** The composite is a **JS fold** (`green-checks.service.ts:62-69`: `completness = completness && greenChecks[key]` over every returned key, skipping only the single-entry `VISUAL_ONLY_GREEN_CHECKS`) — **not** a SQL function. So the stored-function bypasses satisfy only their own terms and cannot short-circuit the AND, and both are legitimate production "section complete" states rather than test-only escapes. `innovation_use_validation` sits unconditionally in the `SELECT` list for indicator 6 (`green-checks.repository.ts:97-98`). Therefore a true fold **entails** the Innovation Use term was consulted.
+
+**And there is a positive counter-witness**: the third scenario holds the other seven terms true with `innovation_use` false and observes `completness` false. Dependence is demonstrated in both directions, not argued.
+
+**AC.5's precondition is non-vacuous by construction rather than by enumeration:** the only mutation between the two checkpoints is the IP Rights save, and none of the five other validations reads `result_ip_rights`, so the after-checkpoint's `true` retroactively proves all five were already true at the before-checkpoint. Pairing both halves in one `it` is what makes that inference available — T-11's F-C discipline, correctly reused.
+
+#### A mandated falsification did not bite, and the Implementer fixed the test rather than the claim
+
+Adding `innovation_use` to `VISUAL_ONLY_GREEN_CHECKS` left the first `completness: false` checkpoint green. **Diagnosis verified correct by both lenses:** at that checkpoint the false state is produced by `ip_rights` being incomplete — which **AC.5's own wording requires** ("complete everything *except* IP Rights") — so dropping `innovation_use` from the AND changes nothing there. The Implementer added a third scenario (all complete **except** `innovation_use`, with `ip_rights` complete) so the mutation has a biting assertion, and both lenses confirmed it reddens.
+
+**Ruled in scope**, and the reasoning matters: T-12's *Requirements covered* claims R-IUA-011's scenario, which contains `BUT it must NOT make ip_rights non-blocking by adding innovation_use or ip_rights to VISUAL_ONLY_GREEN_CHECKS`. At `HEAD` that clause was gated **only by T-08's `grep`** — a presence check, the KZ-001 shape. The new scenario converts it into a behavioural gate, so it serves a clause the task already claimed rather than inventing scope.
+
+**This is the second spec-stated falsification in this spec that did not hold as written** (after T-11's arithmetically impossible one) — and unlike T-11, it was caught by the Implementer and closed by strengthening the test. It also **closes T-11's open sweep question**: T-12's *other* mandated falsification (drop `INNOVATION_USE` from `ipAvailables`) **does** hold, reddening both the row-count assertion and the after-checkpoint while the before-checkpoint stays green.
+
+#### Route (a) was not merely better — route (b) was impossible
+
+The Implementer seeded real `indicators` rows 2 and 6 because `calculateGreenChecks` switches on `results.indicator_id`. **Lens A found independent corroboration the report did not mention:** `general_information_validation` carries `AND r.indicator_id IS NOT NULL` in its `WHERE`, so a NULL-indicator result **can never reach `completness: true` at all.** Route (a) was load-bearing twice over.
+
+The indicator-2 control is a **real** `indicator_id = 2` row, compared as an **exact 9-key set** via `Object.keys(...).sort()` + `toEqual` — the object-level analogue of a whole-row `SELECT *`, so §0's hand-enumeration disqualifier does not bite, and a new key on either indicator reddens.
+
+#### Seeding footprint — the split is right, and one race was checked and does not exist
+
+Never torn down (`INSERT IGNORE`): `indicator_types`, `indicators` 2 and 6, `contract_roles` 1, `lever_roles` 1, `evidence_roles` 1, `user_roles` 1, `clarisa_geo_scope` 1, `intellectual_property_owner` 1, `portfolios` id 1. Fixture-private and torn down: `clarisa_actor_types`, `clarisa_levers`, `clarisa_sdgs`, `alliance_user_staff`, `agresso_contracts`, its own platform and report year.
+
+**The classification criterion is verifiable and Lens A verified it:** `alignment_validation` contains `rl.lever_role_id = CASE WHEN portfolio_id = 1 THEN 1 WHEN portfolio_id = 2 THEN 3 ELSE NULL END` — the portfolio's **literal id must be 1 or 2**, so `portfolios` id 1 genuinely could not have been a private band id. The other never-torn-down ids are likewise hardcoded in function bodies.
+
+**Blast radius swept on every axis (KZ-003/KZ-005):** across all sibling fixtures, **zero** assertions on `alignment` / `geo_location` / `partners` / `evidences` / `completness`; the only sibling reading a green check asserts `ip_rights === 0` alone; no sibling sets a non-NULL `results.indicator_id`, so seeding `indicators` 2/6 cannot move any sibling's output — including F-B's whole-row "no difference" diffs. Nothing `global-setup.ts` owns is touched.
+
+**A race that would have been a first-run-only flake was checked and ruled out:** `sp-versioning-objective-blocks.fixture-spec.ts` inserts a `portfolios` row with `AUTO_INCREMENT` and deletes it **by insertId**. Had that row ever landed on id 1, this file's `INSERT IGNORE (id = 1)` would silently no-op and then lose its portfolio to a sibling's teardown. `baseline.sql` sets `portfolios AUTO_INCREMENT=4`, so the sibling can never contend for id 1. Per-file `INSERT IGNORE` is safe here because this file is the **sole writer** of every row it seeds — which is precisely the condition `global-setup.ts` exists to guarantee where it is not.
+
+#### Leader-run lint verification (post-PASS)
+
+Lens B predicted prettier drift. Confirmed: `npx eslint --no-fix` reported **10 prettier errors**, and `.husky/pre-commit` is empty (established at T-02), so they would have committed silently. Resolved with the repo's own autofix **scoped to the single file** (`npx eslint --fix <path>`), never the package-wide script, which carries `--fix` and mutates broadly.
+
+**Proved semantically inert rather than asserted:** prettier both reflowed and **added trailing commas** when hoisting array brackets, so a whitespace-only comparison was not sufficient. A normalisation stripping whitespace **and** trailing commas before `]`/`)`/`}` shows the two versions **identical**. `git status` confirmed **no collateral**; the fixture suite re-ran at 14/48 with the same 2 T-10 failures, and the unit suite at **336 suites / 2264 tests** green.
+
+#### Declared limits, restated so they are not mistaken for proven
+
+- No HTTP tier at all — no controller, guard, envelope, versioning or Swagger surface. Coverage says nothing here: `completness: true` rests on eight stored functions, which no coverage number reflects (ADR-11).
+- **R-IUA-012 AC.1's observed save is IP Rights, not Innovation Use.** The `innovation_use` key's own false→true transition is driven by raw SQL and never asserted as a pair. AC.1's wording is unqualified ("a section save") and the pull-not-push property (DD-7) is fully exhibited, so this is a recorded limit rather than a violation — and F-A already gates the Innovation Use round trip.
+- **Two properties are now PERMANENTLY unowned at every tier, and T-13's criteria do not cover either:**
+  - **DD-14's partial-PATCH contract** — F-E never calls `ResultInnovationUseService.update`; the level is set by raw SQL.
+  - **That `create` honors the `manager` it receives** (T-08 advisory B-4) — `createResultType(id, indicator)` is called with **two** arguments, so `manager` is `undefined` and `selectManager` resolves to the repository. The transaction path is never entered. **This retires T-05's forward pointer that F-E was the natural owner: it structurally cannot be**, and T-08's advisory was right to say so.
+- **R-IUA-011's scenario clause `AND the submit transition is permitted` is asserted nowhere and no task owns it.** Structurally implied — `function-handler.service.ts` runs the byte-identical fold over the identical object, so `completness: true` entails that gate passes — and the remainder is roles/workflow, outside this spec (DD-5). **Named, not charged.**
+- Only indicator 2 is exercised as a control; indicators 1/3/4/5 rest on the single `switch` at source plus T-08's unit matrix. That is exactly what criterion 5 asks for.
+
+#### `ADVISORY` findings (recorded, non-gating, and they do not become tasks)
+
+| Lens | Finding | Disposition |
+| --- | --- | --- |
+| **Risk** | The never-torn-down `portfolios` id 1 spanning **2000–2200** permanently makes `get_portfolio_id_by_result` (`ORDER BY p.id LIMIT 1`) resolve to id 1 for **every** fixture report year in the shared scratch schema. Nothing is affected today, but a future fixture asserting portfolio-2 alignment (`lever_role_id = 3`) or "no portfolio resolves" would silently get portfolio 1 | **Recorded.** Belongs to the **baseline-snapshot escalation T-10 opened**, not to another per-file patch |
+| Reliability | `afterAll` runs **17 unguarded `DELETE`s** before `harness.close()`. A `beforeAll` throw after boot but before the ids are assigned binds `undefined` and leaks the Nest connection. **Fourth fixture with this shape.** Mitigating factor recorded: every private seed here is existence-checked before a plain `INSERT`, so a leaked row does **not** redden a second run — this file is not exposed to the orphaned-platform regression T-13(a) exists to prevent | Recorded; T-13 candidate |
+| Reliability | `ResultsService` has one class-field initializer (`logger`), `undefined` on the partial. The header's guarantee is phrased over *constructor dependencies* only; naming the **field** axis too would tell the next maintainer that a `this.logger.debug(...)` added inside the `INNOVATION_USE` case is also in scope — it throws loudly, which is the right failure mode | Recorded |
+| Reliability | Test 3 completes the section by raw SQL while the **real** `ResultInnovationUseService` is already in hand. Routing it through `update()` would make criterion 8 true of the Innovation Use section itself, not only IP Rights. F-A already gates that round trip, so strictly optional | Recorded |
+| Readability | `StubResultsUtilWithIndicator` duplicates the shared harness's stub with one getter changed. Keeping it local was the correct blast-radius call (three sibling suites consume the shared harness) and the header says so; a shared factory is T-13 cleanup material | Recorded |
+| Readability | `901_000_000_000_000 + Date.now()` yields codes beginning `902_787…`, so the declared "901_000 band" is a **label, not a prefix** — inherited verbatim from all seven siblings and collision-free at this scale. Recorded so nobody "fixes" it into a real collision | Recorded |
+| Readability | MySQL returns `1`/`0`, so `completness` is numeric; `toBeTruthy`/`toBeFalsy` is the **correct** choice against the requirement's literal "`completness: true`" — the coercion is deliberate, not laxity | Recorded |
+
+**Final verification:** `npm run test:fixtures` → **14 suites / 48 tests, 2 failed (T-10's), 46 passed** · `npm test -- --silent` → **336 suites / 2264 tests** green · `npx eslint --no-fix` clean after the scoped autofix · `git diff HEAD -- src/` **empty** — all re-run independently by the Leader.
+
+#### BUDGET ESCALATION — the fixture tier is ~2.8× its §12 allowance
+
+`design.md` §12 allotted **harness ~120 + F-A…F-E ~800 ≈ 920 LOC** for the fixture tier. Actual: harness **249** + F-A **543** + F-B **710** + F-C **248** + F-D **77** + F-E **718** = **2,545 LOC**, i.e. **~2.8×**.
+
+**Lens A assessed the overrun as intrinsic, not padding**, and checked each link: `completness: true` is the AND of five non-Innovation-Use validations, and on this scratch schema each needed reference data the committed baseline captured as **DDL only** — `general_information_validation` needs a non-NULL `indicator_id` **and** a role-1 `result_users` row; `alignment_validation` has **no bypass** and needs a portfolio whose literal id is 1, a role-1 contract, a role-1 lever and an SDG; `evidences_validation` one more pair. Only `geo_location` and `partners` were free. `beforeAll`/`afterAll` alone are ~278 lines of F-E. Non-intrinsic additions total roughly **45 lines** — the third scenario and its test — and those buy a mandated falsification.
+
+**This is an estimate defect in §12, not delivery padding.** The per-task estimates were written before anyone knew the scratch schema carried no seed data for five unrelated validation functions. Reported to the user at the gate rather than absorbed.
+
+**Forward pointers created by T-12**
+
+| → Task | Pointer |
+| --- | --- |
+| **T-13** | **Its criterion "`test:fixtures` run twice in a row — both green" will collide with T-10's deliberately committed red, exactly as T-12's criterion 9 did.** Carve this out at **dispatch**, not at review. Cleanup candidates (none of them added criteria): the `afterAll` `tryStep`/`finally` guarding (now **four** fixtures), the shared `StubResultsUtil` factory, F-D's `Number()` coercion, AC.3/AC.4's message constraints, and `resolveInnovationUseLevel`'s wrong doc-comment about the driver contract |
+| **T-13 / user** | **Two permanently unowned properties** — DD-14's partial-PATCH contract behaviourally, and that `create` honors its `manager`. Neither is in T-13's criteria. Adopting them is a decision, not a cleanup |
+| Baseline-snapshot owner | **Fifth and sixth instances** of DDL-without-seed: `indicators`, `indicator_types` (this task), after `quantification_roles` 1–2 (T-10) and `global-setup.ts`'s own four. Plus the `portfolios` id 1 range above. The per-file `INSERT IGNORE` patches are accreting across four fixtures |
+| Kaizen (archive) | Three candidates: **(a)** the **three-condition test for a constructor-bypassing partial** (empty-constructor / enumerable-real-collaborators / loud-failure) — a reusable rule extracted from a one-off technique; **(b)** a spec-mandated falsification can be *unfalsifiable against a spec-correct design*, and the right response is to add a scenario that bites, not to restate the claim — second occurrence, first time caught by the Implementer; **(c)** a Leader environment pre-check that reads **stored function bodies** (`SHOW CREATE FUNCTION`) found a five-function seed chain no document mentioned — the pre-check keeps paying, and its scope should include stored routines, not just tables and FKs |
+
+**Budget status:** **12 of 13 tasks complete** (T-10 `[~]`). **22 of ~24 review rounds consumed.** One task remains (T-13) and **the LOC axis has breached at ~2.8× on the fixture tier** — see the escalation above.
+
