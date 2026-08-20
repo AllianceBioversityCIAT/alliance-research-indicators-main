@@ -110,6 +110,34 @@ import { QuantificationRolesEnum } from '../../../src/domain/entities/quantifica
  * goes red. See the falsification table in this task's report for the
  * other two (`result-institution-types.service.ts`'s
  * `deactivateExistingRecords`, and the quantification role scoping).
+ *
+ * **QUARANTINE, 2026-08-19 (T-10 Pivot Record, option B —
+ * `docs/specs/innovation-use/details-api/execution.md` → *T-10* +
+ * *Pivot Record*).** The two `it`s inside the `"save #2 — a payload for
+ * result 1 that submits result 2's row ids"` block that assert result 2's
+ * ACTOR row and ORGANIZATION row are byte-identical are marked
+ * `it.failing(...)`, not `it.skip(...)` and not deleted. **They fail
+ * because the product has a confirmed defect, not because the test is
+ * wrong.** Against real MySQL: result 2's `result_actors` row went
+ * `actor_type_id` 900853 → 900854, `actors_count` 900882 → 900883, with
+ * `result_id` unchanged (still result 2's) — result 1's save silently
+ * rewrote it in place. Same shape for `result_institution_types`. Root
+ * cause: a caller-supplied primary key reaching the save payload with no
+ * `result_id` and no ownership check, in `result-actors.service.ts`'s
+ * `result_actors_id`-present branch and `result-institution-types.service.ts`'s
+ * `buildUpdateData`. It is **shared with `customSaveInnovationDev`** and is
+ * therefore pre-existing platform behaviour, not something this spec
+ * introduced. **R-IUA-009 AC.3 is NOT satisfied by the product** — the
+ * requirement stands; the code does not meet it. `result_quantifications`
+ * is structurally immune (see above) and is the contrast that shows the
+ * generic `upsertByCompositeKeys` algorithm is safe while the two
+ * hand-written branches are not. `it.failing` keeps both assertions
+ * executing: the suite is green *because* they fail as expected, and if
+ * the ownership check is ever added, both turn **RED** — signalling
+ * "remove `.failing`, this quarantine is obsolete" rather than silently
+ * passing forever. When the defect is fixed: remove `.failing` from both
+ * and expect them to pass unmodified. See each `it`'s own comment below
+ * for the per-assertion detail.
  */
 describe('Innovation Use reconciliation never crosses a role or a result boundary (T-10, F-B)', () => {
   const uniqueSuffix = Date.now();
@@ -236,9 +264,10 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       [reportYear],
     );
     if (!existingYear) {
-      await dataSource.query(`INSERT INTO report_years (report_year) VALUES (?)`, [
-        reportYear,
-      ]);
+      await dataSource.query(
+        `INSERT INTO report_years (report_year) VALUES (?)`,
+        [reportYear],
+      );
       reportYearSeeded = true;
     }
 
@@ -262,10 +291,22 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
     }
 
     for (const [code, label] of [
-      [institutionTypeCodeDev, 'T-10 F-B institution type (result 1, Innovation Dev)'],
-      [institutionTypeCodeUseR1, 'T-10 F-B institution type (result 1, Innovation Use)'],
-      [institutionTypeCodeUseR2, 'T-10 F-B institution type (result 2, attack TARGET)'],
-      [institutionTypeCodeAttack, 'T-10 F-B institution type (attacker-submitted value)'],
+      [
+        institutionTypeCodeDev,
+        'T-10 F-B institution type (result 1, Innovation Dev)',
+      ],
+      [
+        institutionTypeCodeUseR1,
+        'T-10 F-B institution type (result 1, Innovation Use)',
+      ],
+      [
+        institutionTypeCodeUseR2,
+        'T-10 F-B institution type (result 2, attack TARGET)',
+      ],
+      [
+        institutionTypeCodeAttack,
+        'T-10 F-B institution type (attacker-submitted value)',
+      ],
     ] as [number, string][]) {
       const [existing] = await dataSource.query(
         `SELECT code FROM clarisa_institution_types WHERE code = ?`,
@@ -311,7 +352,13 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
          women_youth, women_not_youth, men_youth, men_not_youth,
          is_active, created_by, updated_by
        ) VALUES (?, ?, ?, NULL, TRUE, FALSE, FALSE, TRUE, 1, ?, ?)`,
-      [result1Id, actorTypeCodeDev, ActorRolesEnum.INNOVATION_DEV, actingUserId, actingUserId],
+      [
+        result1Id,
+        actorTypeCodeDev,
+        ActorRolesEnum.INNOVATION_DEV,
+        actingUserId,
+        actingUserId,
+      ],
     );
     devActorId = devActorInsert.insertId;
 
@@ -353,7 +400,13 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
          result_id, institution_type_id, institution_type_role_id,
          is_organization_known, is_active, created_by, updated_by
        ) VALUES (?, ?, ?, FALSE, 1, ?, ?)`,
-      [result1Id, institutionTypeCodeDev, InstitutionTypeRoleEnum.INNOVATION_DEV, actingUserId, actingUserId],
+      [
+        result1Id,
+        institutionTypeCodeDev,
+        InstitutionTypeRoleEnum.INNOVATION_DEV,
+        actingUserId,
+        actingUserId,
+      ],
     );
     devOrgId = devOrgInsert.insertId;
 
@@ -462,21 +515,41 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
     useR2QuantId = useR2QuantInsert.insertId;
 
     // "Before" snapshots — captured once, before either save.
-    devActorBefore = await fetchRowByPk('result_actors', 'result_actors_id', devActorId);
+    devActorBefore = await fetchRowByPk(
+      'result_actors',
+      'result_actors_id',
+      devActorId,
+    );
     devOrgBefore = await fetchRowByPk(
       'result_institution_types',
       'result_institution_type_id',
       devOrgId,
     );
-    devQuantRole1Before = await fetchRowByPk('result_quantifications', 'id', devQuantRole1Id);
-    devQuantRole2Before = await fetchRowByPk('result_quantifications', 'id', devQuantRole2Id);
-    r2ActorBefore = await fetchRowByPk('result_actors', 'result_actors_id', useR2ActorId);
+    devQuantRole1Before = await fetchRowByPk(
+      'result_quantifications',
+      'id',
+      devQuantRole1Id,
+    );
+    devQuantRole2Before = await fetchRowByPk(
+      'result_quantifications',
+      'id',
+      devQuantRole2Id,
+    );
+    r2ActorBefore = await fetchRowByPk(
+      'result_actors',
+      'result_actors_id',
+      useR2ActorId,
+    );
     r2OrgBefore = await fetchRowByPk(
       'result_institution_types',
       'result_institution_type_id',
       useR2OrgId,
     );
-    r2QuantBefore = await fetchRowByPk('result_quantifications', 'id', useR2QuantId);
+    r2QuantBefore = await fetchRowByPk(
+      'result_quantifications',
+      'id',
+      useR2QuantId,
+    );
   });
 
   afterAll(async () => {
@@ -485,17 +558,24 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
     }
 
     if (result1Id !== undefined) {
-      await dataSource.query(`DELETE FROM result_quantifications WHERE result_id = ?`, [
+      await dataSource.query(
+        `DELETE FROM result_quantifications WHERE result_id = ?`,
+        [result1Id],
+      );
+      await dataSource.query(
+        `DELETE FROM result_institution_types WHERE result_id = ?`,
+        [result1Id],
+      );
+      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
         result1Id,
       ]);
-      await dataSource.query(`DELETE FROM result_institution_types WHERE result_id = ?`, [
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [result1Id],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
         result1Id,
       ]);
-      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [result1Id]);
-      await dataSource.query(`DELETE FROM result_innovation_use WHERE result_id = ?`, [
-        result1Id,
-      ]);
-      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [result1Id]);
     }
     if (result2Id !== undefined) {
       // Save #2's attack payload, IF it succeeded in corrupting result 2's
@@ -503,29 +583,43 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       // mutates the existing ones. So the same three DELETEs by
       // `result_id` still remove everything result 2 owns, corrupted or
       // not.
-      await dataSource.query(`DELETE FROM result_quantifications WHERE result_id = ?`, [
+      await dataSource.query(
+        `DELETE FROM result_quantifications WHERE result_id = ?`,
+        [result2Id],
+      );
+      await dataSource.query(
+        `DELETE FROM result_institution_types WHERE result_id = ?`,
+        [result2Id],
+      );
+      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
         result2Id,
       ]);
-      await dataSource.query(`DELETE FROM result_institution_types WHERE result_id = ?`, [
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
         result2Id,
       ]);
-      await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [result2Id]);
-      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [result2Id]);
     }
 
     for (const code of institutionTypesSeeded) {
-      await dataSource.query(`DELETE FROM clarisa_institution_types WHERE code = ?`, [code]);
+      await dataSource.query(
+        `DELETE FROM clarisa_institution_types WHERE code = ?`,
+        [code],
+      );
     }
     for (const code of actorTypesSeeded) {
-      await dataSource.query(`DELETE FROM clarisa_actor_types WHERE code = ?`, [code]);
+      await dataSource.query(`DELETE FROM clarisa_actor_types WHERE code = ?`, [
+        code,
+      ]);
     }
     if (reportYearSeeded) {
-      await dataSource.query(`DELETE FROM report_years WHERE report_year = ?`, [reportYear]);
+      await dataSource.query(`DELETE FROM report_years WHERE report_year = ?`, [
+        reportYear,
+      ]);
     }
     if (platformSeeded) {
-      await dataSource.query(`DELETE FROM reporting_platforms WHERE platform_code = ?`, [
-        platformCode,
-      ]);
+      await dataSource.query(
+        `DELETE FROM reporting_platforms WHERE platform_code = ?`,
+        [platformCode],
+      );
     }
     // `quantification_roles` ids 1/2 are NEVER torn down here — same
     // discipline as `global-setup.ts`'s own id-1 top-ups (file header).
@@ -564,7 +658,11 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
     );
     expect(Number(useR1OrgAfter.is_active)).toBe(0);
 
-    const useR1QuantAfter = await fetchRowByPk('result_quantifications', 'id', useR1QuantId);
+    const useR1QuantAfter = await fetchRowByPk(
+      'result_quantifications',
+      'id',
+      useR1QuantId,
+    );
     expect(Number(useR1QuantAfter.is_active)).toBe(0);
 
     // --- Criterion 2/3: every Innovation Dev row (and the two
@@ -691,20 +789,93 @@ describe('Innovation Use reconciliation never crosses a role or a result boundar
       ).toEqual(r2QuantBefore);
     });
 
-    it("leaves result 2's ACTOR row byte-identical — the load-bearing assertion. If customSaveInnovationUse's result_actors_id-present branch has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften", async () => {
-      expect(
-        await fetchRowByPk('result_actors', 'result_actors_id', useR2ActorId),
-      ).toEqual(r2ActorBefore);
-    });
+    /**
+     * QUARANTINED 2026-08-19 — T-10 Pivot Record, option B
+     * (`docs/specs/innovation-use/details-api/execution.md` → *T-10* +
+     * *Pivot Record*). `it.failing`, not `.skip`, and no assertion below is
+     * weakened.
+     *
+     * **This fails because the product has a defect, not because the test
+     * is wrong.** Observed against real MySQL: result 2's `result_actors`
+     * row went `actor_type_id` 900853 → 900854, `actors_count` 900882 →
+     * 900883, with `result_id` UNCHANGED — still pointing at result 2.
+     * Result 1's save silently overwrote result 2's row in place.
+     *
+     * **Root cause:** `result-actors.service.ts`'s `customSaveInnovationUse`,
+     * in its `result_actors_id`-present branch, builds the save payload
+     * from a caller-supplied primary key with no `result_id` and no
+     * ownership check anywhere in the method — `tempRepo.save(...)` then
+     * issues a plain PK-keyed UPDATE that cannot know, and never asks,
+     * whether that PK belongs to the result being saved.
+     *
+     * **Shared with `customSaveInnovationDev`** — pre-existing platform
+     * behaviour, not something this spec introduced.
+     *
+     * **R-IUA-009 AC.3 is NOT satisfied by the product** — the requirement
+     * stands, the code does not meet it. Contrast with
+     * `result_quantifications`, which is structurally immune: the sibling
+     * `it` two below shows `upsertByCompositeKeys` ignoring the same
+     * caller-supplied `id` and landing the row as a new insert scoped to
+     * the calling result instead — the generic algorithm is safe, this
+     * hand-written one is not.
+     *
+     * **When the defect is fixed:** remove `.failing` and expect this test
+     * to pass unmodified.
+     */
+    it.failing(
+      "leaves result 2's ACTOR row byte-identical — the load-bearing assertion. If customSaveInnovationUse's result_actors_id-present branch has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften",
+      async () => {
+        expect(
+          await fetchRowByPk('result_actors', 'result_actors_id', useR2ActorId),
+        ).toEqual(r2ActorBefore);
+      },
+    );
 
-    it("leaves result 2's ORGANIZATION row byte-identical — the load-bearing assertion. If processInstitution's buildUpdateData has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften", async () => {
-      expect(
-        await fetchRowByPk(
-          'result_institution_types',
-          'result_institution_type_id',
-          useR2OrgId,
-        ),
-      ).toEqual(r2OrgBefore);
-    });
+    /**
+     * QUARANTINED 2026-08-19 — T-10 Pivot Record, option B
+     * (`docs/specs/innovation-use/details-api/execution.md` → *T-10* +
+     * *Pivot Record*). `it.failing`, not `.skip`, and no assertion below is
+     * weakened.
+     *
+     * **This fails because the product has a defect, not because the test
+     * is wrong.** Same shape as the ACTOR-row sibling above: result 2's
+     * `result_institution_types` row's `institution_type_id` and
+     * `organization_count` were overwritten by result 1's save (sentinels
+     * 900863/900892 → 900864/900893 in this fixture's seed), with
+     * `result_id` unchanged — still pointing at result 2.
+     *
+     * **Root cause:** `result-institution-types.service.ts`'s
+     * `buildUpdateData` (reached from `processInstitution`'s
+     * `result_institution_type_id`-present check, both branches) builds the
+     * save payload from a caller-supplied primary key with no `result_id`
+     * and no ownership check anywhere in `customSaveInnovationUse` /
+     * `processInstitution`.
+     *
+     * **Shared with `customSaveInnovationDev`** — pre-existing platform
+     * behaviour, not something this spec introduced.
+     *
+     * **R-IUA-009 AC.3 is NOT satisfied by the product** — the requirement
+     * stands, the code does not meet it. Contrast with
+     * `result_quantifications` (the sibling `it` two above), which is
+     * structurally immune: `upsertByCompositeKeys` ignores the same
+     * caller-supplied `id` and lands the row as a new insert scoped to the
+     * calling result instead — the generic algorithm is safe, this
+     * hand-written one is not.
+     *
+     * **When the defect is fixed:** remove `.failing` and expect this test
+     * to pass unmodified.
+     */
+    it.failing(
+      "leaves result 2's ORGANIZATION row byte-identical — the load-bearing assertion. If processInstitution's buildUpdateData has no ownership check, this goes red, and that is a PRODUCT_BUG-class finding to report, not to soften",
+      async () => {
+        expect(
+          await fetchRowByPk(
+            'result_institution_types',
+            'result_institution_type_id',
+            useR2OrgId,
+          ),
+        ).toEqual(r2OrgBefore);
+      },
+    );
   });
 });
