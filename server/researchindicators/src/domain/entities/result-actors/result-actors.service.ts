@@ -7,6 +7,7 @@ import {
   FindOptionsWhere,
   In,
   IsNull,
+  Not,
   Repository,
 } from 'typeorm';
 import {
@@ -211,6 +212,23 @@ export class ResultActorsService extends BaseServiceSimple<
     const tempRepo = manager.getRepository(ResultActor);
     await this.assertInnovationUseOwnership(data, resultId, tempRepo);
     const dataToSave: Partial<ResultActor>[] = [];
+    // PK-collision remediation (2026-08-20,
+    // `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+    // Every `result_actors_id` this payload supplies explicitly (the
+    // id-present branch below). An id-less row's `constructWhereClauseInnovationUse`
+    // lookup, further down, excludes these — without the exclusion, an
+    // ordinary "edit row X's type, add a new row of X's OLD type" payload has
+    // the id-less row's `findOne` resolve to row X itself (still carrying its
+    // OLD type in the DB, since nothing has been written yet), so it adopts
+    // X's PK and `save()` issues two PK-keyed UPDATEs against one row instead
+    // of an UPDATE plus an INSERT — silently dropping the added row and
+    // leaving a column-level hybrid of both payload rows behind. Computed
+    // fresh here rather than reusing `assertInnovationUseOwnership`'s
+    // internal set, since that method is independently audited and
+    // deliberately left unmodified by this fix.
+    const idsAlreadyClaimed = data
+      .filter((institution) => institution?.result_actors_id)
+      .map((institution) => institution.result_actors_id);
     for (const institution of data) {
       // Derived once per row and fed to both the flag write below and
       // `resolveInnovationUseCounts`, on both branches: `innovation_use_validation`
@@ -246,6 +264,7 @@ export class ResultActorsService extends BaseServiceSimple<
         const where = this.constructWhereClauseInnovationUse(
           institution,
           resultId,
+          idsAlreadyClaimed,
         );
         const existData = await tempRepo.findOne({
           where,
@@ -379,9 +398,25 @@ export class ResultActorsService extends BaseServiceSimple<
         };
   }
 
+  /**
+   * PK-collision remediation (2026-08-20,
+   * `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+   * `excludeIds` is `customSaveInnovationUse`'s `idsAlreadyClaimed` — every
+   * `result_actors_id` explicitly submitted elsewhere in the same payload.
+   * Excluding them from this id-less row's lookup is what stops it adopting
+   * a PK another row in the same payload already claimed: without this, the
+   * lookup has no way to tell "an unrelated existing row of this type" (a
+   * legitimate match, left untouched) from "the very row an id-present
+   * sibling is about to update" (the collision this fixture proves). Left
+   * empty (the default) for every call site outside `customSaveInnovationUse`'s
+   * id-less branch, which adds no clause — this is why the where-clause shape
+   * for a payload with no explicit ids at all is byte-identical to before
+   * this fix (`Not(In([]))` is deliberately never constructed).
+   */
   private constructWhereClauseInnovationUse(
     data: InnovationUseActorDto,
     resultId: number,
+    excludeIds: number[] = [],
   ) {
     const where: FindOptionsWhere<ResultActor> = {
       result_id: resultId,
@@ -393,6 +428,9 @@ export class ResultActorsService extends BaseServiceSimple<
     } else {
       where['actor_type_id'] = data?.actor_type_id;
       where['actor_type_custom_name'] = IsNull();
+    }
+    if (excludeIds.length > 0) {
+      where['result_actors_id'] = Not(In(excludeIds));
     }
 
     return where;

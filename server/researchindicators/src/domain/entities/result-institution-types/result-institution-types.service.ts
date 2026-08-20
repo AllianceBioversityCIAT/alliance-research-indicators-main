@@ -204,12 +204,33 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
     const uniqueData = this.removeDuplicates(data);
     const dataToSave: Partial<ResultInstitutionType>[] = [];
 
+    // PK-collision remediation (2026-08-20,
+    // `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+    // Every `result_institution_type_id` this RAW payload supplies explicitly
+    // (mirrors `assertInnovationUseOwnership`'s own raw-payload read, above —
+    // FAIL-B taught this file that reading `uniqueData` here instead would
+    // let an id-less row's identity-key collision in `removeDuplicates` hide
+    // an explicitly-submitted id from this set too). Consumed by
+    // `reconcileAdoptedPrimaryKey`, below, wholly inside this method — never
+    // by `buildWhereClause`/`constructWhereClause`, which stay shared with
+    // `customSaveInnovationDev` and untouched.
+    const idsAlreadyClaimed = new Set(
+      data
+        .filter((institution) => institution?.result_institution_type_id)
+        .map((institution) => String(institution.result_institution_type_id)),
+    );
+
     for (const institution of uniqueData) {
       const institutionData = await this.processInstitution(
         institution,
         resultId,
         tempRepo,
         InstitutionTypeRoleEnum.INNOVATION_USE,
+      );
+      this.reconcileAdoptedPrimaryKey(
+        institution,
+        institutionData,
+        idsAlreadyClaimed,
       );
       dataToSave.push(institutionData);
     }
@@ -220,6 +241,57 @@ export class ResultInstitutionTypesService extends BaseServiceSimple<
       InstitutionTypeRoleEnum.INNOVATION_USE,
     );
     return tempRepo.save(dataToSave);
+  }
+
+  /**
+   * PK-collision remediation (2026-08-20,
+   * `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+   * A Use-only pass over ONE already-built `dataToSave` entry, run
+   * immediately after `processInstitution` and before `save()` — wholly
+   * inside `customSaveInnovationUse`, never touching the shared
+   * `processInstitution`/`buildNewData`/`buildWhereClause`/`constructWhereClause`/
+   * `buildUpdateData` (those stay byte-identical to `customSaveInnovationDev`'s
+   * call path, per this fix's boundary).
+   *
+   * The defect: `buildNewData`'s `findOne` (reached only for an id-LESS row,
+   * `institution?.result_institution_type_id` falsy below) carries no
+   * exclusion of a `result_institution_type_id` another row in this SAME
+   * payload already submitted explicitly. An ordinary "edit row X's type,
+   * add a new row of X's OLD type" payload has that `findOne` resolve to row
+   * X itself — still carrying its OLD identity in the DB, since nothing has
+   * been written yet — so the id-less row's `institutionData` comes back
+   * carrying X's PK. Left uncorrected, `save()` would issue two PK-keyed
+   * UPDATEs against row X instead of an UPDATE plus an INSERT: the added row
+   * is never created, and X ends up a column-level hybrid of both payload
+   * rows.
+   *
+   * Detection is exactly `idsAlreadyClaimed.has(...)` on an id-LESS row's
+   * adopted PK — a row that submitted its OWN id (the `institution?.result_institution_type_id`
+   * guard below) is never touched, since claiming your own PK is not a
+   * collision. Resolution turns the adoption back into a plain insert: drop
+   * the adopted PK and re-derive the audit stamp as `NEW` — `buildUpdateData`/
+   * `buildDataTemplate` had stamped it `UPDATE` (`updated_by` only) on the
+   * belief the row already existed; once the PK is disowned here, that
+   * belief no longer holds, and leaving `updated_by` on a row `save()` is
+   * about to INSERT would carry a stale audit column with no `created_by`.
+   */
+  private reconcileAdoptedPrimaryKey(
+    institution: InstitutionRow,
+    institutionData: Partial<ResultInstitutionType>,
+    idsAlreadyClaimed: Set<string>,
+  ): void {
+    if (institution?.result_institution_type_id) {
+      return;
+    }
+    const adoptedId = institutionData.result_institution_type_id;
+    if (adoptedId === undefined || !idsAlreadyClaimed.has(String(adoptedId))) {
+      return;
+    }
+    delete institutionData.result_institution_type_id;
+    delete institutionData.updated_by;
+    institutionData.created_by = this.currentUser.audit(
+      SetAuditEnum.NEW,
+    ).created_by;
   }
 
   /**

@@ -2285,3 +2285,59 @@ The Reviewer's advisory found that FP-50's blessing of cross-file line citations
 Amended in `src/CLAUDE.md` §9 with the Reviewer's wording, and **`src/AGENTS.md` was found already stale at `HEAD`** — missing FP-45, FP-46, FP-48, FP-49 **and** FP-50 in one contiguous block, i.e. every fixture lesson from both innovation-use specs. Not caused by this spec; resynced after verifying it held nothing `CLAUDE.md` lacked. Agents on hosts reading `AGENTS.md` had been working without the band registry that prevents fixture collisions.
 
 > **Carried, not closed:** the three at-risk line citations are **not** converted. The rule is now written; the codebase does not yet satisfy it. That is deliberate — advisory work, no behavioural effect, and it should not ride into an archive as if it were done.
+
+---
+
+## PRODUCT DEFECT — silent row loss and column-level hybrid on an edit-plus-add save (2026-08-20)
+
+**Found at re-validation by an auditor reading code against the record.** Not by a test, not by a suite run, and not by me. It is the **second** genuine product defect this spec's validation phase has surfaced, and both came from the same method.
+
+### What it was
+
+The ordinary UI flow — ids sent for edited rows, omitted for new ones. Stored: one active Innovation Use actor, `actor_type_id = 1`. Payload: change that row to type 2 **and** add a new row of type 1.
+
+| Step | What happened |
+| --- | --- |
+| Row 1 | id-present branch → save object keyed on the caller's PK |
+| Row 2 | id-less branch → `findOne` via `constructWhereClauseInnovationUse`, which carried **no exclusion of PKs already claimed elsewhere in the same payload** → matched the row being edited (still type 1 in the DB, because nothing had been written yet) → **adopted its PK** |
+| `save()` | two PK-keyed UPDATEs against one row |
+
+**Neither existing gate could catch it.** `validateNoDuplicateActorTypes` keys on identity, and `TYPE:2`/`TYPE:1` are genuinely distinct. `assertInnovationUseOwnership` passes because the submitted id really does belong to `(result, INNOVATION_USE)` — **the authorization guard was never implicated**, which is precisely why an authorization fix could not have prevented this.
+
+### Reproduced before any fix was proposed
+
+Dispatched as **reproduction-only, explicitly no fix**, because this spec has twice shipped a green test over broken behaviour and once produced a false FAIL from a stale comment. A fix for a defect nobody has watched happen is a guess.
+
+Two observations the reasoning had **not** predicted:
+
+1. **The added row is never created at all** — not created-then-deactivated. Row count stays at 1 and the surviving PK is the originally seeded one.
+2. **The survivor is a column-level hybrid matching *neither* payload row** — `actor_type_id` from the edited submission, `actors_count` from the added one. Organizations behave identically.
+
+So the defect is **silent corruption**, not merely silent loss. The reproducing Implementer labelled its TypeORM mechanism as *inference, not verified fact*, and said so explicitly — the right call, and the observation stands without it.
+
+### The ruling, and why the blast radius forced the shape of the fix
+
+Escalated to the user as a scope decision, because the fix's risk is **asymmetric**:
+
+| Path | Helper | Shared with Dev? | Consequence |
+| --- | --- | --- | --- |
+| Actors | `constructWhereClauseInnovationUse` | **No** — private, Use-only | safe to fix in place |
+| Organizations | `processInstitution`, `buildNewData`, `buildWhereClause`, `constructWhereClause`, `buildUpdateData`, `removeDuplicates` | **Yes** | editing them risks **silently regressing a live sibling feature** |
+
+**User ruling: fix both halves here, organizations via a standalone Use-only step that never edits the shared helpers** — the template `assertInnovationUseOwnership` already set.
+
+Delivered accordingly: actors excludes claimed PKs **at the query level** (`Not(In(excludeIds))`, guarded by `if (excludeIds.length > 0)` so an all-id-less payload never gets a poisoned `Not(In([]))` predicate); organizations gained a private `reconcileAdoptedPrimaryKey` that converts an adopted PK back into a plain insert.
+
+**Boundary verified structurally, not by report:** `git diff --numstat` shows **38 insertions / 0 deletions** and **72 insertions / 0 deletions** on the two services. No shared helper body was modified.
+
+**Leader-verified figures:** unit **336 suites / 2283 tests**; fixtures **15 suites / 66 tests** green **twice** on the same container; all three Innovation Dev regression fixtures green; `tsc` clean.
+
+### Runtime failure, and why the gate was not collapsed
+
+The first review of this fix **died on an API session limit** before producing findings. Per `/akili-execute`'s runtime-failure fallback that is an environment blocker, not a work FAIL: retried once. **The Reviewer role is never inlined** — the Leader auditing work it supervised breaks `author ≠ auditor`, and a runtime failure does not suspend a correctness constraint. Re-dispatched to a fresh Reviewer with the same brief and an explicit note that nothing had been concluded.
+
+### What this defect says about the spec
+
+The record's own conclusion after the third rework round was that *"this spec's residual risk lives outside the logic."* **That was wrong, and this is the evidence.** Three rounds of comment-accuracy failures made prose look like the only remaining risk, and a reachable data-corruption path was sitting in the same method the whole time — in code this spec authored, invisible to every tier, on the most ordinary payload a user can send.
+
+> **The transferable lesson:** a run of low-severity findings is not evidence that the high-severity ones are gone. It is evidence about **where the last reviewer was looking.** Both real product defects here were found by an auditor reading code against a claim, and neither by a suite that was green at the time.

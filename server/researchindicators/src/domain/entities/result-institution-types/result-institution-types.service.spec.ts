@@ -783,4 +783,122 @@ describe('ResultInstitutionTypesService', () => {
       expect(savedRow).not.toHaveProperty('organization_count');
     });
   });
+
+  // PK-collision remediation (2026-08-20,
+  // `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+  // Organizations mirror of the actors fixture: row 1 submits
+  // `result_institution_type_id` and a NEW type; row 2 is id-less and
+  // submits the type row 1 is moving AWAY FROM — the seeded row's CURRENT
+  // type, since nothing has been written yet when row 2's `buildNewData`
+  // lookup runs. `buildWhereClause`/`constructWhereClause` are shared with
+  // `customSaveInnovationDev` and stay unmodified (this fix's boundary); the
+  // reconciliation runs entirely inside `customSaveInnovationUse`, after
+  // `processInstitution` returns.
+  describe('customSaveInnovationUse — an id-less row must never adopt a PK another row in the same payload explicitly submitted (edit-plus-add PK collision fix)', () => {
+    it('reconciles an id-less row that resolves to a PK already claimed elsewhere in the payload back into a plain insert, dropping the adopted PK and its stale UPDATE-only audit stamp', async () => {
+      // Ownership guard: row 1's submitted id genuinely belongs to this
+      // (result_id, role).
+      const find = jest
+        .fn()
+        .mockResolvedValue([{ result_institution_type_id: 77 }]);
+      // Faithful to the real defect: the still-unwritten seeded row (id 77)
+      // is what `buildNewData`'s `findOne` resolves for the id-less row,
+      // because `buildWhereClause`/`constructWhereClause` (shared, untouched
+      // by this fix) carry no exclusion of an id claimed elsewhere in this
+      // same payload.
+      const findOne = jest
+        .fn()
+        .mockResolvedValue({ result_institution_type_id: 77 });
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const save = jest
+        .fn()
+        .mockImplementation((rows: unknown[]) => Promise.resolve(rows));
+      const tempRepo = buildTempRepo({ find, findOne, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      const editedRow = {
+        result_institution_type_id: 77,
+        institution_type_id: 6,
+        is_organization_known: false,
+        organization_count: 30,
+      } as InnovationUseOrganizationDto;
+      const addedRow = {
+        institution_type_id: 5,
+        is_organization_known: false,
+        organization_count: 40,
+      } as InnovationUseOrganizationDto;
+
+      await service.customSaveInnovationUse(
+        10,
+        [editedRow, addedRow],
+        mockManager,
+      );
+
+      const savedRows = tempRepo.save.mock.calls[0][0] as Array<
+        Record<string, unknown>
+      >;
+      expect(savedRows).toHaveLength(2);
+      const editedSaved = savedRows.find(
+        (row) => row.result_institution_type_id === 77,
+      );
+      const addedSaved = savedRows.find((row) => row !== editedSaved);
+
+      expect(editedSaved).toMatchObject({
+        result_institution_type_id: 77,
+        institution_type_id: 6,
+        organization_count: 30,
+      });
+      // The collision this fixture proves: without the fix, `addedSaved`
+      // would also carry `result_institution_type_id: 77`, and `save()`
+      // would receive two PK-keyed objects sharing one primary key instead
+      // of an UPDATE plus an INSERT.
+      expect(addedSaved.result_institution_type_id).toBeUndefined();
+      expect(addedSaved).toMatchObject({
+        institution_type_id: 5,
+        organization_count: 40,
+        is_active: true,
+      });
+      // The stale UPDATE-only audit stamp (`updated_by`, no `created_by`)
+      // that `buildDataTemplate` wrote on the belief this row already
+      // existed must not survive reconciliation into a plain insert.
+      expect(addedSaved.updated_by).toBeUndefined();
+      expect(addedSaved.created_by).toBeDefined();
+    });
+
+    it('a genuinely unrelated existing row (not claimed by any row in this payload) is still adopted normally — the reconciliation is scoped to this payload only', async () => {
+      const findOne = jest
+        .fn()
+        .mockResolvedValue({ result_institution_type_id: 91 });
+      const update = jest.fn().mockResolvedValue({ affected: 1 });
+      const save = jest
+        .fn()
+        .mockImplementation((rows: unknown[]) => Promise.resolve(rows));
+      const tempRepo = buildTempRepo({ findOne, update, save });
+      const mockManager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as any;
+
+      // No id-present row in this payload at all — `idsAlreadyClaimed` is
+      // empty, so the pre-existing adoption behaviour for a stale/soft-
+      // deleted row of the same identity is untouched by this fix.
+      const row = {
+        institution_type_id: 5,
+        is_organization_known: false,
+        organization_count: 12,
+      } as InnovationUseOrganizationDto;
+
+      await service.customSaveInnovationUse(10, [row], mockManager);
+
+      expect(tempRepo.save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            result_institution_type_id: 91,
+            organization_count: 12,
+          }),
+        ]),
+      );
+    });
+  });
 });

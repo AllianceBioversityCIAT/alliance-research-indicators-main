@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource, EntityManager, IsNull } from 'typeorm';
+import { DataSource, EntityManager, In, IsNull, Not } from 'typeorm';
 import { ResultActorsService } from './result-actors.service';
 import { ResultActor } from './entities/result-actor.entity';
 import {
@@ -813,6 +813,138 @@ describe('ResultActorsService', () => {
       ]);
       expect(update).not.toHaveBeenCalled();
       expect(save).not.toHaveBeenCalled();
+    });
+  });
+
+  // PK-collision remediation (2026-08-20,
+  // `test/fixtures/innovation-use/innovation-use-edit-plus-add-id-collision.fixture-spec.ts`).
+  // Ordinary UI edit-plus-add: row 1 submits `result_actors_id` and a NEW
+  // type; row 2 is id-less and submits the type row 1 is moving AWAY FROM —
+  // exactly the type the seeded row still carries in the DB, since nothing
+  // has been written yet when row 2's lookup runs.
+  describe('customSaveInnovationUse — an id-less row must never adopt a PK another row in the same payload explicitly submitted (edit-plus-add PK collision fix)', () => {
+    // Mutation-survivor: re-implements the real semantics of the id-less
+    // lookup against ONE seeded row that still carries its ORIGINAL type —
+    // the row row 1 is editing away from. `Not(In([...]))` on `findOne`'s
+    // `where.result_actors_id` is what excludes it; remove that clause (the
+    // reverted state) and this mock resolves the seeded row, reproducing the
+    // exact collision the fixture proves.
+    const buildRealisticFindOneMock = (seededRow: {
+      result_actors_id: number;
+      actor_type_id: number;
+    }) =>
+      jest.fn().mockImplementation(({ where }) => {
+        const typeMatches = where.actor_type_id === seededRow.actor_type_id;
+        const exclusion = where.result_actors_id as
+          | { value?: unknown }
+          | undefined;
+        const excludedIds = Array.isArray(exclusion?.value)
+          ? (exclusion.value as number[])
+          : [];
+        const isExcluded = excludedIds.includes(seededRow.result_actors_id);
+        return Promise.resolve(typeMatches && !isExcluded ? seededRow : null);
+      });
+
+    it("excludes every explicitly-submitted result_actors_id from the id-less lookup, so the added row inserts as new instead of adopting the edited row's PK", async () => {
+      const update = jest.fn().mockResolvedValue({});
+      const save = jest
+        .fn()
+        .mockImplementation((rows: unknown[]) => Promise.resolve(rows));
+      // Ownership guard: row 1's submitted id genuinely belongs to this
+      // (result_id, role) — untouched, unmocked-around, genuinely satisfied.
+      const find = jest.fn().mockResolvedValue([{ result_actors_id: 50 }]);
+      const findOne = buildRealisticFindOneMock({
+        result_actors_id: 50,
+        actor_type_id: 1,
+      });
+      const tempRepo = { find, findOne, update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const editedRow = {
+        result_actors_id: 50,
+        actor_type_id: 2,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 10,
+      } as InnovationUseActorDto;
+      const addedRow = {
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 20,
+      } as InnovationUseActorDto;
+
+      await service.customSaveInnovationUse(3, [editedRow, addedRow], manager);
+
+      expect(findOne).toHaveBeenCalledWith({
+        where: {
+          result_id: 3,
+          actor_role_id: ActorRolesEnum.INNOVATION_USE,
+          actor_type_id: 1,
+          actor_type_custom_name: IsNull(),
+          result_actors_id: Not(In([50])),
+        },
+      });
+
+      const savedRows = save.mock.calls[0][0] as Partial<ResultActor>[];
+      expect(savedRows).toHaveLength(2);
+      // Push order mirrors payload order (`editedRow` first, `addedRow`
+      // second) regardless of whether the fix is present — the assertions
+      // below are what distinguish fixed from reverted, not this indexing.
+      const editedSaved = savedRows[0];
+      const addedSaved = savedRows[1];
+      expect(editedSaved).toMatchObject({
+        result_actors_id: 50,
+        actor_type_id: 2,
+        actors_count: 10,
+      });
+      // The collision this fixture proves: without the fix, `addedSaved`
+      // would carry `result_actors_id: 50` too, and `save()` would receive
+      // two PK-keyed objects sharing one primary key instead of an
+      // UPDATE plus an INSERT.
+      expect(addedSaved.result_actors_id).toBeUndefined();
+      expect(addedSaved).toMatchObject({
+        actor_type_id: 1,
+        actors_count: 20,
+      });
+    });
+
+    it('a genuinely unrelated existing row (not claimed by any row in this payload) is still adopted normally — the exclusion is scoped to this payload only', async () => {
+      const update = jest.fn().mockResolvedValue({});
+      const save = jest
+        .fn()
+        .mockImplementation((rows: unknown[]) => Promise.resolve(rows));
+      // No id-present row in this payload at all — `idsAlreadyClaimed` is
+      // empty, so the where-clause carries no `result_actors_id` key
+      // (asserted below) and the pre-existing adoption behaviour for a
+      // stale/soft-deleted row of the same type is untouched by this fix.
+      const findOne = jest.fn().mockResolvedValue({ result_actors_id: 91 });
+      const tempRepo = { findOne, update, save };
+      const manager = {
+        getRepository: jest.fn().mockReturnValue(tempRepo),
+      } as unknown as EntityManager;
+
+      const row = {
+        actor_type_id: 1,
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 30,
+      } as InnovationUseActorDto;
+
+      await service.customSaveInnovationUse(3, [row], manager);
+
+      expect(findOne).toHaveBeenCalledWith({
+        where: {
+          result_id: 3,
+          actor_role_id: ActorRolesEnum.INNOVATION_USE,
+          actor_type_id: 1,
+          actor_type_custom_name: IsNull(),
+        },
+      });
+      expect(save).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ result_actors_id: 91, actors_count: 30 }),
+        ]),
+      );
     });
   });
 });
