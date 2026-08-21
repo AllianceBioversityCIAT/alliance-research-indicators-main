@@ -97,7 +97,7 @@
 
 ### T-03 — Amend the affected specs and close the verification gate
 
-- **Status:** `[ ]` · **Size:** S · **Dependencies:** T-01, T-02
+- **Status:** `[x]` **done** — Reviewer PASS on attempt 3 of 3 (3 review rounds); see `execution.md` → *T-03* · **Size:** S · **Dependencies:** T-01, T-02
 - **Requirements covered:** NFR-IUD-003 · closure for all three requirements
 - **Design references:** §9, and `proposal.md` §5 *Documents*
 - **Skills:** `cognitive-doc-design`
@@ -105,7 +105,7 @@
 **Scope — documents**
 
 1. **Pivot the open `details-page` spec** (it is `[~]` at T-13, nothing archived): R-IUP-006 AC.2, `design.md:380` (*"Save blocked"*), `tasks.md:428`, criterion **T-09 c5**, and the traceability row `tasks.md:604`. Record it as a Pivot in that spec's `execution.md`, pointing here.
-2. **Superseding record for archived chunk 2** — `docs/specs/archive/2026-08-20-innovation-use--details-api/requirements.md` → `R-IUA-006` AC.3/AC.4 assert the rejection. **Do not edit the archived file in place**; archived specs are point-in-time records. Write the supersession where this spec can be found from it.
+2. **Superseding record for archived chunk 2** — `docs/specs/archive/2026-08-20-innovation-use--details-api/requirements.md` → `R-IUA-006` AC.3/AC.4 assert the rejection. **Do not edit the archived file in place**; archived specs are point-in-time records. Write the supersession where this spec can be found from it. **Done:** [`docs/specs/archive/2026-08-20-innovation-use--details-api/save-time-justification-superseded.md`](../../archive/2026-08-20-innovation-use--details-api/save-time-justification-superseded.md) — also covers AC.1, superseded by the same mechanism (see that note's per-AC table).
 3. **`docs/specs/innovation-use/family.md`** — add a **follow-up/risk row**, not a child row (this is a bugfix, not a family chunk).
 4. **File the platform finding** from `proposal.md` §15 — `completenessValidation` is `enabled: false` on `DRAFT → SUBMITTED` for every indicator — somewhere it has an owner. It is **not** fixed here.
 

@@ -308,3 +308,190 @@ Under that priority, the two items T-01's review left open are **deferred, not d
 | `details-page` **T-13** human gate — c1 partially exercised by the reporter (a result was created and saved); **c7 / c8 / c9 still owed** (light-theme visual ×2 viewports, two screenshots, keyboard pass) | The sibling spec, `[~]` |
 | Migration state in the **target test environment**, including the archived bugfix's `devops-note.md` — two `SP_versioning` repairs to run **together, in order, with Engineering-lead approval** against the shared non-disposable DB | DevOps / Engineering lead |
 | Platform finding: `completenessValidation` is `enabled: false` on `DRAFT → SUBMITTED` for **every** indicator, so any API client can submit an incomplete result on first submission; only the STAR client's green-check gating prevents it | Product / security, filed by `proposal.md` §15 |
+
+---
+
+### T-03 — Amend the affected specs and close the verification gate
+
+| Field | Value |
+| --- | --- |
+| **Skills loaded** | `cognitive-doc-design` |
+| **Scope** | Documentation only — no production or test code touched |
+| **Requirements covered** | NFR-IUD-003, closure for R-IUD-001/002/003 |
+
+#### c1 — Correction Closure, both directions, both axes (KZ-005/KZ-007)
+
+**Falsifying input satisfied first:** the forward grep for `Save blocked|save-block|blocked` across `docs/specs/innovation-use/` was run **before** any amendment and returned 37 hits across 6 files — matching the pre-recorded baseline exactly, confirming the grep is sound.
+
+**Per-file forward-sweep table — every file in the directory, zero-finding files included (KZ-007):**
+
+| File | Hits (phrasing grep) | Related to the deleted save-time guard | Action |
+| --- | --- | --- | --- |
+| `details-page/tasks.md` | 11 | 3 (`:428`, `:438`, `:605`) | **Amended** (all 3) |
+| `details-page/execution.md` | 14 | 2 (`:835`, `:1192` — historical) | **Kept, append-only.** Execution logs are point-in-time history and are not rewritten (the same convention this spec's own T-02 entry and `details-page`'s T-10 Pivot both state explicitly: *"the whole spec folder except `execution.md`, which is append-only history and must not be rewritten"*). A **new** Pivot Record was appended instead, pointing here |
+| `details-page/requirements.md` | 5 | 0 (all 5 are unrelated: general Submit/green-check gating, the allowlist Pivot's `A2`/`OQ-IUP-2`) | **None needed** on these 5. (A 6th, related site — `:186` — exists but was **not caught by this phrasing grep at all**; see the second-axis sweep below) |
+| `details-page/design.md` | 4 | 1 (`:380`) | **Amended.** (A 2nd related site, `:205`, also missed by this grep — see below) |
+| `details-page/proposal.md` | 2 | 0 (both are general Submit-gating language, unaffected) | **None needed** |
+| `family.md` | 1 | 0 (chunk-1 "unblocked" status, unrelated) | **None needed** |
+| `OPEN-ITEMS.md` | 0 | — | **Zero-finding, confirmed** (not silently skipped) |
+| `details-page/judgment.md` | 0 | — | **Zero-finding, confirmed** |
+
+**Second-axis sweep — required because the first axis under-counted (KZ-005's own escalation: bound every axis, not just the one that last failed).** Re-grepped on the token `R-IUP-006` / `level >= 6` / `400` / `guard before save`, independent of the word "blocked": found **two more related sites the phrasing grep could not see**, because neither contains the word "blocked":
+
+| File | Site | Phrasing that hid it | Action |
+| --- | --- | --- | --- |
+| `details-page/requirements.md` | `:186` (§6.2, "400 responses" table) | *"Mirror the rule (R-IUP-006)"* | **Amended** |
+| `details-page/design.md` | `:205` (§4.3, "400 map" table) | *"page-level guard before save"* | **Amended** |
+
+**Backward direction** — grepped for referrers to `R-IUP-006` / `T-09` / the traceability row across the same files: no additional referrer asserts the superseded behavior beyond the 7 sites above (the two `execution.md` historical entries are the only other referrers, and they are correctly left as append-only history).
+
+**Net: 7 live sites amended** (`requirements.md` ×2, `design.md` ×2, `tasks.md` ×3), not the 5 the citing task named — the 2 extra (`requirements.md:186`, `design.md:205`) were found only by the second axis. Recorded in `details-page/execution.md` → *Pivot Record: R-IUP-006 / T-09* for durability.
+
+#### c2 — Superseding record, archive untouched
+
+New sibling file `docs/specs/archive/2026-08-20-innovation-use--details-api/save-time-justification-superseded.md`, mirroring the `bugfix/sp-versioning-roles-id/devops-note.md` precedent (a note added to an archive folder after archiving, archived documents left byte-identical). Back-linked from `tasks.md` scope item 2.
+
+**Beyond the two ACs the citing task named (AC.3/AC.4): `R-IUA-006` AC.1 asserts the identical rejection mechanism and is equally superseded** — verified independently against the requirement text rather than trusted from the citation, given this spec's 3-for-3 record of cited-site under-counts.
+
+**Correction (Reviewer FAIL, rework attempt 2):** the line above originally claimed the superseding note's per-AC table "covers all six (AC.1/AC.3/AC.4 superseded; AC.2/AC.5/AC.6 unaffected)." That was wrong on AC.5. AC.5 has two clauses (`requirements.md:392`): the first ("no level stored anywhere → accepted, rule never fires") is genuinely unaffected, but the second ("when a level *is* stored, the rule evaluates the effective post-write row so an omitted level can't bypass the justification requirement") is the DD-14 save-time evaluation rule — and the rule it fed was deleted by T-01, so there is no bypass left to close. Classifying the whole AC as "Unaffected" answered the first clause and was silent on the second, which is the same under-counting-by-one defect this entry called out for AC.1 one paragraph above; the note's own re-read (this note's closing paragraph) should have re-swept all six ACs at that resolution, not just confirmed a count of six rows present. **Corrected classification: AC.5 is Partially superseded** — first clause unaffected, second clause (and the **DD-14** decision it encodes) superseded by the same T-01 deletion — **DD-14 partially, not wholly**: its *explanation* resolution is now dead code (`_effectiveExplanation`, `result-innovation-use.service.ts:177-181`, zero readers), while its *level* resolution (`effectiveLevelId`, `:163-166`) stays live at `:189` for the unrelated unknown-catalog-id `400`, step 6's partial merge (what actually preserves a stored justification) unchanged. The note's AC.5 row, its summary paragraph, and this entry are now consistent; see `save-time-justification-superseded.md` for the full amended row and the re-run per-AC completeness sweep.
+
+`git diff --exit-code` on the archived `requirements.md`: **clean** (verified below).
+
+#### c3 — `family.md`
+
+Two rows added to **Cross-cutting Risks** (`FR-8`, `FR-9`) — **not** the Children table, which is byte-identical (verified: the diff's single hunk starts after line 97, `git diff -U0` shows no hunk touching lines 40-48).
+
+- **FR-8** — this bugfix's own deferred follow-up (D1 dead-code cleanup, D2/`ADVISORY R1` test hardening), owned by the bugfix spec itself, not minted as a family chunk.
+- **FR-9** — the platform finding (see c-scope item 4 below), given a durable owner.
+
+#### Scope item 4 — the platform finding's home, reasoned
+
+**`OPEN-ITEMS.md` §5 row P1 does not, by itself, discharge this.** That file states its own limits: *"a convenience index, not an authority... re-derive rather than trust this file after any work lands."* Its cited "home" for P1 is `bugfix/innovation-use-draft-save/proposal.md` §15 — this spec's **own** proposal document. Once this spec archives, that "home" is itself a point-in-time record with no ongoing owner watching it; an index row pointing at a bugfix's own proposal is not the same as a finding filed with a party positioned to act on it.
+
+**Action taken:** added `family.md` **FR-9** (above) — the family manifest is the durable, authoritative document for this concern (it already carries the platform, cross-cutting exposure `FR-7`/AC-1718 in the identical shape: found during a chunk, needs its own decision, not owned by the finder). `OPEN-ITEMS.md` P1 and `proposal.md` §15 remain valid pointers *into* the reasoning; `FR-9` is now the durable filing.
+
+**Not created:** a Jira ticket (unlike `FR-7`'s `AC-1718`). Filing a formal ticket wasn't asked for and would be scope the user hasn't authorized; `FR-9` is the documentation-only equivalent this task's constraints permit.
+
+#### R4 — caught, reported, **not fixed** (per explicit instruction)
+
+`server/researchindicators/test/fixtures/innovation-use/innovation-use-section-round-trip.fixture-spec.ts:992-994` still reads:
+
+```
+// The stored justification survived the omission — proving "omitted
+// key preserves the scalar" reached the VALIDATOR too, not only the
+// final UPDATE statement.
+```
+
+**Confirmed still present, unchanged, at the cited lines.** This is false since T-01's deletion — there is no validator left to reach. It is bundled with **D1** (`family.md` FR-8, `OPEN-ITEMS.md` §3.1) under the user's deferral ruling. **Not edited here**: the constraint for this task is documentation-only, and this specific file is test code the user has already ruled to defer, not something T-03 is authorized to touch.
+
+#### c5 — PR description
+
+Written to [`./pr-description.md`](./pr-description.md).
+
+#### c6 — `details-page` T-09 c5
+
+Hardened in place (`details-page/tasks.md:438`) — see c1 above and the Pivot Record.
+
+#### c4 — Verification, quiet window, no delegated agent active
+
+| Check | Result |
+| --- | --- |
+| `server/researchindicators`: `npm test -- --silent`, full unfiltered | **336 suites / 2296 tests passed** — identical to T-01's closure figure |
+| `server/researchindicators`: `npm run lint -- --quiet` | clean, no output |
+| `git status --short server/researchindicators/` after lint | clean — no mutation |
+| `client/research-indicators`: `npm test -- --silent`, full unfiltered | **312 suites / 6515 tests passed**, coverage 99.22/97.94/98.81/99.5 — identical to T-02's closure figure |
+| `client/research-indicators`: `npm run lint -- --quiet` | `All files pass linting.` |
+| `git status --short client/research-indicators/` after lint | clean — no mutation |
+| `git diff --exit-code` on the archived `requirements.md` | clean |
+
+No other agent was active during this run (session-exclusive, per the Leader's pre-check).
+
+#### Files changed by T-03
+
+| File | Rationale |
+| --- | --- |
+| `docs/specs/innovation-use/details-page/requirements.md` | R-IUP-006 Details/AC.2 annotated; §6.2 400-table row corrected (2nd-axis catch) |
+| `docs/specs/innovation-use/details-page/design.md` | §6.6 row (`:380`) and §4.3 400-map row (`:205`, 2nd-axis catch) corrected |
+| `docs/specs/innovation-use/details-page/tasks.md` | T-09 scope note (`:428`), c5 (`:438`), traceability row (`:605`) corrected |
+| `docs/specs/innovation-use/details-page/execution.md` | New `Pivot Record: R-IUP-006 / T-09` appended; no existing entry rewritten |
+| `docs/specs/innovation-use/family.md` | `FR-8` (bugfix follow-up), `FR-9` (platform finding, durable home) added to Cross-cutting Risks; Children table untouched |
+| `docs/specs/archive/2026-08-20-innovation-use--details-api/save-time-justification-superseded.md` | New sibling note (archive precedent), archived `requirements.md` left byte-identical |
+| `docs/specs/bugfix/innovation-use-draft-save/tasks.md` | Back-link to the superseding note added under scope item 2 |
+| `docs/specs/bugfix/innovation-use-draft-save/pr-description.md` | New — c5 deliverable |
+
+#### Not Done / Assumptions
+
+- **R4 and D1 are reported, not fixed** — explicit instruction; deferred by prior user ruling.
+- **`tasks.md` T-03's own Status checkbox and its six `- [ ] c*` criteria lines are left unflipped** by this entry, matching this spec's own convention observed on T-01/T-02 (their criteria checklists remain `- [ ] c*` in `tasks.md` even though each task's Status line reads `[x] done`) — the Status flip is recorded by whoever runs the Reviewer pass this task's own process expects, not assumed here.
+- No code, test, or migration file was touched, per this task's constraint.
+
+---
+
+#### Leader attempt history — T-03 closed on attempt 3 of 3
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer `STATUS: PASS` on attempt 3 |
+| **Date** | 2026-08-21 |
+| **Attempts** | **3 of 3** (the ceiling; a fourth would have HALTed) |
+| **Review rounds** | **3** for this task — **6 cumulative** for the spec, exactly at the re-baselined tripwire ceiling, not beyond it |
+| **Effort** | attempt 1 `high` → attempt 2 **`xhigh`** → attempt 3 **`xhigh` held** |
+| **Triad** | Implementer `akili-implementer` (T2 · sonnet) → Reviewer `akili-reviewer` (T3 · opus, read-only). Same Reviewer across all three rounds — it audited its own FAILs being closed, and reversed itself once |
+
+**Effort adjudication, recorded because it departs from the default.** The rework rule bumps effort one level per retry, which from `xhigh` is `max`. The tier↔effort rule forbids `max` on a T2 model — the prescribed escalation is the *tier*, not the dial. Attempt 3's remediation was one sentence in one row with a fully-specified fix, i.e. under-*specified* work was never the failure mode; escalating to T1 for a one-row citation edit would have been disproportionate. **`xhigh` held, tier unchanged.**
+
+##### Attempt 1 — Reviewer `STATUS: FAIL`, one issue
+
+All four scope items delivered, both suites green, sweep sound. The Reviewer re-ran the forward sweep on a **third axis** it was not given (`400`, `justification`, `mandatory`, the `blocking` inflection, plus a backward `R-IUP-006`/`R-IUA-006`/`validateLevelExplanation` sweep across all of `docs/`) and found **no survivor asserting the deleted guard** — the 37-hit/6-file baseline reconciled exactly with the amendments. It also verified **c6 against the shipped client component**, not merely against spec text, confirming the amended `details-page` T-09 c5 is true of what ships rather than a false-for-false swap.
+
+**FAIL:** the supersession note classified `R-IUA-006` **AC.5** as *"Unaffected — no change to the level-merge logic."* AC.5 has two clauses; the second (*effective-post-write-row evaluation, closing the omitted-level bypass*) is superseded by the same T-01 deletion, and the stated reason answered the **persistence merge** — a different mechanism than the clause asserts. Gate-worthy because the note is the **permanent** record for a byte-frozen archive: it is where a future reader learns which parts of `R-IUA-006` still bind.
+
+##### Attempt 2 — Reviewer `STATUS: FAIL`, one issue
+
+AC.5 corrected to **Partially superseded**, clauses split. The Reviewer confirmed the fix at source and **reversed its own attempt-1 citation**: the dead resolution is `:177-181`, not the `:167-181` it had cited — `:167-176` is comment prose. Ruled in the Implementer's favor. It also adjudicated the Implementer's disclosed fourth edit (the note's summary paragraph, which asserted a count the fix invalidated) as **FORCED, in-scope** — not widening.
+
+**FAIL:** the DD-14 citation added *while remediating a citation defect* named a document that does not define DD-14. `bugfix/.../design.md`'s table is **DD-1 … DD-6**; DD-14 lives in the note's **own folder** (`archive/.../details-api/design.md:469`), and a **different, live DD-14** (dark-mode deferral, `details-page/design.md:509`) is cited twice by this spec — so the pointer resolved to nothing, or to the wrong decision. Secondary: DD-14 resolves **two** values, and only the explanation one is dead.
+
+**Leader verification before relaying:** all four factual claims re-checked at source and confirmed. A Reviewer that had just mis-cited a line range was not taken on trust.
+
+##### Attempt 3 — Reviewer `STATUS: PASS`
+
+One file, one row. DD-14 cited at its real home (`./design.md` `:469`, with §5.1's `:232`/`:238`), the bugfix `design.md` §3.1 demoted to a labelled **evidence** pointer, and the claim scoped: DD-14 **partially** superseded, its two resolutions diverged.
+
+The Reviewer verified **7/7 anchors independently** rather than trusting the Implementer's FP-50 table — and settled the substance by grep: `_effectiveExplanation` has **zero** readers (genuinely dead); `effectiveLevelId` has **exactly one**, at `:189`, feeding the unknown-catalog-id `400` that no `R-IUA-006` AC asserts. It confirmed positively that no standing advisory had been silently actioned (`_effectiveExplanation` still present, so deferred item **D1** was not quietly performed).
+
+> **Reviewer summary:** *"Scope item 2's deliverable is now a supersession record a future reader of `R-IUA-006` can navigate from and trust."*
+
+##### The pattern this task exhibited, worth carrying to Kaizen
+
+**Each remediation introduced the next defect in the sentence it added** — attempt 1's fix carried a wrong-mechanism reason; attempt 2's fix carried a wrong citation *while fixing a citation defect*. Both were caught only because the Reviewer read the amended artifact **whole** rather than as a delta. This is KZ-005's shape one level up: not "the sweep under-counted" but **"the correction is itself an unswept new site."** The final round's brief made reading-whole an explicit instruction, and that is what closed it.
+
+##### `ADVISORY` (4R) across all three rounds — recorded, and all six die here
+
+Per `/akili-execute` §2.4 an advisory never gates, never consumes an attempt, and **never mints or widens a task**. All six were withheld from every Implementer brief by explicit instruction, and attempt 3 confirmed none was actioned.
+
+| ID | Round | Lens | Finding | Reachability |
+| --- | --- | --- | --- | --- |
+| **A1** | 1 | Readability | `details-page/tasks.md:416` — the T-09 heading still reads *"level-6 justification gate, save blocking"*. **Invisible to both sweep axes** (`blocking` ≠ `blocked`; no second-axis token). Not filed as a violation: c1's grep is literally scoped to `Save blocked`/`save-block`/`blocked`, and the heading stays true compositionally — T-09 genuinely still owns duplicate-actor save blocking (DD-5) | Reachable — any reader scanning task titles hits it before the corrected body |
+| **A2** | 1 | Risk | `OPEN-ITEMS.md` is stale in two untouched places: `:43` still shows T-03 `[ ] not started`, and `:79` row **P1** still names `proposal.md §15` as the platform finding's only home — the fragile pointer that `family.md` **FR-9** was created to replace | Reachable — §1 is titled *"Where to start after a session reset"*, the first document a resumed session reads |
+| **A3** | 1 | Reliability | `family.md` **FR-9** and `pr-description.md` say enforcement must be enabled across *"all six"* indicators, while the cited evidence enumerates **five** rows across indicators 1, 2, 3, 4, 6. Consistent with the repo's established "six indicators" phrasing, but the count and the row list do not line up on the page — and FR-9 is the durable filing a product/security decision will be scoped from | Documentation only |
+| **A4** | 2 | Readability / Risk | The note cites `result-innovation-use.service.ts:177-181` — lines that deferred item **D1** will delete. A knowably-rotting citation inside a permanent archival note. Mitigated: `_effectiveExplanation` appears in the same sentence, so the symbol survives the range | No runtime state named |
+| **A5** | 2 | Readability | `tasks.md:108`'s back-link says the note *"also covers AC.1"* and is silent on AC.5 — not false (it defers to the note's per-AC table), but it repeats the shape of the under-count this rework existed to fix | Documentation only |
+| **A6** | 3 | Readability | The row's closing sentence calls DD-14's other half — *"an omitted key preserves a scalar but clears a collection"* — *"the same step-6 partial merge"*. Only the **scalar** half is step 6 (`:216-222`); the **collection** half is the `?? []` arguments at steps 7–9 (`:227`, `:234`, `:241`). The supersession verdict it delivers (**unchanged, not superseded**) is correct for *both* halves, so nothing false about binding is asserted — a two-mechanism compound compressed under one mechanism name | Names no runtime state; not reachable by any input |
+
+**A6's sibling, actioned rather than deferred — and why that is not advisory-widening.** The Reviewer's second attempt-3 advisory named this entry's own `c2` paragraph as coarser than the note it points at (*"the DD-14 decision it encodes ... superseded"*, without the partial/whole distinction). That line is **Leader-owned audit trail, not spec or product scope**, and it was still being authored when the finding arrived. Writing one's own entry accurately is bookkeeping, not scope growth — leaving a knowingly-coarse statement in the permanent record would contradict the entire purpose of T-03. **Corrected in place above**; the six advisories in the table remain untouched.
+
+##### Verification at close
+
+| Check | Result |
+| --- | --- |
+| Server `npm test -- --silent`, full unfiltered | **336 suites / 2296 tests passed** (attempt 1; docs-only edits since) |
+| Client `npm test -- --silent`, full unfiltered | **312 suites / 6515 tests passed**, coverage 99.22 / 97.94 / 98.81 / 99.5 |
+| Both lints `-- --quiet` | clean; `git status` re-inspected after each (the script carries `--fix`) — no mutation |
+| `git diff --exit-code` archived `requirements.md` | **clean, exit 0** — re-verified by the Leader after every attempt (**c2**) |
+| Files outside `docs/specs/` | **none** — Leader-verified after every attempt. No code, test, or migration file touched by T-03 |
+| Suites re-run on attempts 2–3 | **Deliberately not.** Markdown under `docs/` is outside Jest's `rootDir: "src"` and eslint's target — the Reviewer confirmed this independently. Re-measuring while a worker was active would have produced a *wrong* result, not a slow one (root `CLAUDE.md` §4.3) |
+
+**Requirements covered:** NFR-IUD-003 · closure for R-IUD-001, R-IUD-002, R-IUD-003.
+
+**Budget at close:** **295 net LOC** against the re-baselined ~300 — T-03 added documentation only, no production or test LOC. **6 review rounds** against a ceiling of 6. Both axes inside budget; neither has slack left.

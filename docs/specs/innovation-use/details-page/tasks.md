@@ -425,7 +425,7 @@ graph TD
 **Implementation notes**
 
 - `duplicateActorTypeIndexes` is a `computed` over `body().actors`, keyed on `actor_type_id` — or, for type `5`, on `actor_type_id` + **trimmed lowercase** `actor_type_custom_name`. Flagged rows receive `duplicateType: true`; save is blocked while any row is flagged.
-- Justification required at resolved `level >= 6` → save blocked, inline required message on the textarea.
+- Justification required at resolved `level >= 6` → ~~save blocked~~ **(superseded 2026-08-21 by `bugfix/innovation-use-draft-save` — save is no longer blocked; see `execution.md` → *Pivot Record: R-IUP-006 / T-09*)**, inline required message on the textarea. Completeness is enforced only at submit.
 - **Zero actor rows: save is allowed.** A draft with no actors is legal (R-IUP-014); the green check simply stays false and card 2 says at least one actor is required. Do **not** block the save here.
 - Every rule mirrors a server rule; the server stays authoritative (PRD **AC-Role-Correctness**).
 
@@ -435,7 +435,7 @@ graph TD
 - [x] c2 — Two rows of type `5` with the same trimmed lowercase custom name are flagged as duplicates; with different names they are not.
 - [x] c3 — **No PATCH is issued while any row is flagged** (assert zero requests).
 - [x] c4 — Removing row 1 clears the flag and re-offers type `X` on row 2.
-- [x] c5 — At resolved level ≥ 6 with a blank justification, save is blocked and the inline required message renders.
+- [x] c5 — **Hardened 2026-08-21 by the `bugfix/innovation-use-draft-save` Pivot** (`execution.md` → *Pivot Record: R-IUP-006 / T-09*). At resolved level ≥ 6 with a blank justification, ~~save is blocked~~ **the save proceeds** and the inline required message renders. *(Superseded wording: "save is blocked and the inline required message renders" — the block was deleted by that spec's T-01/T-02; the message half is unchanged and re-asserted there by T-02.)*
 - [x] c6 — **Zero actor rows: the save proceeds** and the section renders as incomplete rather than as an error.
 
 **Falsifying input** — key the computed on `actor_type_id` alone → **c2's differing-custom-name half must FAIL** (two distinct `OTHER` rows would be wrongly flagged). Block the save on zero rows → **c6 must FAIL**.
@@ -602,7 +602,7 @@ graph TD
 | R-IUP-003 | AC.1–AC.4 | **T-10** (c6) |
 | R-IUP-004 | AC.1–AC.3 | **T-07** (c1–c5) · AC.4 → **T-01** (c2) |
 | R-IUP-005 | AC.1–AC.6 | **T-04** (c1–c8) |
-| R-IUP-006 | AC.1–AC.4 | **T-07** (c6–c9) · AC.2 save-block → **T-09** (c5) · payload half → **T-08** (c7) |
+| R-IUP-006 | AC.1–AC.4 | **T-07** (c6–c9) · AC.2 (presence/asterisk/message) → **T-09** (c5, hardened 2026-08-21 — no longer a save-block; see *Pivot Record: R-IUP-006 / T-09*) · payload half → **T-08** (c7) |
 | R-IUP-007 | AC.1, AC.2 | **T-05** (c1, c2) · AC.3, AC.4 → **T-08** (c4) |
 | R-IUP-008 | AC.1–AC.5 | **T-02** (c1–c3) · **T-05** (c10, c11) · **T-06** (c6) · **T-03** (c3) |
 | R-IUP-009 | AC.1–AC.3 | **T-09** (c1–c4) |

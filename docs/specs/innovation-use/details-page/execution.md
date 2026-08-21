@@ -1767,3 +1767,48 @@ This is the part that would have gone wrong under a blind string sweep. The forw
 ### Residual note, recorded not actioned
 
 `alliance-navbar.component.ts` injects a service it never uses — dead code in a shared component. **Not minted as work here**: it is outside this spec's task set, and the advisory rule (`/akili-execute` §2.4) forbids growing an approved spec from an incidental finding. Recorded for whoever owns the navbar.
+
+---
+
+## ⛔ Pivot Record: R-IUP-006 / T-09 — the save-time justification guard is deleted by `bugfix/innovation-use-draft-save`
+
+**Date:** 2026-08-21 · **Trigger:** `bugfix/innovation-use-draft-save`, reported live during this spec's own T-13 human gate, deleted the save-time justification guard this spec shipped in T-09 · **Authority:** the bugfix spec's own three approved specify gates; its `tasks.md` T-03 (scope item 1) directs this Pivot by name, pointing back here.
+
+### What changed underneath this spec
+
+`bugfix/innovation-use-draft-save` (approved 2026-08-21, option A, both tiers, Reviewer PASS on both) removed:
+
+- The server's `validateLevelExplanation` guard (`result-innovation-use.service.ts:307-326`, one caller at `:183`) — its own T-01, PASS first attempt.
+- The client's `!this.justificationMissing()` term in the save gate (`innovation-use-details.component.ts:497-503`) — its own T-02, PASS attempt 2.
+
+Both removals are deliberate, not a regression: the justification-at-level-≥6 rule was enforced **at save time**, when it belongs **at submit time**, where `innovation_use_validation`'s `explanationValid` conjunct already gates the section's green check and, through it, the Submit button. See `bugfix/innovation-use-draft-save/design.md` §4 for why relocating the check (rather than deleting it) was rejected as unbuildable.
+
+### Why this is a Pivot, not a rework attempt
+
+This spec's own record — written before the bugfix existed — documented the save-time block as intended, shipped behaviour, correctly, at the time it was written. The bugfix spec's `proposal.md` §11 found the block was an *anomaly*, not a floor: this spec's own T-08 (`tasks.md:429`) already ruled the opposite way for a materially identical case — *"Zero actor rows: save is allowed... Do not block the save here"* — and recorded no reason for treating a blank justification differently. The bugfix closes that inconsistency; this record is this spec's side of the correction.
+
+| Site | Asserted (superseded) | Now reads |
+| --- | --- | --- |
+| `requirements.md:396` (R-IUP-006 Details) | "marked mandatory in that case" — historically implemented (T-09 c5) as a save-time block | Mandatory means the visual marker only (asterisk, required message); Save is not gated on it |
+| `requirements.md:186` (§6.2 400-response table) | "Missing justification at effective level ≥ 6 → Mirror the rule (R-IUP-006)" — a client obligation to guard a `400` | Removed — the server no longer throws it, so there is nothing to mirror |
+| `design.md:205` (§4.3 400 map) | "missing justification... closed by page-level guard before save" | No save-time guard exists to close; superseded |
+| `design.md:380` (§6.6 cross-row validation) | "Justification required at level ≥ 6 → Save blocked, textarea shows..." | Save proceeds; message/asterisk unchanged, enforcement moved to submit |
+| `tasks.md:428` (T-09 scope note) | same "save blocked" phrasing | corrected in place |
+| `tasks.md:438` (T-09 c5, `[x]` done) | "save is blocked and the inline required message renders" | Hardened to "the save proceeds and the inline required message renders" — matches shipped code, so this spec's own history no longer contradicts it |
+| `tasks.md:605` (traceability row) | "AC.2 save-block → T-09 (c5)" | "AC.2 (presence/asterisk/message) → T-09 (c5, hardened) — no longer a save-block" |
+
+**Found by a two-axis Correction Closure sweep, not by the citing task's five-site list.** `bugfix/innovation-use-draft-save/tasks.md` T-03 named five sites (`requirements.md` R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row). The sweep — bounded on the literal phrasing (`Save blocked` / `save-block` / `blocked`) **and** independently on the token `R-IUP-006` / `level >= 6` / `400` / `guard before save` — found **two more sites the phrasing-only grep could not see**, because neither uses the word "blocked" at all: `requirements.md:186` ("Mirror the rule") and `design.md:205` ("guard before save"). Recorded here so the next reader does not re-derive the miss — this is **KZ-005**'s exact shape, already logged three times this session in `docs/specs/innovation-use/OPEN-ITEMS.md` §6.
+
+**Every other "blocked" site in this spec's four documents was checked and ruled unrelated** — duplicate-actor-type blocking (DD-5, unchanged), general Submit/green-check blocking (R-IUP-016, unaffected), the T-13 human-gate "record blocked" disqualifiers (T6 review, dark-mode deferral), and the `RB-2` / allowlist blocking of the create-result entry point (a different defect, resolved at the earlier T-13 Pivot). None of these describe the save-time justification guard. The full per-file classification lives in `bugfix/innovation-use-draft-save/execution.md` → T-03.
+
+### Impact on T-09 / T-13
+
+**T-09 stays `[x]` done — no rework attempt is consumed.** Only the record of what c5 asserts is corrected, under the Pivot Protocol's authority to amend an approved spec's documents without reopening a closed task. **T-13 is unaffected structurally** — still `[~]`, still owed c1/c7/c8/c9 per `docs/specs/innovation-use/OPEN-ITEMS.md` §3.2 — this Pivot changes what T-09 c5 *means*, not whether T-13's human gate is complete.
+
+### Documents corrected by this record
+
+`requirements.md:396` (+ AC.2 annotation), `requirements.md:186`, `design.md:380`, `design.md:205`, `tasks.md:428`, `tasks.md:438`, `tasks.md:605`.
+
+### Not touched
+
+This `execution.md` is append-only history and is not rewritten by this Pivot: the T-09 (`:1183`, `:1188`, `:1192`, `:1196`) and T-07 (`:830`, `:1027`) entries describing the original save-block design and review stand as written — they were true when recorded. `family.md` and `OPEN-ITEMS.md` carry their own follow-up rows for this bugfix (see `bugfix/innovation-use-draft-save/tasks.md` T-03), not a rewrite of this spec's history.

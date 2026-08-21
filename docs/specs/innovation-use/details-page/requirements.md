@@ -183,7 +183,7 @@ Response `data` for both result endpoints:
 | Negative or fractional count | Prevent at the input (R-IUP-008) |
 | Both count modes populated on one row | Structurally impossible in the UI (R-IUP-007) |
 | Missing `actor_type_id` | Filter blank actor rows before send (R-IUP-013) |
-| Missing justification at effective `level >= 6` | Mirror the rule (R-IUP-006) |
+| ~~Missing justification at effective `level >= 6`~~ — **removed 2026-08-21 by `bugfix/innovation-use-draft-save`.** The server no longer rejects this at save; a blank/whitespace-only justification now saves and the `400` cannot fire on this input | ~~Mirror the rule (R-IUP-006)~~ — nothing to mirror. Completeness stays submit-gated only (see R-IUP-006's Pivot note, §Details) |
 | Duplicate actor type in the payload | Mirror the rule (R-IUP-009) |
 | Unknown `innovation_use_level_id` | Only ever send an id from the catalog (R-IUP-005) |
 | A `result_actors_id` / `result_institution_type_id` not owned by this result+role | Only ever echo back ids received from the GET (R-IUP-013) |
@@ -396,10 +396,12 @@ Seeded by migration `1787066437593`. `id = level + 1`; `additional_guidance` **d
 - Behavior: a textarea bound to `innovation_use_level_explanation`, rendered **only** when the selected level (the resolved `level`, not the id) is `>= 6`, and marked mandatory in that case.
 - Toggling below 6 **hides** the control. It does not clear the value in the in-memory body, and it does not send `null`.
 
+> ⛔ **Pivot 2026-08-21 — `bugfix/innovation-use-draft-save`.** "Marked mandatory" was originally shipped (T-09 c5) as a **save-time block**: a blank justification at `level >= 6` refused the `PATCH`. That block is **deleted**. "Mandatory" now means the **visual marker only** — the red asterisk and the inline required message (AC.2) — never a save-time gate. Completeness at this field is enforced **at submit only**, through `innovation_use_validation`'s `explanationValid` conjunct, exactly like every other completeness rule on the platform. See `execution.md` → *Pivot Record: R-IUP-006 / T-09* for the full correction and `bugfix/innovation-use-draft-save/requirements.md` R-IUD-001/R-IUD-002.
+
 **Acceptance criteria**
 
 - [ ] AC.1 — At level `< 6` the textarea is absent and the section can be complete without it.
-- [ ] AC.2 — At level `>= 6` the textarea is present, carries the red asterisk, and shows the inline required message while blank.
+- [ ] AC.2 — At level `>= 6` the textarea is present, carries the red asterisk, and shows the inline required message while blank. **Unaffected by the Pivot above** — AC.2 was never itself a save-block claim, only its historical *implementation* was.
 - [ ] AC.3 — Typing text at level 7, then selecting level 3, then selecting level 7 again shows the original text unchanged.
 - [ ] AC.4 — The condition is evaluated on the resolved `level`, not on `innovation_use_level_id`.
 

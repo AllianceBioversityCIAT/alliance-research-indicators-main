@@ -202,7 +202,7 @@ This spec **consumes** a frozen contract and defines no endpoint. Full producer 
 | negative / fractional count | `[min]="0"` (verified: blocks typed and pasted minus) + `[maxFractionDigits]="0"`, on **every** count field the section renders — the five actor counts (§5.4), `organization_count` (§5.5), **and `quantification_number` (§5.6)** | §6.3 |
 | both count modes on one row | only one mode is ever rendered | §6.2 |
 | missing `actor_type_id` | blank-row filter in `buildPayload` | §6.5 |
-| missing justification at effective `level >= 6` | page-level guard before save + inline required message | §6.4 |
+| ~~missing justification at effective `level >= 6`~~ — **removed 2026-08-21 by `bugfix/innovation-use-draft-save`; no longer a `400` to close** | ~~page-level guard before save~~ + inline required message (message-only now — see §6.6's correction) | §6.4 |
 | duplicate actor type | `duplicateActorTypeIndexes` computed, checked before save | §6.6 |
 | unknown `innovation_use_level_id` | the stepper can only emit a catalog `id` | §6.1 |
 | unauthorized `result_actors_id` / `result_institution_type_id` | ids are only ever echoed from the GET; never synthesized | §6.5 |
@@ -377,7 +377,7 @@ A pure function over `body()`, unit-testable without rendering. Each rule maps t
 | Rule | Mechanism |
 | --- | --- |
 | Duplicate actor type | A `duplicateActorTypeIndexes` computed over `body().actors`, keyed on `actor_type_id` — or, for type `5`, on `actor_type_id + trimmed lowercase actor_type_custom_name`. Flagged rows receive `duplicateType: true` and render the message; save is blocked while any row is flagged |
-| Justification required at `level >= 6` | Save blocked, textarea shows the inline required message |
+| Justification required at `level >= 6` | ⛔ **Superseded 2026-08-21 by `bugfix/innovation-use-draft-save`.** This row read *"Save blocked, textarea shows the inline required message"* — the save-time block is **deleted**. Save now proceeds regardless; the textarea still shows the inline required message and the red asterisk, and the section's green check stays `false` until real text is saved — enforcement moved entirely to submit time. See `execution.md` → *Pivot Record: R-IUP-006 / T-09* |
 | No actor rows | Save is **allowed** (a draft with no actors is legal — R-IUP-014); the green check simply stays false and card 2 says at least one actor is required |
 
 Every one of these mirrors a server rule. The server stays authoritative (PRD **AC-Role-Correctness**); no client check replaces one.
