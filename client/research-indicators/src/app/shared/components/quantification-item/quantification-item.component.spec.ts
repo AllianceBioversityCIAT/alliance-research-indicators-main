@@ -101,6 +101,79 @@ describe('QuantificationItemComponent', () => {
     });
   });
 
+  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
+  describe('fieldsRequired rendering (T-03, baseline established before the inputs existed)', () => {
+    it('reproduces the field-asymmetric rendering: Number and Unit carry isRequired+validateEmpty, Comments carries isRequired only, all three show an asterisk', () => {
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
+
+      expect(inputs.length).toBe(2);
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.isRequired).toBe(true);
+      expect(numberInput.validateEmpty).toBe(true);
+      expect(unitInput.isRequired).toBe(true);
+      expect(unitInput.validateEmpty).toBe(true);
+
+      expect(textareas.length).toBe(1);
+      const commentsTextarea = textareas[0].componentInstance as TextareaComponent;
+      expect(commentsTextarea.isRequired).toBe(true);
+      expect((commentsTextarea as any).validateEmpty).toBeUndefined();
+
+      const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
+      expect(asterisks.length).toBe(3);
+    });
+
+    it('defaults to true', () => {
+      expect(component.fieldsRequired).toBe(true);
+    });
+
+    it('false drops the asterisks and the required validation on all three fields', () => {
+      component.fieldsRequired = false;
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
+
+      expect(inputs.length).toBe(2);
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.isRequired).toBe(false);
+      expect(numberInput.validateEmpty).toBe(false);
+      expect(unitInput.isRequired).toBe(false);
+      expect(unitInput.validateEmpty).toBe(false);
+
+      expect(textareas.length).toBe(1);
+      const commentsTextarea = textareas[0].componentInstance as TextareaComponent;
+      expect(commentsTextarea.isRequired).toBe(false);
+
+      const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
+      expect(asterisks.length).toBe(0);
+    });
+  });
+
+  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
+  describe('maxFractionDigits input (T-03)', () => {
+    it('defaults to undefined and leaves the Number field\'s rendered binding unchanged', () => {
+      expect(component.maxFractionDigits).toBeUndefined();
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const numberInput = inputs[0].componentInstance as InputComponent;
+      expect(numberInput.maxFractionDigits).toBeUndefined();
+    });
+
+    it('is forwarded to the Number field only, not Unit', () => {
+      component.maxFractionDigits = 0;
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.maxFractionDigits).toBe(0);
+      expect(unitInput.maxFractionDigits).toBeUndefined();
+    });
+  });
+
   describe('ngOnInit', () => {
     it('should initialize body with quantification data', () => {
       const data: QuantificationItemData = {

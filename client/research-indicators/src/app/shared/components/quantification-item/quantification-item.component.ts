@@ -22,6 +22,12 @@ export class QuantificationItemComponent implements OnInit, OnChanges {
   @Input() headerLabel = 'ACTUAL COUNT';
   /** External-result / non-editable-status gate, passed from the parent call site. Defaults to false so this component's own editable-status behavior is unaffected. */
   @Input() disabled = false;
+  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
+  /** Defaults to true to reproduce OICR's current, field-asymmetric required/validateEmpty rendering (see the template). `false` — passed only by the new page — drops the asterisks and the required validation on all three fields. */
+  @Input() fieldsRequired = true;
+  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
+  /** Forwarded to the Number field's app-input. No default: `undefined` reproduces today's Intl resolution exactly, so OICR stays byte-identical. */
+  @Input() maxFractionDigits?: number;
   @Output() update = new EventEmitter<QuantificationItemData>();
   @Output() delete = new EventEmitter<void>();
 

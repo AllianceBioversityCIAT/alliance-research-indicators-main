@@ -169,7 +169,7 @@ graph TD
 
 ### T-03 — Promote `QuantificationItemComponent` to `shared/` with two default-preserving inputs
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-02
+- **Status:** done · **Size:** M · **Dependencies:** T-02
 - **Requirements covered:** R-IUP-008 (AC.2/AC.4 for `quantification_number`), R-IUP-012 (AC.1, AC.3, AC.4), R-IUP-019 (AC.1, AC.2, AC.3)
 - **Design references:** §2.1 *Promoted*, §2.3 row 2, §5.6, §7, **DD-3**, `judgment.md` → `S-1`, `S-2`, `I-4`
 - **Skills:** `angular-developer`
@@ -193,12 +193,12 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — `fieldsRequired` defaults to `true` and reproduces the current rendering **including the Number/Unit vs Comments `validateEmpty` asymmetry**, asserted field-by-field.
-- [ ] c2 — `fieldsRequired="false"` drops the asterisks and the required validation on all three fields.
-- [ ] c3 — `maxFractionDigits` is forwarded to the Number field; **omitting it leaves that field's rendered binding unchanged**.
-- [ ] c4 — `oicr-details.component.html` is **byte-identical** to its pre-task state (`git diff --exit-code` on that path).
-- [ ] c5 — **Full** `npm test -- --silent` green; OICR's existing specs pass with no assertion changed (import-path edits excepted, per R-IUP-019 AC.2).
-- [ ] c6 — **Recorded accepted risk, not remediated:** the promoted template is hex-saturated (`bg-[#F4F7F9]`, `border-[#E8EBED]`, `text-[#8D9299]`, `text-[#CF0808]`) and moving it carries those literals into `shared/`. DD-7's "zero hex in **new files**" does not reach it, and detokenizing it here would change another page's rendering inside a move task. State this in the PR description and add it to §7's blocker log as owed follow-up. *(Closes `judgment.md` → `I-4` at task level: the hole is named and bounded rather than left implicit.)*
+- [x] c1 — `fieldsRequired` defaults to `true` and reproduces the current rendering **including the Number/Unit vs Comments `validateEmpty` asymmetry**, asserted field-by-field.
+- [x] c2 — `fieldsRequired="false"` drops the asterisks and the required validation on all three fields.
+- [x] c3 — `maxFractionDigits` is forwarded to the Number field; **omitting it leaves that field's rendered binding unchanged**.
+- [x] c4 — `oicr-details.component.html` is **byte-identical** to its pre-task state (`git diff --exit-code` on that path).
+- [x] c5 — **Full** `npm test -- --silent` green; OICR's existing specs pass with no assertion changed (import-path edits excepted, per R-IUP-019 AC.2).
+- [x] c6 — **Recorded accepted risk, not remediated:** the promoted template is hex-saturated (`bg-[#F4F7F9]`, `border-[#E8EBED]`, `text-[#8D9299]`, `text-[#CF0808]`) and moving it carries those literals into `shared/`. DD-7's "zero hex in **new files**" does not reach it, and detokenizing it here would change another page's rendering inside a move task. State this in the PR description and add it to §7's blocker log as owed follow-up. *(Closes `judgment.md` → `I-4` at task level: the hole is named and bounded rather than left implicit.)*
 
 **Falsifying input** — flip the `fieldsRequired` default to `false` → **c1 must FAIL**. Note explicitly: OICR's *existing* spec **cannot** detect this. It asserts input defaults, disabled state, `ngOnInit`/`ngOnChanges` sync and emit behavior, and **nothing** about `isRequired` / `validateEmpty` / asterisks. Falsifiability here is **created by writing the new assertion, not inherited** (`design.md` §10.3; verified by Judge A's inventory of the spec's `describe`/`it` blocks).
 

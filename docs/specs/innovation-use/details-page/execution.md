@@ -27,7 +27,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | --- | --- | --- | --- | --- |
 | T-01 | 210 | **344** (+344 / −1, 6 files) | 1 | Over its derivation line by 134. Cause: the spec tier is larger than estimated — 252 of the 344 lines are test code across two spec files. See T-01's *Decisions* |
 | T-02 | 72 | **133** (+133 / −0, 3 files) | 2 | Over its derivation line by 61 — impl 4 lines against 12 budgeted, spec ~129 against 60. Cause: c1 inlines the TestBed setup that `renderNumberInput()` already encapsulates (~22 duplicated lines), plus the rework additions. Recorded, not reconciled |
-| **Running total** | **282** | **477** | **3** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 14.9% of the LOC budget and 10.7% of the review rounds spent on 2 of 13 tasks (15.4%). Both tasks ran over their §6 split line for the same reason: the **spec tier** is consistently larger than the derivation assumed, while implementation lines track it closely. If that pattern holds, §12's ~1,500-line spec estimate is the figure that will drift, not the implementation line |
+| T-03 | 170 | **90** (+90 / −8, 4 files; 3 `git mv` renames) | 1 | **Under** its derivation line by 80 — the first task to come in below estimate. Cause: the move carried the bulk of the code, so only the two inputs, the template branch and 5 new `it` blocks are new lines |
+| **Running total** | **452** | **567** | **4** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is +115 lines on a 452-line derivation — noise, not signal. Re-assess at T-07, the largest task |
 
 ---
 
@@ -252,5 +253,102 @@ One rework round, cause recorded above. No environment blockers this task (unlik
 #### Final verification result
 
 Full client suite green (308/308 suites · 6345/6345 tests), coverage above all four floors, lint clean with `git status` re-inspected, both `§6.3` rows exercised with a positive control, and the typed half's falsifiability probed rather than asserted. **T-02 closed on attempt 2 of 3.**
+
+---
+
+### T-03 — Promote `QuantificationItemComponent` to `shared/` with two default-preserving inputs
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 1** |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **1** |
+| **Effort / skills assigned** | `high` · `angular-developer` |
+| **Requirements covered** | R-IUP-008 (AC.2/AC.4 for `quantification_number`), R-IUP-012 (AC.1, AC.3, AC.4), R-IUP-019 (AC.1, AC.2, AC.3) |
+
+#### Leader deviations from the task file, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Effort raised to `high` (a size-M task would default to `medium`) | The implementation is ~14 lines, but this is a **file move with a live regression surface at two OICR call sites**, and the task's own Falsifying-input clause states OICR's existing spec **cannot** detect the failure mode. The risk is precision, not volume |
+| Brief pre-supplied the field-asymmetry table, the consumer inventory, and T-02's settled PrimeNG finding | Ground truth the Leader had already confirmed inline. Re-deriving it would have cost the worker context for no gain, and re-litigating T-02's `numberAttribute(value, null)` conclusion would have risked a *different* answer to a settled question |
+
+#### Attempt 1
+
+**Files changed** (4 — 3 of them `git mv` renames, history preserved)
+
+| File | Change |
+| --- | --- |
+| `shared/components/quantification-item/quantification-item.component.ts` | **moved** from `pages/…/oicr-details/components/` · `+ @Input() fieldsRequired = true` · `+ @Input() maxFractionDigits?: number` (no default) |
+| `…/quantification-item.component.html` | **moved** · three labels branch the asterisk on `fieldsRequired` · `[isRequired]`/`[validateEmpty]` bound to `fieldsRequired` · `[maxFractionDigits]` forwarded to the Number field |
+| `…/quantification-item.component.spec.ts` | **moved** · +73 lines, 5 new `it` blocks |
+| `pages/…/oicr-details/oicr-details.component.ts` | **import path only** — relative → `@components/quantification-item/quantification-item.component` |
+
+**Untouched, verified by command:** `oicr-details.component.html` (c4) and `oicr-details.component.spec.ts` (which declares its own *fake* component with the same selector and never imports the real one — that is what makes c5 achievable without an import-path exception).
+
+**Verification — Implementer**
+
+| Command | Result |
+| --- | --- |
+| `git diff --exit-code -- src/…/oicr-details/oicr-details.component.html` | **exit 0** — c4 discharged by the required mechanism, not by eye |
+| `npm test -- --silent` (full, unfiltered) | `Test Suites: 308 passed, 308 total` · `Tests: 6350 passed, 6350 total`, exit 0 |
+| `npm run lint -- --quiet` | `All files pass linting.`, exit 0; `git status --short` identical before/after — no mutation |
+
+**Baseline captured before editing** (the method this spec now uses for every regression guard): the field-by-field assertion was written and run against the **pre-change** component — 27/27 green — then again after the inputs were added — 31/31 green. A regression guard is only trustworthy if you know it held before the change.
+
+**Falsifying input — executed.** Flipped the `fieldsRequired` default to `false` → `Tests: 2 failed, 29 passed, 31 total`, failing on `expect(numberInput.isRequired).toBe(true) // Received: false` plus `defaults to true`. Restored, 31/31 green. This is the criterion whose falsifiability the task says must be **created, not inherited** — and it was.
+
+**Correction sweep (KZ-005), bounded on every axis.** Old-path grep (`oicr-details/components/quantification-item` *and* `./components/quantification-item`) across `src/`, `jest.config.ts`, `tsconfig.json` → **zero hits**. New-path grep → resolves at every site: the three moved files, the OICR alias import, the two `oicr-details.component.html` selector usages, and the OICR spec's fake component. No barrel `index.ts` exists to update. Reviewer independently re-ran the old-path grep across the whole client package and confirmed zero.
+
+**Reviewer verdict: `STATUS: PASS`**
+
+> All six criteria are met — the move is clean (zero old-path references, both aliases resolve, no relative-import fixups needed), both new inputs are default-preserving, c4 was discharged by the required `git diff --exit-code`, and the full 6350-test suite is green with zero OICR spec edits. The moved template that OICR renders was audited directly, not inferred from c4: with `fieldsRequired = true` the rendered label text, spacing and visual output are unchanged, the inline `@if` adding only a non-rendering comment anchor.
+
+**Per-criterion disposition** (all six — KZ-007)
+
+| # | Verdict | Evidence |
+| --- | --- | --- |
+| c1 | ✅ **Met — asymmetry half satisfied *structurally*, not evidentially** | `fieldsRequired = true`; `defaults to true` asserted; Number/Unit `isRequired`+`validateEmpty` asserted on the **rendered** `InputComponent` instances; Comments `isRequired` asserted. Named falsifying input executed and produced the correct 2 failures. **One of c1's four assertion lines is dead** — see Advisory 1 |
+| c2 | ✅ | `fieldsRequired="false"` → `isRequired`/`validateEmpty` false on both inputs, `isRequired` false on the textarea, asterisk node count **0**. Asserted on rendered controls and rendered DOM, not on a signal |
+| c3 | ✅ | No initialiser; omitted → `undefined` on the Number field; `0` → forwarded to Number while **Unit stays undefined** (the falsifiable half). The deeper `p-inputNumber` hop belongs to T-02 and is settled |
+| c4 | ✅ **by the required mechanism** | `git diff --exit-code` exit 0. **Scope limit recorded below** |
+| c5 | ✅ | Full run 308/308 · 6350/6350. Arithmetic corroborates a pure move plus 5 additions: 6345 → 6350 matches exactly 5 new `it` blocks, and the suite count stays **308** (a rename, not a new file). **Zero OICR spec edits** — so R-IUP-019 AC.2's import-path exception was not even needed |
+| c6 | ✅ **as a recording, correctly not remediated** | The four hex literals are carried verbatim; **no new hex added** (the asterisk spans already carried `text-[#CF0808]` and were only wrapped). No detokenization attempted — doing it inside a move task would change OICR's rendering. Already logged as **RB-5** in `tasks.md` §8 |
+
+**c4's scope limit — stated plainly, because the criterion does not state it.** The command-verified byte-identity covers **only the consumer file**. The template OICR *actually renders* did change — 3 label lines and 2 `app-input` lines — at both call sites (`oicr-details.component.html:60` and `:81`), and **nothing in c4 covers that**, nor does OICR's own spec, which asserts nothing about labels, asterisks, `isRequired` or `validateEmpty`. The Reviewer therefore audited that template directly and found the rendered output unchanged: same text, same spacing, one extra non-rendering comment anchor per label. The single behavioural surface that changed for OICR is the now-bound `[maxFractionDigits]="undefined"` on the Number field, which T-02 settled as identical to no binding. **This is a gap in the criterion's design, not in the work** — worth carrying into `/akili-validate`.
+
+#### Decisions made
+
+1. **A moved file is not a new file for DD-7's purposes.** DD-7's rationale is *"matching an existing violation is not consistency"* — it fences **authored** colour choices, and `git mv` authors none. The four hex literals ride along; c6 records that as a bounded, named risk (RB-5) rather than remediating it inside a move task.
+2. **`@components/*` was the right alias**, confirmed present in **both** `tsconfig.json` and `jest.config.ts`, so `design.md` §7's "no new path alias, no `tsconfig`/`jest.config` change" holds.
+3. **The inline `@if` form is load-bearing and now known to be so.** `Number@if (fieldsRequired) {<span>` has no whitespace anywhere in it, and that is what keeps the rendered label `"Number*"`. See Advisory 2 — this is the most fragile thing T-03 leaves behind.
+4. **T-02's PrimeNG finding was consumed as settled, not re-derived.** The brief supplied it explicitly. Re-investigating a question already answered from pinned source invites a *different* answer to the same question, which is worse than the token cost.
+
+#### `ADVISORY` — 4R lens findings (recorded; **not** gating, **not** rework, **not** new tasks)
+
+| # | Lens | Finding | Reachability verdict | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **Reliability** | `expect((commentsTextarea as any).validateEmpty).toBeUndefined()` **cannot fail.** `TextareaComponent` declares 15+ inputs and no `validateEmpty`; the only declaration site in the repo is `input.component.ts`. **The `as any` cast is the tell** — without it, TS would report that the property does not exist, which is exactly the diagnostic saying the assertion has no subject | **Tried and could not construct it.** Binding `[validateEmpty]` on `app-textarea` is an NG8002 error under `strictTemplates` and throws at TestBed compile time under JIT — the mis-binding **cannot ship** | Not gated: c1's substance is asserted falsifiably on its other three legs, and c1's named falsifying input was executed and behaved correctly. c1 has a live detector; one line of it is decoration. The Reviewer supplied a falsifiable rendered replacement (assert the Comments host contains `This field is required` and **not** `Field cannot be empty`, the latter being produced only by `InputComponent.inputValid()`'s `validateEmpty` branch) — **not actioned**, advisories never widen an approved task |
+| 2 | **Resilience** | The **no-whitespace** form `Number@if (fieldsRequired) {<span>` is load-bearing and undocumented. `preserveWhitespaces: false` collapses runs but does **not** delete a single space inside a mixed text node — so reformatting to `Number @if (...)` would render `"Number *"` at both live OICR call sites | **Reachable by a future hand edit or formatter change; NOT by today's toolchain** — `npm run lint -- --quiet` (which carries `--fix`) left `git status` identical, so prettier does not touch these lines now | **No test would catch it:** the new assertions count `<span>` nodes, not spacing. Cheap guards exist (`expect(h2.textContent).toBe('Number*')`, or a note in the `@akili-spec` comment). **This is the most fragile artefact T-03 leaves behind** — flagged for T-11 (which touches these same templates) and for T-13 c7's human visual check |
+| 3 | **Risk — spec accuracy, not an implementation defect** | **`design.md` §5.6 and `judgment.md` → `S-1` are over-stated.** `InputComponent.inputValid()` tests `isRequired` **before** `validateEmpty` and returns early, so `Field cannot be empty` is unreachable whenever both are true and the value is empty — and both are skipped when it is non-empty. With `fieldsRequired = false` both are false | **Could not construct any input** where the Number/Unit `[validateEmpty]` binding changes rendered output in either state of `fieldsRequired` | So §5.6's claim that applying `validateEmpty` to all three *"would change OICR's rendered validation"* is **false twice over** — once because the compiler forbids the binding, once because the message is shadowed. **Preserving the asymmetry was still the right call** (byte-preservation beats cleverness in a move task). **Not a Pivot:** the spec's justification is wrong, its instruction is not, and the delivered work is correct under either reading. Carried to `/akili-validate` and the Kaizen record — this is a *design-time reasoning* defect, the class the archive retrospective exists to catch |
+| 4 | **Readability** | (a) The asterisk check is **aggregate** (`h2.label span` count === 3) while c1 says *"field-by-field"*; a per-label query would match the wording and would catch a two-asterisks-in-one-label typo the count cannot. (b) The `@akili-spec` marker is on the Number and Comments labels but **not** Unit, which changed identically | n/a | Both cosmetic. Noted for whoever next opens the file |
+| 5 | **Readability — spec hygiene** | `tasks.md` T-03 c6 says *"add it to §7's blocker log"*, but §7 is **PR strategy**; the log is **§8**, where RB-5 correctly already lives | n/a | A stale cross-reference in the approved task file. **Left unedited** — the Leader does not rewrite approved spec prose outside a Pivot. Owner: T-12 / the archive sweep |
+
+#### Forward pointers — carried by the brief or by nobody
+
+| Target task | Pointer |
+| --- | --- |
+| **T-12** | **Must not close without `quantification-item`'s new `shared/` home registered** in `docs/ux-ui/design.md` §8.1. The client child guide makes registration mandatory for shared components; T-03 deliberately deferred it to avoid colliding with T-12 c1, which names it. If T-12 closes without it, the obligation is silently dropped |
+| **T-11** | Advisory 2 — T-11 touches these same templates for tokens/a11y. The whitespace-free `@if` form must survive that pass |
+| **T-13** | c7's human visual check should confirm the three quantification labels render `Number*` / `Unit*` / `Comments*` with **no space** before the asterisk, at both OICR call sites and on the new page |
+| **PR 1** | c6's PR-description half is unverifiable from a diff and is **owed at PR-1 creation** (T-01…T-03): the promoted template carries four hex literals into `shared/` as a named, bounded, accepted risk |
+
+#### Issues encountered
+
+None. No environment blockers, no rework.
+
+#### Final verification result
+
+Full client suite green (308/308 suites · 6350/6350 tests), `git diff --exit-code` clean on the consumer file, lint clean with `git status` re-inspected, the correction sweep bounded on every axis with zero old-path survivors, and the criterion's falsifying input executed and observed failing. **T-03 closed on attempt 1.**
 
 ---
