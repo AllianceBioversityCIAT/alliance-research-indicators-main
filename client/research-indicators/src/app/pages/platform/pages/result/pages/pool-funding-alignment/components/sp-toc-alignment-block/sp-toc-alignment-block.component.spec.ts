@@ -1168,14 +1168,17 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
   });
 
-  // --- catalogState (AC-11.1/11.2) -------------------------------------------
-  describe('catalogState (AC-11.x)', () => {
-    it("loading: shows a loading affordance with aria-live, no dropdowns", () => {
+  // --- catalogState (AC-11.1/11.2, R-PFU-004) -------------------------------------------
+  describe('catalogState (AC-11.x, R-PFU-004)', () => {
+    it('loading: shows informative skeleton loaders and message with aria-live, no dropdowns (R-PFU-004)', () => {
       setup({ draft: emptyDraft({ aligns_with_toc: true }), catalogState: 'loading' });
       fixture.detectChanges();
       const loading = fixture.nativeElement.querySelector('[data-testid="sp-toc-catalog-loading-SP01"]') as HTMLElement;
       expect(loading).not.toBeNull();
       expect(loading.getAttribute('aria-live')).toBe('polite');
+      expect(loading.getAttribute('aria-busy')).toBe('true');
+      expect(loading.textContent).toContain('Fetching Theory of Change catalog from CLARISA...');
+      expect(loading.querySelectorAll('p-skeleton').length).toBeGreaterThanOrEqual(3);
       expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]')).toBeNull();
     });
 
@@ -1189,10 +1192,11 @@ describe('SpTocAlignmentBlockComponent', () => {
       expect(retry).toHaveBeenCalled();
     });
 
-    it('ready: renders the level select for the cascade', () => {
+    it('ready: renders the level select for the cascade without skeletons', () => {
       setup({ draft: emptyDraft({ aligns_with_toc: true }), catalogState: 'ready' });
       fixture.detectChanges();
       expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('p-skeleton')).toBeNull();
     });
   });
 

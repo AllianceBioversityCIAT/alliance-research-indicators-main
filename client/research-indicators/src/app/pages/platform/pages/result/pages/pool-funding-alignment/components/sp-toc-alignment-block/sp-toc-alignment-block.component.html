@@ -62,10 +62,25 @@
       <div
         role="status"
         aria-live="polite"
-        class="sp-toc-block__notice flex items-center gap-2"
+        aria-busy="true"
+        class="flex flex-col gap-4"
         [attr.data-testid]="'sp-toc-catalog-loading-' + spCode()">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-        <span>{{ LOADING_MESSAGE }}</span>
+        <div class="bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm flex items-center gap-2 text-[var(--ac-primary-blue-800)]">
+          <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+          <span class="font-medium">Fetching Theory of Change catalog from CLARISA...</span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="120px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="42px" borderRadius="8px" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="160px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="42px" borderRadius="8px" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="140px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="70px" borderRadius="8px" />
+        </div>
       </div>
     } @else if (catalogState() === 'error') {
       <div

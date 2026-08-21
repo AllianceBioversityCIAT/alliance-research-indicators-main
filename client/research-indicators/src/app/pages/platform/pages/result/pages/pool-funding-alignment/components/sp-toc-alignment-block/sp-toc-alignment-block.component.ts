@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Select, SelectModule } from 'primeng/select';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { SkeletonModule } from 'primeng/skeleton';
 import {
   SpAlignmentDraft,
   TocCatalogIndicator,
@@ -121,7 +122,7 @@ const NO_TYPE_MATCH_ANYWHERE = (resTypeLabel: string, levelLabel: string): strin
 @Component({
   selector: 'app-sp-toc-alignment-block',
   standalone: true,
-  imports: [FormsModule, SelectModule, RadioButtonModule, InputNumberModule],
+  imports: [FormsModule, SelectModule, RadioButtonModule, InputNumberModule, SkeletonModule],
   templateUrl: './sp-toc-alignment-block.component.html',
   styleUrl: './sp-toc-alignment-block.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

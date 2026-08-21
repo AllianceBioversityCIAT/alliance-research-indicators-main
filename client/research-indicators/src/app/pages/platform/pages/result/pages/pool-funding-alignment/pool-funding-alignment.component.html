@@ -126,128 +126,110 @@
                 {{ NO_SP_DEFINED_MESSAGE }}
               </div>
             } @else if (showSpPicker()) {
-              <app-multiselect
-                [label]="SP_PICKER_LABEL"
-                [isRequired]="true"
-                [signal]="formData"
-                signalOptionValue="selected_sps"
-                optionLabel="name"
-                optionValue="official_code"
-                serviceName="bilateralSciencePrograms"
-                placeholder="Select Science Programs"
-                selectedItemsSurfaceColor="#FFFFFF"
-                [columnsOnXl]="true"
-                [disabled]="!editable() || isReadOnly()"
-                (selectEvent)="onSpSelectionChange()">
-                <ng-template #rows let-row>
-                  @let chipCode = row.code || row.official_code;
-                  @let chipSp = findScienceProgram(chipCode);
-                  <span class="flex items-center gap-2 min-w-0"
-                        [class.pf-sp-chip-rejected]="isRejectedSp(chipCode)"
-                        [attr.data-rejected]="isRejectedSp(chipCode) ? 'true' : null"
-                        [attr.data-testid]="'pf-alignment-sp-chip-' + chipCode">
-                    <img [src]="'/sps/' + (chipSp?.icon_key || chipCode) + '.png'"
-                         [alt]="chipCode + ' icon'"
-                         class="rounded shrink-0 object-cover"
-                         [style.background]="(chipSp?.color || row.color) || 'transparent'"
-                         style="width:24px;height:24px;"
-                         loading="lazy" />
-                    <span class="truncate text-[var(--ac-primary-blue-500)] text-[14px]"
-                          style="font-family: 'Barlow', sans-serif;">
-                      <strong>{{ chipCode }} — {{ chipSp?.allocation ?? '—' }}%</strong> - {{ row.name }}
+              @if (isSingleSp() && singleSp(); as sp) {
+                <div class="bg-white rounded-[10px] border border-[var(--ac-primary-blue-200)] flex items-center justify-between gap-4 p-4 shadow-2xs"
+                     tabindex="0"
+                     role="region"
+                     aria-label="Selected Science Program"
+                     data-testid="pf-alignment-single-sp-card">
+                  <div class="flex items-center gap-3.5 min-w-0">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-black/5"
+                         [style.background]="sp.color || 'var(--ac-primary-blue-50)'">
+                      <img [src]="'/sps/' + (sp.icon_key || sp.code) + '.png'"
+                           [alt]="sp.code + ' icon'"
+                           class="w-full h-full object-cover"
+                           loading="lazy" />
+                    </div>
+                    <span class="text-[14px] text-[var(--ac-grey-900)] leading-tight">
+                      <strong>{{ sp.code }} — {{ sp.allocation ?? '—' }}%</strong> - {{ sp.name }}
                     </span>
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-300)] shrink-0"
+                        data-testid="single-sp-primary-badge">
+                    <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                    Primary
                   </span>
-                </ng-template>
-                <ng-template #item let-row>
-                  <span class="flex items-center gap-2 min-w-0">
-                    <img [src]="'/sps/' + (row.icon_key || row.code || row.official_code) + '.png'"
-                         [alt]="(row.code || row.official_code) + ' icon'"
-                         class="rounded shrink-0 object-cover"
-                         [style.background]="row.color || 'transparent'"
-                         style="width:24px;height:24px;"
-                         loading="lazy" />
-                    <span class="truncate text-[var(--ac-grey-800)] text-[14px]"
-                          style="font-family: 'Barlow', sans-serif;">
-                      <strong>{{ row.code }} — {{ row.allocation }}%</strong> - {{ row.name }}
-                    </span>
-                  </span>
-                </ng-template>
-              </app-multiselect>
-              @if (inlineErrors()?.['sp_codes']; as msg) {
-                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
-                       data-testid="pf-alignment-error-sp_codes">{{ msg }}</small>
+                </div>
+              } @else {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5" data-testid="pf-alignment-multi-sp-grid">
+                  @for (sp of sciencePrograms(); track sp.code) {
+                    @let isSelected = isSelectedSp(sp.code);
+                    @let isPrim = isPrimary(sp.code);
+                    <div class="rounded-[10px] p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 border-2"
+                         [class.bg-white]="!isSelected"
+                         [class.border-[var(--ac-grey-300)]]="!isSelected"
+                         [class.hover:border-[var(--ac-primary-blue-300)]]="!isSelected"
+                         [class.bg-[var(--ac-primary-blue-50)]]="isSelected && isPrim"
+                         [class.bg-slate-50]="isSelected && !isPrim"
+                         [class.border-[var(--ac-primary-blue-600)]]="isSelected && isPrim"
+                         [class.border-[var(--ac-primary-blue-400)]]="isSelected && !isPrim"
+                         tabindex="0"
+                         role="checkbox"
+                         [attr.aria-checked]="isSelected"
+                         [attr.data-testid]="'pf-alignment-sp-card-' + sp.code"
+                         (click)="toggleSp(sp)"
+                         (keydown.enter)="toggleSp(sp)"
+                         (keydown.space)="$event.preventDefault(); toggleSp(sp)">
+                      
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-5 h-5 rounded flex items-center justify-center border transition-colors shrink-0"
+                             [class.bg-[var(--ac-primary-blue-600)]]="isSelected"
+                             [class.border-[var(--ac-primary-blue-600)]]="isSelected"
+                             [class.border-[var(--ac-grey-400)]]="!isSelected"
+                             [class.bg-white]="!isSelected">
+                          @if (isSelected) {
+                            <i class="pi pi-check text-white text-xs" aria-hidden="true"></i>
+                          }
+                        </div>
+
+                        <div class="w-8.5 h-8.5 rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-black/5"
+                             [style.background]="sp.color || 'var(--ac-primary-blue-50)'">
+                          <img [src]="'/sps/' + (sp.icon_key || sp.code) + '.png'"
+                               [alt]="sp.code + ' icon'"
+                               class="w-full h-full object-cover"
+                               loading="lazy" />
+                        </div>
+
+                        <span class="text-[14px] text-[var(--ac-grey-900)] leading-tight truncate">
+                          <strong>{{ sp.code }} — {{ sp.allocation ?? '—' }}%</strong> - {{ sp.name }}
+                        </span>
+                      </div>
+
+                      @if (isSelected) {
+                        @if (isPrim) {
+                          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] border border-[var(--ac-primary-blue-300)] shrink-0 shadow-2xs"
+                                [attr.data-testid]="'pf-alignment-role-primary-' + sp.code">
+                            <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                            Primary
+                          </span>
+                        } @else {
+                          <div class="flex items-center gap-2 shrink-0">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200/80 text-slate-700 border border-slate-300 shrink-0"
+                                  [attr.data-testid]="'pf-alignment-role-contributing-' + sp.code">
+                              Contributing
+                            </span>
+                            @if (editable() && !isReadOnly() && !primaryControlDisabled()) {
+                              <button type="button"
+                                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium text-[var(--ac-primary-blue-700)] hover:text-white hover:bg-[var(--ac-primary-blue-600)] border border-[var(--ac-primary-blue-300)] hover:border-[var(--ac-primary-blue-600)] bg-white cursor-pointer transition-all shrink-0 shadow-2xs"
+                                      (click)="setPrimarySp(sp.code, $event)"
+                                      [attr.data-testid]="'pf-alignment-set-primary-' + sp.code">
+                                <i class="pi pi-star text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                                Make Primary
+                              </button>
+                            }
+                          </div>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+                @if (inlineErrors()?.['sp_codes']; as msg) {
+                  <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                         data-testid="pf-alignment-error-sp_codes">{{ msg }}</small>
+                }
               }
             }
           </section>
-
-          <!--
-            R-BIL-127 / design.md §6.3 — the Primary designation is a SEPARATE,
-            single-choice control over the already-selected set (D-C2-7): not a
-            second multiselect, not a mode toggle on app-multiselect above.
-            Renders once there is something to designate a Primary among.
-          -->
-          @if (formData().selected_sps.length >= 1) {
-            <section class="mb-6" data-testid="pf-alignment-primary-section">
-              <p id="pf-alignment-primary-question" class="label inline-block mb-2">
-                {{ PRIMARY_SP_LABEL }}<span class="text-red-500" aria-hidden="true">*</span>
-              </p>
-              <div role="radiogroup"
-                   aria-labelledby="pf-alignment-primary-question"
-                   aria-required="true"
-                   class="flex flex-col gap-2"
-                   data-testid="pf-alignment-primary-radio-group">
-                @for (sp of formData().selected_sps; track sp.official_code) {
-                  @let primarySp = findScienceProgram(sp.official_code);
-                  <div class="pf-primary-row flex items-center gap-3"
-                       [attr.data-testid]="'pf-alignment-primary-row-' + sp.official_code">
-                    <p-radioButton
-                      name="pf-alignment-primary"
-                      [inputId]="'pf-alignment-primary-' + sp.official_code"
-                      [value]="sp.official_code"
-                      [ngModel]="primarySpCode()"
-                      (ngModelChange)="onPrimaryChange($event)"
-                      [disabled]="primaryControlDisabled()"
-                      [attr.data-testid]="'pf-alignment-primary-radio-' + sp.official_code"></p-radioButton>
-                    <label [for]="'pf-alignment-primary-' + sp.official_code"
-                           class="option-label flex items-center gap-2 min-w-0 flex-wrap">
-                      <span class="truncate">
-                        <strong>{{ sp.official_code }} — {{ primarySp?.allocation ?? '—' }}%</strong> - {{ sp.name }}
-                      </span>
-                      @if (primarySp?.mapping_status && primarySp?.mapping_status !== 'Confirmed') {
-                        <span class="pf-stale-tag"
-                              role="status"
-                              aria-live="polite"
-                              [attr.data-testid]="'pf-alignment-pending-tag-' + sp.official_code">
-                          {{ PENDING_SP_TAG }}
-                        </span>
-                      }
-                      <!--
-                        AC.6 — non-colour-only cue: a text label ("Primary"/"Contributing")
-                        always present, plus an icon on the Primary role only. Colour
-                        alone never carries the distinction (WCAG 2.1 AA 1.4.1, PRD C-4).
-                      -->
-                      @if (isPrimary(sp.official_code)) {
-                        <span class="pf-role-badge pf-role-badge--primary"
-                              [attr.data-testid]="'pf-alignment-role-primary-' + sp.official_code">
-                          <i class="pi pi-star-fill" aria-hidden="true"></i>
-                          {{ PRIMARY_ROLE_LABEL }}
-                        </span>
-                      } @else {
-                        <span class="pf-role-badge pf-role-badge--contributing"
-                              [attr.data-testid]="'pf-alignment-role-contributing-' + sp.official_code">
-                          {{ CONTRIBUTING_ROLE_LABEL }}
-                        </span>
-                      }
-                    </label>
-                  </div>
-                }
-              </div>
-              @if (primaryRequiredMessage() ?? inlineErrors()?.['primary_sp_code']; as msg) {
-                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
-                       data-testid="pf-alignment-error-primary_sp_code">{{ msg }}</small>
-              }
-            </section>
-          }
 
           @if (showHloSection() && hloSectionVisible()) {
             <section class="mb-6" data-testid="pf-alignment-hlo-section">

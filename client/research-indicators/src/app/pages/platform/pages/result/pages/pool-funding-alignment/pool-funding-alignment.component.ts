@@ -30,6 +30,9 @@ interface SelectedScienceProgram {
   name?: string;
   category?: string | null;
   color?: string | null;
+  code?: string;
+  allocation?: number | string | null;
+  icon_key?: string | null;
 }
 
 interface AlignmentFormData {
@@ -196,6 +199,9 @@ export default class PoolFundingAlignmentComponent {
   readonly isStale = computed(() => this.mappingStatus() === 'stale');
   // AC-01.3 — mapped but the CLARISA project carries no SPs (distinct message).
   readonly hasNoSciencePrograms = computed(() => this.mappingStatus() === 'mapped' && this.sciencePrograms().length === 0);
+  // R-PFU-001 / DD-1 — Single-SP project detection for streamlined auto-selection & card view
+  readonly isSingleSp = computed(() => this.mappingStatus() === 'mapped' && this.sciencePrograms().length === 1);
+  readonly singleSp = computed<PoolFundingScienceProgram | null>(() => (this.isSingleSp() ? this.sciencePrograms()[0] : null));
   // Single named gate for the picker (used directly in the template). Renders only
   // once the per-result source has resolved (mappingStatus non-null) AND the
   // project is mapped with ≥1 SP and not stale. The null guard prevents an empty-picker flash
@@ -270,7 +276,7 @@ export default class PoolFundingAlignmentComponent {
 
   readonly contributingSps = computed(() => {
     const primary = this.primarySpCode();
-    return this.formData().selected_sps.filter(sp => sp.official_code !== primary);
+    return this.formData().selected_sps.filter(sp => (sp.official_code || sp.code) !== primary);
   });
 
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-128 AC.1/AC.4/AC.5
@@ -285,7 +291,7 @@ export default class PoolFundingAlignmentComponent {
   readonly primarySelectedSp = computed<SelectedScienceProgram | null>(() => {
     const primary = this.primarySpCode();
     if (!primary) return null;
-    return this.formData().selected_sps.find(sp => sp.official_code === primary) ?? null;
+    return this.formData().selected_sps.find(sp => (sp.official_code || sp.code) === primary) ?? null;
   });
 
   // AC.5 — read-only and version-locked states disable the Primary control
@@ -475,18 +481,51 @@ export default class PoolFundingAlignmentComponent {
   }
 
   onContributionChange(value: boolean | null): void {
-    this.formData.update(form => ({
-      ...form,
-      has_contribution: value,
-      selected_sps: value === false ? [] : form.selected_sps,
-      // R-BIL-127 — no selected set, no Primary; ignored server-side anyway
-      // when has_contribution is false (R-BIL-014), but the form must not
-      // carry a stale value into a later "Yes" flip.
-      primary_sp_code: value === false ? null : form.primary_sp_code,
-      toc_drafts: value === false ? [] : form.toc_drafts
-    }));
-    // Flipping to "No" clears the selection, so any rejected-code state is stale.
-    if (value === false) {
+    const sps = this.sciencePrograms();
+    const isSingleSp = this.isSingleSp();
+
+    this.formData.update(form => {
+      if (value === true && isSingleSp && sps.length === 1) {
+        const sp = sps[0];
+        const spCode = sp.code;
+        const selected: SelectedScienceProgram = {
+          code: sp.code,
+          name: sp.name,
+          official_code: sp.code,
+          allocation: sp.allocation,
+          color: sp.color,
+          icon_key: sp.icon_key
+        };
+        return {
+          ...form,
+          has_contribution: true,
+          selected_sps: [selected],
+          primary_sp_code: spCode,
+          toc_drafts: [this.emptyDraft(spCode)]
+        };
+      }
+
+      return {
+        ...form,
+        has_contribution: value,
+        selected_sps: value === false ? [] : form.selected_sps,
+        // R-BIL-127 — no selected set, no Primary; ignored server-side anyway
+        // when has_contribution is false (R-BIL-014), but the form must not
+        // carry a stale value into a later "Yes" flip.
+        primary_sp_code: value === false ? null : form.primary_sp_code,
+        toc_drafts: value === false ? [] : form.toc_drafts
+      };
+    });
+
+    if (value === true) {
+      const errors = this.inlineErrors();
+      if (errors?.['has_contribution']) {
+        const rest = { ...errors };
+        delete rest['has_contribution'];
+        this.inlineErrors.set(Object.keys(rest).length > 0 ? rest : null);
+      }
+    } else if (value === false) {
+      // Flipping to "No" clears the selection, so any rejected-code state is stale.
       this.clearRejectedSpError();
       this.blockErrors.set({});
     }
@@ -504,6 +543,67 @@ export default class PoolFundingAlignmentComponent {
       delete rest['primary_sp_code'];
       this.inlineErrors.set(Object.keys(rest).length > 0 ? rest : null);
     }
+  }
+
+  // R-PFU-002 / DD-2 — Multi-SP Card Selection & Inline Primary Toggle
+  isSelectedSp(code: string): boolean {
+    return this.formData().selected_sps.some(s => (s.official_code || s.code) === code);
+  }
+
+  toggleSp(sp: PoolFundingScienceProgram): void {
+    if (!this.editable() || this.isReadOnly()) return;
+    const spCode = sp.code;
+    const isSelected = this.isSelectedSp(spCode);
+
+    if (isSelected) {
+      if (this.hasMeaningfulAlignment(spCode)) {
+        this.confirmDestructiveRemoval(spCode);
+        return;
+      }
+      this.formData.update(form => {
+        const remaining = form.selected_sps.filter(s => (s.official_code || s.code) !== spCode);
+        let nextPrimary = form.primary_sp_code;
+        if (form.primary_sp_code === spCode) {
+          nextPrimary = remaining.length === 1 ? (remaining[0].official_code || remaining[0].code || null) : (remaining.length > 0 ? (remaining[0].official_code || remaining[0].code || null) : null);
+        }
+        return {
+          ...form,
+          selected_sps: remaining,
+          primary_sp_code: nextPrimary,
+          toc_drafts: form.toc_drafts.filter(d => d.sp_code !== spCode)
+        };
+      });
+    } else {
+      const selected: SelectedScienceProgram = {
+        code: sp.code,
+        name: sp.name,
+        official_code: sp.code,
+        allocation: sp.allocation,
+        color: sp.color,
+        icon_key: sp.icon_key
+      };
+      this.formData.update(form => {
+        const newSelected = [...form.selected_sps, selected];
+        const nextPrimary = form.primary_sp_code ?? spCode;
+        const existingDraft = form.toc_drafts.find(d => d.sp_code === spCode);
+        const newDrafts = existingDraft ? form.toc_drafts : [...form.toc_drafts, this.emptyDraft(spCode)];
+        return {
+          ...form,
+          selected_sps: newSelected,
+          primary_sp_code: nextPrimary,
+          toc_drafts: newDrafts
+        };
+      });
+    }
+
+    this.clearRejectedSpError();
+    this.ensureTocCatalogLoaded();
+  }
+
+  setPrimarySp(spCode: string, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.editable() || this.isReadOnly()) return;
+    this.onPrimaryChange(spCode);
   }
 
   // REQ-BIL-ASR-03 (AC-03.4) — any change to the SP selection clears the inline
@@ -580,7 +680,7 @@ export default class PoolFundingAlignmentComponent {
     });
 
     this.actions.showGlobalAlert({
-      severity: 'delete',
+      severity: 'secondary',
       summary: this.DESELECT_CONFIRM_SUMMARY,
       detail: this.DESELECT_CONFIRM_DETAIL,
       confirmCallback: {
