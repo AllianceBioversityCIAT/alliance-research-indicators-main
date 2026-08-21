@@ -553,7 +553,7 @@ graph TD
 
 ### T-13 — Verification gate: full suite, coverage, build, budget, human visual + a11y review
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-09, T-10, T-12
+- **Status:** `[~]` **7 of 11 discharged — c1/c7/c8/c9 owed to the human gate** (see `execution.md`) · **Size:** M · **Dependencies:** T-09, T-10, T-12
 - **Requirements covered:** R-IUP-019 (all 4), R-IUP-017 (AC.3), R-IUP-018 (AC.1, AC.3, AC.4, AC.5), NFR-IUP-001, NFR-IUP-002, NFR-IUP-003, NFR-IUP-004, NFR-IUP-006
 - **Design references:** §10.1, §10.4, §10.5, §12, requirements §9 (D5, D7, D8, D9), **AR-1**, **AR-2**
 - **Skills:** `systematic-debugging` (on any failure)
@@ -566,16 +566,16 @@ graph TD
 **Done criteria**
 
 - [ ] c1 — **End-to-end (KZ-006):** starting from a clean checkout, an indicator-6 result is opened from the sidebar, the section is filled, saved, re-read, and the sidebar tick turns true — exercising route + sidebar + page + payload + green-check refresh in one pass. A criterion satisfied by the sub-checks below without this pass is **not** satisfied.
-- [ ] c2 — **Full** `npm test -- --silent` green. A run that skips, filters, or targets files is reported as **inconclusive**, never as a pass (KZ-003, R-IUP-019 AC.3).
-- [ ] c3 — `innovation-details.component.spec.ts`, `actor-item.component.spec.ts` and `organization-item.component.spec.ts` pass **unmodified** — `git diff --exit-code` on those three paths returns clean, except for an import-path edit if a component moved (R-IUP-019 AC.2). **DD-2's `1,665` lines across those three files is the reason this is achievable; re-derive it with `wc -l` rather than restating it** (`design.md` DD-2 is that figure's single home).
-- [ ] c4 — `npm run test:coverage` holds the floors: statements 40 / branches 20 / lines 45 / functions 30.
-- [ ] c5 — `npm run build` clean, within `angular.json` budgets: initial ≤ 2 MB warning / 3 MB error, component styles ≤ 4 kB warning / 8 kB error. The new route is lazy, so the initial bundle must not grow materially.
-- [ ] c6 — `npm run lint -- --quiet` clean, **and `git status` re-inspected afterwards** because the script carries `--fix` and mutates files.
+- [x] c2 — **Full** `npm test -- --silent` green. A run that skips, filters, or targets files is reported as **inconclusive**, never as a pass (KZ-003, R-IUP-019 AC.3).
+- [x] c3 — `innovation-details.component.spec.ts`, `actor-item.component.spec.ts` and `organization-item.component.spec.ts` pass **unmodified** — `git diff --exit-code` on those three paths returns clean, except for an import-path edit if a component moved (R-IUP-019 AC.2). **DD-2's `1,665` lines across those three files is the reason this is achievable; re-derive it with `wc -l` rather than restating it** (`design.md` DD-2 is that figure's single home).
+- [x] c4 — `npm run test:coverage` holds the floors: statements 40 / branches 20 / lines 45 / functions 30.
+- [x] c5 — `npm run build` clean, within `angular.json` budgets: initial ≤ 2 MB warning / 3 MB error, component styles ≤ 4 kB warning / 8 kB error. The new route is lazy, so the initial bundle must not grow materially.
+- [x] c6 — `npm run lint -- --quiet` clean, **and `git status` re-inspected afterwards** because the script carries `--fix` and mutates files.
 - [ ] c7 — **Human visual check, both themes, at 1440 px and at the `md:` breakpoint** (landscape, height ≤ 768 px): every label, callout, count field and card border legible; the repeatable cards stack rather than overflow horizontally; no unreadable contrast. **Quote what was observed** (KZ-002 recurrence 6) — "the page renders" does not discharge "contrast ≥ 4.5:1 in dark mode".
 - [ ] c8 — **T6-Multimodal screenshot review** of the section in both themes at both viewports. Per the model registry's *Cross-host dispatch*, the strongest column for T6 may not be this session's host; if no T6-capable reviewer is reachable, record the criterion as **blocked**, not passed.
 - [ ] c9 — **Keyboard pass:** Tab through the whole page — every control receives focus in document order with a visible ring, **no focus trap inside a repeatable card**, and every icon-only control announces an English name. Human-observed; quote what was observed.
-- [ ] c10 — **Budget reconciliation against `design.md` §12** (13 tasks · ~3,200 LOC · ~28 review rounds). Report actuals. A breach **stops execution and escalates to the user** — it is not absorbed silently.
-- [ ] c11 — **Accepted risks re-stated as still open, not closed:** **AR-1** — no client-tier test reaches a live API, so server acceptance rests on chunk 2's archived fixture tier plus §4.3's transcription. **AR-2** — visual and a11y correctness rest on human observation. **Family FR-7 / AC-1718** is **not** discharged by this spec (§8).
+- [x] c10 — **Budget reconciliation against `design.md` §12** (13 tasks · ~3,200 LOC · ~28 review rounds). Report actuals. A breach **stops execution and escalates to the user** — it is not absorbed silently.
+- [x] c11 — **Accepted risks re-stated as still open, not closed:** **AR-1** — no client-tier test reaches a live API, so server acceptance rests on chunk 2's archived fixture tier plus §4.3's transcription. **AR-2** — visual and a11y correctness rest on human observation. **Family FR-7 / AC-1718** is **not** discharged by this spec (§8).
 
 **Disqualifiers — when a green run here is not evidence**
 

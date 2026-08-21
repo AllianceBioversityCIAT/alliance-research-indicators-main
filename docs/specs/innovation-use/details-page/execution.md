@@ -1539,3 +1539,69 @@ It extended the authority boundary correctly on its own initiative: the prohibit
 **No test run, and the Implementer said so rather than reporting a green suite as evidence:** the change touches no code, so no suite applies and `npm run lint` is not applicable. The c4 greps *are* the verification, and they were reported with the file set named — which is what the Falsifying input demands, since *"a grep over the wrong file set cannot fail."*
 
 ---
+
+### T-13 — Verification gate
+
+| Field | Value |
+| --- | --- |
+| **Final status** | 🔶 **`[~]` — 7 of 11 criteria discharged. Four are owed to the human gate by design, not by omission** |
+| **Date** | 2026-08-21 |
+| **Implementer attempts** | **1** (automated half) |
+| **Effort / skills** | `high` · `systematic-debugging` |
+| **Review** | **Deliberately deferred** — see the deviation |
+
+#### Leader deviations, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| **Task split into an automated half and a human half before delegating** | Four of T-13's eleven criteria (**c1** end-to-end, **c7** visual, **c8** T6-multimodal, **c9** keyboard) cannot be discharged by any agent. The brief forbade attempting them and named why: *"Claiming, inferring, or partially discharging any of those four is the single worst thing you could do at this gate"* — **KZ-002 recurrence 6** is the recorded failure of a human observation being credited for a question it did not cover. The Implementer complied exactly, reporting one line each |
+| **Reviewer deliberately NOT spawned yet** | T-13 **cannot close** until the human half lands, so reviewing half a gate and re-reviewing the whole later spends two contexts for one verdict. The Reviewer will audit the **complete** gate. Meanwhile the Leader spot-checked the two computable claims itself rather than deferring them |
+| **Leader pre-ran the environment pre-check** before delegating, per `/akili-execute` §2.1's environment-dependent-verification rule | `docs/infrastructure.md`'s *Local Environment* contract: `docker info` → **daemon active**, and both `environment.ts` / `environment.dev.ts` are present on this machine (gitignored, no committed template). So the stack **is** bringable up — which is what makes c1 assignable to the human rather than blocked outright |
+
+#### The seven discharged — with the Disqualifier each one had to clear
+
+**c2 — full suite.** `npm test -- --silent` from `client/research-indicators/` → **312 suites / 6510 tests passed.** Unfiltered: no `-t`, no path, no pattern. The counts **match the last recorded run exactly**, and the Implementer checked rather than assumed that a docs-only T-12 and a CSS-only stylesheet addition moved nothing — jsdom loads no global stylesheets, so movement there would have been a finding.
+
+**And the gate's own falsifier was executed — the one criterion in the spec that tests the gate rather than the code.** `npm test -- --silent innovation-use` collected **6 of 312 suites, 173 of 6510 tests**. **Recorded as inconclusive, not as a pass.** As the criterion puts it: *"If a targeted run can satisfy c2, the gate is blind to defect class **D5**, which is the one it exists to catch."* The gate proved itself.
+
+**c3 — Innovation Dev unmodified.** `git diff --exit-code` **exit 0 on each of the three paths, reported per path**. The naming trap this run fell into once was avoided — Innovation Dev is `pages/result/pages/innovation-details/`, a different pre-existing page.
+
+**And DD-2's figure was re-derived, not restated** (KZ-005: a measured figure has one home and every other site cites the deriving command): `wc -l` gives **638 + 392 + 635 = 1,665**, matching DD-2 **exactly**. **The Leader re-ran this independently and confirms the same three numbers.**
+
+**c4 — coverage.** 99.22 / 97.94 / 98.81 / 99.5 against floors 40 / 20 / 45 / 30. Reported as floor-clearance only, **not** as proof of behaviour — KZ-001 stays in force for D7/D8.
+
+**c5 — build and budgets.** Initial **1.32 MB raw / 274.39 kB transfer**, matching the authorized post-RB-9 baseline **with no growth beyond it**. `innovation-use-details-component` confirmed as its **own lazy chunk** at 35.09 kB (T-10 recorded 34.92; +0.17 kB consistent with T-11's a11y markup). Against a 2 MB warning — nowhere close. The six component-style warnings are pre-existing on unrelated legacy components, and the four new components **have no `.scss` files at all**, so no per-component budget applies to them. **Concurrency explicitly ruled out**, which its Disqualifier requires — *"a build run while any delegated agent is active is a **wrong** number, not a slow one."*
+
+**c6 — lint.** `All files pass linting.`, and the post-run `git status` is **clean** — evidence, not assumption, which is exactly what its Disqualifier demands of a script carrying `--fix`.
+
+**c10 — budget reconciliation.** Computed from `git show --numstat` per task commit, with the convention **calibrated against the ledger's own T-09 entry** rather than assumed:
+
+| | §6 derivation | Actual | Rounds |
+| --- | --- | --- | --- |
+| T-01…T-09 | 2,802 | 4,871 | 17 |
+| T-10 | 190 | **180** *(under by 10)* | 1 — the Pivot consumed **no** rework round, per protocol |
+| T-11 | 80 | **95** *(over by 15)* | 1 |
+| T-12 | 40 | **18** *(under by 22)* | 0 |
+| T-13 | 0 | **0** | this attempt |
+| **Total** | **3,510** | **5,164** | **20 of ~28 (71%)** |
+
+**vs §12's original ~3,200: +1,964 (+61.4%). vs the user-re-baselined ~4,600: +564 (+12.3%).** *(Leader re-computed both independently — figures confirmed.)*
+
+**Cause unchanged from the two rulings already made:** spec-tier density, not scope creep. **T-10 and T-12 both came in *under* their own derivations**, and T-11's small overage is the same spec-tier fraction, not a new driver. **Not re-escalated a third time** — the user has ruled twice with full information.
+
+**And it disclosed what a narrower reading would have hidden:** RB-9's `responsive-size.scss` added **195 LOC** as a user-authorized non-task change, making the real footprint **5,359**. Named as an addendum *"so the reconciliation isn't silently narrower than the real diff"* — neither folded in nor omitted. **Review rounds remain under budget even though LOC breached; the two dimensions moved independently.**
+
+**c11 — the three risks, written as open.** **AR-1**: no client-tier test reaches a live API, so server acceptance rests on chunk 2's archived fixture tier plus §4.3's transcription — *"this verification gate adds no new evidence toward AR-1."* **AR-2**: D7/D8 have no automated gate and rest on human observation. **Family FR-7 / AC-1718 is not discharged by this spec.** All three stated as open. Closing any here would have been false.
+
+#### The four owed to the human gate — and what each needs
+
+| # | What it requires | Blocker, if any |
+| --- | --- | --- |
+| **c1** | Open an indicator-6 result **from the sidebar**, fill the section, save, re-read, watch the tick turn — **in one pass.** The criterion is explicit that satisfying it via the sub-checks *"is **not** satisfied"* | ⚠️ **`RB-2` / `OQ-IUP-2` may block this outright.** If indicator 6 is not `is_active` in the environment, no indicator-6 result can be created and c1 is **unperformable**. RB-2 classified this as *"blocks nothing"* — true for release comms, **false for this criterion** |
+| **c7** | Human visual check, **both themes**, at **1440 px** and the `md:` breakpoint (landscape, height ≤ 768 px). **Quote what was observed** — *"the page renders"* does not discharge *"contrast ≥ 4.5:1 in dark mode"* | Two outcomes already known and to be **recorded, not discovered**: dark mode **will fail** (1.29:1 and 1.887:1 against 4.5:1, produced by following §5.7 exactly), and **an unrelated result tab must be checked** because `form-header` renders on 13 pages and its typography changed when `rs-*` began resolving |
+| **c8** | T6-Multimodal screenshot review, both themes × both viewports | **Not necessarily blocked.** The criterion says record *blocked* if no T6-capable reviewer is reachable — but the Leader **can read images**. If the human captures the four screenshots, c8 is genuinely dischargeable rather than blocked |
+| **c9** | Keyboard pass — Tab through the page: every control focused in document order with a **visible ring**, **no focus trap inside a repeatable card**, every icon-only control announcing an **English** name. Human-observed; quote it | T-11 improved this surface (native `<button>` for both remove controls, resolving checkbox labels, `[ariaLabel]` on all four selects) but **none of it is proof of rendered focus behaviour** |
+
+**Stack is ready:** `cd client/research-indicators && npm run compose:up:dev` → `http://localhost:4200` (or `npm start` without Docker).
+
+---
