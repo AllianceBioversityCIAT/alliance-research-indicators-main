@@ -1353,3 +1353,72 @@ Five were already recorded, four of them *instruction right, justification wrong
 **Extension for the Kaizen record:** when a design decision's rationale is quoted into a done criterion, the criterion must assert **the decision's authorized change**, never its predicted *consequence*. DD-9 authorized *declare two keys*; its predicted consequence was *the cast becomes unnecessary*; c4 asserted the consequence. **The tell is available at authoring time and costs one question: "does the change this decision authorizes, by itself, produce the state this criterion asserts?"**
 
 ---
+
+### T-11 — Accessibility, design tokens, dark-mode pass
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 1** — but see the escalation: **PASS does not mean the section renders correctly** |
+| **Date** | 2026-08-21 |
+| **Implementer attempts** | **1** |
+| **Effort / skills** | `high` · `angular-developer`, `ui-ux-pro-max` (per T-11's Skill note — a recorded departure from **DD-13**'s scope, not a contradiction of it) |
+| **Review mode** | Single Reviewer, lens checklist |
+
+#### What landed
+
+The coupling migration (T-06's three inert `aria-label` → `[ariaLabel]`, **plus** the `selectByAria()` helper in the same edit), `[ariaLabel]` on T-05's actor-type select (which had **neither** label nor aria-label), `id` → `inputId` on both checkboxes with per-row suffixes, T-05's remove control from `div[role=button]` to a native `<button>`, `aria-label` on the Specify-other input and the request-partner "here" button, the heading reshape across four files, c2 discharged as **resolution**, and c3's four icon assertions.
+
+**Verification:** `npm test -- --silent` full unfiltered from `client/research-indicators/` → **312 suites, 6510 tests passed** (+2, matching exactly the two new label-resolution tests; the four c3 assertions went inside existing tests). Coverage 99.22 / 97.94 / 98.81 / 99.5. Lint clean, `git status` re-inspected. **c1's falsifying input executed** — `#ff00aa` injected into the stepper → grep matched → reverted → clean.
+
+#### Three corrections the Reviewer made to the Leader's framing
+
+1. **c1 is *not* the T-10 c4 shape, and the difference decides ownership.** The Leader proposed that c1 was "satisfied literally, purpose not achieved". Wrong: **c1's purpose is DD-7 (zero hex), and DD-7 is fully achieved.** The `rs-*` gap is *"a **missing criterion**, not a failed one"* — c1 is about colours, c4 about colours *lacking a token*, c5 about `isDarkMode()`. **Nothing in c1–c6 asks whether a mandated utility family exists.** Sharper than the Leader's diagnosis and it changes who owns the fix.
+2. **The inertness is NOT pre-existing app-wide in any meaningful sense.** Measured, not assumed: the families appear **64 times in 6 files**, of which **60 are this spec's four new files** and **4 pre-exist — every one of them `fs-[n]` font-size only** (`form-header` ×3, `bilateral-mapping` ×1). **There is not a single pre-existing use of `rs-p-*`, `rs-m*-*`, `rs-gap-*`, `rs-w-*` or `rs-h-*` anywhere in the application.** So this is not "matching an existing condition" — it is a **new, first-time, at-scale dependency (58 usages) on an unimplemented family**, and this spec is the family's first caller. That is why nobody noticed: a font-size falling back to inherited Barlow ~13–14px is visually indistinguishable from an intended 12/13px.
+3. **The Leader's contrast figure was wrong.** `.label` `#153c71` on dark `#2b2b2b` is **1.29:1**, not 1.26:1 (L_fg 0.04578 / L_bg 0.02415). `.section-title` at **1.887:1** was exact. Slip in the harmless direction, conclusion unchanged — **corrected here because this record is the project's permanent one.**
+
+#### A fourth documentation site the Leader missed — and the sharpest
+
+The Leader named three (`docs/ux-ui/design.md` §7.1, root `CLAUDE.md` §4.2, the client README). The Reviewer added **`client/research-indicators/src/CLAUDE.md`**: its folder-layout block lists `styles/responsive-size.scss`, **and its "Adding code" table routes *"A new color / spacing token"* to that path.** Verified against a `Glob` of `src/styles/**` — five files, and that is not one of them. **An agent following that table edits a path that has never existed.**
+
+#### Per-criterion — all six, re-derived rather than accepted
+
+| # | Verdict | Evidence |
+| --- | --- | --- |
+| c1 | ✅ | Hex grep run **broader than asked** — the whole `innovation-use-details/` folder, all file types — **zero hits**. Falsifying input executed |
+| c2 | ✅ **as resolution** | Both new tests `querySelector` the id from `label.htmlFor` and identity-compare to the checkbox's **rendered `<input>`**. And the `expect(label.htmlFor).toBe(...)` line makes the first-match `label` lookup **self-validating** — if the first label belonged to another control the test fails rather than silently asserting about the wrong one. **11-control tally re-enumerated; the three "cannot resolve" attributions are correct**, root-caused at source in `input.component.html` (`for="username"` vs `inputId="minmax-buttons"`) and `textarea.component.html`. **Nothing tallied as resolving that does not** |
+| c3 | ✅ | All four assert the icon's **text content** (`toBe('warning')`), not presence. T-07's is genuinely the **page's own** block — verified through `TextareaComponent.isInvalid()`: `'   '.length === 3` → false → `app-textarea` renders nothing, so the only matching span is the page's, and the icon query is scoped to `requiredSpan.parent` |
+| c4 | ✅ **vacuous, not dodged** | The only non-`var(--ac-*)` colour in template code is `text-red-500`, which **§5.7 explicitly mandates** for the required marker. `--ac-orange-1` appears **nowhere** — consistent with T-04's settlement. OQ-IUP-4's default assumption was never exercised; `colors.scss` correctly untouched. *(Incidentally: the four components have **no `.scss` files at all** — which is why there is no per-component place to absorb the missing spacing)* |
+| c5 | ✅ | `isDarkMode` grep over the whole folder → zero |
+| c6 | ✅ | Restated only; does not claim c7–c9 |
+
+#### The coupling migration — verified independently, did not narrow
+
+The PrimeNG claim is **true**: `primeng-select.mjs` L2573/L2603 set `[attr.aria-label]="ariaLabel || …"` on the internal `role="combobox"` element, so a host attribute names nothing. The helper's new form reads `componentInstance.ariaLabel` over `queryAll(By.directive(Select))`, so only **rendered** instances are in scope. The Reviewer traced **all six** dependent T-06 criteria through it and confirmed the **negative** assertions still bite — a select rendered with the wrong `ariaLabel` yields falsy, so a labelling regression **fails** rather than passes. **T-06's spec: 25/25.**
+
+#### The three beyond-the-ask changes — all judged sound
+
+1. **`[ariaLabel]` on T-05's actor-type select** — in scope: the card's `<span class="label">` is not a `<label>` and contributed no programmatic name.
+2. **Per-row `inputId` suffixes — this was a *functional* bug, not just a11y.** With a bare static id, **clicking card 2's label toggled card 1's checkbox.** *"Trivially reachable — §6.1 step 4 pushes one blank actor on load and 'Add other actor' adds a second; two cards is the ordinary case."* The Reviewer endorsed both the fix and the disclosure, and endorsed **the boundary it drew**: the same defect shape inside its own file was fixed, while inside a shared component it was deferred — *"same defect class, two different scope verdicts, both correct."*
+3. **The heading reshape does not violate §5.7** — the mapping's *Element* column holds **semantic role names**, not HTML tags, so the binding artifact is the class, and `.section-title`'s own four properties (size, weight, both margins) override any UA `h2` default at higher specificity. No test asserted on the tags (the one relevant query is by **class**). Claim verified: the file set now contains exactly four `<h2 class="section-title">` and **zero** other headings.
+
+#### `ADVISORY`
+
+| Lens | Finding | Reachability |
+| --- | --- | --- |
+| **Risk — ESCALATED, see below** | The `.rs-*` / `.fs-[n]` families do not exist. **T-13 c7 cannot pass in the current state** | **Certain, every render** |
+| **Risk** | `src/CLAUDE.md` is the fourth doc site, and routes token edits to a nonexistent path | Certain |
+| **Reliability** | `docs/ux-ui/design.md` §7.1 line 358 — *"the Aura preset flips via the `.dark-mode` body class"* — is **false**. Grep across `src/` returns 4 hits: the `darkModeSelector` declaration and three service *imports*. `dark-mode.service.ts` only ever calls `setAttribute(documentElement, 'data-theme', …)`, **never `classList`** — so PrimeNG chrome always renders light-Aura regardless of theme | Certain. Platform-wide; discovered here, not caused here |
+| **Reliability (new)** | The heading outline is now `h3 → h2 h2 h2 h2`, because `app-form-header` renders its title as `<h3>` — the container heading sits **below** the cards it contains. **Not** a WCAG AA failure (heading-order is an axe best-practice, not an AA criterion) and **net-positive for SC 1.3.1**, since card headings that look like headings now are ones. Clean fix is in `app-form-header`, a shared component — out of scope | Reachable on every in-form render. → **T-13 c9** |
+| **Readability** | `md:grid-cols-2` is **Tailwind's** `md:` (min-width 768px), whereas the project's `.md:` convention means *landscape, height ≤ 768px*. **Different breakpoints.** T-13 c7 tests at the project's breakpoint and may find the grid does not behave as its class name suggests | → T-13 c7 |
+| **Readability** | The page's `<span class="label">Level of use…</span>` is the one label whose layout depends on a descendant's display rather than its own | Cosmetic → T-13 c7 |
+| **Readability** | Two icon queries are page-wide first-match, justified by an accurate comment; the page spec uses the stricter parent-scoped form. Uniform adoption would make them robust to a future branch change rather than to a current fact | Minor |
+
+#### The dark-mode non-compliance — the record, as the user asked
+
+**R-IUP-017's dark-mode scenario cannot be satisfied within T-11's declared scope.** §5.7 makes `.label`, `.option-label`, `.description` and `.section-title` **binding**, and all four are hard-coded light-theme hexes in `src/styles/custom-fields.scss` (`#153c71`, `#4c5158`, `#777c83`, `#a2a9af`) with **no dark-mode override anywhere in the repo** — grep-confirmed, zero `data-theme`/`dark` references in that file. On the cards' dark surfaces this computes to **1.29:1** for `.label` on `--ac-grey-100` (dark `#2b2b2b`) and **1.887:1** for `.section-title` on `--ac-white-1` (dark `#e5e5e5`), against a **4.5:1** requirement — **both produced by following §5.7 exactly.** Compounding it, `--ac-white-1` **does not invert**: in the dark palette it is a *foreground*-luminance value under a surface token name, so the four page-level card surfaces stay near-white. And `.dark-mode` — the class the Aura preset watches — **is never applied**, so PrimeNG controls render light chrome inside a dark card.
+
+**The files that would have to change are `custom-fields.scss` and `dark-mode.service.ts`, both outside T-11's scope** (four component pairs, plus `colors.scss` only under OQ-IUP-4). T-11's own note prescribes the action taken: *"if a color needs a dark-mode-specific value that the token system cannot express, that is the forbidden case; **stop and escalate**."*
+
+**Remote-stylesheet caveat: closed.** The Implementer fetched the app's one external stylesheet and found it contains **no rule for any of the four classes under any selector**. The Reviewer, lacking network access, replaced that with an argument independent of the fetch: the file is **1074 bytes**, while the documented `rs-*` family spans p/m/gap/w/h/size over 0–500px with `md:` variants plus `fs-` over 1–30 — **tens of kilobytes minimum. 1074 bytes cannot physically contain it.** The conclusion holds either way.
+
+---

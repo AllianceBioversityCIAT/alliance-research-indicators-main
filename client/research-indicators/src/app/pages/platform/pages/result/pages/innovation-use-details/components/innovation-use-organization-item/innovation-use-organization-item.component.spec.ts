@@ -129,7 +129,11 @@ describe('InnovationUseOrganizationItemComponent', () => {
   });
 
   const selects = () => fixture.debugElement.queryAll(By.directive(Select));
-  const selectByAria = (label: string) => selects().find(de => de.nativeElement.getAttribute('aria-label') === label);
+  // Migrated (T-11): PrimeNG's Select names its focusable role="combobox" element from the
+  // `ariaLabel` @Input, not from a host `aria-label` attribute — a plain `aria-label="..."` on
+  // `<p-select>` sets a DOM attribute on the custom element (no role, not focusable) and names
+  // nothing. Read the component's own `ariaLabel` property instead of the host attribute.
+  const selectByAria = (label: string) => selects().find(de => (de.componentInstance as Select).ariaLabel === label);
   const appInputs = () => fixture.debugElement.queryAll(By.directive(InputComponent));
   const appInputInstances = (): InputComponent[] => appInputs().map(de => de.componentInstance as InputComponent);
   const appInputLabelled = (label: string) => appInputInstances().find(i => i.label === label);
@@ -145,6 +149,25 @@ describe('InnovationUseOrganizationItemComponent', () => {
   it('should create', () => {
     fixture.detectChanges();
     expect(component).toBeTruthy();
+  });
+
+  // T-11 c2 — discharged as RESOLUTION, not presence: the checkbox's <label for> must resolve
+  // to the checkbox's own rendered <input>, not merely exist in the DOM (a `<label for="x">`
+  // with no element carrying id="x" is worse than no label — it converts a visible defect into
+  // a green presence check).
+  describe('T-11 c2 — the known-toggle checkbox label resolves to its own input', () => {
+    it("label.htmlFor resolves to the checkbox's rendered input element", () => {
+      component.organization = new InnovationUseOrganization();
+      component.organizationNumber = 3;
+      fixture.detectChanges();
+
+      const label = fixture.debugElement.query(By.css('label')).nativeElement as HTMLLabelElement;
+      const resolved = (fixture.nativeElement as HTMLElement).querySelector(`#${label.htmlFor}`);
+      const checkboxInput = fixture.debugElement.query(By.directive(Checkbox)).query(By.css('input')).nativeElement as HTMLInputElement;
+
+      expect(label.htmlFor).toBe('is_organization_known_3');
+      expect(resolved).toBe(checkboxInput);
+    });
   });
 
   // c1 — Each identity path renders its own field set, and only its own.
@@ -247,6 +270,12 @@ describe('InnovationUseOrganizationItemComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.textContent as string).toContain('does not identify an organization yet');
+      // T-11 c3 — the error is icon AND text, never text alone; only in this @if branch is
+      // "unknown path, no identity yet" true, so exactly one material-symbols-rounded warning
+      // icon exists in the DOM here.
+      const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
     });
 
     it('a touched row that DOES identify an organization shows no message', async () => {

@@ -1582,6 +1582,17 @@ describe('InnovationUseDetailsComponent', () => {
       // for whitespace; asserting on the page's rendered text proves the page's own block fired.
       expect(fixture.nativeElement.textContent).toContain('This field is required');
 
+      // T-11 c3 — icon AND text, never text alone, for the PAGE'S OWN required-message block.
+      // Locate the exact block by its unique text, then assert its sibling icon renders "warning"
+      // (a page-wide icon query would also catch the unrelated actor "required" block).
+      const requiredSpan = fixture.debugElement
+        .queryAll(By.css('span'))
+        .find(el => (el.nativeElement.textContent || '').trim() === 'This field is required')!;
+      expect(requiredSpan).toBeTruthy();
+      const icon = requiredSpan.parent!.query(By.css('i.material-symbols-rounded'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
+
       await component.saveData();
       expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
     });

@@ -48,6 +48,23 @@ describe('InnovationUseActorItemComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  // T-11 c2 — discharged as RESOLUTION, not presence: the checkbox's <label for> must resolve
+  // to the checkbox's own rendered <input>, not merely exist in the DOM.
+  describe('T-11 c2 — the disaggregation-mode checkbox label resolves to its own input', () => {
+    it("label.htmlFor resolves to the checkbox's rendered input element", () => {
+      component.actor = new InnovationUseActor();
+      component.actorNumber = 4;
+      fixture.detectChanges();
+
+      const label = fixture.debugElement.query(By.css('label')).nativeElement as HTMLLabelElement;
+      const resolved = (fixture.nativeElement as HTMLElement).querySelector(`#${label.htmlFor}`);
+      const checkboxInput = fixture.debugElement.query(By.directive(Checkbox)).query(By.css('input')).nativeElement as HTMLInputElement;
+
+      expect(label.htmlFor).toBe('sex_age_disaggregation_not_apply_4');
+      expect(resolved).toBe(checkboxInput);
+    });
+  });
+
   // Pinning test (rework attempt 2, Lens A issue 1): body() is a shallow-spread copy of the
   // parent's @Input row, never the same object reference — app-input's in-place write
   // (UtilsService.setNestedPropertyWithReduceSignal) must never land on the parent's object.
@@ -245,6 +262,12 @@ describe('InnovationUseActorItemComponent', () => {
 
       const selectDe = fixture.debugElement.query(By.directive(Select));
       expect(selectDe.nativeElement.className).toContain('border-[var(--ac-red-1)]');
+
+      // T-11 c3 — icon AND text, never text alone. Only the required message renders here
+      // (actor_type_id is unset, duplicateType is false), so exactly one warning icon exists.
+      const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
     });
   });
 
@@ -258,6 +281,11 @@ describe('InnovationUseActorItemComponent', () => {
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('already been reported on another row');
       expect(text).not.toContain('This field is required');
+
+      // T-11 c3 — icon AND text, never text alone.
+      const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
     });
   });
 

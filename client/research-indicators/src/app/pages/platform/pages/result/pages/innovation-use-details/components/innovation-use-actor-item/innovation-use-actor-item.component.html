@@ -11,20 +11,18 @@
     <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ACTOR # {{ actorNumber }}</span>
 
     @if (!disabled) {
-      <div
-        class="cursor-pointer text-[var(--ac-red-1)]"
-        role="button"
-        tabindex="0"
+      <button
+        type="button"
+        class="cursor-pointer text-[var(--ac-red-1)] bg-transparent border-0 p-0"
         [attr.aria-label]="'Remove actor ' + actorNumber"
-        (click)="onRemove()"
-        (keydown.enter)="onRemove()">
+        (click)="onRemove()">
         <i class="pi pi-times-circle !text-[16px]"></i>
-      </div>
+      </button>
     }
   </div>
 
   <div class="flex flex-col rs-gap-[4]">
-    <h2 class="label">Actor type<span class="text-red-500">*</span></h2>
+    <span class="label">Actor type<span class="text-red-500">*</span></span>
 
     <p-select
       [disabled]="disabled"
@@ -32,6 +30,7 @@
       [optionLabel]="'name'"
       [optionValue]="'code'"
       placeholder="Select the actor type"
+      [ariaLabel]="'Select the actor type'"
       class="fs-[14] w-full {{ actorTypeMissing || duplicateType ? 'border-2 rounded-md border-[var(--ac-red-1)]' : '' }}"
       [ngModel]="body().actor_type_id"
       (onChange)="onActorTypeChange($event.value)"
@@ -52,6 +51,7 @@
         pInputText
         class="rs-mt-[12] w-full {{ otherNameMissing ? 'border-2 border-[var(--ac-red-1)]' : '' }}"
         placeholder="Specify other"
+        aria-label="Specify other actor type"
         [ngModel]="body().actor_type_custom_name"
         (ngModelChange)="onCustomNameChange($event)"
         [disabled]="disabled"
@@ -63,13 +63,13 @@
 
     <div class="flex items-center rs-gap-[8] option-label rs-pt-[12]">
       <p-checkbox
-        id="sex_age_disaggregation_not_apply"
+        [inputId]="'sex_age_disaggregation_not_apply_' + actorNumber"
         [disabled]="disabled"
         [ngModel]="body().sex_age_disaggregation_not_apply"
         (onChange)="onModeChange($event.checked)"
         binary="true"
         styleClass="rs-w-[16] rs-h-[16]" />
-      <label for="sex_age_disaggregation_not_apply">Sex and age disaggregation does not apply</label>
+      <label [attr.for]="'sex_age_disaggregation_not_apply_' + actorNumber">Sex and age disaggregation does not apply</label>
     </div>
 
     @if (!body().sex_age_disaggregation_not_apply) {
