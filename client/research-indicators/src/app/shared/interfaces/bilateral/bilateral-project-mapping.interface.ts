@@ -1,14 +1,18 @@
-export type BilateralMappingSource = 'MANUAL' | 'DERIVED' | 'AI_SUGGESTED' | 'AI_AUTO';
+export type BilateralMappingSource = 'MANUAL' | 'DERIVED' | 'AI_SUGGESTED' | 'AI_AUTO' | 'UNMAPPED';
+export type MappingStatus = 'Mapped' | 'Pending' | 'Inactive';
 
 export interface BilateralProjectMapping {
   id: number;
   agresso_agreement_id: string;
+  agresso_description?: string | null;
   clarisa_project_id: number;
   clarisa_project_short_name?: string | null;
+  clarisa_project_full_name?: string | null;
   source: BilateralMappingSource;
   confidence_score?: number | null;
   notes?: string | null;
   is_active: boolean;
+  mapping_status?: MappingStatus;
   created_at: string;
   updated_at: string;
   created_by?: number | null;
@@ -32,6 +36,7 @@ export interface BilateralMappingListQuery {
   limit?: number;
   search?: string;
   is_active?: boolean;
+  status?: 'all' | 'mapped' | 'pending' | 'inactive';
   source?: BilateralMappingSource;
 }
 

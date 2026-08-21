@@ -18,6 +18,7 @@ import { FindContracts } from '@shared/interfaces/find-contracts.interface';
 // branches on `ok` and, on failure, surfaces `message` (already resolved to the
 // human-readable text) alongside `status` for 409-vs-400 routing.
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-02)
+// @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements (T-BTE-02 / R-BTE-003)
 export type MappingMutationResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; message: string };
@@ -27,9 +28,69 @@ export class BilateralMappingService {
   private readonly api = inject(ApiService);
 
   // AC-03.3 — on failure return null so the component shows the error state. Never throws.
-  async list(query?: BilateralMappingListQuery): Promise<BilateralMappingListPage | null> {
+  async list(query?: BilateralMappingListQuery, phase?: number): Promise<BilateralMappingListPage | null> {
+    if (query?.status === 'pending') {
+      const preview = await this.previewAutoMap(phase);
+      if (!preview) return null;
+
+      const unmappedCandidates = [
+        ...(preview.toCreate ?? []),
+        ...(preview.ambiguous ?? []),
+        ...(preview.unresolved ?? [])
+      ];
+
+      const needle = query.search?.trim().toLowerCase();
+      const filtered = needle
+        ? unmappedCandidates.filter(
+            c =>
+              c.clarisaProjectShortName?.toLowerCase().includes(needle) ||
+              c.clarisaProjectFullName?.toLowerCase().includes(needle) ||
+              c.derivedContractId?.toLowerCase().includes(needle)
+          )
+        : unmappedCandidates;
+
+      const page = query.page ?? 1;
+      const limit = query.limit ?? 20;
+      const total = filtered.length;
+      const paginated = filtered.slice((page - 1) * limit, page * limit);
+
+      const items: BilateralProjectMapping[] = paginated.map(c => ({
+        id: -c.clarisaProjectId,
+        agresso_agreement_id: c.derivedContractId || '—',
+        agresso_description: null,
+        clarisa_project_id: c.clarisaProjectId,
+        clarisa_project_short_name: c.clarisaProjectShortName,
+        clarisa_project_full_name: c.clarisaProjectFullName,
+        source: 'UNMAPPED' as const,
+        is_active: true,
+        mapping_status: 'Pending',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      return {
+        items,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.max(1, Math.ceil(total / limit))
+        }
+      };
+    }
+
     const res = await this.api.GET_BilateralProjectMappings(query);
-    return res?.successfulRequest ? res.data : null;
+    if (!res?.successfulRequest || !res.data) return null;
+
+    const items = res.data.items.map(item => ({
+      ...item,
+      mapping_status: item.mapping_status ?? (item.is_active ? 'Mapped' : 'Inactive')
+    }));
+
+    return {
+      items,
+      meta: res.data.meta
+    };
   }
 
   async get(id: number): Promise<BilateralProjectMapping | null> {

@@ -120,23 +120,22 @@ describe('BilateralMappingComponent', () => {
     jest.clearAllMocks();
   });
 
-  // ── T-BIL-CAM-09: Status filter defaults to "Active" ──────────────────────
+  // ── R-BTE-003: Status filter defaults to "all" ───────────────────────────
 
-  it('defaults activeFilter to "active" and issues the initial list with is_active=true (T-BIL-CAM-09)', async () => {
+  it('defaults statusFilter to "all" and issues the initial list (R-BTE-003)', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
-    // Before init the default signal value is already 'active'
-    expect(component.activeFilter()).toBe('active');
+    // Before init the default signal value is 'all'
+    expect(component.statusFilter()).toBe('all');
 
     fixture.detectChanges(); // triggers ngOnInit → load()
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    // The very first list() call must carry is_active: true
     const firstCall = mockService.list.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(firstCall?.['is_active']).toBe(true);
-    expect(component.activeFilter()).toBe('active');
+    expect(firstCall?.['page']).toBe(1);
+    expect(component.statusFilter()).toBe('all');
   });
 
   // ── AC-03.1: renders table rows on successful list ─────────────────────────
@@ -247,9 +246,9 @@ describe('BilateralMappingComponent', () => {
     expect(lastCall?.['search']).toBe('A511');
   });
 
-  // ── AC-04.2: active-state filter resets page and maps to is_active boolean ─
+  // ── R-BTE-003: status filter resets page and maps to status param ─────────
 
-  it('changing active filter to "active" calls list with is_active=true and resets page', async () => {
+  it('changing status filter to "mapped" calls list with status=mapped and resets page', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
     fixture.detectChanges();
@@ -261,17 +260,17 @@ describe('BilateralMappingComponent', () => {
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
-    component.onActiveFilterChange('active');
+    component.onStatusFilterChange('mapped');
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
     expect(component.page()).toBe(1);
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBe(true);
+    expect(args?.['status']).toBe('mapped');
   });
 
-  it('changing active filter to "inactive" calls list with is_active=false', async () => {
+  it('changing status filter to "pending" calls list with status=pending and resets page', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -280,15 +279,32 @@ describe('BilateralMappingComponent', () => {
 
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([]));
-    component.onActiveFilterChange('inactive');
+    component.onStatusFilterChange('pending');
     await fixture.whenStable();
     await delayMs(0);
 
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBe(false);
+    expect(args?.['status']).toBe('pending');
   });
 
-  it('changing active filter to "all" omits is_active from the query', async () => {
+  it('changing status filter to "inactive" calls list with status=inactive', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow()]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    mockService.list.mockClear();
+    mockService.list.mockResolvedValue(makePage([]));
+    component.onStatusFilterChange('inactive');
+    await fixture.whenStable();
+    await delayMs(0);
+
+    const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(args?.['status']).toBe('inactive');
+  });
+
+  it('changing status filter to "all" omits status from the query', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -297,12 +313,12 @@ describe('BilateralMappingComponent', () => {
 
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([makeRow()]));
-    component.onActiveFilterChange('all');
+    component.onStatusFilterChange('all');
     await fixture.whenStable();
     await delayMs(0);
 
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBeUndefined();
+    expect(args?.['status']).toBeUndefined();
   });
 
   // ── AC-04.3: source filter resets page and maps source enum ───────────────
@@ -390,58 +406,175 @@ describe('BilateralMappingComponent', () => {
       page: 1,
       limit: component.limit(),
       search: 'ACIAR',
-      is_active: true,
+      status: 'mapped',
       source: 'MANUAL'
     });
   });
 
-  // ── AC-03.1: confidence column hidden when source === 'MANUAL' ─────────────
+  // ── R-BTE-001: Confidence column removed from table header & body ──────────
 
-  describe('showConfidence() helper — AC-03.1', () => {
-    it('returns false (hidden) when source is MANUAL', () => {
-      expect(component.showConfidence(makeRow({ source: 'MANUAL' }))).toBe(false);
-    });
+  it('does not render Confidence column header or cells (R-BTE-001)', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.85 })]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
 
-    it('returns true (shown) when source is AI_SUGGESTED', () => {
-      expect(component.showConfidence(makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.85 }))).toBe(true);
-    });
-
-    it('returns true (shown) when source is AI_AUTO', () => {
-      expect(component.showConfidence(makeRow({ source: 'AI_AUTO', confidence_score: 0.92 }))).toBe(true);
-    });
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('Confidence');
+    expect(fixture.nativeElement.querySelector('[data-testid="confidence-value"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="confidence-cell"]')).toBeNull();
   });
 
-  // ── DOM: confidence cell hidden when source === MANUAL ────────────────────
+  // ── R-BTE-002: 2-line rendering for AGRESSO and CLARISA columns ───────────
 
-  it('renders "—" in confidence cell (not the score) for MANUAL rows in the table', async () => {
-    const manualRow = makeRow({ source: 'MANUAL', confidence_score: 0.99 });
-    mockService.list.mockResolvedValue(makePage([manualRow]));
+  it('renders 2-line cells with tooltips for AGRESSO and CLARISA descriptions (R-BTE-002)', async () => {
+    const row = makeRow({
+      agresso_agreement_id: 'A1676',
+      agresso_description: 'Rice Initiative Agreement',
+      clarisa_project_id: 1403,
+      clarisa_project_short_name: 'B-A1676',
+      clarisa_project_full_name: 'Sustainable Rice Systems in Asia'
+    });
+    mockService.list.mockResolvedValue(makePage([row]));
 
     fixture.detectChanges();
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    // The confidence-hidden element should be present, confidence-value absent
-    const hidden = fixture.nativeElement.querySelector('[data-testid="confidence-hidden"]');
-    const shown = fixture.nativeElement.querySelector('[data-testid="confidence-value"]');
-    expect(hidden).not.toBeNull();
-    expect(shown).toBeNull();
+    const agressoTooltip = fixture.nativeElement.querySelector('[data-testid="agresso-description-tooltip"]');
+    const clarisaTooltip = fixture.nativeElement.querySelector('[data-testid="clarisa-fullname-tooltip"]');
+
+    expect(agressoTooltip).not.toBeNull();
+    expect(agressoTooltip.textContent.trim()).toBe('Rice Initiative Agreement');
+    expect(clarisaTooltip).not.toBeNull();
+    expect(clarisaTooltip.textContent.trim()).toBe('Sustainable Rice Systems in Asia');
   });
 
-  it('renders the confidence value for AI_SUGGESTED rows in the table', async () => {
-    const aiRow = makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.75 });
-    mockService.list.mockResolvedValue(makePage([aiRow]));
+  // ── R-BTE-003: Badges and + Map button for Pending ────────────────────────
+
+  it('renders Mapped, Pending, and Inactive badges correctly and triggers map dialog on pending (R-BTE-003)', async () => {
+    const mappedRow = makeRow({ id: 1, mapping_status: 'Mapped', is_active: true });
+    const pendingRow = makeRow({ id: -1403, mapping_status: 'Pending', source: 'UNMAPPED', is_active: true, clarisa_project_id: 1403 });
+    const inactiveRow = makeRow({ id: 2, mapping_status: 'Inactive', is_active: false });
+
+    mockService.list.mockResolvedValue(makePage([mappedRow, pendingRow, inactiveRow]));
 
     fixture.detectChanges();
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    const shown = fixture.nativeElement.querySelector('[data-testid="confidence-value"]');
-    const hidden = fixture.nativeElement.querySelector('[data-testid="confidence-hidden"]');
-    expect(shown).not.toBeNull();
-    expect(hidden).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="mapped-badge"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="pending-badge"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="inactive-badge"]')).not.toBeNull();
+
+    const pendingMapBtn = fixture.nativeElement.querySelector('[data-testid="pending-map-btn"]');
+    expect(pendingMapBtn).not.toBeNull();
+
+    const spyOpenMap = jest.spyOn(component, 'openMapDialogForPending');
+    pendingMapBtn.click();
+    expect(spyOpenMap).toHaveBeenCalledWith(pendingRow);
+  });
+
+  // ── R-BTE-004: Interactive Column Sorting ─────────────────────────────────
+
+  describe('Interactive Column Sorting (R-BTE-004)', () => {
+    it('sorts data by agreement ID ascending and descending via custom sort', () => {
+      const data = [
+        makeRow({ id: 1, agresso_agreement_id: 'D527' }),
+        makeRow({ id: 2, agresso_agreement_id: 'A1676' }),
+        makeRow({ id: 3, agresso_agreement_id: 'C300' })
+      ];
+
+      // Ascending sort
+      component.onSort({ data, field: 'agresso_agreement_id', order: 1 });
+      expect(data.map(r => r.agresso_agreement_id)).toEqual(['A1676', 'C300', 'D527']);
+
+      // Descending sort
+      component.onSort({ data, field: 'agresso_agreement_id', order: -1 });
+      expect(data.map(r => r.agresso_agreement_id)).toEqual(['D527', 'C300', 'A1676']);
+    });
+
+    it('sorts data by CLARISA project short name ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, clarisa_project_short_name: 'USAID' }),
+        makeRow({ id: 2, clarisa_project_short_name: 'ACIAR' }),
+        makeRow({ id: 3, clarisa_project_short_name: 'BMGF' })
+      ];
+
+      component.onSort({ data, field: 'clarisa_project_short_name', order: 1 });
+      expect(data.map(r => r.clarisa_project_short_name)).toEqual(['ACIAR', 'BMGF', 'USAID']);
+
+      component.onSort({ data, field: 'clarisa_project_short_name', order: -1 });
+      expect(data.map(r => r.clarisa_project_short_name)).toEqual(['USAID', 'BMGF', 'ACIAR']);
+    });
+
+    it('sorts data by mapping status ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, mapping_status: 'Pending' }),
+        makeRow({ id: 2, mapping_status: 'Inactive' }),
+        makeRow({ id: 3, mapping_status: 'Mapped' })
+      ];
+
+      component.onSort({ data, field: 'mapping_status', order: 1 });
+      expect(data.map(r => r.mapping_status)).toEqual(['Inactive', 'Mapped', 'Pending']);
+
+      component.onSort({ data, field: 'mapping_status', order: -1 });
+      expect(data.map(r => r.mapping_status)).toEqual(['Pending', 'Mapped', 'Inactive']);
+    });
+
+    it('sorts data by last updated date ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, updated_at: '2024-03-01T00:00:00.000Z' }),
+        makeRow({ id: 2, updated_at: '2024-01-01T00:00:00.000Z' }),
+        makeRow({ id: 3, updated_at: '2024-06-01T00:00:00.000Z' })
+      ];
+
+      component.onSort({ data, field: 'updated_at', order: 1 });
+      expect(data.map(r => r.id)).toEqual([2, 1, 3]);
+
+      component.onSort({ data, field: 'updated_at', order: -1 });
+      expect(data.map(r => r.id)).toEqual([3, 1, 2]);
+    });
+  });
+
+  // ── NFR-BTE-001: Accessibility and keyboard focus for tooltips ────────────
+
+  it('renders tooltips with keyboard accessibility attributes (NFR-BTE-001)', async () => {
+    const row = makeRow({
+      agresso_agreement_id: 'A1676',
+      agresso_description: 'Rice Initiative Agreement',
+      clarisa_project_id: 1403,
+      clarisa_project_short_name: 'B-A1676',
+      clarisa_project_full_name: 'Sustainable Rice Systems in Asia'
+    });
+    mockService.list.mockResolvedValue(makePage([row]));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const agressoTooltip = fixture.nativeElement.querySelector('[data-testid="agresso-description-tooltip"]');
+    expect(agressoTooltip.getAttribute('tabindex')).toBe('0');
+    expect(agressoTooltip.getAttribute('role')).toBe('note');
+
+    const clarisaTooltip = fixture.nativeElement.querySelector('[data-testid="clarisa-fullname-tooltip"]');
+    expect(clarisaTooltip.getAttribute('tabindex')).toBe('0');
+    expect(clarisaTooltip.getAttribute('role')).toBe('note');
+  });
+
+  // ── R-BTE-005: Auto-map button contrast ───────────────────────────────────
+
+  it('renders styled Auto-map button in header (R-BTE-005)', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow()]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const autoMapBtn = fixture.nativeElement.querySelector('[data-testid="header-automap-btn"]');
+    expect(autoMapBtn).not.toBeNull();
   });
 
   // ── NF-06: loading signal resets to false on both success and failure ──────
