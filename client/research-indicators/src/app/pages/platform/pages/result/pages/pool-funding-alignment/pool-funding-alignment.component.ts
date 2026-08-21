@@ -434,7 +434,7 @@ export default class PoolFundingAlignmentComponent {
         this.loadFailed.set(true);
         return;
       }
-      if (alignment.eligible === false) {
+      if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
       }

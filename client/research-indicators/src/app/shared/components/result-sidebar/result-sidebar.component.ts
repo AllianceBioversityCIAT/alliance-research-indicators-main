@@ -81,6 +81,8 @@ export class ResultSidebarComponent {
 
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
+    const meta = this.cache.currentMetadata();
+    if (meta?.indicator_id === 5) return true;
     return !alignment || alignment.eligible === false;
   }
 

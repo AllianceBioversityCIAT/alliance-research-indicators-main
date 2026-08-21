@@ -327,6 +327,19 @@ describe('ResultSidebarComponent', () => {
         expect(poolFundingOption).toBeUndefined();
       });
 
+      it('hides the Pool Funding alignment tab when the result indicator is OICR (indicator_id === 5)', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+        cacheService.currentMetadata?.set({
+          ...cacheService.currentMetadata(),
+          indicator_id: 5
+        } as any);
+
+        const options = component.allOptionsWithGreenChecks();
+        const poolFundingOption = options.find(o => o.path === 'pool-funding-alignment');
+
+        expect(poolFundingOption).toBeUndefined();
+      });
+
       it('places the Pool funding alignment tab at the bottom of the sidebar (per mockup 33356:11736) when eligible=true', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
 
