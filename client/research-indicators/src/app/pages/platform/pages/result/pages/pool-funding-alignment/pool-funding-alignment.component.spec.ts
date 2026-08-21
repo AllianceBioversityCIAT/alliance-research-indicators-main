@@ -190,12 +190,11 @@ describe('PoolFundingAlignmentComponent', () => {
     expect(getAlignmentMock).toHaveBeenCalledWith('RES-001');
   });
 
-  it('renders the section title info icon aligned with tooltip text matching the info banner', () => {
+  it('renders the section title help button aligned with tooltip text', () => {
     fixture.detectChanges();
-    const icon = fixture.nativeElement.querySelector('[data-testid="pf-alignment-title-info-icon"]') as HTMLElement;
-    expect(icon).not.toBeNull();
-    expect(icon.getAttribute('aria-label')).toBe(component.INFO_BANNER);
-    expect(icon.classList.contains('pf-alignment-section-heading__icon')).toBe(true);
+    const btn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]') as HTMLElement;
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('aria-label')).toBe('Learn more about Pool Funding and Theory of Change alignment');
   });
 
   it('falls back to cache.getCurrentNumericResultId when route param is absent', async () => {
@@ -2564,6 +2563,32 @@ describe('PoolFundingAlignmentComponent', () => {
       const pendingBadge = fixture.nativeElement.querySelector('[data-testid*="pending"]');
       expect(pendingBadge).toBeFalsy();
       expect(fixture.nativeElement.textContent).not.toContain('Pending');
+    });
+  });
+
+  describe('Help & Workflow Guide Modal', () => {
+    it('renders the help button in the section header and help link in the banner', () => {
+      fixture.detectChanges();
+      const helpBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      const bannerLink = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+
+      expect(helpBtn).not.toBeNull();
+      expect(bannerLink).not.toBeNull();
+      expect(bannerLink.textContent).toContain('Learn more & view workflow');
+    });
+
+    it('toggles showHelpModal signal when help button or banner link is clicked', () => {
+      fixture.detectChanges();
+      expect(component.showHelpModal()).toBe(false);
+
+      const helpBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      helpBtn.click();
+      expect(component.showHelpModal()).toBe(true);
+
+      component.showHelpModal.set(false);
+      const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+      bannerLink.click();
+      expect(component.showHelpModal()).toBe(true);
     });
   });
 });

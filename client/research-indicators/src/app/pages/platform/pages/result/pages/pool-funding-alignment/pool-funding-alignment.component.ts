@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
@@ -65,6 +66,7 @@ interface ReadOnlyTocSummary {
     FormsModule,
     RadioButtonModule,
     TooltipModule,
+    DialogModule,
     SkeletonModule,
     FormHeaderComponent,
     NavigationButtonsComponent,
@@ -77,6 +79,7 @@ interface ReadOnlyTocSummary {
 })
 export default class PoolFundingAlignmentComponent {
   readonly bilateralService = inject(BilateralService);
+  readonly showHelpModal = signal<boolean>(false);
   private readonly cache = inject(CacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -128,7 +131,8 @@ export default class PoolFundingAlignmentComponent {
   readonly PRMS_SOURCED_BANNER = 'This result is owned by PRMS. Bilateral alignment is read-only in STAR.';
   // Locked backend 409 description that signals the PRMS-sourced read-only cause.
   readonly PRMS_SOURCED_409_DESCRIPTION = 'Result is PRMS-sourced; bilateral alignment is read-only in STAR';
-  readonly INFO_BANNER = 'Select the Theory of Change results (Outputs, Outcomes) and related indicators this result contributes to.';
+  readonly INFO_BANNER =
+    'Align this result with a Science Program and specify its contribution to the Theory of Change (Outputs, Outcomes) and related indicators.';
   readonly CONTRIBUTION_QUESTION = 'Does this result contribute to a Science Program or Accelerator?';
   readonly SP_PICKER_LABEL = 'Select the Science Program(s) this is related to';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127

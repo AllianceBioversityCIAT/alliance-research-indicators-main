@@ -4,14 +4,18 @@
     <div class="content-section w-full">
       <div class="flex flex-col w-full bg-[#fcfcfc] rounded-[10px] p-[30px] mb-10">
         <div class="flex items-center justify-between">
-          <div class="pf-alignment-section-heading flex items-center gap-1.5">
+          <div class="pf-alignment-section-heading flex items-center gap-2">
             <div class="section-title m-0" data-testid="pf-alignment-title">SCIENCE PROGRAM CONTRIBUTION</div>
-            <i class="pi pi-info-circle pf-alignment-section-heading__icon"
-               [pTooltip]="INFO_BANNER"
-               tooltipPosition="top"
-               [attr.aria-label]="INFO_BANNER"
-               tabindex="0"
-               data-testid="pf-alignment-title-info-icon"></i>
+            <button
+              type="button"
+              class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-300)] hover:bg-[var(--ac-primary-blue-100)] hover:text-[var(--ac-primary-blue-900)] flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-[var(--ac-primary-blue-400)]"
+              (click)="showHelpModal.set(true)"
+              aria-label="Learn more about Pool Funding and Theory of Change alignment"
+              [pTooltip]="'How does Pool Funding & Theory of Change alignment work?'"
+              tooltipPosition="top"
+              data-testid="pf-alignment-help-button">
+              <i class="pi pi-question text-[11px]" aria-hidden="true"></i>
+            </button>
           </div>
           @if (readOnlyCause() === 'synced') {
             <app-custom-tag
@@ -63,12 +67,22 @@
         }
 
         <div role="note"
-             class="flex items-center bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm text-[var(--ac-primary-blue-800)] gap-2.5 mb-6"
+             class="flex items-center justify-between flex-wrap gap-2.5 bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm text-[var(--ac-primary-blue-800)] mb-6"
              data-testid="pf-alignment-info-banner">
-          <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
-          <h3 class="text-xs leading-relaxed m-0 text-[var(--ac-grey-700)] font-normal">
-            {{ INFO_BANNER }}
-          </h3>
+          <div class="flex items-center gap-2.5 min-w-0">
+            <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <h3 class="text-xs leading-relaxed m-0 text-[var(--ac-grey-700)] font-normal">
+              {{ INFO_BANNER }}
+            </h3>
+          </div>
+          <button
+            type="button"
+            class="text-xs font-semibold text-[var(--ac-primary-blue-700)] hover:text-[var(--ac-primary-blue-900)] flex items-center gap-1 cursor-pointer ml-auto shrink-0 bg-transparent border-0 p-0 transition-colors"
+            (click)="showHelpModal.set(true)"
+            data-testid="pf-alignment-banner-help-link">
+            <span>Learn more & view workflow</span>
+            <i class="pi pi-arrow-right text-[10px]" aria-hidden="true"></i>
+          </button>
         </div>
 
         <section class="mb-6" data-testid="pf-alignment-contribution-section">
@@ -399,4 +413,124 @@
     [showSave]="editable() && !isReadOnly()"
     [disableSave]="!canSave() || saving()"
     (save)="onSave()" />
+
+  <!-- Help & Workflow Guide Modal -->
+  <p-dialog
+    [(visible)]="showHelpModal"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    [dismissableMask]="true"
+    [style]="{ width: '58rem', maxWidth: '95vw' }"
+    styleClass="pf-help-dialog"
+    header="About Pool Funding & Theory of Change Alignment">
+    <div class="flex flex-col gap-6 py-2 text-[var(--ac-grey-900)]">
+      <!-- Overview Intro Banner -->
+      <div class="bg-[var(--ac-primary-blue-50)] border border-[var(--ac-primary-blue-200)] rounded-xl p-4 flex items-start gap-3.5">
+        <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-xl shrink-0 mt-0.5" aria-hidden="true"></i>
+        <div class="flex flex-col gap-1 text-sm text-[var(--ac-grey-800)] leading-relaxed">
+          <span class="font-semibold text-[var(--ac-primary-blue-900)] text-base">Why align bilateral results with Pool Funding?</span>
+          <p class="m-0 text-[13px] text-[var(--ac-grey-700)]">
+            Bilateral projects contribute significantly to CGIAR goals. This module enables you to link your result with <strong>Science Programs (SPs) or Accelerators</strong> and map its contribution into the <strong>Theory of Change (ToC)</strong> framework (Outputs and Outcomes). Once approved, this alignment can be synchronized directly with <strong>PRMS</strong>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Process Workflow Diagram -->
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-[var(--ac-grey-700)] m-0 flex items-center gap-2">
+            <i class="pi pi-sitemap text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+            End-to-End Alignment & PRMS Sync Flow
+          </h4>
+          <span class="text-[11px] text-[var(--ac-grey-500)]">From result creation to institutional PRMS reporting</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-[var(--ac-grey-50)] p-4 rounded-xl border border-[var(--ac-grey-200)]">
+          <!-- Step 1 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">1</span>
+              <i class="pi pi-th-large text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Science Programs</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Select the contributing Science Program(s) and designate one <strong>Primary SP</strong>.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">2</span>
+              <i class="pi pi-sliders-h text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Theory of Change</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Map the Primary SP's Theory of Change (Outputs / Outcomes) and choose target indicators.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">3</span>
+              <i class="pi pi-check-circle text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Review & Approve</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Submit the result in STAR for validation and approval by the Principal Investigator or Center Admin.
+            </p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-primary-blue-200)] bg-linear-to-b from-[var(--ac-primary-blue-50)]/60 to-white shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-600)] text-white text-xs font-bold flex items-center justify-center">4</span>
+              <i class="pi pi-sync text-[var(--ac-primary-blue-600)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-primary-blue-900)]">PRMS Sync</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Use <strong>PRMS SYNC</strong> in the sidebar to transmit the approved result and ToC mapping to PRMS via API.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Concepts / FAQ Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="p-3.5 rounded-lg border border-[var(--ac-grey-200)] bg-white flex flex-col gap-1.5 shadow-2xs">
+          <div class="flex items-center gap-2 text-xs font-semibold text-[var(--ac-grey-900)]">
+            <i class="pi pi-star-fill text-amber-500 text-xs" aria-hidden="true"></i>
+            <span>Primary vs. Contributing Science Programs</span>
+          </div>
+          <p class="text-xs text-[var(--ac-grey-600)] m-0 leading-relaxed">
+            The <strong>Primary SP</strong> is the main Science Program whose Theory of Change (ToC) targets are mapped. Contributing SPs represent secondary institutional collaborations.
+          </p>
+        </div>
+
+        <div class="p-3.5 rounded-lg border border-[var(--ac-grey-200)] bg-white flex flex-col gap-1.5 shadow-2xs">
+          <div class="flex items-center gap-2 text-xs font-semibold text-[var(--ac-grey-900)]">
+            <i class="pi pi-shield text-[var(--ac-primary-blue-600)] text-xs" aria-hidden="true"></i>
+            <span>Read-Only & PRMS-Sourced Locks</span>
+          </div>
+          <p class="text-xs text-[var(--ac-grey-600)] m-0 leading-relaxed">
+            Results originating in PRMS or already synchronized become read-only in STAR to protect data integrity and prevent unintended discrepancies across platforms.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #footer>
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="px-5 py-2 rounded-lg bg-[var(--ac-primary-blue-600)] hover:bg-[var(--ac-primary-blue-700)] text-white text-xs font-medium cursor-pointer transition-colors"
+          (click)="showHelpModal.set(false)"
+          data-testid="pf-alignment-help-dialog-close">
+          Close
+        </button>
+      </div>
+    </ng-template>
+  </p-dialog>
 </div>
