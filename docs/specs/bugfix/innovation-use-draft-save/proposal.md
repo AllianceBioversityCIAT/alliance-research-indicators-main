@@ -44,7 +44,7 @@ Confirmed by the reporter: lowering the level below 6, or typing anything into t
 | --- | --- | --- |
 | Save with blank justification at `level >= 6` | Silently does nothing | **Persists.** Success toast, values re-read |
 | Green check / sidebar tick for the section | (unreachable — nothing saved) | **Stays false** until the justification is filled |
-| Submit an Innovation Use result with blank justification at `level >= 6` | Blocked | **Still blocked** |
+| Submit an Innovation Use result with blank justification at `level >= 6` | ⚠️ **Corrected by §15 (OQ-1).** This row read *"Blocked → Still blocked"*, which is **false on the `DRAFT → SUBMITTED` path**: `completenessValidation` is `enabled: false` on indicator 6's id 25, so the server evaluates no green checks on a first submit. It **is** blocked on `REVISED → SUBMITTED` (id 30, `enabled: true`) | **Blocked by the STAR client's green-check gating on both paths; server-enforced only on `REVISED → SUBMITTED`.** Unchanged by this fix — the same is already true of every other completeness rule |
 | Inline required message + red asterisk on the textarea | Present (duplicated) | **Present, exactly once** |
 | Whitespace-only justification | Blocked, page-owned message | **Persists as `NULL`-equivalent**; message still renders; server never receives whitespace |
 
@@ -88,7 +88,8 @@ Confirmed by the reporter: lowering the level below 6, or typing anything into t
 
 ## 6. Non-Goals
 
-- **Relaxing the submit gate.** The justification stays mandatory for submission. Nobody asked to change that, and the green check already enforces it.
+- **Relaxing the submit gate.** The justification stays mandatory for submission. Nobody asked to change that. *(Amended by §15 — the second clause originally read "and the green check already enforces it", which is true only on `REVISED → SUBMITTED`. On a first submit the server evaluates no green checks for **any** indicator, so the enforcement is the STAR client's. Not created by this fix, and not fixed by it either.)*
+- **Turning on server-side first-submit validation.** §15's new finding shows `completenessValidation` is disabled on `DRAFT → SUBMITTED` for every indicator. Enabling it — for indicator 6 or platform-wide — is a product and security decision far larger than this bugfix, and it needs a write against the shared dev DB. **Filed, not actioned.**
 - **Touching `hasDuplicateActorType()`'s save block.** A duplicate actor type is *invalid data* the server rejects (R-IUP-009), not an unfinished draft. Blocking it client-side is legitimate mirroring under the PRD's `AC-Role-Correctness`. Different category, out of scope.
 - **Editing the shared `TextareaComponent`.**
 - **Any migration.** The green-check function is **not** modified.
@@ -267,3 +268,59 @@ Four independent lines of evidence support removing rather than relocating:
 ```
 
 Run it in **Bug Mode**. `OQ-1` should be answered during specify, before any task is written — it is the one finding that can change the shape of the fix.
+
+---
+
+## 15. OQ-1 — RESOLVED 2026-08-21, and it changes the shape of the fix
+
+**Answered from the repo, not escalated to DevOps.** Same lesson as `OQ-IUP-2`, which was declared *"not answerable from the repo"* and turned out to be one line in `indicators.service.ts`.
+
+### The answer: `enabled: false`
+
+`result_status_workflow` is keyed by `indicator_id` (`result-status-workflow.entity.ts:24-27`). `1767901590080-insertStatusWorkflow.ts` seeds **6 rows per indicator**; indicator 6 owns **ids 25–30**:
+
+| id | from → to | Transition |
+| --- | --- | --- |
+| **25** | **4 → 2** | **DRAFT → SUBMITTED** ← the one that matters |
+| 26 | 2 → 4 | SUBMITTED → DRAFT |
+| 27 | 2 → 5 | SUBMITTED → REVISED |
+| 28 | 2 → 6 | SUBMITTED → APPROVED |
+| 29 | 2 → 7 | SUBMITTED → REJECTED |
+| **30** | **5 → 2** | **REVISED → SUBMITTED** |
+
+*(Status ids from `result-status.enum.ts`: `SUBMITTED = 2`, `DRAFT = 4`, `REVISED = 5`.)*
+
+`1768329933286-updateConfigWorkflow.ts` writes their config, and it is the **last** migration to touch id 25 — verified by scanning **all 18 migrations** that reference `result_status_workflow`:
+
+| Row | `completenessValidation.enabled` |
+| --- | --- |
+| **id 25 — DRAFT → SUBMITTED** | ⛔ **`false`** |
+| id 30 — REVISED → SUBMITTED | ✅ `true` |
+
+**So on a first submission, the server does not evaluate green checks at all.** It only evaluates them on re-submission after a revision.
+
+### The reframing this forces — and it cuts the other way
+
+The pattern is **uniform across indicators 1, 2, 3, 4 and 6**: every `DRAFT → SUBMITTED` row has `completenessValidation` disabled, every `REVISED → SUBMITTED` row has it enabled. That uniformity means it is a **platform-wide arrangement, not an indicator-6 oversight**.
+
+Which inverts how `validateLevelExplanation` should be read:
+
+> **It is the only bespoke server-side completeness guard on the platform.** Every other completeness rule — at least one actor, the five common sections, the IP-rights conjunction — is *already* unenforced server-side on a first submit. Chunk 2 gave the level-6 justification an extra guard that nothing else has.
+
+So deleting it does **not** open a novel hole. It removes an anomalous extra guard and makes Innovation Use **consistent** with every other indicator. Keeping it makes Innovation Use **anomalously stricter** — at the cost of the reported bug.
+
+`is_status_change_validation_required` (added by `1780331976405-AddedValidationColumn.ts`) is **not** a second enforcement path: it is read at `result-status-workflow.service.ts:182-184`, returned to the client, and enforced nowhere server-side.
+
+### Revised options — the user's call, not the spec's
+
+| | Option | Effect |
+| --- | --- | --- |
+| **A** | **Delete the throw** (as originally proposed) | Drafts save. Innovation Use becomes consistent with the platform. The justification joins every other completeness rule in being client-gated on first submit. **Smallest change; no DB operation.** The platform-wide gap is recorded and escalated separately, where it belongs |
+| **A′** | **Delete the throw AND set `enabled: true` on id 25** | Drafts save *and* first-submit completeness becomes server-enforced for indicator 6. But it makes indicator 6 **stricter than every other indicator**, enforces **all** green checks (not just the justification), and needs a config write against the **shared, non-disposable** dev DB — a human decision under root `CLAUDE.md` §4.3 |
+| **C** | **Keep the server throw; client toast only** | The reported bug stays. Retained only as the do-nothing baseline |
+
+**Recommendation: A**, plus filing the platform-wide finding as its own item. Reasons: it fixes the reported bug, it *reduces* inconsistency rather than adding a new one, it needs no database operation, and it keeps a bugfix scoped to its root cause. Turning on server-side first-submit validation for one indicator inside a bugfix would be a platform behavior change smuggled through the wrong door — and if that gate should be on, it should be on for **all six**, which is a decision far larger than this spec.
+
+### New finding, filed not actioned
+
+**`completenessValidation` is disabled on `DRAFT → SUBMITTED` for every indicator.** Any API client can submit an incomplete result on first submission; only the STAR client's green-check gating prevents it, and that is client-side. Whether this is deliberate (first submit may be incomplete by design) or a config that was never switched on is **unknown from the repo** and needs a product/security answer. **Out of scope here** — recorded so it is owned somewhere rather than discovered again.
