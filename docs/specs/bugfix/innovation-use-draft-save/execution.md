@@ -176,3 +176,100 @@ Attempt 1's `ADVISORY (evidence precision)` claimed *"`npm test -- --silent` doe
 | **Requirements covered** | R-IUD-001 (AC.1, AC.2, AC.4, AC.5) · R-IUD-003 (all 6) |
 | **LOC** | **+140 / −44 = 96 net** across 3 files |
 | **Budget note** | `design.md` §7 budgeted **~180 net for all three tasks**. T-02 alone is **96**, and T-01 has not landed yet. Tracked, not absorbed — the tripwire is 250 net or 6 review rounds; 2 rounds are spent. **Reconciled at T-03; escalated to the user at the gate if T-01 breaches it** |
+
+### T-01 — Server: delete the save-time guard, invert its tests, redesign the boundary fixture
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** — first attempt, one review round |
+| **Date** | 2026-08-21 |
+| **Effort / skills** | `high` · `nestjs-expert` |
+| **LOC** | **+535 / −336 = 199 net** across **5** files (production ≈ −30) |
+| **Requirements covered** | R-IUD-001 (AC.3) · R-IUD-002 (AC.1, AC.3, AC.4) |
+
+#### The change
+
+`validateLevelExplanation` (`:307-326`) and its call (`:183`) deleted. Two things preserved deliberately, and the Reviewer verified both:
+
+- **`resolveInnovationUseLevel` is still called, with its return value discarded** — for its *other* effect: a level id resolving to no catalog row still throws `400` before `BEGIN`. Confirmed live at `:298-309`, with three tests holding it (`:699`, `:1190`, `:635`), none regressed.
+- **Every validator still runs pre-`BEGIN`**, so DD-3's "a failure persists nothing" holds by ordering.
+
+#### Bug Mode — red before, green after (c1)
+
+**RED**, unfixed code: `2 failed, 2 total` — `BadRequestException` at `validateLevelExplanation (:322)` via `update (:183)`. **GREEN** after deletion: `2 passed`.
+
+**Falsifier 1:** restored method + call → **both** c1/c2 and c3 failed together, confirming c2 is not a false pass. **Falsifier 2:** stubbed `innovation_use_validation` to `RETURN TRUE;` via reversible DDL on the scratch container → both failed at `expect(Number(greenCheckRow.innovation_use)).toBe(0)` (`Expected: 0, Received: 1`). Real function body restored, green again.
+
+#### The Reviewer went beyond the falsifier — and this is the strongest evidence in the spec
+
+Falsifier 2 proves the assertion *reads* the real function. It does **not** prove **which conjunct** is false. The Reviewer settled that separately against `1787078283929-createInnovationUseValidation.ts:133-137`: with level id 7 seeded (`commonFields` TRUE, `useLevel` 6), one actor at `actor_type_id = 900_910` (≠ 5, so `tempActors = tempFullActors = 1`), `sex_age_disaggregation_not_apply = TRUE, actors_count = 3` (so `tempModeConsistent = 1`), and `ActorRolesEnum.INNOVATION_USE = 2` matching the routine's `ra.actor_role_id = 2` — **every conjunct is TRUE except `explanationValid`.** So `toBe(0)` fails **if and only if** the justification rule stops holding. That is the strongest form c2/c3 could take.
+
+**And the chain is real end to end, no double anywhere on the assertion's path:** real `ResultInnovationUseService` from a real Nest `TestingModule` over the TEST datasource → hand-constructed `StatusWorkflowFunctionHandlerService` with argument positions verified against `function-handler.service.ts:31-40` → real `GreenCheckRepository` over the real `DataSource` → `innovation_use_validation` as raw SQL. Only `CurrentUserUtil` / `ResultsUtil` are overridden, for `REQUEST` scope, and neither is on this path. **KZ-001 satisfied at the tier that matters.**
+
+#### KZ-001 across the eight inverted unit tests — and the trap that was absent
+
+All eight assert positive outcomes; **no bare `not.toThrow()` anywhere.** The Reviewer identified what would have made them hollow and confirmed it is not the case: the `transaction` double at `:175-184` **really invokes its callback** (`await cb(fakeManager)`), so the `managerUpdate` and child-service assertions are live, and `fakeManager` is a single stable instance so manager-threading assertions are falsifiable rather than self-satisfying. `resolves.toBeDefined()` alone would be near-tautological — every one of the eight pairs it with at least one positive state assertion, and each discriminates against the pre-fix code, which threw.
+
+#### Declared scope excess — adjudicated FORCED, all six. The defect is in the task text
+
+The task named **five** unit-test line numbers and one fixture. The Implementer inverted **three more unit tests** and **three tests in a fifth file** (`innovation-use-section-round-trip.fixture-spec.ts`), disclosed all of it under `Not Done / Assumptions`, and argued c6 was unreachable otherwise.
+
+The Reviewer reconstructed what each of the six asserted **pre-deletion** against the pre-fix control flow, and confirmed every one was asserting the level-≥6 rejection **and nothing else**:
+
+| Site | Pre-fix assertion |
+| --- | --- |
+| unit `:545` DISCRIMINATING PAIR Half B (`level_id: 7`, stored explanation `null`) | 400, level-≥6 rule |
+| unit `:767` / `:796` DD-14 explicit `null` / `''` (stored level 7) | 400, same rule |
+| round-trip `:889` / `:919` / `:937` (`null` / `''` / `'   '`, key present, stored level 6) | 400, same rule re-firing against the cleared value |
+
+**Not scope creep — the cited-site list under-counted.** `tasks.md` T-01 scope item 2 named five lines and missed three same-file sites plus an entire file. **This is the third recorded instance in this spec of a cited-site list under-counting** — and T-01's own falsifying input warns of exactly this. The lesson is mine, not the worker's.
+
+#### Item 2 — `design.md` §3.1 is factually WRONG, and the Implementer's comment is right
+
+My §3.1 claimed the `:168-171` resolution *"is what makes the never-typed case preserve the stored value."* **It is not.** The write at `:216-222` uses the **raw DTO value**, never `_effectiveExplanation`:
+
+```ts
+innovation_use_level_explanation:
+  createResultInnovationUseDto?.innovation_use_level_explanation,
+```
+
+The preserving mechanism is **step 6's partial merge** — an omitted key is `undefined`, which TypeORM's `UpdateQueryBuilder` omits from the `SET` list. `:168-171` **never reached the write**; it existed solely to feed the validator. The service's own DD-14 comment at `:212-215` already said so.
+
+**Three documents carry the same error** and are corrected below: `design.md` §3.1, `design.md` §6's reversion-challenge row, and `tasks.md` §3's `R-IUD-001 sc.1` coverage row.
+
+**But the clause is NOT unevidenced, so no coverage gate is open.** `innovation-use-section-round-trip.fixture-spec.ts:955` PATCHes with the explanation key **omitted** while changing an unrelated actor count, against real MySQL, and reads the column back by **raw SQL** (`:1008-1014`) asserting byte-identity with the sentinel. Unchanged by T-01, and green. The unit tier could not prove it — a mock can only show `undefined` was passed, not that TypeORM skipped it — and the boundary fixture's `toBeNull()` proves nothing about preservation, since nothing was stored. **The fix is a citation correction, not new work.**
+
+#### Nothing under-enforces (item 7)
+
+Duplicate-actor (`:199`, pre-`BEGIN`, four tests), organizations-identified (`:206`, the FAIL-1 data-destruction path, eleven tests untouched), unknown-catalog-id, the `404` existence check (`:145-154`, still first), and ownership / adopted-PK reconcile / `idsAlreadyClaimed` (all outside the diff) — **all intact.** The Leader independently re-ran c5's grep: 5 hits, all comments.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| Fixture suite | **15 suites / 70 tests passed** |
+| `npm test -- --silent`, full unfiltered | **336 suites / 2296 tests passed** |
+| Coverage (`test:cov`) | global 89.75 / 75.76 / 85.22 / 89.21 (floor 60); the service itself **100 / 91.83 / 100 / 100** |
+| Lint | found one real issue (unused `BadRequestException` import in the redesigned fixture), fixed; clean on re-run. `git status` after: only the 5 files |
+| `git diff --exit-code src/db/migrations/` | **clean** (c7) |
+| Container | brought up, `migration:test:bootstrap`, used, **torn down** |
+
+**Environment note worth carrying forward:** the first `compose:test:up` recreated a container that retained partially-migrated state through Docker Compose's anonymous-volume carryover, failing `migration:test:execute` for reasons unrelated to this task. Resolved by a genuine teardown before bringing up fresh. **It cost real time and will recur** — the next task touching fixtures should tear down first, not up first.
+
+#### `ADVISORY` (4R) — recorded; R1 escalated to the user, the rest die here
+
+| ID | Lens | Finding |
+| --- | --- | --- |
+| **R1** | **Risk — reachability: constructible** | **Nothing in the repo asserts that `result_status_workflow` row id 30 dispatches `completenessValidation` with `enabled: true`.** The fixture calls the dispatched function directly (accepted — `ResultOicrModule`'s circular graph makes the alternative disproportionate), so the substitution does not cover the **wiring**. A future migration flipping row 30 to `enabled: false` would leave **every test in this spec green** while removing the last server-side completeness enforcement for this section — `DRAFT → SUBMITTED` is already `false` platform-wide. Cheap close: a raw `SELECT` of row 30's config asserting the function name and `enabled: true`. **The Reviewer names this the single highest-value addition.** Escalated to the user rather than actioned — the advisory rule forbids widening a task from an advisory, and the budget tripwire is already open |
+| **R2** | Readability | Three rationale paragraphs on `resolveInnovationUseLevel` (`:263-264`, `:269-271`, `:278-284`) still assert a rule that no longer exists — the next maintainer will hunt for a threshold check that is gone |
+| **R3** | Reliability — constructible | The three inverted round-trip tests deactivate the section's actors/organization/quantification (`result-actors.service.ts:298-306` deactivates unconditionally, and `actors ?? []` means an omitted key still triggers it) and restore **only** the justification. `:955` repairs the collections by re-sending ids that `assertInnovationUseOwnership` (`:371-377`) accepts **without an `is_active` filter**. Green for a real reason, but the comment's restore claim is incomplete. Insert any read-only assertion between `:937` and `:955`, or drop `:955`'s re-send, and the collections are silently empty |
+| **R4** | Readability | `innovation-use-section-round-trip.fixture-spec.ts:992-994` still says the omitted key *"reached the VALIDATOR too"*. There is no validator reading the explanation any more — **plainly false once the dead code goes.** It sits in a file this task edited, so it is exactly what T-03's Correction Closure must catch |
+| **R5** | Readability | `innovation-use-level-boundary.fixture-spec.ts:58-59` says "the **four** constructor parameters" then lists five; `:212`'s seed description still names the retired F-C; `:730`'s inverted test is the thinnest of the eight |
+
+#### Reviewer directive, not a gate — pending the user's budget ruling
+
+The Reviewer directs that **`_effectiveExplanation` be removed**: unambiguously dead, and per item 2 the lines it occupies were protected for a reason that **was never true**. It is lint- and build-clean (`eslint.config.mjs:51-57` sets `varsIgnorePattern: '^_'`), but *"it passes lint is not a reason to keep an 11-line comment whose entire job is to explain why dead code exists."*
+
+**Order matters and is recorded:** deleting it today would violate `tasks.md` T-01 scope item 1 **as written**. So — amend scope item 1 + `design.md` §3.1/§6 **first** (done below), *then* delete `:167-181` in one follow-up edit together with R2's and R4's stale paragraphs.
+
+**Not actioned in this entry.** It is a production change, the budget tripwire is open and unanswered, and bundling it with R1 is the user's call.

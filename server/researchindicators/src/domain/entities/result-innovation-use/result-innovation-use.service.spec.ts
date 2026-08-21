@@ -281,28 +281,48 @@ describe('ResultInnovationUseService', () => {
       expect(mockUpdateDataUtil.updateLastUpdatedDate).not.toHaveBeenCalled();
     });
 
-    it('a missing justification at level >= 6 throws before BEGIN — zero child-service calls', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+    it('T-01 (docs/specs/bugfix/innovation-use-draft-save): a missing justification at level >= 6 no longer blocks the save — it proceeds to BEGIN and every child service is invoked with the payload (R-IUD-001 AC.3)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
-      await expect(
-        service.update(resultId, {
-          innovation_use_level_id: 7,
-        } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      const dto = {
+        innovation_use_level_id: 7,
+      } as CreateResultInnovationUseDto;
 
-      expect(transaction).not.toHaveBeenCalled();
-      expect(mockResultActors.customSaveInnovationUse).not.toHaveBeenCalled();
+      await expect(service.update(resultId, dto)).resolves.toBeDefined();
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(mockResultActors.customSaveInnovationUse).toHaveBeenCalledWith(
+        resultId,
+        [],
+        fakeManager,
+      );
       expect(
         mockResultInstitutionTypes.customSaveInnovationUse,
-      ).not.toHaveBeenCalled();
+      ).toHaveBeenCalledWith(resultId, [], fakeManager);
       expect(
         mockResultQuantifications.upsertByCompositeKeys,
-      ).not.toHaveBeenCalled();
-      expect(mockUpdateDataUtil.updateLastUpdatedDate).not.toHaveBeenCalled();
+      ).toHaveBeenCalledWith(
+        resultId,
+        [],
+        ['quantification_number', 'unit', 'description'],
+        QuantificationRolesEnum.INNOVATION_USE,
+        fakeManager,
+      );
+      expect(mockUpdateDataUtil.updateLastUpdatedDate).toHaveBeenCalledWith(
+        resultId,
+        fakeManager,
+      );
     });
   });
 
@@ -522,45 +542,51 @@ describe('ResultInnovationUseService', () => {
   describe('update — level ≥ 6 justification (R-IUA-006, trap 2)', () => {
     const resultId = 42;
 
-    it('THE DISCRIMINATING PAIR — catalog id 6 (level 5) without explanation is ACCEPTED; catalog id 7 (level 6) without explanation is REJECTED 400. A rule comparing the FK instead of the resolved level passes the second half and fails the first (AC.1, AC.2, AC.6)', async () => {
-      // Half A — id 6 → level 5 → below the threshold → accepted.
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        innovation_use_level_id: 6,
-        innovation_use_level_explanation: null,
-        innovation_use_level: { level: 5 },
-      });
+    it('T-01: BOTH catalog id 6 (level 5) and catalog id 7 (level 6) without explanation are ACCEPTED — the save-time guard that used to discriminate this pair is deleted; only the green check (innovation_use_validation) discriminates completeness now (AC.1, AC.2, AC.6)', async () => {
+      // Half A — id 6 → level 5 → accepted (unchanged).
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 6,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 5 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 6, level: 5 });
 
-      await expect(
-        service.update(resultId, {
-          innovation_use_level_id: 6,
-        } as CreateResultInnovationUseDto),
-      ).resolves.toBeDefined();
+      const acceptA = await service.update(resultId, {
+        innovation_use_level_id: 6,
+      } as CreateResultInnovationUseDto);
+      expect(acceptA.innovation_use_level).toBe(5);
 
-      // Half B — id 7 → level 6 → at the threshold → rejected.
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+      // Half B — id 7 → level 6 → NOW ALSO accepted. This is the exact
+      // inversion R-IUD-001 requires: pre-fix, this half rejected 400.
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
-      await expect(
-        service.update(resultId, {
-          innovation_use_level_id: 7,
-        } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      const acceptB = await service.update(resultId, {
+        innovation_use_level_id: 7,
+      } as CreateResultInnovationUseDto);
+      expect(acceptB.innovation_use_level).toBe(6);
+      expect(transaction).toHaveBeenCalledTimes(2);
     });
 
-    it('rejects a whitespace-only explanation at level >= 6 (AC.3)', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+    it('T-01: a whitespace-only explanation at level >= 6 no longer blocks the save — it is written through verbatim (R-IUD-001 sc.2)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: '   ',
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
       await expect(
@@ -568,15 +594,26 @@ describe('ResultInnovationUseService', () => {
           innovation_use_level_id: 7,
           innovation_use_level_explanation: '   ',
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
-      expect(transaction).not.toHaveBeenCalled();
+      ).resolves.toBeDefined();
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          innovation_use_level_explanation: '   ',
+        }),
+      );
     });
 
-    it('rejects an empty-string explanation at level >= 6 (AC.4)', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+    it('T-01: an empty-string explanation at level >= 6 no longer blocks the save — it is written through verbatim (R-IUD-001)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: '',
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
       await expect(
@@ -584,8 +621,15 @@ describe('ResultInnovationUseService', () => {
           innovation_use_level_id: 7,
           innovation_use_level_explanation: '',
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
-      expect(transaction).not.toHaveBeenCalled();
+      ).resolves.toBeDefined();
+
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          innovation_use_level_explanation: '',
+        }),
+      );
     });
 
     it('accepts no level at all — the explanation rule does not fire (draft-save, AC.5) — and never queries the catalog', async () => {
@@ -677,19 +721,21 @@ describe('ResultInnovationUseService', () => {
       expect(transaction).not.toHaveBeenCalled();
     });
 
-    // Renamed from "coerces a bigint level returned as a string by the MySQL
-    // driver to a real number ..." (T-06 attempt 3) — that name overstated
-    // what this test proves. It CANNOT distinguish `Number(row.level)` from
-    // the raw `row.level`, because `'6' < 6` coerces identically to `6 < 6`
-    // in JS; a mutation deleting the `Number(...)` call in
-    // `resolveInnovationUseLevel` (would-be-M15) still passes this
-    // assertion. M15 is therefore an undefended mutation — this test is not
-    // its falsifier, whatever the old name implied.
-    it('a string-typed bigint level from the MySQL driver still trips the level >= 6 rule', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+    // T-01 (docs/specs/bugfix/innovation-use-draft-save): this test used to
+    // prove a string-typed bigint level still "tripped" the level >= 6
+    // justification rule. That rule (and its only consumer of the resolved
+    // `level` scalar) is deleted — there is nothing left to trip. Inverted
+    // to its positive counterpart: the save proceeds regardless of the
+    // driver's string-vs-number level representation.
+    it('a string-typed bigint level from the MySQL driver no longer rejects the save — T-01 deleted the level >= 6 justification rule that used to compare against it', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({
         id: 7,
         level: '6',
@@ -699,50 +745,84 @@ describe('ResultInnovationUseService', () => {
         service.update(resultId, {
           innovation_use_level_id: 7,
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      ).resolves.toBeDefined();
+
+      expect(transaction).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('update — DD-14: the level rule runs against the effective post-write row', () => {
+  describe("update — DD-14 effective-row resolution survives T-01's guard deletion; only the write-through behavior remains observable", () => {
     const resultId = 42;
 
-    it('a PATCH that omits the level id but explicitly nulls the explanation is rejected 400 against a stored level 6 (DD-14, closes the R-IUA-006 bypass)', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-        innovation_use_level_id: 7,
-        innovation_use_level_explanation: 'a previously valid justification',
-      });
+    // T-01 (docs/specs/bugfix/innovation-use-draft-save): these two used to
+    // prove DD-14's bypass-closure — that an explicit null/empty explanation
+    // against a stored level >= 6 was rejected even though `create()`'s
+    // partial-merge write would otherwise have left the stored level in
+    // place. The rule they proved is deleted; there is no rejection left to
+    // observe. What remains observable, and still matters (R-IUD-001 sc.1's
+    // BUT clause), is that an EXPLICIT null/empty is written straight
+    // through as a real clearing — never silently dropped — while `:168-171`
+    // (untouched by T-01) still exists to resolve the effective row for
+    // whichever future consumer needs it.
+    it('an explicit null explanation against a stored level 6 now saves — the update statement clears the column to null (the level >= 6 guard that used to intercept this is deleted)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'a previously valid justification',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
       await expect(
         service.update(resultId, {
           innovation_use_level_explanation: null,
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      ).resolves.toBeDefined();
 
-      expect(transaction).not.toHaveBeenCalled();
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({ innovation_use_level_explanation: null }),
+      );
     });
 
-    it('the same bypass via an empty-string explanation is also rejected 400 (DD-14)', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-        innovation_use_level_id: 7,
-        innovation_use_level_explanation: 'a previously valid justification',
-      });
+    it('the same clearing via an empty-string explanation also saves and is written through verbatim', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'a previously valid justification',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: '',
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
       await expect(
         service.update(resultId, {
           innovation_use_level_explanation: '',
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      ).resolves.toBeDefined();
 
-      expect(transaction).not.toHaveBeenCalled();
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({ innovation_use_level_explanation: '' }),
+      );
     });
 
-    it('omitting the level id resolves the rule against the STORED level, not a silent skip (DD-14)', async () => {
+    it("omitting the level id resolves the level lookup against the STORED level, not a silent skip (DD-14's effective-row resolution, unaffected by T-01)", async () => {
       mainFindOne
         .mockResolvedValueOnce({
           result_id: resultId,
@@ -1133,23 +1213,31 @@ describe('ResultInnovationUseService', () => {
       );
     });
 
-    it('logs a warn with result_id and R-IUA-006 when the level >= 6 justification is missing — the explanation text is NOT in the message (there is none) and the resolved level number is NOT in the message', async () => {
-      mainFindOne.mockResolvedValueOnce({
-        result_id: resultId,
-        is_active: true,
-      });
+    // T-01 (docs/specs/bugfix/innovation-use-draft-save): R-IUA-006's
+    // save-time guard and its warn call are deleted — there is no rejection
+    // and no warn left to log for this case. Inverted to the positive
+    // counterpart already established by "does NOT log a warn on a
+    // successful save" below, but pinned to this exact former rejection
+    // site (level >= 6, blank justification) rather than the generic case.
+    it('does NOT log a warn when a level >= 6 justification is blank — R-IUA-006 and its warn call were deleted by T-01; the save now proceeds silently to BEGIN', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 6 },
+        });
       levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
 
       await expect(
         service.update(resultId, {
           innovation_use_level_id: 7,
         } as CreateResultInnovationUseDto),
-      ).rejects.toThrow(BadRequestException);
+      ).resolves.toBeDefined();
 
-      expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
-      const [message] = loggerWarnSpy.mock.calls[0];
-      expect(message).toEqual(expect.stringContaining(String(resultId)));
-      expect(message).toEqual(expect.stringContaining('R-IUA-006'));
+      expect(loggerWarnSpy).not.toHaveBeenCalled();
+      expect(transaction).toHaveBeenCalledTimes(1);
     });
 
     it('logs a warn with result_id and R-IUA-005 when two actor rows share an identity — the actor_type_id / custom name are NOT in the message even though the thrown exception does carry them', async () => {

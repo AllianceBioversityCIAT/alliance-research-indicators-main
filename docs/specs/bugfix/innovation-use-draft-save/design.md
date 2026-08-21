@@ -24,7 +24,13 @@ Delete one server guard, drop one condition from one client `if`, and stop rende
 
 ### 3.1 Server — `result-innovation-use.service.ts`
 
-Remove the call at `:183` and the `validateLevelExplanation` method at `:307-326`. Nothing else in the service references it, so no other control flow shifts. The surrounding effective-explanation resolution (`:168-171`, *key-present ? payload : stored*) is **unchanged** — it is what makes the never-typed case preserve the stored value.
+Remove the call at `:183` and the `validateLevelExplanation` method at `:307-326`. Nothing else in the service references it, so no other control flow shifts.
+
+> ⛔ **Corrected 2026-08-21 at T-01's review — this paragraph asserted a falsehood.** It read: *"The surrounding effective-explanation resolution (`:168-171`, key-present ? payload : stored) is **unchanged** — it is what makes the never-typed case preserve the stored value."*
+>
+> **`:168-171` is not what preserves the stored value, and never was.** The write at `:216-222` uses the **raw DTO value**, not the resolved one. Preservation comes from **step 6's partial merge**: an omitted key is `undefined`, which TypeORM's `UpdateQueryBuilder` omits from the `SET` list. The resolution at `:168-171` **never reached the write** — its only consumer was the validator being deleted, so after the deletion it is **dead code**. The service's own DD-14 comment at `:212-215` already said this; the design doc contradicted a comment sitting eleven lines from the code it described.
+>
+> **Consequence:** `:168-171` carries no behaviour to protect. T-01's scope instruction to leave it untouched was therefore based on a false premise, and it produced retained dead code (`_effectiveExplanation`) whose deletion is directed by the T-01 review — see `execution.md` → *T-01* → *Reviewer directive*.
 
 ### 3.2 Client — `innovation-use-details.component.ts`
 
@@ -76,7 +82,7 @@ The rule already lives at the submit boundary. The save-time throw was a second 
 | An incomplete result becomes submittable | **No.** `innovation_use_validation:134` keeps the rule, and the client gates Submit on all green checks — **confirmed empirically by the reporter**: the button activates only when every tick is green, and the transition then succeeds |
 | The server loses its only defense on `DRAFT → SUBMITTED` | **Partly true, and it is the real cost.** `completenessValidation` is `enabled: false` on that transition, so after the deletion the justification is client-gated on a first submit — exactly like every other completeness rule already is. **The guard was an anomaly, not a floor.** Recorded as the accepted trade-off and filed as a platform finding |
 | Whitespace reaches the database | **True and harmless.** `valid_text` strips all whitespace; `NULL`, `''` and `'   '` all read as absent |
-| A stored justification gets wiped | **No.** The never-typed case omits the key, and `:168-171` preserves the stored value. This is why DD-3 refuses the trim |
+| A stored justification gets wiped | **No** — but *(corrected 2026-08-21)* by a different mechanism than this row originally named. It read *"`:168-171` preserves the stored value"*; the actual mechanism is **step 6's partial merge** — the never-typed case omits the key, and TypeORM's `UpdateQueryBuilder` omits an `undefined` from the `SET` list. `:168-171` never reached the write. The conclusion is unchanged, and it is still why DD-3 refuses the trim. **Proven at the real-MySQL tier** by `innovation-use-section-round-trip.fixture-spec.ts:955` + `:1008-1014`, which PATCHes with the key omitted and reads the column back by raw SQL |
 | `REVISED → SUBMITTED` loses enforcement | **No.** Row id 30 has `completenessValidation` `enabled: true`; that path is untouched |
 
 **Outcome: the challenge names one real cost** — server-side first-submit enforcement of this one field, which was unique on the platform and is now consistent with it. **No design change required.** The cost is stated in `requirements.md` §4 *Out of scope* and carried as the filed finding.

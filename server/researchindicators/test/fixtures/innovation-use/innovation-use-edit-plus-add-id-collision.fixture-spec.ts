@@ -191,8 +191,14 @@ describe('Innovation Use edit-plus-add payload: does an id-less added row collid
   // guard throws at the very top of step 7 and therefore no `result_actors`
   // write is attempted at all. Safe to submit with no
   // `innovation_use_level_id`: the effective level resolves to the stored
-  // `NULL`, so R-IUA-006's level >= 6 justification rule never fires and
-  // this payload cannot be rejected before `BEGIN` for an unrelated reason.
+  // `NULL`, so this payload cannot be rejected before `BEGIN` for an
+  // unrelated reason. (Corrected — T-01,
+  // docs/specs/bugfix/innovation-use-draft-save: this comment used to cite
+  // R-IUA-006's level >= 6 justification rule as the thing that "never
+  // fires" here. That save-time guard is deleted outright — there is no
+  // such rule left to fire regardless of level, so the safety this comment
+  // documents no longer depends on the level being NULL at all. Left
+  // accurate rather than silently stale.)
   const rollbackCanaryExplanation =
     'rollback canary 902_150 — must never be persisted';
 

@@ -164,23 +164,38 @@ export class ResultInnovationUseService {
       createResultInnovationUseDto?.innovation_use_level_id !== undefined
         ? createResultInnovationUseDto.innovation_use_level_id
         : existingResult.innovation_use_level_id;
-    const effectiveExplanation =
+    // T-01 (docs/specs/bugfix/innovation-use-draft-save) deleted this
+    // resolution's only consumer — the level >= 6 justification guard that
+    // used to run at this point (R-IUA-006). Kept verbatim, per that
+    // task's scope item 1: it is NOT what preserves a stored justification
+    // when the field is never typed into (that is step 6's partial-merge
+    // write below — an omitted key stays `undefined`, which TypeORM's
+    // `UpdateQueryBuilder` skips) — but the task explicitly protects these
+    // lines, so the now-unused variable is renamed with a leading
+    // underscore (`@typescript-eslint/no-unused-vars`'s `varsIgnorePattern`)
+    // rather than deleted.
+    const _effectiveExplanation =
       createResultInnovationUseDto?.innovation_use_level_explanation !==
       undefined
         ? createResultInnovationUseDto.innovation_use_level_explanation
         : existingResult.innovation_use_level_explanation;
 
     // Step 3 (cont'd) — resolve the catalog's `level` scalar (trap 2),
-    // against the effective level id, not the raw payload.
-    const level = await this.resolveInnovationUseLevel(
-      effectiveLevelId,
-      resultId,
-    );
+    // against the effective level id, not the raw payload. The resolved
+    // scalar's only consumer, the level >= 6 justification rule, was
+    // deleted by T-01 — this call is kept for its OTHER effect: a level id
+    // that resolves to no catalog row at all still throws 400 here,
+    // unrelated to R-IUD-*.
+    await this.resolveInnovationUseLevel(effectiveLevelId, resultId);
 
-    // Step 4 — a) level rule against the effective row, then b)
-    // duplicate-actor rule over the incoming payload. Any throw here
-    // happens before `BEGIN`; no child service below has been invoked yet.
-    this.validateLevelExplanation(level, effectiveExplanation, resultId);
+    // Step 4 — duplicate-actor rule over the incoming payload. The level
+    // >= 6 justification rule that used to run here (R-IUA-006,
+    // `validateLevelExplanation`) was deleted by T-01
+    // (docs/specs/bugfix/innovation-use-draft-save): completeness is
+    // enforced at submit, via `innovation_use_validation` (the section's
+    // green check), not at save — see that spec's design.md §4 for why
+    // deletion, not relocation, is correct (submission never flows through
+    // this service).
     this.validateNoDuplicateActorTypes(
       createResultInnovationUseDto?.actors ?? [],
       resultId,
@@ -294,35 +309,6 @@ export class ResultInnovationUseService {
     }
 
     return Number(row.level);
-  }
-
-  /**
-   * R-IUA-006 — compares the resolved `level` scalar (`level`, already
-   * joined through the catalog by `resolveInnovationUseLevel`), never the FK
-   * `innovation_use_level_id`. `clarisa_innovation_use_levels.id = level + 1`
-   * — a rule written against the FK demands the justification a full level
-   * early and passes a naive test on the discriminating pair (catalog
-   * `id 6` / `level 5` vs. `id 7` / `level 6`).
-   */
-  private validateLevelExplanation(
-    level: number | undefined,
-    explanation: string | undefined,
-    resultId: number,
-  ): void {
-    if (level === undefined || level === null || level < 6) {
-      return;
-    }
-
-    if (!explanation || explanation.trim().length === 0) {
-      // §9 — result_id and the rule (R-IUA-006), never the explanation text
-      // itself or the resolved level.
-      this.logger.warn(
-        `Innovation use save rejected for result ${resultId}: level >= 6 justification missing (R-IUA-006)`,
-      );
-      throw new BadRequestException([
-        'innovation_use_level_explanation: required when the innovation use level is 6 or above',
-      ]);
-    }
   }
 
   /**

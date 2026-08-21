@@ -17,14 +17,16 @@
 
 ### T-01 — Server: delete the save-time guard, invert its tests, redesign the boundary fixture
 
-- **Status:** `[ ]` · **Size:** M · **Dependencies:** none
+- **Status:** `[x]` **done** — Reviewer PASS on attempt 1 (1 review round); see `execution.md` → *T-01* · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-IUD-001 (AC.3), R-IUD-002 (AC.1, AC.3, AC.4), NFR-IUD-001, NFR-IUD-002
 - **Design references:** §3.1, §4, DD-1, DD-6, §8
 - **Skills:** `nestjs-expert` · `systematic-debugging` (on any failure)
 
 **Scope**
 
-1. `result-innovation-use.service.ts` — remove the call at `:183` and the `validateLevelExplanation` method at `:307-326`. **Leave `:168-171` (the *key-present ? payload : stored* resolution) untouched** — it is what preserves a stored justification when the field was never typed into.
+1. `result-innovation-use.service.ts` — remove the call at `:183` and the `validateLevelExplanation` method at `:307-326`.
+
+   > ⛔ **Amended 2026-08-21 at T-01's review.** This item said: *"**Leave `:168-171` (the key-present ? payload : stored resolution) untouched** — it is what preserves a stored justification when the field was never typed into."* **The premise was false** — preservation comes from step 6's partial merge, not from that resolution, which never reached the write (`design.md` §3.1). The instruction therefore protected dead code for a reason that was never true, and the Implementer complied by retaining it as `_effectiveExplanation`. **The amended instruction: `:168-171` may be deleted, together with the now-stale rationale paragraphs at `:263-264`, `:269-271`, `:278-284` and the false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`.** Pending the user's ruling, bundled with the budget escalation.
 2. Invert the five unit tests at `result-innovation-use.service.spec.ts` `:284, 559, 575, 688, 1136`.
 3. Redesign `test/fixtures/innovation-use/innovation-use-level-boundary.fixture-spec.ts` around the mirror assertion.
 4. Update the referencing comment at `innovation-use-edit-plus-add-id-collision.fixture-spec.ts:194`.
@@ -130,7 +132,7 @@
 | R-IUD-001 | AC.3 | **T-01** c1 |
 | R-IUD-001 | AC.4 | **T-02** c4 |
 | R-IUD-001 | AC.5 | **T-02** c6 |
-| R-IUD-001 · sc.1 | *BUT must NOT clear a stored justification when never typed into* | **T-02** c6 (key omitted) + **T-01** scope item 1 (`:168-171` untouched) |
+| R-IUD-001 · sc.1 | *BUT must NOT clear a stored justification when never typed into* | **T-02** c6 (key omitted) + **`innovation-use-section-round-trip.fixture-spec.ts:955`/`:1008-1014`** — an omitted-key PATCH against real MySQL, column read back by raw SQL, unchanged by T-01 and green. *(Citation corrected 2026-08-21: this row credited "**T-01** scope item 1 (`:168-171` untouched)", which is the wrong mechanism entirely — see `design.md` §3.1's correction. The clause was always evidenced, just not by what the table cited.)* |
 | R-IUD-001 · sc.1 | *AND IT MUST leave the green check false* | **T-01** c2 |
 | R-IUD-001 · sc.2 | *BUT must NOT be normalized to `undefined` in `buildPayload`* | **T-02** c6 |
 | R-IUD-001 · sc.2 | *AND IT MUST keep Submit disabled* | **T-01** c2, c3 |

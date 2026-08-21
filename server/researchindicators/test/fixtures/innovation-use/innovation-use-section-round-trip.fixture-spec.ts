@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { DataSource, Logger } from 'typeorm';
 import {
   createInnovationUseHarness,
@@ -103,14 +102,25 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * with a non-blank `innovation_use_level_explanation` --
  * `innovationUseLevelExplanation` -- and the NFR-IUA-001 `it` is read-only
  * (swaps a `Logger`, never writes), so that precondition is undisturbed
- * entering this block. Three cases send the key PRESENT with an explicit
- * `null` / `''` / `'   '` and must be REJECTED `400` (the level ≥ 6 rule
- * re-fires against the cleared value); the fourth OMITS the key entirely
- * while changing an unrelated field and must be ACCEPTED with the stored
- * justification preserved, read back by raw SQL after the save -- the pair
- * of accept/reject on the SAME stored precondition is what a `??` operator
- * cannot produce, because `??` cannot distinguish an explicit `null` from
- * an omitted key (`design.md` DD-14; `requirements.md` R-IUA-006 AC.3-AC.5).
+ * entering this block.
+ *
+ * **Corrected — T-01 (`docs/specs/bugfix/innovation-use-draft-save`),
+ * found by that spec's own forward sweep, not named in its cited-site
+ * list.** The three cases that send the key PRESENT with an explicit
+ * `null` / `''` / `'   '` used to be REJECTED `400` here (the level >= 6
+ * rule, `validateLevelExplanation`, re-firing against the cleared value).
+ * T-01 deleted that rule outright — there is no server-side rejection left
+ * to re-fire. All three now SAVE, written through verbatim, and each
+ * restores the sentinel justification afterward so the ORIGINAL
+ * `??`-vs-`!== undefined` accept/preserve case below (the fourth, which
+ * OMITS the key entirely) still finds its expected precondition. That
+ * fourth case is the one DD-14 distinction the deletion does NOT touch: an
+ * omitted key still preserves the stored value (step 6's partial-merge
+ * write, `:168-171`'s effective-row resolution — unchanged by T-01), which
+ * `??` cannot produce because it cannot distinguish an explicit `null` from
+ * an omitted key (`design.md` DD-14; `requirements.md` R-IUA-006 AC.3-AC.5
+ * as narrowed by DD-14 — AC.3/AC.4's REJECTION half is superseded by T-01;
+ * AC.5's preservation half stands).
  *
  * **Hole 2 -- T-08 advisory B-4.** Nothing at any tier proves
  * `ResultInnovationUseService.create(resultId, manager)` honors a PASSED
@@ -862,83 +872,84 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
   // NFR-IUA-001 `it` immediately above).
   // -----------------------------------------------------------------------
 
-  it('DD-14 — PATCH {innovation_use_level_explanation: null} (key PRESENT, explicit null) against the stored level-6 row is REJECTED 400, proving `!== undefined` and NOT `??` (R-IUA-006 AC.3/AC.5 as narrowed by DD-14)', async () => {
+  // T-01 (docs/specs/bugfix/innovation-use-draft-save) deleted
+  // `validateLevelExplanation` (R-IUA-006's save-time guard) outright — a
+  // survivor this task's cited five-line-number list in
+  // `result-innovation-use.service.spec.ts` did not name, found here by the
+  // forward sweep this spec's own T-03 falsifying input warns is necessary
+  // (this cited-site list has already missed real hits twice before in
+  // this spec's history). All three tests below used to assert 400
+  // REJECTED; there is no rule left to reject on. Each is inverted to its
+  // positive counterpart — the write proceeds and lands verbatim — and each
+  // RESTORES the sentinel justification afterward, because the remaining
+  // tests in this file (starting with the very next one) assert that the
+  // ORIGINAL justification is undisturbed by unrelated PATCHes; without the
+  // restore, whichever of these three ran last would leave that
+  // precondition false for everything after it.
+  it('T-01: PATCH {innovation_use_level_explanation: null} (key PRESENT, explicit null) against the stored level-6 row now SAVES — the guard that used to reject it is deleted, and the column clears to null exactly as an explicit null instructs', async () => {
     const [before] = await dataSource.query(
       `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
       [resultId],
     );
     // Precondition sanity: stored level is still catalog id 7 (level 6)
-    // with a non-blank justification — required for this case to be
-    // discriminating at all.
+    // with a non-blank justification.
     expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
     expect(before.innovation_use_level_explanation).toBe(
       innovationUseLevelExplanation,
     );
 
-    let caughtError: unknown;
-    try {
-      await harness.service.update(resultId, {
-        innovation_use_level_explanation: null,
-      } as unknown as CreateResultInnovationUseDto);
-    } catch (error) {
-      caughtError = error;
-    }
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_explanation: null,
+    } as unknown as CreateResultInnovationUseDto);
+    expect(result.innovation_use_level_explanation).toBeNull();
 
-    expect(caughtError).toBeInstanceOf(BadRequestException);
-    expect(
-      (
-        (caughtError as BadRequestException).getResponse() as {
-          message: string[];
-        }
-      ).message,
-    ).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('innovation_use_level_explanation'),
-      ]),
-    );
-
-    // Validation runs entirely before BEGIN (design.md §5.1) — a rejected
-    // call must leave the stored row byte-identical to what it was before.
     const [after] = await dataSource.query(
       `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
       [resultId],
     );
     expect(Number(after.innovation_use_level_id)).toBe(innovationUseLevelId);
-    expect(after.innovation_use_level_explanation).toBe(
-      innovationUseLevelExplanation,
-    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+
+    // Restore, for the tests below.
+    await harness.service.update(resultId, {
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
   });
 
-  it("DD-14 — PATCH {innovation_use_level_explanation: ''} (empty string, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.4)", async () => {
-    await expect(
-      harness.service.update(resultId, {
-        innovation_use_level_explanation: '',
-      } as unknown as CreateResultInnovationUseDto),
-    ).rejects.toThrow(BadRequestException);
+  it("T-01: PATCH {innovation_use_level_explanation: ''} (empty string, key present) against the stored level-6 row now SAVES, written through verbatim", async () => {
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_explanation: '',
+    } as unknown as CreateResultInnovationUseDto);
+    expect(result.innovation_use_level_explanation).toBe('');
 
     const [after] = await dataSource.query(
       `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
       [resultId],
     );
-    expect(after.innovation_use_level_explanation).toBe(
-      innovationUseLevelExplanation,
-    );
+    expect(after.innovation_use_level_explanation).toBe('');
+
+    // Restore, for the tests below.
+    await harness.service.update(resultId, {
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
   });
 
-  it("DD-14 — PATCH {innovation_use_level_explanation: '   '} (whitespace-only, key present) against the stored level-6 row is REJECTED 400 (R-IUA-006 AC.3)", async () => {
-    await expect(
-      harness.service.update(resultId, {
-        innovation_use_level_explanation: '   ',
-      } as unknown as CreateResultInnovationUseDto),
-    ).rejects.toThrow(BadRequestException);
+  it("T-01: PATCH {innovation_use_level_explanation: '   '} (whitespace-only, key present) against the stored level-6 row now SAVES, written through verbatim", async () => {
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_explanation: '   ',
+    } as unknown as CreateResultInnovationUseDto);
+    expect(result.innovation_use_level_explanation).toBe('   ');
 
     const [after] = await dataSource.query(
       `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
       [resultId],
     );
-    expect(after.innovation_use_level_explanation).toBe(
-      innovationUseLevelExplanation,
-    );
+    expect(after.innovation_use_level_explanation).toBe('   ');
+
+    // Restore, for the tests below.
+    await harness.service.update(resultId, {
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
   });
 
   it('DD-14 — a PATCH OMITTING the explanation key entirely, while changing an unrelated actor count, is ACCEPTED and the stored justification survives byte-identical, read back by raw SQL (R-IUA-006 AC.5 as narrowed by DD-14 — the half `??` cannot produce)', async () => {
