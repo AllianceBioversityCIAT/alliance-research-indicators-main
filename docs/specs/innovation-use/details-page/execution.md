@@ -1228,3 +1228,88 @@ Remaining §6 derivation: T-09 160 · T-10 190 · T-11 80 · T-12 40 · T-13 0 =
 Full client suite green (**312/312 · 6499/6499**), coverage above floors, lint clean with `git status` re-inspected. **T-09 closed on attempt 2 of 3.**
 
 ---
+
+### T-10 — Reachability wiring: route, sidebar rows, section path, `GreenChecks`
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ⛔ **`[~]` BLOCKED — Pivot Record below.** 6 of 7 criteria PASS; **c4 is unsatisfiable as written** |
+| **Date** | 2026-08-21 |
+| **Implementer attempts** | **1** — *no rework consumed*, per the Pivot Protocol |
+| **Effort / skills** | `high` · `angular-developer` |
+| **Review mode** | **Single Reviewer**, lens checklist |
+
+#### Leader deviations, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| **One Reviewer, not the 2–3 used since T-05** | Production code is ~10 lines across four files, the Implementer's report was unusually candid, and its falsifying input moved **both** halves of the criterion it targets. `.agents/leader.md` → *Delegation Ceiling*: "one subagent beats several for a single modest task." Three contexts here would have been disproportionate |
+| **Leader pre-flighted the c4 trap into the brief** | A grep of `result-sidebar.component.ts` before delegating surfaced that `greenCheckKey` is typed `string` and that one existing key (`cap_sharing`) is undeclared. Briefing it as *"report, do not improvise"* is why this arrived as a clean spec finding on attempt 1 instead of a rework round |
+
+#### What passed — 6 of 7, re-derived by the Reviewer rather than accepted
+
+| # | Verdict | Note |
+| --- | --- | --- |
+| c1 / c2 | ✅ | Indicator 6 yields the seven paths **in R-IUP-001's exact order**, detail row after `Alliance alignment` (index 2) and before `Results partners` (index 7). Asserted as an **ordered array** via `toEqual`; `getTotalCount()` asserted **directly, not inferred** |
+| c3 | ✅ **Disqualifier satisfied** | Four full ordered lists, no spot checks. The Reviewer **re-derived each independently** against the post-edit array and confirmed the hand-traced expectations are right — including that indicator **4 has six** entries (no `ip-rights` row) and indicator **5 has seven** with `links-to-result` between `geographic-scope` and `evidence` |
+| c5 | ✅ | `loadComponent`, `data: createResultData()`, target carries `export default class`. **Route-order claim verified true** — Angular matches non-empty child paths by whole-segment equality, so `'innovation-details'` cannot capture `'innovation-use-details'`; the only order-sensitive entry is the `path: ''` redirect, which stays first. Separate lazy chunk (34.92 kB), initial 1.16 MB against a 2 MB warning |
+| c6 | ✅ **both halves, mechanism genuine** | Both call-site tests delegate to a **real `CacheService` instance**, not a stub — verified, and legal because `CacheService` uses only signals with **no `inject()` calls**. Each asserts the positive path **and** `not.toHaveBeenCalledWith([… , ''])`. **Shared-mock leak ruled out in both files**: `alliance-alignment` builds a fresh mock per `beforeEach`; `partners` uses a module-level mock where `clearAllMocks()` clears calls but *not* implementations — which the Implementer handled explicitly with a restoring `mockReturnValue` **and a comment saying why** |
+| c7 | ✅ | Verified against `SubmissionService` rather than accepted: `:35-38` is `Object.values(checks).every(Boolean)` — **no exclusion list, key-agnostic** — and `grep VISUAL_ONLY_GREEN_CHECKS` across the whole client returns **zero hits**. So `innovation_use` counts and gates with no client code. **`judgment.md` → I-6 genuinely closed** |
+| D-IUP-3 / D-IUP-5 | ✅ | `ip-rights.component.ts` has **zero** matches for `indicator` and no marker. The Pool funding row is byte-unchanged and correctly **absent** from the seven |
+| c4 | ❌ | **Unsatisfiable — see the Pivot Record** |
+
+**Falsifying input confirmed genuine:** deleting `case 6` broke **all four** targeted spec files including **both** call-site tests (`- ["result","ROAR-7","innovation-use-details"] + ["result","ROAR-7",""]`). The Reviewer confirmed this is caused by the deletion breaking the real computed both call-site tests delegate to, **not** by shared mock residue.
+
+**Verification:** `npm test -- --silent` full unfiltered from `client/research-indicators/` → **312 suites, 6508 tests passed**. Lint clean, `git status` re-inspected. `npm run build` clean, no delegated agent active during the measurement.
+
+---
+
+## ⛔ Pivot Record: T-10 — c4 contradicts its own authorizing design
+
+**Trigger:** the Reviewer's ruling, verbatim — *"c4's second sentence is **UNSATISFIABLE** by the change the spec authorizes — a spec defect, not an implementation shortfall… **It must not be scored as under-thinking, and re-dispatching the Implementer unchanged will reproduce the same report.**"*
+
+Per `/akili-execute`'s Pivot Protocol: the loop stopped, the task is `[~]`, **no rework attempt was consumed**, and the decision goes to the user before execution resumes.
+
+### The defect
+
+c4 requires: *"Both keys resolve **without** an `as keyof GreenChecks` cast."*
+
+The cast is applied to `option.greenCheckKey`, whose declared type is **`string`** (`result-sidebar.component.ts:42`). **Indexing a closed interface with a `string` requires an assertion no matter how many keys `GreenChecks` declares.** So the entire authorized change — `+ innovation_use?: number`, `+ ip_rights?: number`, which is what the T-10 Scope table, `design.md` §7 and DD-9 all specify — **cannot remove that cast.**
+
+**DD-9 conflated *declaring a key* with *removing the cast*, and c4 then asserted the latter as if the former achieved it.**
+
+Critically, **the requirement itself is not over-promised.** R-IUP-016 AC.4's binding clause is only *"`innovation_use` is **present on the client `GreenChecks` interface**"* — satisfied — with "so the sidebar's lookup is type-checked rather than cast-only" as its *rationale*. **c4 elevated the rationale into the assertion.** That is the run's **sixth** spec-accuracy finding and it lands squarely in the class Lens A named at T-07: *a rationale is not load-bearing for the implementation, but it is load-bearing for anything derived from it.* Here a **done criterion** was derived from a rationale, which is worse than a falsifier being derived from one.
+
+### Three blockers were on record for the alternative. All three were wrong.
+
+| Claim | Verdict |
+| --- | --- |
+| **Implementer:** narrowing "changes indicator 1's tick behavior, violating c3 / R-IUP-019" | **Wrong** — the runtime string is unchanged, only the type |
+| **Leader:** narrowing "forces edits to ~5 pre-existing spec files, including Innovation Dev's… R-IUP-019 AC.2 permits only import-path edits there" | **Also wrong.** Those files seed `cap_sharing_ip`, which **is** declared, so narrowing does not touch them. **AC.2 does not block it, and no fixture needs changing** |
+| **DD-9:** "closing it costs one line" | **False — it costs ~10.** But all of them **inside the two files T-10 already owns** |
+
+**The complete, enumerated cost of closing it:** declare `cap_sharing?: number` (the only undeclared key among the 13 rows, and one the backend really emits — `green-checks.repository.ts:43` aliases `cap_sharing_validation(...) as cap_sharing`); type `greenCheckKey: keyof GreenChecks`; drop the cast; re-key **7 synthetic literals** in `result-sidebar.component.spec.ts` — a file already in T-10's scope table. Nothing else compiles differently.
+
+**The one genuine design consequence nobody has decided:** narrowing makes `greenCheckKey` a **closed union**, so every future sidebar row must declare its key first. Desirable — and a decision the design never made, *"which is why the Implementer was right not to make it unilaterally under a spec whose culture treats 'left exactly as it is' as binding."*
+
+### The two branches — user decision required
+
+**(A) Amend the spec, ship the code as-is. Zero code change.** Rewrite c4 to match DD-9's actual authorization (e.g. *"both keys are declared on `GreenChecks` and drive the rendered `greenCheck` for their rows"*), which the current diff **already satisfies with evidence** (`result-sidebar.component.spec.ts:506-514`). Correct DD-9's "costs one line", and open a separately-owned follow-up for the cast.
+
+**(B) Authorize the closure explicitly, then it is one cheap round.** Record a new design decision (closed-union `greenCheckKey`), then the ~10 lines above. **Both stated blockers for this option are incorrect**, and it has a concrete payoff: it would have caught the live bug below **at compile time**.
+
+---
+
+## Two live bugs the Reviewer found, both pre-existing and outside T-10
+
+**1. Indicator 1's Home-card progress is wrong, and two tests lock it in.** The brief's ground truth said no production code reads `cap_sharing_ip`. **That was wrong** — `my-latest-results.component.ts:103` casts **both**: `['cap_sharing', 'cap_sharing_ip'] as (keyof GreenChecks)[]`. **That cast lies in both directions:** `'cap_sharing'` is real but undeclared; `'cap_sharing_ip'` is declared but **never emitted**. `getProgress` counts over 8 steps for indicator 1, **one of which can never be truthy**.
+
+*Reachability: reachable, constructed by trace.* A fully-complete indicator-1 result shows **75%** where the truthful figure is 6/7 = **86%**, and the step path can never exceed 88% — 100% is only ever reached through the `completness === 1` short-circuit. **Two tests depend on it and lock the wrong key in** (`my-latest-results.component.spec.ts:180-193` seeds the phantom and *omits* the real key, so the arithmetic coincides at 75% only by substitution; `:251-254` asserts `toContain('cap_sharing_ip')`). Textbook KZ-001, kept invisible by the cast. **Branch (B) would have surfaced it at compile time.**
+
+**2. `D-IUP-5`'s claim is true on the server and false on the client.** `submission.service.ts:37` ANDs **every** emitted key — including `pool_funding_alignment`, which the server emits for **every** indicator. **`optional: true` only affects `getTotalCount()`, not submit gating.**
+
+*Reachability: reachable, payload traced.* The validation function returns `true` when not eligible (which is why nobody has noticed) but **`false` when the result IS eligible and `has_contribution IS NULL`**. So any result whose primary contract is an effective pool-funding contributor, with the Pool funding section unanswered, emits `pool_funding_alignment: 0` → `canSubmitResult()` false → **the sidebar shows "7/7 sections completed" next to a disabled Submit whose tooltip says "once all sections are completed."** Client-side reproduction: `cache.greenChecks.set({ …all 1, pool_funding_alignment: 0 })`.
+
+**T-10 correctly left the row untouched** — but this is newly load-bearing, because **c7's argument and this defect are the same sentence.** Needs a product-defect ticket plus corrections to `design.md` D-IUP-5, `requirements.md` R-IUP-001's note, and `tasks.md` T-10's note.
+
+---

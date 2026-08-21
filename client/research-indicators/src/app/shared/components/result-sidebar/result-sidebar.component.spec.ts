@@ -422,6 +422,98 @@ describe('ResultSidebarComponent', () => {
     });
   });
 
+  // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+  describe('IUP details reachability (T-10)', () => {
+    const pathsFor = (indicatorId: number): string[] => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: indicatorId });
+      return component.allOptionsWithGreenChecks().map(o => o.path);
+    };
+
+    // c3 (R-IUP-001 AC.3) — asserted as the full path list, not a spot check (Disqualifier).
+    it('c3 — indicator 1 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(1)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'capacity-sharing',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+    });
+
+    it('c3 — indicator 2 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(2)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'innovation-details',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+    });
+
+    it('c3 — indicator 4 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(4)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'policy-change',
+        'partners',
+        'geographic-scope',
+        'evidence'
+      ]);
+    });
+
+    it('c3 — indicator 5 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(5)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'oicr-details',
+        'partners',
+        'geographic-scope',
+        'links-to-result',
+        'evidence'
+      ]);
+    });
+
+    // c1/c2 (R-IUP-001 AC.1/AC.2)
+    it('c1/c2 — indicator 6 yields the seven Innovation Use paths in order, and getTotalCount() is 7', () => {
+      const paths = pathsFor(6);
+      expect(paths).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'innovation-use-details',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+      expect(component.getTotalCount()).toBe(7);
+    });
+
+    it('c1 — indicator 6 excludes every other-indicator detail path', () => {
+      const paths = pathsFor(6);
+      expect(paths).not.toContain('innovation-details');
+      expect(paths).not.toContain('capacity-sharing');
+      expect(paths).not.toContain('policy-change');
+      expect(paths).not.toContain('oicr-details');
+      expect(paths).not.toContain('links-to-result');
+    });
+
+    // c4 — the two new keys resolve and drive the rendered tick (assert on the observable
+    // `greenCheck` output the template reads, not on the raw signal — KZ-001).
+    it('c4 — the detail row tick reads greenChecks().innovation_use and the indicator-6 IP rights row reads greenChecks().ip_rights', () => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: 6 });
+      cacheService.greenChecks?.set({ innovation_use: 1, ip_rights: 1 } as GreenChecks);
+      const options = component.allOptionsWithGreenChecks();
+      const detailRow = options.find(o => o.path === 'innovation-use-details');
+      const ipRightsRow = options.find(o => o.path === 'ip-rights');
+      expect(detailRow?.greenCheck).toBe(true);
+      expect(ipRightsRow?.greenCheck).toBe(true);
+    });
+  });
+
   describe('Optional-sections divider (Pool funding alignment group separation)', () => {
     const eligibleAlignment: AlignmentResponse = {
       result_code: 'RES-001',

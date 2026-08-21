@@ -126,6 +126,13 @@ export class ResultSidebarComponent {
       path: 'alliance-alignment',
       greenCheckKey: 'alignment'
     },
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    {
+      label: 'Innovation use details',
+      path: 'innovation-use-details',
+      indicator_id: 6,
+      greenCheckKey: 'innovation_use'
+    },
     {
       label: 'OICR Details',
       path: 'oicr-details',
@@ -183,6 +190,13 @@ export class ResultSidebarComponent {
       label: 'IP rights',
       path: 'ip-rights',
       indicator_id: 2,
+      greenCheckKey: 'ip_rights'
+    },
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    {
+      label: 'IP rights',
+      path: 'ip-rights',
+      indicator_id: 6,
       greenCheckKey: 'ip_rights'
     },
     {

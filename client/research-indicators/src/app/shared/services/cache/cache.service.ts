@@ -62,6 +62,9 @@ export class CacheService {
         return 'policy-change';
       case 5:
         return 'oicr-details';
+      // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+      case 6:
+        return 'innovation-use-details';
       default:
         return '';
     }

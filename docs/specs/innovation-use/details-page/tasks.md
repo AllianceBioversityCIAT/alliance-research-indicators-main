@@ -446,7 +446,7 @@ graph TD
 
 ### T-10 — Reachability wiring: route, sidebar rows, section path, `GreenChecks`
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-07
+- **Status:** `[~]` **blocked — Pivot Record in `execution.md`** (6 of 7 criteria pass; **c4 unsatisfiable as written**) · **Size:** M · **Dependencies:** T-07
 - **Requirements covered:** R-IUP-001 (all 4), R-IUP-002 (AC.1, AC.2), R-IUP-003 (all 4), R-IUP-016 (AC.3, AC.4, AC.5)
 - **Design references:** §2.1 *Modified*, §2.3 rows 3–5, §7, **DD-9**, **D-IUP-3**, **D-IUP-5**
 - **Skills:** `angular-developer`
@@ -472,13 +472,13 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — With `indicator_id = 6`, `allOptionsWithGreenChecks()` yields exactly these seven paths **in this order**: `general-information`, `alliance-alignment`, `innovation-use-details`, `partners`, `geographic-scope`, `evidence`, `ip-rights`.
-- [ ] c2 — `getTotalCount()` returns `7` for indicator 6.
-- [ ] c3 — For indicators 1, 2, 4 and 5 the yielded path list is **byte-identical** to the pre-change list, and indicator 6 yields **none** of `Innovation details`, `CapSharing details`, `Policy Change details`, `OICR Details`, `Links to result`.
+- [x] c1 — With `indicator_id = 6`, `allOptionsWithGreenChecks()` yields exactly these seven paths **in this order**: `general-information`, `alliance-alignment`, `innovation-use-details`, `partners`, `geographic-scope`, `evidence`, `ip-rights`.
+- [x] c2 — `getTotalCount()` returns `7` for indicator 6.
+- [x] c3 — For indicators 1, 2, 4 and 5 the yielded path list is **byte-identical** to the pre-change list, and indicator 6 yields **none** of `Innovation details`, `CapSharing details`, `Policy Change details`, `OICR Details`, `Links to result`.
 - [ ] c4 — The detail row's tick reads `greenChecks().innovation_use`; the indicator-6 IP rights row's tick reads `greenChecks().ip_rights`. Both keys resolve **without** an `as keyof GreenChecks` cast.
-- [ ] c5 — `/result/<id>/innovation-use-details` renders the page; the route is declared with **`loadComponent`**, not `component`.
-- [ ] c6 — `currentResultIndicatorSectionPath()` returns `'innovation-use-details'` for 6, the four existing values for 1/2/4/5, and `''` for anything else. **And** — asserted at each consumer's own call site — `alliance-alignment`'s **Next** and `partners`' **Back** each navigate to `['result', <id>, 'innovation-use-details']` and never to `['result', <id>, '']`.
-- [ ] c7 — With `innovation_use` false, `canSubmitResult()` is false and the Submit affordance is blocked with the standard tooltip. **R-IUP-016 AC.5 requires no client work and is recorded as such:** `VISUAL_ONLY_GREEN_CHECKS` exists only server-side, the client has no equivalent, and the client gate ANDs every emitted key unconditionally — so `innovation_use` counts and gates by default. *(Closes `judgment.md` → `I-6` by owning it explicitly rather than leaving it unaddressed.)*
+- [x] c5 — `/result/<id>/innovation-use-details` renders the page; the route is declared with **`loadComponent`**, not `component`.
+- [x] c6 — `currentResultIndicatorSectionPath()` returns `'innovation-use-details'` for 6, the four existing values for 1/2/4/5, and `''` for anything else. **And** — asserted at each consumer's own call site — `alliance-alignment`'s **Next** and `partners`' **Back** each navigate to `['result', <id>, 'innovation-use-details']` and never to `['result', <id>, '']`.
+- [x] c7 — With `innovation_use` false, `canSubmitResult()` is false and the Submit affordance is blocked with the standard tooltip. **R-IUP-016 AC.5 requires no client work and is recorded as such:** `VISUAL_ONLY_GREEN_CHECKS` exists only server-side, the client has no equivalent, and the client gate ANDs every emitted key unconditionally — so `innovation_use` counts and gates by default. *(Closes `judgment.md` → `I-6` by owning it explicitly rather than leaving it unaddressed.)*
 
 **Falsifying input** — delete `case 6` → **c6's call-site half must FAIL**, not only the `cache.service` assertion. The `cache.service` assertion alone is a presence assertion: it proves the map returns a string, not that any screen uses it (`design.md` §10.3, R-IUP-003's own note).
 
