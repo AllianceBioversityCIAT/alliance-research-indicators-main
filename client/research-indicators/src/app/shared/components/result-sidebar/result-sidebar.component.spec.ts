@@ -481,6 +481,69 @@ describe('ResultSidebarComponent', () => {
     });
   });
 
+  describe('PRMS SYNC button', () => {
+    const eligibleAlignment: AlignmentResponse = {
+      result_code: 'RES-001',
+      eligible: true,
+      has_pool_funding_alignment_eligible: true,
+      has_contribution: null,
+      selected_levers: [],
+      is_synced_to_prms: false,
+      is_read_only: false
+    };
+
+    it('renders the PRMS SYNC button when Pool Funding Alignment is available', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      fixture.detectChanges();
+
+      const button = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button).not.toBeNull();
+      expect(button?.textContent).toContain('PRMS SYNC');
+      expect(button?.querySelector('.pi-sync')).not.toBeNull();
+    });
+
+    it('disables the PRMS SYNC button when result is not approved (status_id !== 6)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 1 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+    });
+
+    it('disables the PRMS SYNC button when pool_funding_alignment is not green-checked', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 0 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+    });
+
+    it('enables the PRMS SYNC button when result is approved (status_id === 6) AND pool_funding_alignment has green check', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(true);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(false);
+    });
+
+    it('does not render the PRMS SYNC button when Pool Funding Alignment is hidden (e.g. OICR or ineligible)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(null);
+      fixture.detectChanges();
+
+      const button = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button).toBeNull();
+    });
+  });
+
   describe('submissionAlertData computed', () => {
     it('should return correct submission alert data', () => {
       const alertData = component.submissionAlertData();

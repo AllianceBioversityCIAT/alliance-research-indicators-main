@@ -95,6 +95,22 @@ export class ResultSidebarComponent {
   readonly OPTIONAL_GROUP_LABEL = 'Optional';
   readonly OPTIONAL_GROUP_TOOLTIP = 'This section does not count toward completed sections and is not required to submit the result.';
 
+  canSyncPrms = computed(() => {
+    const meta = this.cache.currentMetadata();
+    const isApproved = meta?.status_id === 6;
+    const isPoolFundingComplete = Boolean(this.cache.greenChecks()?.pool_funding_alignment);
+    return isApproved && isPoolFundingComplete;
+  });
+
+  hasPoolFundingOption = computed(() => {
+    return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
+  });
+
+  onPrmsSync(): void {
+    if (!this.canSyncPrms()) return;
+    // PRMS sync functionality will be implemented in future task
+  }
+
   showOicrStatusDropdown = computed(() => {
     const meta = this.cache.currentMetadata();
     return (
