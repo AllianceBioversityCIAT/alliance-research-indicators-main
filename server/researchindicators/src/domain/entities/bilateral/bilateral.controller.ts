@@ -39,7 +39,10 @@ import { BilateralService } from './bilateral.service';
 import { BilateralHlosIndicatorsResponse } from './dto/bilateral-hlos-indicators.response.dto';
 import { ListIndicatorsQueryDto } from './dto/list-indicators-query.dto';
 import { ContributionDto } from './dto/upsert-indicator-mapping.dto';
-import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
+import {
+  AlignmentResponse,
+  UpdatePoolFundingAlignmentDto,
+} from './dto/update-pool-funding-alignment.dto';
 
 type RequestWithUser = Request & { user?: User };
 
@@ -54,10 +57,17 @@ export class BilateralController {
     private readonly resultsUtil: ResultsUtil,
   ) {}
 
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
   @Get()
   @Version('1')
   @GetResultVersion()
   @ApiOperation({ summary: 'Find pool funding alignment' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: AlignmentResponse,
+    description:
+      'toc_alignments[] carries the null contract for partial rows: aligns_with_toc: true with only Level + HLO chosen reads back indicator_id, indicator_description, unit_of_measurement, target_value, and target_year as null — toc_result_title stays populated (R-BIL-114 AC.1). PATCH ≡ GET for the same state (R-BIL-096).',
+  })
   async getAlignment(@Req() request: RequestWithUser) {
     return this.bilateralService
       .getAlignment(
@@ -79,7 +89,9 @@ export class BilateralController {
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076)',
+      'Get Science Programs linked to the result’s mapped bilateral project (R-BIL-076, R-PSP-002, R-PSP-004)',
+    description:
+      'Returns admitted Science Programs (Confirmed or Pending) with per-item mapping_status for the mapped bilateral project. Top-level mapping_status is mapped, unmapped, or stale.',
   })
   async getScienceProgramsForResult() {
     return this.bilateralService
@@ -108,7 +120,9 @@ export class BilateralController {
   @GetResultVersion()
   @ApiOperation({
     summary:
-      'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090)',
+      'Get the per-SP, per-allowed-level ToC catalogs for the mapped bilateral project (R-BIL-090, R-PSP-004)',
+    description:
+      'Returns ToC catalogs for the mapped bilateral project. Top-level mapping_status is mapped, unmapped, or stale.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -189,9 +203,15 @@ export class BilateralController {
       'Pool funding alignment payload. Optional toc_alignments[] upserts one ToC answer per sp_code; omitted = saved ToC rows untouched.',
   })
   @ApiResponse({
+    status: HttpStatus.OK,
+    type: AlignmentResponse,
+    description:
+      'toc_alignments[] carries the null contract for partial rows: aligns_with_toc: true with only Level + HLO chosen reads back indicator_id, indicator_description, unit_of_measurement, target_value, and target_year as null — toc_result_title stays populated (R-BIL-114 AC.1). Response ≡ GET for the same state (R-BIL-096).',
+  })
+  @ApiResponse({
     status: HttpStatus.BAD_REQUEST,
     description:
-      'Validation failure — legacy errors.unknown_sp_codes (unchanged contract), or atomic per-alignment errors.toc_alignments[{ sp_code, field, error }] with error ∈ duplicate_sp_code | sp_not_selected | missing_required_fields | level_not_allowed | unknown_toc_result_id | unknown_indicator_id (R-BIL-094; nothing persisted, D-V2-8)',
+      'Validation failure — legacy errors.unknown_sp_codes (unchanged contract), or errors.primary_sp.code ∈ primary_sp_required | primary_sp_not_selected (R-BIL-121, R-BIL-122), or atomic per-alignment errors.toc_alignments[{ sp_code, field, error }] with error ∈ duplicate_sp_code | sp_not_selected | missing_required_fields | level_not_allowed | unknown_toc_result_id | unknown_indicator_id | contribution_without_indicator | toc_alignment_not_primary_sp (R-BIL-094, R-BIL-113 AC.6, R-BIL-124; nothing persisted, D-V2-8)',
   })
   @ApiResponse({
     status: HttpStatus.NOT_FOUND,

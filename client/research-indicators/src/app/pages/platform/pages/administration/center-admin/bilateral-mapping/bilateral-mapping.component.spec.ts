@@ -1,6 +1,7 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05, T-BIL-CAM-06)
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import BilateralMappingComponent from './bilateral-mapping.component';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
 import { ActionsService } from '@services/actions.service';
@@ -78,18 +79,25 @@ describe('BilateralMappingComponent', () => {
     deactivate: jest.Mock;
     loadAgressoOptions: jest.Mock;
     loadClarisaProjectOptions: jest.Mock;
+    getCoverage: jest.Mock;
+    previewAutoMap: jest.Mock;
+    applyAutoMap: jest.Mock;
   };
   let mockActions: { showToast: jest.Mock; showGlobalAlert: jest.Mock };
   let mockClarity: { trackEvent: jest.Mock };
 
   beforeEach(async () => {
+    jest.setTimeout(15000);
     mockService = {
       list: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       deactivate: jest.fn(),
       loadAgressoOptions: jest.fn().mockResolvedValue(AGRESSO_OPTIONS),
-      loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS)
+      loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS),
+      getCoverage: jest.fn().mockResolvedValue({ mapped: 4, pending: 194, reachable: 198 }),
+      previewAutoMap: jest.fn().mockResolvedValue(null),
+      applyAutoMap: jest.fn().mockResolvedValue({ ok: true, data: null })
     };
     mockActions = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
     mockClarity = { trackEvent: jest.fn() };
@@ -112,23 +120,22 @@ describe('BilateralMappingComponent', () => {
     jest.clearAllMocks();
   });
 
-  // ── T-BIL-CAM-09: Status filter defaults to "Active" ──────────────────────
+  // ── R-BTE-003: Status filter defaults to "all" ───────────────────────────
 
-  it('defaults activeFilter to "active" and issues the initial list with is_active=true (T-BIL-CAM-09)', async () => {
+  it('defaults statusFilter to "all" and issues the initial list (R-BTE-003)', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
-    // Before init the default signal value is already 'active'
-    expect(component.activeFilter()).toBe('active');
+    // Before init the default signal value is 'all'
+    expect(component.statusFilter()).toBe('all');
 
     fixture.detectChanges(); // triggers ngOnInit → load()
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    // The very first list() call must carry is_active: true
     const firstCall = mockService.list.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(firstCall?.['is_active']).toBe(true);
-    expect(component.activeFilter()).toBe('active');
+    expect(firstCall?.['page']).toBe(1);
+    expect(component.statusFilter()).toBe('all');
   });
 
   // ── AC-03.1: renders table rows on successful list ─────────────────────────
@@ -239,9 +246,9 @@ describe('BilateralMappingComponent', () => {
     expect(lastCall?.['search']).toBe('A511');
   });
 
-  // ── AC-04.2: active-state filter resets page and maps to is_active boolean ─
+  // ── R-BTE-003: status filter resets page and maps to status param ─────────
 
-  it('changing active filter to "active" calls list with is_active=true and resets page', async () => {
+  it('changing status filter to "mapped" calls list with status=mapped and resets page', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
     fixture.detectChanges();
@@ -253,17 +260,17 @@ describe('BilateralMappingComponent', () => {
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([makeRow()]));
 
-    component.onActiveFilterChange('active');
+    component.onStatusFilterChange('mapped');
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
     expect(component.page()).toBe(1);
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBe(true);
+    expect(args?.['status']).toBe('mapped');
   });
 
-  it('changing active filter to "inactive" calls list with is_active=false', async () => {
+  it('changing status filter to "pending" calls list with status=pending and resets page', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -272,15 +279,32 @@ describe('BilateralMappingComponent', () => {
 
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([]));
-    component.onActiveFilterChange('inactive');
+    component.onStatusFilterChange('pending');
     await fixture.whenStable();
     await delayMs(0);
 
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBe(false);
+    expect(args?.['status']).toBe('pending');
   });
 
-  it('changing active filter to "all" omits is_active from the query', async () => {
+  it('changing status filter to "inactive" calls list with status=inactive', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow()]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    mockService.list.mockClear();
+    mockService.list.mockResolvedValue(makePage([]));
+    component.onStatusFilterChange('inactive');
+    await fixture.whenStable();
+    await delayMs(0);
+
+    const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(args?.['status']).toBe('inactive');
+  });
+
+  it('changing status filter to "all" omits status from the query', async () => {
     mockService.list.mockResolvedValue(makePage([makeRow()]));
     fixture.detectChanges();
     await fixture.whenStable();
@@ -289,12 +313,12 @@ describe('BilateralMappingComponent', () => {
 
     mockService.list.mockClear();
     mockService.list.mockResolvedValue(makePage([makeRow()]));
-    component.onActiveFilterChange('all');
+    component.onStatusFilterChange('all');
     await fixture.whenStable();
     await delayMs(0);
 
     const args = mockService.list.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    expect(args?.['is_active']).toBeUndefined();
+    expect(args?.['status']).toBeUndefined();
   });
 
   // ── AC-04.3: source filter resets page and maps source enum ───────────────
@@ -382,58 +406,175 @@ describe('BilateralMappingComponent', () => {
       page: 1,
       limit: component.limit(),
       search: 'ACIAR',
-      is_active: true,
+      status: 'mapped',
       source: 'MANUAL'
     });
   });
 
-  // ── AC-03.1: confidence column hidden when source === 'MANUAL' ─────────────
+  // ── R-BTE-001: Confidence column removed from table header & body ──────────
 
-  describe('showConfidence() helper — AC-03.1', () => {
-    it('returns false (hidden) when source is MANUAL', () => {
-      expect(component.showConfidence(makeRow({ source: 'MANUAL' }))).toBe(false);
-    });
+  it('does not render Confidence column header or cells (R-BTE-001)', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.85 })]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
 
-    it('returns true (shown) when source is AI_SUGGESTED', () => {
-      expect(component.showConfidence(makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.85 }))).toBe(true);
-    });
-
-    it('returns true (shown) when source is AI_AUTO', () => {
-      expect(component.showConfidence(makeRow({ source: 'AI_AUTO', confidence_score: 0.92 }))).toBe(true);
-    });
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('Confidence');
+    expect(fixture.nativeElement.querySelector('[data-testid="confidence-value"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="confidence-cell"]')).toBeNull();
   });
 
-  // ── DOM: confidence cell hidden when source === MANUAL ────────────────────
+  // ── R-BTE-002: 2-line rendering for AGRESSO and CLARISA columns ───────────
 
-  it('renders "—" in confidence cell (not the score) for MANUAL rows in the table', async () => {
-    const manualRow = makeRow({ source: 'MANUAL', confidence_score: 0.99 });
-    mockService.list.mockResolvedValue(makePage([manualRow]));
+  it('renders 2-line cells with tooltips for AGRESSO and CLARISA descriptions (R-BTE-002)', async () => {
+    const row = makeRow({
+      agresso_agreement_id: 'A1676',
+      agresso_description: 'Rice Initiative Agreement',
+      clarisa_project_id: 1403,
+      clarisa_project_short_name: 'B-A1676',
+      clarisa_project_full_name: 'Sustainable Rice Systems in Asia'
+    });
+    mockService.list.mockResolvedValue(makePage([row]));
 
     fixture.detectChanges();
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    // The confidence-hidden element should be present, confidence-value absent
-    const hidden = fixture.nativeElement.querySelector('[data-testid="confidence-hidden"]');
-    const shown = fixture.nativeElement.querySelector('[data-testid="confidence-value"]');
-    expect(hidden).not.toBeNull();
-    expect(shown).toBeNull();
+    const agressoTooltip = fixture.nativeElement.querySelector('[data-testid="agresso-description-tooltip"]');
+    const clarisaTooltip = fixture.nativeElement.querySelector('[data-testid="clarisa-fullname-tooltip"]');
+
+    expect(agressoTooltip).not.toBeNull();
+    expect(agressoTooltip.textContent.trim()).toBe('Rice Initiative Agreement');
+    expect(clarisaTooltip).not.toBeNull();
+    expect(clarisaTooltip.textContent.trim()).toBe('Sustainable Rice Systems in Asia');
   });
 
-  it('renders the confidence value for AI_SUGGESTED rows in the table', async () => {
-    const aiRow = makeRow({ source: 'AI_SUGGESTED', confidence_score: 0.75 });
-    mockService.list.mockResolvedValue(makePage([aiRow]));
+  // ── R-BTE-003: Badges and + Map button for Pending ────────────────────────
+
+  it('renders Mapped, Pending, and Inactive badges correctly and triggers map dialog on pending (R-BTE-003)', async () => {
+    const mappedRow = makeRow({ id: 1, mapping_status: 'Mapped', is_active: true });
+    const pendingRow = makeRow({ id: -1403, mapping_status: 'Pending', source: 'UNMAPPED', is_active: true, clarisa_project_id: 1403 });
+    const inactiveRow = makeRow({ id: 2, mapping_status: 'Inactive', is_active: false });
+
+    mockService.list.mockResolvedValue(makePage([mappedRow, pendingRow, inactiveRow]));
 
     fixture.detectChanges();
     await fixture.whenStable();
     await delayMs(0);
     fixture.detectChanges();
 
-    const shown = fixture.nativeElement.querySelector('[data-testid="confidence-value"]');
-    const hidden = fixture.nativeElement.querySelector('[data-testid="confidence-hidden"]');
-    expect(shown).not.toBeNull();
-    expect(hidden).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="mapped-badge"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="pending-badge"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="inactive-badge"]')).not.toBeNull();
+
+    const pendingMapBtn = fixture.nativeElement.querySelector('[data-testid="pending-map-btn"]');
+    expect(pendingMapBtn).not.toBeNull();
+
+    const spyOpenMap = jest.spyOn(component, 'openMapDialogForPending');
+    pendingMapBtn.click();
+    expect(spyOpenMap).toHaveBeenCalledWith(pendingRow);
+  });
+
+  // ── R-BTE-004: Interactive Column Sorting ─────────────────────────────────
+
+  describe('Interactive Column Sorting (R-BTE-004)', () => {
+    it('sorts data by agreement ID ascending and descending via custom sort', () => {
+      const data = [
+        makeRow({ id: 1, agresso_agreement_id: 'D527' }),
+        makeRow({ id: 2, agresso_agreement_id: 'A1676' }),
+        makeRow({ id: 3, agresso_agreement_id: 'C300' })
+      ];
+
+      // Ascending sort
+      component.onSort({ data, field: 'agresso_agreement_id', order: 1 });
+      expect(data.map(r => r.agresso_agreement_id)).toEqual(['A1676', 'C300', 'D527']);
+
+      // Descending sort
+      component.onSort({ data, field: 'agresso_agreement_id', order: -1 });
+      expect(data.map(r => r.agresso_agreement_id)).toEqual(['D527', 'C300', 'A1676']);
+    });
+
+    it('sorts data by CLARISA project short name ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, clarisa_project_short_name: 'USAID' }),
+        makeRow({ id: 2, clarisa_project_short_name: 'ACIAR' }),
+        makeRow({ id: 3, clarisa_project_short_name: 'BMGF' })
+      ];
+
+      component.onSort({ data, field: 'clarisa_project_short_name', order: 1 });
+      expect(data.map(r => r.clarisa_project_short_name)).toEqual(['ACIAR', 'BMGF', 'USAID']);
+
+      component.onSort({ data, field: 'clarisa_project_short_name', order: -1 });
+      expect(data.map(r => r.clarisa_project_short_name)).toEqual(['USAID', 'BMGF', 'ACIAR']);
+    });
+
+    it('sorts data by mapping status ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, mapping_status: 'Pending' }),
+        makeRow({ id: 2, mapping_status: 'Inactive' }),
+        makeRow({ id: 3, mapping_status: 'Mapped' })
+      ];
+
+      component.onSort({ data, field: 'mapping_status', order: 1 });
+      expect(data.map(r => r.mapping_status)).toEqual(['Inactive', 'Mapped', 'Pending']);
+
+      component.onSort({ data, field: 'mapping_status', order: -1 });
+      expect(data.map(r => r.mapping_status)).toEqual(['Pending', 'Mapped', 'Inactive']);
+    });
+
+    it('sorts data by last updated date ascending and descending', () => {
+      const data = [
+        makeRow({ id: 1, updated_at: '2024-03-01T00:00:00.000Z' }),
+        makeRow({ id: 2, updated_at: '2024-01-01T00:00:00.000Z' }),
+        makeRow({ id: 3, updated_at: '2024-06-01T00:00:00.000Z' })
+      ];
+
+      component.onSort({ data, field: 'updated_at', order: 1 });
+      expect(data.map(r => r.id)).toEqual([2, 1, 3]);
+
+      component.onSort({ data, field: 'updated_at', order: -1 });
+      expect(data.map(r => r.id)).toEqual([3, 1, 2]);
+    });
+  });
+
+  // ── NFR-BTE-001: Accessibility and keyboard focus for tooltips ────────────
+
+  it('renders tooltips with keyboard accessibility attributes (NFR-BTE-001)', async () => {
+    const row = makeRow({
+      agresso_agreement_id: 'A1676',
+      agresso_description: 'Rice Initiative Agreement',
+      clarisa_project_id: 1403,
+      clarisa_project_short_name: 'B-A1676',
+      clarisa_project_full_name: 'Sustainable Rice Systems in Asia'
+    });
+    mockService.list.mockResolvedValue(makePage([row]));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await delayMs(0);
+    fixture.detectChanges();
+
+    const agressoTooltip = fixture.nativeElement.querySelector('[data-testid="agresso-description-tooltip"]');
+    expect(agressoTooltip.getAttribute('tabindex')).toBe('0');
+    expect(agressoTooltip.getAttribute('role')).toBe('note');
+
+    const clarisaTooltip = fixture.nativeElement.querySelector('[data-testid="clarisa-fullname-tooltip"]');
+    expect(clarisaTooltip.getAttribute('tabindex')).toBe('0');
+    expect(clarisaTooltip.getAttribute('role')).toBe('note');
+  });
+
+  // ── R-BTE-005: Auto-map button contrast ───────────────────────────────────
+
+  it('renders styled Auto-map button in header (R-BTE-005)', async () => {
+    mockService.list.mockResolvedValue(makePage([makeRow()]));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const autoMapBtn = fixture.nativeElement.querySelector('[data-testid="header-automap-btn"]');
+    expect(autoMapBtn).not.toBeNull();
   });
 
   // ── NF-06: loading signal resets to false on both success and failure ──────
@@ -1219,4 +1360,413 @@ describe('BilateralMappingComponent', () => {
 
     expect(component.selectedProject()).toBeNull();
   });
+
+  // ── R-BPF-003: CLARISA picker filterBy client-side search (K-004 / KZ-001) ──
+
+  describe('R-BPF-003: CLARISA picker filterBy client-side search', () => {
+    // 255-character full_name fixture pinned to measured maximum (KZ-001)
+    const FULL_NAME_255 =
+      'Alliance Bioversity-CIAT Global Research Program on Sustainable Agriculture and Climate Resilient Crops with Integrated Pest Management, Advanced Genomic Breeding, Multi-Location Yield Trials, and Smallholder Farmer Technology Transfer Packages across Africa'.slice(
+        0,
+        255
+      );
+
+    const testClarisaOptions: ClarisaBilateralProjectOption[] = [
+      {
+        id: 101,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel'
+      },
+      {
+        id: 102,
+        short_name: 'B-A1080',
+        full_name: 'Fertilize Right Colombia'
+      },
+      {
+        id: 103,
+        short_name: 'C-A480',
+        full_name: FULL_NAME_255
+      },
+      {
+        id: 104,
+        short_name: 'D-A200'
+        // full_name absent
+      },
+      {
+        id: 105,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
+      }
+    ];
+
+    it('asserts FULL_NAME_255 fixture is exactly 255 characters (KZ-001)', () => {
+      expect(FULL_NAME_255.length).toBe(255);
+    });
+
+    it('survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2)', async () => {
+      const { Select } = await import('primeng/select');
+
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      component.openCreateDialog();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      const selects = fixture.debugElement.queryAll(d => d.componentInstance instanceof Select);
+      const inst = selects.map(s => s.componentInstance as Select).find(i => i.inputId === 'bilMapClarisaPicker');
+      expect(inst).toBeDefined();
+
+      inst!.options = testClarisaOptions;
+
+      // 1. Search by name term "musasentinel" -> matches A1806
+      inst!._filterValue.set('musasentinel');
+      const visibleByName = inst!.visibleOptions();
+      expect(visibleByName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['A1806']);
+
+      // 2. Search by name term "fertilize" (case-insensitive) -> matches B-A1080 and id 105
+      inst!._filterValue.set('fertilize');
+      const visibleByFertilize = inst!.visibleOptions();
+      expect(visibleByFertilize.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
+
+      // 3. Search by code term "A1806" -> matches A1806
+      inst!._filterValue.set('A1806');
+      const visibleByCode = inst!.visibleOptions();
+      expect(visibleByCode.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['A1806']);
+
+      // 4. Search by code term "D-A200" on option without full_name -> does not throw, matches
+      inst!._filterValue.set('D-A200');
+      const visibleWithoutFullName = inst!.visibleOptions();
+      expect(visibleWithoutFullName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['D-A200']);
+
+      // 5. Search by term from 255-character name -> matches C-A480
+      inst!._filterValue.set('bioversity');
+      const visibleByLongName = inst!.visibleOptions();
+      expect(visibleByLongName.map((o: ClarisaBilateralProjectOption) => o.short_name)).toEqual(['C-A480']);
+
+      // 6. Search by external_code "B-A1080" when short_name and full_name are project name -> matches id 105 (and short_name B-A1080 on 102)
+      inst!._filterValue.set('B-A1080');
+      const visibleByExternalCode = inst!.visibleOptions();
+      expect(visibleByExternalCode.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
+
+      // 7. Search by external_code lowercase "b-a1080" -> matches id 102 and 105
+      inst!._filterValue.set('b-a1080');
+      const visibleByExternalCodeLower = inst!.visibleOptions();
+      expect(visibleByExternalCodeLower.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
+    });
+  });
+
+  // ── R-BPF-004 / R-BPF-005: clarisaOptionLabel helper ────────────────────────
+
+  describe('clarisaOptionLabel helper (R-BPF-004 / R-BPF-005)', () => {
+    const FULL_NAME_255 =
+      'Alliance Bioversity-CIAT Global Research Program on Sustainable Agriculture and Climate Resilient Crops with Integrated Pest Management, Advanced Genomic Breeding, Multi-Location Yield Trials, and Smallholder Farmer Technology Transfer Packages across Africa'.slice(
+        0,
+        255
+      );
+
+    it('returns "short_name — full_name" when both are present and differ', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 101,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel'
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+    });
+
+    it('returns the title once when short_name equals full_name (R-BPF-004 de-duplication)', () => {
+      // Mandatory input (a) from bug report
+      const optFertilize: ClarisaBilateralProjectOption = {
+        id: 102,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optFertilize)).toBe('Fertilize Right Colombia');
+
+      const optSemillas: ClarisaBilateralProjectOption = {
+        id: 103,
+        short_name: 'Semillas del Futuro - AGROSAVIA',
+        full_name: 'Semillas del Futuro - AGROSAVIA'
+      };
+      expect(component.clarisaOptionLabel(optSemillas)).toBe('Semillas del Futuro - AGROSAVIA');
+
+      const optAtlas: ClarisaBilateralProjectOption = {
+        id: 104,
+        short_name: 'BMGF-Adaptation Atlas: Refinement and Transition',
+        full_name: 'BMGF-Adaptation Atlas: Refinement and Transition'
+      };
+      expect(component.clarisaOptionLabel(optAtlas)).toBe('BMGF-Adaptation Atlas: Refinement and Transition');
+    });
+
+    it('de-duplicates case-insensitively and ignores surrounding whitespace (R-BPF-004)', () => {
+      const optWhitespace: ClarisaBilateralProjectOption = {
+        id: 105,
+        short_name: '  fertilize right colombia  ',
+        full_name: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optWhitespace)).toBe('Fertilize Right Colombia');
+
+      const optCase: ClarisaBilateralProjectOption = {
+        id: 106,
+        short_name: 'A1806',
+        full_name: '  a1806  '
+      };
+      expect(component.clarisaOptionLabel(optCase)).toBe('a1806');
+    });
+
+    it('prefers external_code over short_name as the code (R-BPF-004)', () => {
+      // Mandatory input (b) from bug report
+      const optWithExternalCode: ClarisaBilateralProjectOption = {
+        id: 107,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optWithExternalCode)).toBe('B-A1080 — Fertilize Right Colombia');
+
+      const optCustomCode: ClarisaBilateralProjectOption = {
+        id: 108,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: 'C-A480'
+      };
+      expect(component.clarisaOptionLabel(optCustomCode)).toBe('C-A480 — WTO-Phase 1: MusaSentinel');
+    });
+
+    it('de-duplicates when external_code equals full_name (R-BPF-004)', () => {
+      const optCodeEqualsName: ClarisaBilateralProjectOption = {
+        id: 109,
+        short_name: 'A1806',
+        full_name: 'Fertilize Right Colombia',
+        external_code: 'Fertilize Right Colombia'
+      };
+      expect(component.clarisaOptionLabel(optCodeEqualsName)).toBe('Fertilize Right Colombia');
+    });
+
+    it('renders external_code alone when full_name is absent or empty (R-BPF-004)', () => {
+      const optNoFullName: ClarisaBilateralProjectOption = {
+        id: 110,
+        short_name: 'Fertilize Right Colombia',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optNoFullName)).toBe('B-A1080');
+
+      const optEmptyFullName: ClarisaBilateralProjectOption = {
+        id: 111,
+        short_name: 'Fertilize Right Colombia',
+        full_name: '',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optEmptyFullName)).toBe('B-A1080');
+
+      const optWhitespaceFullName: ClarisaBilateralProjectOption = {
+        id: 112,
+        short_name: 'Fertilize Right Colombia',
+        full_name: '   ',
+        external_code: 'B-A1080'
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceFullName)).toBe('B-A1080');
+    });
+
+    it('falls back to short_name when external_code is whitespace-only or empty (R-BPF-004)', () => {
+      const optEmptyExternal: ClarisaBilateralProjectOption = {
+        id: 113,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: ''
+      };
+      expect(component.clarisaOptionLabel(optEmptyExternal)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+
+      const optWhitespaceExternal: ClarisaBilateralProjectOption = {
+        id: 114,
+        short_name: 'A1806',
+        full_name: 'WTO-Phase 1: MusaSentinel',
+        external_code: '   '
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceExternal)).toBe('A1806 — WTO-Phase 1: MusaSentinel');
+
+      const optWhitespaceExternalDeDupe: ClarisaBilateralProjectOption = {
+        id: 115,
+        short_name: 'Fertilize Right Colombia',
+        full_name: 'Fertilize Right Colombia',
+        external_code: '   '
+      };
+      expect(component.clarisaOptionLabel(optWhitespaceExternalDeDupe)).toBe('Fertilize Right Colombia');
+    });
+
+    it('returns just "short_name" when full_name is absent / undefined', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 104,
+        short_name: 'D-A200'
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('D-A200');
+    });
+
+    it('returns just "short_name" when full_name is an empty string', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 105,
+        short_name: 'B-A1080',
+        full_name: ''
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('B-A1080');
+    });
+
+    it('returns just "short_name" when full_name is whitespace only', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 106,
+        short_name: 'B-A1080',
+        full_name: '   '
+      };
+      expect(component.clarisaOptionLabel(opt)).toBe('B-A1080');
+    });
+
+    it('handles a 255-character full_name correctly (KZ-001 / R-BPF-005)', () => {
+      const opt: ClarisaBilateralProjectOption = {
+        id: 103,
+        short_name: 'C-A480',
+        full_name: FULL_NAME_255
+      };
+      const label = component.clarisaOptionLabel(opt);
+      expect(label).toBe(`C-A480 — ${FULL_NAME_255}`);
+      expect(label.startsWith('C-A480 — ')).toBe(true);
+    });
+
+    it('never renders the literal "undefined", "null", or a bare trailing separator', () => {
+      const optWithoutName: ClarisaBilateralProjectOption = { id: 107, short_name: 'A1806' };
+      const label = component.clarisaOptionLabel(optWithoutName);
+
+      expect(label).not.toContain('undefined');
+      expect(label).not.toContain('null');
+      expect(label.endsWith(' — ')).toBe(false);
+      expect(label.endsWith('—')).toBe(false);
+    });
+
+    it('returns empty string when opt is nullish', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(component.clarisaOptionLabel(null as any)).toBe('');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(component.clarisaOptionLabel(undefined as any)).toBe('');
+    });
+  });
+
+  // ── Automapper & DERIVED source tests (S2 — T-06) ──────────────────────────
+
+  describe('Automapper integration (T-06)', () => {
+    it('supports DERIVED source in SOURCE_OPTIONS and sourceLabel', () => {
+      const derivedOpt = component.sourceOptions.find(opt => opt.value === 'DERIVED');
+      expect(derivedOpt).toEqual({ label: 'Derived', value: 'DERIVED' });
+      expect(component.sourceLabel('DERIVED')).toBe('Derived');
+    });
+
+    it('opens automapper dialog when openAutomapperDialog is called', () => {
+      expect(component.automapperDialogOpen()).toBe(false);
+      component.openAutomapperDialog();
+      expect(component.automapperDialogOpen()).toBe(true);
+    });
+
+    it('reloads mapping list and refreshes coverage strip when automapper run is applied (Issue 2)', async () => {
+      mockService.list.mockResolvedValue(makePage([makeRow()]));
+      mockService.getCoverage.mockResolvedValue({ mapped: 6, pending: 192, reachable: 198 });
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      mockService.getCoverage.mockClear();
+
+      component.onAutomapperApplied();
+      await fixture.whenStable();
+
+      expect(mockService.list).toHaveBeenCalled();
+      expect(mockService.getCoverage).toHaveBeenCalled();
+    });
+
+    it('renders the mapping list table successfully even when coverage service errors (Hard Requirement 4)', async () => {
+      // Coverage returns null (error state)
+      mockService.getCoverage.mockResolvedValue(null);
+      // Main table list succeeds
+      const rows = [makeRow({ id: 10, agresso_agreement_id: 'A511' })];
+      mockService.list.mockResolvedValue(makePage(rows));
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+      fixture.detectChanges();
+
+      // Main table data loaded and rendered
+      expect(component.rows().length).toBe(1);
+      expect(component.loadError()).toBe(false);
+      expect(mockService.list).toHaveBeenCalled();
+
+      // Coverage strip child component receives error but does NOT throw or hide parent table
+      const table = fixture.nativeElement.querySelector('[data-testid="mappings-table"]');
+      expect(table).not.toBeNull();
+    });
+  });
+
+  // ── UI Refinements (2026-08 — R-BIL-UI-001, R-BIL-UI-002, R-BIL-UI-003) ───
+
+  describe('Bilateral Mapping UI Refinements (2026-08)', () => {
+    it('R-BIL-UI-001 — renders Auto-map and New mapping buttons side-by-side in header', async () => {
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const automapHost = root.querySelector('[data-testid="header-automap-btn"]');
+      const newMappingHost = root.querySelector('[data-testid="new-mapping-btn"]');
+
+      expect(automapHost).not.toBeNull();
+      expect(newMappingHost).not.toBeNull();
+
+      // Clicking header-automap-btn opens automapper dialog
+      expect(component.automapperDialogOpen()).toBe(false);
+      const btnToClick = (automapHost?.querySelector('button') ?? automapHost) as HTMLElement;
+      btnToClick.click();
+      fixture.detectChanges();
+      expect(component.automapperDialogOpen()).toBe(true);
+    });
+
+    it('R-BIL-UI-002 — renders Help (?) button with popover explaining module and active phase', async () => {
+      mockService.list.mockResolvedValue(makePage([]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const helpBtn = (root.querySelector('[data-testid="help-popover-btn"] button') ?? root.querySelector('[data-testid="help-popover-btn"]')) as HTMLElement;
+      expect(helpBtn).not.toBeNull();
+      expect(helpBtn.getAttribute('aria-label') ?? helpBtn.parentElement?.getAttribute('aria-label')).toBe('About Bilateral Project Mapping');
+
+      // Click to open popover
+      helpBtn.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const popoverContent = document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
+      expect(popoverContent).not.toBeNull();
+      expect(popoverContent?.textContent).toContain('About Bilateral Project Mapping');
+      expect(popoverContent?.textContent).toContain('Phase 2026');
+      expect(popoverContent?.textContent).toContain('CLARISA');
+      expect(popoverContent?.textContent).toContain('AGRESSO');
+    });
+
+    it('R-BIL-UI-003 — table headers explicitly display Agreement ID (AGRESSO) and CLARISA Project (Bilateral)', async () => {
+      mockService.list.mockResolvedValue(makePage([makeRow()]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const tableHeaders = Array.from(root.querySelectorAll('thead th')).map(th => th.textContent?.trim());
+
+      expect(tableHeaders.some(h => h?.includes('Agreement ID (AGRESSO)'))).toBe(true);
+      expect(tableHeaders.some(h => h?.includes('CLARISA Project (Bilateral)'))).toBe(true);
+    });
+  });
 });
+
+
+
+

@@ -1,0 +1,190 @@
+<div class="flex min-h-screen flex-col">
+  <header class="bg-[var(--ac-primary-blue-500)] text-[color:var(--ac-white-1)]">
+    <div class="flex h-14 w-full items-center gap-3.5 px-8">
+      <span class="text-[14px] font-medium tracking-[0.01em]">Alliance of Bioversity International &amp; CIAT</span>
+      <span aria-hidden="true" class="h-[18px] w-px bg-[var(--ac-primary-blue-300)]"></span>
+      <span class="text-[12px] uppercase tracking-[0.05em] text-[color:var(--ac-primary-blue-100)]">Reporting pathway</span>
+    </div>
+  </header>
+
+  <main class="mx-auto w-full max-w-[940px] flex-1 px-7 pt-10">
+    <h1 class="mb-1.5 text-[21px] font-bold leading-[1.15] tracking-[-0.015em] text-[color:var(--ac-primary-blue-500)] [text-wrap:balance]">
+      Which reporting pathway should I follow?
+    </h1>
+    <p class="mb-6 text-[15px] leading-normal text-[color:var(--ac-grey-700)]">Select the result type to identify the correct reporting platform.</p>
+
+
+    <section aria-label="Reporting pathway selector" class="rounded-lg border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      
+    @if (showTrail()) {
+      <nav aria-label="Breadcrumb" class="px-6 pt-4 flex items-center text-[13px] text-[color:var(--ac-grey-700)]">
+        @for (chip of chips(); track chip.label; let i = $index) {
+          @if (i > 0) {
+            <i class="pi pi-chevron-right mx-2 !text-[9px] text-[color:var(--ac-grey-700)]"></i>
+          }
+          @if (i < chips().length - 1) {
+            <button
+              type="button"
+              class="cursor-pointer border-0 bg-transparent p-0 text-[color:var(--ac-grey-700)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)]"
+              (click)="chip.edit()"
+              [attr.aria-label]="chip.aria">
+              {{ chip.label }}
+            </button>
+          } @else {
+            <span class="text-[color:var(--ac-light-blue-400)]" aria-current="page">{{ chip.label }}</span>
+          }
+        }
+      </nav>
+    }
+    @if (showQ1()) {
+        <div class="px-6 py-5">
+          <h2 class="mb-5 text-[18px] font-semibold text-[color:var(--ac-primary-blue-500)]">What are you reporting?</h2>
+          <div role="group" aria-label="Indicator" class="flex flex-col gap-2">
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('kp')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Knowledge Product</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('oicr')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Outcome Impact Case Report</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('cap')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Capacity Sharing for Development</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('innovDev')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Innovation Development</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('innovUse')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Innovation Use</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setIndicator('policy')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">Policy Change &amp; Investment Contribution</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+          </div>
+        </div>
+      }
+
+      @if (showQ2()) {
+        <div class="px-6 py-5">
+          <h2 class="mb-5 text-[18px] font-semibold text-[color:var(--ac-primary-blue-500)]">What was the primary funding source?</h2>
+          <div role="group" aria-label="Primary funding source" class="flex flex-col gap-2 mb-6">
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setFunding('w3')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">W3 or bilateral project</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3.5 rounded-md border border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] px-4 py-3.5 text-left transition-colors duration-150 hover:border-[color:var(--ac-light-blue-300)] hover:bg-[var(--ac-grey-100)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none"
+              (click)="setFunding('program')">
+              <span class="text-[15px] font-semibold text-[color:var(--ac-grey-900)]">CGIAR Program or Accelerator</span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[color:var(--ac-grey-600)]">&rarr;</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
+            (click)="goBack()">
+            <i class="pi pi-arrow-left !text-[12px]"></i> Back
+          </button>
+        </div>
+      }
+
+      @if (showResult()) {
+        <div aria-live="polite" class="px-6 py-5">
+          <div class="flex items-center gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[color:var(--ac-grey-200)] bg-[var(--ac-grey-100)]">
+              <img class="h-9 w-9 object-contain" [src]="resultLogo() | s3ImageUrl" [alt]="resultName()" />
+            </span>
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color:var(--ac-grey-600)]">Report this result in</div>
+              <h2 class="text-[26px] font-bold leading-tight tracking-[-0.01em] text-[color:var(--ac-primary-blue-500)]">{{ resultName() }}</h2>
+            </div>
+          </div>
+
+          <p class="mt-4 max-w-[58ch] text-[15px] leading-normal text-[color:var(--ac-grey-700)]">{{ resultWhy() }}</p>
+
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <a
+              [href]="resultUrl()"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center rounded-[13px] bg-[var(--ac-light-blue-300)] px-5 py-2.5 text-[15px] font-semibold text-[color:var(--ac-white-1)] no-underline transition-colors hover:bg-[var(--ac-light-blue-400)] hover:text-[color:var(--ac-white-1)] hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)] motion-reduce:transition-none">
+              Open {{ resultName() }}
+            </a>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
+              (click)="goBack()">
+              <i class="pi pi-arrow-left !text-[12px]"></i> Back
+            </button>
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-2 border-1 font-medium border-[#035BA9] text-[#035BA9] px-3 py-1 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:border-[#E8EBED] disabled:text-[#A2A9AF]"
+              (click)="startOver()">
+              <i class="pi pi-refresh !text-[12px]"></i> Start over
+            </button>
+          </div>
+
+          <p class="mt-5 border-t border-[color:var(--ac-grey-200)] pt-4 text-[14px] text-[color:var(--ac-grey-600)]">Technical support: {{ resultSupport() }}</p>
+        </div>
+      }
+    </section>
+
+    <section id="platforms" class="mt-7 scroll-mt-[70px] border-t border-[color:var(--ac-grey-200)] pt-6">
+      <h2 class="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.06em] text-[color:var(--ac-grey-600)]">Already know where to report?</h2>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        @for (platform of quickAccess; track platform.name) {
+          <div
+            class="flex flex-col gap-2 rounded-lg border-y border-r border-l-4 border-[color:var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4"
+            [ngClass]="platform.accent">
+            <div class="flex items-center gap-2.5">
+              <img class="h-8 w-8 shrink-0 object-contain" [src]="platform.logo | s3ImageUrl" [alt]="platform.name" />
+              <span class="text-[15px] font-bold text-[color:var(--ac-grey-900)]">{{ platform.name }}</span>
+            </div>
+            <p class="m-0 text-sm text-[color:var(--ac-grey-800)]">{{ platform.desc }}</p>
+            <p class="m-0 text-[13px] leading-4 text-[color:var(--ac-grey-600)]">Technical support: {{ platform.support }}</p>
+            <a
+              [href]="platform.url"
+              target="_blank"
+              rel="noopener"
+              class="mt-1.5 inline-flex items-center self-start rounded-md bg-[var(--ac-green-500)] px-4 py-2 text-sm font-semibold text-[color:var(--ac-white-1)] no-underline hover:bg-[var(--ac-green-600)] hover:text-[color:var(--ac-white-1)] hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-light-blue-300)]">
+              Open {{ platform.name }}
+            </a>
+          </div>
+        }
+      </div>
+    </section>
+  </main>
+
+  <footer class="mt-6 border-t border-[color:var(--ac-grey-200)] px-8 py-[18px]">
+    <div class="flex w-full flex-wrap gap-4 text-[13px] text-[color:var(--ac-grey-600)]">
+      <span>Reporting responsibility remains with the PI and research team.</span>
+      <a href="mailto:melp@alliance.cgiar.org" class="ml-auto text-[color:var(--ac-light-blue-400)] hover:underline">Contact MELP</a>
+    </div>
+  </footer>
+</div>

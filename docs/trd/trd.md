@@ -55,8 +55,8 @@ lambda-toc (bilateral ToC catalog), analytics SDKs (Hotjar/Clarity/GA/BugHerd).
 
 | Tier | Bootstrap / build | Notes |
 | --- | --- | --- |
-| Server | `src/main.ts` boots **two Nest apps**: HTTP (`AppModule` — helmet CSP, CORS, 50 MB body limit, `/api` prefix, URI versioning, `/admin/public` static assets, Swagger at `/swagger`) + RabbitMQ microservice (`AppMicroserviceModule` on `amqps://…@${ARI_MQ_HOST}`, queue `ARI_QUEUE`, `durable: true`). Port from `ARI_PORT`. | Deploy: AWS Elastic Beanstalk + RDS (MySQL) + DynamoDB + OpenSearch + broker. |
-| Client | `nest`-free Angular CLI build → `dist/research-indicators/browser`, served by Nginx-Alpine (SPA fallback). PWA service worker registers on production only. | CI: GitHub Actions (`unit-tests.yml`, `sonarcloud-analysis.yml`, `jenkins-trigger.yml`). Semver via `version:patch|minor|major`. |
+| Server | `src/main.ts` boots **two Nest apps**: HTTP (`AppModule` — helmet CSP, CORS, 50 MB body limit, `/api` prefix, URI versioning, `/admin/public` static assets, Swagger at `/swagger`) + RabbitMQ microservice (`AppMicroserviceModule` on `amqps://…@${ARI_MQ_HOST}`, queue `ARI_QUEUE`, `durable: true`). Port from `ARI_PORT`. | Deploy: Automated CI/CD releases (On-Premise Dev from `dev` branch; AWS Prod from `main` branch). Local testing via Docker pointing to Dev MySQL. |
+| Client | `nest`-free Angular CLI build → `dist/research-indicators/browser`, served by Nginx-Alpine (SPA fallback). PWA service worker registers on production only. | CI/CD: Automated GitHub Actions / Jenkins pipelines on `dev` and `main`. No manual remote deployments. Semver via `version:patch|minor|major`. |
 
 ---
 
@@ -526,7 +526,7 @@ Federation with STAR / TIP / PRMS / AICCRA is **read/link-only** from the client
 - ROAR remains the canonical IDP for human users at the server edge; Cognito supplies human sessions to the client (region/userpool via `environment*.ts`).
 - CLARISA + AGRESSO + TIP remain authoritative upstream systems; CLARISA endpoints stay stable enough for client-side caching.
 - The `ServerResponseDto`/`MainResponse<T>` envelope is a stable cross-team contract; breaking it is a coordinated change.
-- Deployment target: AWS (Elastic Beanstalk + RDS + DynamoDB + OpenSearch + broker) for the server; containerized Nginx for the client.
+- Deployment & Environments: Fully automated CI/CD. Dev runs On-premise (tracking `dev` branch); Prod runs on AWS Cloud (tracking `main` branch). Zero manual remote deployments by developers/agents. Local testing runs containerized via Docker pointing to the On-premise Dev MySQL.
 - Partner platforms consume `/api` REST or OpenSearch — never direct DB access.
 - WebSocket gateway is same-domain (or CORS-permitted), compatible with `ngx-socket-io` 4.x.
 - Bilateral ToC catalog: the reshaped `hlos-indicators` endpoint performs lambda-toc reads server-side with a 5-min cache (warm-stale on failure; cold → `503`); the client fetches once per section load and keeps prior value on error.

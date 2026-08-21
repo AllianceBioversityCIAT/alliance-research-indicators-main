@@ -14,6 +14,7 @@ import { VersioningType } from '@nestjs/common';
 const logger: LoggerUtil = new LoggerUtil({
   name: 'bootstrap',
 });
+
 async function httpservice() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableCors();
@@ -119,4 +120,5 @@ async function bootstrap() {
   await microservice();
   await httpservice();
 }
+
 bootstrap();

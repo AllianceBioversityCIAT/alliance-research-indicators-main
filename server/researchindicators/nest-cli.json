@@ -9,6 +9,11 @@
         "include": "domain/entities/reports/assets/**/*",
         "outDir": "dist",
         "watchAssets": true
+      },
+      {
+        "include": "domain/tools/clarisa/stub/fixtures/**/*",
+        "outDir": "dist",
+        "watchAssets": true
       }
     ]
   }

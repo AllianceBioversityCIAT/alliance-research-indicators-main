@@ -148,6 +148,8 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - Service tests: assert on the `MainResponse<T>` envelope with `HttpTestingController`.
 - Component tests: cover role-conditional rendering, signal-driven state transitions, form validity, error surfaces.
 - Coverage floors (project-wide, enforced by `jest.config.ts`): statements 40%, branches 20%, lines 45%, functions 30%. Don't regress on changed files.
+- ⚠️ **A component fixture must arrange the TRANSITION the product performs, not the end state (Kaizen KZ-015).** Setting an input before the first `detectChanges()` tests a state the product may never reach. A 2026-08-20 dialog shipped never loading its data on open — the parent renders it always with `visible=false` and only flips the signal later — while every test set `visible=true` *before* the first `detectChanges()`, so the construct-false-then-open sequence, the only one production uses, was never exercised. The suite was green and the feature was broken. Construct in the initial state, assert the negative, **then** change it.
+- ⚠️ **A targeted single-file run trips those project-wide floors and exits `1` with every test passing** (measured: `npx jest <file> --silent` → exit 1 on 63/63 green; `--coverage=false` → exit 0). An exit code from a targeted run without `--coverage=false` is not a signal — and under a red-before/green-after protocol it makes "green after" unreachable (K-020).
 - Excluded from coverage by design: `app.config.ts`, `app.routes.ts`, `shared/sockets/websocket.service.ts`, `shared/components/alert/alert.component.ts`.
 
 ---
@@ -177,3 +179,33 @@ These bind every change inside `src/`. Full text in [`../../../docs/prd.md`](../
 - **C-4** WCAG 2.1 AA on every changed screen.
 - **C-5** Respect `angular.json` bundle budgets (initial ≤ 3 MB error / 2 MB warning; component styles ≤ 8 kB / 4 kB).
 - **C-6** New routes are lazy-loaded standalone components.
+
+---
+
+## ⚠ Test code is neither linted nor type-checked (Kaizen K-002)
+
+Two independent gaps mean **a green test suite does not mean the code compiles**:
+
+- the flat ESLint config **ignores `*.spec.ts`** (`"File ignored because no matching configuration was supplied"`), so `npm run lint` covers production files only;
+- Jest runs **`isolatedModules: true`** under `jest-preset-angular`, so `ts-jest` performs **no type-checking** at all.
+
+A spec once shipped **6,239 passing tests over a tree that failed `npm run build` with `TS2345`**.
+*(Suite size at 2026-08-13: **6,267**. The lesson is unaffected; the number is dated on purpose.)*
+
+**Two gates, and you need both:**
+
+- **`npm run build`** — the gate for **app** code. `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), and with `strictTemplates` on it type-checks templates too. It does **not** see `*.spec.ts`.
+- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. **Gate against the 945 baseline — it will not be "clean", and expecting clean makes it useless again.**
+
+## ⚠ Gates must be proven able to fail (Kaizen K-004)
+
+Three mandated gates in this repo could not go red for the reason they were mandated: `npm run lint` (it is `eslint --fix`), `npm run build` for spec files (excluded by `tsconfig.build.json`), and the spec type-check above. **A verification command may not be cited as evidence until it has been observed failing** — break the thing on purpose once, confirm the gate reddens, then trust it.
+
+## ⚠ Several `environment` URLs are branch selectors, not just destinations (Kaizen K-005)
+
+`jwt.interceptor.ts` branches on whether a request URL matches `textMiningUrl` / `documentOverviewUrl` / `fileManagerUrl`, and mutates `req.body as FormData` when it does — which is `null` on a GET. `api.service.ts:989` uses `saveErrorsUrl` as a POST **base**. In production these are genuinely different hosts, which is what keeps the branches disjoint. **Collapsing them onto `mainApiUrl` "to simplify local" makes every API GET throw inside the interceptor before it leaves the browser, and turns error reporting into a self-reporting 404 loop.** Keep them distinct.
+
+Related: `src/environments/environment.ts` and `environment.dev.ts` are **gitignored**; a clean checkout
+cannot build or test until they exist. Copy the committed template **`src/environments/environment.example.ts`**
+(added 2026-08-13) — it documents the typed traps, including `hotjarId`/`hotjarVersion` which must be
+**numbers**, since a wrongly-typed hand-written stub breaks the build while leaving every test green.

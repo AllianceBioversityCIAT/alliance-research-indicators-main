@@ -4,8 +4,11 @@ import { DataSource } from 'typeorm';
 import { SaveResultService } from './save-all-sections.service';
 import { ResultsService } from '../../entities/results/results.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
+import { ResultInstitutionsService } from '../../entities/result-institutions/result-institutions.service';
+import { ResultEvidencesService } from '../../entities/result-evidences/result-evidences.service';
 import { QueryService } from '../utils/query.service';
 import { CurrentUserUtil } from '../utils/current-user.util';
+import { ResultsUtil } from '../utils/results.util';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
@@ -15,6 +18,10 @@ import {
   CounterResultsEnum,
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
+import { ResultPolicyChangeService } from '../../entities/result-policy-change/result-policy-change.service';
+import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
+import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
+import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -27,8 +34,27 @@ describe('SaveResultService', () => {
   let getRepository: jest.Mock;
   let resultsService: jest.Mocked<ResultsService>;
   let knowledgeProductService: jest.Mocked<ResultKnowledgeProductService>;
+  let resultInstitutionsService: jest.Mocked<
+    Pick<ResultInstitutionsService, 'updatePartners'>
+  >;
+  let resultEvidencesService: jest.Mocked<
+    Pick<ResultEvidencesService, 'updateResultEvidences'>
+  >;
+  let resultPolicyChangeService: jest.Mocked<
+    Pick<ResultPolicyChangeService, 'update'>
+  >;
+  let resultCapacitySharingService: jest.Mocked<
+    Pick<ResultCapacitySharingService, 'update'>
+  >;
+  let resultInnovationDevService: jest.Mocked<
+    Pick<ResultInnovationDevService, 'update'>
+  >;
+  let resultIpRightsService: jest.Mocked<Pick<ResultIpRightsService, 'update'>>;
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
+  let resultsUtil: jest.Mocked<
+    Pick<ResultsUtil, 'setCurrentResult' | 'clearManually'>
+  >;
 
   const minimalResultDto = (): ExternalMappersDto => {
     const r = new ExternalMappersDto();
@@ -123,6 +149,7 @@ describe('SaveResultService', () => {
           provide: QueryService,
           useValue: {
             deleteFullResultById: jest.fn().mockResolvedValue(undefined),
+            deleteLogicalResultById: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -132,14 +159,64 @@ describe('SaveResultService', () => {
             clearSystemUser: jest.fn(),
           },
         },
+        {
+          provide: ResultsUtil,
+          useValue: {
+            setCurrentResult: jest.fn().mockResolvedValue(undefined),
+            clearManually: jest.fn(),
+          },
+        },
+        {
+          provide: ResultInstitutionsService,
+          useValue: {
+            updatePartners: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultEvidencesService,
+          useValue: {
+            updateResultEvidences: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultPolicyChangeService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultCapacitySharingService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultInnovationDevService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ResultIpRightsService,
+          useValue: {
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(SaveResultService);
     resultsService = module.get(ResultsService);
     knowledgeProductService = module.get(ResultKnowledgeProductService);
+    resultInstitutionsService = module.get(ResultInstitutionsService);
+    resultEvidencesService = module.get(ResultEvidencesService);
+    resultPolicyChangeService = module.get(ResultPolicyChangeService);
+    resultCapacitySharingService = module.get(ResultCapacitySharingService);
+    resultInnovationDevService = module.get(ResultInnovationDevService);
+    resultIpRightsService = module.get(ResultIpRightsService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
+    resultsUtil = module.get(ResultsUtil);
   });
 
   afterEach(() => {
@@ -452,7 +529,7 @@ describe('SaveResultService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should persist public_link and sync geo location and knowledge product', async () => {
+    it('should persist public_link and sync geo location, partners, evidences and knowledge product', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 5,
         result_official_code: 7001,
@@ -461,6 +538,8 @@ describe('SaveResultService', () => {
       const dto = minimalResultDto();
       dto.public_link = 'https://example.org/public';
       dto.geoScope = { geo_scope_id: 2, countries: [] } as any;
+      dto.partners = { institutions: [{ institution_id: 10 }] } as any;
+      dto.evidence = { evidence: [{ evidence_url: 'https://e.org' }] } as any;
       dto.knowledgeProduct = { open_access: true, citation: 'cite' } as any;
 
       await service.saveAllSections(dto, prmsExtraData(counters));
@@ -472,15 +551,151 @@ describe('SaveResultService', () => {
           external_link: 'e',
         }),
       );
+      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(5);
       expect(resultsService.saveGeoLocation).toHaveBeenCalledWith(
         5,
         dto.geoScope,
+      );
+      expect(resultInstitutionsService.updatePartners).toHaveBeenCalledWith(
+        5,
+        dto.partners,
+      );
+      expect(resultEvidencesService.updateResultEvidences).toHaveBeenCalledWith(
+        5,
+        dto.evidence,
       );
       expect(knowledgeProductService.update).toHaveBeenCalledWith(
         5,
         dto.knowledgeProduct,
       );
+      expect(resultsUtil.clearManually).toHaveBeenCalled();
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should set and clear ResultsUtil context around section updates', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 60,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(60);
+      expect(resultsUtil.clearManually).toHaveBeenCalled();
+    });
+
+    it('should clear ResultsUtil context even when processing fails', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 61,
+        result_official_code: 7001,
+      } as any);
+      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
+
+      await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(61);
+      expect(resultsUtil.clearManually).toHaveBeenCalled();
+    });
+
+    it('should save policy change section when indicator is POLICY_CHANGE', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 70,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = {
+        policy_type_id: 1,
+        policy_stage_id: 1,
+        evidence_stage: undefined,
+        implementing_organization: [{ institution_id: 8064 }] as any,
+        innovation_development: undefined,
+        innovation_use: undefined,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).toHaveBeenCalledWith(
+        70,
+        dto.policyChange,
+      );
+    });
+
+    it('should not save policy change section when policyChange payload is empty', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 71,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+      dto.policyChange = undefined;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
+    });
+
+    it('should save capacity sharing section when indicator is CAPACITY_SHARING', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 80,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id =
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
+      dto.capacitySharing = {
+        session_format_id: 2,
+        delivery_modality_id: 3,
+        session_length_id: 1,
+        group: {
+          session_participants_male: 59,
+          session_participants_female: 16,
+          session_participants_non_binary: 0,
+          session_participants_total: 75,
+          is_attending_organization: true,
+          trainee_organization_representative: [{ institution_id: 21 }] as any,
+        } as any,
+      };
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
+        80,
+        dto.capacitySharing,
+      );
+    });
+
+    it('should save innovationDev and ipRights when indicator is INNOVATION_DEV', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 90,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
+      dto.innovationDev = {
+        short_title: 'Holistic framework',
+        innovation_nature_id: 1,
+        innovation_type_id: 13,
+        innovation_readiness_id: 14,
+        anticipated_users_id: 2,
+      } as any;
+      dto.ipRights = {
+        private_sector_engagement_id: 3,
+        formal_ip_rights_application_id: 2,
+      } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationDevService.update).toHaveBeenCalledWith(
+        90,
+        dto.innovationDev,
+      );
+      expect(resultIpRightsService.update).toHaveBeenCalledWith(
+        90,
+        dto.ipRights,
+      );
     });
 
     it('should merge STAR primary levers before updating alignment', async () => {
@@ -632,6 +847,29 @@ describe('SaveResultService', () => {
 
       expect(resultRepoHandle.find).not.toHaveBeenCalled();
       expect(resultsService.createResult).toHaveBeenCalled();
+    });
+
+    it('should logically delete lower-priority duplicates after TIP wins', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 88,
+          platform_code: ReportingPlatformEnum.PRMS,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 100,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, tipExtraData());
+
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(queryService.deleteLogicalResultById).toHaveBeenCalledWith(88);
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
     });
   });
 

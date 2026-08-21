@@ -23,6 +23,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:fixtures": "jest --config ./test/jest-fixtures.json",
+    "test:integration": "jest --config ./test/jest-integration.json",
     "compose:up:dev": "docker-compose up dev -d",
     "compose:up:prod": "docker-compose up prod -d",
     "compose:test:up": "docker-compose -f docker-compose.test.yml up -d",
@@ -37,6 +38,7 @@
     "migration:test:revert": "npm run typeorm migration:revert -- -d ./src/db/config/mysql/orm.test.config.ts",
     "baseline:test:load": "node ./scripts/load-baseline.js",
     "migration:test:bootstrap": "npm run baseline:test:load && npm run migration:test:execute",
+    "migration:scan": "node ./scripts/scan-migration-placeholders.js",
     "update:dependencies": "npx npm-check-updates -u"
   },
   "dependencies": {

@@ -17,6 +17,7 @@ import { CurrentResultService } from './cache/current-result.service';
 import { CacheService } from './cache/cache.service';
 import { ErrorResponse } from '@shared/interfaces/responses.interface';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
+import { isPoolFundingCapable } from '@shared/utils/platform-code.util';
 
 export type PatchTagResult =
   | { ok: true; data: PoolFundingTagPatchResponse }
@@ -46,6 +47,13 @@ export type PatchAlignmentResult =
       // AC-08.2 — per-SP ToC alignment validation errors, carried separately so the
       // page can render them inline on the matching block instead of a global toast.
       tocAlignmentErrors?: TocAlignmentError[];
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+      // The server-side 400 `errors.primary_sp: { code, description }` contract,
+      // surfaced defensively. canSave() validates this proactively and the client
+      // must not RELY on this path (design.md §6.1), but a race (e.g. another tab
+      // deselecting the Primary's SP mid-edit) can still reach the server, so the
+      // error is parsed rather than silently dropped as an unmapped 400.
+      primarySpError?: string;
     };
 
 @Injectable({ providedIn: 'root' })
@@ -140,7 +148,16 @@ export class BilateralService {
     return !hasActivePooledFundingContract(contract);
   }
 
+  // R-PFG-001 — the guard lives here (DD-1), covering all 5 call sites in one
+  // change. The ineligible path CLEARS state rather than merely skipping the
+  // fetch (DD-3): `currentAlignment` is a root-scoped singleton with no reset on
+  // navigation, and today the failing request is the only thing that nulls it.
+  // `loadingAlignment` is never raised on this path — there is nothing to await.
   async getAlignment(resultCode: string): Promise<AlignmentResponse | null> {
+    if (!isPoolFundingCapable(resultCode)) {
+      this.currentAlignment.set(null);
+      return null;
+    }
     this.loadingAlignment.set(true);
     try {
       const res = await this.api.GET_PoolFundingAlignment(resultCode);
@@ -210,13 +227,15 @@ export class BilateralService {
       const fieldErrors = this.extractFieldErrors(res?.errorDetail);
       const unknownSpCodes = this.extractUnknownSpCodes(res?.errorDetail);
       const tocAlignmentErrors = this.extractTocAlignmentErrors(res?.errorDetail);
+      const primarySpError = this.extractPrimarySpError(res?.errorDetail);
       return {
         ok: false,
         status: res?.status ?? 0,
         description: res?.errorDetail?.description ?? '',
         ...(fieldErrors ? { fieldErrors } : {}),
         ...(unknownSpCodes ? { unknownSpCodes } : {}),
-        ...(tocAlignmentErrors ? { tocAlignmentErrors } : {})
+        ...(tocAlignmentErrors ? { tocAlignmentErrors } : {}),
+        ...(primarySpError ? { primarySpError } : {})
       };
     } finally {
       this.savingAlignment.set(false);
@@ -282,6 +301,30 @@ export class BilateralService {
       entries.push({ sp_code: spCode, message, ...(typeof field === 'string' ? { field } : {}) });
     }
     return entries.length > 0 ? entries : undefined;
+  }
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
+  // Pull `primary_sp: { code, description }` out of the 400 envelope, defensively
+  // (see `primarySpError` above). Tolerant like the extractors above: accepts
+  // `errorDetail.errors` as EITHER a stringified-JSON string OR an already-parsed
+  // object, and returns only a well-formed, non-empty `description`.
+  private extractPrimarySpError(errorDetail: ErrorResponse | undefined): string | undefined {
+    const raw: unknown = errorDetail?.errors;
+    let parsed: unknown = raw;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith('{')) return undefined;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        return undefined;
+      }
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    const value = (parsed as Record<string, unknown>)['primary_sp'];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const description = (value as Record<string, unknown>)['description'];
+    return typeof description === 'string' && description.trim().length > 0 ? description : undefined;
   }
 
   private extractFieldErrors(errorDetail: ErrorResponse | undefined): Record<string, string> | undefined {
@@ -364,10 +407,19 @@ export class BilateralService {
     }));
   }
 
-  // Save seam (design §4.4 + D-9): `aligns_with_toc === false` → bare No DTO (no
-  // cascade fields); complete Yes → full DTO; unanswered (`null`) or incomplete
-  // Yes drafts are omitted entirely — defensive only, `canSave` gates completeness
-  // upstream (T-BIL-TM2-04).
+  // Save seam (design §4.4, §7.2 + D-C1-5): `aligns_with_toc === false` → bare No
+  // DTO (no cascade fields). A "Yes" is ALWAYS emitted once answered — every
+  // optional field (`level`, `toc_result_id`, `indicator_id`,
+  // `quantitative_contribution`) is included only when set, omitted otherwise.
+  // Only the unanswered (`null`) case is skipped entirely (T-BIL-TM2-04).
+  //
+  // NFR-BIL-112: this seam used to `continue` past an incomplete "Yes",
+  // silently dropping the draft from the request body — the user saw success
+  // while nothing persisted. `isDraftSaveable` (component.ts) blocks save below
+  // the Level + HLO floor, so a below-floor "Yes" should not normally reach this
+  // function in the UI flow; but if it does, it is still emitted here rather
+  // than dropped, so the server can reject it (`missing_required_fields`)
+  // instead of STAR silently discarding the user's answer.
   writeDtoFromDrafts(drafts: SpAlignmentDraft[]): TocAlignmentWriteDto[] {
     const dtos: TocAlignmentWriteDto[] = [];
     for (const draft of drafts) {
@@ -376,22 +428,13 @@ export class BilateralService {
         continue;
       }
       if (draft.aligns_with_toc !== true) continue; // unanswered → omitted
-      if (
-        draft.level === null ||
-        draft.toc_result_id === null ||
-        draft.indicator_id === null ||
-        draft.quantitative_contribution === null ||
-        draft.quantitative_contribution < 0
-      ) {
-        continue; // incomplete Yes → omitted (D-9)
-      }
       dtos.push({
         sp_code: draft.sp_code,
         aligns_with_toc: true,
-        level: draft.level,
-        toc_result_id: draft.toc_result_id,
-        indicator_id: draft.indicator_id,
-        quantitative_contribution: draft.quantitative_contribution
+        ...(draft.level !== null ? { level: draft.level } : {}),
+        ...(draft.toc_result_id !== null ? { toc_result_id: draft.toc_result_id } : {}),
+        ...(draft.indicator_id !== null ? { indicator_id: draft.indicator_id } : {}),
+        ...(draft.quantitative_contribution !== null ? { quantitative_contribution: draft.quantitative_contribution } : {})
       });
     }
     return dtos;

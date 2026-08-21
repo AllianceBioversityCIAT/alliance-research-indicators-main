@@ -36,6 +36,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/oicr-download/oicr-download.component').then(m => m.default)
   },
   {
+    path: 'reporting',
+    loadComponent: () => import('./pages/reporting/reporting.component').then(m => m.default)
+  },
+  {
     path: 'reports/result/:id',
     loadComponent: () => import('./pages/star-report-viewer/star-report-viewer.component').then(m => m.default),
     canMatch: [rolesGuard],

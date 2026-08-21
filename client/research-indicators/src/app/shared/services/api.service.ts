@@ -76,10 +76,15 @@ import { Initiative } from '@shared/interfaces/initiative.interface';
 import { FindContractsResponse } from '../interfaces/find-contracts.interface';
 import { PoolFundingTagPatchBody, PoolFundingTagPatchResponse } from '@interfaces/bilateral/agresso-contract.interface';
 import {
+  AutomapperApplyResponse,
+  AutomapperCoverage,
+  AutomapperPreviewResponse,
+  AutomapperRunRequest,
   BilateralMappingListPage,
   BilateralMappingListQuery,
   BilateralProjectMapping,
   ClarisaBilateralProjectOption,
+  ClarisaProjectPhasesResponse,
   CreateBilateralMappingBody,
   UpdateBilateralMappingBody
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
@@ -845,6 +850,7 @@ export class ApiService {
     if (query?.limit !== undefined) params['limit'] = String(query.limit);
     if (query?.search) params['search'] = query.search;
     if (query?.is_active !== undefined) params['is_active'] = String(query.is_active);
+    if (query?.status) params['status'] = query.status;
     if (query?.source) params['source'] = query.source;
     return this.TP.getWithParams(url(), params);
   };
@@ -869,9 +875,36 @@ export class ApiService {
     return this.TP.patch(url(), {}, { useResultInterceptor: true });
   };
 
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / T-06
+  GET_BilateralMappingCoverage = (phase?: number): Promise<MainResponse<AutomapperCoverage>> => {
+    const url = () => `bilateral-project-mappings/coverage`;
+    const params: Record<string, string> = {};
+    if (phase !== undefined) params['phase'] = String(phase);
+    return this.TP.getWithParams(url(), params);
+  };
+
+  POST_AutomapperPreview = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperPreviewResponse>> => {
+    const url = () => `bilateral-project-mappings/auto-map/preview`;
+    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
+  };
+
+  POST_AutomapperApply = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperApplyResponse>> => {
+    const url = () => `bilateral-project-mappings/auto-map/apply`;
+    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
+  };
+
   GET_ClarisaBilateralProjects = (search?: string): Promise<MainResponse<ClarisaBilateralProjectOption[]>> => {
     const url = () => `tools/clarisa/projects/bilateral`;
     if (search) return this.TP.getWithParams(url(), { search });
+    return this.TP.get(url(), {});
+  };
+
+  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-03 / R-CPC-003
+  // Distinct CLARISA project phases present in the eligible cohort, with a
+  // per-year count. Powers the admin-editable year selector on the
+  // Configuration Variables edit modal (design.md §7.2).
+  GET_ClarisaProjectPhases = (): Promise<MainResponse<ClarisaProjectPhasesResponse>> => {
+    const url = () => `tools/clarisa/projects/phases`;
     return this.TP.get(url(), {});
   };
 
