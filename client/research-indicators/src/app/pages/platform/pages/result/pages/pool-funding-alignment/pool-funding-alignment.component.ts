@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
+import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
@@ -65,6 +66,7 @@ interface ReadOnlyTocSummary {
     FormsModule,
     RadioButtonModule,
     TooltipModule,
+    DialogModule,
     SkeletonModule,
     FormHeaderComponent,
     NavigationButtonsComponent,
@@ -77,6 +79,7 @@ interface ReadOnlyTocSummary {
 })
 export default class PoolFundingAlignmentComponent {
   readonly bilateralService = inject(BilateralService);
+  readonly showHelpModal = signal<boolean>(false);
   private readonly cache = inject(CacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
