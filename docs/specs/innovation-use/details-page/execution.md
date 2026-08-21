@@ -28,7 +28,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-01 | 210 | **344** (+344 / −1, 6 files) | 1 | Over its derivation line by 134. Cause: the spec tier is larger than estimated — 252 of the 344 lines are test code across two spec files. See T-01's *Decisions* |
 | T-02 | 72 | **133** (+133 / −0, 3 files) | 2 | Over its derivation line by 61 — impl 4 lines against 12 budgeted, spec ~129 against 60. Cause: c1 inlines the TestBed setup that `renderNumberInput()` already encapsulates (~22 duplicated lines), plus the rework additions. Recorded, not reconciled |
 | T-03 | 170 | **90** (+90 / −8, 4 files; 3 `git mv` renames) | 1 | **Under** its derivation line by 80 — the first task to come in below estimate. Cause: the move carried the bulk of the code, so only the two inputs, the template branch and 5 new `it` blocks are new lines |
-| **Running total** | **452** | **567** | **4** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is +115 lines on a 452-line derivation — noise, not signal. Re-assess at T-07, the largest task |
+| T-04 | 300 | **363** (+363 / −0, 3 new files) | 2 | Over by 63. 270 of the 363 lines are the spec file — the **spec tier over-runs again**, matching T-01/T-02 and unlike T-03's move |
+| **Running total** | **752** | **930** | **6** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** At +23.7% sustained, the ~3,200 total would land near ~3,950 — still no tripwire *breach*, since §12 is a tripwire on the total and T-13 c10 owns the reconciliation, but the Leader is flagging the trend now rather than discovering it at the gate. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -350,5 +351,146 @@ None. No environment blockers, no rework.
 #### Final verification result
 
 Full client suite green (308/308 suites · 6350/6350 tests), `git diff --exit-code` clean on the consumer file, lint clean with `git status` re-inspected, the correction sweep bounded on every axis with zero old-path survivors, and the criterion's falsifying input executed and observed failing. **T-03 closed on attempt 1.**
+
+---
+
+### T-04 — Innovation use level stepper (0–9) + definition callout
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 2** (1 rework round) |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **2** of a 3-attempt ceiling |
+| **Effort / skills assigned** | attempt 1 `high` · attempt 2 `xhigh` (rework bump) · `angular-developer`, `tdd` |
+| **Requirements covered** | R-IUP-005 (all 6 ACs), R-IUP-018 (AC.2 for the stepper's accessible names) |
+
+#### Leader deviations from the task file, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Added **`tdd`** to the task's listed `angular-developer` | T-04's core is a **value mapping with a documented off-by-one trap**; c2 and c3 pin exact expected values (`label 6 → emit 7`, `id 7 → highlight label 6`). Red-then-green on a mapping is exactly where test-first pays |
+| Effort raised to `high` at attempt 1 (size M would default to `medium`) | The task file itself says *"this task is where the family's trap fires"*. An off-by-one here yields a page that looks correct and saves the wrong level |
+| **Single Reviewer retained at attempt 2 despite `xhigh`** | The 4R mode table triggers *parallel lens reviewers* at `xhigh`. Deliberately not applied: the remaining scope is three class names plus a citation, and `.agents/leader.md` → *Delegation Ceiling* ("one subagent beats several for a single modest task") binds harder here than the mode trigger. Recorded rather than done silently |
+
+#### Attempt 1 — Reviewer `STATUS: FAIL`
+
+**Files created** (3, all new): `innovation-use-level-stepper.component.{ts,html,spec.ts}` under `pages/…/innovation-use-details/components/innovation-use-level-stepper/`. The page directory was created but **the page itself was not** — correctly left to T-07.
+
+**Verification — Implementer:** `npm test -- --silent` full unfiltered → **309 suites passed, 6362 tests passed** (up from 308/6350; +1 suite, +12 tests). Coverage 99.17 / 98.23 / 99.04 / 99.38. `npm run lint -- --quiet` clean, `git status` re-inspected — no mutation. Hex grep over the three files → **0 hits**. c8 grep for a `name`-keyed lookup → **0 hits**.
+
+**Both falsifying inputs executed.** (a) `emit(level.id)` → `emit(level.level as number)` made c2 fail `Expected: 7 / Received: 6`. (b) Adding `<br>{{ selectedLevel.additional_guidance }}` made c4 fail on the marker string. Both reverted byte-identical.
+
+**Self-caught KZ-001 near-miss — worth recording as a positive.** The Implementer's *first* c4 assertion was `expect(calloutText).not.toContain('undefined')`, which **passed even with the bug present**, because Angular interpolates `undefined` as an empty string rather than the literal text. It caught this itself and replaced it with a marker-value fixture (`additional_guidance: 'GUIDANCE-MARKER-XYZ'`). The Reviewer was asked to **verify rather than trust** the replacement and confirmed it is genuinely falsifiable: a marker string cannot be satisfied by empty-string interpolation. This is the KZ-001 failure class detected by the author before review — the first time in this spec's run.
+
+**All eight criteria c1–c8 PASSED.** The FAIL is a §5.7 token violation that **no T-04 criterion covers**.
+
+| # | Verdict | Note |
+| --- | --- | --- |
+| c1 | ✅ | Ordered array equality on rendered labels (`['0'…'9']`), not a count — Disqualifier discharged. Plus a DD-6 shuffle test proving no client-side sort |
+| c2 | ✅ | Click-driven through the DOM; asserts `toHaveBeenCalledWith(7)` **and** `not.toHaveBeenCalledWith(6)` |
+| c3 | ✅ | Rendered className + rendered callout text, plus a negative check that adjacent **id** 8 is *not* also selected |
+| c4 | ✅ | Falsifiability confirmed independently, not trusted |
+| c5 | ✅ | No separate empty-catalog string was required — see Decisions |
+| c6 | ✅ | Per-button English `aria-label`; independent grep for Spanish across all three files → zero |
+| c7 | ✅ | Asserted on the **rendered** `btn.nativeElement.disabled`, not a component property |
+| c8 | ✅ | Genuinely falsifiable: with `selectedLevelId = 3`, a name-keyed `isSelected` would wrongly match the other `"Partners"` row, and the test demands `false` |
+
+**FAIL issue 1 — malformed token utility class names (verbatim):**
+
+> Three malformed design-token utility class names that match no CSS rule and therefore render nothing. The template uses `fs-14`, `fs-16`, and `rs-gap-1`. The repo's token utilities are **bracketed**: `README.md` documents `.fs-[n]` (n = 1–30) and `.rs-gap-[n]`, and the only in-repo usages confirm it — `form-header.component.html:12` `class="fs-[12] atc-grey-600"` and `section-header.component.html:35` `rs-gap-x-[15]`. `fs-14` is not a Tailwind utility either (there is no `fs` namespace), so it resolves to nothing: the required message and the stepper digits render at inherited size (~16px) instead of 14px/16px, a visible regression against the reference, whose `!text-[14px]` / `!text-[16px]` do resolve. […] **No T-04 criterion covers this, and T-11's automated criteria are a hex grep (c1) and an `isDarkMode()` grep (c5) — neither can ever catch it**, so deferring means never catching it. This is the first of four new component templates; left as-is the pattern gets copied into T-05, T-06 and T-07.
+
+> **Violated Rule:** `design.md` §5.7 (declared binding); `docs/ux-ui/design.md` §7.1 — "**Utility classes (do not invent parallels):** `.fs-[n]` … `.rs-gap-*`"; `client/research-indicators/src/CLAUDE.md`.
+
+**FAIL issue 2 — citation to the wrong file (verbatim):** the fixture header attributes the ten-row catalog to `design.md` §6.3; that table is in **`requirements.md`** §6.3, while `design.md` §6.3 is *"Numeric input — what is verified, and what is not"*. **The transcription itself is accurate** — the Reviewer verified all ten rows character-for-character, `id = level + 1` and every adjacent name-sharing pair. A traceability defect, not an evidentiary one.
+
+**The Reviewer's own stated verification limit, recorded because it bounds the evidence.** The utility definitions live in a **remote** stylesheet (`…amazonaws.com/frontend-parameters/colors.css`, loaded from `src/index.html:9`) and Tailwind is a runtime CDN JIT — so the Reviewer could not prove the unbracketed form is absent from that file, only that it is absent from the documentation, from every other file in the repo, and from Tailwind. **Attempt 2 was therefore instructed to verify the bracketed convention independently and to say so if the FAIL is wrong** — a Leader should rather learn the finding was mistaken than have a worker comply with a bad instruction.
+
+#### Leader adjudication
+
+**Not a Pivot.** §5.7's mapping is binding and the code diverges from it; the spec is right and the implementation is short. A rework attempt is the correct instrument.
+
+**Two questions the Leader raised pre-review, both resolved — one against the report, one for it:**
+
+1. **`--ac-red-1` vs `--ac-orange-1`.** The Leader verified inline that `--ac-orange-1` **does** exist (`#f58220` light / `#ff9d56` dark), contradicting the Implementer's stated rationale that *"no `--ac-*` token exists"* for the warning colour. The Reviewer was asked for a definite ruling and gave one: **the choice is correct, the rationale is false.** `docs/ux-ui/design.md` §7.1 assigns `--ac-red-1` to *"Errors, destructive actions"* and `--ac-orange-1` to *"Indicators 4–5"* — orange is bound to **indicator branding**, so using it for a validation message would have been the misuse. `#E69F00` has no token **by design**: DD-7 lists it among the reference page's documented §7.1 violations, and DD-7 *mandates* diverging from it. **`OQ-IUP-4` is therefore not engaged** — its trigger is "a reference colour has no existing token", and for this purpose one exists. The false claim is struck from the record here.
+2. **Zero-hex is necessary but NOT sufficient for token conformance.** The Reviewer's answer, and the general lesson this task produced: a clean hex grep still admits (a) a valid `var(--ac-*)` reference to a token whose §7.1 assignment is a *different purpose*, and (b) **a malformed token-family class name that matches no CSS rule at all — strictly worse than a hex literal, because a hex at least renders.** Issue 1 is instance (b). **This is the single most transferable finding of the run so far** and is why the fix was not deferred to T-11.
+
+#### Attempt 2 — Reviewer `STATUS: PASS`
+
+**Files changed** (2): `.html` and `.spec.ts`. The `.ts` was placed out of scope and is untouched — so every logic-level criterion (c2, c3's `isSelected` half, c7's guard, c8) is unchanged **by construction**.
+
+**Scope delivered** — four fixes, nothing wider:
+
+1. `fs-14` → `fs-[14]` (required-message span).
+2. `fs-16` → `fs-[16]` (stepper button).
+3. **`rs-gap-1` dropped in both places.** `gap-1` kept where it already co-existed; at the stepper row there was no companion and none was added.
+4. Citation corrected to `requirements.md §6.3 "The catalog — all ten rows"`.
+
+Plus the remediation's final clause, discharged as **(a) with the (b) caveat**: a new `describe` pins the rendered class list lexically, carrying an in-file comment stating that **jsdom loads no CSS**, so this proves the class *string* is correct — not that it renders at 14px/16px. The real visual gate is **T-13 c7**.
+
+**The FAIL was independently confirmed, not merely obeyed.** The Implementer was instructed to verify the bracketed convention itself and to say so if the finding was wrong. It found: `README.md:158-164` / `:187-198` document **only** `.fs-[n]` and `.rs-gap-[n]`/`-x-`/`-y-`; a repo-wide grep for the unbracketed form matched **only this component's own file pre-fix, zero elsewhere**; bracketed usages live at `form-header.component.html:12,18,27` and `section-header.component.html:35`. It hit the same remote-`colors.css` ceiling as the Reviewer **and said so rather than papering over it**. Both parties' evidence converged independently.
+
+**Verification:** `npm test -- --silent` full unfiltered → `Test Suites: 309 passed, 309 total` · `Tests: 6364 passed, 6364 total`. Lint clean, `git status` re-inspected. Hex grep zero; malformed-class grep zero.
+
+**Test arithmetic corroborates rather than merely agrees** (the Reviewer's framing, worth keeping): 12 → 14 tests in-file, suite total 6362 → 6364, **suites flat at 309**. A +2 delta with no suite change and no net loss means nothing was renamed, skipped, or quietly removed to make room.
+
+**Reviewer's rulings on the three judgment calls I referred to it**
+
+| Question | Ruling |
+| --- | --- |
+| Dropping `rs-gap-1` with **no** replacement at the stepper row | **Correct, and more strongly than the Implementer argued.** The row's class string is now **byte-identical to the reference** (`innovation-details.component.html:128`), which carries *no gap utility there at all*. So spacing is not merely unchanged, it is exactly reproduced. **Adding `gap-1` would have been the error** — 4px × 18 gaps ≈ 72px of extra width injected into a row that has none, pushing precisely the direction R-IUP-018 AC.5 (no horizontal overflow at `md:`) cares about. The Implementer was right to surface this rather than decide it silently |
+| Is `not.toMatch(/\bfs-14\b/)` redundant after `toContain('fs-[14]')`? | **Not redundant — independently falsifiable, with a constructed input.** `fs-14` does not occur inside `"fs-[14]"` (the `[` intervenes), so the two assertions test different propositions. `class="fs-[14] fs-14"` **passes the first and fails the second** — exactly the regression the pin exists to catch (someone re-adding the unbracketed form "to be safe"). Narrow limit: `\b` makes it exact-value, so `fs-140` would slip through; `/\bfs-\d/` would pin the whole family |
+| Is `By.css('span')` positionally fragile? | **Reliable in the asserted state, and every failure mode is loud.** With `levels = []` exactly one `<span>` renders (the `@for` emits nothing, the callout guard is false, the icon is an `<i>`). If a future edit inserts an earlier span the assertion fails with a wrong-className message — a false **failure**, not a false pass; if the span vanishes, `query` returns `null` and `.nativeElement` throws. Both drift directions are safe. Still positional rather than semantic: the file already contains the better idiom (c2/c3 locate the button by rendered text). Note the asymmetry — the button half is exhaustive (`length === 10` then `forEach`), the span half is first-match |
+
+#### Decisions made
+
+1. **Zero-hex is necessary but not sufficient for token conformance — the run's most transferable finding.** A clean hex grep still admits (a) a valid `var(--ac-*)` reference to a token whose §7.1 assignment is a *different purpose*, and (b) **a malformed token-family class name matching no CSS rule at all — strictly worse than a hex literal, because a hex at least renders.** Issue 1 was instance (b). It was fixed here rather than deferred to T-11 because **T-11's automated criteria are a hex grep (c1) and an `isDarkMode()` grep (c5), and neither can ever see a class name that matches nothing** — deferring would have meant never catching it. And T-04 is the **first of four new component templates**: T-05, T-06 and T-07 are all briefed to follow it as an exemplar.
+2. **`--ac-red-1` stands; its stated rationale was struck.** Ruled above.
+3. **The citation-slip pattern is real and Kaizen-worthy.** Three mis-attributions in four tasks — T-02 (a PrimeNG expression attributed to `design.md` §6.3), T-03 (`tasks.md` c6 citing §7 for a log in §8), T-04 (the catalog attributed to `design.md` §6.3 instead of `requirements.md` §6.3). **Two of the three collide on the string "§6.3", which exists in both documents with unrelated subjects.** The Reviewer's proposed lesson, endorsed: *cite `<file>` §`<n>` **and confirm the section title** before writing it; this spec's two documents share section numbers with different subjects, so a bare "§6.3" is ambiguous by construction.* Carried to the archive Kaizen step.
+4. **Single Reviewer retained at `xhigh`.** Recorded in the deviations table above.
+
+#### `ADVISORY` — 4R findings (recorded; **not** gating, **not** rework, **not** new tasks)
+
+Attempt 1's advisories carry forward unactioned; attempt 2 added two.
+
+| # | Lens | Finding | Reachability verdict | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **Reliability** | `isSelected()` is `this.selectedLevel?.level === level.level`. With nothing selected the left side is `undefined`, and `InnovationUseLevel` defaults `level` to `undefined` — so a row with an absent `level` renders as **selected** while the required message shows beside it. Same defect makes `ariaLabel()` emit `"Innovation use level undefined"` | **Tried three paths, reached none.** Seeded catalog always carries `level` 0–9; `level: null` does **not** trigger it (`null === undefined` is false under `===`); the service sets `response.data` or `[]` and never synthesizes a blank row; T-07 does not exist yet. **Latent, not currently reachable** | **The implementation is a literal transcription of §5.3's binding formula, so the flaw is the spec's, not the Implementer's** — the Reviewer stated it cannot FAIL conformance for conforming. Suggested hardening (`s?.level !== undefined && s.level === l.level`) **plus a matching §5.3 correction** — carried to `/akili-validate` |
+| 2 | **Reliability** | `@for (…; track level.id)` keys on `number \| undefined`; two rows with absent ids collide | **Could not construct.** Real ids are unique 1–10, no path synthesizes blank rows, and Angular raises `NG0955` on duplicate keys in dev — it would fail **loudly** | `track $index` would remove the class at no cost, since rows are never reordered in place |
+| 3 | **Resilience — ESCALATED, see below** | Catalog `500` + a saved level: `main()`'s `catch { list.set([]) }` swallows the failure, so the stepper renders zero buttons **and** "This field is required" over a record whose level *is* stored, with no affordance to see or correct it | **Reachable — payload given.** Mock the catalog GET to `500` and the details GET to `200 { innovation_use_level_id: 7 }` | **Not T-04's** (its §5.2 contract admits no third state) and **not T-07 c4's** (DD-11 governs the *details* GET only). **No task in `tasks.md` owns the catalog-load-failure surface.** Escalated to the user as a spec gap — see below |
+| 4 | **Risk** | `escape="false"` is genuinely effective — `primeng-tooltip.mjs` applies `transform: booleanAttribute` (line 743-744) and line 536 runs `innerHTML = content`, so interpolated `name`/`definition` are injected as raw HTML. `innerHTML` won't run `<script>`, but `<img onerror>` would | **Could not construct a payload.** Per family D-1 the catalog is **migration-seeded**, not CLARISA-synced, and chunk 2 exposes it read-only — no client- or API-reachable write path. Trust boundary is DB/migration level | §5.3 explicitly licenses matching the reference stepper's tooltip. No action. **Recorded so the boundary is on the record if the catalog ever gains a write endpoint** |
+| 5 | **Readability** | The `.ts` docblock repeats the spec's own arithmetic error — *"five names each cover two adjacent levels"* — while `.spec.ts` correctly says *"Four adjacent pairs"*. The table has **six** names, four of which repeat. The two new files now disagree | n/a | Upstream error is in `requirements.md` §6.3's note and R-IUP-005's scenario; per root `CLAUDE.md` §5 the **document** is what should be fixed. Zero behavioural impact — c8's fixture uses a genuinely shared pair (`"Partners"`). Owner: T-12 sweep |
+| 6 | **Readability / a11y** | Both callout lines are `<h3>`, copied from the reference — body prose inside a heading element pollutes the heading outline for screen-reader users | Always applies | Outside T-11 c2's scope (labels and accessible names); lands in **T-13 c7**. Raised now so it is not discovered at the gate |
+| 7 | **Resilience** | `-mt-2` on the required message is copied from a reference context where a helper `<h3>` precedes it. Here it is the root's first child, so the negative margin pulls 8px into whatever T-07 renders above | Always applies; visual only | Cheaper to drop now than to diagnose from a screenshot later. **Forward-pointed to T-07** |
+| 8 | **Readability** | Dead bare `pTooltip` attribute alongside `[pTooltip]`; and the `!` prefixes on `!w-8 !h-8 !flex …` were needed in the reference to beat `pButton`'s styles, which this component does not use | n/a | Noise. Noted |
+| 9 | **Reliability (test hygiene)** | c7's emission half calls `selectLevel()` directly, bypassing the DOM; c3's `isSelected` calls sit beside rendered assertions | n/a | Both layers *are* covered (native `disabled` asserted on every rendered button; c3 has a rendered className + callout assertion). A `click()` under `disabled = true` would prove both in one assertion. Polish, not a gap |
+| 10 | **Readability** | The new lexical-pin `describe` sits between c5 and c6, interrupting the contiguous c1…c8 reading order | n/a | It maps to no criterion so it has no natural slot; after c8 would keep the sequence intact. Cosmetic |
+
+#### ⚠️ Escalation to the user — a spec gap with no owner (Advisory 3)
+
+Per `/akili-execute` §2.4, **an advisory may never mint or widen a task in this spec** — the only route from advisory to new work is out of the spec, via the user. The Reviewer explicitly asked the Leader to assign this rather than leave it advisory, and assigning it is exactly what the Leader may not do unilaterally.
+
+**The gap:** the **catalog**-load-failure surface is unowned. T-01's `GetInnovationUseLevelsService.main()` reads `response?.data` without consulting `successfulRequest`, so a `500` is indistinguishable from an empty catalog. DD-11 and T-07 c4 close this hole for the **details** GET; nothing closes it for the **catalog** GET. The user-visible result is a page asserting a required field is empty over a record that has a level saved.
+
+**Severity is bounded:** no write is triggered, so unlike DD-11's case there is no data-destruction path. The user is blocked and misinformed, not silently damaged.
+
+**Leader recommendation:** carry to `/akili-validate` rather than reopening the spec now. It is not a blocker for T-05…T-13, the mitigation belongs in the same place as the existing `loadFailed` machinery (T-07), and reopening `tasks.md` mid-execution re-runs the budget and approval gates for a bounded, non-destructive defect. **The user's call, recorded either way.**
+
+#### Forward pointers — carried by the brief or by nobody
+
+| Target | Pointer |
+| --- | --- |
+| **T-05, T-06, T-07** | **Use the bracketed token form `fs-[n]` / `rs-gap-[n]`.** T-04 shipped the malformed unbracketed form and no automated criterion in the spec could catch it. These three tasks are briefed to follow T-04 as an exemplar — the exemplar is now correct, and each brief must state the convention explicitly anyway |
+| **T-07** | Advisory 7 — `-mt-2` on the stepper's required message pulls into whatever the page renders above it |
+| **T-11** | Its c1/c5 greps **cannot** detect a malformed utility class. If T-11 is to be the token gate, its evidence must include a lexical check of token-family class names, not only a hex grep |
+| **T-12** | Advisory 5 — the "five names" arithmetic error in `requirements.md` §6.3 / R-IUP-005 and now the `.ts` docblock |
+| **T-13** | c7 must confirm the required message renders at 14px and the stepper digits at 16px — **jsdom proved only the class string, never the rendered size** |
+
+#### Issues encountered
+
+One rework round on a §5.7 token violation no T-04 criterion covered. No environment blockers.
+
+#### Final verification result
+
+Full client suite green (309/309 suites · 6364/6364 tests), coverage above all floors, lint clean with `git status` re-inspected, both falsifying inputs executed and observed failing, and the token convention independently re-verified by both worker and auditor. **T-04 closed on attempt 2 of 3.**
 
 ---

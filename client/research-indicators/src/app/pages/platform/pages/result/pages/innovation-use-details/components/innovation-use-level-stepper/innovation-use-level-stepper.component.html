@@ -1,0 +1,43 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-04 — innovation use level stepper) -->
+<div>
+  @if (!selectedLevel) {
+    <div class="flex items-center gap-1 -mt-2 text-[var(--ac-red-1)]">
+      <i class="material-symbols-rounded !text-[14px]">warning</i>
+      <span class="fs-[14]">This field is required</span>
+    </div>
+  }
+
+  <div class="flex items-center justify-between w-full max-w-4xl mx-auto mt-3 xl:px-5 select-none">
+    @for (level of levels; track level.id) {
+      <div class="flex flex-col items-center">
+        <button
+          pTooltip
+          type="button"
+          class="!rounded-full !border-2 border-[var(--ac-light-blue-300)] fs-[16] !w-8 !h-8 !flex !items-center !justify-center transition-all duration-200 {{
+            isSelected(level) ? 'bg-[var(--ac-light-blue-300)] text-[var(--ac-white-1)]' : 'bg-[var(--ac-white-1)] text-[var(--ac-light-blue-300)]'
+          }}"
+          [disabled]="disabled"
+          (click)="selectLevel(level)"
+          [pTooltip]="tooltip(level)"
+          escape="false"
+          tooltipPosition="top"
+          [attr.aria-label]="ariaLabel(level)">
+          {{ level.level }}
+        </button>
+        @if (isSelected(level)) {
+          <div class="w-0.5 h-10 bg-[var(--ac-light-blue-200)]"></div>
+        }
+      </div>
+      @if (!$last) {
+        <div class="flex-1 h-[2.5px] bg-[var(--ac-grey-200)]" style="min-width: 24px"></div>
+      }
+    }
+  </div>
+
+  @if (selectedLevel) {
+    <div class="flex flex-col border-2 rounded-lg border-[var(--ac-light-blue-200)] mt-3 p-5">
+      <h3 class="option-label font-bold">{{ selectedLevel.level }} - {{ selectedLevel.name }}</h3>
+      <h3 class="description">{{ selectedLevel.definition }}</h3>
+    </div>
+  }
+</div>

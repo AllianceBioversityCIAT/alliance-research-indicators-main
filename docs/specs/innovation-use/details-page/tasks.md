@@ -208,7 +208,7 @@ graph TD
 
 ### T-04 — Innovation use level stepper (0–9) + definition callout
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done · **Size:** M · **Dependencies:** T-01
 - **Requirements covered:** R-IUP-005 (all 6 ACs), R-IUP-018 (AC.2 for the stepper's accessible names)
 - **Design references:** §5.2, §5.3, §6.1 step 5, **DD-5**, **DD-6**, family **D-1**
 - **Skills:** `angular-developer`
@@ -228,14 +228,14 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Ten buttons render labelled `0`…`9` in ascending `level` order, in the order the input array supplies.
-- [ ] c2 — **Selecting the button labelled `6` emits `7`.**
-- [ ] c3 — **`selectedLevelId = 7` highlights the button labelled `6`** and shows the level-6 callout.
-- [ ] c4 — The callout renders `level`, `name`, `definition` and asserts the **absence** of `additional_guidance`.
-- [ ] c5 — An empty `levels` array renders zero buttons and the required message.
-- [ ] c6 — Every button exposes an English `aria-label`; no Spanish string appears in the file.
-- [ ] c7 — `disabled` makes every button non-interactive.
-- [ ] c8 — No code path in the file references `name` for resolution (grep the file for a `name`-keyed `find`/comparison and show zero hits).
+- [x] c1 — Ten buttons render labelled `0`…`9` in ascending `level` order, in the order the input array supplies.
+- [x] c2 — **Selecting the button labelled `6` emits `7`.**
+- [x] c3 — **`selectedLevelId = 7` highlights the button labelled `6`** and shows the level-6 callout.
+- [x] c4 — The callout renders `level`, `name`, `definition` and asserts the **absence** of `additional_guidance`.
+- [x] c5 — An empty `levels` array renders zero buttons and the required message.
+- [x] c6 — Every button exposes an English `aria-label`; no Spanish string appears in the file.
+- [x] c7 — `disabled` makes every button non-interactive.
+- [x] c8 — No code path in the file references `name` for resolution (grep the file for a `name`-keyed `find`/comparison and show zero hits).
 
 **Falsifying inputs** — bind `level` instead of `id` on emit → **c2 must FAIL**. Render `additional_guidance` → **c4 must FAIL** (`design.md` §10.3).
 
