@@ -1,0 +1,10 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 1960, "title": "Project Dashboard — proposed" },
+    { "file": "States.dc.html", "x": 1560, "y": 0, "w": 720, "h": 720, "title": "Async state pattern" }
+  ],
+  "annotations": [
+    { "id": "spec-note", "x": 1560, "y": 800, "w": 340, "text": "AKILI spec: changes/project-dashboard-redesign\nDatos de ejemplo (sample data) — no reales.\nPaleta tomada de los tokens --ac-* de STAR; colores de estado semánticos (verde aprobado / azul enviado / gris borrador / naranja pendiente / rojo rechazado), nunca color solo: siempre punto + etiqueta + valor." }
+  ],
+  "launch": { "view": "canvas" }
+}

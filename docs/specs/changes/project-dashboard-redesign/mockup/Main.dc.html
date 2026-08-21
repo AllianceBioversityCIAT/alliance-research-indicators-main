@@ -1,0 +1,337 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;family=Barlow:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f5f5f5; font-family: 'Barlow', 'Segoe UI', system-ui, sans-serif; color: #4c5158; }
+    a { color: #035ba9; text-decoration: none; }
+    a:hover { color: #074b86; text-decoration: underline; }
+  </style>
+</helmet>
+<div style="width: 1440px; min-height: 1900px; background: #f5f5f5; box-sizing: border-box; padding: 32px 40px 40px 40px; display: flex; flex-direction: column; gap: 20px">
+
+  <!-- Compact data caveat (replaces the 90-word banner) -->
+  <div style="display: flex; align-items: center; gap: 10px; background: #ffffff; border: 1px solid #e8ebed; border-left: 3px solid #1689ca; border-radius: 8px; padding: 10px 16px">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#1689ca" stroke-width="1.5"/><path d="M8 7.2v3.4" stroke="#1689ca" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5" r="0.9" fill="#1689ca"/></svg>
+    <span style="font-size: 13px; color: #777c83; flex: 1">Analytics reflect STAR-reported metadata; TIP / PRMS / AICCRA results may carry partial fields. <a href="#">Learn more</a></span>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" stroke="#a2a9af" stroke-width="1.5" stroke-linecap="round"/></svg>
+  </div>
+
+  <!-- Section header -->
+  <div style="display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17V9M8.5 17V3M14 17v-6M19 17H1" stroke="#153c71" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 19px; letter-spacing: 0.15px; color: #153c71">Result analytics</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="font-size: 13px; color: #777c83">Project A1676 · updated 21 Aug 2026</span>
+      <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; background: #ffffff; border: 1px solid #d1d6da; border-radius: 8px; box-sizing: border-box">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5v8.5m0 0L4.5 7m3 3l3-3M2 11.5v1a1 1 0 001 1h9a1 1 0 001-1v-1" stroke="#035ba9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 13.5px; color: #035ba9">Export</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px">
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(17,47,92,0.04)">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #777c83">Total results</span>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; color: #112f5c; line-height: 1">128</span>
+      <span style="font-size: 12.5px; color: #358540">▲ 18 vs. 2024 reporting cycle</span>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(17,47,92,0.04)">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #777c83">Indicators covered</span>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; color: #112f5c; line-height: 1">5</span>
+      <span style="font-size: 12.5px; color: #777c83">of 5 indicator types</span>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(17,47,92,0.04)">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #777c83">Pending revision</span>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; color: #112f5c; line-height: 1">12</span>
+      <a href="#" style="font-size: 12.5px">Review queue →</a>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(17,47,92,0.04)">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #777c83">Partner institutions</span>
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 34px; color: #112f5c; line-height: 1">24</span>
+      <span style="font-size: 12.5px; color: #777c83">across 11 countries</span>
+    </div>
+  </div>
+
+  <!-- Row B: trend + status -->
+  <div style="display: grid; grid-template-columns: 8fr 4fr; gap: 20px">
+
+    <!-- Results over time -->
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14.5px; color: #153c71">Results over time</span>
+        <span style="font-size: 12px; color: #777c83">by report year · 2025 in progress</span>
+      </div>
+      <svg width="100%" height="240" viewBox="0 0 840 240" role="img" aria-label="Results per report year, 2020 to 2025: 6, 14, 22, 31, 34, and 21 year to date">
+        <line x1="36" y1="196" x2="824" y2="196" stroke="#e8ebed" stroke-width="1"/>
+        <line x1="36" y1="151" x2="824" y2="151" stroke="#f4f7f9" stroke-width="1"/>
+        <line x1="36" y1="106" x2="824" y2="106" stroke="#f4f7f9" stroke-width="1"/>
+        <line x1="36" y1="61" x2="824" y2="61" stroke="#f4f7f9" stroke-width="1"/>
+        <line x1="36" y1="16" x2="824" y2="16" stroke="#f4f7f9" stroke-width="1"/>
+        <text x="28" y="200" text-anchor="end" font-size="11" fill="#a2a9af">0</text>
+        <text x="28" y="155" text-anchor="end" font-size="11" fill="#a2a9af">10</text>
+        <text x="28" y="110" text-anchor="end" font-size="11" fill="#a2a9af">20</text>
+        <text x="28" y="65" text-anchor="end" font-size="11" fill="#a2a9af">30</text>
+        <text x="28" y="20" text-anchor="end" font-size="11" fill="#a2a9af">40</text>
+        <path d="M36,169 L193.6,133 L351.2,97 L508.8,56.5 L666.4,43 L824,101.5 L824,196 L36,196 Z" fill="rgba(3,91,169,0.07)"/>
+        <path d="M36,169 L193.6,133 L351.2,97 L508.8,56.5 L666.4,43" fill="none" stroke="#035ba9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M666.4,43 L824,101.5" fill="none" stroke="#035ba9" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round"/>
+        <circle cx="36" cy="169" r="4" fill="#ffffff" stroke="#035ba9" stroke-width="2"/>
+        <circle cx="193.6" cy="133" r="4" fill="#ffffff" stroke="#035ba9" stroke-width="2"/>
+        <circle cx="351.2" cy="97" r="4" fill="#ffffff" stroke="#035ba9" stroke-width="2"/>
+        <circle cx="508.8" cy="56.5" r="4" fill="#ffffff" stroke="#035ba9" stroke-width="2"/>
+        <circle cx="666.4" cy="43" r="5" fill="#035ba9" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="824" cy="101.5" r="4" fill="#ffffff" stroke="#035ba9" stroke-width="2"/>
+        <text x="666.4" y="30" text-anchor="middle" font-size="12" font-weight="600" fill="#112f5c">34</text>
+        <text x="824" y="88" text-anchor="end" font-size="12" fill="#777c83">21 YTD</text>
+        <text x="36" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2020</text>
+        <text x="193.6" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2021</text>
+        <text x="351.2" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2022</text>
+        <text x="508.8" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2023</text>
+        <text x="666.4" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2024</text>
+        <text x="824" y="216" text-anchor="middle" font-size="11.5" fill="#777c83">2025</text>
+      </svg>
+    </div>
+
+    <!-- Results by status -->
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14.5px; color: #153c71">Results by status</span>
+        <span style="font-size: 12px; color: #777c83">128 total</span>
+      </div>
+      <div style="display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden" role="img" aria-label="Status composition: approved 61, submitted 28, draft 19, pending revision 12, rejected 8">
+        <div style="width: 47.7%; background: #358540"></div>
+        <div style="width: 21.9%; background: #1689ca"></div>
+        <div style="width: 14.8%; background: #8d9299"></div>
+        <div style="width: 9.4%; background: #f58220"></div>
+        <div style="width: 6.2%; background: #cf0808"></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #358540"></span>
+          <span style="flex: 1; font-size: 13.5px; color: #4c5158">Approved</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #112f5c">61</span>
+          <span style="font-size: 12px; color: #a2a9af; width: 38px; text-align: right">48%</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #1689ca"></span>
+          <span style="flex: 1; font-size: 13.5px; color: #4c5158">Submitted</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #112f5c">28</span>
+          <span style="font-size: 12px; color: #a2a9af; width: 38px; text-align: right">22%</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #8d9299"></span>
+          <span style="flex: 1; font-size: 13.5px; color: #4c5158">Draft</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #112f5c">19</span>
+          <span style="font-size: 12px; color: #a2a9af; width: 38px; text-align: right">15%</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #f58220"></span>
+          <span style="flex: 1; font-size: 13.5px; color: #4c5158">Pending revision</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #112f5c">12</span>
+          <span style="font-size: 12px; color: #a2a9af; width: 38px; text-align: right">9%</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span style="width: 9px; height: 9px; border-radius: 50%; background: #cf0808"></span>
+          <span style="flex: 1; font-size: 13.5px; color: #4c5158">Rejected</span>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #112f5c">8</span>
+          <span style="font-size: 12px; color: #a2a9af; width: 38px; text-align: right">6%</span>
+        </div>
+      </div>
+      <a href="#" style="font-size: 12.5px; margin-top: auto">Open in Results Center →</a>
+    </div>
+  </div>
+
+  <!-- Row C: indicators + ranked cards -->
+  <div style="display: grid; grid-template-columns: 5fr 7fr; gap: 20px">
+
+    <!-- Results by indicator -->
+    <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14.5px; color: #153c71">Results by indicator</span>
+        <span style="font-size: 12px; color: #777c83">5 indicators</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: grid; grid-template-columns: 168px minmax(0,1fr) 34px; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #4c5158">Capacity Sharing</span>
+          <div style="height: 12px; background: #f4f7f9; border-radius: 4px"><div style="width: 100%; height: 12px; background: #035ba9; border-radius: 4px"></div></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #112f5c; text-align: right">46</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 168px minmax(0,1fr) 34px; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #4c5158">Innovation Development</span>
+          <div style="height: 12px; background: #f4f7f9; border-radius: 4px"><div style="width: 67%; height: 12px; background: #035ba9; border-radius: 4px"></div></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #112f5c; text-align: right">31</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 168px minmax(0,1fr) 34px; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #4c5158">Policy Change</span>
+          <div style="height: 12px; background: #f4f7f9; border-radius: 4px"><div style="width: 48%; height: 12px; background: #035ba9; border-radius: 4px"></div></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #112f5c; text-align: right">22</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 168px minmax(0,1fr) 34px; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #4c5158">OICR</span>
+          <div style="height: 12px; background: #f4f7f9; border-radius: 4px"><div style="width: 37%; height: 12px; background: #035ba9; border-radius: 4px"></div></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #112f5c; text-align: right">17</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 168px minmax(0,1fr) 34px; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #4c5158">IP Rights</span>
+          <div style="height: 12px; background: #f4f7f9; border-radius: 4px"><div style="width: 26%; height: 12px; background: #035ba9; border-radius: 4px"></div></div>
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13px; color: #112f5c; text-align: right">12</span>
+        </div>
+      </div>
+      <span style="font-size: 12px; color: #a2a9af; margin-top: auto">Click a bar to open the indicator's results, filtered to this project.</span>
+    </div>
+
+    <!-- Ranked 2x2 -->
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 20px">
+      <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #153c71">Top partner institutions</span>
+          <a href="#" style="font-size: 12px">View all</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Alliance Bioversity–CIAT</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 100%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">18</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">CIMMYT</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 50%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">9</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">ICARDA</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 39%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">7</span></div>
+        </div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #153c71">Top primary levers</span>
+          <a href="#" style="font-size: 12px">View all</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Climate action</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 100%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">22</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Nutrition &amp; food security</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 68%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">15</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Multifunctional landscapes</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 45%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">10</span></div>
+        </div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #153c71">Top main contact persons</span>
+          <a href="#" style="font-size: 12px">View all</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">A. Rodríguez</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 100%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">14</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">J. Mwangi</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 79%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">11</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><span style="font-size: 12.5px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">T. Nguyen</span><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 57%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">8</span></div>
+        </div>
+      </div>
+      <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; justify-content: space-between">
+          <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 13.5px; color: #153c71">Top contributing projects</span>
+          <a href="#" style="font-size: 12px">View all</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><a href="#" style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">A0345 — Seed systems scaling</a><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 100%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">6</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><a href="#" style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">A0912 — Agroecology transitions</a><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 67%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">4</span></div>
+          <div style="display: grid; grid-template-columns: minmax(0,1fr) 24px; gap: 8px; align-items: center"><div style="display: flex; flex-direction: column; gap: 3px"><a href="#" style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">A1101 — Digital advisory tools</a><div style="height: 6px; background: #f4f7f9; border-radius: 3px"><div style="width: 50%; height: 6px; background: #345b8f; border-radius: 3px"></div></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">3</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row D: geographic scope -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14.5px; color: #153c71">Geographic scope</span>
+      <div style="display: flex; gap: 16px; font-size: 12.5px; color: #777c83">
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #112f5c"></span>Global 4</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #035ba9"></span>Regional 17</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1689ca"></span>Countries 89</span>
+        <span style="display: flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #7c9cb9"></span>Sub-national 18</span>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 1.4fr); gap: 24px">
+      <div style="background: #f4f7f9; border: 1px solid #e8ebed; border-radius: 8px; min-height: 220px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden">
+        <svg width="280" height="160" viewBox="0 0 280 160" fill="none" aria-label="World map with project countries highlighted">
+          <ellipse cx="70" cy="60" rx="38" ry="26" fill="#d1d6da"/>
+          <ellipse cx="96" cy="112" rx="20" ry="30" fill="#d1d6da"/>
+          <ellipse cx="150" cy="52" rx="30" ry="20" fill="#d1d6da"/>
+          <ellipse cx="158" cy="102" rx="22" ry="28" fill="#d1d6da"/>
+          <ellipse cx="216" cy="64" rx="34" ry="24" fill="#d1d6da"/>
+          <ellipse cx="238" cy="122" rx="16" ry="12" fill="#d1d6da"/>
+          <circle cx="94" cy="106" r="7" fill="#1689ca" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="160" cy="108" r="7" fill="#1689ca" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="166" cy="92" r="5" fill="#1689ca" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="226" cy="74" r="6" fill="#1689ca" stroke="#ffffff" stroke-width="2"/>
+          <circle cx="150" cy="118" r="4" fill="#1689ca" stroke="#ffffff" stroke-width="2"/>
+        </svg>
+        <span style="position: absolute; bottom: 8px; right: 12px; font-size: 11px; color: #a2a9af">Interactive map (Mapbox)</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px">
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Top countries</span>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">Colombia</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 100%; height: 8px; background: #1689ca; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">24</span></div>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">Kenya</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 75%; height: 8px; background: #1689ca; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">18</span></div>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">Vietnam</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 50%; height: 8px; background: #1689ca; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">12</span></div>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">Ethiopia</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 38%; height: 8px; background: #1689ca; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">9</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Top regions</span>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">E. Africa</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 100%; height: 8px; background: #035ba9; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">8</span></div>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">S. America</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 63%; height: 8px; background: #035ba9; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">5</span></div>
+          <div style="display: grid; grid-template-columns: 84px minmax(0,1fr) 24px; gap: 8px; align-items: center"><span style="font-size: 12.5px; color: #4c5158">SE Asia</span><div style="height: 8px; background: #f4f7f9; border-radius: 4px"><div style="width: 50%; height: 8px; background: #035ba9; border-radius: 4px"></div></div><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 12.5px; color: #112f5c; text-align: right">4</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row E: pending revision table -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14.5px; color: #153c71">Results pending revision</span>
+      <a href="#" style="font-size: 12.5px">View all 12 →</a>
+    </div>
+    <div style="display: flex; flex-direction: column">
+      <div style="display: grid; grid-template-columns: 120px minmax(0,1fr) 180px 140px 110px; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #e8ebed">
+        <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Code</span>
+        <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Title</span>
+        <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Indicator</span>
+        <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Submitted by</span>
+        <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a2a9af">Waiting</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px minmax(0,1fr) 180px 140px 110px; gap: 12px; padding: 0 12px; min-height: 46px; align-items: center; border-bottom: 1px solid #f4f7f9">
+        <a href="#" style="font-size: 13px; font-weight: 500">STAR-2841</a>
+        <span style="font-size: 13px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Farmer field schools on climate-smart bean varieties</span>
+        <span style="font-size: 13px; color: #777c83">Capacity Sharing</span>
+        <span style="font-size: 13px; color: #777c83">A. Rodríguez</span>
+        <span style="font-size: 13px; color: #f58220; font-weight: 500">9 days</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px minmax(0,1fr) 180px 140px 110px; gap: 12px; padding: 0 12px; min-height: 46px; align-items: center; border-bottom: 1px solid #f4f7f9">
+        <a href="#" style="font-size: 13px; font-weight: 500">STAR-2836</a>
+        <span style="font-size: 13px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Digital advisory platform adoption by extension services</span>
+        <span style="font-size: 13px; color: #777c83">Innovation Development</span>
+        <span style="font-size: 13px; color: #777c83">J. Mwangi</span>
+        <span style="font-size: 13px; color: #777c83">4 days</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 120px minmax(0,1fr) 180px 140px 110px; gap: 12px; padding: 0 12px; min-height: 46px; align-items: center">
+        <a href="#" style="font-size: 13px; font-weight: 500">STAR-2829</a>
+        <span style="font-size: 13px; color: #4c5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">National seed policy amendment technical inputs</span>
+        <span style="font-size: 13px; color: #777c83">Policy Change</span>
+        <span style="font-size: 13px; color: #777c83">T. Nguyen</span>
+        <span style="font-size: 13px; color: #777c83">2 days</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row F: AI summary, collapsed, moved below analytics -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 14px 24px; box-shadow: 0 1px 2px rgba(17,47,92,0.04); display: flex; align-items: center; gap: 12px; min-height: 56px; box-sizing: border-box">
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5l1.7 4.6 4.8.3-3.7 3 1.2 4.6L9 11.4 5 14l1.2-4.6-3.7-3 4.8-.3L9 1.5z" stroke="#345b8f" stroke-width="1.4" stroke-linejoin="round"/></svg>
+    <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #153c71">Grounded AI executive summary</span>
+    <span style="font-size: 12.5px; color: #777c83; flex: 1">Generated 18 Aug 2026 from 3 grounding documents · admins can regenerate</span>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 5.5L7 9.5l4-4" stroke="#777c83" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

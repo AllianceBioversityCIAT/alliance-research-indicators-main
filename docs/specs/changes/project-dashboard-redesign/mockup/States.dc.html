@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&amp;family=Barlow:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f5f5f5; font-family: 'Barlow', 'Segoe UI', system-ui, sans-serif; color: #4c5158; }
+    a { color: #035ba9; text-decoration: none; }
+    a:hover { color: #074b86; text-decoration: underline; }
+  </style>
+</helmet>
+<div style="width: 720px; min-height: 700px; background: #f5f5f5; box-sizing: border-box; padding: 28px 32px; display: flex; flex-direction: column; gap: 18px">
+
+  <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: #153c71">Unified async states — every data region</span>
+
+  <!-- 1. Skeleton -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px">
+    <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #a2a9af">1 · Loading — skeleton, never empty-state copy</span>
+    <div style="width: 140px; height: 13px; border-radius: 4px; background: #e8ebed"></div>
+    <div style="display: flex; flex-direction: column; gap: 9px">
+      <div style="width: 100%; height: 10px; border-radius: 4px; background: #f4f7f9"></div>
+      <div style="width: 82%; height: 10px; border-radius: 4px; background: #f4f7f9"></div>
+      <div style="width: 64%; height: 10px; border-radius: 4px; background: #f4f7f9"></div>
+      <div style="width: 45%; height: 10px; border-radius: 4px; background: #f4f7f9"></div>
+    </div>
+  </div>
+
+  <!-- 2. Error -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px">
+    <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #a2a9af">2 · Error — named failure + retry, distinct from empty</span>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 3L26 24H2L14 3z" stroke="#cf0808" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 11v6" stroke="#cf0808" stroke-width="1.8" stroke-linecap="round"/><circle cx="14" cy="20.4" r="1.2" fill="#cf0808"/></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+        <span style="font-size: 13.5px; font-weight: 500; color: #4c5158">We couldn't load the status data.</span>
+        <span style="font-size: 12.5px; color: #777c83">Your other charts are unaffected.</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; background: #035ba9; border-radius: 8px; box-sizing: border-box">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 13.5px; color: #ffffff">Try again</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Empty -->
+  <div style="background: #ffffff; border: 1px solid #e8ebed; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px">
+    <span style="font-size: 11.5px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: #a2a9af">3 · Empty — confirmed no data, with the next action</span>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="6" width="22" height="18" rx="2" stroke="#a2a9af" stroke-width="1.8"/><path d="M8 14h12M8 18.5h7" stroke="#a2a9af" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <div style="display: flex; flex-direction: column; gap: 2px; flex: 1">
+        <span style="font-size: 13.5px; font-weight: 500; color: #4c5158">No results reported for this project yet.</span>
+        <span style="font-size: 12.5px; color: #777c83">Charts appear as soon as the first result is created.</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; height: 44px; padding: 0 20px; background: #ffffff; border: 1px solid #d1d6da; border-radius: 8px; box-sizing: border-box">
+        <span style="font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 13.5px; color: #035ba9">Create a result</span>
+      </div>
+    </div>
+  </div>
+
+  <span style="font-size: 12px; color: #777c83; line-height: 1.5">Rule: a region in flight shows the skeleton — never the empty-state copy. Error and empty are visually and verbally distinct, and error always offers retry scoped to that region only.</span>
+
+</div>
+</x-dc>
+</body>
+</html>
