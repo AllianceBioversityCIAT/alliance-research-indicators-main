@@ -276,11 +276,11 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   // ── Column Sorting (R-BTE-004) ─────────────────────────────────────────────
   onSort(event: { data?: BilateralProjectMapping[]; field?: string; order?: number }): void {
     if (!event.data || !event.field || !event.order) return;
-    const field = event.field;
+    const field = event.field as keyof BilateralProjectMapping;
     const order = event.order;
-    event.data.sort((data1: Record<string, unknown>, data2: Record<string, unknown>) => {
-      let val1 = (data1[field] as string | number | null | undefined) ?? '';
-      let val2 = (data2[field] as string | number | null | undefined) ?? '';
+    event.data.sort((data1: BilateralProjectMapping, data2: BilateralProjectMapping) => {
+      let val1 = data1[field] ?? '';
+      let val2 = data2[field] ?? '';
       if (typeof val1 === 'string') val1 = val1.toLowerCase();
       if (typeof val2 === 'string') val2 = val2.toLowerCase();
       if (val1 < val2) return -1 * order;

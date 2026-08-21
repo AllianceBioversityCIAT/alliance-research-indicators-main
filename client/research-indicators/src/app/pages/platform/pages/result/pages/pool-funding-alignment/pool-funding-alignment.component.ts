@@ -11,7 +11,6 @@ import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
 import { WebsocketService } from '@sockets/websocket.service';
-import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
@@ -67,7 +66,6 @@ interface ReadOnlyTocSummary {
     RadioButtonModule,
     TooltipModule,
     SkeletonModule,
-    MultiselectComponent,
     FormHeaderComponent,
     NavigationButtonsComponent,
     CustomTagComponent,
