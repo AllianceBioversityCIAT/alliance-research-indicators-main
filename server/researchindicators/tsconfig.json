@@ -20,7 +20,8 @@
     "resolveJsonModule": true,
     "jsx": "react",
     "esModuleInterop": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "types": ["node", "jest", "multer"]
   },
   "exclude": ["node_modules", "dist", "vite.config.ts"]
 }
