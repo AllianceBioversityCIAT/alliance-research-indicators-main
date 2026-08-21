@@ -327,7 +327,7 @@ graph TD
 
 ### T-07 — Page shell: layout, four cards, load, the four UI states, conditional justification
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-03, T-04, T-05, T-06
+- **Status:** done · **Size:** L · **Dependencies:** T-01, T-03, T-04, T-05, T-06
 - **Requirements covered:** R-IUP-004 (all), R-IUP-006 (AC.1–AC.4), R-IUP-010 (AC.4, AC.5), R-IUP-012 (AC.1, AC.3, AC.4), R-IUP-015 (AC.1, AC.2), R-IUP-002 (AC.3 — version preservation on Back/Next)
 - **Design references:** §5.1, §6.1, §6.4, §6.7 step 6, **DD-1**, **DD-8**, **DD-10**, **DD-11**
 - **Skills:** `angular-developer`
@@ -348,20 +348,20 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Loading state renders the shared skeleton treatment via `CacheService.currentResultIsLoading`.
-- [ ] c2 — A `200` with all nulls / empty arrays renders the empty state including **exactly one** blank Actor card and **zero** organization and quantification cards.
-- [ ] c3 — A `200` carrying data renders every scalar and every row.
-- [ ] c4 — **`successfulRequest: false` reaches `ActionsService`, sets `loadFailed`, and does not render as a clean empty form.** Assert that no blank actor card is offered in the error state.
-- [ ] c5 — The error state does **not** overwrite cached green checks with an all-false set derived from the failure.
-- [ ] c6 — The textarea is absent below level 6 and present with an asterisk + inline required message at level ≥ 6.
-- [ ] c7 — **Type at level 7 → select level 3 → select level 7 again: the original text renders unchanged.**
-- [ ] c8 — The conditional is evaluated on the resolved `level`; loading `innovation_use_level_id = 7` (level 6) shows the textarea, and `id = 6` (level 5) does not.
-- [ ] c9 — Level 3 with a blank justification does not block completion.
-- [ ] c10 — Cards 3 and 4 render **no** asterisk; card 2 renders the at-least-one-actor message when `actors` is empty.
-- [ ] c11 — `Add other actor` appends a row and **issues no HTTP request** (assert zero requests on `HttpTestingController`).
-- [ ] c12 — `unit` renders as a free-text input, not a dropdown.
-- [ ] c13 — With `isEditableStatus() === false`: every input, every stepper button, and every add/remove control is non-interactive or absent, while all stored values still render.
-- [ ] c14 — Back navigates to `alliance-alignment` and Next to `partners`, **each preserving `?version=N`**.
+- [x] c1 — Loading state renders the shared skeleton treatment via `CacheService.currentResultIsLoading`.
+- [x] c2 — A `200` with all nulls / empty arrays renders the empty state including **exactly one** blank Actor card and **zero** organization and quantification cards.
+- [x] c3 — A `200` carrying data renders every scalar and every row.
+- [x] c4 — **`successfulRequest: false` reaches `ActionsService`, sets `loadFailed`, and does not render as a clean empty form.** Assert that no blank actor card is offered in the error state.
+- [x] c5 — The error state does **not** overwrite cached green checks with an all-false set derived from the failure.
+- [x] c6 — The textarea is absent below level 6 and present with an asterisk + inline required message at level ≥ 6.
+- [x] c7 — **Type at level 7 → select level 3 → select level 7 again: the original text renders unchanged.**
+- [x] c8 — The conditional is evaluated on the resolved `level`; loading `innovation_use_level_id = 7` (level 6) shows the textarea, and `id = 6` (level 5) does not.
+- [x] c9 — Level 3 with a blank justification does not block completion.
+- [x] c10 — Cards 3 and 4 render **no** asterisk; card 2 renders the at-least-one-actor message when `actors` is empty.
+- [x] c11 — `Add other actor` appends a row and **issues no HTTP request** (assert zero requests on `HttpTestingController`).
+- [x] c12 — `unit` renders as a free-text input, not a dropdown.
+- [x] c13 — With `isEditableStatus() === false`: every input, every stepper button, and every add/remove control is non-interactive or absent, while all stored values still render.
+- [x] c14 — Back navigates to `alliance-alignment` and Next to `partners`, **each preserving `?version=N`**.
 
 **Falsifying inputs** — seed `body` with an empty shape on failure → **c4 must FAIL**. Clear `innovation_use_level_explanation` on the level toggle → **c7 must FAIL**. Call `saveCurrentSection()` from `addActor()` → **c11 must FAIL**.
 

@@ -31,7 +31,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-04 | 300 | **363** (+363 / −0, 3 new files) | 2 | Over by 63. 270 of the 363 lines are the spec file — the **spec tier over-runs again**, matching T-01/T-02 and unlike T-03's move |
 | T-05 | 610 | **688** (+688 / −0, 3 new files) | 2 | Over by 78. 424 of 688 are the spec file. **Spec-tier over-run again**, fifth task, same direction |
 | T-06 | 600 | **824** (+824 / −0, 3 new files) | 2 | Over by 224 — the largest single-task overrun so far. 500 of 824 are the spec file |
-| **Running total** | **1,962** | **2,442** | **10** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
+| T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
+| **Running total** | **2,642** | **3,463** | **12** | ⚠️ **BUDGET TRIPWIRE BREACHED** — see below | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -813,5 +814,188 @@ One rework round; three issues from two lenses. No environment blockers.
 #### Final verification result
 
 Full client suite green (**311/311 suites · 6412/6412 tests**), coverage above all floors, lint clean with `git status` re-inspected, both falsification probes executed and observed failing, the `.html` revert verified by the Leader rather than accepted, and the test inventory reconstructed independently by the auditor. **T-06 closed on attempt 2 of 3.**
+
+---
+
+### T-07 — Page shell: layout, four cards, load, the four UI states, conditional justification
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 2** (1 rework round; 5 issues, **all evidence defects — zero product defects**) |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **2** of a 3-attempt ceiling |
+| **Effort / skills** | attempt 1 `xhigh` · attempt 2 `xhigh` (held) · `angular-developer`, `tdd` |
+| **Requirements covered** | R-IUP-004 (all), R-IUP-006 (AC.1–AC.4), R-IUP-010 (AC.4, AC.5), R-IUP-012 (AC.1, AC.3, AC.4), R-IUP-015 (AC.1, AC.2), R-IUP-002 (AC.3) |
+| **Review mode** | **Parallel lens reviewers (2)** — correctness/state · test-fidelity + tokens/a11y/copy |
+
+#### Attempt 1 — Lens A **PASS**, Lens B **FAIL** (5 issues)
+
+**Files created** (3, new, 934 insertions). Route/sidebar/`GreenChecks` correctly left to T-10; `buildPayload`/PATCH to T-08; save-blocking and `duplicateType` wiring to T-09.
+
+**Verification:** `npm test -- --silent` full unfiltered → **312 suites, 6443 tests passed** (from 311/6412). Lint clean, `git status` re-inspected. **`npm run build` clean** — run early, which is T-13 c5's check. Hex and unbracketed-utility greps zero, **re-run independently by Lens B**.
+
+**Every fix from this round is test-side. Lens A passed the implementation entirely — zero product defects.**
+
+##### Lens A — `STATUS: PASS`
+
+> DD-11 is airtight (`body` untouched by reference on failure, `loadFailed` correctly reset on both version-switch directions), DD-10's asymmetry is correct and the blank actor is unreachable in the failure path twice over, §6.4 is gated on the resolved level with the correct fail-closed fallback, §5.6's `id` round-trips without the shared card learning it exists, both id accessors are correct for their respective uses, `replaceUrl: true` matches all six sibling pages, and the R-IUP-015 gate is complete with no ungated control.
+
+Notable confirmations, recorded so they are not re-litigated:
+
+- **Both id accessors are right, and swapping them breaks both directions.** `getCurrentNumericResultId()` strips the platform prefix (`'PLATFORM-1234'` → `1234`) for the endpoint's `number` param; `currentResultId()` is the raw route segment, correct for `['result', <id>, path]` because the URL must carry the id the user is browsing — **including the prefix for a federated result**.
+- **`replaceUrl: true` is platform convention, not invention** — all six sibling detail pages use it for Back/Next. Diverging here would be the defect.
+- **No `ngOnInit` is conformant.** `onVersionChange` registers an `effect`, which runs once on registration. Verified byte-equivalent to `capacity-sharing`.
+- **The read-only gate is complete** — Lens A enumerated stepper, all three card types (8 + 7 + 3 controls), every add and remove affordance, and the textarea, and *"could not find an ungated control or affordance"*.
+
+##### The methodology finding of the run — a Kaizen lesson, sharpened
+
+Lens A was asked whether three spec-accuracy findings (T-03's §5.6 `validateEmpty` claim, T-04's "five names" arithmetic, T-07's DD-8 rationale) constitute a pattern. It rejected the obvious lesson as unactionable and produced a sharper one:
+
+> A spec's **rationale** is not load-bearing for the implementation — all three produced conformant code anyway, because in all three the *instruction* was independently right. A rationale **is** load-bearing for any **falsifying input derived from it.** DD-8 is the only one of the three where a falsifier was derived from the rationale rather than from the criterion's assertion mechanism, and it is the only one that came out **inert** — a criterion with no gate, the exact failure mode the falsifier column exists to prevent.
+>
+> **Lesson:** derive every falsifying input from **the observable the criterion asserts on**, never from the design decision's stated cause; and for any falsifier of the form *"add call X → criterion must FAIL"*, confirm in the same breath that **X actually produces the observable the criterion measures.** At Judgment Day, spot-check rationales **only** where a falsifier or a done-criterion depends on them — a bounded sweep, unlike "verify all prose."
+
+**It then found a fourth instance, different in kind, that would have caused a real defect.** `design.md` §6.1 step 1 reads `` `ngOnInit` **/** `onVersionChange` `` — a slash, correctly meaning *either*. `tasks.md` T-07's Implementation notes transcribe it as `` **+** ``. **Following `tasks.md` literally fires two GETs on load**, each with `loadingTrigger: true`, hence two `greenChecks.set({})` clears and two green-check round trips. Second clause of the lesson: *`tasks.md`'s Implementation notes are a **transcription** of `design.md`; when the two disagree, that is a spec bug to fix upward, not a choice for the Implementer.*
+
+##### The `saveCurrentSection` finding — c11 satisfied, its falsifier inert
+
+The Implementer discovered that `ActionsService.saveCurrentSection()` sets a signal with **zero production consumers** (the only plausible one, `SaveOnWritingDirective.autosave()`, is an **empty method body**). The Leader verified this independently before briefing; Lens A verified it a third time.
+
+**Consequence: DD-8's stated rationale is false** — calling it from `addActor()` PATCHes nothing, so **c11's named falsifying input cannot fail.** The Implementer re-derived the falsifier against an observable that *can* see the violation (a direct spy, asserted three times) and **disclosed the substitution rather than claiming the original.** Lens A's ruling: **c11 is satisfied** — the criterion's own text asks for zero requests on `HttpTestingController`, which was produced with the real `ApiService` and the real HTTP layer, including flushing the `green-checks` side-effect GET so it could not be mistaken for an `addActor()` request. *"A satisfied criterion with a defective falsifier. The fix belongs in `tasks.md`, not in the diff."*
+
+**And DD-8's decision is worth more than its rationale claims:** the moment anyone gives `saveCurrentSectionValue` a consumer — which is exactly what that empty `autosave()` body is a placeholder for — the hazard becomes live **retroactively** in every page that calls it (`alliance-alignment`, `evidence`, `innovation-details`), and **this page will be the only one already immune.**
+
+##### Lens B — `STATUS: FAIL`, five issues, all evidence defects
+
+| # | Issue | Why it matters |
+| --- | --- | --- |
+| 1 | **c10's asterisk assertion cannot fail** — it queries `.text-red-500`, but the shared quantification card renders its asterisk as `text-[15px] text-[#CF0808]`. So the assertion returns null whether `fieldsRequired` is `false`, `true`, **or omitted — and its default is `true`.** Removing `[fieldsRequired]="false"`, the exact binding R-IUP-012 AC.3 exists to enforce, **reds nothing** | A check that cannot fail is not evidence (§10.3) |
+| 2 | **c13 under-covers the surface its own wording names** — *"every input, every stepper button, and every add/remove control"*. Nothing inside the three card types is asserted disabled, and no remove affordance is asserted absent. **Mutation that stays green:** drop `[disabled]` from the three child usages → read-only mode exposes **~10 editable controls per actor row plus every remove icon** | **Third recurrence of this exact shape** (T-05 c12, T-06 c8) |
+| 3 | **c5's evidence is vacuous** — `expect(greenChecks.set).not.toHaveBeenCalled()` cannot fail for *any* implementation, because the component never references `greenChecks`. A structural fact dressed as a test. **And the mechanism the AC forbids is real, one layer down:** `ToPromiseService` runs `greenChecks.set({})` **unconditionally at request start**, and `finalize()` calls `updateGreenChecks()`, which sets `response.data` — `undefined` if that second GET also fails. The block mocks `ApiService`, bypassing all of it | Confirmed the Leader's pre-review suspicion |
+| 4 | **c3's rendered half is a signal read**, leaving the spec's only **High** risk (RK-4) undetectable at the call site. The likely mutation — `[selectedLevelId]="resolvedLevel()"` — **type-checks and looks like a fix for the id/level trap**, and would leave the whole suite green while highlighting the wrong button and showing the wrong callout. **T-04's spec structurally cannot see it**, because it is handed the input directly | The id≠level trap, at the one place no child spec can guard it. **The most valuable of the five** |
+| 5 | **c9's name outruns its assertion** — titled *"no textarea and no required message"*, asserts only the textarea, duplicating c6 exactly. The "does not block completion" half has no save path until T-08/T-09 | Same pattern commit `9b571c36` was made to close |
+
+##### Leader adjudication
+
+**Not a Pivot.** All five are evidence defects against a sound implementation, all in scope (each cites a T-07 criterion), and all fixable in the spec file. **One consolidated rework** dispatched.
+
+**On Issue 3 the Leader chose remediation (b)** — record c5 honestly as *structurally satisfied, with `ToPromiseService`'s clear-then-refresh named as outside T-07's reach* — rather than (a), asserting shared-service behaviour no T-07 criterion owns. Lens B explicitly permitted either: *"An honest KZ-007 record is acceptable; a claimed PASS on this assertion is not."*
+
+**Lens B's advisory A4 was folded into the rework** because it lands in a test already being edited: c6's `This field is required` search is **page-wide**, and three components can emit that string — attribution is clean today only by accident of the default body.
+
+#### Attempt 2 — Lens B **PASS** (Lens A's surface untouched, so it was not re-run)
+
+**Files changed** (1): `.spec.ts` only, 590 → 677 lines. The Leader verified `git diff` on the `.ts` (207) and `.html` (137) is **empty**, so Lens A's PASS carries forward without a re-audit — a deliberate cost saving, recorded.
+
+**Six fixes applied**
+
+| Fix | What landed |
+| --- | --- |
+| c10 | The vacuous `.text-red-500` query replaced with a **text-node scan for a bare `*`**, plus `not.toContain('This field is required')` on the quant card, plus a length guard |
+| c13 | Two new tests — every rendered `input`/`textarea` in all three card types asserted disabled (length-guarded per card type), and every remove affordance asserted hidden. Stored values extended to `unit: 'ha'` and `quantification_number: 3` read off the **rendered** inputs |
+| c5 | Remediation **(b)** — the weak assertion kept with an in-file comment recording its exact reach, that the zero-call-site fact is **grep-verified not test-verified**, and naming `ToPromiseService`'s clear-then-refresh as out of T-07's reach |
+| c3 | The **rendered** stepper callout asserted (`toContain('7 - Level 7 name')`) — closing RK-4 at the call site |
+| c9 | Two missing assertions added; the completion half **attributed as owed to T-08 c14 / T-09 c6, not claimed** |
+| A4 | c6's search scoped to `By.directive(TextareaComponent)` |
+
+**All three falsification probes failed as predicted**
+
+| Probe | Failure |
+| --- | --- |
+| Remove `[fieldsRequired]="false"` | `Expected: false / Received: true` |
+| Remove `[disabled]` from the actor card | `Expected: true / Received: false` **and** `Expected: 0 / Received: 1` |
+| `[selectedLevelId]="resolvedLevel()"` (**RK-4**, the spec's only High risk) | `Expected substring: "7 - Level 7 name" / Received string: " 0 1 … 9 6 - Level 6 nameLevel 6 definition"` |
+
+**That third output is the finding rendered.** The mutation resolves **`6 - Level 6 name`** where level 7 was expected — the id≠level off-by-one, showing the wrong callout and highlighting the wrong button, on a mutation that **type-checks and looks like a fix.** T-04's own spec structurally cannot see it, because it is handed the input directly. This is the single most valuable assertion added in the entire run.
+
+**Verification:** `npm test -- --silent` full unfiltered **from `client/research-indicators`** → **312 suites, 6445 tests passed**. Coverage 99.23 / 97.98 / 98.83 / 99.5. Lint clean, `git status` re-inspected. Hex and unbracketed-utility greps zero.
+
+##### The unprompted stabilization — scrutinised, and upheld with a correction
+
+The Implementer added, unbidden, `await fixture.whenStable(); fixture.detectChanges();` to c13's `beforeEach`, attributing it to PrimeNG. The Leader flagged it for the hardest possible look, since Lens B had previously found an equivalent T-05 substitution's *diagnosis* implausible while its *resolution* was sound.
+
+**Lens B's ruling: legitimate, and this time the diagnosis is substantively correct — but it names the wrong layer.**
+
+> The true mechanism is **Angular Forms, not PrimeNG.** `app-input`'s number branch carries **both** `[disabled]` and `[(ngModel)]` on the same element, so `NgModel` **claims the `disabled` binding as its own `@Input`** — the DOM property binding never happens — and applies it through `_updateDisabled`, **deferred by a resolved-promise microtask**, reaching the control via `setDisabledState()`. For a **raw** element (`app-textarea`'s `<textarea>`) that writes the native property imperatively, so no extra pass is needed — **which is exactly why the pre-existing textarea assertion passed in attempt 1 on a single `detectChanges()`.** For a **wrapped** PrimeNG control it sets the component's field and calls `markForCheck()`, so the inner native `<input>`'s binding needs **one more CD pass.**
+
+**"The internal consistency of that pattern is what convinces me the observation is real rather than a shot in the dark"** — it applies to exactly the controls the new assertions target (`p-inputNumber`, `p-checkbox`) and not to the one that already worked.
+
+**Can it make a failing assertion pass? No** — additional passes over a *missing* binding yield `false` forever, and **probe 2 failed with the accommodation in place**, which is direct empirical confirmation the assertions stay live. It introduces no softening (no `try/catch`, no conditional expectation, no `if (el)` guard, no `toBeGreaterThan` where an exact count belongs). It masks exactly one class — an implementation that disables *one microtask late* — which is not a defect class, since `isEditableStatus()` is settled before the cards render. **And the alternative fix (asserting the component flag) is the one c13's disqualifier bans, so the Implementer chose the correct escape.** It is also load-bearing for the new `numberInput.value === '3'` assertion for an independent reason.
+
+##### Other confirmations
+
+- **c10 is non-vacuous on both halves.** The Organizations half is **live, not passing by construction** — every asterisk form in the codebase is span-wrapped, so the most plausible mutation (adding `[isRequired]="true"` to that card's count input) is caught. Residual: a bare `*` text node outside any `<span>` would slip through.
+- **c13's hole is closed — the T-05 c12 / T-06 c8 shape does not recur a third time.** All ~10 controls per actor row reached, all three `forEach` loops length-guarded, every remove affordance asserted absent with selectors matching the real bindings, and the quant card's delete icon correctly given different treatment with the reason recorded rather than papered over.
+- **Arithmetic:** all 31 attempt-1 tests survive, two added (both inside the existing c13 `describe`), one title extended, one body rewritten. 6443 → 6445, suites flat at 312, 590 → 677 lines.
+- **Branch coverage 98.00 → 97.98 with zero implementation change cannot be a regression from this task** — added tests can only hold or raise a ratio whose denominator did not move. It signals only that the figure is project-wide and drifts with anything else in the tree. **T-13 c4 owns the authoritative run.**
+
+#### Decisions made
+
+1. **Only one lens was re-run.** Because the rework was spec-file-only and the Leader verified the implementation byte-unchanged, Lens A's PASS carried forward. Re-auditing an untouched surface would have cost a full context for no information.
+2. **c5 was recorded honestly rather than force-fitted.** Remediation (b) over (a): asserting `ToPromiseService`'s behaviour would have put shared-service coverage inside a criterion that does not own it. **Lens B's follow-up request is honoured by this entry** — *"a `[x]` in `tasks.md` next to c5 is read by people who will never open the spec file"*, so the limitation is stated here, in the audit trail, not only in a code comment.
+3. **The stabilization's attribution is corrected in the record** even though the code is right, because *"it prevents the comment being copied as a general 'PrimeNG is flaky' licence."*
+
+#### `ADVISORY` — new at attempt 2
+
+| # | Lens | Finding | Reachability | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **B · Risk / a11y** | **`app-input` emits duplicate, cross-wired DOM ids.** It hardcodes `id="username"` on the text branch (with `label for="username"` and `aria-describedby="username-help"`) and `inputId="minmax-buttons"` on the number branch. **On the c13 fixture alone the page renders six elements with `id="minmax-buttons"`.** `label[for]` resolves to the **first match in the document**, so every visible `app-input` label points at **some other field's control** | **Reachable deterministically** — any render with two or more numeric fields; established by reading the shared template | **Sharper than the known `app-textarea` case: there `for` resolves to *nothing*, here it resolves to the *wrong element*.** Inherited from a shared component, so → **T-11**, alongside the other label findings. **Coupling:** `spec.ts:472`'s `input#minmax-buttons` query works only because it is scoped to the quantification card — document-wide it would hit the actor card's first count field. **If T-11 fixes the ids, that assertion must migrate in the same change** |
+| 2 | **B · Reliability** | c13's remove-affordance test is **absence-only** and keyed on `aria-label` strings, so a rename would void two of three detectors silently — **and T-11 is the task most likely to touch exactly those strings** | Reachable via planned T-11 work | A positive control in the editable state (assert count `1` per rendered row) would make the selector self-validating |
+| 3 | **B · Readability** | The stabilization comment names PrimeNG where the cause is Angular Forms | n/a | Recorded above. *"Prevents the comment being copied as a general 'PrimeNG is flaky' licence"* |
+| 4 | **B · Reliability** | c10's organization half has **no length guard** — a residual of Lens B's own remediation, which named only the quantification guard | n/a | c2 and c3 cover the "org card renders" fact elsewhere, so the aggregate is sound; one extra assertion would make the test self-contained |
+
+#### Forward pointers
+
+| Target | Pointer |
+| --- | --- |
+| **T-08** | **(a) The stale-success race becomes destructive here.** `getData()` has no request sequencing, and `app-navigation-buttons` renders **outside** the `@if (loadFailed())` branch — right for T-07 (a user must be able to leave a broken section) but the moment `(save)` is wired, a PATCH built from a stale `body` would write **version N−1's rows onto version N** — the DD-11 destruction class arriving through a door DD-11 does not cover. T-08's save path must consult `loadFailed()`. **(b) `unit`/`description` absent→`''`:** the quantification card emits on its first effect flush, so a never-touched blank row is `{unit: '', description: ''}`, **not** all-absent. §6.5 step 4 drops rows where all three are "absent" — an implementation reading that as `== null` **keeps and sends the row**, which is the untouched-blank-row `400` §4.3 claims to close by construction. **T-08 must treat "absent" as falsy-or-empty.** **(c)** T-09 has no criterion for *level 3 blank → save proceeds*; c9's other half is owed there |
+| **T-10** | **Ordering constraint:** an unwired `Save` button renders in the editable status today (the page binds `(back)`/`(next)` but not `(save)`). Not user-reachable because no route exists — **it becomes reachable if T-10 lands before T-08** |
+| **T-11** | Advisories 1 and 2 above, plus the standing inbox: T-06's `selectByAria()` coupling, `app-textarea`'s `for="username"`, heading hierarchy, and **the scope gap** — R-IUP-017's dark-mode scenario cannot be satisfied within T-11's declared scope |
+| **T-12** | The inline load-failure banner is a **new visual pattern** not on T-12 c1's registration list, and R-IUP-017 AC.4 requires registration *"in the same change"* |
+| **T-13** | c7 must confirm card padding ≈30px and ≈25px between cards **as a specific observation** — *"the page renders"* would not discharge it, because no gate in this repo can prove the `rs-*` family resolves |
+
+#### Final verification result
+
+Full client suite green (**312/312 suites · 6445/6445 tests**), coverage above all floors, lint clean with `git status` re-inspected, three falsification probes executed and observed failing including the spec's only High risk, and the test inventory reconstructed independently by the auditor. **T-07 closed on attempt 2 of 3.**
+
+---
+
+## ⚠️ BUDGET TRIPWIRE — breached at T-07, execution stopped for the user
+
+`/akili-execute` §2.4: *"When actual execution exceeds it, **stop and escalate to the user** with the delta and the cause — do not continue on the assumption that finishing is what was wanted. Exceeding a budget is information, not failure; the cost of a mis-sized spec is only recoverable while it is still running."*
+
+**Status: actually breached, not projected.**
+
+| Measure | `design.md` §12 budget | Actual at T-07 (7 of 13 tasks) | Verdict |
+| --- | --- | --- | --- |
+| LOC | ~3,200 | **3,463** | ❌ **Exceeded, with 6 tasks still to run** |
+| Review rounds | ~28 | **12** | ✅ Tracking well under |
+| Tasks | 13 | 7 done | 54% |
+
+**The cause is single and consistent, established over seven tasks.** Every task shipping new spec files over-runs, and **the over-run is entirely in the spec tier**:
+
+| Task | §6 derivation | Actual | Delta | Spec-file share of actual |
+| --- | --- | --- | --- | --- |
+| T-01 | 210 | 344 | +134 | 252 / 344 |
+| T-02 | 72 | 133 | +61 | 129 / 133 |
+| T-03 | 170 | **90** | **−80** | — (a `git mv` carries code without authoring it) |
+| T-04 | 300 | 363 | +63 | 270 / 363 |
+| T-05 | 610 | 688 | +78 | 424 / 688 |
+| T-06 | 600 | 824 | +224 | 500 / 824 |
+| T-07 | 680 | 1,021 | +341 | 677 / 1,021 |
+
+**Implementation lines track the derivation closely; the spec tier does not.** §12's split was ~1,700 implementation / ~1,500 spec. The implementation half is holding. The spec half is the entire miss — and the reason is visible in this log: **the assertion standard this spec sets is expensive to meet.** Every "assert the *rendered* output, not the signal", every length-guarded loop, every executed falsifying input, and every disqualifier that bans the cheap assertion costs lines. Fourteen falsification probes were run across seven tasks, and **five of them caught a defect the criteria alone would have passed.**
+
+**Projection for the remaining six tasks** (§6 derivation: T-08 400 · T-09 160 · T-10 190 · T-11 80 · T-12 40 · T-13 0 = **870**). At the observed +31% on spec-bearing tasks, that is ~1,140, for a **final total near 4,600 — about +44% over §12.**
+
+**What the Leader is NOT doing:** absorbing this silently, or continuing on the assumption that finishing is what was wanted. Both are what the tripwire exists to prevent.
+
+**Options for the user, with the Leader's recommendation:**
+
+1. **Accept the overrun and re-baseline §12** to ~4,600, recording the cause (spec-tier density, not scope creep). T-13 c10 then reconciles against a figure that means something. **Recommended** — the spend bought falsifiable evidence, the review-round budget is healthy at 12/28, and no task has exceeded its 3-attempt ceiling.
+2. **Hold §12 and reduce the assertion standard** for the remaining six tasks — fewer rendered-output assertions, fewer probes. **Not recommended:** this is precisely the standard that caught the c3/RK-4 mutation, T-05's aliasing, T-06's c8 hole and T-07's four dead assertions. Cutting it to hit a line estimate trades real defect detection for a number.
+3. **Split the spec** — ship PR 1 + PR 2 (T-01…T-09) and re-scope T-10…T-13 as a follow-on. Defensible, but §7's PR plan already sequences this, and T-13 is the verification gate for the whole thing.
+
+**Nothing further will be dispatched until the user rules.**
 
 ---

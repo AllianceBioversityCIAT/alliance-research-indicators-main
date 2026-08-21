@@ -1,0 +1,137 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell) -->
+<div class="app-page-wrapper">
+  <app-form-header />
+
+  @if (loadFailed()) {
+    <div class="flex items-center rs-gap-[8] rs-p-[20] rs-mb-[25] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+      <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
+      <span class="fs-[14] text-[var(--ac-grey-700)]">The Innovation Use section could not be loaded. Please try again.</span>
+    </div>
+  } @else {
+    <!-- INNOVATION USE DETAILS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <div class="section-title">INNOVATION USE DETAILS</div>
+
+      <h2 class="label">Level of use of this innovation<span class="text-red-500">*</span></h2>
+      <app-innovation-use-level-stepper
+        [levels]="levelsService.list()"
+        [selectedLevelId]="body().innovation_use_level_id"
+        [disabled]="!submission.isEditableStatus()"
+        (levelSelected)="onLevelSelected($event)" />
+
+      @if (showJustification()) {
+        <div class="rs-mt-[20]">
+          <app-textarea
+            [signal]="body"
+            [optionValue]="'innovation_use_level_explanation'"
+            [label]="'Justification'"
+            [isRequired]="true"
+            [disabled]="!submission.isEditableStatus()"
+            [rows]="4"
+            placeholder="Explain the use of this innovation at this level"></app-textarea>
+        </div>
+      }
+    </div>
+
+    <!-- ACTORS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <div class="section-title">ACTORS</div>
+
+      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
+        <i class="material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-300)]">info</i>
+        <span class="fs-[14] text-[var(--ac-grey-600)]">List every actor group using this innovation.</span>
+      </div>
+
+      @if (body().actors.length === 0) {
+        <div class="flex items-center rs-gap-[8] rs-mb-[12] text-[var(--ac-red-1)]">
+          <i class="material-symbols-rounded !text-[14px]">warning</i>
+          <span class="fs-[14]">At least one actor is required</span>
+        </div>
+      }
+
+      <div class="flex flex-col rs-gap-[16]">
+        @for (actor of body().actors; track $index) {
+          <app-innovation-use-actor-item
+            [actor]="actor"
+            [actorNumber]="$index + 1"
+            [disabled]="!submission.isEditableStatus()"
+            (update)="onActorUpdate($index, $event)"
+            (remove)="removeActor($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addActor()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            Add other actor
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- ORGANIZATIONS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <div class="section-title">ORGANIZATIONS</div>
+
+      <div class="flex flex-col rs-gap-[16]">
+        @for (organization of body().organizations; track $index) {
+          <app-innovation-use-organization-item
+            [organization]="organization"
+            [organizationNumber]="$index + 1"
+            [disabled]="!submission.isEditableStatus()"
+            (update)="onOrganizationUpdate($index, $event)"
+            (remove)="removeOrganization($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addOrganization()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            Add other organization
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- OTHER QUANTITATIVE MEASURES -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <div class="section-title">OTHER QUANTITATIVE MEASURES</div>
+
+      <div class="flex flex-col rs-gap-[16]">
+        @for (quantification of quantificationsView(); track $index) {
+          <app-quantification-item
+            [quantification]="quantification"
+            [quantNumber]="$index + 1"
+            [headerLabel]="'MEASURE'"
+            [disabled]="!submission.isEditableStatus()"
+            [fieldsRequired]="false"
+            [maxFractionDigits]="0"
+            (update)="onQuantificationUpdate($index, $event)"
+            (delete)="removeQuantification($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addQuantification()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            Add other measure
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <app-navigation-buttons (back)="navigate('back')" (next)="navigate('next')" />
+</div>
