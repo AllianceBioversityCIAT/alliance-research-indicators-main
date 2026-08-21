@@ -53,6 +53,11 @@ import {
 } from '../dto/reports-contract-staff.dto';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
+import {
+  ContractResultsSummaryReportDto,
+  ContractResultsSummaryStatusBucketDto,
+  ContractResultsSummaryYearBucketDto,
+} from '../dto/contract-results-summary-report.dto';
 
 @Injectable()
 export class AgressoContractRepository
@@ -620,10 +625,14 @@ export class AgressoContractRepository
 
   private buildPrimaryContractResultsSubquery(options?: {
     includeGeoScope?: boolean;
+    includeStatusId?: boolean;
+    includeReportYearId?: boolean;
   }): string {
-    const selectColumns = options?.includeGeoScope
-      ? 'r.result_id, r.geo_scope_id'
-      : 'r.result_id';
+    const columns = ['r.result_id'];
+    if (options?.includeGeoScope) columns.push('r.geo_scope_id');
+    if (options?.includeStatusId) columns.push('r.result_status_id');
+    if (options?.includeReportYearId) columns.push('r.report_year_id');
+    const selectColumns = columns.join(', ');
 
     return `
       SELECT DISTINCT ${selectColumns}
@@ -1057,6 +1066,92 @@ export class AgressoContractRepository
         name: formatPersonName(name),
         role,
       }));
+  }
+
+  async getResultsSummaryReport(
+    contractId: string,
+  ): Promise<ContractResultsSummaryReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const statusSubquery = this.buildPrimaryContractResultsSubquery({
+      includeStatusId: true,
+    });
+    const yearSubquery = this.buildPrimaryContractResultsSubquery({
+      includeReportYearId: true,
+    });
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const statusQuery = `
+      SELECT
+        contract_results.result_status_id AS status_id,
+        COALESCE(rs.name, 'No status') AS name,
+        COUNT(*) AS count
+      FROM (${statusSubquery}) contract_results
+      LEFT JOIN result_status rs
+        ON rs.result_status_id = contract_results.result_status_id
+      GROUP BY contract_results.result_status_id, rs.name
+      ORDER BY count DESC
+    `;
+
+    const yearQuery = `
+      SELECT
+        contract_results.report_year_id AS year,
+        COUNT(*) AS count
+      FROM (${yearSubquery}) contract_results
+      GROUP BY contract_results.report_year_id
+      ORDER BY year
+    `;
+
+    const partnersQuery = `
+      SELECT
+        COUNT(DISTINCT result_institution.institution_id) AS partner_institutions
+      FROM result_institutions result_institution
+      INNER JOIN (${baseSubquery}) contract_results
+        ON contract_results.result_id = result_institution.result_id
+      WHERE result_institution.institution_role_id = ?
+        AND result_institution.is_active = TRUE
+    `;
+
+    const [statusRows, yearRows, partnerRows] = await Promise.all([
+      this.query(statusQuery, [contractId]),
+      this.query(yearQuery, [contractId]),
+      this.query(partnersQuery, [contractId, InstitutionRolesEnum.PARTNERS]),
+    ]);
+
+    const by_status: ContractResultsSummaryStatusBucketDto[] = (
+      statusRows as Array<Record<string, unknown>>
+    ).map((row) => ({
+      status_id:
+        row.status_id === null || row.status_id === undefined
+          ? null
+          : Number(row.status_id),
+      name: String(row.name ?? 'No status'),
+      count: Number(row.count ?? 0),
+    }));
+
+    const by_year: ContractResultsSummaryYearBucketDto[] = (
+      yearRows as Array<Record<string, unknown>>
+    ).map((row) => ({
+      year:
+        row.year === null || row.year === undefined ? null : Number(row.year),
+      count: Number(row.count ?? 0),
+    }));
+
+    const partner_institutions = Number(
+      (partnerRows as Array<Record<string, unknown>>)[0]
+        ?.partner_institutions ?? 0,
+    );
+
+    const total = by_status.reduce((sum, row) => sum + row.count, 0);
+
+    return {
+      total,
+      by_status,
+      by_year,
+      partner_institutions,
+    };
   }
 
   async getFundingTypes() {

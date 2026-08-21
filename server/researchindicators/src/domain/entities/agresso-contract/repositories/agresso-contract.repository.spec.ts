@@ -1244,6 +1244,132 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getResultsSummaryReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getResultsSummaryReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should build results summary report with three grouped queries (asserts generated SQL text + bound params)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          { status_id: 1, name: 'Approved', count: 5 },
+          { status_id: 2, name: 'Submitted', count: 3 },
+        ])
+        .mockResolvedValueOnce([
+          { year: 2024, count: 6 },
+          { year: 2023, count: 2 },
+        ])
+        .mockResolvedValueOnce([{ partner_institutions: 7 }]);
+
+      const result = await repository.getResultsSummaryReport('A1676');
+
+      expect(repository.query).toHaveBeenCalledTimes(3);
+
+      const statusSql = (repository.query as jest.Mock).mock.calls[0][0];
+      const yearSql = (repository.query as jest.Mock).mock.calls[1][0];
+      const partnerSql = (repository.query as jest.Mock).mock.calls[2][0];
+
+      // Shared subquery predicates appear in every grouped query (subquery is interpolated)
+      expect(statusSql).toContain('is_primary = TRUE');
+      expect(statusSql).toContain('is_snapshot = FALSE');
+      expect(statusSql).toContain('is_active');
+      expect(yearSql).toContain('is_primary = TRUE');
+      expect(yearSql).toContain('is_snapshot = FALSE');
+      expect(yearSql).toContain('is_active');
+      expect(partnerSql).toContain('is_primary = TRUE');
+      expect(partnerSql).toContain('is_snapshot = FALSE');
+      expect(partnerSql).toContain('is_active');
+
+      // LEFT JOIN appears in the by_status query (judgment SU2 — result_status_id is nullable)
+      expect(statusSql).toContain('LEFT JOIN');
+
+      // Both grouped queries carry a GROUP BY
+      expect(statusSql).toContain('GROUP BY');
+      expect(yearSql).toContain('GROUP BY');
+
+      // Bound params: status & year queries take only contractId; partners adds the role id
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A1676',
+      ]);
+      expect((repository.query as jest.Mock).mock.calls[1][1]).toEqual([
+        'A1676',
+      ]);
+      expect((repository.query as jest.Mock).mock.calls[2][1]).toEqual([
+        'A1676',
+        InstitutionRolesEnum.PARTNERS,
+      ]);
+
+      expect(result).toEqual({
+        total: 8,
+        by_status: [
+          { status_id: 1, name: 'Approved', count: 5 },
+          { status_id: 2, name: 'Submitted', count: 3 },
+        ],
+        by_year: [
+          { year: 2024, count: 6 },
+          { year: 2023, count: 2 },
+        ],
+        partner_institutions: 7,
+      });
+    });
+
+    it('should preserve NULL-status and NULL-year rows in explicit buckets with bucket-sum invariant', async () => {
+      // Disqualifier guard: a fixture without NULL rows proves nothing — both are present here.
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          { status_id: 1, name: 'Approved', count: 5 },
+          { status_id: null, name: 'No status', count: 3 },
+        ])
+        .mockResolvedValueOnce([
+          { year: 2024, count: 6 },
+          { year: null, count: 2 },
+        ])
+        .mockResolvedValueOnce([{ partner_institutions: 4 }]);
+
+      const result = await repository.getResultsSummaryReport('A100');
+
+      // NULL-status bucket preserved (LEFT JOIN result_status, not an inner join that drops it)
+      expect(result.by_status).toContainEqual({
+        status_id: null,
+        name: 'No status',
+        count: 3,
+      });
+      // NULL-year bucket preserved (no join to drop it — judgment W8)
+      expect(result.by_year).toContainEqual({
+        year: null,
+        count: 2,
+      });
+
+      // AC.2 — bucket-sum invariant: by_status sums to total AND by_year sums to total
+      const statusSum = result.by_status.reduce(
+        (sum, row) => sum + row.count,
+        0,
+      );
+      const yearSum = result.by_year.reduce((sum, row) => sum + row.count, 0);
+      expect(result.total).toBe(statusSum);
+      expect(result.total).toBe(yearSum);
+      expect(result.total).toBe(8);
+    });
+
+    it('should return empty buckets for an unknown/inaccessible contract (sibling behavior)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ partner_institutions: 0 }]);
+
+      const result = await repository.getResultsSummaryReport('UNKNOWN');
+
+      expect(result).toEqual({
+        total: 0,
+        by_status: [],
+        by_year: [],
+        partner_institutions: 0,
+      });
+    });
+  });
+
   describe('buildDateFilterClause', () => {
     it('should build date range filter when both dates provided', () => {
       const filter = { start_date: '2023-01-01', end_date: '2023-12-31' };
