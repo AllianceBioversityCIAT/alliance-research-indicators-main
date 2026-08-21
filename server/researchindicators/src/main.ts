@@ -11,7 +11,6 @@ import helmet from 'helmet';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { VersioningType } from '@nestjs/common';
-import { mountClarisaStub } from './domain/tools/clarisa/stub/clarisa-stub.mount';
 const logger: LoggerUtil = new LoggerUtil({
   name: 'bootstrap',
 });
@@ -51,11 +50,6 @@ async function httpservice() {
   );
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
-
-  // [SPEC bilateral/clarisa-fixture-stub] T-06 — after helmet/json/urlencoded/enableCors,
-  // before listen(). See mountClarisaStub's own doc comment (clarisa-stub.mount.ts) for why
-  // this is unconditional.
-  mountClarisaStub(app);
 
   app.setGlobalPrefix('api');
   app.enableVersioning({

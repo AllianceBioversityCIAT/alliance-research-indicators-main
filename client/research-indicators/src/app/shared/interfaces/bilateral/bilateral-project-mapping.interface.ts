@@ -1,14 +1,18 @@
-export type BilateralMappingSource = 'MANUAL' | 'AI_SUGGESTED' | 'AI_AUTO';
+export type BilateralMappingSource = 'MANUAL' | 'DERIVED' | 'AI_SUGGESTED' | 'AI_AUTO' | 'UNMAPPED';
+export type MappingStatus = 'Mapped' | 'Pending' | 'Inactive';
 
 export interface BilateralProjectMapping {
   id: number;
   agresso_agreement_id: string;
+  agresso_description?: string | null;
   clarisa_project_id: number;
   clarisa_project_short_name?: string | null;
+  clarisa_project_full_name?: string | null;
   source: BilateralMappingSource;
   confidence_score?: number | null;
   notes?: string | null;
   is_active: boolean;
+  mapping_status?: MappingStatus;
   created_at: string;
   updated_at: string;
   created_by?: number | null;
@@ -32,6 +36,7 @@ export interface BilateralMappingListQuery {
   limit?: number;
   search?: string;
   is_active?: boolean;
+  status?: 'all' | 'mapped' | 'pending' | 'inactive';
   source?: BilateralMappingSource;
 }
 
@@ -86,4 +91,99 @@ export interface ClarisaProjectPhasesResponse {
    */
   phaseAbsentCount: number;
 }
+
+// ── Automapper (S2 — T-06) ──────────────────────────────────────────────────
+
+export interface AutomapperRunRequest {
+  phase?: number;
+}
+
+export interface AutomapperCandidate {
+  clarisaProjectId: number;
+  clarisaProjectFullName: string | null;
+  clarisaProjectShortName: string | null;
+  externalCode: string | null;
+  derivedContractId: string;
+}
+
+export interface AutomapperReconciledEntry extends AutomapperCandidate {
+  action: 'alreadyMapped' | 'divergent' | 'supersede';
+  existingMappingId: number;
+  existingClarisaProjectId: number;
+}
+
+export interface AutomapperToCreateEntry extends AutomapperCandidate {
+  action: 'toCreate';
+}
+
+export interface AutomapperPreviewCounts {
+  toCreate: number;
+  alreadyMapped: number;
+  ambiguous: number;
+  unresolved: number;
+  divergent: number;
+  supersede: number;
+}
+
+export interface AutomapperPreviewResponse {
+  feedFetchedAt: string | null;
+  counts: AutomapperPreviewCounts;
+  toCreate: AutomapperToCreateEntry[];
+  alreadyMapped: AutomapperReconciledEntry[];
+  ambiguous: AutomapperCandidate[];
+  unresolved: AutomapperCandidate[];
+  divergent: AutomapperReconciledEntry[];
+  supersede: AutomapperReconciledEntry[];
+}
+
+export interface AutomapperApplyCounts {
+  created: number;
+  alreadyMapped: number;
+  ambiguous: number;
+  unresolved: number;
+  divergent: number;
+  superseded: number;
+}
+
+export interface AutomapperApplyResponse {
+  feedFetchedAt: string | null;
+  counts: AutomapperApplyCounts;
+  ambiguous: AutomapperCandidate[];
+  unresolved: AutomapperCandidate[];
+}
+
+export interface AutomapperCoverage {
+  mapped: number;
+  pending: number;
+  reachable: number;
+}
+
+/**
+ * Formats a project label for display (R-5 / F-A).
+ * Collapses the label to a single name when short_name === full_name (case-insensitive),
+ * rendering `${short_name} — ${full_name}` only when both are present and distinct.
+ */
+export function formatClarisaProjectLabel(project: {
+  short_name?: string | null;
+  full_name?: string | null;
+  clarisaProjectShortName?: string | null;
+  clarisaProjectFullName?: string | null;
+  id?: number;
+  clarisaProjectId?: number;
+}): string {
+  const shortName = (project.clarisaProjectShortName ?? project.short_name)?.trim() || '';
+  const fullName = (project.clarisaProjectFullName ?? project.full_name)?.trim() || '';
+  const id = project.clarisaProjectId ?? project.id;
+
+  if (!shortName && !fullName) {
+    return id !== undefined ? `Project #${id}` : '';
+  }
+  if (!shortName) return fullName;
+  if (!fullName) return shortName;
+  if (shortName.toLowerCase() === fullName.toLowerCase()) {
+    return shortName;
+  }
+  return `${shortName} — ${fullName}`;
+}
+
 

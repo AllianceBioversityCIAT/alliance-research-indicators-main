@@ -93,27 +93,33 @@ describe('project-selector.util', () => {
       });
     });
 
-    describe('negative excluded values (OQ-A, R-BAS-001)', () => {
-      it('excludes Window 3', () => {
-        expect(isBilateralFunding('Window 3')).toBe(false);
+    describe('positive W3 family values (R-W3B-001)', () => {
+      it('accepts Window 3', () => {
+        expect(isBilateralFunding('Window 3')).toBe(true);
       });
 
-      it('excludes Window 3 - Restricted', () => {
-        expect(isBilateralFunding('Window 3 - Restricted')).toBe(false);
+      it('accepts Window 3 - Restricted', () => {
+        expect(isBilateralFunding('Window 3 - Restricted')).toBe(true);
       });
 
-      it('excludes WINDOW 3 - RESTRICTED', () => {
-        expect(isBilateralFunding('WINDOW 3 - RESTRICTED')).toBe(false);
+      it('accepts WINDOW 3 - RESTRICTED', () => {
+        expect(isBilateralFunding('WINDOW 3 - RESTRICTED')).toBe(true);
       });
 
-      it('excludes Windows 3', () => {
-        expect(isBilateralFunding('Windows 3')).toBe(false);
+      it('accepts Windows 3', () => {
+        expect(isBilateralFunding('Windows 3')).toBe(true);
       });
 
-      it('excludes W3', () => {
-        expect(isBilateralFunding('W3')).toBe(false);
+      it('accepts W3', () => {
+        expect(isBilateralFunding('W3')).toBe(true);
       });
 
+      it('accepts window3 (no-space spelling used by 28 of 198 stub rows, AC.3)', () => {
+        expect(isBilateralFunding('window3')).toBe(true);
+      });
+    });
+
+    describe('negative excluded values (R-W3B-001; OQ-A superseded — W3 spellings moved to the positive block above)', () => {
       it('excludes SRV', () => {
         expect(isBilateralFunding('SRV')).toBe(false);
       });
@@ -388,8 +394,8 @@ describe('project-selector.util', () => {
     });
   });
 
-  describe('Bug-Mode Regression Suite: Production-Shaped Dataset (25 eligible vs 1 pre-fix)', () => {
-    // 25 eligible production rows + negative rows mirroring real CLARISA production feed
+  describe('Bug-Mode Regression Suite: Production-Shaped Dataset (30 eligible vs 1 pre-fix)', () => {
+    // 25 Bilateral + 5 W3-family eligible rows + negative rows mirroring real CLARISA production feed
     const allianceInstitution = {
       id: 1,
       name: 'Alliance of Bioversity International and CIAT',
@@ -433,8 +439,7 @@ describe('project-selector.util', () => {
         lead_institution_object: allianceInstitution,
       },
 
-      // --- NEGATIVE ROWS (Must be excluded) ---
-      // Window 3 spellings (all 6 observed spellings)
+      // --- W3-FAMILY ROWS (eligible since R-W3B-001) ---
       {
         id: 501,
         short_name: 'PROD-W3-1',
@@ -465,6 +470,7 @@ describe('project-selector.util', () => {
         source_of_funding: 'W3',
         lead_institution_object: allianceInstitution,
       },
+      // --- NEGATIVE ROWS (Must be excluded) ---
       {
         id: 506,
         short_name: 'PROD-SRV',
@@ -563,7 +569,7 @@ describe('project-selector.util', () => {
       },
     ];
 
-    it('returns exactly 25 eligible projects with the fixed selector predicates', () => {
+    it('returns 30 eligible projects with the widened selector predicates (R-W3B-001 admits 5 more W3 rows)', () => {
       const eligible = productionFixture.filter(
         (p) =>
           isBilateralFunding(p.source_of_funding) &&
@@ -571,7 +577,7 @@ describe('project-selector.util', () => {
           matchesPhase(p.phase, 2026),
       );
 
-      expect(eligible.length).toBe(25);
+      expect(eligible.length).toBe(30);
     });
 
     it('reproduces the bug: pre-fix predicate returns only 1 project', () => {
@@ -586,7 +592,7 @@ describe('project-selector.util', () => {
       expect(preFixEligible[0].id).toBe(101);
     });
 
-    it('excludes all Window 3 projects (6 rows)', () => {
+    it('admits all Window 3 family projects (5 rows, R-W3B-001) but keeps SRV excluded', () => {
       const eligible = productionFixture.filter(
         (p) =>
           isBilateralFunding(p.source_of_funding) &&
@@ -594,10 +600,12 @@ describe('project-selector.util', () => {
           matchesPhase(p.phase, 2026),
       );
 
-      const window3Ids = [501, 502, 503, 504, 505, 506];
+      const window3Ids = [501, 502, 503, 504, 505];
       for (const id of window3Ids) {
-        expect(eligible.some((p) => p.id === id)).toBe(false);
+        expect(eligible.some((p) => p.id === id)).toBe(true);
       }
+
+      expect(eligible.some((p) => p.id === 506)).toBe(false);
     });
 
     it('excludes null and whitespace funding projects', () => {

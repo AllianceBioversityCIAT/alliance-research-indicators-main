@@ -6,12 +6,16 @@
         <div class="flex items-center justify-between">
           <div class="pf-alignment-section-heading flex items-center gap-1.5">
             <div class="section-title m-0" data-testid="pf-alignment-title">SCIENCE PROGRAM CONTRIBUTION</div>
-            <i class="pi pi-info-circle pf-alignment-section-heading__icon"
-               [pTooltip]="INFO_BANNER"
-               tooltipPosition="top"
-               [attr.aria-label]="INFO_BANNER"
-               tabindex="0"
-               data-testid="pf-alignment-title-info-icon"></i>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center w-5 h-5 text-[var(--ac-grey-400)] hover:text-[var(--ac-primary-blue-600)] hover:bg-[var(--ac-primary-blue-50)] rounded-full transition-colors cursor-pointer border-0 bg-transparent p-0 focus:outline-none focus:ring-1 focus:ring-[var(--ac-primary-blue-400)]"
+              (click)="showHelpModal.set(true)"
+              aria-label="Learn more about Pool Funding and Theory of Change alignment"
+              [pTooltip]="'How does Pool Funding & Theory of Change alignment work?'"
+              tooltipPosition="top"
+              data-testid="pf-alignment-help-button">
+              <i class="pi pi-question-circle text-[15px]" aria-hidden="true"></i>
+            </button>
           </div>
           @if (readOnlyCause() === 'synced') {
             <app-custom-tag
@@ -33,38 +37,52 @@
         </div>
 
         @if (loadFailed()) {
-          <section class="mb-4 text-sm text-red-700" data-testid="pf-alignment-load-failed" role="alert">
-            Could not load alignment — please refresh.
+          <section class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900 flex items-center gap-2.5" data-testid="pf-alignment-load-failed" role="alert">
+            <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
+            <span>Could not load alignment — please refresh.</span>
           </section>
         }
 
         @if (readOnlyCause() === 'synced') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                data-testid="pf-alignment-synced-banner">
-            {{ SYNCED_BANNER }}
+            <i class="pi pi-lock text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ SYNCED_BANNER }}</span>
           </div>
         } @else if (readOnlyCause() === 'prms-sourced') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                data-testid="pf-alignment-prms-sourced-banner">
-            {{ PRMS_SOURCED_BANNER }}
+            <i class="pi pi-shield text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ PRMS_SOURCED_BANNER }}</span>
           </div>
         } @else if (readOnlyCause() === 'permission') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-grey-500)] bg-[var(--ac-grey-100)] text-sm text-[var(--ac-grey-800)] flex items-center gap-2.5"
                data-testid="pf-alignment-readonly-banner">
-            {{ READ_ONLY_BANNER }}
+            <i class="pi pi-lock text-[var(--ac-grey-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ READ_ONLY_BANNER }}</span>
           </div>
         }
 
         <div role="note"
-             class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-[30px]"
+             class="flex items-center justify-between flex-wrap gap-2.5 bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm text-[var(--ac-primary-blue-800)] mb-6"
              data-testid="pf-alignment-info-banner">
-          <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180" aria-hidden="true">info</span>
-          <h3 class="text-[#777C83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
-            {{ INFO_BANNER }}
-          </h3>
+          <div class="flex items-center gap-2.5 min-w-0">
+            <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <h3 class="text-xs leading-relaxed m-0 text-[var(--ac-grey-700)] font-normal">
+              {{ INFO_BANNER }}
+            </h3>
+          </div>
+          <button
+            type="button"
+            class="text-xs font-semibold text-[var(--ac-primary-blue-700)] hover:text-[var(--ac-primary-blue-900)] flex items-center gap-1 cursor-pointer ml-auto shrink-0 bg-transparent border-0 p-0 transition-colors"
+            (click)="showHelpModal.set(true)"
+            data-testid="pf-alignment-banner-help-link">
+            <span>Learn more & view workflow</span>
+            <i class="pi pi-arrow-right text-[10px]" aria-hidden="true"></i>
+          </button>
         </div>
 
         <section class="mb-6" data-testid="pf-alignment-contribution-section">
@@ -107,133 +125,145 @@
 
         @if (formData().has_contribution === true) {
           <section class="mb-6" data-testid="pf-alignment-levers-section">
-            @if (isUnmapped()) {
+            @if (loadingSciencePrograms() && mappingStatus() === null) {
+              <div role="status" aria-live="polite" aria-busy="true"
+                   class="flex flex-col gap-3.5 p-4 rounded-[10px] bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)]"
+                   data-testid="pf-alignment-sps-loading">
+                <div class="flex items-center gap-2 text-sm text-[var(--ac-primary-blue-700)]">
+                  <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                  <span class="font-medium">Loading Science Programs from CLARISA...</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                </div>
+              </div>
+            } @else if (isUnmapped()) {
               <div role="status" aria-live="polite"
-                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-amber-500 bg-amber-50 text-sm text-amber-900 flex items-center gap-2.5"
                    data-testid="pf-alignment-unmapped-message">
-                {{ UNMAPPED_SP_MESSAGE }}
+                <i class="pi pi-exclamation-triangle text-amber-600 text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ UNMAPPED_SP_MESSAGE }}</span>
+              </div>
+            } @else if (isStale()) {
+              <div role="status" aria-live="polite"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-amber-500 bg-amber-50 text-sm text-amber-900 flex items-center gap-2.5"
+                   data-testid="pf-alignment-stale-message">
+                <i class="pi pi-exclamation-triangle text-amber-600 text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ STALE_SP_MESSAGE }}</span>
               </div>
             } @else if (hasNoSciencePrograms()) {
               <div role="status" aria-live="polite"
-                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                    data-testid="pf-alignment-no-sps-message">
-                {{ NO_SP_DEFINED_MESSAGE }}
+                <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ NO_SP_DEFINED_MESSAGE }}</span>
               </div>
             } @else if (showSpPicker()) {
-              <app-multiselect
-                [label]="SP_PICKER_LABEL"
-                [isRequired]="true"
-                [signal]="formData"
-                signalOptionValue="selected_sps"
-                optionLabel="name"
-                optionValue="official_code"
-                serviceName="bilateralSciencePrograms"
-                placeholder="Select Science Programs"
-                selectedItemsSurfaceColor="#FFFFFF"
-                [columnsOnXl]="true"
-                [disabled]="!editable() || isReadOnly()"
-                (selectEvent)="onSpSelectionChange()">
-                <ng-template #rows let-row>
-                  @let chipCode = row.code || row.official_code;
-                  @let chipSp = findScienceProgram(chipCode);
-                  <span class="flex items-center gap-2 min-w-0"
-                        [class.pf-sp-chip-rejected]="isRejectedSp(chipCode)"
-                        [attr.data-rejected]="isRejectedSp(chipCode) ? 'true' : null"
-                        [attr.data-testid]="'pf-alignment-sp-chip-' + chipCode">
-                    <img [src]="'/sps/' + (chipSp?.icon_key || chipCode) + '.png'"
-                         [alt]="chipCode + ' icon'"
-                         class="rounded shrink-0 object-cover"
-                         [style.background]="(chipSp?.color || row.color) || 'transparent'"
-                         style="width:24px;height:24px;"
-                         loading="lazy" />
-                    <span class="truncate text-[var(--ac-primary-blue-500)] text-[14px]"
-                          style="font-family: 'Barlow', sans-serif;">
-                      <strong>{{ chipCode }} — {{ chipSp?.allocation ?? '—' }}%</strong> - {{ row.name }}
+              @if (isSingleSp() && singleSp(); as sp) {
+                <div class="bg-white rounded-[10px] border border-[var(--ac-primary-blue-200)] flex items-center justify-between gap-4 p-4 shadow-2xs"
+                     tabindex="0"
+                     role="region"
+                     aria-label="Selected Science Program"
+                     data-testid="pf-alignment-single-sp-card">
+                  <div class="flex items-center gap-3.5 min-w-0">
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-black/5"
+                         [style.background]="sp.color || 'var(--ac-primary-blue-50)'">
+                      <img [src]="'/sps/' + (sp.icon_key || sp.code) + '.png'"
+                           [alt]="sp.code + ' icon'"
+                           class="w-full h-full object-cover"
+                           loading="lazy" />
+                    </div>
+                    <span class="text-[14px] text-[var(--ac-grey-900)] leading-tight">
+                      <strong>{{ sp.code }} — {{ sp.allocation ?? '—' }}%</strong> - {{ sp.name }}
                     </span>
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-300)] shrink-0"
+                        data-testid="single-sp-primary-badge">
+                    <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                    Primary
                   </span>
-                </ng-template>
-                <ng-template #item let-row>
-                  <span class="flex items-center gap-2 min-w-0">
-                    <img [src]="'/sps/' + (row.icon_key || row.code || row.official_code) + '.png'"
-                         [alt]="(row.code || row.official_code) + ' icon'"
-                         class="rounded shrink-0 object-cover"
-                         [style.background]="row.color || 'transparent'"
-                         style="width:24px;height:24px;"
-                         loading="lazy" />
-                    <span class="truncate text-[var(--ac-grey-800)] text-[14px]"
-                          style="font-family: 'Barlow', sans-serif;">
-                      <strong>{{ row.code }} — {{ row.allocation }}%</strong> - {{ row.name }}
-                    </span>
-                  </span>
-                </ng-template>
-              </app-multiselect>
-              @if (inlineErrors()?.['sp_codes']; as msg) {
-                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
-                       data-testid="pf-alignment-error-sp_codes">{{ msg }}</small>
+                </div>
+              } @else {
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5" data-testid="pf-alignment-multi-sp-grid">
+                  @for (sp of sciencePrograms(); track sp.code) {
+                    @let isSelected = isSelectedSp(sp.code);
+                    @let isPrim = isPrimary(sp.code);
+                    <div class="rounded-[10px] p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 border-2"
+                         [class.bg-white]="!isSelected"
+                         [class.border-[var(--ac-grey-300)]]="!isSelected"
+                         [class.hover:border-[var(--ac-primary-blue-300)]]="!isSelected"
+                         [class.bg-[var(--ac-primary-blue-50)]]="isSelected && isPrim"
+                         [class.bg-slate-50]="isSelected && !isPrim"
+                         [class.border-[var(--ac-primary-blue-600)]]="isSelected && isPrim"
+                         [class.border-[var(--ac-primary-blue-400)]]="isSelected && !isPrim"
+                         tabindex="0"
+                         role="checkbox"
+                         [attr.aria-checked]="isSelected"
+                         [attr.data-testid]="'pf-alignment-sp-card-' + sp.code"
+                         (click)="toggleSp(sp)"
+                         (keydown.enter)="toggleSp(sp)"
+                         (keydown.space)="$event.preventDefault(); toggleSp(sp)">
+                      
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="w-5 h-5 rounded flex items-center justify-center border transition-colors shrink-0"
+                             [class.bg-[var(--ac-primary-blue-600)]]="isSelected"
+                             [class.border-[var(--ac-primary-blue-600)]]="isSelected"
+                             [class.border-[var(--ac-grey-400)]]="!isSelected"
+                             [class.bg-white]="!isSelected">
+                          @if (isSelected) {
+                            <i class="pi pi-check text-white text-xs" aria-hidden="true"></i>
+                          }
+                        </div>
+
+                        <div class="w-8.5 h-8.5 rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-black/5"
+                             [style.background]="sp.color || 'var(--ac-primary-blue-50)'">
+                          <img [src]="'/sps/' + (sp.icon_key || sp.code) + '.png'"
+                               [alt]="sp.code + ' icon'"
+                               class="w-full h-full object-cover"
+                               loading="lazy" />
+                        </div>
+
+                        <span class="text-[14px] text-[var(--ac-grey-900)] leading-tight truncate">
+                          <strong>{{ sp.code }} — {{ sp.allocation ?? '—' }}%</strong> - {{ sp.name }}
+                        </span>
+                      </div>
+
+                      @if (isSelected) {
+                        @if (isPrim) {
+                          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] border border-[var(--ac-primary-blue-300)] shrink-0 shadow-2xs"
+                                [attr.data-testid]="'pf-alignment-role-primary-' + sp.code">
+                            <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                            Primary
+                          </span>
+                        } @else {
+                          <div class="flex items-center gap-2 shrink-0">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200/80 text-slate-700 border border-slate-300 shrink-0"
+                                  [attr.data-testid]="'pf-alignment-role-contributing-' + sp.code">
+                              Contributing
+                            </span>
+                            @if (editable() && !isReadOnly() && !primaryControlDisabled()) {
+                              <button type="button"
+                                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium text-[var(--ac-primary-blue-700)] hover:text-white hover:bg-[var(--ac-primary-blue-600)] border border-[var(--ac-primary-blue-300)] hover:border-[var(--ac-primary-blue-600)] bg-white cursor-pointer transition-all shrink-0 shadow-2xs"
+                                      (click)="setPrimarySp(sp.code, $event)"
+                                      [attr.data-testid]="'pf-alignment-set-primary-' + sp.code">
+                                <i class="pi pi-star text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                                Make Primary
+                              </button>
+                            }
+                          </div>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+                @if (inlineErrors()?.['sp_codes']; as msg) {
+                  <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                         data-testid="pf-alignment-error-sp_codes">{{ msg }}</small>
+                }
               }
             }
           </section>
-
-          <!--
-            R-BIL-127 / design.md §6.3 — the Primary designation is a SEPARATE,
-            single-choice control over the already-selected set (D-C2-7): not a
-            second multiselect, not a mode toggle on app-multiselect above.
-            Renders once there is something to designate a Primary among.
-          -->
-          @if (formData().selected_sps.length >= 1) {
-            <section class="mb-6" data-testid="pf-alignment-primary-section">
-              <p id="pf-alignment-primary-question" class="label inline-block mb-2">
-                {{ PRIMARY_SP_LABEL }}<span class="text-red-500" aria-hidden="true">*</span>
-              </p>
-              <div role="radiogroup"
-                   aria-labelledby="pf-alignment-primary-question"
-                   aria-required="true"
-                   class="flex flex-col gap-2"
-                   data-testid="pf-alignment-primary-radio-group">
-                @for (sp of formData().selected_sps; track sp.official_code) {
-                  @let primarySp = findScienceProgram(sp.official_code);
-                  <div class="pf-primary-row flex items-center gap-3"
-                       [attr.data-testid]="'pf-alignment-primary-row-' + sp.official_code">
-                    <p-radioButton
-                      name="pf-alignment-primary"
-                      [inputId]="'pf-alignment-primary-' + sp.official_code"
-                      [value]="sp.official_code"
-                      [ngModel]="primarySpCode()"
-                      (ngModelChange)="onPrimaryChange($event)"
-                      [disabled]="primaryControlDisabled()"
-                      [attr.data-testid]="'pf-alignment-primary-radio-' + sp.official_code"></p-radioButton>
-                    <label [for]="'pf-alignment-primary-' + sp.official_code"
-                           class="option-label flex items-center gap-2 min-w-0 flex-wrap">
-                      <span class="truncate">
-                        <strong>{{ sp.official_code }} — {{ primarySp?.allocation ?? '—' }}%</strong> - {{ sp.name }}
-                      </span>
-                      <!--
-                        AC.6 — non-colour-only cue: a text label ("Primary"/"Contributing")
-                        always present, plus an icon on the Primary role only. Colour
-                        alone never carries the distinction (WCAG 2.1 AA 1.4.1, PRD C-4).
-                      -->
-                      @if (isPrimary(sp.official_code)) {
-                        <span class="pf-role-badge pf-role-badge--primary"
-                              [attr.data-testid]="'pf-alignment-role-primary-' + sp.official_code">
-                          <i class="pi pi-star-fill" aria-hidden="true"></i>
-                          {{ PRIMARY_ROLE_LABEL }}
-                        </span>
-                      } @else {
-                        <span class="pf-role-badge pf-role-badge--contributing"
-                              [attr.data-testid]="'pf-alignment-role-contributing-' + sp.official_code">
-                          {{ CONTRIBUTING_ROLE_LABEL }}
-                        </span>
-                      }
-                    </label>
-                  </div>
-                }
-              </div>
-              @if (primaryRequiredMessage() ?? inlineErrors()?.['primary_sp_code']; as msg) {
-                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
-                       data-testid="pf-alignment-error-primary_sp_code">{{ msg }}</small>
-              }
-            </section>
-          }
 
           @if (showHloSection() && hloSectionVisible()) {
             <section class="mb-6" data-testid="pf-alignment-hlo-section">
@@ -242,22 +272,36 @@
               </p>
 
               @if (loadingTocCatalog() && !tocCatalog()) {
-                <div role="status" aria-live="polite"
-                     class="flex items-center gap-2 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                <div role="status" aria-live="polite" aria-busy="true"
+                     class="flex flex-col gap-4 p-4 rounded-[10px] bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)]"
                      data-testid="pf-alignment-hlo-loading">
-                  <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-                  <span>{{ HLO_CATALOG_LOADING_MESSAGE }}</span>
+                  <div class="flex items-center gap-2 text-sm text-[var(--ac-primary-blue-700)]">
+                    <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                    <span class="font-medium">Fetching Theory of Change catalog from PRMS...</span>
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <p-skeleton width="120px" height="1rem" styleClass="mb-1" />
+                    <p-skeleton width="100%" height="42px" borderRadius="8px" />
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <p-skeleton width="160px" height="1rem" styleClass="mb-1" />
+                    <p-skeleton width="100%" height="42px" borderRadius="8px" />
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <p-skeleton width="140px" height="1rem" styleClass="mb-1" />
+                    <p-skeleton width="100%" height="70px" borderRadius="8px" />
+                  </div>
                 </div>
               } @else if (tocCatalogError() && !tocCatalog()) {
                 <div role="alert" aria-live="polite"
-                     class="flex items-center justify-between gap-3 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     class="flex items-center justify-between gap-3 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900"
                      data-testid="pf-alignment-hlo-catalog-error">
-                  <span class="flex items-center gap-2">
-                    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+                  <span class="flex items-center gap-2.5">
+                    <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
                     <span>{{ HLO_CATALOG_ERROR_MESSAGE }}</span>
                   </span>
                   <button type="button"
-                          class="shrink-0 text-[var(--ac-primary-blue-500)] underline cursor-pointer bg-transparent border-0 p-0"
+                          class="shrink-0 font-medium text-[var(--ac-primary-blue-700)] hover:underline cursor-pointer bg-transparent border-0 p-0"
                           data-testid="pf-alignment-hlo-retry"
                           (click)="retryCatalog()">
                     Retry
@@ -267,9 +311,10 @@
 
               @if (versionLocked()) {
                 <div role="status" aria-live="polite"
-                     class="mb-4 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                      data-testid="pf-alignment-version-locked-banner">
-                  {{ VERSION_LOCKED_BANNER }}
+                  <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+                  <span>{{ VERSION_LOCKED_BANNER }}</span>
                 </div>
               }
 
@@ -352,8 +397,11 @@
         }
 
         @if (inlineErrors()?.['_global']; as msg) {
-          <div role="alert" aria-live="polite" class="mb-3 text-sm text-red-700"
-               data-testid="pf-alignment-error-global">{{ msg }}</div>
+          <div role="alert" aria-live="polite" class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900 flex items-center gap-2.5"
+               data-testid="pf-alignment-error-global">
+            <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ msg }}</span>
+          </div>
         }
       </div>
     </div>
@@ -365,4 +413,124 @@
     [showSave]="editable() && !isReadOnly()"
     [disableSave]="!canSave() || saving()"
     (save)="onSave()" />
+
+  <!-- Help & Workflow Guide Modal -->
+  <p-dialog
+    [(visible)]="showHelpModal"
+    [modal]="true"
+    [draggable]="false"
+    [resizable]="false"
+    [dismissableMask]="true"
+    [style]="{ width: '58rem', maxWidth: '95vw' }"
+    styleClass="pf-help-dialog"
+    header="About Pool Funding & Theory of Change Alignment">
+    <div class="flex flex-col gap-6 py-2 text-[var(--ac-grey-900)]">
+      <!-- Overview Intro Banner -->
+      <div class="bg-[var(--ac-primary-blue-50)] border border-[var(--ac-primary-blue-200)] rounded-xl p-4 flex items-start gap-3.5">
+        <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-xl shrink-0 mt-0.5" aria-hidden="true"></i>
+        <div class="flex flex-col gap-1 text-sm text-[var(--ac-grey-800)] leading-relaxed">
+          <span class="font-semibold text-[var(--ac-primary-blue-900)] text-base">Why align bilateral results with Pool Funding?</span>
+          <p class="m-0 text-[13px] text-[var(--ac-grey-700)]">
+            Bilateral projects contribute significantly to CGIAR goals. This module enables you to link your result with <strong>Science Programs (SPs) or Accelerators</strong> and map its contribution into the <strong>Theory of Change (ToC)</strong> framework (Outputs and Outcomes). Once approved, this alignment can be synchronized directly with <strong>PRMS</strong>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Process Workflow Diagram -->
+      <div class="flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-[var(--ac-grey-700)] m-0 flex items-center gap-2">
+            <i class="pi pi-sitemap text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+            End-to-End Alignment & PRMS Sync Flow
+          </h4>
+          <span class="text-[11px] text-[var(--ac-grey-500)]">From result creation to institutional PRMS reporting</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 bg-[var(--ac-grey-50)] p-4 rounded-xl border border-[var(--ac-grey-200)]">
+          <!-- Step 1 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">1</span>
+              <i class="pi pi-th-large text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Science Programs</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Select the contributing Science Program(s) and designate one <strong>Primary SP</strong>.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">2</span>
+              <i class="pi pi-sliders-h text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Theory of Change</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Map the Primary SP's Theory of Change (Outputs / Outcomes) and choose target indicators.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-grey-200)] shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] text-xs font-bold flex items-center justify-center">3</span>
+              <i class="pi pi-check-circle text-[var(--ac-primary-blue-500)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-grey-900)]">Review & Approve</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Submit the result in STAR for validation and approval by the Principal Investigator or Center Admin.
+            </p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="flex flex-col gap-2.5 bg-white p-3.5 rounded-lg border border-[var(--ac-primary-blue-200)] bg-linear-to-b from-[var(--ac-primary-blue-50)]/60 to-white shadow-2xs">
+            <div class="flex items-center justify-between">
+              <span class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-600)] text-white text-xs font-bold flex items-center justify-center">4</span>
+              <i class="pi pi-sync text-[var(--ac-primary-blue-600)] text-sm" aria-hidden="true"></i>
+            </div>
+            <span class="font-semibold text-xs text-[var(--ac-primary-blue-900)]">PRMS Sync</span>
+            <p class="text-[11px] text-[var(--ac-grey-600)] m-0 leading-normal">
+              Use <strong>PRMS SYNC</strong> in the sidebar to transmit the approved result and ToC mapping to PRMS via API.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Concepts / FAQ Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="p-3.5 rounded-lg border border-[var(--ac-grey-200)] bg-white flex flex-col gap-1.5 shadow-2xs">
+          <div class="flex items-center gap-2 text-xs font-semibold text-[var(--ac-grey-900)]">
+            <i class="pi pi-star-fill text-amber-500 text-xs" aria-hidden="true"></i>
+            <span>Primary vs. Contributing Science Programs</span>
+          </div>
+          <p class="text-xs text-[var(--ac-grey-600)] m-0 leading-relaxed">
+            The <strong>Primary SP</strong> is the main Science Program whose Theory of Change (ToC) targets are mapped. Contributing SPs represent secondary institutional collaborations.
+          </p>
+        </div>
+
+        <div class="p-3.5 rounded-lg border border-[var(--ac-grey-200)] bg-white flex flex-col gap-1.5 shadow-2xs">
+          <div class="flex items-center gap-2 text-xs font-semibold text-[var(--ac-grey-900)]">
+            <i class="pi pi-shield text-[var(--ac-primary-blue-600)] text-xs" aria-hidden="true"></i>
+            <span>Read-Only & PRMS-Sourced Locks</span>
+          </div>
+          <p class="text-xs text-[var(--ac-grey-600)] m-0 leading-relaxed">
+            Results originating in PRMS or already synchronized become read-only in STAR to protect data integrity and prevent unintended discrepancies across platforms.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #footer>
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="px-5 py-2 rounded-lg bg-[var(--ac-primary-blue-600)] hover:bg-[var(--ac-primary-blue-700)] text-white text-xs font-medium cursor-pointer transition-colors"
+          (click)="showHelpModal.set(false)"
+          data-testid="pf-alignment-help-dialog-close">
+          Close
+        </button>
+      </div>
+    </ng-template>
+  </p-dialog>
 </div>
