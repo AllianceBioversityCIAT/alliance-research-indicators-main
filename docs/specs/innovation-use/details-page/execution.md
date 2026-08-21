@@ -1605,3 +1605,110 @@ It extended the authority boundary correctly on its own initiative: the prohibit
 **Stack is ready:** `cd client/research-indicators && npm run compose:up:dev` → `http://localhost:4200` (or `npm start` without Docker).
 
 ---
+
+---
+
+## ⛔ Pivot Record: T-13 — the create-result entry point is closed by a client allowlist
+
+**Date:** 2026-08-21 · **Trigger:** user-reported defect during the T-13 human gate (screenshot: the *Create result* → `Indicator` dropdown offers four options; Innovation Use is absent) · **Approved by the user:** *"Pivot + arreglar en el spec"*
+
+### What was discovered
+
+`client/research-indicators/src/app/shared/services/control-list/indicators.service.ts:34`
+
+```ts
+const targetIndicatorIds = [1, 2, 4, 5];
+```
+
+Applied inside `generateGroupedIndicators()`, whose output `indicatorsGrouped()` has **exactly one consumer**: `create-result-form.component.html:49` (`<p-select [options]="indicatorsService.indicatorsGrouped()">`). Indicator 6 is filtered out before render, **independently of the server's `is_active` value**. The four options in the user's screenshot are ids 1, 2, 4, 5.
+
+Verified blast radius: `about-indicators.component.html:2` reads the **unfiltered** `indicators()`; `indicator.component.ts` does not read the list at all. The allowlist governs the create-result dropdown and nothing else. The line carries no explanatory comment and its history is squashed into the monorepo-migration commit `c0645b58`, so original intent is unrecoverable.
+
+### Why this is a Pivot and not a rework attempt
+
+The implementation conformed to the spec. **The spec was factually wrong**, in a way that propagated through every downstream document:
+
+| Site | Claimed | Reality |
+| --- | --- | --- |
+| `proposal.md:40` | *"the indicator **is** selectable: `IndicatorsService.findAll()` filters only on `is_active`"* | **Root cause.** `findAll()` is the **server's** `IndicatorsService`. The dropdown uses the **client's** same-named class, which allowlists. Two tiers, one class name, wrong tier audited |
+| `requirements.md` §Executive Summary | *"`GetAllIndicatorsService` applies no client-side filter"* | True of that service — but it does not feed the dropdown |
+| `requirements.md` §6.4 audit row | *"Indicator selectability · `get-all-indicators.service.ts` · **No client-side filter**"* | Wrong file audited |
+| `requirements.md` §Why-now | *"the entry point is already live in production … confirmed by code inspection in §6.4"* | Cited the wrong audit row as its own confirmation |
+| `requirements.md` `A2` | *"Indicator 6 is `is_active` …, **so** the create-result flow offers it"* | **Invalid inference.** `is_active` does not imply offered |
+| `design.md` §10.5 / §13, `OQ-IUP-2`, `RB-2` | *"a deployment fact, not answerable from the repo"* / *"blocks nothing"* | Answerable from the repo; blocked `T-13` c1, c7, c8, c9 — the entire human gate |
+
+**This supersedes `execution.md:1600`**, the T-13 entry's c1 blocker row, which hypothesized `is_active` as the cause. That row stands as written (this log is append-only); this record is its correction.
+
+### Impact on T-13
+
+c1 requires opening an indicator-6 result; c7/c8/c9 require the page rendered. With no creatable indicator-6 result, **all four owed criteria were unperformable** — not failing, unperformable. The gate could not run at all.
+
+### Alternatives considered
+
+| Option | Assessment |
+| --- | --- |
+| **A — Correct the documents and admit `6` to the allowlist** | **Chosen by the user.** One line, one consumer, and it is the only route that closes the spec. Aligned with `design.md` §13's own declared intent (*"Innovation Use is now reportable"*) |
+| B — Correct the documents; run the gate against a pre-existing indicator-6 result | Depends on such a result existing in the dev environment — unverified, and leaves the entry point shipped broken |
+| C — Correct the documents; park T-13 with c1/c7/c8/c9 recorded **blocked** | Defensible (making an indicator selectable is a product decision), but ships a page no user can reach |
+
+### Revised technical direction
+
+1. **Documents corrected** (this Leader, done): `requirements.md` §Executive Summary, §Why-now, §6.4 audit row, §6.4 Conclusion, `A2`, `OQ-IUP-2`; `design.md` §10.5, §13 Comms, `OQ-IUP-2`; `tasks.md` `RB-2` and the §closure checklist; `proposal.md:40` annotated with the root-cause diagnosis.
+2. **Correction Closure sweep, both directions — executed.** The forward sweep caught **two residual live falsehoods absent from the cited-site list**: `requirements.md` §Why-now and `proposal.md:40`. This is **KZ-005's exact failure mode recurring inside the spec that records it**, and it is the second time in this run that the sweep — not the analysis — caught the survivor.
+3. **Code change** — delegated to the Implementer, not written by the Leader: admit `6` to `targetIndicatorIds`, update `indicators.service.spec.ts`, full suite + lint.
+4. **Recorded as a user-authorized non-task change on the `RB-9` precedent**, not as a new numbered task and not by reopening the closed `T-10`. Per `/akili-execute` §2.4 a spec's task list is what the user approved; the Pivot Protocol authorizes the amendment, and `RB-9` already established this treatment in this spec.
+5. **No TRD ADR is overturned.** A hardcoded client allowlist is not a recorded architecture decision — there is no `ADR-NNN` to supersede.
+
+### Kaizen candidate
+
+**Same-named classes across the two tiers make "which tier does this symbol live in" a mandatory step of any code-inspection claim.** And: **an assumption carrying its own verification instruction, never verified, is a latent Pivot.** `A2` said *"to be confirmed against the deployed environment before implementation"*; implementation ran to the final task without it, and the cost was paid at the most expensive possible moment — the last gate of a 13-task spec.
+
+### PV-T13-1 — allowlist correction: ✅ PASS
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer verdict, first attempt, no advisory block |
+| **Date** | 2026-08-21 |
+| **Authorized by** | User, at the T-13 Pivot (*"Pivot + arreglar en el spec"*). Recorded as a non-task change on the `RB-9` precedent |
+| **Attempts** | **1** |
+| **Effort / skills** | `medium` · `angular-developer` |
+| **Triad** | Implementer (`akili-implementer` · T2 · sonnet) → Reviewer (`akili-reviewer` · T3 · opus, read-only). `author ≠ auditor` held on both axes — **not collapsed despite the diff being one production line**, per `/akili-execute` §Delegation Ceiling |
+
+**The change.** `indicators.service.ts:34` — `[1, 2, 4, 5]` → `[1, 2, 4, 5, 6]`, plus a two-line comment naming what the array gates and citing this spec. **+27 / −2 across two files.**
+
+**Coverage is real, not nominal — and this was the trap.** The pre-existing fixture `mockIndicatorTypes` held indicators 1, 2, 3, 4, 5 and **no 6**, so the existing filter test would have passed against either array: *the change could have shipped with a green suite and zero evidence.* The brief named this explicitly. The Implementer added indicator 6 to the fixture (making the pre-existing deep-equality assertion load-bearing at the same time) plus a dedicated test asserting **6 present and 3 still absent** — the falsifier proving the allowlist widened by exactly one member rather than being disabled. **Validated by reverting line 34: 2 failed / 5 passed. Restored: 7 passed.**
+
+**Verification.** `npm test -- --silent` full unfiltered → **312 suites / 6511 tests** against the 312 / 6510 baseline: suites held, tests +1, matching the single new `it()` exactly. Coverage 99.22 / 97.94 / 98.81 / 99.5 vs floors 40 / 20 / 45 / 30. `npm run lint -- --quiet` → `All files pass linting.`, `git status` re-inspected after (the script carries `--fix`).
+
+#### What the Reviewer established independently — beyond confirming the Leader
+
+Three findings the Leader had **not** verified, and one it had:
+
+1. **The fixture's `indicator_type_id: 2` is production-accurate, not incidental.** Traced to the server seed rather than reasoned about: migration `1729174028390-addedDescriptionColumnIndicators.ts:14` inserts `INNOVATION_USE, 'Innovation Use', …, 2`; `1729611300485-addedDescriptionAndIconToIndicators.ts:33` sets `indicator_type_id = IndicatorTypeEnum.OUTCOME`; `OUTCOME = 2` (`indicator-types/enum/indicator-type.enum.ts:3`) and `INNOVATION_USE = 6` (`indicators/enum/indicators.enum.ts:7`). **Consequence for the human gate: Innovation Use renders under the *OUTCOMES* group, not *OUTPUTS*.**
+2. **Indicator 3 is Knowledge Product**, moved to `OUTPUT` by the same migration — so the fixture's placement of 3 under type 1 is also accurate. Its continued exclusion is out of this change's scope and remains unexplained by any comment in the codebase.
+3. **No sibling allowlist exists.** Grepped `\[1,\s*2,\s*4,\s*5\]|targetIndicator` across the whole client `src/` — three hits, all inside the one method. There was no second copy of this filter to miss.
+4. **Blast radius confirmed against the Leader's claim** (which the brief instructed it not to take on trust): `indicatorsGrouped|generateGroupedIndicators` has exactly **one runtime consumer**, `create-result-form.component.html:49`, plus two test-only sites. `about-indicators/` holds no reference to the grouped list.
+
+#### The question that mattered most — is anything owed? (brief Q5)
+
+**Nothing.** The Reviewer followed the create→open path end to end, which is the check that would have caught "a dropdown that creates a result the app cannot open":
+
+| Hop | Evidence |
+| --- | --- |
+| Sidebar row | `result-sidebar.component.ts:130-135` (`indicator_id: 6` → `innovation-use-details`) and `:196-201` (`ip_rights`) — both from **T-10** |
+| Route | `app.routes.ts:148-152`, lazy child route |
+| Section path | `cache.service.ts:66-67` returns `'innovation-use-details'` for case 6 — the Next/Back dead link is closed |
+| Create-form logic | No indicator-6 gap. The OICR special paths (`=== 5`: forced 2025 year, `CreateOicr()`, "Continue" label) don't apply; indicator 6 takes the generic `createResult(true)` path |
+| Server create | `results.service.ts:546-548` creates the `result_innovation_use` row; `:556-564` includes `INNOVATION_USE` in `ipAvailables`, so the `ip_rights` row the sidebar expects exists |
+
+**This is the first evidence in the run that T-10's reachability wiring works against a result reachable by a real user** — every prior check exercised it against fixtures.
+
+**`STATUS: PASS`** — *"precisely the change the T-13 Pivot Record authorized — one array member plus falsifying test coverage in two files — with production-accurate fixture semantics, a single verified consumer, and all companion routing, sidebar, section-path and server-side create wiring already in place from T-10 and chunk 2."*
+
+#### Budget
+
+**+25 net LOC** (+27 / −2). Running total **5,164 + 25 = 5,189**, or **5,384** including RB-9's 195. Review rounds **20 → 21 of ~28**. Not re-escalated: the user has ruled twice on this spec's overrun with full information, and a 25-line Pivot correction does not change the diagnosis.
+
+#### T-13 status after this change
+
+Still **`[~]`**. This unblocked the gate; it did not discharge it. **c1, c7, c8, c9 remain owed to the human** — now performable rather than unperformable, which is the whole point of the Pivot.

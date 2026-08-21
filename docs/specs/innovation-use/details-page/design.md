@@ -484,7 +484,7 @@ A check that cannot fail is not evidence. Each of these must be shown to fail ag
 ### 10.5 What a green run still does not prove
 
 - That the server accepts the payload — **AR-1**. No client-tier test reaches a live API. Contract conformance rests on chunk 2's archived fixture tier plus §4.3's transcription.
-- That indicator 6 is selectable in the deployed environment — **A2 / OQ-IUP-2**, a deployment fact.
+- ~~That indicator 6 is selectable in the deployed environment — **A2 / OQ-IUP-2**, a deployment fact.~~ **Corrected 2026-08-21 at the T-13 Pivot:** this was not a deployment fact and not unprovable from the repo. `indicators.service.ts:34` closes the create-result dropdown to indicator 6 with a hardcoded allowlist `[1, 2, 4, 5]`. **A2 is falsified, OQ-IUP-2 is resolved**, and the allowlist correction is authorized in `execution.md` → `## Pivot Record: T-13`. What a green run still does not prove is the *deployed* state of that corrected code — which is an ordinary release fact, not a spec unknown.
 - That the section is visually correct or accessible — **AR-2**, human-gated.
 
 ---
@@ -547,7 +547,7 @@ A check that cannot fail is not evidence. Each of these must be shown to fail ag
 | Feature flag | **None.** The page is only reachable from an indicator-6 result, which today reaches a dead end. Shipping it strictly improves that path; a flag would add a state to test with no state to protect |
 | Migration | none |
 | Backout | Revert the client commit. No data written by the page is orphaned — chunk 2's endpoint owns the rows and other paths already read them |
-| Comms | STAR reporters: Innovation Use is now reportable. MEL: a seventh section appears in the review flow for indicator 6. **Confirm A2 / OQ-IUP-2 first** — if indicator 6 is already selectable in production, some users may have parked results sitting on the dead end, and those results become completable the moment this ships |
+| Comms | STAR reporters: Innovation Use is now reportable — **and newly *selectable*, which this spec did not originally plan to change.** *(Amended 2026-08-21 at the T-13 Pivot: this row previously said "Confirm A2 / OQ-IUP-2 first — if indicator 6 is already selectable in production…". It cannot be: `indicators.service.ts:34`'s allowlist closed it everywhere, so the premise was false in every environment.)* MEL: a seventh section appears in the review flow for indicator 6. **Two audiences, not one:** (a) reporters gain a new selectable indicator in *Create result* — the visible product change; (b) any results already parked on indicator 6 (created before the allowlist, or by another path) become completable the moment this ships. Whether (b) is a non-empty set remains a deployment fact worth confirming for comms, but it no longer gates anything |
 | Follow-up owed | (a) Consolidate the two actor-card implementations (§11.1). (b) Results Center / dashboard / export for indicator 6 (**D-IUP-6**). (c) Family **FR-7** / AC-1718 — **not** this spec's, and not closed by it. **The `docs/ux-ui/design.md` §8.1 + §12 registration is *not* on this list**: R-IUP-017 AC.4 requires it "in the same change" and **`T-12`** budgets it inside this spec. *(Corrected at Judgment Day round 1, `judgment.md` → `C-3`: it was previously listed here as owed follow-up, so a reader of this table alone would have shipped in breach of AC.4.)* |
 
 ### Task decomposition preview (authored in Phase 3)
@@ -562,7 +562,7 @@ Contract layer → shared additive edits → child components → page → wirin
 
 | ID | Question | Owner | Blocks | Status |
 | --- | --- | --- | --- | --- |
-| OQ-IUP-2 | Is indicator 6 `is_active` in the deployed environment (family **FR-5**)? | Product owner / DevOps | nothing — informs §13 comms and urgency | **still open** — a deployment fact, not answerable from the repo |
+| OQ-IUP-2 | Is indicator 6 `is_active` in the deployed environment (family **FR-5**)? | Product owner / DevOps | ~~nothing — informs §13 comms and urgency~~ → **blocked `T-13` c1/c7/c8/c9** | ✅ **RESOLVED 2026-08-21 at the T-13 Pivot.** The status previously read *"a deployment fact, not answerable from the repo"* — **both halves were wrong.** It was answerable from the repo (`indicators.service.ts:34`, allowlist `[1, 2, 4, 5]`), and it blocked the spec's entire human gate. `is_active` is now moot for reachability |
 | OQ-IUP-4 | If a reference color has no existing `--ac-*` token (DD-7), is adding one to `colors.scss` acceptable in this spec, or should it be a separate design-system change? | Engineering lead | one criterion of `T-11` | **new** — raised by DD-7; default assumption is *add it here and register it in §7.1 in the same change*, per the client guide's own instruction |
 
 ### Closed at design time

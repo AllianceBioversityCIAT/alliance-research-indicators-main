@@ -37,7 +37,15 @@ Selecting Innovation Use in STAR today leads to a **dead end**, because the clie
 | Route child | `app.routes.ts:143` (siblings for each detail page) | ❌ no `innovation-use-details` route |
 | Active-section resolver | `shared/services/cache/cache.service.ts:56-68` (`currentResultIndicatorSectionPath`) | ❌ falls through to `''` |
 
-Meanwhile the indicator **is** selectable: `IndicatorsService.findAll()` filters only on `is_active`, and indicator 6 was seeded active with its `long_description`. `GetInnoUseOutputService` already queries `indicator-codes: [6]`. So the entry point is likely live while the destination is not — this chunk closes an existing gap rather than opening a new one. **Confirm against the deployed environment during specify** (family risk FR-5).
+> ⛔ **ROOT CAUSE OF THE T-13 PIVOT — corrected 2026-08-21. The paragraph below is retained verbatim as a point-in-time record; its central claim is false.**
+>
+> **The indicator is *not* selectable.** The paragraph reasons from **`IndicatorsService.findAll()`**, which is the **server's** service (`server/researchindicators/.../indicators`) and does filter only on `is_active`. But the create-result dropdown is fed by the **client's** same-named `IndicatorsService` (`client/research-indicators/src/app/shared/services/control-list/indicators.service.ts`), whose `generateGroupedIndicators()` applies a hardcoded allowlist at line 34: `const targetIndicatorIds = [1, 2, 4, 5]`. **Two different classes share one name across the two tiers, and the audit landed on the wrong tier.**
+>
+> The error then propagated — into `requirements.md` §Executive Summary, §6.4's audit row, §Why-now, assumption `A2`, `OQ-IUP-2`, `RB-2`, and `design.md` §10.5 / §13 — and was only caught at **T-13 c1**, the spec's last task, when the human gate could not be performed because no indicator-6 result could be created. Every downstream document had inherited the premise without re-deriving it.
+>
+> **The generalizable lesson (candidate Kaizen entry):** this monorepo has same-named classes in both tiers, so *"which tier does this symbol live in"* is a required step of any code-inspection claim, and `A2`'s own instruction — *"to be confirmed against the deployed environment before implementation"* — was never carried out. An assumption that carries its own verification instruction and is then never verified is a **latent Pivot**, and it detonated at the most expensive possible moment: the final gate. See `execution.md` → `## Pivot Record: T-13`.
+
+*(Original text, superseded:)* Meanwhile the indicator **is** selectable: `IndicatorsService.findAll()` filters only on `is_active`, and indicator 6 was seeded active with its `long_description`. `GetInnoUseOutputService` already queries `indicator-codes: [6]`. So the entry point is likely live while the destination is not — this chunk closes an existing gap rather than opening a new one. **Confirm against the deployed environment during specify** (family risk FR-5).
 
 The section is also **not** a copy of the PRMS screenshot. The user was explicit: *"la imagen suministrada no es un mock de star sino una seccion de otra plataforma"* — PRMS defines the fields; STAR defines the look.
 

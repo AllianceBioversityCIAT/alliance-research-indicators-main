@@ -33,7 +33,14 @@
 
 ## Executive Summary
 
-**Today, choosing Innovation Use in STAR leads to a dead end.** Indicator 6 is selectable — `GetAllIndicatorsService` applies no client-side filter and the server returns any `is_active` indicator — but the client has no section for it: no sidebar row, no route, and `CacheService.currentResultIndicatorSectionPath()` returns `''` for indicator 6, so *Alliance alignment → Next* and *Results partners → Back* navigate to a non-route.
+**Today, Innovation Use cannot be chosen in STAR at all, and the results that already exist on indicator 6 lead to a dead end.** *(Corrected 2026-08-21 by the T-13 Pivot — this paragraph previously asserted that indicator 6 **is** selectable because "`GetAllIndicatorsService` applies no client-side filter". That audited the wrong service: `GetAllIndicatorsService` indeed applies no filter, but it does not feed the create-result dropdown. See the corrected audit row in §3 and `execution.md` → `## Pivot Record: T-13`.)*
+
+Two defects stack, one in front of the other:
+
+1. **The entry point is closed.** `indicators.service.ts:34` carries a hardcoded allowlist — `const targetIndicatorIds = [1, 2, 4, 5]` — applied in `generateGroupedIndicators()`. Its output, `indicatorsGrouped()`, is consumed at exactly one site: `create-result-form.component.html:49`. Indicator 6 is dropped before it reaches the `<p-select>`, **regardless of whether the server marks it `is_active`**. No new Innovation Use result can be created.
+2. **Results already on indicator 6 have nowhere to go.** The client has no section for it: no sidebar row, no route, and `CacheService.currentResultIndicatorSectionPath()` returns `''` for indicator 6, so *Alliance alignment → Next* and *Results partners → Back* navigate to a non-route.
+
+This chunk closes (2). Closing (1) is a one-line change with a single consumer, authorized by the user at the T-13 Pivot and recorded in `execution.md` rather than as a numbered task — the same treatment `RB-9` received.
 
 Chunks 1 and 2 built the schema, the green check, and a frozen REST contract. **This chunk builds the only part a user can see.**
 
@@ -47,7 +54,7 @@ It delivers one new lazy standalone page — `Innovation use details` — plus t
 
 Chunk 3 of the `innovation-use` family. The user story asked for a reporting page for the Innovation Use indicator; chunks 1 and 2 built everything underneath it and shipped no user-visible surface at all.
 
-**Why now:** the entry point is already live in production while the destination does not exist (family risk **FR-5**, confirmed by code inspection in §6.4). This spec closes an existing gap rather than opening a new one.
+**Why now:** *(corrected 2026-08-21 by the T-13 Pivot — this line previously read "the entry point is already live in production while the destination does not exist … confirmed by code inspection in §6.4". It cited as confirmation the very §6.4 audit row that was itself wrong. **Caught by the Pivot's forward sweep, not by the cited-site list** — the KZ-005 failure mode, recurring in the document that records it.)* **neither end is wired: the entry point is closed by a client allowlist and the destination does not exist.** This spec closes the destination; the T-13 Pivot closes the entry point (family risk **FR-5**). It remains a gap-closing change rather than a new capability — but the gap is **two** defects deep, not one.
 
 **Who asked:** product owner, via the user story pasted verbatim into `/akili-propose` on 2026-08-14 and confirmed as 100% of the requirement source.
 
@@ -212,10 +219,10 @@ Seeded by migration `1787066437593`. `id = level + 1`; `additional_guidance` **d
 | Section path map | `cache.service.ts:55-68` | `switch` has cases 1, 2, 4, 5 and `default: ''` | **two live consumers**: `alliance-alignment.component.ts:338` (Next) and `partners.component.ts:73` (Back). Both currently navigate to `['result', id, '']` for indicator 6 |
 | Green check keys emitted | `green-checks.repository.ts:96-118` | For indicator 6 the server **already** emits `innovation_use` **and** `ip_rights` alongside the five common keys | `result-sidebar.component.ts:78`, `submission.service.ts:36` |
 | Client `GreenChecks` interface | `get-green-checks.interface.ts` | Has neither `innovation_use` nor `ip_rights` | typed reads only; the runtime lookup is an `as keyof` cast, so this is a type gap, not a behavior gap |
-| Indicator selectability | `get-all-indicators.service.ts` | **No client-side filter.** Any `is_active` indicator the server returns is offered | the create-result flow |
+| Indicator selectability | `indicators.service.ts:34` | ⛔ **A hardcoded client-side allowlist — `const targetIndicatorIds = [1, 2, 4, 5]`** — applied in `generateGroupedIndicators()`. Indicator 6 is filtered out before rendering | **one consumer**: `create-result-form.component.html:49` (`indicatorsGrouped()`). `about-indicators.component.html:2` reads the *unfiltered* `indicators()`, so it is unaffected |
 | `validateOpenResult` | `current-result.service.ts:53` | Returns true only for indicator 5 or specific OICR statuses — indicator 6 takes no special path | the resolver and the sidebar |
 
-**Conclusion:** the entry point is live, three wiring points are missing, and two sibling pages already have broken Next/Back for indicator 6. **AND IT MUST be re-confirmed against the deployed environment before implementation starts** (family FR-5) — code inspection proves the client-side gap, not that indicator 6 is `is_active` in the target database.
+**Conclusion:** *(corrected 2026-08-21 by the T-13 Pivot — this line previously opened "the entry point is live", which was false and was the load-bearing error behind `A2`, `OQ-IUP-2` and `RB-2`.)* **the entry point is closed by a client-side allowlist**, three wiring points are missing, and two sibling pages already have broken Next/Back for indicator 6. Code inspection proves **both** the closed entry point and the client-side wiring gap; it does not prove that indicator 6 is `is_active` in the target database, which remains a separate deployment fact — but that fact is now **moot for reachability**, because the allowlist filters indicator 6 out whether or not the server offers it.
 
 ---
 
@@ -863,7 +870,7 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 | # | Assumption |
 | --- | --- |
 | A1 | Chunk 2's endpoints are deployed in the environment this page is tested against. Untested against a live server, the page cannot be verified end to end |
-| A2 | Indicator 6 is `is_active` in the target database, so the create-result flow offers it (family **FR-5**) — **to be confirmed against the deployed environment before implementation** |
+| A2 | ⛔ **FALSIFIED 2026-08-21 at the T-13 Pivot.** This row read: *"Indicator 6 is `is_active` in the target database, so the create-result flow offers it (family **FR-5**) — to be confirmed against the deployed environment before implementation."* **The inference was invalid**: `is_active` does not imply the flow offers it, because `indicators.service.ts:34` applies a hardcoded allowlist `[1, 2, 4, 5]` that drops indicator 6 client-side. The assumption was never confirmed before implementation as its own text required, and it blocked `T-13` c1/c7/c8/c9 rather than "nothing". Superseded by the allowlist correction recorded in `execution.md` → `## Pivot Record: T-13` |
 | A3 | `clarisa_innovation_use_levels` is seeded with the ten rows in §6.3 in every environment the page runs against; the seed ships in chunk 1's migration M1 |
 | A4 | The actor-type value for `OTHER` is `5`, and the client's actor-type list exposes it as `code`. **The *value* is shared across both trees; the *symbol* is not.** `ClarisaActorTypesEnum` exists only in the server tree — zero matches under `client/research-indicators/src` — so the client uses the literal `5`, as the existing actor card already does. *(Corrected 2026-08-20 at Judgment Day round 1, `judgment.md` → `C-2`: this row previously read "verified in both trees", which was true of the number and false of the name.)* |
 | A5 | The institution-type "other" convention (`institution_type_id === 78`) used by the existing organization card also applies to Innovation Use organizations |
@@ -898,7 +905,7 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 | ID | Question | Owner | Blocks | Target |
 | --- | --- | --- | --- | --- |
 | OQ-IUP-1 | Reuse strategy for `actor-item` / `organization-item` — promote to shared and parameterize, or build Innovation-Use-local components? RK-1's evidence materially changes the proposal's Option-A recommendation. | Engineering lead + product owner | `design.md`, task decomposition | Phase 2 approval gate |
-| OQ-IUP-2 | Is indicator 6 `is_active` in the deployed environment today (family **FR-5**)? If yes, users can already reach the dead end and this chunk is a fix, not an addition. | Product owner / DevOps | nothing — informs release comms and urgency only | before implementation starts |
+| OQ-IUP-2 | Is indicator 6 `is_active` in the deployed environment today (family **FR-5**)? If yes, users can already reach the dead end and this chunk is a fix, not an addition. | Product owner / DevOps | ~~nothing — informs release comms and urgency only~~ → **blocked `T-13` c1/c7/c8/c9** | ✅ **RESOLVED 2026-08-21 at the T-13 Pivot — and it was the wrong question.** The blocking fact was never `is_active`; it was `indicators.service.ts:34`'s allowlist `[1, 2, 4, 5]`, **answerable from the repo all along.** The server's `is_active` value is now moot for reachability. The remaining half — whether indicator-6 results already exist in production — stays a genuine deployment fact and still informs release comms |
 | OQ-IUP-3 | Should the `Other quantitative measures` block reuse the OICR page's `quantification-item` component (shape `{number, unit, comments}`) or use the Innovation Use wire shape (`{id, quantification_number, unit, description}`) directly? | Engineering lead | one task's file set | Phase 2 approval gate |
 
 ### Resolved at specify time
