@@ -29,6 +29,7 @@ export interface SpTocBlockScienceProgram {
   name?: string;
   category?: string | null;
   color?: string | null;
+  icon_key?: string | null;
 }
 
 /** Plain dropdown option (label/value pairs fed to raw `p-select`). */
@@ -162,6 +163,7 @@ export class SpTocAlignmentBlockComponent {
   // whether the result aligns; the underlying stored field keeps its name and
   // value domain unchanged (D-C1-2 — copy-only, no rename).
   readonly ALIGN_QUESTION = 'Would you like to complete the detailed Theory of Change mapping for this result?';
+  readonly GUIDANCE_BANNER_TEXT = 'Theory of Change alignment is configured for the Primary Science Program.';
   readonly LEVEL_LABEL = 'Level';
   readonly INDICATOR_LABEL = 'Indicator';
   readonly CONTRIBUTION_LABEL = 'Quantitative contribution';

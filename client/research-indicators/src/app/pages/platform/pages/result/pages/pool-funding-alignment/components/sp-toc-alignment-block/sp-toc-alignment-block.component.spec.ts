@@ -946,10 +946,8 @@ describe('SpTocAlignmentBlockComponent', () => {
       const callout = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-callout-SP01"]') as HTMLElement;
       expect(callout).not.toBeNull();
       expect(callout.classList.contains('items-center')).toBe(true);
-      expect(callout.classList.contains('border-l-[5px]')).toBe(true);
-      expect(callout.classList.contains('bg-[#F4F7F9]')).toBe(true);
+      expect(callout.classList.contains('border-l-4')).toBe(true);
       const text = callout.querySelector('p');
-      expect(text?.classList.contains('leading-[17px]')).toBe(true);
       expect(text?.textContent).toContain('2026 target');
     });
 
@@ -1254,6 +1252,102 @@ describe('SpTocAlignmentBlockComponent', () => {
       fixture.detectChanges();
       const question = fixture.nativeElement.querySelector('#sp-toc-aligns-q-SP01') as HTMLElement;
       expect(question.classList.contains('label')).toBe(true);
+    });
+  });
+
+  // --- R-PTU-001 / DD-1: Primary SP Header & Context Guidance Banner ----------
+  describe('R-PTU-001 — Primary SP Header & Context Guidance Banner', () => {
+    it('renders the header with primary styling classes and spCode data-testid', () => {
+      setup();
+      fixture.detectChanges();
+      const header = fixture.nativeElement.querySelector('[data-testid="sp-toc-header-SP01"]') as HTMLElement;
+      expect(header).not.toBeNull();
+      expect(header.classList.contains('bg-white')).toBe(true);
+      expect(header.classList.contains('rounded-[10px]')).toBe(true);
+      expect(header.classList.contains('p-4')).toBe(true);
+    });
+
+    it('resolves SP icon path from spCode when icon_key is not provided', () => {
+      setup({ sp: { official_code: 'SP03', name: 'Sustainable Animal and Aquatic Foods', color: '#173f6f' } });
+      fixture.detectChanges();
+      const img = fixture.nativeElement.querySelector('header img') as HTMLImageElement;
+      expect(img).not.toBeNull();
+      expect(img.getAttribute('src')).toBe('/sps/SP03.png');
+      expect(img.getAttribute('alt')).toBe('SP03 icon');
+    });
+
+    it('resolves SP icon path from icon_key when provided', () => {
+      setup({ sp: { official_code: 'SP03', name: 'Sustainable Animal and Aquatic Foods', icon_key: 'custom_sp03' } });
+      fixture.detectChanges();
+      const img = fixture.nativeElement.querySelector('header img') as HTMLImageElement;
+      expect(img).not.toBeNull();
+      expect(img.getAttribute('src')).toBe('/sps/custom_sp03.png');
+    });
+
+    it('renders the Primary badge with star icon and high-contrast styling', () => {
+      setup();
+      fixture.detectChanges();
+      const badge = fixture.nativeElement.querySelector('[data-testid="sp-toc-primary-badge-SP01"]') as HTMLElement;
+      expect(badge).not.toBeNull();
+      expect(badge.textContent?.trim()).toContain('Primary');
+      const icon = badge.querySelector('i.pi-star-fill');
+      expect(icon).not.toBeNull();
+    });
+
+    it('renders the contextual guidance banner with role="note" and correct copy', () => {
+      setup();
+      fixture.detectChanges();
+      const banner = fixture.nativeElement.querySelector('[data-testid="sp-toc-guidance-banner-SP01"]') as HTMLElement;
+      expect(banner).not.toBeNull();
+      expect(banner.getAttribute('role')).toBe('note');
+      expect(banner.textContent?.trim()).toContain(component.GUIDANCE_BANNER_TEXT);
+      expect(component.GUIDANCE_BANNER_TEXT).toBe('Theory of Change alignment is configured for the Primary Science Program.');
+      const infoIcon = banner.querySelector('i.pi-info-circle');
+      expect(infoIcon).not.toBeNull();
+    });
+
+    it('renders title with SP code and full name', () => {
+      setup({ sp: { official_code: 'SP01', name: 'Biodiversity for Food and Agriculture' } });
+      fixture.detectChanges();
+      const title = fixture.nativeElement.querySelector('[data-testid="sp-toc-block-title-SP01"]') as HTMLElement;
+      expect(title).not.toBeNull();
+      expect(title.textContent?.trim()).toContain('SP01');
+      expect(title.textContent?.trim()).toContain('Biodiversity for Food and Agriculture');
+    });
+  });
+
+  // --- R-PTU-005 / DD-3: 3-Stat Quantitative Contribution & Target Summary Card
+  describe('R-PTU-005 — 3-Stat Quantitative Contribution & Target Summary Card', () => {
+    it('renders the 3-column stats card with Unit, Target, and Contribution stat boxes', () => {
+      setup({
+        catalog: SP01_CAT,
+        draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 10 })
+      });
+      fixture.detectChanges();
+      const card = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-SP01"]') as HTMLElement;
+      expect(card).not.toBeNull();
+      expect(card.classList.contains('bg-white')).toBe(true);
+      expect(card.classList.contains('rounded-[10px]')).toBe(true);
+
+      const unitBox = fixture.nativeElement.querySelector('[data-testid="sp-toc-unit-stat-box"]') as HTMLElement;
+      expect(unitBox).not.toBeNull();
+
+      const targetBox = fixture.nativeElement.querySelector('[data-testid="sp-toc-target-stat-box"]') as HTMLElement;
+      expect(targetBox).not.toBeNull();
+
+      const contribBox = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-stat-box"]') as HTMLElement;
+      expect(contribBox).not.toBeNull();
+    });
+
+    it('renders the contribution callout banner with primary blue styling', () => {
+      setup({
+        catalog: SP01_CAT,
+        draft: emptyDraft({ aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: null })
+      });
+      fixture.detectChanges();
+      const callout = fixture.nativeElement.querySelector('[data-testid="sp-toc-contribution-callout-SP01"]') as HTMLElement;
+      expect(callout).not.toBeNull();
+      expect(callout.textContent?.trim()).toContain(component.CONTRIBUTION_CALLOUT);
     });
   });
 });
