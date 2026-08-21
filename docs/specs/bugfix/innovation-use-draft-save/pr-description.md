@@ -41,9 +41,9 @@ No migration, no feature flag, no data backfill. Backout is a plain revert — r
 
 | Check | Result |
 | --- | --- |
-| `server/researchindicators` — `npm test -- --silent` | 336 suites / 2296 tests passed |
-| `server/researchindicators` — `npm run lint -- --quiet` | clean |
-| `client/research-indicators` — `npm test -- --silent` | 312 suites / 6515 tests passed (coverage 99.22 / 97.94 / 98.81 / 99.5) |
+| `server/researchindicators` — `npm test -- --silent` | **374 suites / 3158 tests passed** |
+| `server/researchindicators` — `npm run build` (what CI runs) | **exit 0** |
+| `client/research-indicators` — `npm test -- --silent` | **317 suites / 6975 tests passed** (coverage 98.08 / 95.83 / 97.67 / 98.4) |
 | `client/research-indicators` — `npm run lint -- --quiet` | clean |
 | Server regression fixture | Red on current code (`400` via the deleted guard), green after deletion |
 | Migrations | None added; `innovation_use_validation` and the migration folder are byte-identical |
@@ -56,3 +56,30 @@ No migration, no feature flag, no data backfill. Backout is a plain revert — r
 - [x] `buildPayload` and `TextareaComponent` are byte-identical
 - [x] Both full suites green, both lints clean, no migration
 - [ ] Both tiers deploy together (deployment step, not a code check)
+
+---
+
+## Branch integration — read before reviewing the diff size
+
+This branch was brought up to date twice before this PR. **Both suites were re-run after each merge**; the figures above are from the final integrated tree, not from before.
+
+| Merge | Conflicts | How they were resolved |
+| --- | --- | --- |
+| `staging` -> `AC-1679` | 3 | All by **union** — nothing from either side was discarded. `package.json` (each side added different scripts in the same place), `docs/infrastructure.md` (two complementary blocks + two Open-Items lists merged without duplicating the topics both listed), `docs/specs/kaizen-log.md` (see below) |
+| `dev` -> `AC-1679-to-dev` | 1 | `package.json` again, and `dev`'s side was **empty** — it simply lacks 5 scripts this branch has. Ours kept. Every source file automerged |
+
+**The PR is opened from `AC-1679-to-dev`, not from `AC-1679`.** That is deliberate: resolving the conflict through GitHub's web editor would have merged `dev` into `AC-1679`, and `dev` is a terminal branch. The integration branch absorbs `dev` so the feature branch stays clean; it is disposable once this PR closes.
+
+### `kaizen-log.md` was deliberately NOT reconciled
+
+The two lines of work evolved that registry in parallel and **assigned the same IDs to different lessons** — `KZ-002`, `KZ-007` and `KZ-008` do not mean the same thing on each side (`KZ-001` is the same lesson, and `staging`'s version is the more evolved one: recurrence 13 vs 4). Merging by ID would have made every existing `KZ-00x` citation in the other lineage's specs point at the wrong lesson. Both tables are kept, separated by lineage, with a visible warning. **Reconciliation needs a human decision and is not part of this PR.**
+
+## Pre-existing defects surfaced by the merges — none introduced here, none fixed here
+
+| # | Finding | Evidence it is pre-existing |
+| --- | --- | --- |
+| 1 | **`dev`'s tree does not pass its own lint** — 181 Prettier errors, all auto-fixable, in 9 files that come from `dev`. The Prettier/ESLint config is **identical** on both branches, so these were committed unformatted | On `AC-1679` after the `staging` merge, `lint --fix` produced **zero** mutations. The errors appear only after merging `dev`. **CI runs `npm run build`, not lint, and the build passes** |
+| 2 | **`migration:scan` is a dead script** — `package.json` points at `./scripts/scan-migration-placeholders.js`, deleted on 2026-08-13 by `2c50e1f1` (which did not remove the npm entry). Exits non-zero. Nothing invokes it; neither CI workflow calls it | Already filed three times in `staging`'s own docs — `kaizen-log.md:213` records it as *"Not fixed; needs an owner."* Same for `migration:show`, which the guides reference but which is not an npm script |
+| 3 | **A Jest worker leak appeared in the server suite** (`worker process has failed to exit gracefully`) — a test that does not clear a timer | Compared run-to-run: absent before the `dev` merge, present after. All 3158 tests still pass, exit 0 |
+
+**Deliberately not fixed in this PR.** Item 1 would add ~185 lines of pure formatting churn unrelated to the bugfix, would collide with anyone else editing those files, and would mean **editing an already-merged migration** — which the append-only rule forbids. Items 2 and 3 belong to `dev`/`staging` and already have (or need) their own owner.
