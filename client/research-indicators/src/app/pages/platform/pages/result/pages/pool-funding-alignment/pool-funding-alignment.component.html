@@ -4,17 +4,17 @@
     <div class="content-section w-full">
       <div class="flex flex-col w-full bg-[#fcfcfc] rounded-[10px] p-[30px] mb-10">
         <div class="flex items-center justify-between">
-          <div class="pf-alignment-section-heading flex items-center gap-2">
+          <div class="pf-alignment-section-heading flex items-center gap-1.5">
             <div class="section-title m-0" data-testid="pf-alignment-title">SCIENCE PROGRAM CONTRIBUTION</div>
             <button
               type="button"
-              class="w-6 h-6 rounded-full bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-300)] hover:bg-[var(--ac-primary-blue-100)] hover:text-[var(--ac-primary-blue-900)] flex items-center justify-center text-xs font-bold transition-all cursor-pointer shadow-2xs focus:outline-none focus:ring-2 focus:ring-[var(--ac-primary-blue-400)]"
+              class="inline-flex items-center justify-center w-5 h-5 text-[var(--ac-grey-400)] hover:text-[var(--ac-primary-blue-600)] hover:bg-[var(--ac-primary-blue-50)] rounded-full transition-colors cursor-pointer border-0 bg-transparent p-0 focus:outline-none focus:ring-1 focus:ring-[var(--ac-primary-blue-400)]"
               (click)="showHelpModal.set(true)"
               aria-label="Learn more about Pool Funding and Theory of Change alignment"
               [pTooltip]="'How does Pool Funding & Theory of Change alignment work?'"
               tooltipPosition="top"
               data-testid="pf-alignment-help-button">
-              <i class="pi pi-question text-[11px]" aria-hidden="true"></i>
+              <i class="pi pi-question-circle text-[15px]" aria-hidden="true"></i>
             </button>
           </div>
           @if (readOnlyCause() === 'synced') {
