@@ -1,0 +1,133 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-05 — innovation use actor card) -->
+<ng-template #requiredMessage>
+  <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-red-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
+  <div class="flex justify-between items-center rs-gap-[4]">
+    <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ACTOR # {{ actorNumber }}</span>
+
+    @if (!disabled) {
+      <div
+        class="cursor-pointer text-[var(--ac-red-1)]"
+        role="button"
+        tabindex="0"
+        [attr.aria-label]="'Remove actor ' + actorNumber"
+        (click)="onRemove()"
+        (keydown.enter)="onRemove()">
+        <i class="pi pi-times-circle !text-[16px]"></i>
+      </div>
+    }
+  </div>
+
+  <div class="flex flex-col rs-gap-[4]">
+    <h2 class="label">Actor type<span class="text-red-500">*</span></h2>
+
+    <p-select
+      [disabled]="disabled"
+      [scrollHeight]="'218px'"
+      [optionLabel]="'name'"
+      [optionValue]="'code'"
+      placeholder="Select the actor type"
+      class="fs-[14] w-full {{ actorTypeMissing || duplicateType ? 'border-2 rounded-md border-[var(--ac-red-1)]' : '' }}"
+      [ngModel]="body().actor_type_id"
+      (onChange)="onActorTypeChange($event.value)"
+      [options]="actorService.list()">
+    </p-select>
+
+    @if (duplicateType) {
+      <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-red-1)]">
+        <i class="material-symbols-rounded !text-[14px]">warning</i>
+        <span class="fs-[14]">This actor type has already been reported on another row</span>
+      </div>
+    } @else if (actorTypeMissing) {
+      <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+
+    @if (body().actor_type_id === otherActorTypeId) {
+      <input
+        pInputText
+        class="rs-mt-[12] w-full {{ otherNameMissing ? 'border-2 border-[var(--ac-red-1)]' : '' }}"
+        placeholder="Specify other"
+        [ngModel]="body().actor_type_custom_name"
+        (ngModelChange)="onCustomNameChange($event)"
+        [disabled]="disabled"
+        type="text" />
+      @if (otherNameMissing) {
+        <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+      }
+    }
+
+    <div class="flex items-center rs-gap-[8] option-label rs-pt-[12]">
+      <p-checkbox
+        id="sex_age_disaggregation_not_apply"
+        [disabled]="disabled"
+        [ngModel]="body().sex_age_disaggregation_not_apply"
+        (onChange)="onModeChange($event.checked)"
+        binary="true"
+        styleClass="rs-w-[16] rs-h-[16]" />
+      <label for="sex_age_disaggregation_not_apply">Sex and age disaggregation does not apply</label>
+    </div>
+
+    @if (!body().sex_age_disaggregation_not_apply) {
+      <div class="grid grid-cols-1 md:grid-cols-2 rs-gap-[16] rs-pt-[12]">
+        <app-input
+          [signal]="body"
+          [optionValue]="'women_youth_count'"
+          [label]="'Women youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="Enter a count"></app-input>
+        <app-input
+          [signal]="body"
+          [optionValue]="'women_not_youth_count'"
+          [label]="'Women non-youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="Enter a count"></app-input>
+        <app-input
+          [signal]="body"
+          [optionValue]="'men_youth_count'"
+          [label]="'Men youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="Enter a count"></app-input>
+        <app-input
+          [signal]="body"
+          [optionValue]="'men_not_youth_count'"
+          [label]="'Men non-youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="Enter a count"></app-input>
+      </div>
+    } @else {
+      <div class="rs-pt-[12]">
+        <app-input
+          [signal]="body"
+          [optionValue]="'actors_count'"
+          [label]="'How many'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="Enter a count"></app-input>
+      </div>
+    }
+
+    <div class="flex justify-between items-center rs-pt-[12] border-t border-[var(--ac-grey-200)]">
+      <span class="label">Total</span>
+      <span class="actor-total fs-[16] font-bold text-[var(--ac-grey-800)]">{{ total() ?? '' }}</span>
+    </div>
+  </div>
+</div>

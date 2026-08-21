@@ -245,7 +245,7 @@ graph TD
 
 ### T-05 — Innovation Use actor card: type, OTHER name, mode switch, counts, derived total
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02
+- **Status:** done · **Size:** L · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-IUP-007 (all), R-IUP-008 (AC.1–AC.5 for the five actor counts), R-IUP-010 (AC.1–AC.3), R-IUP-011 (AC.1–AC.4), R-IUP-014 (AC.4)
 - **Design references:** §5.2, §5.4, §6.2, §6.3, **DD-2**, **DD-5**, family **D-4**
 - **Skills:** `angular-developer`
@@ -267,19 +267,19 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Unchecked renders the four disaggregated inputs and **no** `actors_count` input; checked renders one `How many` and **none** of the four. Exactly one mode is ever in the DOM.
-- [ ] c2 — Switching modes clears the departing mode's fields in the emitted row.
-- [ ] c3 — Entering `3` and `2` in two disaggregated fields renders a live total of `5`.
-- [ ] c4 — **All four disaggregated fields empty renders an empty total, not `0`.**
-- [ ] c5 — Aggregate mode's total equals `actors_count`; a saved aggregate row of `12` renders `12`.
-- [ ] c6 — The total control cannot receive a typed value (assert it is not an `input`/`p-inputNumber`).
-- [ ] c7 — Actor type `5` reveals a mandatory `Specify other`; changing away from `5` clears `actor_type_custom_name` in the emitted row.
-- [ ] c8 — A row with no actor type shows the inline required message and the error border.
-- [ ] c9 — `duplicateType = true` renders the duplicate message **instead of** the generic required message.
-- [ ] c10 — `0` is accepted in every count field and is distinguishable from absent.
-- [ ] c11 — Pasting `-1` and pasting `2.5` into each of the five count fields yields no negative and no fractional value in the emitted row.
-- [ ] c12 — `disabled` hides the remove icon and makes every control non-interactive.
-- [ ] c13 — No `import` in the file resolves to a server path or to `actor-item`; the file contains no reference to `ClarisaActorTypesEnum`.
+- [x] c1 — Unchecked renders the four disaggregated inputs and **no** `actors_count` input; checked renders one `How many` and **none** of the four. Exactly one mode is ever in the DOM.
+- [x] c2 — Switching modes clears the departing mode's fields in the emitted row.
+- [x] c3 — Entering `3` and `2` in two disaggregated fields renders a live total of `5`.
+- [x] c4 — **All four disaggregated fields empty renders an empty total, not `0`.**
+- [x] c5 — Aggregate mode's total equals `actors_count`; a saved aggregate row of `12` renders `12`.
+- [x] c6 — The total control cannot receive a typed value (assert it is not an `input`/`p-inputNumber`).
+- [x] c7 — Actor type `5` reveals a mandatory `Specify other`; changing away from `5` clears `actor_type_custom_name` in the emitted row.
+- [x] c8 — A row with no actor type shows the inline required message and the error border.
+- [x] c9 — `duplicateType = true` renders the duplicate message **instead of** the generic required message.
+- [x] c10 — `0` is accepted in every count field and is distinguishable from absent.
+- [x] c11 — Pasting `-1` and pasting `2.5` into each of the five count fields yields no negative and no fractional value in the emitted row.
+- [x] c12 — `disabled` hides the remove icon and makes every control non-interactive.
+- [x] c13 — No `import` in the file resolves to a server path or to `actor-item`; the file contains no reference to `ClarisaActorTypesEnum`.
 
 **Falsifying input** — return `0` instead of `null` for the all-absent case → **c4 must FAIL** (`design.md` §10.3).
 

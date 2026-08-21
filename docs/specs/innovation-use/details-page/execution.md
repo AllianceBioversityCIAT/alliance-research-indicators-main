@@ -29,7 +29,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-02 | 72 | **133** (+133 / −0, 3 files) | 2 | Over its derivation line by 61 — impl 4 lines against 12 budgeted, spec ~129 against 60. Cause: c1 inlines the TestBed setup that `renderNumberInput()` already encapsulates (~22 duplicated lines), plus the rework additions. Recorded, not reconciled |
 | T-03 | 170 | **90** (+90 / −8, 4 files; 3 `git mv` renames) | 1 | **Under** its derivation line by 80 — the first task to come in below estimate. Cause: the move carried the bulk of the code, so only the two inputs, the template branch and 5 new `it` blocks are new lines |
 | T-04 | 300 | **363** (+363 / −0, 3 new files) | 2 | Over by 63. 270 of the 363 lines are the spec file — the **spec tier over-runs again**, matching T-01/T-02 and unlike T-03's move |
-| **Running total** | **752** | **930** | **6** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** At +23.7% sustained, the ~3,200 total would land near ~3,950 — still no tripwire *breach*, since §12 is a tripwire on the total and T-13 c10 owns the reconciliation, but the Leader is flagging the trend now rather than discovering it at the gate. Re-assess at **T-07**, the largest task |
+| T-05 | 610 | **688** (+688 / −0, 3 new files) | 2 | Over by 78. 424 of 688 are the spec file. **Spec-tier over-run again**, fifth task, same direction |
+| **Running total** | **1,362** | **1,618** | **8** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -492,5 +493,166 @@ One rework round on a §5.7 token violation no T-04 criterion covered. No enviro
 #### Final verification result
 
 Full client suite green (309/309 suites · 6364/6364 tests), coverage above all floors, lint clean with `git status` re-inspected, both falsifying inputs executed and observed failing, and the token convention independently re-verified by both worker and auditor. **T-04 closed on attempt 2 of 3.**
+
+---
+
+### T-05 — Innovation Use actor card: type, OTHER name, mode switch, counts, derived total
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 2** (1 rework round; 3 issues from 2 of 3 lenses) |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **2** of a 3-attempt ceiling |
+| **Effort / skills** | attempt 1 `xhigh` · attempt 2 `xhigh` (**held, not bumped**) · `angular-developer`, `tdd` |
+| **Requirements covered** | R-IUP-007 (all), R-IUP-008 (AC.1–AC.5), R-IUP-010 (AC.1–AC.3), R-IUP-011 (AC.1–AC.4), R-IUP-014 (AC.4) |
+| **Review mode** | **Parallel lens reviewers (3)** — first use in this spec |
+
+#### Leader deviations, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Added **`tdd`** | The derived-total rule is a business rule with exact expected values including the `null`-not-`0` case; 13 criteria pin specific outputs |
+| Effort `xhigh` at attempt 1 (size L defaults to `medium`) | The derived total is **correctness-critical for the meaning of user data** — returning `0` where the answer is "nothing was reported" tells the user they reported a count of zero |
+| **Parallel lens reviewers used** (correctness · test-fidelity · a11y/tokens) | The 4R table triggers this at `xhigh`, and unlike T-04's three-character rework the trigger was *appropriate*: 646 LOC, 13 criteria, three genuinely distinct failure surfaces. The distinction from T-04 is diff size and surface count, not the effort label alone |
+| **Effort NOT bumped for the rework** | The dial's rule is *never `max` a cheaper tier — escalate the tier instead*, and a T1 escalation was unwarranted: all three FAILs arrived with precise named remediations, making this precision work, not exploration. Recorded because the standing rule is "bump one level on every retry" — a deliberate, reasoned exception |
+
+#### Attempt 1 — two lenses FAIL, one PASS
+
+**Files created** (3, new, 646 insertions). Page not created — correctly T-07's.
+
+**Verification:** `npm test -- --silent` full unfiltered → **310 suites, 6386 tests passed** (from 309/6364). Coverage 99.21 / 98.11 / 99.02 / 99.44. Lint clean, `git status` re-inspected. Hex grep and malformed-utility grep both zero. **Named falsifying input executed:** `return 0` instead of `null` → c4 failed `Expected: "" / Received: "0"`. Reverted.
+
+All 13 criteria were reported PASS. The FAILs are things **no criterion covers** (Lens A) or that a criterion covers but its assertion does not reach (Lens B).
+
+##### Confirmed correct by the lenses — recorded so it is not re-litigated
+
+| Finding | Lens | Evidence |
+| --- | --- | --- |
+| **The derived total is correct clause-by-clause** (§6.2), and `0` is distinguishable from absent **in both directions** | A + B | `{{ total() ?? '' }}` uses `??`, not `\|\|` — a total of `0` interpolates as `"0"`, only `null` becomes `''`. Lens B's decisive framing: **each of c4/c10 passes with the other's bug present**, so both are necessary and neither redundant. c4 catches a `computed` returning `0`; c10 catches a template using `\|\|` |
+| **`app-input` genuinely drives the signal — c3 passes for the reason it appears to** | B | `setValue` → `setNestedPropertyWithReduceSignal`, whose dotless branch returns `{...obj}` — a **new reference**, so the `computed` invalidates. No KZ-001. But the *in-place half* of that same write is Lens A's issue |
+| **c11 encodes rounding, not rejection** | B | Traced through PrimeNG source: `2.5` at `maxFractionDigits: 0` → `'3'` → model `3`. Assertions are `Number.isInteger` + `>= 0`. Per §6.3's T-02-settled finding an assertion demanding *rejection* would have been **wrong**; none was written |
+| **`effect()` is the right mechanism and the only one that works** | A | The five count fields are written by `app-input` **directly into the signal** — no card-owned method to hook. Per-mutation emits would cover three paths and miss five unless `app-input` were re-plumbed (out of scope). DD-5's *intent* is satisfied |
+| **`[ngModel]` one-way + explicit handlers is correct** | A | `NgModel.ngOnChanges` writes only when the bound model differs from the view value — no control/model fight, no caret reset — while parent changes still propagate. The one place diverging from the reference's `[(ngModel)]` was *required* |
+| **c13 SATISFIED — spec contradiction resolved** | A | c13's literal *"no reference to `ClarisaActorTypesEnum`"* conflicts with the same task's note mandating *"a comment naming the server enum"*. **Ruling: the note governs; "no reference" means no *code* reference.** Backed by `judgment.md` → C-2's ledger and requirements **A4** (*"the value is shared across both trees; the symbol is not"*). C-2's hazard is a build-breaking import; a comment cannot break a build. All nine imports resolve to `@angular/*`, `primeng/*`, `@shared/*` |
+| **Row identity — a construction argument, not a happy-path check** | A | Complete enumeration of every write into `body`: two whole-object sets, three spreads naming exactly eight keys, five `app-input` writes whose `[optionValue]` literals are all count keys. `result_actors_id` is **never named** in `.ts` or `.html`, and `new InnovationUseActor()` initialises it `undefined`, not a number — so no id can originate in the card nor be copied between rows. The *absence of a synthesis path* §6.5 demands |
+| **The `JSON.stringify` echo guard has no wrongly-equal case** | A | Lens A hunted and **could not construct one**: the guard can only miss a key-present-`undefined` vs key-absent difference, and every consumer treats those identically (`total`'s filter, the template's truthiness `@if`s, §6.5's payload rules, `HttpClient`'s own stringify dropping `undefined`). The mirror direction *is* detected. Its real weakness is key-order sensitivity — one redundant emit, converging after one bounce |
+| **Init-time emit is real, harmless as specced** | A | Proven from Angular source: pre-order hooks run at `core.mjs:14340`, `runEffectsInView` at `:14353`, so `initialized` is `true` on the effect's first run. Emit ≠ HTTP, so DD-8 and T-07 c11 stand — **but see the T-07 pointer** |
+| **Tokens and a11y: PASS** | C | Four of five colour substitutions are **exact-value transcriptions** of the reference hexes (`--ac-grey-100`=`#f4f7f9`, `-200`=`#e8ebed`, `-600`=`#8d9299`, `-800`=`#4c5158`), all correct §7.1 families; `--ac-red-1`=`#cf0808` on an error message and a destructive control, both in-purpose. **Zero semantic misuse, zero hex, zero `isDarkMode()`.** All 16 bracketed utility uses are documented families with in-range values. Both failure modes T-04 taught are **absent** |
+| **Errors are icon + text in every reachable branch** | C | The select's red border fires on `actorTypeMissing \|\| duplicateType`; the message branches' union is *exactly* that condition, so **border ⟹ text** with no residue |
+| **c9's exclusivity holds by construction** | C | `@if (duplicateType) { … } @else if (actorTypeMissing) { … }` — the `@else if` is unreachable when the first holds, so duplicate wins. Asserted on **rendered text** |
+| **`.section-title` correctly NOT applied to `ACTOR # n`** | C | Across the client it is used exclusively for page/section headers (19 sites), never a repeatable-row header, and §7.1 gives it `uppercase` + `margin-bottom: 20px` which would change this card's layout. **Recorded so T-11 does not "fix" it** |
+| **Test-double inventory: all four faithful** | B | The `GetActorTypesService` double is a real signal matching `ActorType` field-for-field, and the rendered options genuinely flow from it. `jest.spyOn(update,'emit')` calls through. The partial `ClipboardEvent` was verified property-by-property against PrimeNG source. `CacheService`/`UtilsService`/`WordCountService` are **not** doubled — real services, real `p-inputNumber` |
+
+##### `STATUS: FAIL` — three issues, all adjudicated in scope
+
+**Lens A — the card mutates its `@Input` object in place.** *Two lenses reached this independently, from opposite directions; that convergence is the strongest signal of the run.* `ngOnInit` does `body.set(this.actor)` — a **reference** assignment — so `body()` *is* the parent's row. `setNestedPropertyWithReduceSignal` then does `obj[keys[0]] = value` **before** returning `{...obj}`, so the write lands on the parent's object. A count typed into the card reaches the parent's row through a side channel that **bypasses `@Output` entirely**. The docblock claiming *"Local copy of the row"* is false — which matters because T-07's author would build on that stated invariant.
+
+> **Violated Rule:** §5.2 *"The new cards are pure: given inputs they render, and they emit on change"* + T-05's *"`@Input`/`@Output` only… never write through a parent array key (DD-5)"*. **Both named prohibitions are literally satisfied** (no parent signal, no `actors[i]` write); the aliasing re-creates by reference exactly the side channel they exist to eliminate.
+
+Reachability: mechanism constructible **today** and provable with one assertion; the data-loss *consequence* (corrupted dirty-check snapshot, or a stale `total` when a parent mutates in place — no version bump, so the `computed` never invalidates) needs T-07/T-08. Exposure window: a count edited **before** the first type/mode change — precisely R-IUP-014's resume flow. Lens A filed it as an issue **rather than an advisory** because *chunk 2's history is two defects that sat in an advisory register until one became a silent data-destruction path on a `200`* — it applied **KZ-008** to its own filing decision.
+
+**Lens B — c12 never covers the aggregate-mode count field.** Both c12 tests run in disaggregated mode, so the `How many` input's `[disabled]` is **never evaluated**. Delete it and **all 13 criteria still pass**, while a user on a non-editable result can type into that field — a mutation surface on a locked result. Secondarily, three of four c12 assertions read component properties, not rendered controls. *Violates c12's own wording ("**every control**") and §10.4's coverage disqualifier.*
+
+**Lens B — a `describe` labelled `c13` asserts something else.** It tests `result_actors_id` pass-through, an **Implementation note**, not c13. A reader auditing "is c13 covered?" sees a green block named c13 that does not test c13. Both properties *are* satisfied; the defect is the labelling. Repo precedent: commit `9b571c36`, *"harden the test whose name outran its assertion."*
+
+##### Leader adjudication
+
+**Not a Pivot** — all three are implementation-or-evidence defects against a sound spec. All accepted in scope: the first violates §5.2's purity clause and DD-5's intent, the second is c12's literal wording, the third has direct repo precedent. **One consolidated rework dispatched** rather than three serial ones; per-lens dispatch would have burned attempts on findings fixable in a single pass. **Lens C passed, so none of its findings entered the rework** — two are escalations, recorded at the gate.
+
+#### Attempt 2 — **both failing lenses PASS**
+
+**Files changed** (2): `.ts` and `.spec.ts`. **`.html` byte-unchanged** — confirmed by `git diff --stat`, empty — so Lens C's passed token/a11y surface was never reopened and did not need re-review.
+
+**The three fixes**
+
+1. **Aliasing (Lens A):** both ingress paths now shallow-spread — `this.body.set({ ...(this.actor ?? new InnovationUseActor()) })` and `const next = { ...(this.actor ?? …) }`. Guard unchanged, comparing against the spread. Docblock corrected so the "local copy" claim is true, and it now *teaches* why the spread is load-bearing.
+2. **c12's aggregate gap (Lens B):** new `disables the How many control in aggregate mode` test; both disabled loops converted from the wrapper property to the **rendered** control via the file's existing `inputNumberInside` helper; both loops length-guarded (`toBe(4)` / `toBe(1)`) so `forEach(expect)` cannot pass on an empty array.
+3. **Mislabelled describe (Lens B):** renamed to `result_actors_id is passed through unchanged (T-05 Implementation notes / §5.2)`, with c13 stated as the static grep-discharged check.
+
+**Both falsification probes executed and failed as predicted** — this is what makes the two fixes *load-bearing* rather than merely present:
+
+| Probe | Result |
+| --- | --- |
+| Delete `[disabled]` from the aggregate `app-input` | `● … disables the How many control in aggregate mode` → `Expected: true / Received: false` at the new assertion. Restored byte-identical (verified against a backup) |
+| Revert `ngOnInit` to the reference assignment | `● … a count typed into the card does not mutate the @Input object the parent still holds` → `expect(received).toBeUndefined() / Received: 3`. Restored to the spread |
+
+**Verification:** `npm test -- --silent` full unfiltered → **310 suites, 6388 tests passed**. Coverage 99.21 / 98.11 / 99.02 / 99.44. Lint clean, `git status` re-inspected. Hex and malformed-utility greps re-run → zero.
+
+**Test arithmetic independently reconstructed by Lens B, not accepted.** It inventoried all 21 `it` declarations by line number, noted that one sits inside a `forEach` over four fields (20 + 4 = **24**), and matched that to 22 → 24 and 6386 → 6388 with **suites flat at 310**. The only other edits were two *labels*. **Every attempt-1 test is still present; no rename masks a removal.**
+
+##### `LENS A — STATUS: PASS`
+
+> The single Lens A issue is fully and correctly closed — both ingress paths spread, the copy is shallow-sufficient because every `InnovationUseActor` field is scalar, and no third path to the parent's object exists in either file. The guard, the `total` computed, the `result_actors_id` construction argument and the init-emit ordering are all unchanged by the fix; all 13 done criteria hold, the c13 adjudication from attempt 1 stands, and the docblock is now true in every clause.
+
+**The completeness argument, recorded because it is what makes the fix trustworthy:** `this.actor` is read in **exactly two places** in the component and **nowhere** in the template (which touches only `body()`, `actorNumber`, `disabled`, `duplicateType`, the two getters, `actorService`, `otherActorTypeId`, `total()`). Both reads spread. So *"both ingress paths"* is **exhaustive, not merely plural**. The `@Input` default is a per-instance initialiser, not a shared module constant, so sibling cards cannot alias one default row either. **Consequence now permanent: the GET response's row objects — and any snapshot the parent takes of `response.data` — are unreachable from this card.**
+
+**The emit-direction question I put to Lens A, answered definitively.** `update.emit(this.body())` *does* hand the parent the card's live object, and a parent doing `actors[i] = event` re-establishes an alias. Ruled **benign and categorically different** from the failed defect, for two reasons: (1) **consent and direction of truth** — the object is one the card *gave* the parent as the new truth, whereas the defect wrote into an object the parent held as its *prior* state and never surrendered; (2) **the aliased write carries no information the emit does not** — `app-input`'s in-place write and the emit that follows occur in the same change-detection flush with the same key and value, so the mutation is a few microseconds' preview of the emit, never a divergence.
+
+##### `LENS B — STATUS: PASS`
+
+> Both FAIL issues are correctly closed, my reachability verdict on the aggregate-mode gap is now **measured rather than source-traced** (the falsification run reproduced the exact assertion I predicted), all 13 criteria are covered with c12 now exercising all six controls across both template branches, and the residual `Select`/`Checkbox` property assertions sit at the vendor boundary rather than short of it — a fidelity gradient, not a coverage hole. Twelve criteria are evidence; c13 is honestly declared as grep-discharged rather than dressed as a green test.
+
+**The residual item I referred for a definite ruling — resolved (b), do not spend attempt 3 — and on better grounds than I offered.** I framed it as "your remediation text was app-input-specific". Lens B called that *the weaker half* and gave the substantive reason: the deciding factor is **how many first-party layers sit between the card and the vendor control.**
+
+| Path | Verdict |
+| --- | --- |
+| Card → `app-input` (**first-party**, modified by T-02) → `p-inputNumber` → `<input>` | `InputComponent.disabled` stopped **one layer short of the vendor boundary**, with a first-party layer in between that can change independently. **That was the hole** |
+| Card → `p-select` / `p-checkbox` | The card binds **directly** to the vendor input. `Select.disabled` **already *is* the vendor boundary** — no intervening first-party layer to skip |
+
+Going deeper would mean asserting PrimeNG's private markup (`.p-disabled`, `aria-disabled`, inner `tabindex`) — brittle across patch bumps, and it tests PrimeNG rather than the card: *"trades card coverage for vendor coupling, a net loss."* Lens B also verified the property assertion's **falsification range from PrimeNG 19 source**: both `Select` and `Checkbox` declare `@Input({ transform: booleanAttribute }) disabled` with **no `false` default**, so a deleted binding leaves `undefined` and `expect(undefined).toBe(true)` fails. **Deletion, inversion and a wrong source expression are all caught.** The only uncatchable case is a vendor regression, outside T-05's blast radius. It closed by noting the Implementer *"flagging this rather than doing it silently was the right call, and its instinct about scope was correct on the merits, not just on the text."*
+
+#### Decisions made
+
+1. **Two independent lenses converging on one defect from opposite directions is the strongest signal this run has produced.** Lens A derived the aliasing from the ingress path; Lens B hit the same object from the `UtilsService` write path while auditing c3's fidelity. Neither saw the other's report. **This is the concrete argument for parallel lens review on a large task** — a single reviewer had passed the same file on the surfaces it *did* examine.
+2. **The consolidated rework was the right instrument.** Three issues from two lenses, dispatched as one brief. Per-lens dispatch would have burned two or three of the three attempts on findings fixable in one pass.
+3. **Effort was deliberately NOT bumped**, against the standing retry rule. Reasons in the deviations table; recorded so the exception is visible rather than looking like an oversight.
+4. **Lens C's PASS was load-bearing for cost, not just for quality.** Because `.html` was untouched by the rework, Lens C did not need re-running — the re-review cost two lenses instead of three.
+
+#### `ADVISORY` — recorded; **not** gating, **not** rework, **not** new tasks
+
+Attempt 1's advisories carry forward. New or sharpened at attempt 2:
+
+| # | Lens | Finding | Reachability | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **A · Reliability** | The init emit now **replaces the parent's row object with an equal-valued copy**, so the array element changes identity on load with no user interaction. Inert under the index keying §5.2 mandates, but `@for (… ; track row)` would re-create every card once, and code comparing `actors[i] === response.data.actors[i]` would report a change that did not happen | **Not constructible today** — T-07 is `todo` and its component does not exist in the tree | **Forward-pointed to T-07.** The design already forbids the hazardous option; the brief must say so out loud |
+| 2 | **A · Risk** | The parent-consented alias means the emitted row is **live-mutable** | Not constructible today; entirely inside T-07's authorship | **Forward-pointed to T-07:** a baseline for dirty-checking or discard-changes must come from the **GET response** or a deep copy — never from an object received via `update` or a shallow copy of `body()` |
+| 3 | **B · Reliability (new)** | **The checkbox is the one control no test touches as a control**, and the *enabled* direction is asserted for the select only | **Constructed, reachable, green.** Change the checkbox's binding to `[disabled]="true"`: c12 test 1 expects `true` and passes, test 3 never looks at the checkbox, and c2 reaches `onModeChange` by direct method call — so **nobody can ever leave disaggregated mode, suite green** | **Outside c12's letter** (c12 governs the `disabled = true` direction only), so not a gate and explicitly not grounds for attempt 3. One assertion whenever this file is next opened |
+| 4 | **B · Readability (standing)** | The c12 comment still claims `fakeAsync + tick()` above three tests that use `async` + `await whenStable()`. Lens B's analysis found the stated zone.js mechanism does not hold up (`ZoneAwarePromise.then` captures `Zone.current` at call time, so `tick()` *would* flush it), and the reference card offers **no precedent** — its spec has zero `disabled` assertions | n/a | The resolution is legitimate; **the recorded explanation is not.** *"A wrong mechanism left in a comment is how the next maintainer comes to trust a test's timing story."* Two-line fix |
+| 5 | **B · Reliability (standing)** | **`ngOnChanges` remains entirely untested** — every test assigns `component.actor` on the instance, so the reconciliation never runs. Lens A's fix *changed* that method, which raises the value of a `setInput('actor', …)` test | Constructible via `fixture.componentRef.setInput` | T-05 has no reload criterion (T-06 has c9), so not a gate. **The one un-probed state transition in the card** |
+| 6 | **B/C · Risk (standing)** | **No T-05 criterion pins the `p-select` options to `GetActorTypesService`.** The double is shape-faithful and the template does read `actorService.list()`, but a hardcoded taxonomy here would pass | n/a | Scoped to **T-06 c7 / NFR-IUP-005**. Recorded so T-06's reviewer does not inherit it as already discharged |
+| 7 | **C · Accessibility** | Remove control is a `div[role=button]` honouring only Enter; `role="button"` promises **Enter and Space** | Constructed statically | → **T-11.** A native `<button type="button">` delivers both keys, the correct focus ring and `disabled` semantics, and lets three attributes be deleted |
+| 8 | **C · Accessibility** | `p-select` has no `ariaLabel`/`ariaLabelledBy`; the OTHER input has **only a placeholder**, which is not an accessible name and disappears on input | Constructed statically | → **T-11** (both are inside its declared scope) |
+| 9 | **C · Reliability of the gate** | T-05's c8/c9 assert message *text* and the border class but **never the `warning` icon**, so T-11 c3's "icon **and** text" has no regression guard | Not a defect today — the icons render | → **T-11 c3** should assert `i.material-symbols-rounded` inside each message row |
+| 10 | **C · Accessibility** | The derived `Total` has no `aria-live`/`role="status"`, so a screen-reader user typing counts never hears it change | Constructed statically | Not required by any AC. → **T-13 c9**'s SR pass |
+| 11 | **C · Doc** | Record the `.section-title` ruling for `ACTOR # n` so a future reader does not "fix" a repeatable-row header into a section heading and inherit `uppercase` + `margin-bottom: 20px` | n/a | → **T-12** registration |
+| 12 | **C · Verification honesty** | Tailwind is a **runtime browser CDN** here and the `fs-*`/`rs-*` families are served from a **remote** S3 stylesheet, so **no Jest run in this repo can prove a bracketed utility resolves to a real rule.** The side variants used (`rs-p-`, `rs-pt-`, `rs-mt-`, `rs-w-`, `rs-h-`) have **zero precedent anywhere in `src/app`** — documented in README, which is the contract, so not a defect | Could not construct a check — stylesheet is remote, no network access | → **T-13 c7** must confirm the card's 20px padding, 16px gaps and 12px top-paddings **render**, quoting the observation (KZ-002) |
+| 13 | **C · Readability** | `class="actor-total"` is a test hook matching no CSS rule — indistinguishable from dead styling. `data-testid` states the intent (idiom already used in `pool-funding-alignment`) | n/a | *"The same shape as the failure mode this lens exists to catch"* — cheaper to disambiguate than to re-litigate |
+| 14 | **C · Readability** | The duplicate-type message hand-duplicates `#requiredMessage`'s icon+text structure, so R-IUP-018 AC.3's contract now has **two maintenance sites in one file** | n/a | `[ngTemplateOutletContext]` on the existing template would leave one |
+
+#### Forward pointers — carried by the brief or by nobody
+
+| Target | Pointer |
+| --- | --- |
+| **T-07** | **(a)** Track by **`$index`**, never object identity (Advisory 1). **(b)** A dirty-check/discard baseline must come from the **GET response or a deep copy**, never from an emitted row or a shallow copy of `body()` (Advisory 2). **(c)** The `update` handler must be a **pure write** — the card emits once on init *and once per keystroke* on the OTHER name, so a debounced save-on-`update` parent would auto-PATCH a blank row **without** the `saveCurrentSection()`-in-`addActor()` call site that T-07's falsifying input targets; c11's zero-request assertion would catch it, the falsifying input as worded would **not**. **(d)** T-04's `-mt-2` pulls 8px into whatever renders above the stepper |
+| **T-06** | Advisory 6 — NFR-IUP-005's "options come from the CLARISA service" is **not** discharged by T-05. T-06 c7 is the first criterion that actually asserts it |
+| **T-11** | Advisories 7, 8, 9 (in scope) + the two escalations below |
+| **T-12** | Advisory 11 — the `.section-title` ruling |
+| **T-13** | Advisories 10, 12 — the SR pass, and that **no automated check in this repo can prove a bracketed utility resolves**; c7 must supply it by observation |
+
+#### ⚠️ Two escalations for the user — T-11 cannot discharge its own requirements as scoped
+
+Both surfaced by Lens C, both **T-11-time decisions**, neither blocking T-06…T-10.
+
+**1. `docs/ux-ui/design.md` §5.7's own mandated classes have no dark-mode definition.** `.label` (`#153c71`) and `.option-label` (`#4c5158`) are **hardcoded hex in `src/styles/custom-fields.scss` with no dark-mode override anywhere in the repo**. Against this card's dark background (`--ac-grey-100` → `#2b2b2b`) Lens C computes ≈**1.3:1** and ≈**1.8:1** — far under 4.5:1, **produced by following §5.7 exactly.** Compounding it: `app.config.ts` binds PrimeNG Aura's dark palette to `darkModeSelector: '.dark-mode'`, but `dark-mode.service.ts` sets only `data-theme` on `<html>` and **nothing in `src/` ever adds `.dark-mode`** — so the select, checkbox and inputNumber render light-Aura surfaces inside a dark card. **R-IUP-017 AC.3 and NFR-IUP-002 are therefore not achievable from within the four new components**, which is precisely the case **T-11's own note routes to "stop and escalate."** *One caveat Lens C could not close:* the app also loads a **remote** stylesheet (`…amazonaws.com/frontend-parameters/colors.css`) that is not in the repo; if it redefines `.label` under a dark selector, the first half of this is void. **That single unknown gates every token claim in this spec and is worth resolving once.**
+
+**2. T-11 c2's wording will green-light broken label associations, and the fix for the worst case is unowned.** c2 says *"Every input has a `<label>` or `aria-label`."* Read literally, **the four/one count fields and the checkbox pass** — a `<label>` exists in the DOM for both. But neither *resolves*: `input.component.html`'s number branch renders `inputId="minmax-buttons"` (a **hardcoded constant**, so four sibling fields emit the same id) while its label hardcodes `for="username"`, which does not exist in that branch; and PrimeNG's Checkbox binds its inner input's id from **`inputId`**, not `id`, so the card's `id=` lands on a non-labelable custom element and `for=` resolves to nothing. **This is T-04's `fs-14` lesson on the a11y axis: a presence check passing over a name that does not exist — worse than no label, because it converts a visible defect into a green check.** c2 must assert **resolution**, not presence. And the count-field fix lives in `input.component.html`, **outside T-11's declared scope *and* outside T-02's** — so T-11 will honestly report a finding it is not authorised to fix. Any fix is additionally bounded by R-IUP-019 to a semantics-only change (unique per-instance ids, `for` pointing at the real input) with **no visual delta**, since that file renders on Innovation Dev and ~every form page.
+
+#### Issues encountered
+
+One rework round, three issues from two of three lenses. No environment blockers.
+
+#### Final verification result
+
+Full client suite green (**310/310 suites · 6388/6388 tests**), coverage above all floors, lint clean with `git status` re-inspected, both falsification probes executed and observed failing, and the test inventory independently reconstructed line-by-line by the auditor. **T-05 closed on attempt 2 of 3.**
 
 ---
