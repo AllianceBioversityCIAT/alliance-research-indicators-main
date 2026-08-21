@@ -180,6 +180,10 @@ export class AgressoContractService {
     return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
   }
 
+  async getResultsSummaryReport(contractId: string) {
+    return this._agressoContractRepository.getResultsSummaryReport(contractId);
+  }
+
   async getTopPartnersReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getTopPartnersReport(
       contractId,

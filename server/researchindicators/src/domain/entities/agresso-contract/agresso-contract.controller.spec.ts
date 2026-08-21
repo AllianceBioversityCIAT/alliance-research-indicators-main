@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { BadRequestException, HttpStatus } from '@nestjs/common';
 import { ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { AgressoContractController } from './agresso-contract.controller';
@@ -40,6 +40,7 @@ describe('AgressoContractController', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getResultsSummaryReport: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -291,6 +292,82 @@ describe('AgressoContractController', () => {
       await controller.getGeoScopeReport('A100', undefined);
 
       expect(service.getGeoScopeReport).toHaveBeenCalledWith('A100', undefined);
+    });
+  });
+
+  describe('getResultsSummaryReport', () => {
+    it('should return formatted results summary report with the aggregate data shape', async () => {
+      const mockReport = {
+        total: 8,
+        by_status: [
+          { status_id: 1, name: 'Approved', count: 5 },
+          { status_id: null, name: 'No status', count: 3 },
+        ],
+        by_year: [
+          { year: 2024, count: 6 },
+          { year: null, count: 2 },
+        ],
+        partner_institutions: 7,
+      };
+
+      mockAgressoContractService.getResultsSummaryReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getResultsSummaryReport('A1676');
+
+      expect(
+        mockAgressoContractService.getResultsSummaryReport,
+      ).toHaveBeenCalledWith('A1676');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract results summary report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract results summary report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+
+    it('should propagate BadRequestException when contract-id is empty', async () => {
+      mockAgressoContractService.getResultsSummaryReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(controller.getResultsSummaryReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(
+        mockAgressoContractService.getResultsSummaryReport,
+      ).toHaveBeenCalledWith('');
+    });
+
+    it('should declare Swagger operation and contract-id query param metadata (AC.3)', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getResultsSummaryReport,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getResultsSummaryReport,
+      );
+
+      expect(operation).toMatchObject({
+        summary:
+          'Results summary report for results linked to a primary contract',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'contract-id',
+            required: true,
+            type: String,
+          }),
+        ]),
+      );
     });
   });
 

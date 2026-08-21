@@ -273,6 +273,23 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/results-summary')
+  @ApiOperation({
+    summary: 'Results summary report for results linked to a primary contract',
+  })
+  @ApiContractReportQueries()
+  async getResultsSummaryReport(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getResultsSummaryReport(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract results summary report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('results/current-user')
   @ApiOperation({ summary: 'Find all contracts by current user' })
   async findContractsByCurrentUser() {

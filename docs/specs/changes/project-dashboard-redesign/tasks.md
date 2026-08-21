@@ -2,7 +2,7 @@
 
 - **Module:** project-detail (client) + agresso-contract (server)
 - **Spec id:** 2026-08-project-dashboard-redesign
-- **Status:** in-progress (T-01 done)
+- **Status:** in-progress (T-01 done, T-02 automated done / manual deferred to HITL)
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-judgment corrections; ledger ./judgment.md)
@@ -60,10 +60,10 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** `@Get('reports/results-summary')` with `@Query('contract-id')` via `ApiContractReportQueries`, seventh sibling of the reports family (D-PD-1). Thin service pass-through.
 - **Dependencies:** T-01 · **Skills:** `nestjs-expert`, `api-design-principles`
 - **Acceptance / done check:**
-  - [ ] Controller/service specs: happy path, empty `contract-id` → 400 `contract_id is required`. *Red input: call with `''` and assert the 400 — must fail if the guard is removed.*
-  - [ ] Endpoint visible in `/swagger` with the query param documented (manual check, screenshot in `execution.md`).
-  - [ ] AC.4 (401 envelope): **no automated gate exists** (unit specs mock the middleware; no e2e in this family — judgment SU4). Substitute: one manual unauthenticated `curl` against local/Dev, output pasted into `execution.md`. *Disqualifier: a 401 from a wrong URL (404-shaped) is not the evidence — the response body must carry the standard envelope.*
-  - [ ] Dev cross-check (R-PD-001 scenario): endpoint counts vs. primary-scoped `GET /results` counts for one real contract (A1676), both outputs recorded. *Disqualifier: comparing against the any-link count — the scenario is primary-scoped by D-PD-12.*
+  - [x] Controller/service specs: happy path, empty `contract-id` → 400 `contract_id is required`. *Red input: call with `''` and assert the 400 — must fail if the guard is removed.*
+  - [ ] Endpoint visible in `/swagger` with the query param documented (manual check, screenshot in `execution.md`). — **deferred to HITL validation**
+  - [ ] AC.4 (401 envelope): **no automated gate exists** (unit specs mock the middleware; no e2e in this family — judgment SU4). Substitute: one manual unauthenticated `curl` against local/Dev, output pasted into `execution.md`. *Disqualifier: a 401 from a wrong URL (404-shaped) is not the evidence — the response body must carry the standard envelope.* — **deferred to HITL validation**
+  - [ ] Dev cross-check (R-PD-001 scenario): endpoint counts vs. primary-scoped `GET /results` counts for one real contract (A1676), both outputs recorded. *Disqualifier: comparing against the any-link count — the scenario is primary-scoped by D-PD-12.* — **deferred to HITL validation**
 
 ### T-03 — Client: `--ac-viz-*` token family + validation + registry mirrors
 

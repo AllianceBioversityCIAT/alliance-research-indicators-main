@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
@@ -44,6 +45,7 @@ describe('AgressoContractService', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getResultsSummaryReport: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -566,6 +568,40 @@ describe('AgressoContractService', () => {
 
       expect(repository.getGeoScopeReport).toHaveBeenCalledWith('A100', 10);
       expect(result).toEqual(expectedReport);
+    });
+  });
+
+  describe('getResultsSummaryReport', () => {
+    it('should delegate results summary report to repository', async () => {
+      const expectedReport = {
+        total: 8,
+        by_status: [
+          { status_id: 1, name: 'Approved', count: 5 },
+          { status_id: null, name: 'No status', count: 3 },
+        ],
+        by_year: [
+          { year: 2024, count: 6 },
+          { year: null, count: 2 },
+        ],
+        partner_institutions: 7,
+      };
+      mockRepository.getResultsSummaryReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getResultsSummaryReport('A1676');
+
+      expect(repository.getResultsSummaryReport).toHaveBeenCalledWith('A1676');
+      expect(result).toEqual(expectedReport);
+    });
+
+    it('should propagate BadRequestException when contract-id is empty', async () => {
+      mockRepository.getResultsSummaryReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(service.getResultsSummaryReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.getResultsSummaryReport).toHaveBeenCalledWith('');
     });
   });
 
