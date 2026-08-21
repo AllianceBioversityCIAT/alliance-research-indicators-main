@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
+import { SkeletonModule } from 'primeng/skeleton';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -65,6 +66,7 @@ interface ReadOnlyTocSummary {
     FormsModule,
     RadioButtonModule,
     TooltipModule,
+    SkeletonModule,
     MultiselectComponent,
     FormHeaderComponent,
     NavigationButtonsComponent,
