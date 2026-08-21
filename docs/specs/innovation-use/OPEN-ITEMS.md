@@ -8,13 +8,13 @@
 
 ---
 
-## 0. Hallazgos de la sesión de prueba — 2026-08-21, para retomar el lunes
+## 0. Findings from the test-environment session — 2026-08-21, to pick up Monday
 
-Reportados por el product owner tras verificar el avance ya desplegado en **test**. **Ninguno bloquea lo desplegado**; los dos son trabajo nuevo.
+Reported by the product owner after checking the work already deployed to **test**. **Neither blocks what is deployed**; both are new work.
 
-### N-1 · El filtro "INNOVATION USE" del Results Center está inactivo — **causa raíz encontrada, arreglo de una línea**
+### N-1 · The Results Center "INNOVATION USE" filter is inactive — **root cause found, one-line fix**
 
-El chip aparece en gris y no se puede seleccionar, mientras los otros indicadores sí. No es permisos ni datos: es una **allowlist hardcodeada en el cliente**.
+The chip renders greyed out and cannot be selected while the other indicators can. It is not permissions and not data: it is a **hardcoded allowlist in the client**.
 
 ```
 client/research-indicators/src/app/pages/platform/pages/results-center/results-center.service.ts:419
@@ -22,28 +22,28 @@ client/research-indicators/src/app/pages/platform/pages/results-center/results-c
     able: [0, 1, 2, 3, 4, 5].includes(indicator.indicator_id),
 ```
 
-El indicador **6** (Innovation Use) no está en el arreglo, así que el chip se renderiza con `able = false` y el CSS lo pinta gris (`indicators-tab-filter.component.html`, clase `able`). El endpoint `indicators` del servidor **sí** devuelve el indicador 6 (`IndicatorsService.findAll()` solo filtra por `is_active`), o sea que el dato llega bien y el cliente lo descarta.
+Indicator **6** (Innovation Use) is not in the array, so the chip is rendered with `able = false` and the CSS greys it out (`indicators-tab-filter.component.html`, class `able`). The server's `indicators` endpoint **does** return indicator 6 (`IndicatorsService.findAll()` filters only on `is_active`), so the data arrives correctly and the client discards it.
 
-**Es exactamente el mismo patrón que ya corrigió `695b5248`** (*"fix(indicators.service): admit indicator 6 — the create-result entry point was closed all along"*): una lista fija a la que nadie le agregó el 6. Aquella era la del servidor para crear resultados; ésta es la del cliente para filtrar.
+**This is the same pattern `695b5248` already fixed** (*"fix(indicators.service): admit indicator 6 — the create-result entry point was closed all along"*). That one was the server's allowlist for creating results; this is the client's allowlist for filtering them.
 
-**Arreglo:** agregar `6` al arreglo. **Antes de darlo por cerrado**, buscar otras allowlists con la misma forma — este es el segundo sitio con el mismo defecto, así que asumir que son dos es repetir el error que ya se cometió una vez. Hay un test que cubre esta función (`results-center.service.spec.ts`), así que el cambio necesita actualizarlo.
+**Fix:** add `6` to the array. **Before calling it closed**, grep for other allowlists of the same shape — this is the *second* site with the same defect, so assuming there are only two repeats the mistake that was already made once. A test covers this function (`results-center.service.spec.ts`), so the change has to update it.
 
-### N-2 · La justificación no se limpia al bajar de nivel — **decisión de diseño, no solo un fix**
+### N-2 · The justification is not cleared when the level drops — **a design decision, not just a fix**
 
-Si el nivel de uso cambia de uno que exige justificación (`>= 6`) a uno que no (p. ej. 2), el texto **se queda guardado en la base**. Queda un dato que no aplica: una justificación llena con nivel 2 no tiene sentido.
+When the use level changes from one that requires a justification (`>= 6`) to one that does not (e.g. 2), the text **stays stored in the database**. That leaves a value that does not apply: a filled justification at level 2 is meaningless.
 
-**Por qué pasa hoy, confirmado:** el cliente omite la clave `innovation_use_level_explanation` del `PATCH` cuando el campo no se tocó (`buildPayload`, **DD-3**), y el servidor hace *partial merge* en el paso 6 — una clave ausente llega como `undefined` y `UpdateQueryBuilder` de TypeORM la excluye del `SET`. O sea que el valor viejo **sobrevive por diseño**, y ese diseño es correcto para el caso que protege (`R-IUD-001` sc.1: *no debe borrar una justificación guardada cuando el campo nunca se tocó*). El problema es que el cambio de nivel es un disparador **distinto** que hoy nadie contempla.
+**Why it happens today, confirmed:** the client omits the `innovation_use_level_explanation` key from the `PATCH` when the field was never touched (`buildPayload`, **DD-3**), and the server does a partial merge at step 6 — an absent key arrives as `undefined` and TypeORM's `UpdateQueryBuilder` leaves it out of the `SET`. So the old value **survives by design**, and that design is correct for the case it protects (`R-IUD-001` sc.1: *must NOT clear a stored justification when the field was never typed into*). The gap is that a level change is a **different** trigger, which nothing currently handles.
 
-**No es un bug funcional hoy, es higiene de datos.** El green check ya evalúa `IF(useLevel >= 6, explanationValid, TRUE)` (`1787078283929-createInnovationUseValidation.ts:134`), así que una justificación obsoleta en nivel 2 **no bloquea nada** — simplemente ensucia la base y puede confundir a quien lea los datos o construya reportes.
+**This is not a functional bug today — it is data hygiene.** The green check already evaluates `IF(useLevel >= 6, explanationValid, TRUE)` (`1787078283929-createInnovationUseValidation.ts:134`), so a stale justification at level 2 **blocks nothing**. It only pollutes the data and can mislead anyone reading it or building reports from it.
 
-**Cuatro cosas a decidir antes de escribir código:**
+**Four things to decide before writing code:**
 
-1. **Dónde se limpia.** El servidor es el lugar seguro: es el sistema de registro y la API se puede llamar directo, así que limpiar solo en el cliente dejaría a cualquier consumidor de la API guardando datos inconsistentes.
-2. **Qué pasa si el usuario baja y vuelve a subir el nivel** en la misma sesión. Limpiar al guardar significa que pierde el texto. Probablemente aceptable, pero es una decisión de producto, no técnica.
-3. **⚠️ Interacción con el ítem D1 — mirar esto primero.** D1 (abajo) manda borrar `_effectiveExplanation` por código muerto. **Pero esa resolución es justamente la forma que necesita este cambio**: resolver el nivel efectivo y la explicación efectiva del *post-write row* para decidir si limpiar. Si se hace D1 primero, se borra código que habría que volver a escribir. **Decidir N-2 antes de ejecutar D1**, o ejecutar D1 sabiendo que esto vuelve.
-4. **Filas ya inconsistentes.** ¿Se limpian las existentes con una migración de backfill, o solo aplica de aquí en adelante? Y ojo con el versionado: qué pasa con versiones ya aprobadas.
+1. **Where the clearing happens.** The server is the safe place: it is the system of record and the API can be called directly, so clearing only in the client would let any API consumer keep storing inconsistent data.
+2. **What happens if the user lowers and then raises the level again** in the same session. Clearing on save means they lose the text. Probably acceptable, but that is a product decision, not a technical one.
+3. **⚠️ Interaction with item D1 — look at this first.** D1 (below) calls for deleting `_effectiveExplanation` as dead code. **But that resolution is exactly the shape this change needs**: resolving the effective level and effective explanation of the post-write row to decide whether to clear. Doing D1 first deletes code that would have to be written again. **Decide N-2 before executing D1**, or execute D1 knowing this brings it back.
+4. **Rows that are already inconsistent.** Are they cleaned by a backfill migration, or does this apply going forward only? And mind the versioning: what happens to already-approved versions.
 
-**Alcance acordado con el product owner: por ahora, solo el campo de justificación.** Otros campos condicionales pueden tener el mismo problema, pero no se abordan en este ciclo.
+**Scope agreed with the product owner: for now, the justification field only.** Other conditional fields may have the same problem, but they are out of scope for this cycle.
 
 ---
 
@@ -59,7 +59,7 @@ Then, for the only unfinished task in an active spec:
 /akili-execute bugfix/innovation-use-draft-save
 ```
 
-Branch: **`AC-1679-Create-the-innovation-use-section`** — pusheada. **Actualizada con `staging`** (266 commits, 3 conflictos resueltos por union). El PR hacia `dev` sale de la rama de integracion **`AC-1679-to-dev`** (que absorbe `dev` para que la rama de feature no lo haga): **[PR #154](https://github.com/AllianceBioversityCIAT/alliance-research-indicators-main/pull/154)**, `MERGEABLE`. **El avance ya esta desplegado en test.** Punto de retorno: tag `backup/AC-1679-pre-staging-merge`.
+Branch: **`AC-1679-Create-the-innovation-use-section`**, pushed. **Brought up to date with `staging`** (266 commits, 3 conflicts, all resolved by union). The PR to `dev` is opened from the integration branch **`AC-1679-to-dev`**, which absorbs `dev` so the feature branch never has to: **[PR #154](https://github.com/AllianceBioversityCIAT/alliance-research-indicators-main/pull/154)**, `MERGEABLE`. **The work is already deployed to test.** Rollback point: tag `backup/AC-1679-pre-staging-merge`.
 
 ---
 
@@ -79,7 +79,7 @@ Branch: **`AC-1679-Create-the-innovation-use-section`** — pusheada. **Actualiz
 
 | # | Item | State |
 | --- | --- | --- |
-| ~~**T-03**~~ | ✅ **HECHO** 2026-08-21 — Reviewer PASS en el intento 3 de 3. ~~Amend the affected specs and close the verification gate: Pivot `details-page` (R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row), write a **superseding record** for archived chunk 2's `R-IUA-006` AC.3/AC.4 (**do not edit the archived file**), add a follow-up row to `family.md`, file the platform finding, run Correction Closure both directions, and run both full suites in a quiet window~~ | **`[x]` cerrado** |
+| ~~**T-03**~~ | ✅ **DONE** 2026-08-21 — Reviewer PASS en el intento 3 de 3. ~~Amend the affected specs and close the verification gate: Pivot `details-page` (R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row), write a **superseding record** for archived chunk 2's `R-IUA-006` AC.3/AC.4 (**do not edit the archived file**), add a follow-up row to `family.md`, file the platform finding, run Correction Closure both directions, and run both full suites in a quiet window~~ | **`[x]` closed** |
 | **D1** | **Deferred by user ruling** — remove `_effectiveExplanation` (dead since T-01) plus three stale rationale paragraphs at `result-innovation-use.service.ts:263-264`, `:269-271`, `:278-284`, and the now-false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`. **Zero functional effect.** `tasks.md` T-01 scope item 1 is already amended to permit it | **deferred, not dropped** |
 | **D2** | **Deferred by user ruling · `ADVISORY R1` · highest-value item owed.** Nothing asserts that `result_status_workflow` **row id 30** dispatches `completenessValidation` with `enabled: true`. A future migration flipping it would leave **every test in this spec green** while removing the last server-side completeness enforcement for the section. **Test-only** close: a raw `SELECT` of row 30's config in `innovation-use-level-boundary.fixture-spec.ts`. It is the **only unasserted premise in R-IUD-002's chain** | **deferred — pick up first** |
 
@@ -121,13 +121,13 @@ Branch: **`AC-1679-Create-the-innovation-use-section`** — pusheada. **Actualiz
 
 ---
 
-## 5b. Pendientes surgidos del despliegue a test — 2026-08-21
+## 5b. Items raised by the test deployment — 2026-08-21
 
-| # | Item | Dueño / estado |
+| # | Item | Owner / state |
 | --- | --- | --- |
-| **S-1** | **Quality Gate de SonarCloud en rojo en el PR #154**, aprobado por el lider para corregir en un PR aparte. **Todo lo rojo es nuestro** (verificado: el gate mide *New Code* = el diff contra la base, asi que es estructuralmente imposible que reporte deuda heredada de `dev`). Los 4 bugs CRITICAL son la misma regla `S2871` (`.sort()` sin comparador) en `innovation-use-result-creation.fixture-spec.ts:697,708,711,722`; las 2 vulnerabilidades MINOR son avisos de `PATH` en `scripts/load-baseline.js:80,94`. **Cero hallazgos en codigo fuente del servidor.** **Causa raiz verificada:** el workflow excluye `**/*.spec.ts`, pero los 13 fixtures se llaman `*.fixture-spec.ts` — terminan en `-spec.ts`, no en `.spec.ts`, asi que el glob no los alcanza y Sonar los analiza como produccion. **Arreglo recomendado: una linea** en `.github/workflows/sonarcloud-analysis-backend.yml` agregando `**/*.fixture-spec.ts,**/scripts/**` a las exclusiones — ataca las tres condiciones a la vez y evita que reaparezca con cada fixture nuevo. Diagnostico completo comentado en el PR | **abierto**, PR aparte |
-| **S-2** | **Colision de IDs en `docs/specs/kaizen-log.md`** — las dos lineas de trabajo evolucionaron el registro en paralelo y asignaron **los mismos IDs a lecciones distintas** (`KZ-002`, `KZ-007`, `KZ-008` no significan lo mismo en cada lado; `KZ-001` si es la misma leccion y la de `staging` esta mas evolucionada: recurrencia 13 vs 4). Fusionar por ID haria que **cada cita `KZ-00x` de los specs del otro linaje apunte a la leccion equivocada**. Las dos tablas quedaron separadas por linaje con una advertencia visible. **Necesita decision humana**, no hay resolucion mecanica correcta | **abierto** |
-| **S-3** | **Deuda heredada de `dev` — NO tocar dentro de nuestros PRs.** (a) El arbol de `dev` no pasa su propio lint: **181 errores de Prettier** en 9 archivos, con config identica en ambas ramas (probado: sobre `AC-1679` post-`staging`, `lint --fix` produjo cero mutaciones). **El CI corre `npm run build`, no lint, y el build pasa.** Cuidado: `npm run lint` lleva `--fix` y **muta archivos**, incluida una migracion (append-only) — revisar `git status` despues de correrlo. (b) **`migration:scan`** apunta a `scripts/scan-migration-placeholders.js`, borrado el 2026-08-13 por `2c50e1f1`, que no quito el entry de `package.json`; ya reportado 3 veces en la documentacion de `staging` (*"Not fixed; needs an owner"*). Lo mismo con **`migration:show`**, que las guias mencionan pero no existe como script npm — el comando real es `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`. (c) **Worker leak de Jest** en la suite del servidor, ausente antes del merge con `dev` y presente despues; los 3158 tests siguen pasando | **de `dev`**, dueño propio |
+| **S-1** | **SonarCloud Quality Gate is red on PR #154**, approved by the lead to be fixed in a separate PR. **Everything red is ours** (verified: the gate measures *New Code* = the diff against the base, so it is structurally impossible for it to report debt inherited from `dev`). The 4 CRITICAL bugs are all the same rule `S2871` (`.sort()` without a comparator) in `innovation-use-result-creation.fixture-spec.ts:697,708,711,722`; the 2 MINOR vulnerabilities are `PATH` warnings in `scripts/load-baseline.js:80,94`. **Zero findings in server source code.** **Root cause verified:** the workflow excludes `**/*.spec.ts`, but the 13 fixtures are named `*.fixture-spec.ts` — they end in `-spec.ts`, not `.spec.ts`, so the glob never reaches them and Sonar analyses them as production code. **Recommended fix: one line** in `.github/workflows/sonarcloud-analysis-backend.yml` adding `**/*.fixture-spec.ts,**/scripts/**` to the exclusions — it addresses all three conditions at once and stops the problem recurring with every new fixture. Full diagnosis is commented on the PR | **open**, separate PR |
+| **S-2** | **ID collision in `docs/specs/kaizen-log.md`** — the two lines of work evolved the registry in parallel and assigned **the same IDs to different lessons** (`KZ-002`, `KZ-007`, `KZ-008` do not mean the same thing on each side; `KZ-001` is the same lesson and `staging`'s version is the more evolved one: recurrence 13 vs 4). Merging by ID would make **every `KZ-00x` citation in the other lineage's specs point at the wrong lesson**. Both tables were kept, separated by lineage, with a visible warning. **Needs a human decision** — there is no correct mechanical resolution | **open** |
+| **S-3** | **Debt inherited from `dev` — do NOT fix inside our PRs.** (a) `dev`'s tree does not pass its own lint: **181 Prettier errors** across 9 files, with an identical config on both branches (proven: on `AC-1679` after the `staging` merge, `lint --fix` produced zero mutations). **CI runs `npm run build`, not lint, and the build passes.** Careful: `npm run lint` carries `--fix` and **mutates files**, including a migration (append-only) — re-inspect `git status` after running it. (b) **`migration:scan`** points at `scripts/scan-migration-placeholders.js`, deleted on 2026-08-13 by `2c50e1f1`, which did not remove the `package.json` entry; already reported three times in `staging`'s own docs (*"Not fixed; needs an owner"*). Same for **`migration:show`**, which the guides reference but which is not an npm script — the real command is `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`. (c) **Jest worker leak** in the server suite, absent before the `dev` merge and present after; all 3158 tests still pass | **`dev`'s**, needs its own owner |
 
 ---
 
