@@ -30,13 +30,16 @@
             [rows]="4"
             placeholder="Explain the use of this innovation at this level"></app-textarea>
 
-          @if (justificationMissing()) {
-            <!-- T-09 Rework: `app-textarea`'s own `isInvalid()` checks `length === 0` without
-                 trimming, so a whitespace-only value renders no message there even though
-                 `justificationMissing()` (which trims) blocks the save. This block is the page's
-                 own required-message source of truth, structurally tied to the same computed
-                 that gates `saveData()` (§6.6 / §6.7 step 2) — not left to coincide with the
-                 shared component's untrimmed check. -->
+          @if (justificationWhitespaceOnly()) {
+            <!-- T-02 (bugfix/innovation-use-draft-save) / R-IUD-003: `app-textarea` itself is
+                 untouched (DD-2) and its own required message keeps rendering, unsuppressed, for
+                 a truly empty value — `isInvalid()` there checks untrimmed `length === 0`, so it
+                 already fires for blank/`''` and stays silent for whitespace. This block covers
+                 exactly the gap that leaves open: whitespace-only, where the raw value is
+                 non-empty but trims to nothing. Gating on that disjoint subset (rather than on
+                 `justificationMissing()` directly) keeps the two messages mutually exclusive by
+                 construction — never both, never neither — so R-IUD-003's count stays 1/1/0
+                 without editing or suppressing the shared component from the call site. -->
             <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
               <i class="material-symbols-rounded !text-[14px]">warning</i>
               <span class="fs-[14]">This field is required</span>

@@ -258,10 +258,25 @@ describe('InnovationUseDetailsComponent', () => {
       // level), the actor card (no actor type), and `app-textarea` can all emit "This field is
       // required" page-wide, so a page-wide text search is only correct by accident of today's
       // default body.
+      //
+      // T-02 (bugfix/innovation-use-draft-save) / R-IUD-003: `app-textarea`'s own binding
+      // (`label`/`isRequired`) is deliberately untouched (DD-2) — for a truly blank value its
+      // own untrimmed `isInvalid()` still fires, so this remains its message, not a duplicate.
+      // The page-owned block (below, in the template) stays silent here because
+      // `justificationWhitespaceOnly()` excludes the blank case by construction — it only covers
+      // whitespace-only, where `app-textarea`'s own check cannot see the problem.
       const textareaEl = fixture.debugElement.query(By.directive(TextareaComponent));
       expect(textareaEl).not.toBeNull();
       expect(textareaEl.nativeElement.textContent).toContain('Justification');
       expect(textareaEl.nativeElement.textContent).toContain('This field is required');
+      // REWORK (T-02 rework, c5 / R-IUD-003 AC.5): the asterisk is proven as a rendered text
+      // node, scoped to the `app-textarea` instance itself — not by `.text-red-500` class
+      // (disqualified elsewhere in this file, see c10's REWORK at :361-366) and not page-wide
+      // (the level stepper's own label also renders a bare `*` and would pass vacuously).
+      const hasAsteriskTextNode = Array.from((textareaEl.nativeElement as HTMLElement).querySelectorAll('span')).some(
+        span => (span.textContent || '').trim() === '*'
+      );
+      expect(hasAsteriskTextNode).toBe(true);
     });
   });
 
@@ -1555,8 +1570,10 @@ describe('InnovationUseDetailsComponent', () => {
     });
   });
 
-  describe('T-09 c5 — resolved level >= 6 with a blank justification blocks save and renders the required message', () => {
-    it('renders the required message and issues zero PATCH requests while blank at level >= 6', async () => {
+  describe('T-02 (bugfix/innovation-use-draft-save) c1/c2 — inverts T-09 c5: a blank or whitespace-only justification at resolved level >= 6 now SAVES, and the required message still renders', () => {
+    // T-02 c1 / R-IUD-001 AC.1 / KZ-001: both halves — the PATCH and the rendered message — in
+    // one test, so a double that renders nothing (or a gate that silently no-ops) cannot pass.
+    it('issues exactly one PATCH and still renders the required message while blank at level >= 6', async () => {
       component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: undefined });
       fixture.detectChanges();
 
@@ -1564,22 +1581,29 @@ describe('InnovationUseDetailsComponent', () => {
       expect(fixture.nativeElement.textContent).toContain('This field is required');
 
       await component.saveData();
-      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
     });
 
-    // REWORK (Reviewer FAIL, attempt 1): whitespace-only is the exact defect that shipped — the
-    // guard (trimmed) and the visible message (untrimmed, on `app-textarea` alone) disagreed.
-    // This test asserts the page's OWN required-message block renders — the fix's actual
-    // evidence — plus zero PATCH, so it can no longer pass on a build that blocks silently.
-    it('renders the page-owned required message and issues zero PATCH requests while the justification is only whitespace at level >= 6', async () => {
+    // T-02 c2 / R-IUD-001 AC.2, sc.2 / R-IUD-003 sc.1: whitespace-only is the exact defect that
+    // originally shipped — the guard (trimmed) and the visible message (untrimmed, on
+    // `app-textarea` alone) disagreed. This asserts the page's OWN required-message block
+    // renders, the PATCH is issued, and the payload carries the whitespace verbatim (DD-3 — it
+    // must never be trimmed away before `buildPayload`, or a later deletion could silently fail
+    // to persist).
+    it('issues exactly one PATCH carrying the whitespace verbatim, and still renders the page-owned required message, while the justification is only whitespace at level >= 6', async () => {
       component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: '   ' });
       fixture.detectChanges();
 
       expect(component.justificationMissing()).toBe(true);
-      // Falsifying check (Reviewer FAIL): `app-textarea`'s own built-in message does NOT cover
-      // this case — its `isInvalid()` is untrimmed length-based and sees a non-empty string, so
-      // it renders nothing. If this assertion is satisfied only by that mechanism, it would fail
-      // for whitespace; asserting on the page's rendered text proves the page's own block fired.
+      // Falsifying check (Reviewer FAIL, pre-dating T-02): `app-textarea`'s own built-in message
+      // does NOT cover this case even when it was still wired up — its `isInvalid()` is
+      // untrimmed length-based and sees a non-empty string, so it renders nothing. Asserting on
+      // the page's rendered text proves the page-owned block fired, and T-02's falsifying input
+      // (deleting that block) must fail this specific assertion while c1's blank case above
+      // still passes.
       expect(fixture.nativeElement.textContent).toContain('This field is required');
 
       // T-11 c3 — icon AND text, never text alone, for the PAGE'S OWN required-message block.
@@ -1594,7 +1618,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
 
       await component.saveData();
-      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledWith(1, expect.objectContaining({ innovation_use_level_explanation: '   ' }));
     });
 
     it('renders no required message and issues a PATCH once the justification is filled in at level >= 6', async () => {
@@ -1613,6 +1639,54 @@ describe('InnovationUseDetailsComponent', () => {
       component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(3), innovation_use_level_explanation: undefined });
 
       expect(component.justificationMissing()).toBe(false);
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('T-02 c3 — the message count is exactly 1 / 1 / 0 across blank / whitespace-only / real text (R-IUD-003 AC.1-3)', () => {
+    // Scoped to the wrapper around `app-textarea` (not page-wide) — the level stepper and the
+    // actor card can each independently emit "This field is required" for their own missing
+    // field, so a page-wide count would not isolate the justification field's own message.
+    // Counts rendered nodes, not class strings (the task's own disqualifier for this criterion).
+    const countRequiredMessageNodes = (): number => {
+      const textarea = fixture.debugElement.query(By.css('textarea'))!;
+      const wrapper = (textarea.nativeElement as HTMLElement).closest('app-textarea')!.parentElement!;
+      return Array.from(wrapper.querySelectorAll('span')).filter(el => (el.textContent || '').trim() === 'This field is required').length;
+    };
+
+    it('renders exactly one required-message node for a blank justification', () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: undefined });
+      fixture.detectChanges();
+
+      expect(countRequiredMessageNodes()).toBe(1);
+    });
+
+    it('renders exactly one required-message node for a whitespace-only justification', () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: '   ' });
+      fixture.detectChanges();
+
+      expect(countRequiredMessageNodes()).toBe(1);
+    });
+
+    it('renders zero required-message nodes once real text is present', () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: 'used across three countries' });
+      fixture.detectChanges();
+
+      expect(countRequiredMessageNodes()).toBe(0);
+    });
+  });
+
+  describe('T-02 c4 — at resolved level < 6: textarea absent, message absent, and save still fires (R-IUD-001 AC.4, R-IUD-003 AC.4)', () => {
+    it('renders no textarea and no required message, and still issues a PATCH, with a blank justification at level 3', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(3), innovation_use_level_explanation: undefined });
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
+      expect(fixture.nativeElement.textContent).not.toContain('Justification');
+      expect(fixture.nativeElement.textContent).not.toContain('This field is required');
+
       await component.saveData();
 
       expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);

@@ -157,20 +157,39 @@ export default class InnovationUseDetailsComponent {
   showJustification = computed<boolean>(() => (this.resolvedLevel() ?? Number.NEGATIVE_INFINITY) >= JUSTIFICATION_MIN_LEVEL);
 
   /**
-   * §6.6 / R-IUP-006 AC.2, R-IUP-014 AC.3: at the resolved `level >= 6`, save is blocked while
-   * the justification is blank-or-whitespace-only. Gates both `saveData()` (§6.7 step 2) **and**
-   * the page's own required-message block in the template.
+   * §6.6 / R-IUP-006 AC.2, R-IUP-014 AC.3. At the resolved `level >= 6`, the justification is
+   * blank-or-whitespace-only. **T-02 (bugfix/innovation-use-draft-save) / DD-4:** this no longer
+   * gates `saveData()` — R-IUD-001 makes an incomplete justification save like every other
+   * incomplete field. What survives is the template-only half: it still gates
+   * `justificationWhitespaceOnly()` below (R-IUD-003) and, via `innovation_use_validation` on the
+   * server (untouched), keeps the section's green check `false` until real text is saved, which
+   * keeps the Submit button disabled (R-IUD-002).
    *
-   * **REWORK (Reviewer FAIL, attempt 1):** trimming here without a matching trim on the
-   * rendered side is exactly the bug that shipped — `app-textarea`'s own `isInvalid()` checks
-   * `value.length === 0` untrimmed, so a whitespace-only value blocked the save silently with no
-   * visible message (guard and message disagreed on what "blank" means). The fix keeps `.trim()`
-   * here (the server is authoritative and should not receive whitespace either — PRD
-   * **AC-Role-Correctness**) and adds the page's own message block gated on this exact computed,
-   * rather than editing the shared `app-textarea`/`TextareaComponent` (out of this task's scope
-   * and used by many other pages).
+   * **REWORK (Reviewer FAIL, attempt 1, pre-dating T-02):** trimming here without a matching trim
+   * on the rendered side is exactly the bug that originally shipped — `app-textarea`'s own
+   * `isInvalid()` checks `value.length === 0` untrimmed, so a whitespace-only value renders no
+   * message there even though this computed (which trims) considers it missing. Kept here rather
+   * than editing the shared `app-textarea`/`TextareaComponent` (DD-2, out of scope, used by many
+   * other pages).
    */
   justificationMissing = computed<boolean>(() => this.showJustification() && !this.body().innovation_use_level_explanation?.trim());
+
+  /**
+   * R-IUD-003 (T-02, bugfix/innovation-use-draft-save): the page-owned required-message block's
+   * gate, narrowed to the one gap `app-textarea`'s own required message cannot see.
+   *
+   * `app-textarea`'s `isInvalid()` is untrimmed: it already renders "This field is required" —
+   * unmodified, unsuppressed — whenever the raw value is `undefined`/`null`/`''`, and stays
+   * silent whenever the raw value is a non-empty string (`length > 0`), whitespace-only
+   * included. `justificationMissing()` above is trimmed, so it is `true` for all three of
+   * blank, `''`, *and* whitespace-only. AND-ing it with "the raw value is a non-empty string"
+   * removes exactly the blank/`''` overlap, leaving only whitespace-only — the one case
+   * `app-textarea` cannot flag. The two conditions are then mutually exclusive by construction
+   * (one fires on raw-empty, the other on raw-non-empty-trims-empty), so exactly one message
+   * ever renders for an incomplete justification, never zero and never two (R-IUD-003 AC.1-3) —
+   * with no edit to, and no suppressing input passed into, `TextareaComponent` (DD-2).
+   */
+  justificationWhitespaceOnly = computed<boolean>(() => this.justificationMissing() && !!this.body().innovation_use_level_explanation);
 
   /**
    * §6.6 / R-IUP-009: rows sharing an actor identity, keyed on `actor_type_id` — or, for type
@@ -476,12 +495,18 @@ export default class InnovationUseDetailsComponent {
    *    **REWORK (Issue 3):** `loadFailed()` only covers the *failed-load* subset. The
    *    *stale-success* subset — a version switch's in-flight GET, where `body` still holds the
    *    previous version's rows and `loadFailed()` is `false` — is covered by `loading()` instead.
-   * 2b. **T-09 (§6.6):** two more blocking client rules, same shape as (1)/(2) — issue nothing,
-   *    still fall through to navigation below. `hasDuplicateActorType()` (a duplicate actor
-   *    identity somewhere in the block) and `justificationMissing()` (blank justification at the
-   *    resolved level >= 6). Neither replaces the mirrored server rule (PRD
-   *    **AC-Role-Correctness**); zero actor rows trips neither guard, so an empty draft still
-   *    saves (R-IUP-010 AC.5 / R-IUP-014 AC.3 / c6).
+   * 2b. **T-09 (§6.6), narrowed by T-02 (bugfix/innovation-use-draft-save):** one remaining
+   *    blocking client rule, same shape as (1)/(2) — issue nothing, still fall through to
+   *    navigation below. `hasDuplicateActorType()` (a duplicate actor identity somewhere in the
+   *    block) is invalid *data* the server rejects, not an unfinished draft, so it still blocks
+   *    (DD-5, unchanged). `justificationMissing()` **no longer gates the save** — R-IUD-001: a
+   *    blank-or-whitespace justification at resolved level >= 6 must save like everything else on
+   *    an incomplete draft. Completeness is still required to *submit* — `innovation_use_validation`
+   *    (unchanged) keeps the green check `false`, which keeps the Submit button disabled
+   *    (R-IUD-002). `justificationMissing()` itself stays (DD-4): `justificationWhitespaceOnly()`
+   *    (below it) composes on top of it to drive the page's own required-message block in the
+   *    template. Zero actor rows trips neither guard, so an empty draft still saves (R-IUP-010
+   *    AC.5 / R-IUP-014 AC.3 / c6).
    * 3. `PATCH_InnovationUseDetails(id, buildPayload())`.
    * 4. On success -> toast -> `await getData()`. That GET carries `loadingTrigger: true`, which
    *    is what turns the sidebar tick (R-IUP-016 AC.1/AC.2 / c9).
@@ -494,13 +519,7 @@ export default class InnovationUseDetailsComponent {
   async saveData(page?: 'back' | 'next'): Promise<void> {
     this.saveErrors.set([]);
 
-    if (
-      this.submission.isEditableStatus() &&
-      !this.loadFailed() &&
-      !this.loading() &&
-      !this.hasDuplicateActorType() &&
-      !this.justificationMissing()
-    ) {
+    if (this.submission.isEditableStatus() && !this.loadFailed() && !this.loading() && !this.hasDuplicateActorType()) {
       const response = await this.api.PATCH_InnovationUseDetails(this.cache.getCurrentNumericResultId(), this.buildPayload());
 
       if (response.successfulRequest) {

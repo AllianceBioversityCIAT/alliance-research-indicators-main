@@ -56,7 +56,7 @@
 
 ### T-02 — Client: drop the save gate condition and the duplicate message
 
-- **Status:** `[ ]` · **Size:** S · **Dependencies:** none *(parallel-safe with T-01)*
+- **Status:** `[x]` **done** — Reviewer PASS on attempt 2 of 3 (2 review rounds); see `execution.md` → *T-02* · **Size:** S · **Dependencies:** none *(parallel-safe with T-01)*
 - **Requirements covered:** R-IUD-001 (AC.1, AC.2, AC.4, AC.5), R-IUD-003 (all 6)
 - **Design references:** §3.2, §3.3, DD-2, DD-3, DD-4, DD-5
 - **Skills:** `angular-developer` · `ui-ux-pro-max` (message rendering) · `systematic-debugging` (on any failure)
@@ -64,10 +64,10 @@
 **Scope**
 
 1. `innovation-use-details.component.ts:497-503` — remove **only** `!this.justificationMissing()`. The other four conditions stay, **including `!this.hasDuplicateActorType()`** (DD-5).
-2. Suppress the shared `app-textarea`'s own required message for this field, keeping the page-owned block. **From the call site only.**
+2. **Make the two required messages disjoint** — do **not** suppress either. *(Corrected 2026-08-21 after attempt 1; this item said "suppress the shared `app-textarea`'s own required message … from the call site only", which c2's falsifying input forbids.)* `app-textarea`'s untrimmed check already owns the raw-empty cases; gate the page-owned block on **whitespace-only** (`justificationMissing()` AND a non-empty raw value) so the two never overlap. **Leave `app-textarea`'s bindings untouched.**
 3. Invert T-09 c5's assertions and add R-IUD-003's message counts.
 
-**Do not** touch `buildPayload` (**DD-3** — trimming there is a bug, not a cleanup). **Do not** remove `justificationMissing()` itself (**DD-4** — it drives the surviving message). **Do not** edit `TextareaComponent` (**DD-2**).
+**Do not** touch `buildPayload` (**DD-3** — trimming there is a bug, not a cleanup). **Do not** remove `justificationMissing()` itself (**DD-4** — it drives the page-owned message, one of the two disjoint sources). **Do not** edit `TextareaComponent` (**DD-2**).
 
 **Done criteria**
 

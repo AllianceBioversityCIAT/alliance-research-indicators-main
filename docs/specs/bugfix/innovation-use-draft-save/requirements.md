@@ -147,7 +147,11 @@ Clicking **Save** on the Innovation Use details section currently does nothing w
 **Details**
 
 - Two messages render today for a pure-blank justification: the shared `app-textarea`'s own, and a page-owned block T-09 added because the shared component does not trim.
-- The **page-owned block is the one to keep** — it uses `.trim()`, so it covers blank *and* whitespace. The shared component's message must be suppressed **for this field only, without editing the shared component.**
+- **The two messages must be made DISJOINT, not one of them suppressed.** `app-textarea`'s own `isInvalid()` is untrimmed, so it owns the **raw-empty** cases (`undefined`, `null`, `''`) and is silent on whitespace. The page-owned block owns exactly the gap that leaves: **whitespace-only**, where the raw value is non-empty but trims to nothing. Gate it on that disjoint subset rather than on `justificationMissing()` directly, and the two are mutually exclusive by construction — never both, never neither. `app-textarea`'s bindings stay untouched.
+
+> ⛔ **Corrected 2026-08-21 after T-02 attempt 1.** This bullet originally read: *"The **page-owned block is the one to keep** — it uses `.trim()`, so it covers blank and whitespace. The shared component's message must be suppressed for this field only, without editing the shared component."* **That prescription is falsified by this spec's own gates.** Suppressing the shared message unconditionally makes deleting the page-owned block kill the blank *and* whitespace cases together — but `tasks.md` T-02's mandatory falsifying input requires **only** the whitespace case to fail while the blank case still passes, and §8 **D5** says the same. Two binding gates contradicted the prose. The bullet was **over-specified from the start**: `design.md` §3.3 had already delegated the mechanism to the Implementer, and this Details bullet should never have prescribed one.
+>
+> **Do not "fix" this back toward suppression.** It reads like the simpler design and it breaks the falsifier. Recorded here so the next reader does not re-derive the mistake. *(Found by the T-02 Reviewer's 4R risk lens, not by the conformance gate — all six ACs held, which is exactly why the drift would otherwise have survived the run.)*
 
 **Acceptance criteria**
 

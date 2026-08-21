@@ -34,7 +34,9 @@ Remove `!this.justificationMissing()` from the save gate at `:497-503`. The othe
 
 ### 3.3 Client — the duplicate message
 
-Suppress the shared `app-textarea`'s own required message for this one field, keeping the page-owned block. Implemented from the page's binding to the shared component, never by editing the component. The exact binding is the Implementer's call; the constraint is **DD-2** plus R-IUD-003 AC.6's byte-identity check.
+**Make the two messages disjoint rather than suppressing one.** *(Corrected 2026-08-21 after T-02 attempt 1 — this paragraph prescribed suppression, which this spec's own falsifying input forbids. See `requirements.md` §6 R-IUD-003 for the full correction.)*
+
+`app-textarea`'s untrimmed `isInvalid()` already owns the **raw-empty** cases (`undefined`, `null`, `''`) and is silent on whitespace. Gate the page-owned block on the complementary subset — **whitespace-only**, i.e. `justificationMissing()` AND a non-empty raw value — and the two sources become mutually exclusive by construction: exactly one message, never zero, never two. `app-textarea`'s bindings stay **untouched**, which satisfies **DD-2** and R-IUD-003 AC.6 without needing a suppressing input at all.
 
 ---
 
@@ -57,9 +59,9 @@ The rule already lives at the submit boundary. The save-time throw was a second 
 | ID | Decision | Rationale |
 | --- | --- | --- |
 | **DD-1** | **Delete the guard rather than enable `completenessValidation` on `DRAFT → SUBMITTED`** (option A over A′) | `proposal.md` §15: the flag is `false` on that transition for **every** indicator, so enabling it for indicator 6 alone would make one indicator stricter than five, enforce *all* green checks rather than this rule, and require a write to the shared non-disposable dev DB. A platform gate belongs on for all six or none — that decision is bigger than a bugfix and is **filed, not actioned** |
-| **DD-2** | **Do not edit `TextareaComponent`** | T-09's ruling, on blast-radius grounds, and it still holds. The shared component renders across the app; a required-message change there is a platform change. Suppress from the call site instead |
+| **DD-2** | **Do not edit `TextareaComponent`** | T-09's ruling, on blast-radius grounds, and it still holds. The shared component renders across the app; a required-message change there is a platform change. **Leave its bindings alone entirely** and make the page-owned block cover only the complementary case (§3.3) — *corrected 2026-08-21; this cell previously ended "Suppress from the call site instead", which the falsifying input rules out. The decision itself is unchanged; only the prescribed mechanism was wrong* |
 | **DD-3** | **Do not add a trim to `buildPayload`** | It looks like a cleanup and is a **bug**. Trimming to `undefined` omits the key; the server's *key-present ? payload : stored* rule then preserves the old value, so a user deleting their justification would find the deletion did not persist. Whitespace reaching the column is harmless because `valid_text` strips all whitespace before measuring — the green check already reads it as absent |
-| **DD-4** | **Keep `justificationMissing()`** even though it leaves the save gate | It still drives the page-owned required message, which R-IUD-003 keeps as the surviving one. Only its use *in the gate* is removed |
+| **DD-4** | **Keep `justificationMissing()`** even though it leaves the save gate | It still drives the page-owned required message — **one of two disjoint sources R-IUD-003 keeps**, not "the surviving one" *(phrasing corrected 2026-08-21; both message sources survive, each owning a complementary case)*. Only its use *in the gate* is removed |
 | **DD-5** | **Keep the `hasDuplicateActorType()` save block** | A duplicate actor type is invalid data the server rejects (R-IUP-009); blocking it client-side is mirroring, which the PRD requires. Different category from an unfinished draft |
 | **DD-6** | **The regression fixture asserts both halves** — the save succeeds **and** the green check stays `false` | Asserting only the save cannot distinguish *"the bug is fixed"* from *"all enforcement is gone"*. One assertion, two failure modes, is not a gate |
 
