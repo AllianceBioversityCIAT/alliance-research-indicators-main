@@ -1,0 +1,407 @@
+{
+  "measure_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "362.5px",
+    "wideGridRect": {
+      "x": 13.75,
+      "y": 85,
+      "width": 362.5,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 13.75,
+        "y": 85,
+        "width": 362.5,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 381,
+        "width": 362.5,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 677,
+        "width": 362.5,
+        "height": 281.75
+      },
+      {
+        "x": 13.75,
+        "y": 974.75,
+        "width": 362.5,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "362.5px",
+    "singleGridRect": {
+      "x": 13.75,
+      "y": 1322.75,
+      "width": 362.5,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 13.75,
+        "y": 1322.75,
+        "width": 362.5,
+        "height": 280
+      }
+    ]
+  },
+  "measure_768": {
+    "innerWidth": 768,
+    "innerHeight": 1000,
+    "documentScrollWidth": 768,
+    "documentClientWidth": 768,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "721.594px",
+    "wideGridRect": {
+      "x": 23.203125,
+      "y": 77,
+      "width": 721.59375,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 23.203125,
+        "y": 77,
+        "width": 721.59375,
+        "height": 280
+      },
+      {
+        "x": 23.203125,
+        "y": 373,
+        "width": 721.59375,
+        "height": 280
+      },
+      {
+        "x": 23.203125,
+        "y": 669,
+        "width": 721.59375,
+        "height": 281.75
+      },
+      {
+        "x": 23.203125,
+        "y": 966.75,
+        "width": 721.59375,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "352.797px 352.797px",
+    "singleGridRect": {
+      "x": 23.203125,
+      "y": 1314.75,
+      "width": 721.59375,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 23.203125,
+        "y": 1314.75,
+        "width": 352.796875,
+        "height": 280
+      }
+    ]
+  },
+  "measure_1440": {
+    "innerWidth": 1440,
+    "innerHeight": 1200,
+    "documentScrollWidth": 1440,
+    "documentClientWidth": 1440,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "442.656px 442.672px 442.656px",
+    "wideGridRect": {
+      "x": 40,
+      "y": 77,
+      "width": 1360,
+      "height": 577.75
+    },
+    "wideCardRects": [
+      {
+        "x": 40,
+        "y": 77,
+        "width": 442.65625,
+        "height": 280
+      },
+      {
+        "x": 498.65625,
+        "y": 77,
+        "width": 442.671875,
+        "height": 280
+      },
+      {
+        "x": 957.328125,
+        "y": 77,
+        "width": 442.65625,
+        "height": 281.75
+      },
+      {
+        "x": 40,
+        "y": 374.75,
+        "width": 442.65625,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "328px 328px 328px 328px",
+    "singleGridRect": {
+      "x": 40,
+      "y": 722.75,
+      "width": 1360,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 40,
+        "y": 722.75,
+        "width": 328,
+        "height": 280
+      }
+    ]
+  },
+  "measure_719": {
+    "innerWidth": 719,
+    "innerHeight": 1000,
+    "documentScrollWidth": 719,
+    "documentClientWidth": 719,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "675.047px",
+    "wideGridRect": {
+      "x": 21.96875,
+      "y": 77,
+      "width": 675.046875,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 21.96875,
+        "y": 77,
+        "width": 675.046875,
+        "height": 280
+      },
+      {
+        "x": 21.96875,
+        "y": 373,
+        "width": 675.046875,
+        "height": 280
+      },
+      {
+        "x": 21.96875,
+        "y": 669,
+        "width": 675.046875,
+        "height": 281.75
+      },
+      {
+        "x": 21.96875,
+        "y": 966.75,
+        "width": 675.046875,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "675.047px",
+    "singleGridRect": {
+      "x": 21.96875,
+      "y": 1314.75,
+      "width": 675.046875,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 21.96875,
+        "y": 1314.75,
+        "width": 675.046875,
+        "height": 280
+      }
+    ]
+  },
+  "measure_720": {
+    "innerWidth": 720,
+    "innerHeight": 1000,
+    "documentScrollWidth": 720,
+    "documentClientWidth": 720,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "676px",
+    "wideGridRect": {
+      "x": 22,
+      "y": 77,
+      "width": 676,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 22,
+        "y": 77,
+        "width": 676,
+        "height": 280
+      },
+      {
+        "x": 22,
+        "y": 373,
+        "width": 676,
+        "height": 280
+      },
+      {
+        "x": 22,
+        "y": 669,
+        "width": 676,
+        "height": 281.75
+      },
+      {
+        "x": 22,
+        "y": 966.75,
+        "width": 676,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "330px 330px",
+    "singleGridRect": {
+      "x": 22,
+      "y": 1314.75,
+      "width": 676,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 22,
+        "y": 1314.75,
+        "width": 330,
+        "height": 280
+      }
+    ]
+  },
+  "control_forced_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "900px",
+    "wideGridRect": {
+      "x": 13.75,
+      "y": 85,
+      "width": 362.5,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 13.75,
+        "y": 85,
+        "width": 900,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 381,
+        "width": 900,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 677,
+        "width": 900,
+        "height": 281.75
+      },
+      {
+        "x": 13.75,
+        "y": 974.75,
+        "width": 900,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "362.5px",
+    "singleGridRect": {
+      "x": 13.75,
+      "y": 1322.75,
+      "width": 362.5,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 13.75,
+        "y": 1322.75,
+        "width": 362.5,
+        "height": 280
+      }
+    ]
+  },
+  "control_cleared_390": {
+    "innerWidth": 390,
+    "innerHeight": 900,
+    "documentScrollWidth": 390,
+    "documentClientWidth": 390,
+    "overflowX": 0,
+    "bodyOverflowX": 0,
+    "wideGridComputedColumns": "362.5px",
+    "wideGridRect": {
+      "x": 13.75,
+      "y": 85,
+      "width": 362.5,
+      "height": 1169.75
+    },
+    "wideCardRects": [
+      {
+        "x": 13.75,
+        "y": 85,
+        "width": 362.5,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 381,
+        "width": 362.5,
+        "height": 280
+      },
+      {
+        "x": 13.75,
+        "y": 677,
+        "width": 362.5,
+        "height": 281.75
+      },
+      {
+        "x": 13.75,
+        "y": 974.75,
+        "width": 362.5,
+        "height": 280
+      }
+    ],
+    "singleGridComputedColumns": "362.5px",
+    "singleGridRect": {
+      "x": 13.75,
+      "y": 1322.75,
+      "width": 362.5,
+      "height": 280
+    },
+    "singleCardRects": [
+      {
+        "x": 13.75,
+        "y": 1322.75,
+        "width": 362.5,
+        "height": 280
+      }
+    ]
+  },
+  "scroll_probe": {
+    "found": true,
+    "focused": true,
+    "scrollTopBefore": 0,
+    "scrollHeight": 285,
+    "clientHeight": 138,
+    "tag": "DIV",
+    "role": "group",
+    "ariaLabel": "Scroll probe (T-16 fixture)",
+    "scrollTopAfter": 120,
+    "stillActive": true,
+    "dispatched": true
+  }
+}

@@ -98,6 +98,13 @@ Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-modul
 - `--ac-pool-funding-fg`: `#1b5e20`
 - `--ac-pool-funding-border`: `#2e7d32`
 
+### Chip (Info)
+
+Used by the project-dashboard Indicator-metadata band's result-count chip (see `docs/specs/project-dashboard/indicator-metadata-charts/design.md` §7.6). Added because the nearest same-family token, `--ac-primary-blue-100`, is a mid-tone rather than a tint and fails WCAG 2.1 AA paired with `--ac-primary-blue-300` foreground (3.88:1 light / 1.55:1 dark). This pair is verified at 6.00:1 light / 7.09:1 dark.
+
+- `--ac-chip-blue-bg`: `#e8f0f7`
+- `--ac-chip-blue-fg`: `#345b8f`
+
 ## Dark Mode Variables
 
 When the dark mode is active, the following variables will be applied:
@@ -108,6 +115,8 @@ When the dark mode is active, the following variables will be applied:
 - `--ac-light-blue-300`: `#2b5986`
 - `--ac-light-blue-400`: `#23466b`
 - `--ac-light-blue-500`: `#1b3450`
+- `--ac-chip-blue-bg`: `#253448`
+- `--ac-chip-blue-fg`: `#b0c4dd`
   ... (Similar for all other variables)
 
 ## Utility Classes

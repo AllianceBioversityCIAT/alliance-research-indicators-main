@@ -47,6 +47,15 @@
   --ac-red-1: #cf0808;
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
+
+  // Chip (info) — added for the Indicator-metadata band's result-count chip.
+  // `--ac-primary-blue-100` was tried first and rejected: it is a mid-tone
+  // (#b0c4dd), not a tint of #e8f0f7, and fails WCAG 2.1 AA paired with
+  // `--ac-primary-blue-300` foreground (3.88:1 light / 1.55:1 dark). This
+  // pair is purpose-built and verified: 6.00:1 light / 7.09:1 dark — see
+  // docs/specs/project-dashboard/indicator-metadata-charts/design.md §7.6.
+  --ac-chip-blue-bg: #e8f0f7;
+  --ac-chip-blue-fg: #345b8f;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -154,4 +163,6 @@ $colors: (
   --ac-red-1: #ff4d4d;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
+  --ac-chip-blue-bg: #253448;
+  --ac-chip-blue-fg: #b0c4dd;
 }

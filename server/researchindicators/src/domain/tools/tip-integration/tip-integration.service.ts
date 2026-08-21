@@ -136,7 +136,7 @@ export class TipIntegrationService extends BaseApi {
           );
         });
 
-      response?.data.forEach(async (item) => {
+      response?.data?.forEach(async (item) => {
         await this.dataSource
           .getRepository(SyncStagingRecordsEntity)
           .save({
@@ -289,8 +289,8 @@ export class TipIntegrationService extends BaseApi {
         description: result.abstract,
         main_contact_person: !isEmpty(carnet)
           ? ({
-              user_id: carnet,
-            } as ResultUser)
+            user_id: carnet,
+          } as ResultUser)
           : null,
         keywords: keywords,
       };

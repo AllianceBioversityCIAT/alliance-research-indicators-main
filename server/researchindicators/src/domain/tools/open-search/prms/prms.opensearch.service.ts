@@ -32,8 +32,12 @@ import { Result } from '../../../entities/results/entities/result.entity';
 import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { ResultsService } from '../../../entities/results/results.service';
-import { QueryService } from '../../../shared/utils/query.service';
+import {
+  QueryService,
+  ResultDeleteStatus,
+} from '../../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../../entities/result-knowledge-product/result-knowledge-product.service';
+import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { CurrentUserUtil } from '../../../shared/utils/current-user.util';
 import { PooledFundingContractsService } from '../../../entities/pooled-funding-contracts/pooled-funding-contracts.service';
 import {
@@ -75,7 +79,6 @@ import { CreateResultInnovationDevDto } from '../../../entities/result-innovatio
 import { UpdateIpRightDto } from '../../../entities/result-ip-rights/dto/update-ip-right.dto';
 import { CreateResultActorDto } from '../../../entities/result-actors/dto/create-result-actor.dto';
 import { CreateResultInstitutionTypeDto } from '../../../entities/result-institution-types/dto/create-result-institution-type.dto';
-import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
 import { PolicyStageHomologation } from './homologation/policy-stage.homologation';
 import { DeliveryModalityHomologation } from './homologation/delivery-modality.homologation';
@@ -208,9 +211,22 @@ export class PrmsOpenSearchService
           this.logger.error(
             `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
           );
-          await this._queryService.deleteFullResultById(
-            createNewResult.result_id,
-          );
+          // T-07 pivot per-caller verdict: the rollback can be REFUSED like
+          // any other delete — resolves without throwing, so a silent miss
+          // here leaves a live row on an ambiguous identity in place.
+          const rollbackOutcomes =
+            await this._queryService.deleteFullResultById(
+              createNewResult.result_id,
+            );
+          if (
+            rollbackOutcomes?.some(
+              (outcome) => outcome.status === ResultDeleteStatus.REFUSED,
+            )
+          ) {
+            this.logger.warn(
+              `Rollback of result ${createNewResult.result_id} was REFUSED: its identity has more than one live row, so snapshot ownership is undecidable. Needs manual handling — the row was NOT removed.`,
+            );
+          }
         }
         this.logger.error(`Error processing tip result: ${errorMessage}`);
       }
@@ -229,11 +245,10 @@ export class PrmsOpenSearchService
     const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
-    const counters: CounterResults = {
-      createdRecords: 0,
-      updatedRecords: 0,
-      errorRecords: 0,
-    };
+    // Use the constructor rather than an object literal so a new counter cannot
+    // be forgotten here — omittedDuplicateRecords was, and the sync summary then
+    // silently lost every omission.
+    const counters: CounterResults = new CounterResults();
     try {
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.PRMS_INTEGRATION,
@@ -707,8 +722,42 @@ export class PrmsOpenSearchService
         }
       }
 
-      result.public_link = item?.pdf_link;
-      result.external_link = item?.prms_link;
+      // @akili-spec results/cross-platform-duplicate-resolution — T-13
+      // (rev 4, 2026-08-05). `processKnowledgeProduct` (below) is BANNED
+      // here and must stay that way: it reads
+      // `item.result_knowledge_product_array`, absent from every real PRMS
+      // payload measured (0 of 13,507 staged rows), and it also writes
+      // `body.knowledgeProduct`, which HAS a live production reader
+      // (`SaveResultService` -> `ResultKnowledgeProductService.update`) that
+      // would overwrite `result_knowledge_products.citation`/`type` on 2,388
+      // PRMS rows per sync (citation populated today: TIP 8,476/8,476, PRMS
+      // 0/2,388 — design §0.5's provenance baseline). Neither is touched
+      // below.
+      //
+      // The real field is `item.knowledge_product_summary.handle` — measured
+      // present, non-empty and handle-format on 277/277 live Knowledge
+      // Product items. `indicator` above is already the homologated
+      // `IndicatorsEnum` value derived from `item.indicator_category.code`
+      // (`ResultTypeEnum.KNOWLEDGE_PRODUCT = 6` on the wire, which
+      // `IndicatorHomologation` maps to `IndicatorsEnum.KNOWLEDGE_PRODUCT`
+      // (3) — NOT the same constant, and an earlier probe of this spec
+      // tested 3 directly against the raw payload and measured nothing), so
+      // comparing against `IndicatorsEnum.KNOWLEDGE_PRODUCT` here is
+      // equivalent to testing the raw code and does not repeat that
+      // mistake.
+      //
+      // The handle is carried into `dto.evidence.evidence[]` — the same
+      // carrier TIP's mapper uses (`tip-integration.service.ts:340-352`) and
+      // the only production reader of it on the sync path is the identity
+      // resolver this spec adds (`SaveResultService` reads
+      // `result.evidence?.evidence`; `ResultEvidencesService
+      // .updateResultEvidences` — the only DB writer of `result_evidences`
+      // reachable from a sync — is never called with it). This is the ONLY
+      // field written here: `public_link`/`external_link` stay
+      // `pdf_link`/`prms_link` and `dto.knowledgeProduct` stays `undefined`.
+      // See execution.md -> "Pivot Record: T-13 — RESOLVED BY OBSERVATION".
+      // Applied after `mapEvidence` below so staging's PRMS evidences are not
+      // wiped, and the KP handle remains available to the identity resolver.
 
       result.createResult = {
         year: parseInt(item.year),
@@ -770,6 +819,25 @@ export class PrmsOpenSearchService
       result.geoScope = await this.mapGeoScope(item);
       result.partners = await this.mapPartners(item);
       result.evidence = this.mapEvidence(item);
+
+      // KP publication handle → evidence carrier for duplicate identity (T-13).
+      // Must run after `mapEvidence` so PRMS evidence rows are preserved.
+      if (
+        indicator === IndicatorsEnum.KNOWLEDGE_PRODUCT &&
+        !isEmpty(item?.knowledge_product_summary?.handle)
+      ) {
+        const handle = item.knowledge_product_summary.handle;
+        const existing = result.evidence?.evidence ?? [];
+        const alreadyHasHandle = existing.some(
+          (el) => el.evidence_url === handle,
+        );
+        result.evidence = {
+          ...result.evidence,
+          evidence: alreadyHasHandle
+            ? existing
+            : ([{ evidence_url: handle }, ...existing] as ResultEvidence[]),
+        };
+      }
 
       if (indicator === IndicatorsEnum.POLICY_CHANGE) {
         result.policyChange = await this.mapPolicyChange(

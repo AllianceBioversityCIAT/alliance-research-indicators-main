@@ -16,12 +16,14 @@ import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiContractReportQueries } from './decorators/api-contract-report-queries.decorator';
+import { ContractFullReportsDto } from './dto/reports-full.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { AgressoFindNamePayload } from './dto/agresso-find-options.payload';
@@ -147,6 +149,28 @@ export class AgressoContractController {
       .then((response) =>
         ResponseUtils.format({
           description: 'Contract top primary levers report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
+  @Get('reports/full')
+  @ApiOperation({
+    summary:
+      'Full contract reports aggregate (partners, levers, contributors, contacts, staff and geo-scope without top-N limit, plus indicator-metadata aggregations)',
+  })
+  @ApiContractReportQueries({
+    contractIdDescription:
+      'Primary contract agreement id used to build the full reports payload',
+  })
+  @ApiOkResponse({ type: ContractFullReportsDto })
+  async getFullContractReports(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getFullContractReports(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract full reports generated',
           status: HttpStatus.OK,
           data: response,
         }),

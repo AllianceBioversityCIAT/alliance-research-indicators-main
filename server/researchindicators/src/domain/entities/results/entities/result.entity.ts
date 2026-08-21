@@ -44,12 +44,12 @@ import { ResultQuantification } from '../../result-quantifications/entities/resu
 import { ResultNotableReference } from '../../result-notable-references/entities/result-notable-reference.entity';
 import { ResultImpactArea } from '../../result-impact-areas/entities/result-impact-area.entity';
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
+import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 import { ResultPoolFundingAlignment } from '../../bilateral/entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
 import { ResultReviewHistory } from '../../result-review-history/entities/result-review-history.entity';
 import { ResultImpactOutcome } from '../../result-impact-outcomes/entities/result-impact-outcome.entity';
 import { ResultStrategicObjective } from '../../result-strategic-objectives/entities/result-strategic-objective.entity';
-import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
 
 @Entity('results')
 @Index('idx_results_snapshot_active_report_year', [
@@ -380,6 +380,12 @@ export class Result extends AuditableEntity {
   @OneToMany(() => ResultKnowledgeProduct, (rkp) => rkp.result)
   knowledge_products?: ResultKnowledgeProduct[];
 
+  @OneToMany(
+    () => BulkUploadResults,
+    (bulkUploadResult) => bulkUploadResult.result,
+  )
+  bulkUploadResults?: BulkUploadResults[];
+
   @OneToMany(() => ResultPoolFundingAlignment, (alignment) => alignment.result)
   pool_funding_alignments?: ResultPoolFundingAlignment[];
 
@@ -403,10 +409,4 @@ export class Result extends AuditableEntity {
     (resultStrategicObjective) => resultStrategicObjective.result,
   )
   resultStrategicObjectives?: ResultStrategicObjective[];
-
-  @OneToMany(
-    () => BulkUploadResults,
-    (bulkUploadResult) => bulkUploadResult.result,
-  )
-  bulkUploadResults?: BulkUploadResults[];
 }

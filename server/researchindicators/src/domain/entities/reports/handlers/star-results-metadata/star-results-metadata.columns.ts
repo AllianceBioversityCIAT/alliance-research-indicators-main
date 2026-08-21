@@ -1,7 +1,8 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
+import { STAR_RESULTS_METADATA_INNOVATION_DEV_COLUMNS } from './star-results-metadata.innovation-dev.columns';
 
 /**
- * Raw data sheet columns A–BV (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–CW (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -196,6 +197,7 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     header: 'Implementing organizations',
     width: 56,
   },
+  ...STAR_RESULTS_METADATA_INNOVATION_DEV_COLUMNS,
   { key: 'mel_regional_expert', header: 'MEL Regional Expert', width: 28 },
   {
     key: 'sharepoint_link',

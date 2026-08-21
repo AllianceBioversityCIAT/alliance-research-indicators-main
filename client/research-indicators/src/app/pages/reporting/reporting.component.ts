@@ -9,12 +9,26 @@ type PlatformId = 'TIP' | 'STAR' | 'PRMS';
 interface Indicator {
   label: string;
   type: 'fixed' | 'funding';
+  /** Evidence to have ready — shown on the result screen. */
+  evidence: string;
+  /** Common pitfall to avoid — shown on the result screen. */
+  pitfall: string;
 }
 
 interface Platform {
   name: string;
   url: string;
   support: string;
+  /** S3 relative logo path (resolved through the s3ImageUrl pipe). */
+  logo: string;
+  /** Tailwind class for the accent border used across the UI. */
+  accentBorder: string;
+  /** Tailwind class for the result card top border. */
+  topBorder: string;
+  /** Tailwind classes for the "Open platform" button (bg + hover). */
+  btn: string;
+  /** Tailwind class for the result platform name colour. */
+  ink: string;
 }
 
 interface Outcome {
@@ -31,7 +45,7 @@ interface Chip {
 /**
  * Public "Reporting Pathway Wayfinder" (route: /reporting).
  *
- * Step-by-step state machine mirroring the original design:
+ * Step-by-step state machine:
  *   Q1 result type -> (optional) Q2 funding source -> result screen.
  *
  * Routing logic (unchanged from the source design):
@@ -44,17 +58,47 @@ interface Chip {
   standalone: true,
   imports: [S3ImageUrlPipe, NgClass],
   templateUrl: './reporting.component.html',
-  host: { class: 'block min-h-screen bg-[var(--ac-background)] text-[color:var(--ac-grey-900)]' },
+  host: { class: 'block min-h-screen bg-[#FAF8F1] text-[#1E3932]' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export default class ReportingComponent {
   readonly INDICATORS: Record<IndicatorId, Indicator> = {
-    kp: { label: 'Knowledge Product', type: 'fixed' },
-    oicr: { label: 'Outcome Impact Case Report', type: 'fixed' },
-    cap: { label: 'Capacity Sharing for Development', type: 'funding' },
-    innovDev: { label: 'Innovation Development', type: 'funding' },
-    innovUse: { label: 'Innovation Use', type: 'funding' },
-    policy: { label: 'Policy Change & Investment Contribution', type: 'funding' }
+    kp: {
+      label: 'Knowledge Product',
+      type: 'fixed',
+      evidence: 'The product record itself — DOI, repository or publisher link.',
+      pitfall: 'Registering the same product more than once.'
+    },
+    oicr: {
+      label: 'Outcome Impact Case Report',
+      type: 'fixed',
+      evidence: 'Policy documents, monitoring data, evaluations, adoption statistics, partner confirmations.',
+      pitfall: 'Describing activities instead of the change, or weak attribution.'
+    },
+    cap: {
+      label: 'Capacity Sharing for Development',
+      type: 'funding',
+      evidence: 'Participant list, agenda, training materials, workshop report, presentations.',
+      pitfall: 'Reporting meetings or awareness events with no learning component.'
+    },
+    innovDev: {
+      label: 'Innovation Development',
+      type: 'funding',
+      evidence: 'Technical documentation, prototypes, testing results, validation studies, field trials.',
+      pitfall: 'Reporting planned work, or overstating the readiness level.'
+    },
+    innovUse: {
+      label: 'Innovation Use',
+      type: 'funding',
+      evidence: 'Adoption surveys, monitoring data, platform analytics, user or partner confirmations.',
+      pitfall: 'Treating training, availability or awareness as evidence of use.'
+    },
+    policy: {
+      label: 'Policy Change & Investment Contribution',
+      type: 'funding',
+      evidence: 'Official drafts or approved instruments, budget documents, minutes, citations, evaluations.',
+      pitfall: 'Reporting advocacy or consultations with no documented policy change.'
+    }
   };
 
   readonly FUNDING: Record<FundingId, { label: string }> = {
@@ -63,23 +107,67 @@ export default class ReportingComponent {
   };
 
   readonly PLATFORMS: Record<PlatformId, Platform> = {
-    TIP: { name: 'TIP', url: 'https://tip.alliance.cgiar.org/', support: 'DMOS' },
-    STAR: { name: 'STAR', url: 'https://star.alliance.cgiar.org/', support: 'MELP' },
-    PRMS: { name: 'PRMS', url: 'https://reporting.cgiar.org/', support: 'CGIAR Reporting Support Team' }
-  };
-
-  /** S3 relative logo path per platform (resolved through the s3ImageUrl pipe). */
-  private readonly LOGOS: Record<PlatformId, string> = {
-    TIP: 'images/tracking.svg',
-    STAR: 'images/star.svg',
-    PRMS: 'images/prms-reporting-tool.svg'
+    TIP: {
+      name: 'TIP',
+      url: 'https://tip.alliance.cgiar.org/',
+      support: 'DMOS',
+      logo: 'images/tracking.svg',
+      accentBorder: 'border-l-[#E8862A]',
+      topBorder: 'border-t-[#E8862A]',
+      btn: 'bg-[#B4611A] hover:bg-[#94500F]',
+      ink: 'text-[#B4611A]'
+    },
+    STAR: {
+      name: 'STAR',
+      url: 'https://star.alliance.cgiar.org/',
+      support: 'MELP',
+      logo: 'images/star.svg',
+      accentBorder: 'border-l-[#3C8DC8]',
+      topBorder: 'border-t-[#3C8DC8]',
+      btn: 'bg-[#2A6D9E] hover:bg-[#1F567E]',
+      ink: 'text-[#2A6D9E]'
+    },
+    PRMS: {
+      name: 'PRMS',
+      url: 'https://reporting.cgiar.org/',
+      support: 'CGIAR Reporting Support Team',
+      logo: 'images/prms-reporting-tool.svg',
+      accentBorder: 'border-l-[#5569DD]',
+      topBorder: 'border-t-[#5569DD]',
+      btn: 'bg-[#5569DD] hover:bg-[#4152BB]',
+      ink: 'text-[#5569DD]'
+    }
   };
 
   /** Cards for the "Already know where to report?" quick-access section. */
   readonly quickAccess = [
-    { ...this.PLATFORMS.TIP, logo: this.LOGOS.TIP, desc: 'Publications and knowledge products', accent: 'border-l-[color:var(--ac-orange-1)]' },
-    { ...this.PLATFORMS.STAR, logo: this.LOGOS.STAR, desc: 'Alliance results reporting', accent: 'border-l-[color:var(--ac-green-500)]' },
-    { ...this.PLATFORMS.PRMS, logo: this.LOGOS.PRMS, desc: 'CGIAR Program results', accent: 'border-l-[color:var(--ac-light-blue-400)]' }
+    { ...this.PLATFORMS.STAR, desc: 'OICRs, W3 & bilateral results · support: MELP' },
+    { ...this.PLATFORMS.TIP, desc: 'Knowledge Products · support: DMOS' },
+    { ...this.PLATFORMS.PRMS, desc: 'CGIAR Program results · support: CGIAR Reporting Team' }
+  ];
+
+  /** Common questions for the reference section. */
+  readonly faqs = [
+    {
+      q: 'Several funding sources contributed. Which one counts?',
+      a: 'The one that financed the largest share of the activities, resources and staff time. Record the other contributing projects inside STAR or PRMS so all contributions stay traceable.'
+    },
+    {
+      q: 'Does funding source affect Knowledge Products or OICRs?',
+      a: 'No. Knowledge Products always go to TIP and OICRs are always initiated in STAR, whatever funded them.'
+    },
+    {
+      q: 'Who is responsible for reporting?',
+      a: 'The Principal Investigator and research team. Support teams provide technical backstopping, but accountability for quality stays with you.'
+    },
+    {
+      q: 'What is the difference between outputs and outcomes?',
+      a: 'Outputs are what the Alliance produces — Knowledge Products, Capacity Sharing, Innovation Development. Outcomes are the changes that follow when others use them — Innovation Use, Policy Change, OICRs.'
+    },
+    {
+      q: 'How does the OICR process work?',
+      a: 'Submit a request to draft an OICR through STAR, then technical review and quality assurance, scientific validation, editorial review, and publication with an update of the STAR submission.'
+    }
   ];
 
   readonly indicator = signal<IndicatorId | null>(null);
@@ -121,10 +209,12 @@ export default class ReportingComponent {
   readonly resultUrl = computed(() => this.platform()?.url ?? '#');
   readonly resultSupport = computed(() => this.platform()?.support ?? '');
   readonly resultWhy = computed(() => this.outcome()?.why ?? '');
-  readonly resultLogo = computed(() => {
-    const outcome = this.outcome();
-    return outcome ? this.LOGOS[outcome.platform] : '';
-  });
+  readonly resultLogo = computed(() => this.platform()?.logo ?? '');
+  readonly resultTopBorder = computed(() => this.platform()?.topBorder ?? '');
+  readonly resultBtn = computed(() => this.platform()?.btn ?? '');
+  readonly resultInk = computed(() => this.platform()?.ink ?? '');
+  readonly resultEvidence = computed(() => this.currentIndicator()?.evidence ?? '');
+  readonly resultPitfall = computed(() => this.currentIndicator()?.pitfall ?? '');
 
   /** KP -> TIP (fixed), OICR -> STAR (fixed), others -> funding: w3 -> STAR, program -> PRMS. */
   private route(indicator: IndicatorId | null, funding: FundingId | null): Outcome | null {

@@ -8,6 +8,9 @@ import { ResultPolicyChangeModule } from '../../entities/result-policy-change/re
 import { ResultCapacitySharingModule } from '../../entities/result-capacity-sharing/result-capacity-sharing.module';
 import { ResultInnovationDevModule } from '../../entities/result-innovation-dev/result-innovation-dev.module';
 import { ResultIpRightsModule } from '../../entities/result-ip-rights/result-ip-rights.module';
+import { ResultOpenSearchModule } from '../../tools/open-search/results/result.opensearch.module';
+import { DuplicateResolutionRunner } from './duplicate-resolution-runner.service';
+import { StarRelationshipService } from './star-relationship.service';
 
 @Module({
   imports: [
@@ -19,8 +22,17 @@ import { ResultIpRightsModule } from '../../entities/result-ip-rights/result-ip-
     ResultCapacitySharingModule,
     ResultInnovationDevModule,
     ResultIpRightsModule,
+    // `OpenSearchResultApi`, which `DuplicateResolutionRunner` needs to drop a
+    // hard-deleted row from the search index.
+    ResultOpenSearchModule,
   ],
-  providers: [SaveResultService],
+  // `SaveResultService` gained the cross-platform duplicate resolution
+  // collaborators (results/cross-platform-duplicate-resolution). They are
+  // declared HERE rather than in each consumer module (PRMS, TIP) because this
+  // module is what owns `SaveResultService` — the consumers only import it.
+  // `DuplicateCandidateRepository` arrives through `ResultsModule`, which
+  // exports it, and `QueryService` through the `@Global()` `GlobalUtilsModule`.
+  providers: [SaveResultService, StarRelationshipService, DuplicateResolutionRunner],
   exports: [SaveResultService],
 })
 export class SaveAllSectionsModule {}

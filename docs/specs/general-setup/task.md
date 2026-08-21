@@ -67,6 +67,8 @@ Each task uses this structure:
 - **Acceptance / done check:**
   - [ ] <observable check 1>
   - [ ] <observable check 2>
+  - [ ] **If the host renders N instances of one component, gate EACH instance's bindings** — not the mechanism once (**KZ-005**).
+- **Evidence that does NOT count:** <what looks like proof and is not>. Must name a **falsifiability** check (e.g. mutation-kill: break it, see red, restore) — and **verify that check actually exists in this repo's toolchain** before relying on it (**KZ-004**).
 - **Dependencies:** T-<NN>, T-<NN>
 - **Estimated effort:** S | M | L (S ≈ ½ day, M ≈ 1 day, L ≈ 2+ days)
 - **Owner:** <name>
@@ -105,6 +107,7 @@ Per task, declare:
 - Which `*.spec.ts` files are added or updated.
 - Coverage target if differing from the global 60% threshold.
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
+- A **`Disqualifies` clause**: what would make the evidence inconclusive. **A fixture whose N units are built from identical defaults cannot distinguish per-unit scoping from a batch-wide bug — vary at least one discriminating field per unit.** *(Kaizen KZ-004)*
 
 **Bug Mode — where the regression test belongs.** The red-before-green test MUST be owned by the task that **changes the buggy code path**, never by a task that creates new code. A test over a newly-created function is green from the moment it compiles and could never have been red, so assigning the evidence there closes Bug Mode without producing the one artifact Bug Mode exists for. A new unit still owes a gate **proven able to fail** — demonstrate it by mutation — but that is a different claim from reproducing the defect.
 
@@ -148,6 +151,7 @@ Append-only table for the lifetime of the spec.
 
 The spec is complete when:
 - [ ] All `T-<NN>` tasks are `done`.
+- [ ] **Someone has exercised the feature in the running product, BEFORE `/akili-validate` issues a verdict — not after.** Automated gates verify the system against the spec's own description of itself; only a human at the screen can falsify that description. Where a manual gate is named as a substitute control for a known coverage gap, it is the first check, not the last. *(Kaizen KZ-007)*
 - [ ] All requirement-level ACs are checked.
 - [ ] Coverage thresholds are still green.
 - [ ] Swagger documents every new endpoint.

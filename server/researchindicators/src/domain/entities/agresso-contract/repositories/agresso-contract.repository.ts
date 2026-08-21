@@ -51,14 +51,15 @@ import {
   ContractStaffFieldsDto,
   ContractStaffReportDto,
 } from '../dto/reports-contract-staff.dto';
+import { ContractBaseReportsDto } from '../dto/reports-full.dto';
+import { buildPrimaryContractResultsScopeSql } from '../utils/primary-contract-results.util';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 
 @Injectable()
 export class AgressoContractRepository
   extends Repository<AgressoContract>
-  implements ElasticFindEntity<AgressoContractOpensearchDto>
-{
+  implements ElasticFindEntity<AgressoContractOpensearchDto> {
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -103,19 +104,18 @@ export class AgressoContractRepository
     );
     const whereClause = filterWhere.length
       ? `WHERE ${filterWhere
-          .map(([key, value]) =>
-            key === 'is_pool_funding_contributor'
-              ? `ac.${key} = ${value ? 1 : 0}`
-              : `ac.${key} like '%${value}%'`,
-          )
-          .join(' AND ')}`
+        .map(([key, value]) =>
+          key === 'is_pool_funding_contributor'
+            ? `ac.${key} = ${value ? 1 : 0}`
+            : `ac.${key} like '%${value}%'`,
+        )
+        .join(' AND ')}`
       : '';
     const query = `
     select ac.*,
     ifnull(cl.full_name, 'Not available' ) as lever,
     cl.id as lever_id
-    ${
-      relations?.countries
+    ${relations?.countries
         ? `,JSON_ARRAYAGG(
             JSON_OBJECT(
                 'agreement_id', acc.agreement_id,
@@ -124,7 +124,7 @@ export class AgressoContractRepository
             )
         ) AS countries`
         : ''
-    }
+      }
     from agresso_contracts ac 
     LEFT JOIN 
         agresso_contract_countries acc ON ac.agreement_id = acc.agreement_id
@@ -610,7 +610,18 @@ export class AgressoContractRepository
     return '';
   }
 
-  private normalizeReportLimit(limit?: number): number {
+  /**
+   * Resolves the report row limit.
+   * - Default (fetchAll=false): 10, capped at 100.
+   * - fetchAll=true: null (no SQL LIMIT; return every matching row).
+   */
+  private normalizeReportLimit(
+    limit?: number,
+    fetchAll = false,
+  ): number | null {
+    if (fetchAll) {
+      return null;
+    }
     const parsedLimit = Number(limit);
     if (isEmpty(limit) || Number.isNaN(parsedLimit) || parsedLimit < 1) {
       return 10;
@@ -618,23 +629,27 @@ export class AgressoContractRepository
     return Math.min(parsedLimit, 100);
   }
 
+  private appendSqlLimit(
+    sql: string,
+    params: unknown[],
+    limit: number | null,
+  ): { sql: string; params: unknown[] } {
+    if (limit === null) {
+      return { sql, params };
+    }
+    return { sql: `${sql}\n      LIMIT ?`, params: [...params, limit] };
+  }
+
+  /**
+   * Delegates to the shared scoping rule so this class and
+   * `IndicatorMetadataReportsRepository` cannot drift apart (`requirements.md`
+   * §4.2). Kept as a private method purely so the eight existing call sites in
+   * this file stay unchanged — the SQL itself lives in one place only.
+   */
   private buildPrimaryContractResultsSubquery(options?: {
     includeGeoScope?: boolean;
   }): string {
-    const selectColumns = options?.includeGeoScope
-      ? 'r.result_id, r.geo_scope_id'
-      : 'r.result_id';
-
-    return `
-      SELECT DISTINCT ${selectColumns}
-      FROM results r
-      INNER JOIN result_contracts rc ON rc.result_id = r.result_id
-      WHERE rc.contract_id = ?
-        AND rc.is_primary = TRUE
-        AND rc.is_active = TRUE
-        AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
-    `;
+    return buildPrimaryContractResultsScopeSql(options);
   }
 
   private buildContractResultsSubquery(): string {
@@ -667,12 +682,13 @@ export class AgressoContractRepository
   async getGeoScopeReport(
     contractId: string,
     limit?: number,
+    fetchAll = false,
   ): Promise<ContractGeoScopeReportDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }
 
-    const safeLimit = this.normalizeReportLimit(limit);
+    const safeLimit = this.normalizeReportLimit(limit, fetchAll);
     const contractResultsSubquery = this.buildContractResultsSubquery();
 
     const summaryQuery = `
@@ -685,7 +701,7 @@ export class AgressoContractRepository
       FROM (${contractResultsSubquery}) cr
     `;
 
-    const regionsQuery = `
+    const regionsBaseQuery = `
       SELECT
         clarisa_region.um49Code AS region_id,
         clarisa_region.name AS region_name,
@@ -697,10 +713,51 @@ export class AgressoContractRepository
       WHERE rr.is_active = TRUE
       GROUP BY clarisa_region.um49Code, clarisa_region.name
       ORDER BY count DESC, clarisa_region.um49Code
-      LIMIT ?
     `;
+    const regionsQuery = this.appendSqlLimit(
+      regionsBaseQuery,
+      [contractId],
+      safeLimit,
+    );
 
-    const countriesMatrixQuery = `
+    const countriesMatrixQuery =
+      safeLimit === null
+        ? this.buildAllCountriesMatrixQuery()
+        : this.buildTopCountriesMatrixQuery();
+
+    const countriesMatrixParams =
+      safeLimit === null
+        ? [contractId]
+        : [contractId, safeLimit, safeLimit, safeLimit];
+
+    const [summaryRows, regionRows, countryMatrixRows] = await Promise.all([
+      this.query(summaryQuery, [contractId]),
+      this.query(regionsQuery.sql, regionsQuery.params),
+      this.query(countriesMatrixQuery, countriesMatrixParams),
+    ]);
+
+    const summaryRow = summaryRows[0] ?? {};
+    const geoScopeSummary: GeoScopeSummaryDto = {
+      global: Number(summaryRow.global_count ?? 0),
+      regional: Number(summaryRow.regional_count ?? 0),
+      countries: Number(summaryRow.countries_count ?? 0),
+      sub_national: Number(summaryRow.sub_national_count ?? 0),
+      yet_to_be_determined: Number(summaryRow.yet_to_be_determined_count ?? 0),
+    };
+
+    const topCountries = this.mapCountriesWithSubNationals(countryMatrixRows);
+
+    return {
+      contract_id: contractId,
+      limit: safeLimit,
+      geo_scope_summary: geoScopeSummary,
+      top_regions: regionRows as RegionByContractCountDto[],
+      top_countries: topCountries,
+    };
+  }
+
+  private buildTopCountriesMatrixQuery(): string {
+    return `
       WITH contract_results AS (
         ${this.buildPrimaryContractResultsSubquery()}
       ),
@@ -773,36 +830,77 @@ export class AgressoContractRepository
       WHERE top_countries.country_rank <= ?
       ORDER BY top_countries.country_rank, ranked_subnationals.sub_rank
     `;
+  }
 
-    const [summaryRows, regionRows, countryMatrixRows] = await Promise.all([
-      this.query(summaryQuery, [contractId]),
-      this.query(regionsQuery, [contractId, safeLimit]),
-      this.query(countriesMatrixQuery, [
-        contractId,
-        safeLimit,
-        safeLimit,
-        safeLimit,
-      ]),
-    ]);
-
-    const summaryRow = summaryRows[0] ?? {};
-    const geoScopeSummary: GeoScopeSummaryDto = {
-      global: Number(summaryRow.global_count ?? 0),
-      regional: Number(summaryRow.regional_count ?? 0),
-      countries: Number(summaryRow.countries_count ?? 0),
-      sub_national: Number(summaryRow.sub_national_count ?? 0),
-      yet_to_be_determined: Number(summaryRow.yet_to_be_determined_count ?? 0),
-    };
-
-    const topCountries = this.mapCountriesWithSubNationals(countryMatrixRows);
-
-    return {
-      contract_id: contractId,
-      limit: safeLimit,
-      geo_scope_summary: geoScopeSummary,
-      top_regions: regionRows as RegionByContractCountDto[],
-      top_countries: topCountries,
-    };
+  private buildAllCountriesMatrixQuery(): string {
+    return `
+      WITH contract_results AS (
+        ${this.buildPrimaryContractResultsSubquery()}
+      ),
+      country_usage AS (
+        SELECT
+          result_country.isoAlpha2,
+          clarisa_country.name AS country_name,
+          COUNT(*) AS country_count
+        FROM result_countries result_country
+        INNER JOIN contract_results cr ON cr.result_id = result_country.result_id
+        INNER JOIN clarisa_countries clarisa_country
+          ON clarisa_country.isoAlpha2 = result_country.isoAlpha2
+        WHERE result_country.is_active = TRUE
+        GROUP BY result_country.isoAlpha2, clarisa_country.name
+      ),
+      all_countries AS (
+        SELECT
+          isoAlpha2,
+          country_name,
+          country_count,
+          ROW_NUMBER() OVER (
+            ORDER BY country_count DESC, isoAlpha2
+          ) AS country_rank
+        FROM country_usage
+      ),
+      subnational_usage AS (
+        SELECT
+          result_country.isoAlpha2,
+          clarisa_sub_national.id AS sub_national_id,
+          clarisa_sub_national.name AS sub_national_name,
+          COUNT(*) AS sub_count
+        FROM result_countries_sub_nationals result_sub_national
+        INNER JOIN result_countries result_country
+          ON result_country.result_country_id = result_sub_national.result_country_id
+        INNER JOIN contract_results cr ON cr.result_id = result_country.result_id
+        INNER JOIN clarisa_sub_nationals clarisa_sub_national
+          ON clarisa_sub_national.id = result_sub_national.sub_national_id
+        WHERE result_sub_national.is_active = TRUE
+          AND result_country.is_active = TRUE
+        GROUP BY
+          result_country.isoAlpha2,
+          clarisa_sub_national.id,
+          clarisa_sub_national.name
+      ),
+      ranked_subnationals AS (
+        SELECT
+          subnational_usage.*,
+          ROW_NUMBER() OVER (
+            PARTITION BY subnational_usage.isoAlpha2
+            ORDER BY subnational_usage.sub_count DESC, subnational_usage.sub_national_id
+          ) AS sub_rank
+        FROM subnational_usage
+      )
+      SELECT
+        all_countries.isoAlpha2,
+        all_countries.country_name,
+        all_countries.country_count,
+        all_countries.country_rank,
+        ranked_subnationals.sub_national_id,
+        ranked_subnationals.sub_national_name,
+        ranked_subnationals.sub_count,
+        ranked_subnationals.sub_rank
+      FROM all_countries
+      LEFT JOIN ranked_subnationals
+        ON ranked_subnationals.isoAlpha2 = all_countries.isoAlpha2
+      ORDER BY all_countries.country_rank, ranked_subnationals.sub_rank
+    `;
   }
 
   private mapCountriesWithSubNationals(
@@ -837,16 +935,17 @@ export class AgressoContractRepository
   async getTopPartnersReport(
     contractId: string,
     limit?: number,
+    fetchAll = false,
   ): Promise<ContractTopPartnersReportDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }
 
-    const safeLimit = this.normalizeReportLimit(limit);
+    const safeLimit = this.normalizeReportLimit(limit, fetchAll);
     const primaryContractResultsSubquery =
       this.buildPrimaryContractResultsSubquery();
 
-    const query = `
+    const baseQuery = `
       SELECT
         clarisa_institution.code AS institution_id,
         clarisa_institution.name AS institution_name,
@@ -864,14 +963,14 @@ export class AgressoContractRepository
         clarisa_institution.name,
         clarisa_institution.acronym
       ORDER BY count DESC, clarisa_institution.code
-      LIMIT ?
     `;
 
-    const rows = await this.query(query, [
-      contractId,
-      InstitutionRolesEnum.PARTNERS,
+    const { sql, params } = this.appendSqlLimit(
+      baseQuery,
+      [contractId, InstitutionRolesEnum.PARTNERS],
       safeLimit,
-    ]);
+    );
+    const rows = await this.query(sql, params);
 
     return {
       contract_id: contractId,
@@ -883,16 +982,17 @@ export class AgressoContractRepository
   async getTopContributorsReport(
     contractId: string,
     limit?: number,
+    fetchAll = false,
   ): Promise<ContractTopContributorsReportDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }
 
-    const safeLimit = this.normalizeReportLimit(limit);
+    const safeLimit = this.normalizeReportLimit(limit, fetchAll);
     const primaryContractResultsSubquery =
       this.buildPrimaryContractResultsSubquery();
 
-    const query = `
+    const baseQuery = `
       SELECT
         secondary_contract.contract_id,
         agresso_contract.description AS contract_description,
@@ -910,10 +1010,14 @@ export class AgressoContractRepository
         agresso_contract.description,
         agresso_contract.projectDescription
       ORDER BY count DESC, secondary_contract.contract_id
-      LIMIT ?
     `;
 
-    const rows = await this.query(query, [contractId, safeLimit]);
+    const { sql, params } = this.appendSqlLimit(
+      baseQuery,
+      [contractId],
+      safeLimit,
+    );
+    const rows = await this.query(sql, params);
 
     return {
       contract_id: contractId,
@@ -925,16 +1029,17 @@ export class AgressoContractRepository
   async getTopPrimaryLeversReport(
     contractId: string,
     limit?: number,
+    fetchAll = false,
   ): Promise<ContractTopPrimaryLeversReportDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }
 
-    const safeLimit = this.normalizeReportLimit(limit);
+    const safeLimit = this.normalizeReportLimit(limit, fetchAll);
     const primaryContractResultsSubquery =
       this.buildPrimaryContractResultsSubquery();
 
-    const query = `
+    const baseQuery = `
       SELECT
         clarisa_lever.id AS lever_id,
         clarisa_lever.short_name AS short_name,
@@ -954,10 +1059,14 @@ export class AgressoContractRepository
         clarisa_lever.full_name,
         clarisa_lever.icon
       ORDER BY count DESC, clarisa_lever.id
-      LIMIT ?
     `;
 
-    const rows = await this.query(query, [contractId, safeLimit]);
+    const { sql, params } = this.appendSqlLimit(
+      baseQuery,
+      [contractId],
+      safeLimit,
+    );
+    const rows = await this.query(sql, params);
 
     return {
       contract_id: contractId,
@@ -969,16 +1078,17 @@ export class AgressoContractRepository
   async getTopMainContactPersonsReport(
     contractId: string,
     limit?: number,
+    fetchAll = false,
   ): Promise<ContractTopMainContactPersonsReportDto> {
     if (isEmpty(contractId)) {
       throw new BadRequestException('contract_id is required');
     }
 
-    const safeLimit = this.normalizeReportLimit(limit);
+    const safeLimit = this.normalizeReportLimit(limit, fetchAll);
     const primaryContractResultsSubquery =
       this.buildPrimaryContractResultsSubquery();
 
-    const query = `
+    const baseQuery = `
       SELECT
         alliance_user_staff.carnet AS user_id,
         alliance_user_staff.first_name AS first_name,
@@ -998,14 +1108,14 @@ export class AgressoContractRepository
         alliance_user_staff.last_name,
         alliance_user_staff.email
       ORDER BY count DESC, alliance_user_staff.carnet
-      LIMIT ?
     `;
 
-    const rows = await this.query(query, [
-      contractId,
-      UserRolesEnum.MAIN_CONTACT,
+    const { sql, params } = this.appendSqlLimit(
+      baseQuery,
+      [contractId, UserRolesEnum.MAIN_CONTACT],
       safeLimit,
-    ]);
+    );
+    const rows = await this.query(sql, params);
 
     return {
       contract_id: contractId,
@@ -1039,6 +1149,48 @@ export class AgressoContractRepository
     return {
       contract_id: contractId,
       staff: this.mapContractStaff(rows[0] as ContractStaffFieldsDto),
+    };
+  }
+
+  /**
+   * Aggregates every contract report section without applying the default
+   * top-N safe limit (returns the full datasets).
+   */
+  async getFullContractReports(
+    contractId: string,
+  ): Promise<ContractBaseReportsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const [
+      primaryLevers,
+      contributors,
+      mainContactPersons,
+      staffReport,
+      partners,
+      geoScope,
+    ] = await Promise.all([
+      this.getTopPrimaryLeversReport(contractId, undefined, true),
+      this.getTopContributorsReport(contractId, undefined, true),
+      this.getTopMainContactPersonsReport(contractId, undefined, true),
+      this.getContractStaffReport(contractId),
+      this.getTopPartnersReport(contractId, undefined, true),
+      this.getGeoScopeReport(contractId, undefined, true),
+    ]);
+
+    return {
+      contract_id: contractId,
+      top_primary_levers: primaryLevers.top_primary_levers,
+      top_contributors: contributors.top_contributors,
+      top_main_contact_persons: mainContactPersons.top_main_contact_persons,
+      staff: staffReport.staff,
+      top_partners: partners.top_partners,
+      geo_scope: {
+        geo_scope_summary: geoScope.geo_scope_summary,
+        top_regions: geoScope.top_regions,
+        top_countries: geoScope.top_countries,
+      },
     };
   }
 

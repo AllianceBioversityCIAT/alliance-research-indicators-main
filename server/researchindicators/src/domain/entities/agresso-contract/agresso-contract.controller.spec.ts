@@ -40,6 +40,7 @@ describe('AgressoContractController', () => {
     getTopPrimaryLeversReport: jest.fn(),
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
+    getFullContractReports: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -97,6 +98,50 @@ describe('AgressoContractController', () => {
       });
       expect(result).toEqual({
         description: 'Contract top primary levers report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+  });
+
+  describe('getFullContractReports', () => {
+    it('should return the full contract reports aggregate', async () => {
+      const mockReport = {
+        contract_id: 'A100',
+        top_primary_levers: [],
+        top_contributors: [],
+        top_main_contact_persons: [],
+        staff: [],
+        top_partners: [],
+        geo_scope: {
+          geo_scope_summary: {
+            global: 0,
+            regional: 0,
+            countries: 0,
+            sub_national: 0,
+            yet_to_be_determined: 0,
+          },
+          top_regions: [],
+          top_countries: [],
+        },
+      };
+
+      mockAgressoContractService.getFullContractReports.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getFullContractReports('A100');
+
+      expect(
+        mockAgressoContractService.getFullContractReports,
+      ).toHaveBeenCalledWith('A100');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract full reports generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract full reports generated',
         status: HttpStatus.OK,
         data: mockReport,
       });
