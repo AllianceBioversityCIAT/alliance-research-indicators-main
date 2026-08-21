@@ -75,7 +75,11 @@ describe('BilateralProjectMappingService', () => {
 
   const mockClarisaProjectsService = {
     listBilateralProjects: jest.fn().mockResolvedValue([
-      { id: 1403, short_name: 'B-A1676', full_name: 'Sustainable Rice-Wheat Cropping Initiatives' },
+      {
+        id: 1403,
+        short_name: 'B-A1676',
+        full_name: 'Sustainable Rice-Wheat Cropping Initiatives',
+      },
       { id: 1404, short_name: 'B-A1677', full_name: 'Cassava Seed Systems' },
     ]),
   };
@@ -92,7 +96,10 @@ describe('BilateralProjectMappingService', () => {
         BilateralProjectMappingService,
         { provide: BilateralProjectMappingRepository, useValue: mockRepo },
         { provide: DataSource, useValue: mockDataSource },
-        { provide: ClarisaProjectsService, useValue: mockClarisaProjectsService },
+        {
+          provide: ClarisaProjectsService,
+          useValue: mockClarisaProjectsService,
+        },
       ],
     }).compile();
 
@@ -274,7 +281,10 @@ describe('BilateralProjectMappingService', () => {
         { id: 2, agresso_agreement_id: 'A1677', clarisa_project_id: 1404 },
       ];
       const mockRaw = [
-        { ac_description: 'Rice-Wheat Initiative', ac_projectDescription: null },
+        {
+          ac_description: 'Rice-Wheat Initiative',
+          ac_projectDescription: null,
+        },
         { ac_description: null, ac_projectDescription: 'Cassava Breeding' },
       ];
 
@@ -304,7 +314,8 @@ describe('BilateralProjectMappingService', () => {
           id: 1,
           agresso_agreement_id: 'A1676',
           agresso_description: 'Rice-Wheat Initiative',
-          clarisa_project_full_name: 'Sustainable Rice-Wheat Cropping Initiatives',
+          clarisa_project_full_name:
+            'Sustainable Rice-Wheat Cropping Initiatives',
         }),
       );
       expect(out.items[1]).toEqual(
@@ -322,7 +333,11 @@ describe('BilateralProjectMappingService', () => {
 
     it('falls back to null when contract has no description or projectDescription (R-BTE-002 Scenario 2.2)', async () => {
       const mockEntities = [
-        { id: 1, agresso_agreement_id: 'UNKNOWN_AGREEMENT', clarisa_project_id: 999 },
+        {
+          id: 1,
+          agresso_agreement_id: 'UNKNOWN_AGREEMENT',
+          clarisa_project_id: 999,
+        },
       ];
       const mockRaw = [{ ac_description: null, ac_projectDescription: null }];
 
@@ -378,9 +393,12 @@ describe('BilateralProjectMappingService', () => {
       });
       mockRepo.createQueryBuilder.mockReturnValueOnce(qbMapped);
       await service.list({ status: 'mapped' });
-      expect(qbMapped.andWhere).toHaveBeenCalledWith('bpm.is_active = :is_active', {
-        is_active: true,
-      });
+      expect(qbMapped.andWhere).toHaveBeenCalledWith(
+        'bpm.is_active = :is_active',
+        {
+          is_active: true,
+        },
+      );
 
       // Test status = 'inactive'
       const qbInactive = makeQb({
@@ -389,9 +407,12 @@ describe('BilateralProjectMappingService', () => {
       });
       mockRepo.createQueryBuilder.mockReturnValueOnce(qbInactive);
       await service.list({ status: 'inactive' });
-      expect(qbInactive.andWhere).toHaveBeenCalledWith('bpm.is_active = :is_active', {
-        is_active: false,
-      });
+      expect(qbInactive.andWhere).toHaveBeenCalledWith(
+        'bpm.is_active = :is_active',
+        {
+          is_active: false,
+        },
+      );
 
       // Test status = 'pending'
       const qbPending = makeQb({

@@ -42,7 +42,9 @@ export class BilateralProjectMappingService {
 
   async list(
     query: ListBilateralProjectMappingsQueryDto,
-  ): Promise<PaginatedBilateralProjectMappings<EnrichedBilateralProjectMapping>> {
+  ): Promise<
+    PaginatedBilateralProjectMappings<EnrichedBilateralProjectMapping>
+  > {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
 
@@ -89,7 +91,7 @@ export class BilateralProjectMappingService {
 
     const { entities, raw } = rawAndEntities;
 
-    let clarisaNameMap = new Map<number, string>();
+    const clarisaNameMap = new Map<number, string>();
     if (this.clarisaProjectsService) {
       try {
         const clarisaProjects =
@@ -97,10 +99,7 @@ export class BilateralProjectMappingService {
         if (clarisaProjects) {
           for (const cp of clarisaProjects) {
             if (cp.id !== undefined && cp.id !== null) {
-              clarisaNameMap.set(
-                cp.id,
-                cp.full_name ?? cp.short_name ?? '',
-              );
+              clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
             }
           }
         }
