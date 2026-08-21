@@ -183,6 +183,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       science_programs: ['SP01', 'SP03'].map((code) => ({
         code,
         name: `name-of-${code}`,
+        mapping_status: 'Confirmed',
         category: null,
         color: null,
         icon_key: null,

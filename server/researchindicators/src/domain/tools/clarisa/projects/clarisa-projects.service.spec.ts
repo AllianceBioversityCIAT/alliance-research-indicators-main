@@ -130,7 +130,7 @@ describe('ClarisaProjectsService', () => {
       expect(service.hasSciencePrograms(project)).toBe(true);
     });
 
-    it('returns false when mapping is Pending or Draft even if entity code is 22', () => {
+    it('returns true when mapping is Pending and entity code is 22 (R-PSP-003)', () => {
       const project: ClarisaProject = {
         id: 2,
         short_name: 'P-PENDING-SP',
@@ -142,6 +142,34 @@ describe('ClarisaProjectsService', () => {
             program_id: 20,
             allocation: 50,
             status: 'Pending',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(true);
+    });
+
+    it('returns false when mapping is Draft or Rejected even if entity code is 22', () => {
+      const project: ClarisaProject = {
+        id: 2,
+        short_name: 'P-REJECTED-SP',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 11,
+            project_id: 2,
+            program_id: 20,
+            allocation: 50,
+            status: 'Rejected',
             global_unit_object: {
               id: 20,
               name: 'Plant Health',
@@ -775,6 +803,58 @@ describe('ClarisaProjectsService', () => {
 
     it('returns null for non-numeric id', async () => {
       expect(await service.findProjectById(Number.NaN)).toBeNull();
+      expect(connectionGet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findProjectByExternalCode (T-06, R-PSP-005, D-PSP-6)', () => {
+    it('returns the project when found by exact external_code', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+        { ...bilateralProject(2, 'B'), external_code: 'D527' },
+      ]);
+
+      const out = await service.findProjectByExternalCode('A1676');
+
+      expect(out?.id).toBe(1);
+      expect(out?.short_name).toBe('A');
+    });
+
+    it('returns the project when searching with prefix-stripped code ({B-, C-})', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(10, 'Proj 10'), external_code: 'B-A1676' },
+      ]);
+
+      const out1 = await service.findProjectByExternalCode('A1676');
+      expect(out1?.id).toBe(10);
+
+      const out2 = await service.findProjectByExternalCode('B-A1676');
+      expect(out2?.id).toBe(10);
+    });
+
+    it('does NOT resolve X-A1676 to A1676 (closed set {B-, C-}, Named Red Input)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+      ]);
+
+      const out = await service.findProjectByExternalCode('X-A1676');
+
+      expect(out).toBeNull();
+    });
+
+    it('returns null when not found in feed', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+      ]);
+
+      expect(await service.findProjectByExternalCode('NONEXISTENT')).toBeNull();
+    });
+
+    it('returns null for null, undefined, or empty string', async () => {
+      expect(await service.findProjectByExternalCode(null)).toBeNull();
+      expect(await service.findProjectByExternalCode(undefined)).toBeNull();
+      expect(await service.findProjectByExternalCode('')).toBeNull();
+      expect(await service.findProjectByExternalCode('   ')).toBeNull();
       expect(connectionGet).not.toHaveBeenCalled();
     });
   });

@@ -1968,6 +1968,82 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(root.querySelector('app-multiselect')).not.toBeNull();
       expect(component.showSpPicker()).toBe(true);
     });
+
+    it('T-09 / R-PSP-004 — stale renders the reconcile-ops message, hides the picker, and does not tell user to register mapping (KZ-015)', () => {
+      showPickerSection();
+      fixture.detectChanges(); // KZ-015: arrange transition after initial detectChanges
+
+      mappingStatus.set('stale');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const staleEl = root.querySelector('[data-testid="pf-alignment-stale-message"]');
+      expect(staleEl).not.toBeNull();
+      expect(staleEl?.textContent?.trim()).toContain(
+        'The linked CLARISA project could not be found in the current feed. Contact the bilateral operations team to reconcile the project mapping.'
+      );
+      expect(staleEl?.textContent).not.toContain('register');
+      expect(root.querySelector('[data-testid="pf-alignment-unmapped-message"]')).toBeNull();
+      expect(root.querySelector('app-multiselect')).toBeNull();
+      expect(component.isStale()).toBe(true);
+      expect(component.showSpPicker()).toBe(false);
+    });
+
+    it('T-09 / R-PSP-004 — all three empty-state messages are pairwise distinct on rendered DOM', () => {
+      showPickerSection();
+      fixture.detectChanges();
+
+      // 1. Unmapped state
+      mappingStatus.set('unmapped');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      const unmappedText = root.querySelector('[data-testid="pf-alignment-unmapped-message"]')?.textContent?.trim();
+
+      // 2. Stale state
+      mappingStatus.set('stale');
+      fixture.detectChanges();
+      const staleText = root.querySelector('[data-testid="pf-alignment-stale-message"]')?.textContent?.trim();
+
+      // 3. No SPs defined state
+      mappingStatus.set('mapped');
+      fixture.detectChanges();
+      const noSpsText = root.querySelector('[data-testid="pf-alignment-no-sps-message"]')?.textContent?.trim();
+
+      expect(unmappedText).toBeTruthy();
+      expect(staleText).toBeTruthy();
+      expect(noSpsText).toBeTruthy();
+
+      expect(staleText).not.toEqual(unmappedText);
+      expect(staleText).not.toEqual(noSpsText);
+      expect(unmappedText).not.toEqual(noSpsText);
+    });
+
+    it('T-09 / R-PSP-004 — renders Pending qualifier chip for SPs with non-Confirmed mapping_status in primary section', () => {
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'Science Program 1', role: 'PRIMARY' },
+          { code: 'SP02', name: 'Science Program 2', role: 'CONTRIBUTING' }
+        ]
+      });
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Science Program 1', icon_key: 'SP01', allocation: 50, mapping_status: 'Pending' },
+        { code: 'SP02', name: 'Science Program 2', icon_key: 'SP02', allocation: 50, mapping_status: 'Confirmed' }
+      ]);
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const pendingTagSp01 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP01"]');
+      const pendingTagSp02 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP02"]');
+
+      expect(pendingTagSp01).not.toBeNull();
+      expect(pendingTagSp01?.textContent?.trim()).toBe('Pending');
+      expect(pendingTagSp02).toBeNull();
+    });
   });
 
   describe('real-time reconcile via Socket.IO — regression', () => {

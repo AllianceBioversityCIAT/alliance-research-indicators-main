@@ -2,14 +2,23 @@
 
 - **Module:** clarisa (served from `bilateral/` because it exists for the bilateral mapping work)
 - **Spec id:** 2026-08-clarisa-fixture-stub
-- **Status:** draft
+- **Status:** archived (removal condition fired 2026-08-20; apparatus deleted per spec)
 - **Owner:** Juan Carlos Cadavid
 - **Linked PRD section:** `docs/prd.md` — bilateral project↔contract mapping
 - **Linked tickets:** AC-1676
-- **Last updated:** 2026-08-18
+- **Last updated:** 2026-08-20 (archived)
 - **Extends:** `docs/specs/bilateral/clarisa-fixture-stub/proposal.md`
 - **Unblocks:** `docs/specs/bilateral/clarisa-automapper-s2` (development only, not shipping)
 - **Depth:** Standard
+
+> **Archived 2026-08-20 (T-08 / R-PSP-007):**
+> The removal condition (*"when CLARISA publishes external_code and phase-2026 data, unset the flag and delete the stub, fixture, dictionary, reference capture and converter; do not maintain them"*) fired on 2026-08-20:
+> - CLARISA test published 1210 projects with 911 carrying `external_code` (phase 2026).
+> - Phase-2026 eligible cohort is 198 projects, with 198/198 carrying `external_code`.
+> - The stub apparatus (`src/domain/tools/clarisa/stub/`) has been completely removed from the repository.
+>
+> **Correction on M-14 (2026-08-20):**
+> Measurement M-14's original claim (*"Real mapping status is uniformly Confirmed (493)"*) was measured over a capture that was already filtered to `Confirmed`. The full live CLARISA feed at the time held 1847 project mapping rows (493 `Confirmed`, 1354 `Pending`). R-PSP-001 widened the predicate to accept `Confirmed` and `Pending`.
 
 ---
 

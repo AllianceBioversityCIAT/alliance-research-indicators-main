@@ -113,6 +113,12 @@
                    data-testid="pf-alignment-unmapped-message">
                 {{ UNMAPPED_SP_MESSAGE }}
               </div>
+            } @else if (isStale()) {
+              <div role="status" aria-live="polite"
+                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   data-testid="pf-alignment-stale-message">
+                {{ STALE_SP_MESSAGE }}
+              </div>
             } @else if (hasNoSciencePrograms()) {
               <div role="status" aria-live="polite"
                    class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
@@ -207,6 +213,14 @@
                       <span class="truncate">
                         <strong>{{ sp.official_code }} — {{ primarySp?.allocation ?? '—' }}%</strong> - {{ sp.name }}
                       </span>
+                      @if (primarySp?.mapping_status && primarySp?.mapping_status !== 'Confirmed') {
+                        <span class="pf-stale-tag"
+                              role="status"
+                              aria-live="polite"
+                              [attr.data-testid]="'pf-alignment-pending-tag-' + sp.official_code">
+                          {{ PENDING_SP_TAG }}
+                        </span>
+                      }
                       <!--
                         AC.6 — non-colour-only cue: a text label ("Primary"/"Contributing")
                         always present, plus an icon on the Primary role only. Colour
