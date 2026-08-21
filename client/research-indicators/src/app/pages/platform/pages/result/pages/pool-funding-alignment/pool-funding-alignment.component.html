@@ -107,7 +107,20 @@
 
         @if (formData().has_contribution === true) {
           <section class="mb-6" data-testid="pf-alignment-levers-section">
-            @if (isUnmapped()) {
+            @if (loadingSciencePrograms() && mappingStatus() === null) {
+              <div role="status" aria-live="polite" aria-busy="true"
+                   class="flex flex-col gap-3.5 p-4 rounded-[10px] bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)]"
+                   data-testid="pf-alignment-sps-loading">
+                <div class="flex items-center gap-2 text-sm text-[var(--ac-primary-blue-700)]">
+                  <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                  <span class="font-medium">Loading Science Programs from CLARISA...</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                </div>
+              </div>
+            } @else if (isUnmapped()) {
               <div role="status" aria-live="polite"
                    class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
                    data-testid="pf-alignment-unmapped-message">

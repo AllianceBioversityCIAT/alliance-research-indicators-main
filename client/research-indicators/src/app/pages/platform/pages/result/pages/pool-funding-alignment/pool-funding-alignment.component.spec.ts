@@ -73,6 +73,7 @@ describe('PoolFundingAlignmentComponent', () => {
   let editable: ReturnType<typeof signal<boolean>>;
   let sciencePrograms: ReturnType<typeof signal<PoolFundingScienceProgram[]>>;
   let mappingStatus: ReturnType<typeof signal<PoolFundingMappingStatus | null>>;
+  let loadingSciencePrograms: ReturnType<typeof signal<boolean>>;
   let tocCatalog: ReturnType<typeof signal<BilateralTocCatalogResponse | null>>;
   let loadingTocCatalog: ReturnType<typeof signal<boolean>>;
   let tocCatalogError: ReturnType<typeof signal<boolean>>;
@@ -111,6 +112,7 @@ describe('PoolFundingAlignmentComponent', () => {
     editable = signal<boolean>(true);
     sciencePrograms = signal<PoolFundingScienceProgram[]>([]);
     mappingStatus = signal<PoolFundingMappingStatus | null>(null);
+    loadingSciencePrograms = signal<boolean>(false);
     tocCatalog = signal<BilateralTocCatalogResponse | null>(null);
     loadingTocCatalog = signal<boolean>(false);
     tocCatalogError = signal<boolean>(false);
@@ -132,6 +134,7 @@ describe('PoolFundingAlignmentComponent', () => {
       editable,
       sciencePrograms,
       mappingStatus,
+      loadingSciencePrograms,
       tocCatalog,
       loadingTocCatalog,
       tocCatalogError,
@@ -1930,6 +1933,17 @@ describe('PoolFundingAlignmentComponent', () => {
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
     };
+
+    it('shows the SP loading skeleton when loadingSciencePrograms is true and mappingStatus is null', () => {
+      showPickerSection();
+      loadingSciencePrograms.set(true);
+      mappingStatus.set(null);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-sps-loading"]')).not.toBeNull();
+      expect(root.textContent).toContain('Loading Science Programs from CLARISA...');
+      expect(component.showSpPicker()).toBe(false);
+    });
 
     it('AC-01.2 — unmapped renders the contact-ops message and hides the picker', () => {
       showPickerSection();
