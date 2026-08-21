@@ -273,3 +273,38 @@ The Reviewer directs that **`_effectiveExplanation` be removed**: unambiguously 
 **Order matters and is recorded:** deleting it today would violate `tasks.md` T-01 scope item 1 **as written**. So — amend scope item 1 + `design.md` §3.1/§6 **first** (done below), *then* delete `:167-181` in one follow-up edit together with R2's and R4's stale paragraphs.
 
 **Not actioned in this entry.** It is a production change, the budget tripwire is open and unanswered, and bundling it with R1 is the user's call.
+
+---
+
+## Budget tripwire — fired, escalated, re-baselined by user ruling
+
+**2026-08-21.** Actuals hit **295 net** (T-01 199 + T-02 96) against `design.md` §7's **~180**, breaching the 250 tripwire by 45. Escalated to the user with the delta and the cause **before starting T-03**, per `/akili-execute` §2.4. **Ruling: re-baseline to ~300, record the cause, continue.**
+
+**Cause: spec-tier density, not scope creep.** Production landed at ≈ −30 net — exactly the estimate. The whole overrun is test authoring (384 lines in the boundary fixture, 288 in the unit spec, 123 in the fifth file). Same diagnosis the sibling spec recorded across eight tasks; third occurrence in this project.
+
+**What the tripwire itself got wrong:** it predicted the right cause but watched the wrong axis. Review rounds came in **under** budget (3 of ~4); **LOC** breached. Recorded in `design.md` §7 so the next estimate binds the trigger to the axis the estimate is weakest on.
+
+### Deferred by user ruling — priority is a stable test deployment today
+
+The user's instruction: *reach a point today where this can be deployed to test and be stable; the deploy is to show progress, and iteration continues afterward.*
+
+Under that priority, the two items T-01's review left open are **deferred, not dropped** — and **neither affects runtime behaviour**:
+
+1. **Remove `_effectiveExplanation`** plus the three stale rationale paragraphs and the false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`. Deleting an unused variable and fixing comments. `tasks.md` T-01 scope item 1 is already amended to permit it, so no further spec change is needed when it is picked up.
+2. **`ADVISORY R1`** — assert that `result_status_workflow` row id 30 dispatches `completenessValidation` with `enabled: true`. **Test-only**, closing a future exposure rather than a present defect. **The highest-value item owed**, and the only unasserted premise in R-IUD-002's chain.
+
+**Recorded as a deliberate priority call, with the reasoning, so `/akili-resume` reads it as owed work rather than as a gap nobody noticed.** The advisory rule was not bent: R1 was never allowed to widen T-01 — it was escalated to the user, who ruled on it.
+
+### Deploy readiness at this point — what is and is not settled
+
+**Code:** T-01 and T-02 are `[x]` with Reviewer PASS. Both tiers are committed on `AC-1679-Create-the-innovation-use-section`, **7 commits unpushed, nothing deployed.** Full suites green on both sides (server 336/2296, client 312/6515), both lints clean, no migration in this spec.
+
+**Deployment coupling stands and is the one hard rule:** ship **both tiers or neither**. Server-only changes nothing perceivable; **client-only turns today's silent no-op into a visible `400`** — strictly worse than the bug being fixed.
+
+**Still open, and none of it is this spec's:**
+
+| Item | Owner |
+| --- | --- |
+| `details-page` **T-13** human gate — c1 partially exercised by the reporter (a result was created and saved); **c7 / c8 / c9 still owed** (light-theme visual ×2 viewports, two screenshots, keyboard pass) | The sibling spec, `[~]` |
+| Migration state in the **target test environment**, including the archived bugfix's `devops-note.md` — two `SP_versioning` repairs to run **together, in order, with Engineering-lead approval** against the shared non-disposable DB | DevOps / Engineering lead |
+| Platform finding: `completenessValidation` is `enabled: false` on `DRAFT → SUBMITTED` for **every** indicator, so any API client can submit an incomplete result on first submission; only the STAR client's green-check gating prevents it | Product / security, filed by `proposal.md` §15 |

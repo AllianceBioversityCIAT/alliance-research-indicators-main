@@ -91,15 +91,30 @@ The rule already lives at the submit boundary. The save-time throw was a second 
 
 ## 7. Budget (Step 2.4)
 
-| | Estimate |
+| | Original estimate | **Re-baselined 2026-08-21** | Actual |
+| --- | --- | --- | --- |
+| **Tasks** | 3 | 3 | 3 |
+| **LOC (net)** | ~180 | **~300** | **295** (T-01 199 + T-02 96) |
+| **Review rounds** | ~4 | ~4 | **3** (T-01 ×1, T-02 ×2) |
+
+**Re-baselined by user ruling after the tripwire fired at 295 net (+64% over ~180).** The escalation happened as designed — the number's job was to force a stop, and it did.
+
+**Cause, diagnosed not guessed: spec-tier density, not scope creep.** The production change landed at **≈ −30 net**, which is *exactly* the original estimate. The entire overrun is test authoring: 384 lines in the boundary-fixture redesign, 288 in the unit spec, 123 in the fifth file the cited-site list missed. **This is the same diagnosis the sibling spec `innovation-use/details-page` recorded across eight tasks** — every task shipping new spec files over-runs, and the over-run is always in the test tier while implementation lines track the estimate closely. Third occurrence in this project.
+
+**What the original tripwire got wrong, worth carrying into the next estimate:** it predicted the right *cause* — *"the likely cause would be the boundary fixture"* — but bound the trigger to **review rounds**, which came in **under** budget (3 of ~4). LOC is what breached. A tripwire is only as good as the axis it watches, and the axis that fails is the one the estimate was weakest on.
+
+> **Tripwire, re-baselined.** Actuals above **~380** net or beyond **6** review rounds stop execution and escalate.
+
+### Deferred by user ruling, 2026-08-21 — not oversight
+
+The T-01 review left two items open. **Both were deliberately deferred to prioritise a stable test deployment**, on the user's explicit instruction that the deploy is to show progress and iteration continues afterward. **Neither affects runtime behaviour:**
+
+| Item | Why deferring is safe |
 | --- | --- |
-| **Tasks** | **3** |
-| **LOC** | **~180** net (production **≈ −25**; the rest is test authoring, dominated by the boundary-fixture redesign) |
-| **Review rounds** | **~4** (T-01 is the risky one) |
+| Remove `_effectiveExplanation` + three stale rationale paragraphs (`result-innovation-use.service.ts:263-264`, `:269-271`, `:278-284`) and the false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994` | Deleting an unused variable and correcting comments. **Zero functional effect.** `tasks.md` T-01 scope item 1 is already amended to permit it |
+| **`ADVISORY R1`** — assert that `result_status_workflow` row **id 30** dispatches `completenessValidation` with `enabled: true` | **Test-only.** It closes a *future* exposure (a migration flipping the flag would leave every test green), not a present defect. The Reviewer called it the single highest-value addition, and it stays owed |
 
-Consistent with **Lite**. The production change is smaller than a typical `/akili-quick`; the spec exists for the test tier and the cross-spec document amendments, not for the code.
-
-> **Tripwire.** Actuals above ~250 LOC or beyond 6 review rounds stop execution and escalate. The likely cause would be the boundary fixture, so **if T-01 exceeds two review rounds, stop and re-scope the fixture rather than pressing on.**
+**R1 is the one to pick up first when iteration resumes** — it is the only unasserted premise in R-IUD-002's chain.
 
 ---
 
