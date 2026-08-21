@@ -1313,3 +1313,43 @@ Critically, **the requirement itself is not over-promised.** R-IUP-016 AC.4's bi
 **T-10 correctly left the row untouched** — but this is newly load-bearing, because **c7's argument and this defect are the same sentence.** Needs a product-defect ticket plus corrections to `design.md` D-IUP-5, `requirements.md` R-IUP-001's note, and `tasks.md` T-10's note.
 
 ---
+
+### Pivot resolution — T-10, 2026-08-21
+
+**User ruling: branch (A).** Amend c4 to match what DD-9 actually authorizes; **zero code change.** T-10 moves from `[~]` to **done**, all 7 criteria marked, and the cast closure becomes a tracked follow-up instead of a blocked criterion.
+
+#### Edits applied
+
+| File | Edit |
+| --- | --- |
+| `tasks.md` T-10 c4 | Rewritten to *"both keys are **declared** on `GreenChecks` and **drive the rendered `greenCheck`** for their rows"*, with the superseded wording quoted and the reason it was unsatisfiable stated inline |
+| `tasks.md` T-10 Implementation notes | The *"closing it costs one line"* claim corrected |
+| `tasks.md` §8 | **RB-8** added — the cast closure plus the two live bugs, with the enumerated ~10-line cost and the note that **all three previously-recorded blockers were wrong** |
+| `design.md` **DD-9** | *"Closing it costs one line"* corrected in place, with the conflation named |
+| `design.md` §2.1 row | Aligned; points at RB-8 |
+| `requirements.md` **R-IUP-016 AC.4** | **Annotated, not redefined.** The binding clause (*"is present on the client `GreenChecks` interface"*) is marked satisfied; the trailing rationale (*"so the lookup is type-checked rather than cast-only"*) is marked **not achievable by declaring the key**, tracked as RB-8 |
+
+**On AC.4: the Leader deliberately annotated rather than rewrote.** Editing an *acceptance criterion* changes what the requirement demands, which branch (A) did not authorize — but leaving the rationale unmarked would have left `requirements.md` asserting a falsehood about shipped code, which root `CLAUDE.md` §5 forbids. Annotating keeps the requirement intact and removes the falsehood. **Flagged as an extension beyond the literal option text, so it is visible and revertible.**
+
+#### Correction Closure — the two-direction sweep, bounded on every axis (KZ-005)
+
+**File set swept:** `tasks.md`, `design.md`, `requirements.md`, `judgment.md` — the whole spec folder except `execution.md`, which is append-only history and must not be rewritten.
+
+**Forward** (the superseded claim, in every phrasing — `as keyof GreenChecks`, `cast-only`, `costs one line`, `type gap`, `widen a known type`): **six sites found, not the two the pivot analysis cited.** Four corrected. Two deliberately left:
+
+- **`requirements.md:214` — NOT edited, and checking saved a real error.** It sits in a *"State for indicator 6"* inventory table whose every row describes the **pre-change** state (*"No `indicator_id: 6` row exists"*, *"No `innovation-use-details` child"*, *"switch has cases 1, 2, 4, 5"*). So *"Has neither `innovation_use` nor `ip_rights`"* is a correct historical record, and its note that *"the runtime lookup is an `as keyof` cast, so this is a type gap, not a behavior gap"* **remains true** — the cast still exists. Editing it would have falsified the requirements' record of the starting state.
+- The one surviving `costs one line` string is **inside the correction itself**, quoted as the superseded text. That is where it belongs.
+
+**Backward** (documents citing c4 or DD-9): the §4 traceability row `AC.4 → T-10 (c4)` still holds under the new wording, since AC.4's binding clause is the declaration. **Every other `c4` hit belonged to a different task** (T-02, T-04, T-05, T-06, T-07, T-11, T-12, T-13) — a concrete illustration of why this sweep must be bounded **by task**, not by string.
+
+**Re-grep of the NEW value** (the axis KZ-005 says corrections keep missing): **RB-8 is defined exactly once** in §8 and resolves at all six citation sites (3 in `tasks.md`, 2 in `design.md`, 1 in `requirements.md`).
+
+**No `src/` file changed**, so the suite is unaffected — the last full run (312 suites / 6508 tests, build clean) stands. Re-running would be a measurement with nothing to measure.
+
+#### The sixth spec-accuracy finding, and what it adds to the pattern
+
+Five were already recorded, four of them *instruction right, justification wrong*, and one (TRD §6.1) *instruction unsatisfiable because the contract it cites is fictional*. **T-10's is the worst variant yet:** a **done criterion** was derived from a rationale. Lens A's T-07 lesson said a rationale is load-bearing for anything derived from it and named *falsifying inputs* as the risk — **a done criterion is strictly worse, because a falsifier that cannot fire merely fails to catch a defect, while a criterion that cannot be satisfied blocks a correct implementation.**
+
+**Extension for the Kaizen record:** when a design decision's rationale is quoted into a done criterion, the criterion must assert **the decision's authorized change**, never its predicted *consequence*. DD-9 authorized *declare two keys*; its predicted consequence was *the cast becomes unnecessary*; c4 asserted the consequence. **The tell is available at authoring time and costs one question: "does the change this decision authorizes, by itself, produce the state this criterion asserts?"**
+
+---

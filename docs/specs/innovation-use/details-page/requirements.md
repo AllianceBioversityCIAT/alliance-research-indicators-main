@@ -697,7 +697,7 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 - [ ] AC.1 — After a successful save that completes the section, the sidebar tick for `Innovation use details` turns true without a manual reload.
 - [ ] AC.2 — After a save that removes the last actor row, the tick turns false.
 - [ ] AC.3 — With `innovation_use` false, `canSubmitResult()` is false and the Submit affordance is blocked with the standard tooltip.
-- [ ] AC.4 — `innovation_use` is present on the client `GreenChecks` interface so the sidebar's lookup is type-checked rather than cast-only.
+- [x] AC.4 — `innovation_use` is present on the client `GreenChecks` interface. **The binding clause is satisfied** (T-10). **Annotated 2026-08-21 (T-10 Pivot):** the trailing rationale *"so the sidebar's lookup is type-checked rather than cast-only"* is **not achieved and is not achievable by declaring the key** — the `as keyof GreenChecks` cast is applied to `greenCheckKey`, typed `string`. The rationale is tracked for closure as `tasks.md` RB-8; **the requirement itself is met.**
 - [ ] AC.5 — `innovation_use` is **not** added to `VISUAL_ONLY_GREEN_CHECKS` semantics on the client — it counts and it gates.
 
 #### Scenario: Deleting the last actor un-ticks the section
