@@ -1175,7 +1175,7 @@ describe('SpTocAlignmentBlockComponent', () => {
       expect(loading).not.toBeNull();
       expect(loading.getAttribute('aria-live')).toBe('polite');
       expect(loading.getAttribute('aria-busy')).toBe('true');
-      expect(loading.textContent).toContain('Fetching Theory of Change catalog from CLARISA...');
+      expect(loading.textContent).toContain('Fetching Theory of Change catalog from PRMS...');
       expect(loading.querySelectorAll('p-skeleton').length).toBeGreaterThanOrEqual(3);
       expect(fixture.nativeElement.querySelector('[data-testid="sp-toc-level-SP01"]')).toBeNull();
     });
