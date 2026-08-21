@@ -20,8 +20,7 @@ import {
   BilateralMappingListMeta,
   BilateralMappingSource,
   BilateralProjectMapping,
-  ClarisaBilateralProjectOption,
-  MappingStatus
+  ClarisaBilateralProjectOption
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
 import { BilateralMappingCoverageComponent } from './components/bilateral-mapping-coverage/bilateral-mapping-coverage.component';
 import { AutomapperDialogComponent } from './components/automapper-dialog/automapper-dialog.component';
@@ -257,8 +256,8 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     void this.load();
   }
 
-  onActiveFilterChange(value: any): void {
-    const val = value === 'active' ? 'mapped' : value;
+  onActiveFilterChange(value: string | MappingStatusFilter): void {
+    const val = (value === 'active' ? 'mapped' : value) as MappingStatusFilter;
     this.onStatusFilterChange(val);
   }
 
@@ -279,9 +278,9 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     if (!event.data || !event.field || !event.order) return;
     const field = event.field;
     const order = event.order;
-    event.data.sort((data1: Record<string, any>, data2: Record<string, any>) => {
-      let val1 = data1[field] ?? '';
-      let val2 = data2[field] ?? '';
+    event.data.sort((data1: Record<string, unknown>, data2: Record<string, unknown>) => {
+      let val1 = (data1[field] as string | number | null | undefined) ?? '';
+      let val2 = (data2[field] as string | number | null | undefined) ?? '';
       if (typeof val1 === 'string') val1 = val1.toLowerCase();
       if (typeof val2 === 'string') val2 = val2.toLowerCase();
       if (val1 < val2) return -1 * order;

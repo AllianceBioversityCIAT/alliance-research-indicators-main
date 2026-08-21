@@ -59,7 +59,8 @@ export class ListBilateralProjectMappingsQueryDto {
   source?: MappingSourceEnum;
 }
 
-export interface EnrichedBilateralProjectMapping extends BilateralProjectMapping {
+export interface EnrichedBilateralProjectMapping
+  extends BilateralProjectMapping {
   agresso_description?: string | null;
   clarisa_project_full_name?: string | null;
 }
