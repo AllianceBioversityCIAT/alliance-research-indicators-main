@@ -46,7 +46,7 @@ Confirmed by the reporter: lowering the level below 6, or typing anything into t
 | Green check / sidebar tick for the section | (unreachable — nothing saved) | **Stays false** until the justification is filled |
 | Submit an Innovation Use result with blank justification at `level >= 6` | ⚠️ **Corrected by §15 (OQ-1).** This row read *"Blocked → Still blocked"*, which is **false on the `DRAFT → SUBMITTED` path**: `completenessValidation` is `enabled: false` on indicator 6's id 25, so the server evaluates no green checks on a first submit. It **is** blocked on `REVISED → SUBMITTED` (id 30, `enabled: true`) | **Blocked by the STAR client's green-check gating on both paths; server-enforced only on `REVISED → SUBMITTED`.** Unchanged by this fix — the same is already true of every other completeness rule |
 | Inline required message + red asterisk on the textarea | Present (duplicated) | **Present, exactly once** |
-| Whitespace-only justification | Blocked, page-owned message | **Persists as `NULL`-equivalent**; message still renders; server never receives whitespace |
+| Whitespace-only justification | Blocked, page-owned message | **Persists verbatim** (the whitespace reaches the column — corrected 2026-08-21; the earlier claim *"server never receives whitespace"* was false, `buildPayload` does not trim). Harmless: `valid_text` strips all whitespace before measuring, so the green check reads it as **absent**, the tick stays gray, and Submit stays disabled. The required message still renders |
 
 ---
 
@@ -68,7 +68,7 @@ Confirmed by the reporter: lowering the level below 6, or typing anything into t
 | --- | --- |
 | Remove the save gate | `innovation-use-details.component.ts:497-503` — drop `!this.justificationMissing()` from the `if`. **Leave `!this.hasDuplicateActorType()` in place** (see §6) |
 | Fix the duplicate message | Keep the **page-owned** block (it uses `.trim()`, so it covers blank *and* whitespace); suppress the shared `app-textarea`'s own message on this field. **Constraint: do not edit the shared `TextareaComponent`** — T-09 ruled that out on blast-radius grounds, and that ruling stands |
-| Preserve the payload trim | `buildPayload`'s `.trim()` stays — T-09's decision that the server must never receive whitespace is unaffected |
+| **Leave `buildPayload` exactly as it is** | ⚠️ **Corrected 2026-08-21.** This row claimed *"`buildPayload`'s `.trim()` stays — the server must never receive whitespace."* **`buildPayload` does not trim.** Line 394 sends `current.innovation_use_level_explanation ?? undefined`; the `.trim()` at line 173 belongs to the `justificationMissing()` **gate**, not the payload. So whitespace **is** sent today and will be stored under option A. **That is harmless and must not be "fixed":** `valid_text` strips all whitespace before measuring, so the green check reads it as absent. And trimming-to-`undefined` would introduce a real bug — a user who deletes their text would send no key, and the server's *key-present ? payload : stored* rule would **preserve the old value**, so the deletion would not persist |
 | Invert the T-09 c5 tests | They were deliberately hardened to assert *"blocked **and** message renders"*. Now: *"saved **and** message renders"* |
 
 ### Documents
@@ -251,7 +251,7 @@ Four independent lines of evidence support removing rather than relocating:
 1. At resolved `level >= 6` with a blank justification, **Save persists the draft** and shows the success toast; a re-read returns the saved values.
 2. The section's green check / sidebar tick **stays false** until the justification is filled.
 3. **Submit is still rejected** for that result, with the existing *"There are still sections pending…"* message.
-4. Whitespace-only justification **persists**, the server receives no whitespace, and the required message renders.
+4. Whitespace-only justification **persists** (whitespace does reach the column — corrected 2026-08-21), the **green check still reads it as absent** so the tick stays gray and Submit stays disabled, and the required message renders. **Assert on the green check's value, not on the column's contents** — the column holding `'   '` is expected, not a defect.
 5. Exactly **one** *"This field is required"* message renders in every case — blank, whitespace, and after the level drops below 6.
 6. The shared `TextareaComponent` is **byte-identical** (`git diff --exit-code` on its path).
 7. `hasDuplicateActorType()` still blocks the save — unchanged.
