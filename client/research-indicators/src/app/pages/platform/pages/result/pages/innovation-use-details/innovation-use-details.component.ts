@@ -27,6 +27,17 @@ import { InnovationUseOrganizationItemComponent } from './components/innovation-
 const JUSTIFICATION_MIN_LEVEL = 6;
 
 /**
+ * §6.6 / R-IUP-009 AC.2: CLARISA actor-type value reserved for "OTHER". A client-side literal,
+ * not an import — `ClarisaActorTypesEnum.OTHER = 5` exists only in the server tree
+ * (server/researchindicators/src/domain/tools/clarisa/entities/clarisa-actor-types/enum/); a
+ * grep of client/research-indicators/src returns zero matches. Mirrors the identical literal
+ * already declared inside `InnovationUseActorItemComponent` (design.md §5.4 / judgment.md C-2)
+ * — duplicated here rather than imported, because the card is a pure `@Input`/`@Output`
+ * component (DD-5) and this page must not reach into its internals to read the constant.
+ */
+const OTHER_ACTOR_TYPE_ID = 5;
+
+/**
  * §6.5 step 5 / c6: the shape a PATCH body's rows take. Every id field here is `number |
  * undefined` and is a straight passthrough of whatever `body()` already carried for that row —
  * `buildPayload()` never assigns one. See the id-write-site enumeration on `buildPayload()` below.
@@ -144,6 +155,60 @@ export default class InnovationUseDetailsComponent {
 
   /** Hides the textarea below level 6 without ever touching its value (R-IUP-006). */
   showJustification = computed<boolean>(() => (this.resolvedLevel() ?? Number.NEGATIVE_INFINITY) >= JUSTIFICATION_MIN_LEVEL);
+
+  /**
+   * §6.6 / R-IUP-006 AC.2, R-IUP-014 AC.3: at the resolved `level >= 6`, save is blocked while
+   * the justification is blank-or-whitespace-only. Gates both `saveData()` (§6.7 step 2) **and**
+   * the page's own required-message block in the template.
+   *
+   * **REWORK (Reviewer FAIL, attempt 1):** trimming here without a matching trim on the
+   * rendered side is exactly the bug that shipped — `app-textarea`'s own `isInvalid()` checks
+   * `value.length === 0` untrimmed, so a whitespace-only value blocked the save silently with no
+   * visible message (guard and message disagreed on what "blank" means). The fix keeps `.trim()`
+   * here (the server is authoritative and should not receive whitespace either — PRD
+   * **AC-Role-Correctness**) and adds the page's own message block gated on this exact computed,
+   * rather than editing the shared `app-textarea`/`TextareaComponent` (out of this task's scope
+   * and used by many other pages).
+   */
+  justificationMissing = computed<boolean>(() => this.showJustification() && !this.body().innovation_use_level_explanation?.trim());
+
+  /**
+   * §6.6 / R-IUP-009: rows sharing an actor identity, keyed on `actor_type_id` — or, for type
+   * `5` (OTHER), on `actor_type_id` + trimmed lowercase `actor_type_custom_name` (AC.2: two
+   * OTHER rows are distinguished by their custom name, not conflated by the shared type id).
+   * Rows with no `actor_type_id` are excluded from the count: an empty type is the
+   * required-field case (`actorTypeMissing` on the card itself), not a duplicate.
+   *
+   * **Falsifying input** (`design.md` §10.3): keying only on `actor_type_id` would flag two
+   * OTHER rows carrying different custom names as duplicates — the trimmed-lowercase-name half
+   * of this key is what keeps that from happening (c2's differing-name half).
+   */
+  duplicateActorTypeIndexes = computed<Set<number>>(() => {
+    const indexesByKey = new Map<string, number[]>();
+
+    this.body().actors.forEach((row, index) => {
+      if (!row.actor_type_id) return;
+      const key =
+        row.actor_type_id === OTHER_ACTOR_TYPE_ID
+          ? `${row.actor_type_id}:${(row.actor_type_custom_name ?? '').trim().toLowerCase()}`
+          : `${row.actor_type_id}`;
+      indexesByKey.set(key, [...(indexesByKey.get(key) ?? []), index]);
+    });
+
+    const flagged = new Set<number>();
+    indexesByKey.forEach(indexes => {
+      if (indexes.length > 1) indexes.forEach(index => flagged.add(index));
+    });
+    return flagged;
+  });
+
+  /**
+   * §6.6 / R-IUP-009: save is blocked while any actor row is flagged. **Zero actor rows never
+   * flags anything** — `duplicateActorTypeIndexes()` is empty on an empty `actors` array, so
+   * this stays `false` and R-IUP-014 AC.3's "a draft with no actors is legal" is a structural
+   * consequence of the same computed, not a separate carve-out (R-IUP-010 AC.5 / c6).
+   */
+  hasDuplicateActorType = computed<boolean>(() => this.duplicateActorTypeIndexes().size > 0);
 
   /**
    * §6.7 step 5: the one field on this page a save error can be addressed to by a stable name.
@@ -411,6 +476,12 @@ export default class InnovationUseDetailsComponent {
    *    **REWORK (Issue 3):** `loadFailed()` only covers the *failed-load* subset. The
    *    *stale-success* subset — a version switch's in-flight GET, where `body` still holds the
    *    previous version's rows and `loadFailed()` is `false` — is covered by `loading()` instead.
+   * 2b. **T-09 (§6.6):** two more blocking client rules, same shape as (1)/(2) — issue nothing,
+   *    still fall through to navigation below. `hasDuplicateActorType()` (a duplicate actor
+   *    identity somewhere in the block) and `justificationMissing()` (blank justification at the
+   *    resolved level >= 6). Neither replaces the mirrored server rule (PRD
+   *    **AC-Role-Correctness**); zero actor rows trips neither guard, so an empty draft still
+   *    saves (R-IUP-010 AC.5 / R-IUP-014 AC.3 / c6).
    * 3. `PATCH_InnovationUseDetails(id, buildPayload())`.
    * 4. On success -> toast -> `await getData()`. That GET carries `loadingTrigger: true`, which
    *    is what turns the sidebar tick (R-IUP-016 AC.1/AC.2 / c9).
@@ -423,7 +494,13 @@ export default class InnovationUseDetailsComponent {
   async saveData(page?: 'back' | 'next'): Promise<void> {
     this.saveErrors.set([]);
 
-    if (this.submission.isEditableStatus() && !this.loadFailed() && !this.loading()) {
+    if (
+      this.submission.isEditableStatus() &&
+      !this.loadFailed() &&
+      !this.loading() &&
+      !this.hasDuplicateActorType() &&
+      !this.justificationMissing()
+    ) {
       const response = await this.api.PATCH_InnovationUseDetails(this.cache.getCurrentNumericResultId(), this.buildPayload());
 
       if (response.successfulRequest) {

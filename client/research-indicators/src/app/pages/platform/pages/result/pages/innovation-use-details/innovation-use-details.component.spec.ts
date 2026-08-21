@@ -1206,6 +1206,9 @@ describe('InnovationUseDetailsComponent', () => {
         ...component.body(),
         innovation_use_level_id: idForLevel(7),
         innovation_use_level: 7, // server-derived; must never reach the wire
+        // T-09: level 7 resolves to level >= 6, so the justification gate (§6.6) requires a
+        // non-blank value here or this save would be blocked before ever reaching the PATCH.
+        innovation_use_level_explanation: 'used across three countries',
         actors: [
           { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4, total: 4, women_youth_count: 9 },
           new InnovationUseActor() // blank -> must be dropped
@@ -1241,6 +1244,9 @@ describe('InnovationUseDetailsComponent', () => {
       component.body.set({
         ...component.body(),
         innovation_use_level_id: idForLevel(8),
+        // T-09: level 8 resolves to level >= 6, so the justification gate (§6.6) requires a
+        // non-blank value here or this save would be blocked before ever reaching the PATCH.
+        innovation_use_level_explanation: 'used across three countries',
         actors: [
           {
             ...new InnovationUseActor(),
@@ -1257,6 +1263,7 @@ describe('InnovationUseDetailsComponent', () => {
       const serverEcho: GetInnovationUseDetails = {
         ...new GetInnovationUseDetails(),
         innovation_use_level_id: idForLevel(8),
+        innovation_use_level_explanation: 'used across three countries',
         actors: [
           {
             ...new InnovationUseActor(),
@@ -1365,7 +1372,14 @@ describe('InnovationUseDetailsComponent', () => {
 
   describe('T-08 — the justification textarea renders an inline field-scoped save error', () => {
     it('renders the error message when it names innovation_use_level_explanation', async () => {
-      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(7) });
+      // T-09: a non-blank justification satisfies the client-side gate (§6.6) so the PATCH is
+      // actually issued; this fixture simulates a server-side rejection the client mirror does
+      // not itself catch (e.g. a length rule), not the client's own blank-value gate.
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(7),
+        innovation_use_level_explanation: 'used across three countries'
+      });
       apiService.PATCH_InnovationUseDetails.mockResolvedValue({
         successfulRequest: false,
         status: 400,
@@ -1394,6 +1408,226 @@ describe('InnovationUseDetailsComponent', () => {
       await component.saveData();
 
       expect(component.justificationError()).toBeUndefined();
+    });
+  });
+
+  // =================================================================================================
+  // T-09 — Cross-row validation (§6.6): duplicate actor type, level-6 justification gate, save
+  // blocking. Requirements: R-IUP-009 (all 3), R-IUP-010 AC.5, R-IUP-006 AC.2, R-IUP-014 AC.3.
+  // =================================================================================================
+  const OTHER_ACTOR_TYPE_ID = 5;
+
+  describe('T-09 c1 — duplicate actor type renders the RENDERED card message, not just the computed', () => {
+    it('renders the duplicate message on row 2 when row 1 already holds the same actor type', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 1 }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(2);
+      // Disqualifier guard (KZ-002 / task disqualifier): assert the card's `duplicateType` input
+      // actually reached true AND that the message renders in the DOM the card owns — not a
+      // presence check on the page-level computed alone.
+      expect(cards[0].componentInstance.duplicateType).toBe(true);
+      expect(cards[1].componentInstance.duplicateType).toBe(true);
+      expect(cards[0].nativeElement.textContent).toContain('This actor type has already been reported on another row');
+      expect(cards[1].nativeElement.textContent).toContain('This actor type has already been reported on another row');
+    });
+
+    it('renders no duplicate message and duplicateType=false when actor types differ', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 2 }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[0].componentInstance.duplicateType).toBe(false);
+      expect(cards[1].componentInstance.duplicateType).toBe(false);
+      expect(cards[0].nativeElement.textContent).not.toContain('This actor type has already been reported on another row');
+      expect(cards[1].nativeElement.textContent).not.toContain('This actor type has already been reported on another row');
+    });
+
+    it('does not flag rows that share no actor_type_id (both blank is the required-field case, not a duplicate)', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [new InnovationUseActor(), new InnovationUseActor()]
+      });
+
+      expect(component.duplicateActorTypeIndexes().size).toBe(0);
+    });
+  });
+
+  describe('T-09 c2 — OTHER (type 5) rows are keyed on trimmed lowercase custom name, not on the shared type id alone', () => {
+    it('flags two OTHER rows sharing the same trimmed lowercase custom name', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: OTHER_ACTOR_TYPE_ID, actor_type_custom_name: 'Local cooperatives' },
+          { ...new InnovationUseActor(), actor_type_id: OTHER_ACTOR_TYPE_ID, actor_type_custom_name: '  local cooperatives  ' }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[0].componentInstance.duplicateType).toBe(true);
+      expect(cards[1].componentInstance.duplicateType).toBe(true);
+      expect(cards[0].nativeElement.textContent).toContain('This actor type has already been reported on another row');
+    });
+
+    it('does NOT flag two OTHER rows with different custom names (falsifying input: keying on actor_type_id alone would wrongly flag this)', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: OTHER_ACTOR_TYPE_ID, actor_type_custom_name: 'Local cooperatives' },
+          { ...new InnovationUseActor(), actor_type_id: OTHER_ACTOR_TYPE_ID, actor_type_custom_name: 'National federations' }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[0].componentInstance.duplicateType).toBe(false);
+      expect(cards[1].componentInstance.duplicateType).toBe(false);
+      expect(component.duplicateActorTypeIndexes().size).toBe(0);
+      expect(cards[0].nativeElement.textContent).not.toContain('This actor type has already been reported on another row');
+    });
+  });
+
+  describe('T-09 c3 — no PATCH is issued while any row is flagged as a duplicate', () => {
+    it('issues zero PATCH requests when two rows share the same actor type', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 1 }
+        ]
+      });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('T-09 c4 — removing the duplicating row clears the flag and re-offers the type', () => {
+    it('clears duplicateType on the surviving row once the other duplicate is removed', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 1 }
+        ]
+      });
+      fixture.detectChanges();
+      expect(component.duplicateActorTypeIndexes().size).toBe(2);
+
+      component.removeActor(0);
+      fixture.detectChanges();
+
+      expect(component.duplicateActorTypeIndexes().size).toBe(0);
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(1);
+      expect(cards[0].componentInstance.duplicateType).toBe(false);
+      expect(cards[0].nativeElement.textContent).not.toContain('This actor type has already been reported on another row');
+    });
+
+    it('re-offering the type also un-blocks the save (PATCH is issued once the duplicate is gone)', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 2 }
+        ]
+      });
+      component.removeActor(1);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('T-09 c5 — resolved level >= 6 with a blank justification blocks save and renders the required message', () => {
+    it('renders the required message and issues zero PATCH requests while blank at level >= 6', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: undefined });
+      fixture.detectChanges();
+
+      expect(component.justificationMissing()).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+    });
+
+    // REWORK (Reviewer FAIL, attempt 1): whitespace-only is the exact defect that shipped — the
+    // guard (trimmed) and the visible message (untrimmed, on `app-textarea` alone) disagreed.
+    // This test asserts the page's OWN required-message block renders — the fix's actual
+    // evidence — plus zero PATCH, so it can no longer pass on a build that blocks silently.
+    it('renders the page-owned required message and issues zero PATCH requests while the justification is only whitespace at level >= 6', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: '   ' });
+      fixture.detectChanges();
+
+      expect(component.justificationMissing()).toBe(true);
+      // Falsifying check (Reviewer FAIL): `app-textarea`'s own built-in message does NOT cover
+      // this case — its `isInvalid()` is untrimmed length-based and sees a non-empty string, so
+      // it renders nothing. If this assertion is satisfied only by that mechanism, it would fail
+      // for whitespace; asserting on the page's rendered text proves the page's own block fired.
+      expect(fixture.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+    });
+
+    it('renders no required message and issues a PATCH once the justification is filled in at level >= 6', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: 'used across three countries' });
+      fixture.detectChanges();
+
+      expect(component.justificationMissing()).toBe(false);
+      expect(fixture.nativeElement.textContent).not.toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not block save at level 3 with a blank justification (the gate is scoped to level >= 6)', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(3), innovation_use_level_explanation: undefined });
+
+      expect(component.justificationMissing()).toBe(false);
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('T-09 c6 — zero actor rows: save proceeds, section renders as incomplete rather than as an error', () => {
+    it('issues a PATCH when actors is empty (falsifying input: blocking save on zero rows must FAIL this)', async () => {
+      component.body.set({ ...component.body(), actors: [] });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+    });
+
+    it('renders the incomplete "at least one actor is required" message rather than any error state when actors is empty', () => {
+      component.body.set({ ...component.body(), actors: [] });
+      fixture.detectChanges();
+
+      expect(component.hasDuplicateActorType()).toBe(false);
+      expect(component.loadFailed()).toBe(false);
+      expect(fixture.nativeElement.textContent).toContain('At least one actor is required');
+      // Distinct from the error surface (c4/c5's rendered "could not be loaded" block).
+      expect(fixture.nativeElement.textContent).not.toContain('could not be loaded');
     });
   });
 });

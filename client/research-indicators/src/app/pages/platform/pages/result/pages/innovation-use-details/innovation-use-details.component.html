@@ -30,6 +30,19 @@
             [rows]="4"
             placeholder="Explain the use of this innovation at this level"></app-textarea>
 
+          @if (justificationMissing()) {
+            <!-- T-09 Rework: `app-textarea`'s own `isInvalid()` checks `length === 0` without
+                 trimming, so a whitespace-only value renders no message there even though
+                 `justificationMissing()` (which trims) blocks the save. This block is the page's
+                 own required-message source of truth, structurally tied to the same computed
+                 that gates `saveData()` (§6.6 / §6.7 step 2) — not left to coincide with the
+                 shared component's untrimmed check. -->
+            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
+              <i class="material-symbols-rounded !text-[14px]">warning</i>
+              <span class="fs-[14]">This field is required</span>
+            </div>
+          }
+
           @if (justificationError()) {
             <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
               <i class="material-symbols-rounded !text-[14px]">warning</i>
@@ -62,6 +75,7 @@
             [actor]="actor"
             [actorNumber]="$index + 1"
             [disabled]="!submission.isEditableStatus()"
+            [duplicateType]="duplicateActorTypeIndexes().has($index)"
             (update)="onActorUpdate($index, $event)"
             (remove)="removeActor($index)" />
         }

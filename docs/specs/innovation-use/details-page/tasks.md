@@ -415,7 +415,7 @@ graph TD
 
 ### T-09 — Cross-row validation: duplicate actor type, level-6 justification gate, save blocking
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-05, T-08
+- **Status:** done · **Size:** M · **Dependencies:** T-05, T-08
 - **Requirements covered:** R-IUP-009 (all 3), R-IUP-010 (AC.5), R-IUP-006 (AC.2), R-IUP-014 (AC.3)
 - **Design references:** §6.6, §5.4 (`duplicateType`)
 - **Skills:** `angular-developer`
@@ -431,12 +431,12 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Choosing type `X` on row 2 when row 1 already holds `X` renders an inline message naming the field, or the option is not offerable.
-- [ ] c2 — Two rows of type `5` with the same trimmed lowercase custom name are flagged as duplicates; with different names they are not.
-- [ ] c3 — **No PATCH is issued while any row is flagged** (assert zero requests).
-- [ ] c4 — Removing row 1 clears the flag and re-offers type `X` on row 2.
-- [ ] c5 — At resolved level ≥ 6 with a blank justification, save is blocked and the inline required message renders.
-- [ ] c6 — **Zero actor rows: the save proceeds** and the section renders as incomplete rather than as an error.
+- [x] c1 — Choosing type `X` on row 2 when row 1 already holds `X` renders an inline message naming the field, or the option is not offerable.
+- [x] c2 — Two rows of type `5` with the same trimmed lowercase custom name are flagged as duplicates; with different names they are not.
+- [x] c3 — **No PATCH is issued while any row is flagged** (assert zero requests).
+- [x] c4 — Removing row 1 clears the flag and re-offers type `X` on row 2.
+- [x] c5 — At resolved level ≥ 6 with a blank justification, save is blocked and the inline required message renders.
+- [x] c6 — **Zero actor rows: the save proceeds** and the section renders as incomplete rather than as an error.
 
 **Falsifying input** — key the computed on `actor_type_id` alone → **c2's differing-custom-name half must FAIL** (two distinct `OTHER` rows would be wrongly flagged). Block the save on zero rows → **c6 must FAIL**.
 

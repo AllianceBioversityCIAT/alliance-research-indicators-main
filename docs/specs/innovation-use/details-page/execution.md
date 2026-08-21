@@ -33,7 +33,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-06 | 600 | **824** (+824 / −0, 3 new files) | 2 | Over by 224 — the largest single-task overrun so far. 500 of 824 are the spec file |
 | T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
 | T-08 | 400 | **1,081** (+1,081 / −14, 3 files) | 3 | **2.7× its derivation** — the largest overrun of the run. 806 of 1,081 are the spec file |
-| **Running total** | **3,042** | **4,544** | **15** | ⚠️ **The re-baselined ~4,600 is now 98.8% consumed at 8 of 13 tasks** — see the second tripwire note | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
+| T-09 | 160 | **327** (+327 / −2, 3 files) | 2 | 2.0× derivation; attempt-1 FAIL (whitespace silent block) closed by page-owned message. Running total **4,871** |
+| **Running total** | **3,202** | **4,871** | **17** | ⚠️ Above re-baseline ~4,600; continuing under the T-07/T-08 ruling. T-13 c10 reconciles. Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -1165,5 +1166,65 @@ Remaining §6 derivation: T-09 160 · T-10 190 · T-11 80 · T-12 40 · T-13 0 =
 **Why T-08 specifically blew through it, stated so the next estimate is better:** the task's own criteria were *worded* about the request body but the natural implementation is a pure function, so satisfying them honestly required a **second assertion tier** nobody budgeted — Lens C's finding that all 14 criteria were blind to the wire join is exactly that gap made visible. Add three hazards briefed as scope-without-criteria, and 806 of the 1,081 lines are spec. **This is the same spec-tier density as the first breach, concentrated: the more a task's criteria are about *what reaches the server*, the more assertion tiers it needs.**
 
 **The Leader is not stopping again.** The tripwire's purpose is to surface a mis-sized budget while it is still recoverable, and that has now been done twice with the same diagnosis; the user accepted it once with full information. Continuing is the ruling already given. **But the figure is reported, not absorbed:** T-13 c10 should reconcile against ~5,300, not ~4,600, and the estimate model itself — not the spec's scope — is what proved wrong.
+
+---
+
+### T-09 — Cross-row validation: duplicate actor type, level-6 justification gate, save blocking
+
+| Field | Value |
+| --- | --- |
+| **Date** | 2026-08-21 |
+| **Final status** | ✅ **PASS on attempt 2 of 3** (1 rework; Reviewer FAIL → remediación option 1) |
+| **Implementer** | `akili-implementer` · T2 · `claude-sonnet-5-thinking-high` · effort `high` → `xhigh` on rework |
+| **Reviewer** | Attempt 1: `akili-reviewer` · T3 · `claude-opus-5-thinking-high`. Attempt 2: primary T3 models (opus / fable / gpt / gemini) hit **host usage limits** — runtime failure, not a work FAIL. Substitute auditor: `akili-reviewer` · `composer-2.5-fast` (≠ Implementer model; `author ≠ auditor` held on model family). Recorded per `/akili-execute` Reviewer runtime-failure fallback |
+| **Skills** | `angular-developer` (+ `systematic-debugging` on attempt 2). No deviation from task list beyond the rework add |
+| **LOC** | **327** (+327 / −2, 3 files) vs §6 derivation **160** — 2.0×; same spec-tier density pattern. Running total **4,544 + 327 = 4,871** (above the ~4,600 re-baseline; continuing under the prior ruling; T-13 c10 reconciles) |
+| **Review rounds** | 2 (this task) · cumulative **17** vs ~28 |
+| **Requirements** | R-IUP-009 (all 3), R-IUP-010 AC.5, R-IUP-006 AC.2, R-IUP-014 AC.3 |
+| **Design** | §6.6, §5.4 (`duplicateType`), §6.4, §6.7 step 2, §4.3 |
+
+#### Attempt 1 — Implementer Done → Reviewer **FAIL** (1 issue)
+
+**Delivered:** `OTHER_ACTOR_TYPE_ID = 5` literal; `duplicateActorTypeIndexes` / `hasDuplicateActorType` / `justificationMissing` (with `.trim()`); `saveData` guards; `[duplicateType]` template binding; T-09 c1–c6 specs; three T-08 fixtures filled with non-blank justification so they still reach PATCH.
+
+**Verification:** full suite **312 / 6500**; coverage 99.22 / 97.94 / 98.81 / 99.5; lint clean. Live falsifying probes: drop OTHER name from key → c2 FAIL; block zero-row save → c6 FAIL; both reverted.
+
+**Reviewer FAIL (verbatim substance):** with whitespace-only justification at resolved level ≥ 6, `justificationMissing()` blocks the PATCH (trims) but `app-textarea`'s `isInvalid()` does not trim, so **no inline required message** and no toast — silent Save no-op. Violates design §4.3 / §6.6 / §6.7 step 2 and T-09 c5's "blocked **and** message renders". Remediation preference: keep `.trim()` + page-owned message gated by `justificationMissing()` (do not edit shared textarea).
+
+#### Attempt 2 — Implementer Done → Reviewer **PASS**
+
+**Delivered:** page-owned `@if (justificationMissing())` block (token `var(--ac-red-1)`, same shape as `justificationError()`); `.trim()` kept; shared `TextareaComponent` untouched; c5 tests hardened so whitespace asserts **rendered** `"This field is required"` **and** zero PATCH; blank case pairs message + zero PATCH; filled case asserts message absent. Doc comment on `justificationMissing` corrected.
+
+**Verification:** full suite **312 / 6499**; coverage unchanged above floors; lint clean. Live probe: remove page-owned block → whitespace test FAIL; restored.
+
+**Reviewer PASS summary:** c1–c6 met; §6.6 / §4.3 closed; guard↔message structural for blank and whitespace; disqualifier on c1 satisfied (DOM on real card).
+
+#### Decisions
+
+1. **Option 1 over option 2** on the FAIL — keep client trim (server must not receive whitespace) and own the message on the page rather than widening shared `app-textarea` blast radius.
+2. **T-08 fixture edits** (add non-blank explanation) are consequential of the new gate, not scope creep — each fixture still asserts its original claim.
+3. **T-08 Lens A advisory** (identity-less org pre-save gate) **not absorbed** — Advisory Never Becomes A Task.
+4. **Reviewer model substitution** after Opus/usage-limit cascade — recorded; PASS stands on substitute auditor ≠ Implementer.
+
+#### `ADVISORY` — recorded; not gating (KZ-008 reachability)
+
+| Source | Finding | Reachability |
+| --- | --- | --- |
+| Attempt 1 Reviewer | Two blank-OTHER rows collide on key `5:` and show the duplicate message alongside `otherNameMissing` | **Reachable** — Add other actor ×2, pick OTHER, leave names empty |
+| Attempt 1 Reviewer | Back/Next navigates while a blocking rule is active (no PATCH) | **Reachable** — conforming to §6.7 step 6 / T-08 precedent |
+| Attempt 1 Reviewer | T-09 c5 has no `id ≠ level` falsifier (`idForLevel(5)` blank → PATCH) | Not a user state — variant by inspection; T-07 c8 owns resolved-level binding |
+| Attempt 1 Reviewer | Two OTHER rows with distinct names PATCH by design; if chunk-2 keyed only on type id, server would 400 | Client-reachable; server outcome **unverifiable** at this tier (§10.5) |
+| Attempt 2 Reviewer | Pure blank may show duplicate "This field is required" (textarea + page block) | **Reachable** with `explanation: ''` at level ≥ 6 — cosmetic, not the whitespace defect |
+
+#### Forward pointers (not absorbed)
+
+| Target | Note |
+| --- | --- |
+| *(none minted)* | Blank-OTHER `5:` collision and navigate-while-blocked remain advisories only |
+| T-10 | Next eligible by document order (deps T-07 satisfied; T-09 does not block it) |
+
+#### Final verification
+
+Full client suite green (**312/312 · 6499/6499**), coverage above floors, lint clean with `git status` re-inspected. **T-09 closed on attempt 2 of 3.**
 
 ---
