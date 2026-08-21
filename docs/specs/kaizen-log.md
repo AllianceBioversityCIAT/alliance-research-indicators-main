@@ -17,7 +17,7 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **12** (+5 in one spec: two `is_active` guards, an `IN`-list scope, a feed timestamp that survived `return Date.now()`, and — one level up — a shared mock whose `andWhere` was a **no-op stub**; +1 in `pool-funding-sp-picker-empty`, a mock whose **model of the query language** differed from the language, hiding `A OR (B AND C)`) | Product | Proposed |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **13** (+1 in `bilateral-mapping-table-enhancements`: testing sort logic on component instance without template binding `[customSort]` on `<p-table>`) | Product | Proposed |
 | **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note. **A red that would pass with the defect reintroduced is not evidence** | **High** | **2** (+5 in `pool-funding-sp-picker-empty`: an unrun comparison claimed verbatim; an assertion inverted against its own title; behavioural tests green with the defect restored; a mutated *assertion* offered as a code mutation; prose offered as screenshots) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
 | **KZ-015** | **A component fixture must arrange the TRANSITION the product performs, not the end state.** Setting an input before the first `detectChanges()` tests a state the product may never reach | **High** | 1 | Product + Methodology | **Applied** — `client/.../src/CLAUDE.md` (+ upstream owed) |
 | **KZ-017** | **A verification must declare what it CANNOT reach.** K-014 governs a command's output; this governs its **scope**. A check narrower than its claim returns a confident green | **High** | 1 (**5 instances in one spec**, 2 of them the auditor's) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
@@ -73,6 +73,23 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-20 — changes/bilateral-mapping-table-enhancements
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 4 | tasks.md |
+| Reviewer FAIL rework attempts | **3** (T-BTE-01: 1, T-BTE-04: 2) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 0 | execution.md |
+| Validation FAIL / WARN | 0 | execution.md |
+| Budget | 4 tasks · ~200 LOC · 2 review rounds budgeted vs 3 actual | design.md §7 |
+| **Defects found by the test suite** | 0 of 3 (all 3 discovered by Reviewer adversarial audit) | execution.md |
+
+*Lessons: KZ-001 recurrence (sorting assertion without template binding).*
 
 ### 2026-08-20 — changes/bilateral-mapping-ui-improvements
 

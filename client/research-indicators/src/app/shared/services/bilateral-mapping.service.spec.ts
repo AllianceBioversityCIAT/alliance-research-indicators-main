@@ -88,17 +88,57 @@ describe('BilateralMappingService', () => {
   });
 
   describe('list', () => {
-    it('returns the {items,meta} page on successfulRequest:true', async () => {
+    it('returns the {items,meta} page on successfulRequest:true with mapping_status populated', async () => {
       const page: BilateralMappingListPage = {
-        items: [mapping()],
+        items: [mapping({ is_active: true })],
         meta: { total: 1, page: 1, limit: 10, totalPages: 1 }
       };
       mockApi.GET_BilateralProjectMappings.mockResolvedValue(ok(page));
 
       const result = await service.list({ page: 1, limit: 10 });
 
-      expect(result).toEqual(page);
+      expect(result).not.toBeNull();
+      expect(result?.items[0].mapping_status).toBe('Mapped');
       expect(mockApi.GET_BilateralProjectMappings).toHaveBeenCalledWith({ page: 1, limit: 10 });
+    });
+
+    it('returns pending unmapped candidates when status is pending', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
+        ok({
+          feedFetchedAt: null,
+          counts: { toCreate: 1, alreadyMapped: 0, ambiguous: 0, unresolved: 0, divergent: 0, supersede: 0 },
+          toCreate: [
+            {
+              clarisaProjectId: 1403,
+              clarisaProjectFullName: 'Rice Project',
+              clarisaProjectShortName: 'B-A1676',
+              externalCode: 'B-A1676',
+              derivedContractId: 'A1676',
+              action: 'toCreate'
+            }
+          ],
+          alreadyMapped: [],
+          ambiguous: [],
+          unresolved: [],
+          divergent: [],
+          supersede: []
+        })
+      );
+
+      const result = await service.list({ status: 'pending' }, 2026);
+
+      expect(result).not.toBeNull();
+      expect(result?.items).toHaveLength(1);
+      expect(result?.items[0]).toEqual(
+        expect.objectContaining({
+          clarisa_project_id: 1403,
+          clarisa_project_short_name: 'B-A1676',
+          clarisa_project_full_name: 'Rice Project',
+          agresso_agreement_id: 'A1676',
+          mapping_status: 'Pending',
+          source: 'UNMAPPED'
+        })
+      );
     });
 
     it('returns null on successfulRequest:false (AC-03.3)', async () => {

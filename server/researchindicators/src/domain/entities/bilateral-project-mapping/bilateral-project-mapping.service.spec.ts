@@ -3,10 +3,13 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
 import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
+import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / T-15.6
+// @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements — T-BTE-01 / T-BTE-04 / R-BTE-002 / NFR-BTE-003
 // Covers R-BIL-078 (lookup helper) + R-BIL-080 scenarios (create, conflict,
 // deactivate, role flow). Role-deny path is exercised in the controller spec.
 
@@ -18,13 +21,17 @@ describe('BilateralProjectMappingService', () => {
   const repoFindOne = jest.fn();
   const repoSave = jest.fn();
 
-  // chainable QB stub — accepts plain async impls for getOne / getManyAndCount.
+  // chainable QB stub — accepts plain async impls for getOne / getRawAndEntities / getCount.
   type QbImpl = {
     getOne?: () => Promise<unknown>;
+    getRawAndEntities?: () => Promise<{ entities: unknown[]; raw: unknown[] }>;
+    getCount?: () => Promise<number>;
     getManyAndCount?: () => Promise<[unknown[], number]>;
   };
   const makeQb = (impl: QbImpl = {}) => {
     const qb: Record<string, jest.Mock> = {};
+    qb.leftJoin = jest.fn().mockReturnValue(qb);
+    qb.addSelect = jest.fn().mockReturnValue(qb);
     qb.orderBy = jest.fn().mockReturnValue(qb);
     qb.skip = jest.fn().mockReturnValue(qb);
     qb.take = jest.fn().mockReturnValue(qb);
@@ -34,6 +41,15 @@ describe('BilateralProjectMappingService', () => {
     qb.getOne = jest
       .fn()
       .mockImplementation(impl.getOne ?? (() => Promise.resolve(null)));
+    qb.getRawAndEntities = jest
+      .fn()
+      .mockImplementation(
+        impl.getRawAndEntities ??
+          (() => Promise.resolve({ entities: [], raw: [] })),
+      );
+    qb.getCount = jest
+      .fn()
+      .mockImplementation(impl.getCount ?? (() => Promise.resolve(0)));
     qb.getManyAndCount = jest
       .fn()
       .mockImplementation(
@@ -57,6 +73,13 @@ describe('BilateralProjectMappingService', () => {
       .mockImplementation(async (fn) => fn({ getRepository: txGetRepository })),
   };
 
+  const mockClarisaProjectsService = {
+    listBilateralProjects: jest.fn().mockResolvedValue([
+      { id: 1403, short_name: 'B-A1676', full_name: 'Sustainable Rice-Wheat Cropping Initiatives' },
+      { id: 1404, short_name: 'B-A1677', full_name: 'Cassava Seed Systems' },
+    ]),
+  };
+
   const mockRepo = {
     findOne: repoFindOne,
     save: repoSave,
@@ -69,6 +92,7 @@ describe('BilateralProjectMappingService', () => {
         BilateralProjectMappingService,
         { provide: BilateralProjectMappingRepository, useValue: mockRepo },
         { provide: DataSource, useValue: mockDataSource },
+        { provide: ClarisaProjectsService, useValue: mockClarisaProjectsService },
       ],
     }).compile();
 
@@ -243,29 +267,91 @@ describe('BilateralProjectMappingService', () => {
     });
   });
 
-  describe('list', () => {
-    it('paginates with sensible defaults and exposes meta', async () => {
+  describe('list (R-BTE-002 / NFR-BTE-003)', () => {
+    it('paginates with sensible defaults, joins AgressoContract, enriches CLARISA titles, and exposes meta', async () => {
+      const mockEntities = [
+        { id: 1, agresso_agreement_id: 'A1676', clarisa_project_id: 1403 },
+        { id: 2, agresso_agreement_id: 'A1677', clarisa_project_id: 1404 },
+      ];
+      const mockRaw = [
+        { ac_description: 'Rice-Wheat Initiative', ac_projectDescription: null },
+        { ac_description: null, ac_projectDescription: 'Cassava Breeding' },
+      ];
+
       const qb = makeQb({
-        getManyAndCount: async () => [[{ id: 1 }, { id: 2 }], 2],
+        getRawAndEntities: async () => ({
+          entities: mockEntities,
+          raw: mockRaw,
+        }),
+        getCount: async () => 2,
       });
       mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
 
       const out = await service.list({});
 
+      expect(qb.leftJoin).toHaveBeenCalledWith(
+        AgressoContract,
+        'ac',
+        'ac.agreement_id = bpm.agresso_agreement_id',
+      );
+      expect(qb.addSelect).toHaveBeenCalledWith([
+        'ac.description',
+        'ac.projectDescription',
+      ]);
       expect(out.items).toHaveLength(2);
+      expect(out.items[0]).toEqual(
+        expect.objectContaining({
+          id: 1,
+          agresso_agreement_id: 'A1676',
+          agresso_description: 'Rice-Wheat Initiative',
+          clarisa_project_full_name: 'Sustainable Rice-Wheat Cropping Initiatives',
+        }),
+      );
+      expect(out.items[1]).toEqual(
+        expect.objectContaining({
+          id: 2,
+          agresso_agreement_id: 'A1677',
+          agresso_description: 'Cassava Breeding',
+          clarisa_project_full_name: 'Cassava Seed Systems',
+        }),
+      );
       expect(out.meta).toEqual({ total: 2, page: 1, limit: 50, totalPages: 1 });
       expect(qb.skip).toHaveBeenCalledWith(0);
       expect(qb.take).toHaveBeenCalledWith(50);
     });
 
-    it('filters on is_active, source, and search', async () => {
-      const qb = makeQb({ getManyAndCount: async () => [[], 0] });
+    it('falls back to null when contract has no description or projectDescription (R-BTE-002 Scenario 2.2)', async () => {
+      const mockEntities = [
+        { id: 1, agresso_agreement_id: 'UNKNOWN_AGREEMENT', clarisa_project_id: 999 },
+      ];
+      const mockRaw = [{ ac_description: null, ac_projectDescription: null }];
+
+      const qb = makeQb({
+        getRawAndEntities: async () => ({
+          entities: mockEntities,
+          raw: mockRaw,
+        }),
+        getCount: async () => 1,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
+
+      const out = await service.list({});
+
+      expect(out.items[0].agresso_description).toBeNull();
+      expect(out.items[0].clarisa_project_full_name).toBeNull();
+    });
+
+    it('filters on is_active, source, and search across agreement ID, CLARISA short name, and contract descriptions', async () => {
+      const qb = makeQb({
+        getRawAndEntities: async () => ({ entities: [], raw: [] }),
+        getCount: async () => 0,
+      });
       mockRepo.createQueryBuilder.mockReturnValueOnce(qb);
 
       await service.list({
         is_active: true,
         source: MappingSourceEnum.MANUAL,
-        search: 'D527',
+        search: 'Rice',
         page: 2,
         limit: 10,
       });
@@ -277,11 +363,56 @@ describe('BilateralProjectMappingService', () => {
         source: MappingSourceEnum.MANUAL,
       });
       expect(qb.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('bpm.agresso_agreement_id LIKE :s'),
-        { s: '%D527%' },
+        '(bpm.agresso_agreement_id LIKE :s OR bpm.clarisa_project_short_name LIKE :s OR ac.description LIKE :s OR ac.projectDescription LIKE :s)',
+        { s: '%Rice%' },
       );
       expect(qb.skip).toHaveBeenCalledWith(10);
       expect(qb.take).toHaveBeenCalledWith(10);
+    });
+
+    it('filters on status (mapped, inactive, pending, all)', async () => {
+      // Test status = 'mapped'
+      const qbMapped = makeQb({
+        getRawAndEntities: async () => ({ entities: [], raw: [] }),
+        getCount: async () => 0,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qbMapped);
+      await service.list({ status: 'mapped' });
+      expect(qbMapped.andWhere).toHaveBeenCalledWith('bpm.is_active = :is_active', {
+        is_active: true,
+      });
+
+      // Test status = 'inactive'
+      const qbInactive = makeQb({
+        getRawAndEntities: async () => ({ entities: [], raw: [] }),
+        getCount: async () => 0,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qbInactive);
+      await service.list({ status: 'inactive' });
+      expect(qbInactive.andWhere).toHaveBeenCalledWith('bpm.is_active = :is_active', {
+        is_active: false,
+      });
+
+      // Test status = 'pending'
+      const qbPending = makeQb({
+        getRawAndEntities: async () => ({ entities: [], raw: [] }),
+        getCount: async () => 0,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qbPending);
+      await service.list({ status: 'pending' });
+      expect(qbPending.andWhere).toHaveBeenCalledWith('1 = 0');
+
+      // Test status = 'all'
+      const qbAll = makeQb({
+        getRawAndEntities: async () => ({ entities: [], raw: [] }),
+        getCount: async () => 0,
+      });
+      mockRepo.createQueryBuilder.mockReturnValueOnce(qbAll);
+      await service.list({ status: 'all' });
+      expect(qbAll.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('is_active'),
+        expect.anything(),
+      );
     });
   });
 });

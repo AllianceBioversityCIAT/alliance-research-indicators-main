@@ -1,4 +1,5 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05)
+// @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements (T-BTE-03 / T-BTE-04 / R-BTE-001..005)
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -11,6 +12,7 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { TextareaModule } from 'primeng/textarea';
 import { PopoverModule } from 'primeng/popover';
+import { TooltipModule } from 'primeng/tooltip';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from '@services/clarity.service';
@@ -18,12 +20,13 @@ import {
   BilateralMappingListMeta,
   BilateralMappingSource,
   BilateralProjectMapping,
-  ClarisaBilateralProjectOption
+  ClarisaBilateralProjectOption,
+  MappingStatus
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
 import { BilateralMappingCoverageComponent } from './components/bilateral-mapping-coverage/bilateral-mapping-coverage.component';
 import { AutomapperDialogComponent } from './components/automapper-dialog/automapper-dialog.component';
 
-type ActiveFilter = 'all' | 'active' | 'inactive';
+export type MappingStatusFilter = 'all' | 'mapped' | 'pending' | 'inactive';
 type DialogMode = 'create' | 'edit';
 
 /** Option shape used by p-select in filter dropdowns. */
@@ -40,9 +43,10 @@ interface AgressoOption {
 
 const NOTES_MAX_LENGTH = 500;
 
-const ACTIVE_OPTIONS: SelectOption<ActiveFilter>[] = [
+export const STATUS_OPTIONS: SelectOption<MappingStatusFilter>[] = [
   { label: 'All', value: 'all' },
-  { label: 'Active', value: 'active' },
+  { label: 'Mapped', value: 'mapped' },
+  { label: 'Pending', value: 'pending' },
   { label: 'Inactive', value: 'inactive' }
 ];
 
@@ -71,6 +75,7 @@ const SOURCE_OPTIONS: SelectOption<SourceFilter>[] = [
     DialogModule,
     TextareaModule,
     PopoverModule,
+    TooltipModule,
     BilateralMappingCoverageComponent,
     AutomapperDialogComponent
   ],
@@ -95,16 +100,26 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   readonly loading = signal(true);
   readonly loadError = signal(false);
 
-  // --- Filter / pagination state ---
+  // --- Filter / pagination / sort state (R-BTE-003, R-BTE-004) ---
   readonly search = signal('');
-  readonly activeFilter = signal<ActiveFilter>('active');
+  readonly statusFilter = signal<MappingStatusFilter>('all');
   readonly sourceFilter = signal<SourceFilter>('all');
   readonly page = signal(1);
   readonly limit = signal(20);
+  readonly sortField = signal<string>('updated_at');
+  readonly sortOrder = signal<number>(-1);
 
   // --- Option lists for filter dropdowns ---
-  readonly activeOptions = ACTIVE_OPTIONS;
+  readonly statusOptions = STATUS_OPTIONS;
   readonly sourceOptions = SOURCE_OPTIONS;
+
+  // Backward compatibility alias for legacy tests
+  get activeFilter() {
+    return this.statusFilter;
+  }
+  get activeOptions() {
+    return this.statusOptions;
+  }
 
   // --- Dialog state (T-BIL-CAM-05) ---
   readonly dialogOpen = signal(false);
@@ -208,16 +223,19 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.loadError.set(false);
     this.rows.set([]);
 
-    const af = this.activeFilter();
-    const sf = this.sourceFilter();
+    const sf = this.statusFilter();
+    const src = this.sourceFilter();
 
-    const result = await this.service.list({
-      page: this.page(),
-      limit: this.limit(),
-      ...(this.search().trim() ? { search: this.search().trim() } : {}),
-      ...(af !== 'all' ? { is_active: af === 'active' } : {}),
-      ...(sf !== 'all' ? { source: sf as BilateralMappingSource } : {})
-    });
+    const result = await this.service.list(
+      {
+        page: this.page(),
+        limit: this.limit(),
+        ...(this.search().trim() ? { search: this.search().trim() } : {}),
+        ...(sf !== 'all' ? { status: sf } : {}),
+        ...(src !== 'all' ? { source: src as BilateralMappingSource } : {})
+      },
+      this.phase()
+    );
 
     // NF-06: always resolve to a terminal state — never leave spinner forever.
     if (result === null) {
@@ -233,10 +251,15 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.searchInput$.next(value);
   }
 
-  onActiveFilterChange(value: ActiveFilter): void {
-    this.activeFilter.set(value);
+  onStatusFilterChange(value: MappingStatusFilter): void {
+    this.statusFilter.set(value);
     this.page.set(1);
     void this.load();
+  }
+
+  onActiveFilterChange(value: any): void {
+    const val = value === 'active' ? 'mapped' : value;
+    this.onStatusFilterChange(val);
   }
 
   onSourceFilterChange(value: SourceFilter): void {
@@ -251,9 +274,20 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     void this.load();
   }
 
-  /** Returns true when the confidence score column should be shown for a row. */
-  showConfidence(row: BilateralProjectMapping): boolean {
-    return row.source !== 'MANUAL';
+  // ── Column Sorting (R-BTE-004) ─────────────────────────────────────────────
+  onSort(event: { data?: BilateralProjectMapping[]; field?: string; order?: number }): void {
+    if (!event.data || !event.field || !event.order) return;
+    const field = event.field;
+    const order = event.order;
+    event.data.sort((data1: Record<string, any>, data2: Record<string, any>) => {
+      let val1 = data1[field] ?? '';
+      let val2 = data2[field] ?? '';
+      if (typeof val1 === 'string') val1 = val1.toLowerCase();
+      if (typeof val2 === 'string') val2 = val2.toLowerCase();
+      if (val1 < val2) return -1 * order;
+      if (val1 > val2) return 1 * order;
+      return 0;
+    });
   }
 
   /** Human-readable source label for display in the table badge. */
@@ -263,6 +297,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
       case 'DERIVED': return 'Derived';
       case 'AI_SUGGESTED': return 'AI Suggested';
       case 'AI_AUTO': return 'AI Auto';
+      case 'UNMAPPED': return 'Unmapped';
     }
   }
 
@@ -291,6 +326,26 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.editingAgreementId.set(null);
     this.selectedAgreement.set(null);
     this.selectedProjectId.set(null);
+    this.notes.set('');
+    this.saveError.set(null);
+    this.editSnapshot = null;
+    this.dialogOpen.set(true);
+    void this.loadPickerOptions();
+  }
+
+  /** Opens create dialog prefilled with project info when clicking "+ Map" on a pending row. */
+  openMapDialogForPending(row: BilateralProjectMapping): void {
+    this.dialogMode.set('create');
+    this.editingId.set(null);
+    this.editingAgreementId.set(null);
+    const agressoId =
+      row.agresso_agreement_id &&
+      row.agresso_agreement_id !== '—' &&
+      !row.agresso_agreement_id.includes('Derived')
+        ? row.agresso_agreement_id
+        : null;
+    this.selectedAgreement.set(agressoId);
+    this.selectedProjectId.set(row.clarisa_project_id);
     this.notes.set('');
     this.saveError.set(null);
     this.editSnapshot = null;
@@ -380,7 +435,6 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     return `${code} — ${title}`;
   }
 
-
   /** Dispatches create or update depending on the current dialog mode. */
   async onSave(): Promise<void> {
     if (!this.canSave()) return;
@@ -457,7 +511,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     if (result.ok) {
       // AC-07.1: update the row's is_active to false in-place in the rows() signal
       this.rows.update(current =>
-        current.map(r => (r.id === row.id ? { ...r, is_active: false } : r))
+        current.map(r => (r.id === row.id ? { ...r, is_active: false, mapping_status: 'Inactive' } : r))
       );
       this.actions.showToast({
         severity: 'success',

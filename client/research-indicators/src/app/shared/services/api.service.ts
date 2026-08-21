@@ -833,6 +833,7 @@ export class ApiService {
     if (query?.limit !== undefined) params['limit'] = String(query.limit);
     if (query?.search) params['search'] = query.search;
     if (query?.is_active !== undefined) params['is_active'] = String(query.is_active);
+    if (query?.status) params['status'] = query.status;
     if (query?.source) params['source'] = query.source;
     return this.TP.getWithParams(url(), params);
   };
