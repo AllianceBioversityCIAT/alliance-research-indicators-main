@@ -289,7 +289,7 @@ graph TD
 
 ### T-06 — Innovation Use organization card: known/unknown paths, type + sub-type, OTHER name, count
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02
+- **Status:** done · **Size:** L · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-IUP-008 (AC.1–AC.5 for `organization_count`), R-IUP-012 (AC.1, AC.2, AC.3, AC.5), NFR-IUP-005
 - **Design references:** §5.2, §5.5, **DD-2**, **DD-5**, requirements **A5**
 - **Skills:** `angular-developer`
@@ -309,15 +309,15 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Each identity path renders its own field set, and only its own.
-- [ ] c2 — The sub-type select appears **only** when the service returns rows for the chosen type; an empty result renders no sub-type control.
-- [ ] c3 — `institution_type_id === 78` reveals the `Specify other` input.
-- [ ] c4 — **No asterisk renders on any field of this card** (assert zero `text-red-500` asterisk nodes).
-- [ ] c5 — A touched row satisfying neither identity path renders the not-yet-identified message; an untouched row does not.
-- [ ] c6 — Pasting `-1` and `2.5` into `organization_count` yields no negative and no fractional value in the emitted row; `0` is accepted and distinct from absent.
-- [ ] c7 — Every vocabulary is read from its CLARISA control-list service, asserted on the service source rather than on a hardcoded array.
-- [ ] c8 — `disabled` hides add/remove affordances and makes every control non-interactive.
-- [ ] c9 — A saved-and-reloaded row restores `institution_id` / `institution_type_id` / `sub_institution_type_id` / `institution_type_custom_name` / `organization_count`.
+- [x] c1 — Each identity path renders its own field set, and only its own.
+- [x] c2 — The sub-type select appears **only** when the service returns rows for the chosen type; an empty result renders no sub-type control.
+- [x] c3 — `institution_type_id === 78` reveals the `Specify other` input.
+- [x] c4 — **No asterisk renders on any field of this card** (assert zero `text-red-500` asterisk nodes).
+- [x] c5 — A touched row satisfying neither identity path renders the not-yet-identified message; an untouched row does not.
+- [x] c6 — Pasting `-1` and `2.5` into `organization_count` yields no negative and no fractional value in the emitted row; `0` is accepted and distinct from absent.
+- [x] c7 — Every vocabulary is read from its CLARISA control-list service, asserted on the service source rather than on a hardcoded array.
+- [x] c8 — `disabled` hides add/remove affordances and makes every control non-interactive.
+- [x] c9 — A saved-and-reloaded row restores `institution_id` / `institution_type_id` / `sub_institution_type_id` / `institution_type_custom_name` / `organization_count`.
 
 **Falsifying input** — add an asterisk to any field → **c4 must FAIL**. Return an empty sub-type list and assert the control is absent; render it unconditionally → **c2 must FAIL**.
 

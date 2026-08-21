@@ -30,7 +30,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-03 | 170 | **90** (+90 / −8, 4 files; 3 `git mv` renames) | 1 | **Under** its derivation line by 80 — the first task to come in below estimate. Cause: the move carried the bulk of the code, so only the two inputs, the template branch and 5 new `it` blocks are new lines |
 | T-04 | 300 | **363** (+363 / −0, 3 new files) | 2 | Over by 63. 270 of the 363 lines are the spec file — the **spec tier over-runs again**, matching T-01/T-02 and unlike T-03's move |
 | T-05 | 610 | **688** (+688 / −0, 3 new files) | 2 | Over by 78. 424 of 688 are the spec file. **Spec-tier over-run again**, fifth task, same direction |
-| **Running total** | **1,362** | **1,618** | **8** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
+| T-06 | 600 | **824** (+824 / −0, 3 new files) | 2 | Over by 224 — the largest single-task overrun so far. 500 of 824 are the spec file |
+| **Running total** | **1,962** | **2,442** | **10** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -654,5 +655,163 @@ One rework round, three issues from two of three lenses. No environment blockers
 #### Final verification result
 
 Full client suite green (**310/310 suites · 6388/6388 tests**), coverage above all floors, lint clean with `git status` re-inspected, both falsification probes executed and observed failing, and the test inventory independently reconstructed line-by-line by the auditor. **T-05 closed on attempt 2 of 3.**
+
+---
+
+### T-06 — Innovation Use organization card: known/unknown paths, type + sub-type, OTHER name, count
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 2** (1 rework round; 3 issues from 2 lenses) |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **2** of a 3-attempt ceiling |
+| **Effort / skills** | attempt 1 `xhigh` · attempt 2 `xhigh` (held) · `angular-developer` |
+| **Requirements covered** | R-IUP-008 (AC.1–AC.5 for `organization_count`), R-IUP-012 (AC.1, AC.2, AC.3, AC.5), NFR-IUP-005 |
+| **Review mode** | **Parallel lens reviewers (2)** — correctness/contract · test-fidelity + tokens/a11y |
+
+#### Leader deviations, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| **`tdd` deliberately NOT assigned**, unlike T-05 | T-06 has no derived-value business rule — it is two conditional render paths plus a service-sourced vocabulary. Red-green would be overhead; the discipline this task needed was **test-double fidelity**, addressed directly in the brief instead |
+| **Two lenses, not three** | Proportionate: tokens/a11y passed cleanly on T-05 and T-06 follows T-05's idiom as its declared exemplar, so that surface was lower-risk and was merged into Lens B rather than given its own context. Two concurrent workers is also the default width |
+
+#### Attempt 1 — both lenses FAIL
+
+**Files created** (3, new, 756 insertions). Page not created — correctly T-07's.
+
+**Verification:** `npm test -- --silent` full unfiltered → **311 suites, 6411 tests passed** (from 310/6388). Lint clean, `git status` re-inspected. Hex grep, malformed-token grep, and a `result_institution_type_id` write grep all zero/comment-only. **Both named falsifying inputs executed:** adding an asterisk failed c4 (`Expected: 0, Received: 1`); removing the sub-type guard failed c2's zero-rows test on a rendered `<p-select>`. Both reverted.
+
+##### The headline question — resolved AGAINST the Leader's suspicion, from server source
+
+The Implementer flagged a judgment call rather than burying it: **it chose not to clear the opposite identity path when `is_organization_known` toggles.** So a row can carry both `institution_id` and `institution_type_id`. The Leader made this Lens A's gating question, suspecting a manufactured `400`. **Lens A read the frozen server contract rather than §4.3's client-side transcription, and upheld the Implementer:**
+
+| Evidence | Finding |
+| --- | --- |
+| `InnovationUseOrganizationDto` | Every field `@IsOptional()`, **no cross-field constraint** |
+| `InnovationUseActorDto`, same file | **Does** carry `@IsExclusiveOfActorMode('disaggregated')`/`('aggregate')` on all five counts, message *"sex_age_disaggregation_not_apply is true, so a disaggregated count must not be supplied"* |
+| **Therefore** | **The actor exclusivity is a real DTO rejection; the organization analogue does not exist** |
+| `validateOrganizationsAreIdentified` | Its predicate is *literally* the card's `identitySatisfied` getter. A both-populated row takes the known branch and passes |
+| `buildUpdateData` / `buildDataTemplate` | The server **branches on `is_organization_known` and nulls the other side** explicitly |
+| Both `400` maps (§4.3 and `requirements.md` §6.2) | List *"both count modes on one row"* for actors and *"identity-less organization row"* for organizations — **there is no both-identity-paths row** |
+
+**T-05 is not precedent, and the reason is contractual:** T-05's toggle enforces a rule the server **rejects** on; the organization discriminator is one the server **normalizes** on. Same-looking UI gesture, opposite contract obligation. And §5.5's *"mirror the existing organization card"* **is** authority here — the two endpoints do not merely agree by coincidence: `customSaveInnovationDev` and `customSaveInnovationUse` **share** `processInstitution` / `buildUpdateData` / `buildDataTemplate` / `buildWhereClause` / `removeDuplicates`, and the `is_organization_known` branch lives in the shared helpers.
+
+**Ruling: the judgment call was correct and T-06 conforms.** Adding clearing would diverge from §5.5 without a spec amendment. **This is the second time in this run a Leader suspicion was resolved against the Leader by a reviewer reading primary source** (the first was T-04's `--ac-red-1`), and both times the worker's instinct was right.
+
+##### Confirmed correct — recorded so it is not re-litigated
+
+| Finding | Lens | Evidence |
+| --- | --- | --- |
+| **c7 is discharged — the FIRST real assertion of NFR-IUP-005 in the spec** | B | T-05 discharged nothing here, so T-06 inherited nothing. Two of three selects are **genuine rendered-DOM** assertions: `show()` + `detectChanges()` + `document.body.querySelectorAll('.p-select-option')`, verified as the real option class (`primeng-select.mjs:276`, `:364`), with `setup-jest.ts`'s global `provideNoopAnimations()` making the overlay paint synchronously. The sub-type case traverses the full chain fake → Map → `list(code)` → signal → `[options]` → rendered `<li>` text. **Zero `toHaveBeenCalled` assertions in the file** |
+| **The virtual-scroll compromise is honest and its limit is stated** | B | `visibleOptions()` **is** the signal feeding the scroller (`primeng-select.mjs:721` = compiled `ɵɵproperty("items", ctx_r2.visibleOptions())`). And jsdom genuinely **cannot** paint a row: `offsetHeight` 0 → `numItemsInViewport` 0 → `calculateLast(0,0,0)` 0 → `loadedItems = []`. **The DOM technique was unavailable, not skipped.** What it does *not* prove, recorded: unfiltered, `visibleOptions()` collapses to the `[options]` value, so it is an input-binding assertion — it would still pass if the item template rendered `institution.name` or nothing at all |
+| **c2 is not a race** | B | `onInstitutionTypeChange` awaits `loadSubTypes` which awaits `getSubTypes` then sets; the test awaits that promise. An unresolved promise would leave `subTypeOptions` `[]` **and** fail the sibling type-10 test — the pair is not satisfiable by a pending promise |
+| **All three doubles are faithful** | B | Checked against real sources. The `FakeSubTypesService` replicates the real **non-signal** shape exactly (async populate into a Map + sync `list(code)` with `\|\| []` on miss). Every key the template reads is present, including `app-partner-selected-item`'s `acronym`/`name`/`institution_type.name`/`isoAlpha2` |
+| **Row identity — construction argument complete** | A | All seven writes into `body` enumerated: two whole-object spreads (no keys named) and five `update`s naming only the five editable fields, every one carrying `...current`. Template-side the sole in-place writer is the single `app-input` at `[optionValue]="'organization_count'"`, and `setNestedPropertyWithReduceSignal`'s single-key branch can write **only** that key. The other three `[optionValue]` literals are PrimeNG **option-field** names, not body keys. **Every `[ngModel]` in the file is one-way — no `[(ngModel)]` anywhere.** `result_institution_type_id` appears only in a doc comment |
+| **Tokens clean, dark mode holds without a branch** | B | Greps re-run independently: hex **0**, unbracketed utilities **0**, `isDarkMode` **0**. All eight `var(--ac-*)` tokens exist **with dark-palette values**. `--ac-light-blue-300` = `#1689ca` and `--ac-red-1` = `#cf0808` are the **exact de-hexed equivalents** of the reference's literals — right substitutions, not approximations. §7.1 semantics respected; `--ac-orange-1` appears nowhere |
+| **The native `<button>` for remove was adopted** | B | T-05's recommendation taken up — the `div[role=button]`/Enter-only defect **does not recur**. The `Specify other` input's `aria-label` is on a native `<input>`, so it resolves |
+| **c4 airtight by construction; c6 encodes rounding not rejection** | B | c4's query is the whole debug tree **including `app-input`'s subtree** — the widest correct scope. The template contains zero `text-red-500` nodes and never passes `isRequired`, so the asterisk is unreachable. c6's `Number.isInteger` fails on `undefined`, which is what anchors the `-1` half |
+| **`getSubTypes(2, typeId)` matches §5.5's depth**; count renders on both paths with `[min]="0"` + `[maxFractionDigits]="0"` and no `isRequired`; both paths mutually exclusive by `@if/@else`; sub-type gated on resolved rows, not on type selection | A | Verified |
+
+##### `STATUS: FAIL` — three issues, all in scope
+
+**Lens A — `ngOnChanges` is an incomplete mirror of `ngOnInit`.** It replaces `body` but **never refreshes the sub-type option list**. `ngOnInit` bootstraps it, `onInstitutionTypeChange` refreshes it, `ngOnChanges` does neither — so on the parent-driven ingress path a row carrying `institution_type_id` + `sub_institution_type_id` renders **no sub-type control**, or the *previous* type's options while `body()` holds a sub-type absent from that list. The card implements `ngOnChanges` deliberately, *"so it advertises parent-driven row replacement and then serves a different rendering for the same row depending on which door the row came through."* The value is not lost, but **the user cannot see or change a saved sub-type**.
+
+> **Violated Rule:** c9 and **R-IUP-012 AC.2**. **c9 is currently discharged only on the `ngOnInit` path** — all three c9 tests assign `component.organization` before the first `detectChanges()`, and an input assigned directly on the instance **produces no `SimpleChanges` record**. The parent-driven path — the one §6.7 step 4's post-save re-read and §6.1's `onVersionChange` reload actually use, against index-keyed rows — has **zero coverage**.
+
+Reachability: **reachable by construction, not constructible today** (needs T-07). Two constructions given: index shift after a row removal, and a version switch pushing another version's rows into live card instances. The benign case is why it passes today — after a successful save the re-read equals what the card holds, the guard short-circuits, and the loaded options stay correct. Asymmetry noted: the `Specify other` input keys directly off `body()`, so it *does* restore on both paths — making the sub-type gap **an inconsistency inside the card**, not a uniform limitation.
+
+**Lens B — c8's test name outran its assertion.** The unknown-path test is named *"disables organization-type, sub-type and Specify other"* but **never evaluates the sub-type select's `[disabled]`**: it drives type `78`, the fixture has no `78` key, the fake resolves `[]`, and the guard removes the control from the DOM. No test renders that select with `disabled = true`. **This is the T-05 c12 coverage hole recurring**, plus the exact pattern commit `9b571c36` was made to close.
+
+**Lens B — nothing asserts `organization_count` renders on the KNOWN path.** §5.5 puts the count on *both*, but every count assertion runs on the unknown path (the default). On the known path c1 asserts only selects, c4 only asterisks, c9 only `body()`, and c8's `forEach` passes **vacuously** on an empty query. **Deleting the count field from the known branch leaves the whole suite green while violating §5.5.**
+
+##### Leader adjudication
+
+**Not a Pivot for T-06** — one product defect and two evidence defects against a sound card spec. All three accepted in scope; **one consolidated rework** dispatched. Lens A's three companion items (refresh `initialSnapshot`, make it a **signal** so `touched`'s dependency is real rather than incidental, and an in-flight guard in `loadSubTypes`) were folded into Fix 1 because they live in the same lines.
+
+**A coupling hazard was deliberately excluded from the rework and forward-pointed instead** — see the T-11 pointer below. Fixing the inert `aria-label`s would move the attribute off the host and **red six criteria at once**, because T-06's `selectByAria()` helper locates selects by it.
+
+#### Attempt 2 — **both lenses PASS**
+
+**Files changed** (2): `.ts` and `.spec.ts`. **`.html` unchanged.** The Implementer's two falsification probes touched it temporarily; **the Leader verified the revert rather than accepting the claim** — 135 lines (identical to attempt 1), the probe's `@if (!body().is_organization_known)` wrapper absent, and the count field in a plain `<div>` outside both branches, so §5.5's both-paths rule holds structurally. Both lenses independently re-confirmed this.
+
+**Fix 1 (Lens A) — four items, all landed**
+
+| Item | Verified |
+| --- | --- |
+| `private syncSubTypes(row)` extracted, called from **both** `ngOnInit` and the `body.set(next)` branch of `ngOnChanges` | ✅ with the `else this.subTypeOptions.set([])` present and **reachable from `ngOnChanges` on both triggering shapes** — a swap to a known-path row, and a swap to an unknown row with no type. The second is what matters for c2: without it, a card holding type-10 options that receives a blank row would keep rendering the sub-type select with the departed type's options |
+| `initialSnapshot` refreshed alongside `body.set(next)` | ✅ |
+| `initialSnapshot` → `signal<string>` | ✅ **complete, no half-conversion** — declaration, two `.set()` writes, one read inside `touched`, no residual plain-field access. `touched` now has a genuine dependency on both signals, which was the point |
+| In-flight guard in `loadSubTypes` | ✅ after the `await`, before the `set` |
+
+**Fix 2 (Lens B):** c8's unknown-path test now drives type 10 first (resolving two rows **through the new guard**), asserts **both** the type-select's and the sub-type-select's `disabled === true` while the control is in the DOM, then switches to 78 and asserts `Specify other`. Approach (a) of the two Lens B offered, chosen for requiring no fixture change.
+
+**Fix 3 (Lens B):** `expect(appInputLabelled('Organization count')).toBeTruthy()` in c1's known-path test; `expect(inputs.length).toBe(1)` guarding c8's known-path `forEach`.
+
+**Housekeeping:** unused `tick` import removed — the one Lens B's gate-fact note flagged as invisible to every check in this repo.
+
+**Both falsification probes executed and failed as predicted:**
+
+| Probe | Result |
+| --- | --- |
+| Revert the `ngOnChanges` → `syncSubTypes(next)` call | `expect(subTypeSelectDe).toBeTruthy(); Received: undefined` at `spec.ts:479` |
+| Wrap the count `app-input` in `@if (!body().is_organization_known)` | `expect(appInputLabelled('Organization count')).toBeTruthy(); Received: undefined` at `spec.ts:161:54` |
+
+**Verification:** `npm test -- --silent` full unfiltered → **311 suites, 6412 tests passed**. Coverage 99.16 / 98.00 / 98.76 / 99.42. Targeted file 24/24. Lint clean, `git status` re-inspected. Hex, malformed-token and `isDarkMode` greps **re-run by both lenses independently** → zero.
+
+##### `LENS A — STATUS: PASS`
+
+> All four Lens A remediations landed as specified and are correct by inspection… the in-flight guard sits after the `await` and before the `set` where it **closes the out-of-order class outright** — safe because all three callers write `body` before calling. My Q5 half-one advisory is closed by the snapshot refresh. The seven-write enumeration for `result_institution_type_id`, the ingress shallow-spread, and `identitySatisfied` are all undisturbed.
+
+**Why the guard closes rather than narrows the class** — recorded because it depends on an invariant that is now load-bearing: **all three callers write `body` before invoking `loadSubTypes`** (`ngOnInit` 98→102, `ngOnChanges` 109→111, `onInstitutionTypeChange` 141→147). So the guard never wrongly skips a legitimate load, including on the new `ngOnChanges` path. Across all three orderings of a rapid 10 → 20 → 10, every settlement either matches the row's current type and writes `list(typeId)` read from the Map **at write time** (the freshest content for the winning code), or is skipped. **The terminal state is always the list for the row's current type, regardless of settlement order.**
+
+**`touched`'s semantics changed, for the better.** The refresh moves it from *"diverged from the row this card was constructed with"* to *"diverged from the most recent row the parent pushed"* — which is what R-IUP-012 AC.5 actually asks for (*"a row the user has begun but not identified"*). Its only new false-negative is a parent-pushed unidentified row reading as untouched, which is **correct**, since the user has not begun it.
+
+##### `LENS B — STATUS: PASS`
+
+> Both FAIL issues are genuinely closed, not relabelled. c8's unknown-path test now renders the sub-type select … and asserts its `[disabled]` while it is in the DOM, with non-null assertions that fail loudly rather than vacuously — and **its title, previously false, is now accurate.**
+
+- **c8's sequencing is sound:** both `expect()` calls execute eagerly and are recorded **before** the switch to 78 is called, so the later switch cannot retroactively invalidate them. And `selectByAria(...)!` on an absent control yields `undefined` and the `!` produces a **TypeError — a loud failure, not a silent green.**
+- **`toBe(1)` is exact, not merely non-zero.** The template holds exactly **one** `<app-input>`, outside both branches — the known branch has `p-select` + `app-partner-selected-item`, the unknown has selects + a raw `pInputText`, none of which is an `InputComponent`. So the count is 1 on **both** paths, and the exact assertion additionally catches an accidental duplicate.
+- **c1's new assertion discriminates**, resolving through `By.directive(InputComponent)` on the rendered tree and matching the `label` @Input. The falsification landed on **exactly that line** (`spec.ts:161:54`) — line number, message and mechanism all agree.
+- **A bonus on the c7 axis:** the new `setInput` case re-asserts the sub-type options' distinctive names through the **`ngOnChanges` ingress path**, so **NFR-IUP-005 now has a rendered-DOM proof on two independent entry points.**
+- **The `signal<string>` conversion disturbs no prior assertion**, and the reason is structural: **`ngOnChanges` cannot fire in any c5 test**, because all three assign `component.organization` as a plain property, which produces no `SimpleChanges` record.
+
+**Test arithmetic reconstructed independently by Lens B:** all 23 attempt-1 titles present **verbatim**, one addition (the `setInput` case), 24 in-file, suites flat at 311, so 6411 → 6412 is that one test and nothing else. Fixes 2 and 3 moved no counter because they added `expect`s inside existing blocks.
+
+#### Decisions made
+
+1. **A Leader suspicion was resolved against the Leader for the second time this run** — and again by a reviewer reading primary source. T-04's `--ac-red-1` and now T-06's toggle semantics. **Both times the worker's instinct was right and its stated rationale was the weaker part.** Worth carrying into how briefs are written: ask workers to flag judgment calls (both did), and route the flag to primary source rather than to precedent.
+2. **A coupling hazard was deliberately kept out of the rework.** Fixing the inert `aria-label`s would move the attribute off the host and **red six criteria at once** through the `selectByAria()` helper. Excluded and forward-pointed to T-11 as one coordinated edit. Recorded because the *right* fix was knowingly deferred, which is different from missing it.
+3. **`tdd` was correctly withheld.** T-06's risk was fixture fidelity, not expected-value derivation, and the brief addressed it directly. Both lenses confirmed all three doubles faithful and c7/c2 sound on first attempt.
+4. **Two lenses were sufficient here.** Tokens came back clean first time under the merged Lens B, vindicating the choice not to spend a third context on a surface that T-05 had already validated and that this card inherited by exemplar.
+
+#### `ADVISORY` — recorded; **not** gating, **not** rework, **not** new tasks
+
+Attempt-1 advisories carry forward unactioned. New at attempt 2:
+
+| # | Lens | Finding | Reachability | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **A · Reliability** | The in-flight guard keys on `body().institution_type_id` rather than a monotonic request token, so it cannot distinguish *"the row still wants type 10"* from *"the row is now known-path but retains a stale `institution_type_id: 10"* — exactly the both-populated row the settled ruling permits | **State constructed; no observable failure could be constructed from it.** The sub-type select lives inside the unknown-path `@else`, so nothing renders it on the known path, and the re-populated list is correct for the type the row still carries | Benign **unless the sub-type control ever renders on the known path**. `private subTypeRequest = 0` with a captured generation would make it exact. Recorded, not changed |
+| 2 | **A · Test gap** | `syncSubTypes`'s `else` clear is **load-bearing for c2 on the `ngOnChanges` path yet has no falsifying test** — on `ngOnInit` it is a semantic no-op (`subTypeOptions` already `[]`), and the new case exercises only the loading direction. **Delete the line and the suite stays green** | Reachable under §5.2's index keying via the same shift construction; **not constructible today** — T-07 does not exist | → **T-07's spec work**, where the index-shift sequence is reachable end-to-end and can be asserted on the page rather than simulated on the card |
+| 3 | **B · Reliability** | The **in-flight guard itself has no test** — the one new behaviour without one | **Could not construct with the current double:** `FakeSubTypesService` resolves in a single microtask in call order, so overlapping calls cannot resolve out of order. Reachable in production (real HTTP round trip) and in test only with a **deferred** double | No T-06 criterion covers it. One test with a deferred double would prove it; without one the branch is asserted by inspection only |
+| 4 | **B · Risk** | `ngOnChanges` now re-baselines `initialSnapshot`, so a parent-driven row replacement **resets `touched` to `false`** and would hide R-IUP-012 AC.5's message for a row the user had begun. The `JSON.stringify` guard protects the common case (a parent echoing the same row is a no-op), so it bites only when the parent pushes back a **differing** object for the same row — e.g. a normalised or id-stamped copy after a save | **Could not construct** — T-07 does not exist, so nothing today pushes a differing row down. Becomes constructible the moment T-07's write-back lands | → **T-07**, which is the right place to test it. *"Flagging it now so it is not discovered as a `400`-adjacent surprise later"* |
+
+#### Forward pointers — carried by the brief or by nobody
+
+| Target | Pointer |
+| --- | --- |
+| **T-07** | Advisories 2 and 4 above, **plus everything already filed from T-05**: track by `$index` never object identity; a dirty-check baseline must come from the GET response or a deep copy; the `update` handler must be a **pure write** (both cards emit once on init and per keystroke on their free-text fields) |
+| **T-08** | **The escalation below.** `buildPayload` step 3 must null the inactive identity path, symmetric with step 2 |
+| **T-11** | **One coordinated edit, or it breaks T-06's suite.** (a) `aria-label` → `ariaLabel` on all three `p-select`s **and migrate `selectByAria()` in the same change** — the helper is load-bearing for c1/c2/c3/c7/c8/c9. (b) checkbox `id` → `inputId` (`primeng-checkbox.mjs:525`). (c) `app-input`'s `for="username"` vs `inputId="minmax-buttons"` — **unfixable from T-06's file set**, since `app-input` exposes no `inputId`/`ariaLabel`; **T-11 c2 cannot honestly tally `Organization count` as "has a label" without extending `app-input`.** (d) Field labels are `<h2>` elements (inherited from T-05), putting 1–3 spurious level-2 headings per card in the outline. (e) The request-partner control's accessible name is the single word *"here"* |
+| **T-13** | `rs-p-[12]` and `rs-p-[16]` have **no precedent anywhere in `src/app`** and their generator is a **remote** stylesheet — bracketed and in the documented range, so not the `fs-14` failure mode, but only c7's human gate can confirm they resolve |
+
+#### Issues encountered
+
+One rework round; three issues from two lenses. No environment blockers.
+
+#### Final verification result
+
+Full client suite green (**311/311 suites · 6412/6412 tests**), coverage above all floors, lint clean with `git status` re-inspected, both falsification probes executed and observed failing, the `.html` revert verified by the Leader rather than accepted, and the test inventory reconstructed independently by the auditor. **T-06 closed on attempt 2 of 3.**
 
 ---

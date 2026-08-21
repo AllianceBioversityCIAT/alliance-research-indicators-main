@@ -1,0 +1,135 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-06 — innovation use organization card) -->
+<ng-template #notIdentifiedMessage>
+  <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-red-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This row does not identify an organization yet</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
+  <div class="flex justify-between items-center rs-gap-[4]">
+    <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber }}</span>
+
+    @if (!disabled) {
+      <button
+        type="button"
+        class="cursor-pointer text-[var(--ac-red-1)] bg-transparent border-0 p-0"
+        [attr.aria-label]="'Remove organization ' + organizationNumber"
+        (click)="onRemove()">
+        <i class="pi pi-times-circle !text-[16px]"></i>
+      </button>
+    }
+  </div>
+
+  <div class="flex flex-col rs-gap-[4]">
+    <div class="flex items-center rs-gap-[8] option-label">
+      <p-checkbox
+        id="is_organization_known_{{ organizationNumber }}"
+        [disabled]="disabled"
+        [ngModel]="body().is_organization_known"
+        (onChange)="onKnownToggle($event.checked)"
+        binary="true"
+        styleClass="rs-w-[16] rs-h-[16]" />
+      <label for="is_organization_known_{{ organizationNumber }}">Is the organization known?</label>
+    </div>
+
+    @if (body().is_organization_known) {
+      <div class="flex items-center bg-[var(--ac-grey-200)] border-l-4 border-l-[var(--ac-light-blue-500)] rs-gap-[8] rs-p-[12] rs-mt-[12]">
+        <i class="text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
+        <span class="fs-[14] text-[var(--ac-grey-700)]">
+          Can't find the institution you need? Request to add it
+          <button
+            type="button"
+            class="text-[var(--ac-light-blue-300)] underline bg-transparent border-0 p-0 cursor-pointer"
+            [disabled]="disabled"
+            (click)="onRequestPartner()">
+            here
+          </button>.
+        </span>
+      </div>
+
+      <h2 class="label rs-mt-[12]">Organization</h2>
+      <p-select
+        [disabled]="disabled"
+        [scrollHeight]="'218px'"
+        [optionLabel]="'html_full_name'"
+        [optionValue]="'institution_id'"
+        [filter]="true"
+        [filterBy]="'html_full_name'"
+        [virtualScroll]="true"
+        [virtualScrollItemSize]="38"
+        placeholder="Select the organization"
+        aria-label="Select the organization"
+        class="fs-[14] w-full"
+        [ngModel]="body().institution_id"
+        (onChange)="onInstitutionChange($event.value)"
+        [options]="institutionsService.list()">
+        <ng-template pTemplate="item" let-institution>
+          <div class="flex items-center whitespace-normal break-words gap-2" [innerHTML]="institution.html_full_name"></div>
+        </ng-template>
+      </p-select>
+
+      @if (body().institution_id) {
+        <app-partner-selected-item [institution]="selectedInstitution()" class="rs-mt-[12] bg-[var(--ac-grey-200)] rs-p-[16]" />
+      }
+    } @else {
+      <h2 class="label rs-mt-[12]">Organization type</h2>
+      <p-select
+        [disabled]="disabled"
+        [scrollHeight]="'218px'"
+        [optionLabel]="'name'"
+        [optionValue]="'code'"
+        placeholder="Select the organization type"
+        aria-label="Select the organization type"
+        class="fs-[14] w-full"
+        [ngModel]="body().institution_type_id"
+        (onChange)="onInstitutionTypeChange($event.value)"
+        [options]="institutionTypesService.list()">
+      </p-select>
+
+      @if (subTypeOptions().length > 0) {
+        <h2 class="label rs-mt-[12]">Sub-type</h2>
+        <p-select
+          [disabled]="disabled"
+          [scrollHeight]="'218px'"
+          [optionLabel]="'name'"
+          [optionValue]="'code'"
+          placeholder="Select the organization sub-type"
+          aria-label="Select the organization sub-type"
+          class="fs-[14] w-full"
+          [ngModel]="body().sub_institution_type_id"
+          (onChange)="onSubTypeChange($event.value)"
+          [options]="subTypeOptions()">
+        </p-select>
+      }
+
+      @if (body().institution_type_id === otherInstitutionTypeId) {
+        <input
+          pInputText
+          class="rs-mt-[12] w-full"
+          placeholder="Specify other"
+          aria-label="Specify other organization type"
+          [ngModel]="body().institution_type_custom_name"
+          (ngModelChange)="onCustomNameChange($event)"
+          [disabled]="disabled"
+          type="text" />
+      }
+    }
+
+    <div class="rs-mt-[12]">
+      <app-input
+        [signal]="body"
+        [optionValue]="'organization_count'"
+        [label]="'Organization count'"
+        [type]="'number'"
+        [min]="0"
+        [maxFractionDigits]="0"
+        [disabled]="disabled"
+        placeholder="Enter a count"></app-input>
+    </div>
+
+    @if (showNotIdentifiedMessage) {
+      <ng-container *ngTemplateOutlet="notIdentifiedMessage"></ng-container>
+    }
+  </div>
+</div>
