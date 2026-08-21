@@ -128,7 +128,8 @@ export default class PoolFundingAlignmentComponent {
   readonly PRMS_SOURCED_BANNER = 'This result is owned by PRMS. Bilateral alignment is read-only in STAR.';
   // Locked backend 409 description that signals the PRMS-sourced read-only cause.
   readonly PRMS_SOURCED_409_DESCRIPTION = 'Result is PRMS-sourced; bilateral alignment is read-only in STAR';
-  readonly INFO_BANNER = 'Select the Theory of Change results (Outputs, Outcomes) and related indicators this result contributes to.';
+  readonly INFO_BANNER =
+    'Align this result with a Science Program and specify its contribution to the Theory of Change (Outputs, Outcomes) and related indicators.';
   readonly CONTRIBUTION_QUESTION = 'Does this result contribute to a Science Program or Accelerator?';
   readonly SP_PICKER_LABEL = 'Select the Science Program(s) this is related to';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
