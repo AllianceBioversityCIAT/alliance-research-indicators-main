@@ -1712,3 +1712,58 @@ Three findings the Leader had **not** verified, and one it had:
 #### T-13 status after this change
 
 Still **`[~]`**. This unblocked the gate; it did not discharge it. **c1, c7, c8, c9 remain owed to the human** — now performable rather than unperformable, which is the whole point of the Pivot.
+
+---
+
+## Dark-mode deferral — user ruling, 2026-08-21 (`design.md` DD-14)
+
+**Not a waiver, and not a numbered task.** A scope reduction the user authorized after the T-13 human gate opened, recorded here as the single home for the reasoning; `design.md` **DD-14** is its decision-log entry and the ID every amended site cites.
+
+### What triggered it
+
+T-13's c7 required a human visual pass in **both themes**, and the dark half was **known in advance to fail**: the T-11 review measured **1.29:1** and **1.887:1** against WCAG's 4.5:1, produced by following `design.md` §5.7 exactly. So the gate was scheduled to spend a human pass in order to confirm a defect the spec had already located, in a theme nobody could reach.
+
+### The evidence that made it a ruling rather than a shortcut
+
+The user's premise was **verified before the reduction was accepted**, not taken on trust:
+
+| Check | Finding |
+| --- | --- |
+| `DarkModeService` exists? | Yes — `client/research-indicators/src/app/shared/services/dark-mode.service.ts` |
+| Injected anywhere? | Yes — `alliance-navbar.component.ts:22` (import), `:52` (`inject(DarkModeService)`) |
+| Exposed in the navbar template? | **No.** Zero matches for `dark` in `alliance-navbar.component.html` |
+| Any other control exposing a toggle? | **No** |
+
+**It is a dead injection.** No user can enter dark mode, so the §5.7 contrast defect sits in an **unreachable state**.
+
+This is **KZ-008's reachability discipline run in the negative direction.** KZ-008 exists because advisories naming *reachable* states were left unowned and became data-destruction defects; the same test, applied here, rules a finding *out*. Using one test in both directions is the point — a rule that can only ever escalate is not a test, it is a ratchet.
+
+### The split — verification lifted, implementation kept
+
+This is the part that would have gone wrong under a blind string sweep. The forward sweep found 20+ dark-mode mentions across the spec folder in **two categories**, and only one was amended:
+
+| | Category | Sites | Action |
+| --- | --- | --- | --- |
+| **A** | **Verification obligations** — someone must look at dark mode | `T-13` c7, `T-13` c8, `requirements.md` D7 row, `requirements.md` §closure checklist, `requirements.md` RK-3, `design.md` §10.4 | **Amended to light-theme only**, each citing DD-14 |
+| **B** | **Implementation discipline** — how colors are written | DD-7 (zero hex literals), R-IUP-017 + its *"Dark mode is not an afterthought"* scenario (never branch on `isDarkMode()`), `T-11` c5 (already `[x]`, grep zero hits), `design.md` §5.7's token mechanism, `tasks.md` T-11 notes | **UNCHANGED and still binding** |
+
+**Why B survives.** It already passed, it costs nothing to keep, and it is exactly what would make dark mode work on the day a toggle is wired up. Deleting it would be a real loss dressed as a saving. The user asked not to *spend* on dark mode; keeping already-green discipline is not spending.
+
+**Left deliberately untouched:** three sites quote *"contrast ≥ 4.5:1 in dark mode"* as an **illustration of a bad human tick** (`requirements.md` AR-2, `tasks.md` §rules, `design.md` §10.4 disqualifier). They teach KZ-002's rule, they are not obligations to check dark mode, and the example remains valid. Amending them would have been the sweep mistaking a citation for a requirement.
+
+### Consequences for T-13
+
+| | Before | After |
+| --- | --- | --- |
+| **c7** | Human visual, **both themes** × 2 viewports | Human visual, **light only** × 2 viewports |
+| **c8** | T6-Multimodal, **4 screenshots** | T6-Multimodal, **2 screenshots** |
+| §5.7 contrast defect | A blocking finding awaiting c7 | **Deferred as unreachable** — not fixed, not closed, not shipped-broken |
+| Light-mode WCAG 2.1 AA | Gated | **Still fully gated** (PRD **C-4**). Only the dark half is lifted |
+
+### Reopening condition — stated so it is not lost
+
+**If a dark-mode toggle is ever exposed to users, this deferral expires by its own terms:** `T-13` c7/c8 revert to both themes and §5.7's contrast defect becomes live and blocking. The deferral rests entirely on unreachability, so the moment that premise changes, so does the conclusion. Whoever wires up the toggle inherits this paragraph.
+
+### Residual note, recorded not actioned
+
+`alliance-navbar.component.ts` injects a service it never uses — dead code in a shared component. **Not minted as work here**: it is outside this spec's task set, and the advisory rule (`/akili-execute` §2.4) forbids growing an approved spec from an incidental finding. Recorded for whoever owns the navbar.
