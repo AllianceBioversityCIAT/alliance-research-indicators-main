@@ -10,6 +10,8 @@ One-line record of trivial, fast-tracked changes made with `/akili-quick`.
 | 2026-08-20 | quick/pool-funding-loading-copy — update ToC catalog loading banner text to reference PRMS instead of CLARISA | client/.../pool-funding-alignment.component.html, client/.../sp-toc-alignment-block.component.html, client/.../sp-toc-alignment-block.component.spec.ts | `npx jest` (350/350 passed) | [SPEC:quick/pool-funding-loading-copy] |
 | 2026-08-20 | quick/pool-funding-sps-skeleton — add animated PrimeNG skeleton loaders for Science Programs section during initial fetch from CLARISA | client/research-indicators/src/app/pages/platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component.html, pool-funding-alignment.component.spec.ts | `npx jest` (351/351 passed) & `npx eslint` (0 errors) | [SPEC:quick/pool-funding-sps-skeleton] |
 | 2026-08-20 | quick/hide-pool-funding-for-oicr — hide Pool Funding Alignment section in sidebar and redirect if accessed for OICR results (indicator_id === 5) | client/research-indicators/src/app/shared/components/result-sidebar/result-sidebar.component.ts, result-sidebar.component.spec.ts, client/.../pool-funding-alignment.component.ts | `npx jest` (99/99 and 351/351 passed) & `npx eslint` (0 errors) | [SPEC:quick/hide-pool-funding-for-oicr] |
+| 2026-08-20 | quick/pool-funding-toc-info-banner — update general info banner and section label to reference Theory of Change results (Outputs, Outcomes) across all levels | client/research-indicators/src/app/pages/platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component.ts, pool-funding-alignment.component.html | `npx jest` (351/351 passed) & `npx eslint` (0 errors) | [SPEC:quick/pool-funding-toc-info-banner] |
+
 
 
 
