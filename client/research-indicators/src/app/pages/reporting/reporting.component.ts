@@ -195,6 +195,23 @@ export default class ReportingComponent {
   readonly indicator = signal<IndicatorId | null>(null);
   readonly funding = signal<FundingId | null>(null);
 
+  /** Which quick-access platform cards are expanded ("View more"). */
+  private readonly expandedPlatforms = signal<ReadonlySet<string>>(new Set());
+
+  isPlatformExpanded(name: string): boolean {
+    return this.expandedPlatforms().has(name);
+  }
+
+  togglePlatform(name: string): void {
+    const next = new Set(this.expandedPlatforms());
+    if (next.has(name)) {
+      next.delete(name);
+    } else {
+      next.add(name);
+    }
+    this.expandedPlatforms.set(next);
+  }
+
   private readonly outcome = computed<Outcome | null>(() => this.route(this.indicator(), this.funding()));
   private readonly currentIndicator = computed<Indicator | null>(() => {
     const id = this.indicator();
