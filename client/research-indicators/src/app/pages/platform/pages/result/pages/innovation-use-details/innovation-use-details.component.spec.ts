@@ -77,6 +77,7 @@ describe('InnovationUseDetailsComponent', () => {
     submission.isEditableStatus.mockReturnValue(true);
     apiService.GET_InnovationUseDetails.mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true });
     apiService.GET_InnovationUseLevels.mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true });
+    apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true });
 
     await TestBed.configureTestingModule({
       imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
@@ -475,25 +476,27 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c14 — Back/Next preserve ?version=N
+  // c14 (T-07) — Back/Next preserve ?version=N. `navigate()` was replaced by `saveData()` in
+  // T-08 (§6.7) — these three cases now go through the save-then-navigate flow. `saveData()` is
+  // async, so each case awaits it before asserting.
   // ---------------------------------------------------------------------------------------------
-  describe('c14 — Back/Next navigation', () => {
-    it('navigates back to alliance-alignment preserving the version query param', () => {
-      component.navigate('back');
+  describe('c14 — Back/Next navigation via saveData()', () => {
+    it('navigates back to alliance-alignment preserving the version query param', async () => {
+      await component.saveData('back');
       expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'alliance-alignment'], { queryParams: { version: 'v1' }, replaceUrl: true });
     });
 
-    it('navigates next to partners preserving the version query param', () => {
-      component.navigate('next');
+    it('navigates next to partners preserving the version query param', async () => {
+      await component.saveData('next');
       expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'partners'], { queryParams: { version: 'v1' }, replaceUrl: true });
     });
 
-    it('navigates with no query params when version is absent', () => {
+    it('navigates with no query params when version is absent', async () => {
       const routeMock = TestBed.inject(ActivatedRoute) as unknown as typeof activatedRouteMock;
       const original = routeMock.snapshot.queryParamMap.get;
       routeMock.snapshot.queryParamMap.get = () => null;
 
-      component.navigate('next');
+      await component.saveData('next');
 
       expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'partners'], { queryParams: undefined, replaceUrl: true });
       routeMock.snapshot.queryParamMap.get = original;
@@ -604,6 +607,793 @@ describe('InnovationUseDetailsComponent', () => {
       // `track $index` reuses the same component instance for index 0 (not destroy + recreate).
       expect(cardsAfter[0].componentInstance).toBe(survivingInstance);
       expect(cardsAfter[0].componentInstance.subTypeOptions().length).toBe(0);
+    });
+  });
+
+  // =================================================================================================
+  // T-08 — buildPayload() (§6.5). Pure function over body(), asserted directly, no rendering.
+  // =================================================================================================
+  describe('T-08 buildPayload() — c1: blank actor rows are dropped', () => {
+    it('drops a blank added actor row and keeps the one complete row', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          new InnovationUseActor() // added-but-not-filled: no actor_type_id
+        ]
+      });
+
+      const payload = component.buildPayload();
+
+      expect(payload.actors.length).toBe(1);
+      expect(payload.actors[0].actor_type_id).toBe(1);
+    });
+  });
+
+  describe('T-08 buildPayload() — c2: blank organization rows are dropped', () => {
+    it('drops an organization row identifying neither an institution nor a type', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          { ...new InnovationUseOrganization(), institution_type_id: 10 },
+          new InnovationUseOrganization() // touched but never identified
+        ]
+      });
+
+      const payload = component.buildPayload();
+
+      expect(payload.organizations.length).toBe(1);
+      expect(payload.organizations[0].institution_type_id).toBe(10);
+    });
+
+    it('keeps a known-organization row identified only by institution_id', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 }]
+      });
+
+      const payload = component.buildPayload();
+
+      expect(payload.organizations.length).toBe(1);
+      expect(payload.organizations[0].institution_id).toBe(501);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // REWORK Issue 1 — the identity predicate is the spec's OR across both paths, not an
+  // active-path-only check. Falsifying scenario: a GET returns an organization row identified by
+  // `institution_type_id`; the user then ticks "Is the organization known?" but picks no
+  // institution. §5.5 deliberately does not clear the abandoned `institution_type_id`, so the row
+  // still carries a live identity on the other path and must survive. The old active-path-only
+  // predicate dropped it, and an empty `organizations: []` array deactivates every organization
+  // row for this result server-side (no early return on empty array) — a silent deletion.
+  // ---------------------------------------------------------------------------------------------
+  describe('T-08 buildPayload() — Issue 1 fix: organization identity is an OR over both paths', () => {
+    it('keeps a saved row toggled to is_organization_known: true with no institution_id picked yet, because institution_type_id still identifies it', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            result_institution_type_id: 55,
+            institution_type_id: 10,
+            is_organization_known: true,
+            institution_id: undefined,
+            organization_count: 12
+          }
+        ]
+      });
+
+      const payload = component.buildPayload();
+
+      expect(payload.organizations.length).toBe(1);
+      expect(payload.organizations[0].result_institution_type_id).toBe(55);
+
+      // Lens C (attempt 3): the OR-predicate fix keeps this row, but hazard (a)'s known-branch
+      // nulling then wipes the *other* path's identity — this composed row carries no identity on
+      // either path once serialized. That is intentional, not a regression: server-side,
+      // `ResultInnovationUseService.update` calls `validateOrganizationsAreIdentified` **before**
+      // `dataSource.transaction` (pre-`BEGIN`). It requires `institution_id` whenever
+      // `is_organization_known === true`; here it is `undefined`, so the request is rejected with
+      // `BadRequestException` before `customSaveInnovationUse`/`deactivateExistingRecords`/`save`
+      // ever run. Nothing is written — row 55 keeps `is_active: true` with its original
+      // `institution_type_id`/`organization_count` — and the user gets a loud, recoverable 400.
+      // This is the deliberate replacement for attempt 1's silent mass deactivation. Do not "fix"
+      // this nulling back into a silent-delete to avoid the 400.
+      expect(payload.organizations[0].institution_id).toBeUndefined();
+      expect(payload.organizations[0].institution_type_id).toBeNull();
+      expect(payload.organizations[0].sub_institution_type_id).toBeNull();
+      expect(payload.organizations[0].institution_type_custom_name).toBeNull();
+    });
+  });
+
+  describe('T-08 buildPayload() — c3: fully-absent quantification rows are dropped', () => {
+    it('drops a row with number, unit and description all absent', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: undefined, unit: undefined, description: undefined }]
+      });
+
+      expect(component.buildPayload().quantifications.length).toBe(0);
+    });
+
+    // Hazard (b): the shared card's real ingress default is '', not undefined/null.
+    it('drops a never-touched row whose fields are the adapter default ("", "", undefined) — hazard (b)', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: undefined, unit: '', description: '' }]
+      });
+
+      expect(component.buildPayload().quantifications.length).toBe(0);
+    });
+
+    it('keeps a row with only a number, including 0 (0 is a present value, not absent)', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 0, unit: '', description: '' }]
+      });
+
+      const payload = component.buildPayload();
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.quantifications[0].quantification_number).toBe(0);
+    });
+
+    it('keeps a row identified only by unit or only by description', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [
+          { id: undefined, quantification_number: undefined, unit: 'hectares', description: '' },
+          { id: undefined, quantification_number: undefined, unit: '', description: 'a note' }
+        ]
+      });
+
+      expect(component.buildPayload().quantifications.length).toBe(2);
+    });
+  });
+
+  describe('T-08 buildPayload() — c4: exactly one active count mode per actor row', () => {
+    it('aggregate mode sends sex_age_disaggregation_not_apply + actors_count and nulls the four disaggregated fields', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            actor_type_id: 1,
+            sex_age_disaggregation_not_apply: true,
+            actors_count: 6,
+            women_youth_count: 4,
+            men_youth_count: 2
+          }
+        ]
+      });
+
+      const row = component.buildPayload().actors[0];
+      expect(row.sex_age_disaggregation_not_apply).toBe(true);
+      expect(row.actors_count).toBe(6);
+      expect(row.women_youth_count).toBeNull();
+      expect(row.women_not_youth_count).toBeNull();
+      expect(row.men_youth_count).toBeNull();
+      expect(row.men_not_youth_count).toBeNull();
+    });
+
+    it('disaggregated mode sends the four counts and nulls actors_count', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            actor_type_id: 1,
+            sex_age_disaggregation_not_apply: false,
+            women_youth_count: 3,
+            men_not_youth_count: 2,
+            actors_count: 99
+          }
+        ]
+      });
+
+      const row = component.buildPayload().actors[0];
+      expect(row.sex_age_disaggregation_not_apply).toBe(false);
+      expect(row.women_youth_count).toBe(3);
+      expect(row.men_not_youth_count).toBe(2);
+      expect(row.actors_count).toBeNull();
+    });
+
+    it('no payload row ever carries a value in both modes at once', () => {
+      const modes = [true, false];
+      modes.forEach(aggregate => {
+        component.body.set({
+          ...component.body(),
+          actors: [
+            {
+              ...new InnovationUseActor(),
+              actor_type_id: 1,
+              sex_age_disaggregation_not_apply: aggregate,
+              actors_count: 6,
+              women_youth_count: 4
+            }
+          ]
+        });
+        const row = component.buildPayload().actors[0];
+        const disaggregatedPresent = [row.women_youth_count, row.women_not_youth_count, row.men_youth_count, row.men_not_youth_count].some(
+          value => value !== null && value !== undefined
+        );
+        const aggregatePresent = row.actors_count !== null && row.actors_count !== undefined;
+        expect(disaggregatedPresent && aggregatePresent).toBe(false);
+      });
+    });
+  });
+
+  describe('T-08 buildPayload() — c5: no total, no innovation_use_level', () => {
+    it('never carries a total key on any actor row', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [{ ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4, total: 4 }]
+      });
+
+      expect(Object.keys(component.buildPayload().actors[0])).not.toContain('total');
+    });
+
+    it('never carries innovation_use_level at the top level', () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(3), innovation_use_level: 3 });
+
+      expect(Object.keys(component.buildPayload())).not.toContain('innovation_use_level');
+    });
+  });
+
+  describe('T-08 buildPayload() — c6: ids are echoed from the GET, never synthesized', () => {
+    it('passes through an id that was present on the row (echoed from a prior GET)', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [{ ...new InnovationUseActor(), result_actors_id: 501, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 }],
+        organizations: [{ ...new InnovationUseOrganization(), result_institution_type_id: 601, institution_type_id: 10 }],
+        quantifications: [{ id: 701, quantification_number: 4, unit: 'ha', description: 'note' }]
+      });
+
+      const payload = component.buildPayload();
+      expect(payload.actors[0].result_actors_id).toBe(501);
+      expect(payload.organizations[0].result_institution_type_id).toBe(601);
+      expect(payload.quantifications[0].id).toBe(701);
+    });
+
+    it('no id repeats across two rows of the same block', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 1 },
+          { ...new InnovationUseActor(), result_actors_id: 2, actor_type_id: 2, sex_age_disaggregation_not_apply: true, actors_count: 2 }
+        ]
+      });
+
+      const ids = component.buildPayload().actors.map(row => row.result_actors_id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    // Disqualifier: a happy-path body assertion alone cannot prove the absence of a synthesis
+    // path. These three cases add a row through the real UI-facing methods (`addActor` /
+    // `addOrganization` / `addQuantification`) — never constructed with a literal id — and
+    // assert the emitted row's id is `undefined`, for every block.
+    it('a row added via addActor() has no id, and buildPayload() emits it as undefined', () => {
+      component.body.set({ ...component.body(), actors: [] });
+      component.addActor();
+      component.onActorUpdate(0, { ...component.body().actors[0], actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 });
+
+      expect(component.buildPayload().actors[0].result_actors_id).toBeUndefined();
+    });
+
+    it('a row added via addOrganization() has no id, and buildPayload() emits it as undefined', () => {
+      component.body.set({ ...component.body(), organizations: [] });
+      component.addOrganization();
+      component.onOrganizationUpdate(0, { ...component.body().organizations[0], institution_type_id: 10 });
+
+      expect(component.buildPayload().organizations[0].result_institution_type_id).toBeUndefined();
+    });
+
+    it('a row added via addQuantification() has no id, and buildPayload() emits it as undefined', () => {
+      component.body.set({ ...component.body(), quantifications: [] });
+      component.addQuantification();
+      component.onQuantificationUpdate(0, { number: 4, unit: 'ha', comments: 'note' });
+
+      expect(component.buildPayload().quantifications[0].id).toBeUndefined();
+    });
+  });
+
+  describe('T-08 buildPayload() — c7: level toggle never sends an explicit null explanation', () => {
+    it('sends the stored explanation unchanged after toggling the level down and back up', () => {
+      component.onLevelSelected(idForLevel(7));
+      component.body.update(current => ({ ...current, innovation_use_level_explanation: 'used across three countries' }));
+      component.onLevelSelected(idForLevel(3));
+      component.onLevelSelected(idForLevel(7));
+
+      const payload = component.buildPayload();
+      expect(payload.innovation_use_level_explanation).toBe('used across three countries');
+      expect(payload.innovation_use_level_explanation).not.toBeNull();
+    });
+  });
+
+  // buildPayload()-only support check — a pure-function precondition for c13's real assertion
+  // below, not the criterion itself (REWORK Issue 6: a save was never actually issued here).
+  describe('T-08 buildPayload() — c13 support: an unchanged section round-trips every row', () => {
+    it('preserves every already-saved row (with its id) when nothing was edited', () => {
+      const loaded: GetInnovationUseDetails = {
+        ...new GetInnovationUseDetails(),
+        actors: [{ ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 }],
+        organizations: [{ ...new InnovationUseOrganization(), result_institution_type_id: 2, institution_type_id: 10 }],
+        quantifications: [{ id: 3, quantification_number: 4, unit: 'ha', description: 'note' }]
+      };
+      component.body.set(loaded);
+
+      const payload = component.buildPayload();
+      expect(payload.actors.length).toBe(1);
+      expect(payload.organizations.length).toBe(1);
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.actors[0].result_actors_id).toBe(1);
+      expect(payload.organizations[0].result_institution_type_id).toBe(2);
+      expect(payload.quantifications[0].id).toBe(3);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // REWORK Issue 6 — c13's real criterion routed through saveData(), not buildPayload() alone:
+  // "a save issued while the section is unchanged does not deactivate existing rows." The
+  // client-tier mechanism that prevents deactivation is that all three ids reach the actual PATCH
+  // call unchanged. The server-side residual (`deactivateExistingRecords`'s actual behavior on a
+  // matching id) is out of client-tier reach and is recorded as AR-1-bounded, not claimed as PASS.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 saveData() — c13: an unchanged section sends every existing row\'s id through the actual PATCH', () => {
+    it('sends all three previously-saved ids unchanged when saving without editing anything', async () => {
+      const loaded: GetInnovationUseDetails = {
+        ...new GetInnovationUseDetails(),
+        actors: [{ ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 }],
+        organizations: [{ ...new InnovationUseOrganization(), result_institution_type_id: 2, institution_type_id: 10 }],
+        quantifications: [{ id: 3, quantification_number: 4, unit: 'ha', description: 'note' }]
+      };
+      component.body.set(loaded);
+
+      await component.saveData();
+
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors[0].result_actors_id).toBe(1);
+      expect(sent.organizations[0].result_institution_type_id).toBe(2);
+      expect(sent.quantifications[0].id).toBe(3);
+    });
+  });
+
+  // buildPayload()-only support check — a pure-function precondition for c14's real assertion
+  // below, not the criterion itself (REWORK Issue 6: `not.toThrow()` over class defaults is an
+  // assertion no plausible implementation makes false; no PATCH was ever issued here).
+  describe('T-08 buildPayload() — c14 support: a partially filled section (level only) builds without error', () => {
+    it('builds a payload with a level and zero actor/organization/quantification rows', () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(2), actors: [], organizations: [], quantifications: [] });
+
+      expect(() => component.buildPayload()).not.toThrow();
+      const payload = component.buildPayload();
+      expect(payload.innovation_use_level_id).toBe(idForLevel(2));
+      expect(payload.actors).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // REWORK Issue 6 — c14's real criterion routed through saveData(): a level-only save actually
+  // issues a PATCH and succeeds, rather than merely showing a pure function does not throw.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 saveData() — c14: a partially filled section (level only) saves without error', () => {
+    it('issues a level-only PATCH and shows a success toast, never an error toast', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(2), actors: [], organizations: [], quantifications: [] });
+
+      await component.saveData();
+
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent).toEqual({ innovation_use_level_id: idForLevel(2), actors: [], organizations: [], quantifications: [] });
+      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // Hazard (a) — organization inactive-path nulling. Not a named c-criterion; flagged by the task
+  // brief as a reachable, destructive gap in §6.5 step 3.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 hazard (a) — the inactive organization identity path is nulled', () => {
+    it('nulls institution_type_id/sub_institution_type_id/institution_type_custom_name when is_organization_known is true', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            is_organization_known: true,
+            institution_id: 501,
+            institution_type_id: 10,
+            sub_institution_type_id: 20,
+            institution_type_custom_name: 'stale'
+          }
+        ]
+      });
+
+      const row = component.buildPayload().organizations[0];
+      expect(row.institution_id).toBe(501);
+      expect(row.institution_type_id).toBeNull();
+      expect(row.sub_institution_type_id).toBeNull();
+      expect(row.institution_type_custom_name).toBeNull();
+    });
+
+    it('nulls institution_id when is_organization_known is false', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_id: 501, institution_type_id: 10 }]
+      });
+
+      const row = component.buildPayload().organizations[0];
+      expect(row.institution_type_id).toBe(10);
+      expect(row.institution_id).toBeNull();
+    });
+
+    // Falsifier for this hazard: without the nulling, two rows sharing `institution_type_id: 10`
+    // — one of which also carries a known-organization `institution_id` — collide on the
+    // server's `type_${institution_type_id}` key and one is silently dropped. This spec proves
+    // the *client* payload no longer gives both rows a live `institution_type_id: 10` to collide
+    // on: only the row that is actually on the type path keeps it.
+    it("closes the removeDuplicates collision: a known-organization row no longer carries a live institution_type_id to collide on", () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501, institution_type_id: 10 },
+          { ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10 }
+        ]
+      });
+
+      const [known, typed] = component.buildPayload().organizations;
+      expect(known.institution_type_id).toBeNull();
+      expect(typed.institution_type_id).toBe(10);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // Hazard (b) — quantification "absent" must include falsy/empty text, not just == null. Not a
+  // named c-criterion; flagged by the task brief.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 hazard (b) — a never-touched blank quantification row does not survive to the body', () => {
+    it('drops the adapter\'s own untouched-row shape: {number: undefined, unit: "", description: ""}', () => {
+      // This is exactly what onQuantificationUpdate() writes back for the shared card's first
+      // effect-driven emit on a still-blank row (§6.5 step 4's own falsifying scenario).
+      component.body.set({ ...component.body(), quantifications: [{ id: undefined, quantification_number: undefined, unit: '', description: '' }] });
+      component.onQuantificationUpdate(0, { number: null, unit: '', comments: '' });
+
+      expect(component.buildPayload().quantifications.length).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // Third hazard — the save path consults loadFailed() before issuing a PATCH. Not a named
+  // c-criterion; flagged by the task brief as the DD-11 destruction class arriving through a door
+  // DD-11 itself does not cover.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 third hazard — saveData() issues nothing while loadFailed() is true', () => {
+    it('issues no PATCH when the preceding GET failed, even though isEditableStatus() is true', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValue({ successfulRequest: false, errorDetail: { description: 'boom' } });
+      await component.getData();
+      expect(component.loadFailed()).toBe(true);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+    });
+
+    it('still navigates on Back/Next while loadFailed() is true (navigation-only, matching the isEditableStatus() guard)', async () => {
+      apiService.GET_InnovationUseDetails.mockResolvedValue({ successfulRequest: false, errorDetail: { description: 'boom' } });
+      await component.getData();
+
+      await component.saveData('back');
+
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+      expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'alliance-alignment'], { queryParams: { version: 'v1' }, replaceUrl: true });
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // REWORK Issue 3 — the staleness guard's *stale-success* subset. `loadFailed()` only covers a
+  // failed GET; this covers the in-flight window of an in-progress (still-pending, not yet
+  // failed or succeeded) GET, where `body` still holds the previous version's rows.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 Issue 3 fix — saveData() issues nothing while a GET is in flight', () => {
+    it('issues zero PATCH requests when saveData() is called while getData() has not yet resolved', async () => {
+      let resolveGet!: (value: { data: GetInnovationUseDetails; successfulRequest: boolean }) => void;
+      apiService.GET_InnovationUseDetails.mockImplementation(
+        () => new Promise(resolve => { resolveGet = resolve; })
+      );
+      // If the guard under test is absent, saveData() calls PATCH; keep it a *failure* response so
+      // saveData()'s own success branch (which calls getData() again) is never reached — that
+      // second call would reuse this same pending mock and hang the test on an unrelated promise
+      // instead of failing cleanly on the assertion below.
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ successfulRequest: false, errorDetail: { errors: 'boom' } });
+
+      const getDataPromise = component.getData(); // not awaited: the GET is still pending
+      expect(component.loading()).toBe(true);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+
+      resolveGet({ data: new GetInnovationUseDetails(), successfulRequest: true });
+      await getDataPromise;
+      expect(component.loading()).toBe(false);
+    });
+  });
+
+  // =================================================================================================
+  // T-08 — saveData() (§6.7)
+  // =================================================================================================
+  describe('T-08 saveData() — c9: success toast then re-read (loadingTrigger turns the sidebar tick)', () => {
+    it('shows a success toast and calls getData() again after a successful PATCH', async () => {
+      const getDataSpy = jest.spyOn(component, 'getData');
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true });
+
+      await component.saveData();
+
+      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
+      expect(getDataSpy).toHaveBeenCalled();
+      // The re-read is exactly `getData()`, whose own implementation calls the GET that carries
+      // `loadingTrigger: true` (that config is asserted directly on `ApiService.GET_InnovationUseDetails`
+      // in api.service.spec.ts; here the observable is that saveData() drives a real re-read).
+      expect(apiService.GET_InnovationUseDetails).toHaveBeenCalledTimes(1); // no getData() ran before this test — this is save's own re-read
+    });
+  });
+
+  describe('T-08 saveData() — c10: no PATCH while not editable; a failed PATCH is not swallowed', () => {
+    it('issues zero PATCH requests while isEditableStatus() is false', async () => {
+      submission.isEditableStatus.mockReturnValue(false);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a 400 from ResultStatusGuard through ActionsService rather than swallowing it', async () => {
+      // REWORK (Issue 2): the real envelope. `GlobalExceptions` sets `errorDetail.description` to
+      // the *exception class name* (`HttpException.initName()` -> `this.constructor.name`), never
+      // to a message — a fixture carrying human text in `description` cannot distinguish a fix
+      // from the defect it is meant to catch. `errorDetail.errors` carries the actual message.
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({
+        successfulRequest: false,
+        status: 400,
+        description: 'Bad Request',
+        errorDetail: {
+          description: 'BadRequestException',
+          errors: 'Only results in DRAFT, REVISED, SCIENCE_EDITION, KM_CURATION status can be edited'
+        }
+      });
+
+      await component.saveData();
+
+      expect(actions.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          detail: 'Only results in DRAFT, REVISED, SCIENCE_EDITION, KM_CURATION status can be edited'
+        })
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // REWORK Issue 2 — an array-row save error (naming no field this page binds inline) renders in
+  // the page-level block rather than being dropped.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 Issue 2 fix — an unaddressed save error renders in a page-level block', () => {
+    it('renders an errors message that names no field this page addresses inline', async () => {
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({
+        successfulRequest: false,
+        status: 400,
+        description: 'BadRequestException',
+        errorDetail: { description: 'BadRequestException', errors: 'actors.0.actor_type_id must not be empty' }
+      });
+
+      await component.saveData();
+      fixture.detectChanges();
+
+      expect(component.unaddressedSaveErrors()).toEqual(['actors.0.actor_type_id must not be empty']);
+      expect(fixture.nativeElement.textContent).toContain('actors.0.actor_type_id must not be empty');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // REWORK Issue 4 — the most serious finding: nothing previously connected buildPayload() to the
+  // wire. Every c1-c7/c13/c14 test called buildPayload() directly; c8/c11/c12 used a mocked PATCH
+  // that ignored its arguments. This test captures the actual second argument
+  // PATCH_InnovationUseDetails was called with, adversarial on all four axes at once.
+  // -------------------------------------------------------------------------------------------------
+  describe('T-08 Issue 4 fix — buildPayload() output is what actually reaches PATCH_InnovationUseDetails', () => {
+    it('sends the built payload — not the raw body — as the PATCH argument', async () => {
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(7),
+        innovation_use_level: 7, // server-derived; must never reach the wire
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4, total: 4, women_youth_count: 9 },
+          new InnovationUseActor() // blank -> must be dropped
+        ],
+        organizations: [
+          { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 },
+          new InnovationUseOrganization() // identity-less -> must be dropped
+        ],
+        quantifications: [{ id: undefined, quantification_number: undefined, unit: '', description: undefined }] // absent -> dropped
+      });
+
+      await component.saveData();
+
+      const [id, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(id).toBe(1);
+      expect(sent.actors).toHaveLength(1);
+      expect(Object.keys(sent.actors[0])).not.toContain('total');
+      expect(Object.keys(sent)).not.toContain('innovation_use_level');
+      expect(sent.organizations).toHaveLength(1);
+      expect(sent.quantifications).toHaveLength(0);
+
+      // Lens C (attempt 3): the fixture already seeds an aggregate-mode row
+      // (sex_age_disaggregation_not_apply: true, actors_count: 4, women_youth_count: 9) — assert
+      // what the hazard-(a) nulling actually put on the wire, giving c4/step 1 a wire-tier check.
+      expect(sent.actors[0].women_youth_count).toBeNull();
+      expect(sent.actors[0].actors_count).toBe(4);
+    });
+  });
+
+  describe('T-08 saveData() — c11: level 8 + aggregate OTHER actor + organization + quantification round-trip', () => {
+    it('reloads exactly as entered after a successful save, with the derived total rendering 12', async () => {
+      const otherActorTypeId = 5;
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(8),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            actor_type_id: otherActorTypeId,
+            actor_type_custom_name: 'local cooperatives',
+            sex_age_disaggregation_not_apply: true,
+            actors_count: 12
+          }
+        ],
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 }],
+        quantifications: [{ id: undefined, quantification_number: 4, unit: 'hectares', description: 'note' }]
+      });
+
+      const serverEcho: GetInnovationUseDetails = {
+        ...new GetInnovationUseDetails(),
+        innovation_use_level_id: idForLevel(8),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            result_actors_id: 9,
+            actor_type_id: otherActorTypeId,
+            actor_type_custom_name: 'local cooperatives',
+            sex_age_disaggregation_not_apply: true,
+            actors_count: 12,
+            total: 12
+          }
+        ],
+        organizations: [{ ...new InnovationUseOrganization(), result_institution_type_id: 8, is_organization_known: true, institution_id: 501 }],
+        quantifications: [{ id: 21, quantification_number: 4, unit: 'hectares', description: 'note' }]
+      };
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+      apiService.GET_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+
+      await component.saveData();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.body().innovation_use_level_id).toBe(idForLevel(8));
+      expect(component.body().actors[0].actor_type_custom_name).toBe('local cooperatives');
+      expect(component.body().organizations[0].institution_id).toBe(501);
+      expect(component.body().quantifications[0].description).toBe('note');
+
+      // REWORK (Issue 5): these three can only pass if `body()` was actually replaced by the
+      // server's echo — none of these ids exist pre-save. Without a real re-read (echo discarded,
+      // or getData() skipped), `body()` keeps the pre-save shape and every one of these is
+      // `undefined`.
+      expect(component.body().actors[0].result_actors_id).toBe(9);
+      expect(component.body().organizations[0].result_institution_type_id).toBe(8);
+      expect(component.body().quantifications[0].id).toBe(21);
+
+      // REWORK (Issue 5): "exactly as entered" extended past the original 4 asserted fields.
+      expect(component.body().actors[0].actor_type_id).toBe(otherActorTypeId);
+      expect(component.body().actors[0].actors_count).toBe(12);
+      expect(component.body().actors[0].sex_age_disaggregation_not_apply).toBe(true);
+      expect(component.body().quantifications[0].unit).toBe('hectares');
+      expect(component.body().quantifications[0].quantification_number).toBe(4);
+
+      const totalEl = fixture.debugElement.query(By.css('.actor-total'));
+      expect(totalEl.nativeElement.textContent.trim()).toBe('12');
+    });
+  });
+
+  describe('T-08 saveData() — c8: client-displayed total equals the server-returned total for the same row', () => {
+    it('renders the same total the server echoes back after a save round trip', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [{ ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: false, women_youth_count: 3, men_not_youth_count: 2 }]
+      });
+
+      const serverEcho: GetInnovationUseDetails = {
+        ...new GetInnovationUseDetails(),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            result_actors_id: 1,
+            actor_type_id: 1,
+            sex_age_disaggregation_not_apply: false,
+            women_youth_count: 3,
+            men_not_youth_count: 2,
+            total: 5
+          }
+        ]
+      };
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+      apiService.GET_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+
+      await component.saveData();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const totalEl = fixture.debugElement.query(By.css('.actor-total'));
+      expect(totalEl.nativeElement.textContent.trim()).toBe(String(serverEcho.actors[0].total));
+    });
+  });
+
+  describe('T-08 saveData() — c12: rows deleted before saving are not resurrected by the re-read', () => {
+    it('does not bring back a row the user removed before saving', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 1 },
+          { ...new InnovationUseActor(), result_actors_id: 2, actor_type_id: 2, sex_age_disaggregation_not_apply: true, actors_count: 2 }
+        ]
+      });
+      component.removeActor(1); // remove the result_actors_id: 2 row before saving
+
+      const serverEcho: GetInnovationUseDetails = {
+        ...new GetInnovationUseDetails(),
+        actors: [{ ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 1, total: 1 }]
+      };
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+      apiService.GET_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
+
+      await component.saveData();
+
+      expect(component.body().actors.length).toBe(1);
+      expect(component.body().actors.some(row => row.result_actors_id === 2)).toBe(false);
+    });
+  });
+
+  describe('T-08 — the justification textarea renders an inline field-scoped save error', () => {
+    it('renders the error message when it names innovation_use_level_explanation', async () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(7) });
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({
+        successfulRequest: false,
+        status: 400,
+        description: 'Bad Request',
+        errorDetail: { description: 'Bad Request', errors: 'innovation_use_level_explanation is required at this level' }
+      });
+
+      await component.saveData();
+      fixture.detectChanges();
+
+      expect(component.justificationError()).toBe('innovation_use_level_explanation is required at this level');
+      expect(fixture.nativeElement.textContent).toContain('innovation_use_level_explanation is required at this level');
+    });
+
+    it('clears the previous save error on the next saveData() call', async () => {
+      apiService.PATCH_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: false,
+        status: 400,
+        description: 'Bad Request',
+        errorDetail: { description: 'Bad Request', errors: 'innovation_use_level_explanation is required at this level' }
+      });
+      await component.saveData();
+      expect(component.justificationError()).toBeDefined();
+
+      apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true });
+      await component.saveData();
+
+      expect(component.justificationError()).toBeUndefined();
     });
   });
 });

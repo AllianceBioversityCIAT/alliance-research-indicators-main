@@ -29,6 +29,13 @@
             [disabled]="!submission.isEditableStatus()"
             [rows]="4"
             placeholder="Explain the use of this innovation at this level"></app-textarea>
+
+          @if (justificationError()) {
+            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
+              <i class="material-symbols-rounded !text-[14px]">warning</i>
+              <span class="fs-[14]">{{ justificationError() }}</span>
+            </div>
+          }
         </div>
       }
     </div>
@@ -133,5 +140,19 @@
     </div>
   }
 
-  <app-navigation-buttons (back)="navigate('back')" (next)="navigate('next')" />
+  @if (unaddressedSaveErrors().length > 0) {
+    <!-- REWORK (Issue 2): array-row save errors (actor/organization/quantification) carry no
+         server-assigned index this page can bind an inline message to, so they render here
+         rather than being dropped. The justification textarea handles its own field above. -->
+    <div class="flex flex-col rs-gap-[4] rs-mb-[16] rs-p-[12] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+      @for (message of unaddressedSaveErrors(); track message) {
+        <div class="flex items-center rs-gap-[4] text-[var(--ac-red-1)]">
+          <i class="material-symbols-rounded !text-[14px]">warning</i>
+          <span class="fs-[14]">{{ message }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <app-navigation-buttons [showSave]="true" (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
 </div>

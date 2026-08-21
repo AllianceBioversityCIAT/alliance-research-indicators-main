@@ -32,7 +32,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-05 | 610 | **688** (+688 / −0, 3 new files) | 2 | Over by 78. 424 of 688 are the spec file. **Spec-tier over-run again**, fifth task, same direction |
 | T-06 | 600 | **824** (+824 / −0, 3 new files) | 2 | Over by 224 — the largest single-task overrun so far. 500 of 824 are the spec file |
 | T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
-| **Running total** | **2,642** | **3,463** | **12** | ⚠️ **BUDGET TRIPWIRE BREACHED** — see below | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
+| T-08 | 400 | **1,081** (+1,081 / −14, 3 files) | 3 | **2.7× its derivation** — the largest overrun of the run. 806 of 1,081 are the spec file |
+| **Running total** | **3,042** | **4,544** | **15** | ⚠️ **The re-baselined ~4,600 is now 98.8% consumed at 8 of 13 tasks** — see the second tripwire note | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
 
@@ -1011,5 +1012,158 @@ Full client suite green (**312/312 suites · 6445/6445 tests**), coverage above 
 **Recorded cause: spec-tier density, not scope creep.** The implementation half of §12's split (~1,700) is holding. The entire miss is the spec half (~1,500), and the reason is the assertion standard this spec sets — rendered-output assertions over signal reads, length-guarded loops, executed falsifying inputs, and disqualifiers that ban the cheap assertion. **That standard is what the overrun bought**, and it is not a candidate for reduction: it caught RK-4's off-by-one, T-05's `@Input` aliasing, T-06's c8 coverage hole and T-07's four dead assertions.
 
 **What the user did NOT authorise, and what the Leader therefore did not do.** `continue` was read as accepting the budget and resuming execution. It was **not** read as approval to amend the approved spec. So the two artifact changes Lens A drafted for T-08 — a `design.md` §6.5 step-3 amendment and a new `c4b` criterion — **were not made.** Instead the Leader briefed T-08 to close the hazard **in code**, as a correct reading of step 3 against the server contract, and to record it as **done-without-a-named-criterion**. Consequence, stated plainly: **the silent-data-loss path is closed in the implementation but no done criterion gates it**, so a future regression would not be caught by `tasks.md`. That is the cost of not amending, and it is the user's call to leave it or close it.
+
+---
+
+### T-08 — `buildPayload()` + save + re-read
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 3 of 3** (2 rework rounds; **6 issues from 3 lenses**, the largest finding count of the run) |
+| **Date** | 2026-08-21 |
+| **Implementer attempts** | **3** of a 3-attempt ceiling — **the ceiling was reached** |
+| **Effort / skills** | attempt 1 `xhigh` · attempt 2 `xhigh` (held) · `angular-developer`, `tdd`, `error-handling-patterns` |
+| **Requirements covered** | R-IUP-013 (all 6), R-IUP-014 (all 4), R-IUP-011 (AC.5, AC.6), R-IUP-007 (AC.3, AC.4), R-IUP-006, R-IUP-015 (AC.3, AC.4), R-IUP-016 (AC.1, AC.2) |
+| **Review mode** | **Parallel lens reviewers (3)** — payload correctness · save/re-read/error flow · test fidelity |
+
+#### Leader deviations, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| **Effort `xhigh`, not `max`, on a data-loss surface** | The dial says `max` for data-loss-critical work, but *never `max` a cheaper tier — escalate the tier instead*. Escalating the Implementer to T1 would have **collapsed the model axis of `author ≠ auditor`** (the wrappers bind Implementer→sonnet, Reviewer→opus precisely to hold both axes). So the compensating rigour went into **three** lens reviewers instead of two. Recorded because the dial's literal reading was not followed |
+| **Three hazards briefed as scope, without minting criteria** | The user accepted the budget but **did not authorise a spec amendment**, so Lens A's drafted `design.md` §6.5 step-3 amendment and `c4b` criterion were **not** made. The hazards were briefed as correct readings of §6.5 and are recorded **done-without-a-named-criterion**. Consequence stated plainly: the fixes exist in code but **no criterion gates them**, so a future regression would not be caught by `tasks.md` |
+
+#### Attempt 1 — **all three lenses FAIL. Six issues.** The largest finding count of this spec's run.
+
+**Files changed** (3): `.ts` +213, `.html` +9, `.spec.ts` +593. **Verification:** `npm test -- --silent` full unfiltered from `client/research-indicators/` → **312 suites, 6479 tests passed** (from 312/6445; **+34**). Lint clean, `git status` re-inspected.
+
+**Test-count discrepancy resolved by Lens C, not accepted:** the Implementer estimated "~40"; Lens C counted `it(` blocks per criterion and got **exactly 34**, matching the suite delta. All three T-07 c14 cases survived the `navigate()` → `saveData()` rename with **byte-identical `router.navigate` tuples**, and `navigate()` no longer exists on the component — no orphan. **Nothing was removed.**
+
+##### Confirmed correct — all three lenses, from server source rather than the spec's transcription
+
+| Finding | Lens |
+| --- | --- |
+| **Steps 1, 2, 4 and 5 are correct.** `innovation_use_level` is absent from the payload *interface*, so c5's second half holds **by construction**. `buildActorPayload` nulls both directions off one derived `aggregate`, making c4 structural — one ternary pair, one source of truth. The explicit nulls are DTO-accepted (`IsActorCountModeExclusiveConstraint` returns true for null/undefined; `@IsOptional()` short-circuits `@IsInt()`) | A |
+| **Hazard (b) is right on both edges** — `0` survives (the predicate tests `undefined \|\| null`, **not falsiness**) **and** `onQuantificationUpdate`'s `value.number ?? undefined` preserves it, where a `\|\|` *"would have silently deleted every reported zero"* | A |
+| **Hazard (a)'s nulling genuinely closes the collision** — nulling `institution_type_id` moves a known-org row's key from `type_<n>` to `institution_<id>`, so the two rows no longer collide in `removeDuplicates` | A |
+| **c6 is discharged, not inconclusive.** Lens A **re-derived the entire id-write enumeration independently**: every site is `<field>: row.<same field>`; no literal, counter, index-derived or `Date.now()` id anywhere; `QuantificationItemData` structurally lacks an `id`; templates `track $index` so a card never receives another row's object | A |
+| **c8 closes `judgment.md` → S-3 in substance** — the rendered `.actor-total` reads the card's own `computed` and **never** `row.total`, so the test compares two independently produced numbers. That is precisely what S-3 said no check anywhere in the strategy did | B + C |
+| **c9's mechanism claim holds, including the cross-file half** — `PATCH` does not carry `loadingTrigger`, the re-read GET does, and `finalize` calls `updateGreenChecks()` only under it. The cited `api.service.spec.ts:2338` is real and proves it via the follow-on `green-checks` request. *"Legitimate composition, not a hand-wave"* | B + C |
+| **c3 is "the strongest block in the diff"** — four tests pinning `''`-vs-`undefined`, `0`-is-present, and unit-only/description-only | C |
+| **§6.7 step 5's partial inline binding is conformant** — the spec's own hedge (*"where the message carries one"*) licenses binding only the field the message names. And the substring match could not be made to produce a false positive | B |
+
+##### `STATUS: FAIL` ×3 — six issues
+
+**Two product defects on silent-data-destruction paths:**
+
+**A1 — step 3's predicate is narrower than the spec's.** The implementation is *active-path-only*; **the spec is an OR over both paths.** They diverge on one reachable row shape: a saved row with `institution_type_id`, user ticks *organization is known* and picks nothing, save → row fails the active test → dropped → `organizations: []` → and `customSaveInnovationUse` has **no early return for an empty array**, so `deactivateExistingRecords` sets `is_active = false` on **every** organization row of the result. **HTTP `200`, success toast, data gone.** Under the spec's OR the row is kept and the server's own `validateOrganizationsAreIdentified` throws `400` **before `BEGIN`** — nothing written, row survives, user sees the error. ***"The implementation converts a loud, recoverable rejection into a silent deletion."***
+
+> **Lens A's generalization — the sharpest insight of the run.** *"The general invariant this task needs is not 'drop rows the server would reject' but **'never drop a row that carries an id from the GET'**"* — because both consumers treat a present-but-empty block as *deactivate everything for this role*, and `buildPayload()` always emits all three keys. **The actor block is currently safe only by accident:** no `showClear` on the actor-type select, and `actor_type_id` is `@IsNotEmpty()`. Adding `showClear` would open the identical hole for actors.
+
+**B1 — the toast shows the user an exception class name.** `errorDetail.description` on the wire is `exception?.name`, and Nest sets `name = this.constructor.name` — so `ResultStatusGuard`'s rejection displays the literal string **`"BadRequestException"`**. The human text lives in `errorDetail.errors`. **The c10 test is green only because its fixture misrepresents the envelope**, setting *both* fields to human text so the assertion cannot distinguish them. There is a **codified in-repo warning** at `bilateral-mapping.service.ts:100-104` stating verbatim that `description` is the exception class name and must not be preferred, and a sibling page (`general-information.component.ts:105`) already does it correctly. T-07's `getData()` failure toast has the identical defect.
+
+**One incomplete hazard closure:**
+
+**B2 — the `loadFailed()` guard covers only the failed-load half.** *Stale-success* is reachable and unguarded: after a version switch the component instance is **reused**, so during the in-flight window `body` holds v1's rows while `loadFailed()` is `false` — and `resultInterceptor` resolves the version from the **URL at request time**, so a Save/Next click PATCHes **v1's rows against v2**. With an all-id-less stale body the server accepts it and deactivates v2's rows: **destruction on a `200`**. The nav buttons are clickable throughout — outside every conditional branch, with no `disableSave`/`disableNext` passed. **So §4.3's closure claim has a hole: an id echoed from *another version's* GET is still unauthorized for this one.**
+
+**Three evidence defects:**
+
+**C1 — nothing connects `buildPayload()` to the wire. The most serious finding of the run.** c1–c5 are all *worded* about the request body; all are discharged against the pure function's return. The spec's only references to `PATCH_InnovationUseDetails` as an assertion target are `not.toHaveBeenCalled()` — no `toHaveBeenCalledWith`, no `mock.calls`, no spy on `buildPayload`. **Change the call's second argument to `this.body()` and all 14 criteria stay PASS while the app ships the raw body** — `total`, `innovation_use_level`, blank actor rows, identity-less organization rows, and both count modes on one row: *the entire §4.3 `400` set plus hazard (a)'s silent-deactivation path.* KZ-001 at the highest stakes in the spec.
+
+**C2 — c11's round trip is insensitive to the round trip.** Pre-save `body()` and `serverEcho` are identical in every asserted field, so every assertion holds if `getData()` were never called, if the echo were discarded, or if the PATCH body were wrong. The echo carries `result_actors_id: 9`, `result_institution_type_id: 8`, quantification `id: 21` — **none exist pre-save, all three unasserted.** *"What is asserted is 'after `saveData()` the page still shows what it showed before.'"*
+
+**C3 — c13 and c14 both name a save; neither issues one.** c14 is `expect(() => component.buildPayload()).not.toThrow()` — *"an assertion no plausible implementation makes false"*. c13 is a `buildPayload()`-only test in a block the Implementer itself named *"c13 support"*.
+
+##### Leader adjudication
+
+**Not a Pivot** — the spec is right in every case; A1 is the implementation diverging *from* it. All six accepted in scope: two product defects, one completing a guard the Leader itself briefed, three evidence defects each citing a T-08 criterion. **One consolidated rework**, attempt 2 of 3, effort held. Lens A's generalization was passed as a **rule** for the rework, with an explicit question about whether the actor and quantification filters can drop an id-carrying row.
+
+##### Escalations added by this round
+
+**A fifth spec-accuracy finding, in a NEW class.** The four recorded so far share the pattern *instruction right, justification wrong*. This one is different: **`docs/trd/trd.md` §6.1 claims `errors?: Array<{field, message}>`, which is false — and §11.1 of the same document describes the real passthrough correctly.** The TRD **contradicts itself and §6.1 is the wrong side.** Class: ***instruction unsatisfiable because the contract it cites is fictional*** — §6.3's *"render `errorDetail.errors[]` inline next to the offending field"* presumes a field binding that does not exist on the wire. **Constitutional-document amendment; not the Leader's to make.**
+
+**A product-intent question, not a defect.** `saveData()` navigates on Back/Next **whether the PATCH succeeded or failed**, and Lens B verified both premises: §6.7's step list genuinely orders it that way, and `capacity-sharing` genuinely navigates unconditionally. **But Lens B constructed the loss:** `body` is component state, the lazy route destroys the instance, `replaceUrl: true` removes the history entry, the next visit re-GETs server state — *"every edit made in that session is silently lost."* The error toast **does** survive the route change (the host sits above the router outlet), so *"the user is not left with no signal; they are left with a signal on the wrong page and no data."* Lens B declined to FAIL it (it conforms) and asked the Leader to escalate: **should a failed save suppress navigation, or prompt?** — noting the fix is one line here but is a **cross-page product rule**, since every sibling detail page behaves this way today. Lens B also observed the exemplar `capacity-sharing` **never checks `successfulRequest` at all**, so it toasts *success* on a `400` — *"the implementation under review is strictly better than the thing it cites."*
+
+#### Attempt 2 — Lens A **PASS**, Lens B **PASS**, Lens C **FAIL** (1 new issue, created by a sibling's fix)
+
+Six issues + two hardenings landed. **All five falsifications failed as predicted**, the decisive one being Lens C's: changing the PATCH argument to `this.body()` produced `1 failed, 72 passed` — **only the new wire-tier test failing**, empirically confirming that all 14 criteria had been blind to the mutation.
+
+**Lens A's rulings on the two questions delegated to it:**
+
+- **Actors — safe, and genuinely unreachable.** No `showClear` on either select, `onActorTypeChange` only ever assigns, and the DTO is `@IsNotEmpty()`. *"I attempted the input and no UI path produces an id-carrying row without an `actor_type_id`."* Its invariant does not demand a guard *because* it is unreachable, not because of scope — *"a guard against an unreachable state buys nothing until someone edits the select."*
+- **Quantifications — genuine delete semantics, not Issue 1 in different clothes.** Three reasons, the third decisive: keeping a cleared row would emit `{undefined,'',''}`, which **inserts a phantom all-NULL row** that the GET then renders as a blank card which re-emits itself — so *"keep cleared rows" contradicts hazard (b), a property this same task was required to establish.* And the class line: **"in Issue 1 the trigger was orthogonal to the data destroyed"** — a checkbox click discarded a live `institution_type_id: 10` and `organization_count: 12` the user never touched — *"here the trigger **is** the user erasing every field. That is deletion the user performed."*
+- **The OR × nulling interaction, traced end to end:** the row is kept, `validateOrganizationsAreIdentified` throws **pre-`BEGIN`**, so `customSaveInnovationUse`/`deactivateExistingRecords`/`save` **never run**. Row 55 keeps `is_active = true` with its data intact and the user gets a `400`. **The silent deletion is gone, replaced by the loud recoverable outcome the fix was for.**
+
+**Lens B's ruling on the residual my own brief got wrong.** I told the Implementer the `loading` signal closed the double-click hazard "same signal, no extra work." **It does not** — `loading` is set in `getData()`, so at the first PATCH's await it is still `false`. The Implementer **pushed back rather than claiming closure.** Lens B ruled **(b)**, recorded-with-an-owner, on four grounds — the fourth being the one worth keeping: ***"It would punish the disclosure. The Implementer declined to claim closure on a brief that was wrong. That is the behavior the loop wants; a FAIL for surfacing it teaches the opposite."*** It supplied the exact guard (a *separate* `saving` signal, `try/finally` load-bearing) and noted `[disableSave]="saving()"` works today, so the fix is cheaper than "out of scope" implies. Since `capacity-sharing` shares the defect, a **platform-level** item is the better home.
+
+**Lens C's new issue:** the two fixes **compose** into a wire row that is id-carrying with **no identity on either path**, its only identity sent as a present `null` — and the test asserted just two fields, neither able to see the four nulled ones. Worse, *"coverage appears complete because hazard (a)'s first test looks like the same case — it is not: it carries `institution_id: 501`, so nulling leaves a live identity. **The two tests together create the appearance of covering the composed state while covering only its safe half.**"* **The fourth recurrence in this spec of "assertion surface narrower than the change's blast radius"** (T-05 c12, T-06 c8, T-07 c13).
+
+#### Attempt 3 — **Lens C PASS. All three lenses green.**
+
+**Scoped deliberately narrow on a final attempt:** assertions only, no production change, with the values supplied rather than left to the Implementer to decide — because Lens C said the outcome *"is not settleable at this tier"* and **Lens A had already settled it from server source.** The Implementer was told that if it judged a production change necessary it should **stop and ask** rather than make one.
+
+Delivered: the four identity-field assertions inside the existing test; a comment recording Lens A's pre-`BEGIN` reasoning with a do-not-revert instruction; and two free wire-tier assertions on axes the fixture already seeded. **Zero `it` blocks added** — hence 6485 → 6485, which Lens C confirmed is correct for assertions added inside existing blocks.
+
+**Falsification:** stopping the known-branch nulling → `expect(received).toBeNull() / Received: 10` at `:704`. **No production file touched** — the Leader verified all four anchors at identical line numbers (`:371`, `:381`, `:382-383`, `:426`) rather than accepting the claim.
+
+**Two corrections Lens C made to the Leader's own framing:**
+1. **c5 does not cover the scalar-copy step.** Its two tests are function-tier and assert *absence* (`not.toContain(...)`) — they say nothing about the scalar being copied with the right value. The covering assertion is **c14's wire test's whole-object `toEqual`**. No gap, but not where the Leader looked.
+2. **`toBeUndefined()` is not the T-04 class.** It *is* falsifiable — changing the branch to `?? null` fails it. But it cannot distinguish **present-with-`undefined`** from **key-absent**, which is the dimension §6.4's key-present semantics turn on. **Not reachable as a defect**, because the pre-`BEGIN` validator rejects before any key is resolved against stored data.
+
+**The wire-join detector got broader, not just preserved:** under the raw-body mutation **six of eight** assertions now fire, up from four of six.
+
+**Final verification:** `npm test -- --silent` full unfiltered from `client/research-indicators/` → **312 suites, 6485 tests passed**. Coverage 99.22 / 97.95 / 98.81 / 99.5. Lint clean, `git status` re-inspected.
+
+#### Decisions made
+
+1. **Effort was capped at `xhigh` on a data-loss surface**, against the dial's literal `max`, because `max` on a T2 tier is forbidden and escalating the tier would have collapsed the model axis of `author ≠ auditor`. **The compensating rigour — three lenses — is what found all six issues**, including two the Leader's own brief had asked for and got wrong.
+2. **Three hazards were closed in code with no criterion gating them**, because the user accepted the budget but did not authorise a spec amendment. **Consequence, stated plainly: a future regression on any of the three would not be caught by `tasks.md`.** The lens tests are the only gate.
+3. **The final attempt was scoped to assertions only.** An over-reach on attempt 3 of 3 is what turns a closable task into a HALT.
+4. **A wrong Leader instruction was corrected by the worker and upheld by the reviewer.** Recorded because the loop only works if disclosure is safe.
+
+#### `ADVISORY` — recorded; not gating
+
+| Lens | Finding | Reachability |
+| --- | --- | --- |
+| **A** | The `400` the fix now produces asks for `institution_type_id` — **the field the client just nulled** — when the user's remedy is to pick an institution, untick the box, or remove the row. Lands as a generic toast, and blocks every save of the section until fixed | **Reachable**, same one-click sequence. Nothing is lost (pre-`BEGIN`). Clean closure is §6.7 step 2's shape — a page-level gate reusing the card's existing `showNotIdentifiedMessage`. **Natural home: T-09**, alongside the other two save gates |
+| **A** | `!!row.actor_type_id \|\| !!row.result_actors_id` would make the actor filter's safety **structural** rather than resting on three unrelated facts, the first of which is one template attribute away from changing | Not reachable today |
+| **A** | Record ruling 2's reasoning in `design.md` §6.5 step 4 — "cleared equals deleted" is a deliberate product semantic that follows from quantifications having **no server-honored identity** (`upsertByCompositeKeys` ignores the client's `id` and rotates it on every content edit) | n/a — doc |
+| **B** | **Double-submit**: a second click inside the first PATCH's await passes all three predicates. Worst traced outcome is duplicate id-less inserted rows plus a duplicate-type `400` on the next save; **could not construct data loss**, and the interleaving depends on chunk 2's transaction boundaries | **Reachable.** Guard supplied; needs a named owner. **Platform-level is the better home** — the exemplar shares it |
+| **B** | `getData()` has **no `try/finally`** — a throw between `loading.set(true)` and either clear leaves it stuck `true`, which now **silently disables saving for the session**, indistinguishable from the non-editable branch, with no toast | Could not construct a rejection path (`ToPromiseService` resolves errors rather than throwing). Cheap hardening |
+| **B** | `@for … track message` risks `NG0955` on two byte-identical messages; prefer `track $index` for a display-only list | Could not construct — nested validator paths are index-prefixed |
+| **B/C** | The messages now surfaced are the server's **raw snake_case identifiers**, and a spec assertion pins one as user-facing copy. With Issue 1 fixed these are visible to users **for the first time**, so the raw-identifier UX matters more than it did | Always |
+| **C** | **`tasks.md` c13 is still unqualified** — a reader ticking it will read it as the server-side claim, while the AR-1-bounded record lives only in a code comment. One clause fixes it. (Mitigated: AR-1 is already RB-3 and re-stated by T-13 c11) | n/a — doc |
+| **C** | `toEqual` recursively ignores `undefined` keys, so c14's wire test **pins values, not key shape** — it is not a second detector of the raw-body mutation. Absence is covered by c5 + the wire-join test | n/a |
+| **C** | `loading` is a **boolean, not a counter**, so two `onVersionChange` firings inside one GET round trip briefly reopen the save window against a stale body | Reachable in principle; **could not construct** through the component's public surface |
+| **C** | `justificationError`'s `.filter().join(' ')` — the **multi-message case the change exists for** is not covered | Minor |
+
+#### Forward pointers
+
+| Target | Pointer |
+| --- | --- |
+| **T-09** | **(a)** Lens A's advisory — a page-level pre-save gate reusing `showNotIdentifiedMessage` is the clean closure for the identity-less-row `400`, and T-09 already owns the other two save gates. **(b)** T-09 has **no criterion** for *level 3 blank → save proceeds*; c9's other half is owed there. **(c)** `duplicateType` is unbound and `saveData()` performs no cross-row validation — both are T-09's |
+| **T-10** | Lens B's double-submit guard needs a named owner if not taken platform-wide |
+| **T-13** | c11 re-states AR-1 as open — the three hazards' server-side behaviour is inherited from chunk 2's fixture tier, not proven here |
+
+#### Final verification result
+
+Full client suite green (**312/312 suites · 6485/6485 tests**), coverage above all floors, lint clean with `git status` re-inspected, **nine falsification probes across three attempts all failing as predicted**, and every production anchor Leader-verified at source rather than accepted. **T-08 closed on attempt 3 of 3** — the ceiling reached but not breached.
+
+---
+
+## ⚠️ SECOND BUDGET NOTE — the re-baseline is already consumed
+
+The user re-baselined §12 to **~4,600** after T-07. **T-08 alone came in at 1,081 lines against a 400-line derivation — 2.7×** — and the running total is now **4,544 at 8 of 13 tasks: 98.8% of the re-baselined figure with five tasks still to run.**
+
+| Measure | Original §12 | Re-baselined | Actual at T-08 (8/13) |
+| --- | --- | --- | --- |
+| LOC | ~3,200 | ~4,600 | **4,544** |
+| Review rounds | ~28 | ~28 | **15** ✅ still under |
+
+Remaining §6 derivation: T-09 160 · T-10 190 · T-11 80 · T-12 40 · T-13 0 = **470**. Even at a modest 1.5× that lands near **5,250**; at T-08's 2.7× it would exceed 5,800.
+
+**Why T-08 specifically blew through it, stated so the next estimate is better:** the task's own criteria were *worded* about the request body but the natural implementation is a pure function, so satisfying them honestly required a **second assertion tier** nobody budgeted — Lens C's finding that all 14 criteria were blind to the wire join is exactly that gap made visible. Add three hazards briefed as scope-without-criteria, and 806 of the 1,081 lines are spec. **This is the same spec-tier density as the first breach, concentrated: the more a task's criteria are about *what reaches the server*, the more assertion tiers it needs.**
+
+**The Leader is not stopping again.** The tripwire's purpose is to surface a mis-sized budget while it is still recoverable, and that has now been done twice with the same diagnosis; the user accepted it once with full information. Continuing is the ruling already given. **But the figure is reported, not absorbed:** T-13 c10 should reconcile against ~5,300, not ~4,600, and the estimate model itself — not the spec's scope — is what proved wrong.
 
 ---

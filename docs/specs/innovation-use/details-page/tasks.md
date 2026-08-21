@@ -371,7 +371,7 @@ graph TD
 
 ### T-08 — `buildPayload()` + save + re-read
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-07
+- **Status:** done · **Size:** L · **Dependencies:** T-07
 - **Requirements covered:** R-IUP-013 (all 6), R-IUP-014 (all 4), R-IUP-011 (AC.5, AC.6), R-IUP-007 (AC.3, AC.4), R-IUP-006 (the "no explicit `null`" half), R-IUP-015 (AC.3, AC.4), R-IUP-016 (AC.1, AC.2)
 - **Design references:** §4.3, §6.5, §6.7, §6.2
 - **Skills:** `angular-developer`, `tdd`, `error-handling-patterns`
@@ -392,20 +392,20 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — A blank actor card added but not filled is **absent** from the request body; the one complete row is present.
-- [ ] c2 — A blank organization card added but not filled is absent from the body.
-- [ ] c3 — A quantification row with number, unit and description all absent is absent from the body.
-- [ ] c4 — Switching a saved row to aggregate mode sends `sex_age_disaggregation_not_apply: true` + `actors_count`, and **none** of the four `*_count` values; switching back does the inverse. No body the UI can produce carries a value in both modes on one row.
-- [ ] c5 — **No actor row in any body carries a `total` key**; no body carries `innovation_use_level`.
-- [ ] c6 — Every id in the body was present in the preceding GET for the same result, and **no id appears twice across a block's rows**. Additionally assert that no code path assigns an id to a row that arrived without one.
-- [ ] c7 — A level toggle from 7 to 3 sends the stored explanation, **not** an explicit `null`.
-- [ ] c8 — **After a successful save the client-displayed total equals the `total` the server returned for the same row** (R-IUP-011 AC.6). *(Closes `judgment.md` → `S-3`, which found this AC had no named check anywhere in the strategy.)*
-- [ ] c9 — On success a toast confirms and the section re-reads through the GET carrying `loadingTrigger: true`.
-- [ ] c10 — **No PATCH is issued while `isEditableStatus()` is false** (assert zero requests), and a `400` from `ResultStatusGuard` surfaces through `ActionsService` rather than being swallowed.
-- [ ] c11 — Round trip: level 8 + one aggregate `OTHER` actor named `"local cooperatives"` with `actors_count: 12` + one organization + one quantification reload exactly as entered, with the derived total rendering `12`.
-- [ ] c12 — Rows the user deleted before saving are **not** resurrected by the re-read.
-- [ ] c13 — A save issued while the section is unchanged does not deactivate existing rows.
-- [ ] c14 — A partially filled section (level only) saves without error.
+- [x] c1 — A blank actor card added but not filled is **absent** from the request body; the one complete row is present.
+- [x] c2 — A blank organization card added but not filled is absent from the body.
+- [x] c3 — A quantification row with number, unit and description all absent is absent from the body.
+- [x] c4 — Switching a saved row to aggregate mode sends `sex_age_disaggregation_not_apply: true` + `actors_count`, and **none** of the four `*_count` values; switching back does the inverse. No body the UI can produce carries a value in both modes on one row.
+- [x] c5 — **No actor row in any body carries a `total` key**; no body carries `innovation_use_level`.
+- [x] c6 — Every id in the body was present in the preceding GET for the same result, and **no id appears twice across a block's rows**. Additionally assert that no code path assigns an id to a row that arrived without one.
+- [x] c7 — A level toggle from 7 to 3 sends the stored explanation, **not** an explicit `null`.
+- [x] c8 — **After a successful save the client-displayed total equals the `total` the server returned for the same row** (R-IUP-011 AC.6). *(Closes `judgment.md` → `S-3`, which found this AC had no named check anywhere in the strategy.)*
+- [x] c9 — On success a toast confirms and the section re-reads through the GET carrying `loadingTrigger: true`.
+- [x] c10 — **No PATCH is issued while `isEditableStatus()` is false** (assert zero requests), and a `400` from `ResultStatusGuard` surfaces through `ActionsService` rather than being swallowed.
+- [x] c11 — Round trip: level 8 + one aggregate `OTHER` actor named `"local cooperatives"` with `actors_count: 12` + one organization + one quantification reload exactly as entered, with the derived total rendering `12`.
+- [x] c12 — Rows the user deleted before saving are **not** resurrected by the re-read.
+- [x] c13 — A save issued while the section is unchanged does not deactivate existing rows.
+- [x] c14 — A partially filled section (level only) saves without error.
 
 **Falsifying input** — remove the `actor_type_id` guard from step 2 → **c1 must FAIL** and the body must show two rows (`design.md` §10.3).
 
