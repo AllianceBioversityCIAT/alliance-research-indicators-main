@@ -33,36 +33,40 @@
         </div>
 
         @if (loadFailed()) {
-          <section class="mb-4 text-sm text-red-700" data-testid="pf-alignment-load-failed" role="alert">
-            Could not load alignment — please refresh.
+          <section class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900 flex items-center gap-2.5" data-testid="pf-alignment-load-failed" role="alert">
+            <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
+            <span>Could not load alignment — please refresh.</span>
           </section>
         }
 
         @if (readOnlyCause() === 'synced') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                data-testid="pf-alignment-synced-banner">
-            {{ SYNCED_BANNER }}
+            <i class="pi pi-lock text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ SYNCED_BANNER }}</span>
           </div>
         } @else if (readOnlyCause() === 'prms-sourced') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                data-testid="pf-alignment-prms-sourced-banner">
-            {{ PRMS_SOURCED_BANNER }}
+            <i class="pi pi-shield text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ PRMS_SOURCED_BANNER }}</span>
           </div>
         } @else if (readOnlyCause() === 'permission') {
           <div role="status" aria-live="polite"
-               class="mb-6 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-grey-500)] bg-[var(--ac-grey-100)] text-sm text-[var(--ac-grey-800)] flex items-center gap-2.5"
                data-testid="pf-alignment-readonly-banner">
-            {{ READ_ONLY_BANNER }}
+            <i class="pi pi-lock text-[var(--ac-grey-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ READ_ONLY_BANNER }}</span>
           </div>
         }
 
         <div role="note"
-             class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5 mb-[30px]"
+             class="flex items-center bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm text-[var(--ac-primary-blue-800)] gap-2.5 mb-6"
              data-testid="pf-alignment-info-banner">
-          <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180" aria-hidden="true">info</span>
-          <h3 class="text-[#777C83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+          <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+          <h3 class="text-xs leading-relaxed m-0 text-[var(--ac-grey-700)] font-normal">
             {{ INFO_BANNER }}
           </h3>
         </div>
@@ -107,23 +111,39 @@
 
         @if (formData().has_contribution === true) {
           <section class="mb-6" data-testid="pf-alignment-levers-section">
-            @if (isUnmapped()) {
+            @if (loadingSciencePrograms() && mappingStatus() === null) {
+              <div role="status" aria-live="polite" aria-busy="true"
+                   class="flex flex-col gap-3.5 p-4 rounded-[10px] bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)]"
+                   data-testid="pf-alignment-sps-loading">
+                <div class="flex items-center gap-2 text-sm text-[var(--ac-primary-blue-700)]">
+                  <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                  <span class="font-medium">Loading Science Programs from CLARISA...</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                  <p-skeleton width="100%" height="64px" borderRadius="10px" />
+                </div>
+              </div>
+            } @else if (isUnmapped()) {
               <div role="status" aria-live="polite"
-                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-amber-500 bg-amber-50 text-sm text-amber-900 flex items-center gap-2.5"
                    data-testid="pf-alignment-unmapped-message">
-                {{ UNMAPPED_SP_MESSAGE }}
+                <i class="pi pi-exclamation-triangle text-amber-600 text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ UNMAPPED_SP_MESSAGE }}</span>
               </div>
             } @else if (isStale()) {
               <div role="status" aria-live="polite"
-                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-amber-500 bg-amber-50 text-sm text-amber-900 flex items-center gap-2.5"
                    data-testid="pf-alignment-stale-message">
-                {{ STALE_SP_MESSAGE }}
+                <i class="pi pi-exclamation-triangle text-amber-600 text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ STALE_SP_MESSAGE }}</span>
               </div>
             } @else if (hasNoSciencePrograms()) {
               <div role="status" aria-live="polite"
-                   class="p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                   class="p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                    data-testid="pf-alignment-no-sps-message">
-                {{ NO_SP_DEFINED_MESSAGE }}
+                <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+                <span>{{ NO_SP_DEFINED_MESSAGE }}</span>
               </div>
             } @else if (showSpPicker()) {
               @if (isSingleSp() && singleSp(); as sp) {
@@ -260,14 +280,14 @@
                 </div>
               } @else if (tocCatalogError() && !tocCatalog()) {
                 <div role="alert" aria-live="polite"
-                     class="flex items-center justify-between gap-3 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     class="flex items-center justify-between gap-3 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900"
                      data-testid="pf-alignment-hlo-catalog-error">
-                  <span class="flex items-center gap-2">
-                    <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+                  <span class="flex items-center gap-2.5">
+                    <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
                     <span>{{ HLO_CATALOG_ERROR_MESSAGE }}</span>
                   </span>
                   <button type="button"
-                          class="shrink-0 text-[var(--ac-primary-blue-500)] underline cursor-pointer bg-transparent border-0 p-0"
+                          class="shrink-0 font-medium text-[var(--ac-primary-blue-700)] hover:underline cursor-pointer bg-transparent border-0 p-0"
                           data-testid="pf-alignment-hlo-retry"
                           (click)="retryCatalog()">
                     Retry
@@ -277,9 +297,10 @@
 
               @if (versionLocked()) {
                 <div role="status" aria-live="polite"
-                     class="mb-4 p-3 rounded border border-[var(--ac-grey-700)] bg-[var(--ac-grey-100)] text-sm"
+                     class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                      data-testid="pf-alignment-version-locked-banner">
-                  {{ VERSION_LOCKED_BANNER }}
+                  <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+                  <span>{{ VERSION_LOCKED_BANNER }}</span>
                 </div>
               }
 
@@ -362,8 +383,11 @@
         }
 
         @if (inlineErrors()?.['_global']; as msg) {
-          <div role="alert" aria-live="polite" class="mb-3 text-sm text-red-700"
-               data-testid="pf-alignment-error-global">{{ msg }}</div>
+          <div role="alert" aria-live="polite" class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-red-500 bg-red-50 text-sm text-red-900 flex items-center gap-2.5"
+               data-testid="pf-alignment-error-global">
+            <i class="pi pi-exclamation-circle text-red-600 text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ msg }}</span>
+          </div>
         }
       </div>
     </div>

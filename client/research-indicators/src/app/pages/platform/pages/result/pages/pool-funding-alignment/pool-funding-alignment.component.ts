@@ -130,7 +130,7 @@ export default class PoolFundingAlignmentComponent {
   readonly PRMS_SOURCED_BANNER = 'This result is owned by PRMS. Bilateral alignment is read-only in STAR.';
   // Locked backend 409 description that signals the PRMS-sourced read-only cause.
   readonly PRMS_SOURCED_409_DESCRIPTION = 'Result is PRMS-sourced; bilateral alignment is read-only in STAR';
-  readonly INFO_BANNER = 'Select the High-Level Outputs (HLO) and related indicators this result contributes to.';
+  readonly INFO_BANNER = 'Select the Theory of Change results (Outputs, Outcomes) and related indicators this result contributes to.';
   readonly CONTRIBUTION_QUESTION = 'Does this result contribute to a Science Program or Accelerator?';
   readonly SP_PICKER_LABEL = 'Select the Science Program(s) this is related to';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
@@ -151,7 +151,7 @@ export default class PoolFundingAlignmentComponent {
   // REQ-BIL-ASR-03 — AC-03.3 inline message naming the rejected SP codes.
   readonly REJECTED_SP_MESSAGE_PREFIX = 'These Science Programs are no longer valid for this result: ';
   readonly REJECTED_SP_MESSAGE_SUFFIX = '. Remove them and save again.';
-  readonly HLO_SECTION_LABEL = 'Map HLOs and/or indicators';
+  readonly HLO_SECTION_LABEL = 'Map Theory of Change results and indicators';
   // AC-09.1 — live-version gate notice (2026-only ToC mapping).
   readonly VERSION_LOCKED_BANNER =
     'Theory of Change alignment is only editable on the live 2026 version of this result. The alignment below is read-only.';
@@ -434,7 +434,7 @@ export default class PoolFundingAlignmentComponent {
         this.loadFailed.set(true);
         return;
       }
-      if (alignment.eligible === false) {
+      if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
       }
