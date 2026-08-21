@@ -135,7 +135,7 @@ graph TD
 
 ### T-02 — `app-input` gains an optional `maxFractionDigits` passthrough
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-IUP-008 (AC.2, AC.4), R-IUP-019 (AC.1, AC.3)
 - **Design references:** §2.3 row 1, §5.7, §6.3, §7, **DD-4**
 - **Skills:** `angular-developer`
@@ -156,10 +156,10 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — Passing `maxFractionDigits="0"` forwards `0` to the rendered `p-inputNumber`.
-- [ ] c2 — **Omitting it leaves the rendered `p-inputNumber` binding unchanged** from before this task — asserted on the rendered binding, not on the component property.
-- [ ] c3 — `[min]="0"` continues to block a typed and a pasted minus sign (§6.3 rows 1–2), unchanged.
-- [ ] c4 — **Full** `npm test -- --silent` green, covering all 16 consumer templates' existing specs.
+- [x] c1 — Passing `maxFractionDigits="0"` forwards `0` to the rendered `p-inputNumber`.
+- [x] c2 — **Omitting it leaves the rendered `p-inputNumber` binding unchanged** from before this task — asserted on the rendered binding, not on the component property.
+- [x] c3 — `[min]="0"` continues to block a typed and a pasted minus sign (§6.3 rows 1–2), unchanged.
+- [x] c4 — **Full** `npm test -- --silent` green, covering all 16 consumer templates' existing specs.
 
 **Falsifying input** — give `maxFractionDigits` a non-`undefined` default → **c2 must FAIL** (`design.md` §10.3).
 

@@ -26,7 +26,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | Task | `tasks.md` §6 derivation | Actual LOC | Review rounds | Note |
 | --- | --- | --- | --- | --- |
 | T-01 | 210 | **344** (+344 / −1, 6 files) | 1 | Over its derivation line by 134. Cause: the spec tier is larger than estimated — 252 of the 344 lines are test code across two spec files. See T-01's *Decisions* |
-| **Running total** | **210** | **344** | **1** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 10.8% of the LOC budget spent on 1 of 13 tasks (7.7%) |
+| T-02 | 72 | **133** (+133 / −0, 3 files) | 2 | Over its derivation line by 61 — impl 4 lines against 12 budgeted, spec ~129 against 60. Cause: c1 inlines the TestBed setup that `renderNumberInput()` already encapsulates (~22 duplicated lines), plus the rework additions. Recorded, not reconciled |
+| **Running total** | **282** | **477** | **3** | Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 14.9% of the LOC budget and 10.7% of the review rounds spent on 2 of 13 tasks (15.4%). Both tasks ran over their §6 split line for the same reason: the **spec tier** is consistently larger than the derivation assumed, while implementation lines track it closely. If that pattern holds, §12's ~1,500-line spec estimate is the figure that will drift, not the implementation line |
 
 ---
 
@@ -131,5 +132,125 @@ Each carries a reachability verdict per **KZ-008**.
 #### Final verification result
 
 Full client suite green (308/308 suites · 6342/6342 tests), coverage well above all four floors, lint clean with `git status` re-inspected, and the criterion's own falsifying input executed and confirmed failing. **T-01 closed on attempt 1.**
+
+---
+
+### T-02 — `app-input` gains an optional `maxFractionDigits` passthrough
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 2** (1 rework round) |
+| **Date** | 2026-08-20 |
+| **Implementer attempts** | **2** of a 3-attempt ceiling |
+| **Effort / skills assigned** | attempt 1 `medium` · attempt 2 `high` (rework bump) · `angular-developer` |
+| **Requirements covered** | R-IUP-008 (AC.2, AC.4), R-IUP-019 (AC.1, AC.3) |
+
+#### Leader deviations from the task file, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Did **not** add `tdd`, unlike T-01 | The criterion that matters here (c2) is a *regression guard* that must pass both before and after the change — not a failing-then-passing test. Red-green does not model it. The equivalent discipline was given as an explicit instruction instead: capture the baseline assertion and confirm it passes **before** editing. The Implementer did so (59/59 pre-edit) |
+
+#### Attempt 1 — Reviewer `STATUS: FAIL`
+
+**Files changed** (3): `input.component.ts` (+`@Input() maxFractionDigits?: number`, no default), `input.component.html` (`[maxFractionDigits]` forwarded on the `p-inputNumber` branch), `input.component.spec.ts` (new top-level `describe` rendering the real template — the pre-existing suite overrides the template with `''` and never renders `p-inputNumber`).
+
+**Verification — Implementer:** `npm test -- --silent` full run from `client/research-indicators/` → `Test Suites: 308 passed, 308 total` · `Tests: 6345 passed, 6345 total` (+3 over T-01's 6342). Coverage 99.17 / 98.23 / 99.04 / 99.38. `npm run lint -- --quiet` → `All files pass linting.`, `git status` re-inspected after, nothing mutated. Baseline confirmed: c2 and c3 were run against unmodified code first (59/59) — so the regression guard is known to have held pre-edit. Falsifying input executed: a `= 0` default made c2 fail (`Received: 0`), then reverted.
+
+**The decisive question, resolved in the Implementer's favour.** T-02's whole purpose is to be behaviour-preserving for 7 existing `type="number"` call sites, and the diff makes `[maxFractionDigits]` an **unconditional** binding that receives `undefined` when callers omit it. The Leader put the resulting risk to the Reviewer as the review's gating question: is bound-but-`undefined` behaviourally identical to *no binding*, or does it silently change `Intl` resolution for all 7? The Reviewer answered from the pinned `primeng@19.0.6` source rather than from the diff's comments:
+
+| Link in the chain | Finding |
+| --- | --- |
+| The `@Input` transform | `(value) => numberAttribute(value, null)` — PrimeNG passes an explicit `null` fallback, **overriding** Angular's `NaN` default. So bound-`undefined` → `null`, **not** `NaN` |
+| `getOptions()` | `maximumFractionDigits: this.maxFractionDigits ?? undefined` — `null ?? undefined` is `undefined`, a byte-identical options object to the unbound case. **No `null`→`0` coercion, no `RangeError`** |
+| Other read sites | Null/undefined-agnostic (`&& this.maxFractionDigits`; `resolvedOptions()` off the identical formatter) |
+| Re-initialisation | `ngOnChanges` now *does* see a first-pass `SimpleChange` and calls `updateConstructParser()` where it previously did not — but that method is guarded by `this.initialized`, set only in `ngOnInit`, which Angular runs **after** `ngOnChanges` on the first pass. **Net: zero extra `constructParser()` calls** |
+| Empirical corroboration | `capacity-sharing.component.html` hides its GROUP TRAINING block with `[class.hidden]`, **not `@if`**, and its spec mocks `currentResultIsLoading` to `false` — so that fixture constructs **four real `p-inputNumber` instances through the new binding** and runs `Intl.NumberFormat` on them. A throw-class regression would have surfaced |
+
+**Verdict: no formatting change reaches any of the 7 existing call sites.** `strictTemplates` also confirmed safe via `ngAcceptInputType_maxFractionDigits: unknown` — worth recording because `ts-jest` does not run the template type checker, so the green suite alone would not have proven it.
+
+**FAIL issue (verbatim from the Reviewer)**
+
+> **Discovered Issue:** c3 asserts only the *pasted* minus sign. The criterion requires a typed **and** a pasted one, and the test's own name was narrowed to "blocks a pasted minus sign". A grep of the whole spec file for the typed path returns nothing […] §6.3 row 1 (typed `-`) is therefore unasserted.
+> Secondary, same test: both assertions are negative (`not.toHaveBeenCalled`, `not.toBe(-1)`), so c3 would also pass if the paste never reached PrimeNG at all. I verified by source read that it *does* reach the guard — `parseValue('-1')` returns `-1`, not `null`, so `insert()` is entered and `allowMinusSign()` (`0 == null || 0 < 0` → false) is what returns early — but the test does not establish it.
+>
+> **Violated Rule:** `tasks.md` → `### T-02` c3: "`[min]="0"` continues to block a **typed and a pasted** minus sign (§6.3 rows 1–2), unchanged." Compounded by §5 clause-closure **row 16**, which assigns R-IUP-008's "BUT NOT rely on the server's `@Min(0)` as the only line of defence" to **T-02 c1/c3**.
+>
+> **Remediation Suggestion:** On the same rendered fixture, add the typed half — `inputNumberInstance.onInputKeyPress({ which: 45, code: 'Minus', preventDefault: jest.fn() } as unknown as KeyboardEvent)` — then the same two assertions. […] Restore the test name to name both halves. Add a positive control in the same test — paste `'1'` and assert `setValue` **was** called with `1` — so the negative assertions mean "blocked", not "nothing wired".
+
+**Per-criterion disposition, attempt 1** (all four reported — KZ-007)
+
+| # | Verdict | Note |
+| --- | --- | --- |
+| c1 | ✅ | `By.directive(InputNumber)` off the real template; the value traversed both the template binding and PrimeNG's transform. A genuine rendered-binding assertion, not a property assertion in disguise |
+| c2 | ✅ | Literal satisfaction confirmed. The `?? undefined` normalisation spans a **provably behaviour-identical** pair (`null`/`undefined` both resolve to `maximumFractionDigits: undefined`), so it is legitimate — but it catches only the named mutation class. See Advisory 2 |
+| c3 | ❌ **FAIL** | Typed half unasserted; both assertions negative with no positive control |
+| c4 | ✅ | Full unfiltered run, correct package root. On blindness: the suite is **not** blind to a throw-class regression (verified above), but **is** blind to a *silent* formatting change — no spec in the repo asserts resolved `Intl` options or rendered numeric text. That branch was falsified by the source read instead, which is exactly what §6.3 and DD-4 demand |
+
+**Leader adjudication.** The FAIL is in scope, specific, and cites the criterion's own wording — c3 says "typed **and** a pasted". Not a spec defect, so no Pivot; a rework attempt is the right instrument. Attempt 2 dispatched at effort `high` with the report above passed **verbatim** and a three-item scope: add the typed assertion, add the positive control, restore the test name. The implementation files were explicitly placed **out of scope** for the rework — they passed review and changing them would put a reviewed result back at risk.
+
+#### Attempt 2 — Reviewer `STATUS: PASS`
+
+**Files changed** (1): `input.component.spec.ts` only. The Leader verified inline that `input.component.ts` and `input.component.html` are byte-identical to the state reviewed in attempt 1 — 4 added lines, zero deletions, same content — because the attempt-2 PASS carries c1/c2 forward on exactly that premise.
+
+**Scope delivered** — the three assigned items, nothing wider:
+
+1. Typed-minus assertion added via `inputNumberInstance.onInputKeyPress({ which: 45, code: 'Minus', … })`.
+2. Positive control added: pasting `'1'` asserts `setValue` **was** called with `1`, so the two negative assertions mean *blocked* rather than *never reached* (KZ-001).
+3. Test name restored to `'c3 — [min]="0" continues to block a typed and a pasted minus sign'`, matching c3's own wording.
+
+**Verification — Implementer:** `npm test -- --silent` full unfiltered from `client/research-indicators/` → `Test Suites: 308 passed, 308 total` · `Tests: 6345 passed, 6345 total`. Test count is unchanged from attempt 1 because the new assertions live inside the existing `it` — noted so the flat count is not mistaken for "nothing was added". Coverage 99.17 / 98.23 / 99.04 / 99.38. `npm run lint -- --quiet` → `All files pass linting.`, `git status --short` identical before and after.
+
+**Falsifiability of the typed half — probed, not asserted.** Setting `component.min = -1` (the only probe class that flips `allowMinusSign()`, which is `min == null || min < 0`) made the test fail with the spy called once with the **string** `"-"`. Reverted with a verified zero diff. The Implementer also reported that `min = 5` does *not* defeat the guard — evidence it understood that a probe which changes nothing proves nothing.
+
+**Reviewer re-audit.** The same Reviewer was resumed rather than replaced: it already held the pinned PrimeNG source in context, and re-auditing the Implementer's fix is not self-verification. It was explicitly instructed to be adversarial about its own remediation. It enumerated **every** exit between `onInputKeyPress` entry and the guard to rule out a green-for-the-wrong-reason:
+
+| Candidate short-circuit | Ruled out because |
+| --- | --- |
+| `this.readonly` | `readonly = false` is a hard default (`primeng-inputnumber.mjs:591`) and `input.component.html` never binds it. **This was the only candidate for a silent green, and it is closed** |
+| `this.input.nativeElement` unresolved | The `<input #input>` at `:1704-1743` is unconditional, so the ViewChild resolves. Decisively: had it not, the destructure at `:1238` would throw a `TypeError` and fail **loudly** — this can never be a quiet pass |
+| `selectionStart` on an unfocused element | The element carries `inputmode="decimal"` and no `type` attribute, so it is `type="text"` and jsdom's selection API returns `0`/`0` rather than `null`, without throwing |
+| `this.maxlength` | Unbound, `undefined`, so the `:1248` branch is skipped |
+| `isMinusSign('-')` | `:1274` tests `char === '-'` as a hard literal — true unconditionally, independent of locale or `constructParser` state |
+
+So `:1251-1252` reaches `insert(event, '-', { isMinusSign: true })`, which returns at `:1316-1318`. **The typed half is genuinely asserted.** The Reviewer also validated the `min = -1` probe as sound on the strength of its *artifact*: the spy landing on the **string** `"-"` is precisely what its independent character-level trace predicts, and a fabricated or mis-traced probe would not land on the string form.
+
+**Spy ordering judged sound.** The spy is created post-render with zero calls; both negative assertions precede the only call-producing interaction, so cumulative counting *strengthens* the second `not.toHaveBeenCalled()`. `toHaveBeenCalledWith(1)` cannot mask an earlier call because the count was already pinned at 0 and jest aborts on first failure. The reverse ordering would have been broken; as written it is the only ordering that works — and both halves keep independent mutation coverage, since a mutation local to `onPaste` is caught *only* by the paste assertions.
+
+**Per-criterion disposition, attempt 2** (all four — KZ-007)
+
+| # | Verdict | Note |
+| --- | --- | --- |
+| c1 | ✅ | Carried forward; implementation byte-identical, verified |
+| c2 | ✅ | Assertion unchanged. Citation corrected — see below |
+| c3 | ✅ | Both §6.3 rows 1–2 exercised, with a positive control |
+| c4 | ✅ | Full unfiltered run, correct package root, coverage above all floors |
+
+**Non-gating correction applied, recorded because it was Leader-authorised.** Attempt 1's c2 comment attributed the expression `this.maxFractionDigits ?? undefined` to `design.md` §6.3, which does not contain it (§6.3 states the *resolved value* `3`, not the operator). The Leader authorised the fix as a correction to a false claim **the same diff had introduced** — not new scope, and explicitly non-gating. The citation now names `getOptions()` in `primeng@19.0.6`'s `primeng-inputnumber.mjs` (verified at `:836-837`), in DD-12 / D-IUP-8 form (symbols and anchors, not line numbers). Judged accurate by the Reviewer.
+
+#### Decisions made
+
+1. **The rework was the right instrument, not a Pivot.** The FAIL cited c3's own wording ("typed **and** a pasted"), so the spec was right and the evidence was short. No spec defect, no Pivot.
+2. **Implementation files were placed out of scope for the rework.** They had already passed review; reopening them would put a reviewed result back at risk for a test-only defect. The Leader verified byte-identity afterwards rather than trusting the report.
+3. **The decisive risk was resolved by source read, not by the green suite.** The suite is *not* blind to a throw-class regression — `capacity-sharing.component.spec.ts` constructs four real `p-inputNumber` instances through the new binding — but it **is** blind to a silent formatting change, since no spec in the repo asserts resolved `Intl` options or rendered numeric text. That branch was closed by reading pinned PrimeNG source, which is exactly what §6.3 and DD-4 require. Recorded because it is the general shape of this spec's risk: *a green client suite does not prove a PrimeNG behaviour claim.*
+4. **`strictTemplates` conformance is not proven by the suite.** `ts-jest` does not run Angular's template type checker. The binding is safe because `primeng/inputnumber/inputnumber.d.ts` declares `static ngAcceptInputType_maxFractionDigits: unknown`. **T-13 c5's `npm run build` is the first check that would actually catch a template-type error in this spec** — worth knowing before then.
+
+#### `ADVISORY` — 4R lens findings (recorded; **not** gating, **not** rework, **not** new tasks)
+
+| # | Lens | Finding | Reachability verdict | Disposition |
+| --- | --- | --- | --- | --- |
+| 1 | **Reliability** | The positive control is a *paste*, so it proves the paste entry point is wired, not the typed one. If `onInputKeyPress` ever began short-circuiting, the typed assertion would go green and the paste-based control would not catch it | **Reachable in principle.** Currently covered by evidence *outside* the repo — the Reviewer's source trace and the `min = -1` probe, both recorded only in this log | The Reviewer's two-line suggestion (a typed positive control with `which: 49` / `code: 'Digit1'`, asserting `setValue` called with `1`) would move that evidence into the repo. **Not actioned:** advisories never widen an approved task. Noted for whoever next opens this file |
+| 2 | **Readability** | `expect(component.body().value).not.toBe(-1)` **cannot fail** after the typed block — an unblocked typed `-` yields the *string* `'-'`, not the number `-1` (`parseValue` returns `filteredText` unconverted at `:962-964`). It reads as value-level coverage the typed path does not have | n/a | Harmless: the typed half is carried entirely by the adjacent `expect(setValueSpy).not.toHaveBeenCalled()`, which the probe proved does fire. The same assertion **is** load-bearing in the paste block, where `'-1'` parses to the number `-1` |
+| 3 | **Readability** | The `min = -1` probe write-up is under-specified — `component.min = -1` alone does not reach `inputNumberInstance.min` without a `detectChanges`, and the test's own `expect(inputNumberInstance.min).toBe(0)` would have failed first had it propagated | n/a | The observed outcome is only producible with `allowMinusSign()` true, so the probe did what it claims; the *record* just does not say how the value crossed the binding. Evidence hygiene, not a defect |
+| 4 | **Readability** | c1 still inlines the ~20-line TestBed setup `renderNumberInput()` already encapsulates; a `maxFractionDigits?: number` parameter would remove ~22 lines | n/a | This is most of the gap between 133 actual insertions and §6's 72-line derivation. Recorded in the budget ledger, not gated — §12 holds budget authority and its aggregate tripwire is untouched |
+| 5 | **Risk** (carried from attempt 1, reachability re-verified) | The no-behaviour-change guarantee rests on the `, null` argument in PrimeNG's `(value) => numberAttribute(value, null)` (`:1677`, `:1926-1928`), **not** on `numberAttribute`, whose own default is `NaN` — and `NaN ?? undefined` is `NaN`, which makes `new Intl.NumberFormat(locale, { maximumFractionDigits: NaN })` throw `RangeError` inside `constructParser()` | **Not reachable at `primeng@19.0.6`** — both sites carry the `null` fallback, verified. Reachable only on an upgrade that drops it | Would fail **loudly**, not silently: `capacity-sharing.component.spec.ts` constructs four real instances through this binding. **This is a PrimeNG-upgrade tripwire for the repo, wider than this spec** — recorded here because that is where it was found, and correctly left unactioned as out of scope |
+
+#### Issues encountered
+
+One rework round, cause recorded above. No environment blockers this task (unlike T-01, whose Reviewer died on a session limit).
+
+#### Final verification result
+
+Full client suite green (308/308 suites · 6345/6345 tests), coverage above all four floors, lint clean with `git status` re-inspected, both `§6.3` rows exercised with a positive control, and the typed half's falsifiability probed rather than asserted. **T-02 closed on attempt 2 of 3.**
 
 ---

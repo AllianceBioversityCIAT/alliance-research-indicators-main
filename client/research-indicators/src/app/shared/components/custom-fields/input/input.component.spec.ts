@@ -4,6 +4,8 @@ import { CacheService } from '../../../services/cache/cache.service';
 import { UtilsService } from '../../../services/utils.service';
 import { signal } from '@angular/core';
 import { WordCountService } from '../../../services/word-count.service';
+import { By } from '@angular/platform-browser';
+import { InputNumber } from 'primeng/inputnumber';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -681,5 +683,132 @@ describe('InputComponent', () => {
         message: 'Maximum 10 words allowed'
       });
     });
+  });
+});
+
+// @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
+// A separate top-level suite: the outer `describe('InputComponent', ...)` above overrides the
+// component's template with '' for every test, so none of those tests render the real
+// `p-inputNumber`. c1/c2/c3 must be asserted on the *rendered* PrimeNG binding (KZ-001), which
+// requires the real template — hence a fresh TestBed configuration that does not override it.
+describe('InputComponent — rendered p-inputNumber (T-02 maxFractionDigits)', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+
+  async function renderNumberInput(): Promise<InputNumber> {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+    fixture.detectChanges();
+
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    return inputNumberDe.componentInstance as InputNumber;
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('c1 — maxFractionDigits="0" forwards 0 to the rendered p-inputNumber', async () => {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+    component.maxFractionDigits = 0;
+    fixture.detectChanges();
+
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    const inputNumberInstance = inputNumberDe.componentInstance as InputNumber;
+
+    expect(inputNumberInstance.maxFractionDigits).toBe(0);
+  });
+
+  it('c2 — omitting maxFractionDigits leaves the rendered p-inputNumber binding unchanged', async () => {
+    const inputNumberInstance = await renderNumberInput();
+
+    // Before this task there was no [maxFractionDigits] binding on p-inputNumber at all, so the
+    // rendered instance resolved no fraction-digit restriction. PrimeNG's `getOptions()`
+    // (`primeng@19.0.6`'s `primeng-inputnumber.mjs`) resolves it as
+    // `maximumFractionDigits: this.maxFractionDigits ?? undefined` — normalizing through that
+    // same operator is what "unchanged" means at the rendered binding (null and undefined are
+    // functionally identical to PrimeNG's Intl resolution; a bare `undefined` binding is not an
+    // available assertion because PrimeNG's `numberAttribute` transform maps an unbound input to
+    // `undefined` and a bound-but-undefined input to `null`).
+    expect(inputNumberInstance.maxFractionDigits ?? undefined).toBeUndefined();
+  });
+
+  it('c3 — [min]="0" continues to block a typed and a pasted minus sign', async () => {
+    const inputNumberInstance = await renderNumberInput();
+    expect(inputNumberInstance.min).toBe(0);
+
+    const setValueSpy = jest.spyOn(component, 'setValue');
+
+    // Typed minus sign (§6.3 row 1): onInputKeyPress reads keyCode 45 as '-', which reaches
+    // insert()'s isMinusSign arm; allowMinusSign() is `this.min == null || this.min < 0` — with
+    // min=0 that is false, so insert() returns before updateValue/setValue is ever reached.
+    inputNumberInstance.onInputKeyPress({
+      which: 45,
+      code: 'Minus',
+      preventDefault: jest.fn()
+    } as unknown as KeyboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).not.toHaveBeenCalled();
+    expect(component.body().value).not.toBe(-1);
+
+    // Pasted minus sign (§6.3 row 2): onPaste -> parseValue('-1') -> insert(), same early return.
+    inputNumberInstance.onPaste({
+      preventDefault: jest.fn(),
+      clipboardData: { getData: () => '-1' }
+    } as unknown as ClipboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).not.toHaveBeenCalled();
+    expect(component.body().value).not.toBe(-1);
+
+    // Positive control (KZ-001): a paste that is NOT a blocked minus sign DOES reach setValue,
+    // proving the two negative assertions above mean "blocked", not "nothing wired".
+    inputNumberInstance.onPaste({
+      preventDefault: jest.fn(),
+      clipboardData: { getData: () => '1' }
+    } as unknown as ClipboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).toHaveBeenCalledWith(1);
   });
 });

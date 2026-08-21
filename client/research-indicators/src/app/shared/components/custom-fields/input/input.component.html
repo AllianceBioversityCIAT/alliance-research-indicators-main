@@ -41,9 +41,11 @@
           [autocomplete]="autoComplete"
           (ngModelChange)="setValue($event)" />
       } @else if (type === 'number') {
+        <!-- @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough) -->
         <p-inputNumber
           [min]="min"
           [max]="max"
+          [maxFractionDigits]="maxFractionDigits"
           class="w-full {{ isInvalid() || showMaxReachedMessage() ? 'border-2 rounded-[8px] border-[#E69F00]' : '' }}"
           [placeholder]="placeholder"
           [(ngModel)]="this.body().value"
