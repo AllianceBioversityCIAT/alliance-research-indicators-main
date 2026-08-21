@@ -996,6 +996,20 @@ Full client suite green (**312/312 suites · 6445/6445 tests**), coverage above 
 2. **Hold §12 and reduce the assertion standard** for the remaining six tasks — fewer rendered-output assertions, fewer probes. **Not recommended:** this is precisely the standard that caught the c3/RK-4 mutation, T-05's aliasing, T-06's c8 hole and T-07's four dead assertions. Cutting it to hit a line estimate trades real defect detection for a number.
 3. **Split the spec** — ship PR 1 + PR 2 (T-01…T-09) and re-scope T-10…T-13 as a follow-on. Defensible, but §7's PR plan already sequences this, and T-13 is the verification gate for the whole thing.
 
-**Nothing further will be dispatched until the user rules.**
+### User ruling — 2026-08-21
+
+**Option 1 accepted: the overrun is accepted and §12 is re-baselined.** The user's instruction was `continue`, given after the delta, the cause and the three options were presented in full. Execution resumed at T-08.
+
+**Re-baselined budget for T-13 c10's reconciliation:**
+
+| Measure | §12 original | Re-baselined | Basis |
+| --- | --- | --- | --- |
+| LOC | ~3,200 | **~4,600** | 3,463 actual at 7 tasks + ~1,140 projected for the remaining six (§6 derivation 870 at the observed +31% on spec-bearing tasks) |
+| Review rounds | ~28 | **~28, unchanged** | 12 used at 7 tasks; tracking under |
+| Tasks | 13 | 13, unchanged | No scope change |
+
+**Recorded cause: spec-tier density, not scope creep.** The implementation half of §12's split (~1,700) is holding. The entire miss is the spec half (~1,500), and the reason is the assertion standard this spec sets — rendered-output assertions over signal reads, length-guarded loops, executed falsifying inputs, and disqualifiers that ban the cheap assertion. **That standard is what the overrun bought**, and it is not a candidate for reduction: it caught RK-4's off-by-one, T-05's `@Input` aliasing, T-06's c8 coverage hole and T-07's four dead assertions.
+
+**What the user did NOT authorise, and what the Leader therefore did not do.** `continue` was read as accepting the budget and resuming execution. It was **not** read as approval to amend the approved spec. So the two artifact changes Lens A drafted for T-08 — a `design.md` §6.5 step-3 amendment and a new `c4b` criterion — **were not made.** Instead the Leader briefed T-08 to close the hazard **in code**, as a correct reading of step 3 against the server contract, and to record it as **done-without-a-named-criterion**. Consequence, stated plainly: **the silent-data-loss path is closed in the implementation but no done criterion gates it**, so a future regression would not be caught by `tasks.md`. That is the cost of not amending, and it is the user's call to leave it or close it.
 
 ---
