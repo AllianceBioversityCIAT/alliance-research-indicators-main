@@ -35,6 +35,7 @@ import { AllianceUserStaffModule } from '../alliance-user-staff/alliance-user-st
 import { ClarisaLeversModule } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { AgressoContractModule } from '../agresso-contract/agresso-contract.module';
 import { ResultInnovationDevModule } from '../result-innovation-dev/result-innovation-dev.module';
+import { ResultInnovationUseModule } from '../result-innovation-use/result-innovation-use.module';
 import { ResultSdgsModule } from '../result-sdgs/result-sdgs.module';
 import { ResultIpRightsModule } from '../result-ip-rights/result-ip-rights.module';
 import { ResultOicrModule } from '../result-oicr/result-oicr.module';
@@ -80,6 +81,7 @@ import { AiReportsModule } from '../ai-reports/ai-reports.module';
     ClarisaLeversModule,
     AgressoContractModule,
     ResultInnovationDevModule,
+    ResultInnovationUseModule,
     ResultSdgsModule,
     ResultIpRightsModule,
     forwardRef(() => ResultOicrModule),

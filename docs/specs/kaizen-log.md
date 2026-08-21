@@ -27,6 +27,12 @@ Other AKILI commands read only the `## Active Lessons` table below.
 
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
+> ⚠️ **Colisión de IDs sin reconciliar — merge de `staging` -> `AC-1679`, 2026-08-21.**
+> Las dos líneas de trabajo evolucionaron este registro en paralelo y **asignaron los mismos IDs a lecciones distintas** (`KZ-002`, `KZ-007`, `KZ-008` no significan lo mismo en cada lado; `KZ-001` sí es la misma lección, y la versión de `staging` es la más evolucionada). Renumerar cualquiera de los dos lados rompería las citas por ID que ya existen en los specs del otro.
+> **Ninguna tabla fue descartada ni fusionada por ID.** Quedan abajo separadas por linaje hasta que haya una decisión humana. **Al citar una lección, nombra el linaje**, no solo el ID.
+
+#### Linaje `staging` (registro principal — más entradas y recurrencias más altas)
+
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
 | **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **13** (+1 in `bilateral-mapping-table-enhancements`: testing sort logic on component instance without template binding `[customSort]` on `<p-table>`) | Product | Proposed |
 | **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note. **A red that would pass with the defect reintroduced is not evidence** | **High** | **2** (+5 in `pool-funding-sp-picker-empty`: an unrun comparison claimed verbatim; an assertion inverted against its own title; behavioural tests green with the defect restored; a mutated *assertion* offered as a code mutation; prose offered as screenshots) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
@@ -81,11 +87,26 @@ Other AKILI commands read only the `## Active Lessons` table below.
 > no `Write`, so the known mitigation cannot apply to it). Institutionalizing a rule retires the *rule*,
 > not the *failure mode*.
 
+#### Linaje `innovation-use` / `AC-1679` (esta rama)
+
+| ID | Lesson | Severity | Recurrence | Target | Status |
+| --- | --- | --- | --- | --- | --- |
+| KZ-001 | A test double that doesn't render or evaluate what it stands in for produces a green suite over broken behavior. Verify the double's fidelity, not just the assertion. | **High** | 4 | Product | proposed |
+| KZ-002 | Enumerating scope by a convenient proxy misses what the proxy stands in for. Enumerate by **the real thing**. **Recurred 2026-08-18** (live schema table list derived from source code: 3 of 64). **Recurred 2026-08-19** at the orchestration layer — the Leader's own finalize write marked a spec-wide *"every AC is checked"* item `[x]` while all 59 checkboxes were unflipped. **Recurred 2026-08-20** (`innovation-use/details-api` T-01 c1): a Done criterion asserting a live `200` in a `ServerResponseDto` was ticked because a human `/swagger` observation "released" it — but that observation covers the page **rendering**, and the wire envelope is proven at no tier. **The proxy was a human's answer to a different question**, which is the hardest variant to see. | **High** | 6 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19): grep-falsify any aggregate before flipping it. **+ `docs/specs/general-setup/task.md` §*A task is NOT done until* (2026-08-20, user-approved) — a criterion discharged by a human observation must quote what that observation covered, the variant recurrence 6 exposed.** Methodology upstream pending |
+| KZ-003 | Changing a component that many screens render requires a full-suite run. Targeted suites confirm the brief was followed, not that the blast radius is clean. | Medium | 1 | Product | proposed |
+| KZ-004 | Executing Bug Mode without the stack's verification prerequisites installed forces a red-before/green-after waiver the methodology can't recover post-fix. Pre-flight the test command's prerequisites before the fix lands. **Recurred 2026-08-18** (`bugfix/sp-versioning-roles-id` T-01): the named verification script did not exist and the "TEST" datasource was unreachable from any script. | **High** | 2 | Product + Methodology | proposed |
+| **KZ-005** | A correction sweep must bound its search space on **every axis** — phrasing, token, **file set**, and exemption criterion — not only the axis that last failed; and must re-grep any *new* value the correction introduces. **Recurred 2026-08-20** (`innovation-use/details-api`, validation round 2 FAIL-5): a figure correction updated two documents' **header rows** and asserted *"recorded identically"* in both, while **13 body sites** across five files kept the old values — a correction *relocated*, not applied, committed by the agent that had just invoked the closure rule. **Escalation this recurrence forces: the durable fix is not a better sweep, it is fewer sites asserting the same derived figure.** That cell has now been restated five times (2264 → 2275 → 2279 → 2285 → 2296); no sweep discipline survives a figure that goes stale whenever the tree changes. **Recurred 4× in `innovation-use/data-model-and-catalog` alone** (phrasing → token → file set → exemption-by-citation). **Root cause of the recurrence identified 2026-08-19: the lesson had been standardized into `.agents/leader.md` only, while every recurrence occurred in a *worker* executing a Leader-mandated sweep.** A lesson applied to the orchestrator does not reach the agent that performs the action. | **High** | 6 | Product + Methodology | **applied** → `.agents/leader.md` (2026-08-18) **+ `.agents/implementer.md` §Correction sweeps (2026-08-19) — the edit that closes the role gap. + `.agents/leader.md` (2026-08-20, user-approved) — a measured figure gets ONE home and cites its deriving command; fewer sites, not better sweeps.** Methodology upstream pending |
+| **KZ-006** | A task delivering a harness, fixture, or verification mechanism needs **one end-to-end criterion**. Every per-piece check can pass while the mechanism cannot run at all. | **High** | 1 | Product + Methodology | **applied** → `docs/specs/general-setup/task.md` §*A task is NOT done until* (2026-08-18, user-approved). Methodology upstream pending |
+| **KZ-007** | A brief that is locally correct in every bullet can still leave the worker's search space unbounded on the next axis down. Require a **per-unit completeness line that includes units with zero findings**, and require every claimed exemption to **quote the clause granting it**. | **High** | 1 | Product + Methodology | **applied** → `.agents/leader.md` §Bounding a worker's search space (2026-08-19, user-approved). Methodology upstream pending |
+| **KZ-008** | **An advisory that names a reachable state is not an advisory — it is an unfiled defect.** The advisory register has no owner and no gate, so a finding placed there stops being acted on. In `innovation-use/details-api`, **two of four product defects were sitting in the previous validation round's advisory register before they were defects** — the missing ownership check was *"recorded as an advisory three times"*, and the line immediately below it in the same register (*"identity-less organization rows binding `findOne` to an arbitrary existing row … but live"*) became a HIGH-severity silent data-destruction path. Require every advisory naming a reachable state to carry a **reachability verdict** — construct the payload, or say plainly that you could not. | **High** | 2 (both within one spec) | Product + Methodology | **applied** → `.agents/reviewer.md` §4R Review Lenses (2026-08-20, user-approved): an advisory naming a reachable state must carry a reachability verdict. Methodology upstream pending |
+
 ---
 
 ## Entries
 
 ### 2026-08-20 — changes/bilateral-mapping-table-enhancements
+
+### 2026-08-20 — innovation-use/details-api
 
 **Metrics**
 
@@ -122,6 +143,50 @@ Other AKILI commands read only the `## Active Lessons` table below.
 ---
 
 ### 2026-08-20 — bugfix/pool-funding-sp-picker-empty
+
+| Tasks executed | 13 | `tasks.md` |
+| Reviewer FAIL rework attempts | **≥ 8** — T-01 ×2 (incl. a reopen from `[x]`), T-03 ×2, T-06 ×2, T-07 ×1 + Pivot, T-09 ×2, T-11 ×1 | `execution.md` |
+| **Pivot Records** | **3** — T-01, T-07, T-10 | `execution.md` |
+| **Product defects** | **4**, all fixed on this endpoint; **plus 2 defects inside the remediations themselves** | `validation-report.md`, `execution.md` |
+| Validation rounds | **2** — round 1: 5 FAIL / 21 WARN · round 2: 7 FAIL / 22 WARN, **6 closed in-session** | `validation-report.md` |
+| Review rounds vs budget | **≥ 26 vs ~24** — stated as a floor, because the exact figure is not derivable from the tree | `tasks.md` §7 |
+| Fixture tier LOC vs estimate | **4,619** vs ~920 (**~5×**), escalated at T-12 and re-measured at archive | `tasks.md` §7 |
+| Human gates left open | **2** — security sign-off, FR-7 | `requirements.md` §15, `../family.md` |
+
+**MUDA identified.** The rework is *defect waste*, but its distribution is the finding: **not one of the four product defects was caught by a test run** — every one produced a `200`, and all four were found by an auditor reading code against a claim. Meanwhile three rework rounds were spent entirely on **comment accuracy**, after which the record concluded that *"this spec's residual risk lives outside the logic."* A reachable data-corruption path was in the same method the whole time. **Jidoka held** — every FAIL stopped the line, no defect was waived, and two quarantines were inverted by fixing the defect rather than softening the criterion.
+
+**Lessons**
+
+- **KZ-008 — NEW, High. The advisory register is where findings go to stop being acted on.** (Product + Methodology)
+  - Root cause: an advisory has no owner, no gate and no reachability verdict, so severity is never tested. Two of this spec's four product defects lived there first.
+  - Evidence: `validation-report.md` round 1 *Advisory register* — the ownership check *"recorded as an advisory three times before becoming a proven defect"*, and the adjacent line on identity-less organization rows, which round 2 promoted to **FAIL-1**.
+  - Standardization proposed: `.agents/reviewer.md` — an advisory naming a reachable state must carry a reachability verdict.
+
+- **KZ-002 — recurrence 5 → 6, and this variant is the hardest to see.** (Product + Methodology, High)
+  - Root cause: the proxy was **a human's answer to a different question**. T-01 c1 asserts a live `200` in a `ServerResponseDto`; it was ticked because a human `/swagger` observation "released" it, and that observation covers rendering.
+  - Evidence: `tasks.md` T-01 c1 · `execution.md` *Human `/swagger` Observation* · `test-report.md` G-3 · `validation-report.md` FAIL-3.
+  - Standardization proposed: `docs/specs/general-setup/task.md` — a criterion discharged by a human observation must quote what the observation covered.
+
+- **KZ-005 — recurrence 5 → 6, and the recurrence forces an escalation.** (Product + Methodology, High)
+  - Root cause: the sweep updated **header rows** and asserted cross-document identity without grepping the bodies — 13 stale sites across five files. Committed by the agent that had just invoked the correction-closure rule.
+  - Evidence: `validation-report.md` FAIL-5 · the trajectory 2264 → 2275 → 2279 → 2285 → 2296.
+  - **Escalation: the durable fix is fewer sites asserting one derived figure, not a better sweep.** A figure that goes stale whenever the tree changes will outlive any discipline applied to the people restating it.
+  - Standardization proposed: `.agents/leader.md` — derive-once, cite-the-deriving-command, and cap the number of documents allowed to state a measured figure.
+
+**Standardization applied 2026-08-20 (user-approved, all four):**
+
+| # | Edit | Home |
+|---|---|---|
+| 1 | Result *section* controllers do NOT use `@Roles` — section access is JWT + `ResultStatusGuard`. Grep-verified: 0 of 15 `RESULT_CODE` controllers declare it | `server/researchindicators/src/CLAUDE.md` §4 **+ its `AGENTS.md` mirror** |
+| 2 | KZ-008 — an advisory naming a reachable state must carry a reachability verdict | `.agents/reviewer.md` §4R Review Lenses |
+| 3 | KZ-002 — a criterion discharged by a human observation must quote what the observation covered | `docs/specs/general-setup/task.md` §*A task is NOT done until* |
+| 4 | KZ-005 — a measured figure gets ONE home; cite the deriving command; never assert cross-document identity you did not grep | `.agents/leader.md` §Bounding a worker's search space |
+
+Edit 1 is constitution sync, not Kaizen: the guide was telling every future agent to add the one thing DD-5 ruled out. The persona wrappers under `.claude/agents/` and `.agents/agents/` are thin pointers to `.agents/<role>.md`, so edits 2 and 4 need no wrapper change.
+
+---
+
+### 2026-08-19 — innovation-use/data-model-and-catalog
 
 **Metrics**
 
@@ -721,6 +786,88 @@ Two defects found in local verification **after** the spec was archived. Both we
 - **Pivots cost zero rework attempts**, as designed. Both spec defects were caught before burning the 3-attempt ceiling.
 
 ---
+
+
+| Tasks executed | 13 (T-03 extracted to its own spec) | `tasks.md` |
+| Reviewer FAIL rework attempts | **6** — T-12 ×2, T-13 ×2, T-14 ×2 | `execution.md` |
+| Escalations resolved by user ruling | 2 (T-12, T-13) | `execution.md` |
+| HALTs / FATAL_FAILs / Pivots | **0** | `execution.md` |
+| Judgment-day findings | **44** across 3 rounds, all ESCALATED, lineage exhausted | `design.md` §0 |
+| Validation FAIL / WARN | **0 / 7** | `validation-report.md` |
+| Review rounds vs budget | **13 vs 4–5 — 2.6×**, authorized, never silent | `design.md` §12, `execution.md` |
+
+**MUDA identified:** the review-round overrun is almost entirely *defect waste* concentrated in three tasks, and all six rework attempts trace to two root causes already in this log. **Jidoka held throughout** — every FAIL stopped the line, no defect was waived, and the one attempt that ran out of road (T-14 attempt 3) passed rather than HALTing.
+
+**Lessons**
+
+- **KZ-005 — recurrence 4→5, and the recurrence itself is the finding.** (Product + Methodology, High)
+  - Root cause: the lesson was standardized into `.agents/leader.md`, but **every one of the four recurrences happened inside a worker** carrying out a Leader-mandated sweep. The orchestrator knew the rule; the agent doing the work never saw it.
+  - Evidence: `execution.md` — T-14 attempts 1–3; the Leader adjudication table under *attempt 2*.
+  - Standardization: append §Correction sweeps to `.agents/implementer.md`. → **Applied 2026-08-19 (user-approved)**
+
+- **KZ-002 — recurrence 4→5, new layer: the orchestrator's own finalize write.** (Product + Methodology, High)
+  - Root cause: the Leader marked a spec-wide *"every AC is checked"* done-definition item `[x]` while all 59 checkboxes were unflipped — substituting the proxy ("the tasks are done") for the real thing. **The finalize write is the only claim in the pipeline no Reviewer audits.**
+  - Evidence: commit `1753e786` (defect), `d1e57ead` (retraction), `39dd8f6c` (discharged on evidence); `execution.md` — *Leader self-correction*.
+  - Standardization: grep-falsify clause in `.agents/leader.md`. → **Applied 2026-08-19 (user-approved)**
+
+- **KZ-007 — a locally-correct brief can still leave the search space unbounded.** (Product + Methodology, High)
+  - Root cause: three consecutive Leader briefs were correct in every bullet yet each bounded only the axis that had last failed — phrasing, then token, then file set — so the defect moved down one level each time. The countermeasure that finally worked was structural: a per-unit completeness line **including units with zero findings**, plus a requirement that exemptions quote their governing clause.
+  - Evidence: `execution.md` — *Leader accountability* notes in T-14 attempts 1 and 2; the method section of attempt 3.
+  - Standardization: append §Bounding a worker's search space to `.agents/leader.md`. → **Applied 2026-08-19 (user-approved)**
+
+**Carried follow-up:** **C-4** — `platformSeeded` / `innovationDevRoleSeeded` in the fixture harness are structurally always `false` (dead branches). User ruling 2026-08-19: **log as follow-up for chunk 2**, which will be in those files and can verify the removal in context.
+
+
+### 2026-08-18 — `bugfix/sp-versioning-roles-id`
+
+**Outcome:** delivered and validated; **archived 2026-08-18 to `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/` with three readiness gates unmet, on explicit user instruction** (T-03 `[~]`, both §7 sign-off rows open, branch unmerged; W-4 unowned). This retrospective ran *ahead* of the move, when `/akili-archive` was first blocked at that gate — Steps 3 and 4 do not depend on the merge, and the Constitution Sync had found a constitutional document stating a falsehood. **The fix has not run against the shared dev database**; the archive records a closed spec, not a shipped repair.
+
+**What shipped:** two append-only migrations repairing `SP_versioning` (MySQL 1054, `roles_id` dropped from under it) and its mandatory companion `SP_delete_result_version` (MySQL 1451, activated *by* the first repair — RB-5), plus the repo's first disposable-MySQL harness and a committed schema-only baseline snapshot.
+
+#### Measure
+
+| Signal | Count | Source |
+| --- | --- | --- |
+| Tasks executed | 5 (T-01, T-01b, T-02, T-02b, T-03) | tasks.md |
+| Reviewer FAIL / rework cycles | 1 (T-03 attempt 1 — 4 findings across 2 lenses) | execution.md → T-03 attempt 1 |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| **Pivot records** | **3** (T-01, T-01b, T-02) | execution.md → `## Pivot Record` ×3 |
+| PRODUCT_BUGs | 0 (no `/akili-test` phase — accepted, no application code changed) | validation-report.md → Test Evidence |
+| Judgment Day severe findings | 0 in-spec; **the spec itself exists because of one** — chunk 1's round-3 transcription found `SP_versioning` non-executable in `main` | innovation-use/data-model-and-catalog/judgment.md |
+| Validation FAIL / WARN | **2 / 11** → 2 closed, 10 closed, 1 open (W-4) | validation-report.md → Remediation Status |
+| Constitution drift attributable | 6 sites (2 high) | execution.md → `## Constitution Impact` |
+| Runtime (non-work) failures | 1 — Reviewer spawn died on API 529, retried; the "dead" spawn later completed | execution.md → T-03 attempt 2 addendum |
+| Budget variance | tasks 5/5 · LOC ≈3,065 vs ~2,750 (**+11%**) · review rounds **5 vs 3–4** | execution.md → Document Control |
+
+#### Learn
+
+- **KZ-005 — A correction sweep enumerated the strings it had edited, not the claim it had changed.** (Product + Methodology, **High**)
+  - **Root cause.** The T-02 Pivot's forward sweep and the B-12 advisory remediation both searched for the *literal values they had just changed*. Neither searched for every place the underlying **idea** was restated. The pivot turned a one-migration spec into a two-migration spec; "one migration" was never a string anyone grepped for, so it survived in four places — including **both Executive Summaries and a Document Control row**, the first text a merge approver reads. A reader stopping there is told to ship one migration, which the spec's own **RB-5** classifies as converting a total failure into **partial data loss**.
+  - **Evidence.** `validation-report.md` → F-1 (four sites) and F-2 (`tasks.md:155` still "37 child deletes" after advisory B-12 was recorded ✅ FIXED naming only two of its three sites); `execution.md:490-492` asserts the forward sweep "All located and updated".
+  - **Confirming datum.** When the remediation finally grepped for the *concept* rather than the strings, it found **six further sites nobody had named**, including a **third** stale figure (`~2,110`) that had propagated into a neighbouring spec in five places and that neither the auditor nor the Leader knew existed — they were both grepping for `~2,050`.
+  - **Standardization:** added a bullet to `.agents/leader.md`'s Spec Drift / Pivot Protocol section — sweep the *claim* in every phrasing, then re-grep for any new value the correction introduces. → **Applied 2026-08-18 (user-approved)**
+  - **Methodology upstream:** `/akili-specify`'s **Correction Closure** step says to grep "the superseded **value**". That word is the gap — it prescribes a string search for a conceptual problem. Recommend upstreaming to the AKILI repo.
+
+- **KZ-006 — A harness passed every per-piece check while being unable to run at all.** (Product + Methodology, **High**)
+  - **Root cause.** T-01's done-definition decomposed the harness into pieces and verified each: the module resolved to `dataSourceTarget.TEST` (proven by a falsifying sentinel), a smoke fixture passed with the container up and failed with it down, the untouched files were confirmed untouched. Every criterion passed. The harness still could not produce a schema, because **no criterion exercised the whole mechanism end to end** — and the reason it couldn't was outside every piece: 10 migrations write to `sec_template` and none of the 303 creates it (MySQL 1146). That took **two pivots** (T-01, then T-01b) to surface and resolve, and retired one done-criterion as never-achievable.
+  - **Evidence.** `execution.md` → `## Pivot Record: T-01` and `## Pivot Record: T-01b`; `tasks.md:60` (criterion retired as never achievable, RB-1d); the Leader's own candidate lesson at `execution.md:148`.
+  - **Distinct from KZ-004**, which is about pre-flighting a verification command's prerequisites. This one is about the **shape of a done-definition**: per-piece completeness is not mechanism completeness.
+  - **Standardization:** added a bullet to `docs/specs/general-setup/task.md`'s *A task is NOT done until* list — a task delivering a harness/fixture/verification mechanism must carry one end-to-end criterion. → **Applied 2026-08-18 (user-approved)**
+  - **Methodology upstream:** the same gap exists in the AKILI task template. Recommend upstreaming.
+
+- **Recurrences (no new lesson — root cause already active):**
+  - **KZ-002 → recurrence 4.** Deriving the live database's table list from source code found **3 of 64** (95% miss); caught only because the Implementer flagged its own result as unverified rather than asserting completeness. Same root cause as the original — a convenient proxy substituted for the real thing, one layer down. Evidence: `execution.md:242`, `src/db/baseline/README.md:41`.
+  - **KZ-004 → recurrence 2, severity raised Medium → High.** T-01 found the design's named verification script (`migration:run`) did not exist, and the `TEST` datasource target was unreachable from any npm script. Evidence: `execution.md:105`, `:146`.
+
+#### What went right, and is worth imitating
+
+Recorded because a retrospective that only lists defects teaches half the lesson:
+
+- **Every pivot stopped the line rather than working around the blocker** — *jidoka*. Each `## Pivot Record` names its trigger, argues why it is not rework, sizes the blast radius, presents costed alternatives, waits for a user ruling, then lists amendments and runs a sweep. The validation auditor called the records "exemplary"; what failed was the sweeps, not the protocol.
+- **Load-bearing claims were re-derived rather than adjudicated on report** — the Leader independently verified the `sec_*` grep, the datasource route, the dump composition, the body diff, the RESTRICT-FK chain and the statement counts. That is the only reason the validation could audit the figures at all.
+- **Workers overruled their briefs, correctly, three times:** the Implementer corrected the auditor's "all three documents" overstatement; it declined the auditor's "five of six" tick count because the sixth would assert T-03 was done while it is `[~]`; and a Reviewer verified `RB-B2`'s status independently after being told it was settled. All three would have been silent errors under deference.
+- **`author ≠ auditor` was defended under pressure.** When a Reviewer spawn died on an API 529, the inline fallback was refused on the grounds that an infrastructure failure does not suspend a correctness constraint. When the "dead" spawn later completed, the two PASS verdicts were recorded as **asymmetric** — the second had seen a tree already containing the first's record — rather than presented as two clean confirmations.
+
 
 ### 2026-08-13 — `bugfix/oicr-lever-dropdowns`
 

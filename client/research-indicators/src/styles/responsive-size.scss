@@ -1,0 +1,193 @@
+// Responsive Size Utility Classes
+// Contract: client/research-indicators/README.md ("Responsive Size Utility
+// Classes Documentation") + docs/ux-ui/design.md §7.1. Do not edit ranges
+// here without updating both docs in the same change (RB-9 exists precisely
+// because this file and those docs drifted apart).
+// Ranges (per README "Notes"): fs-[n] is 1-30px; the three size families
+// (rs-size/rs-w/rs-h) go 0-500px; every other rs-* family (gap/margin/
+// padding) is 1-30px, same as fs-[n].
+// Escaping: bracketed class names need `\[` / `\]`; the `md:` prefix's
+// colon needs `\:`. `.md-rs-hide` uses a literal hyphen, NOT `md\:rs-hide`
+// — that is the README's own documented inconsistency, preserved as-is.
+// `md:` breakpoint (README, opening sentence): landscape orientation and
+// screens with height <= 768px. `md:` variants carry `!important` to
+// override base rules, per README "Notes".
+
+// ---- Font size: 1-30px ----
+@for $i from 1 through 30 {
+  .fs-\[#{$i}\] {
+    font-size: #{$i}px;
+  }
+}
+
+// ---- Size (width/height): 0-500px ----
+@for $i from 0 through 500 {
+  .rs-size-\[#{$i}\] {
+    width: #{$i}px;
+    height: #{$i}px;
+  }
+  .rs-w-\[#{$i}\] {
+    width: #{$i}px;
+  }
+  .rs-h-\[#{$i}\] {
+    height: #{$i}px;
+  }
+}
+
+// ---- Gap: 1-30px ----
+@for $i from 1 through 30 {
+  .rs-gap-\[#{$i}\] {
+    gap: #{$i}px;
+  }
+  .rs-gap-x-\[#{$i}\] {
+    column-gap: #{$i}px;
+  }
+  .rs-gap-y-\[#{$i}\] {
+    row-gap: #{$i}px;
+  }
+}
+
+// ---- Margin: 1-30px ----
+@for $i from 1 through 30 {
+  .rs-m-\[#{$i}\] {
+    margin: #{$i}px;
+  }
+  .rs-mx-\[#{$i}\] {
+    margin-left: #{$i}px;
+    margin-right: #{$i}px;
+  }
+  .rs-my-\[#{$i}\] {
+    margin-top: #{$i}px;
+    margin-bottom: #{$i}px;
+  }
+  .rs-mt-\[#{$i}\] {
+    margin-top: #{$i}px;
+  }
+  .rs-mb-\[#{$i}\] {
+    margin-bottom: #{$i}px;
+  }
+  .rs-ml-\[#{$i}\] {
+    margin-left: #{$i}px;
+  }
+  .rs-mr-\[#{$i}\] {
+    margin-right: #{$i}px;
+  }
+}
+
+// ---- Padding: 1-30px ----
+@for $i from 1 through 30 {
+  .rs-p-\[#{$i}\] {
+    padding: #{$i}px;
+  }
+  .rs-px-\[#{$i}\] {
+    padding-left: #{$i}px;
+    padding-right: #{$i}px;
+  }
+  .rs-py-\[#{$i}\] {
+    padding-top: #{$i}px;
+    padding-bottom: #{$i}px;
+  }
+  .rs-pt-\[#{$i}\] {
+    padding-top: #{$i}px;
+  }
+  .rs-pb-\[#{$i}\] {
+    padding-bottom: #{$i}px;
+  }
+  .rs-pl-\[#{$i}\] {
+    padding-left: #{$i}px;
+  }
+  .rs-pr-\[#{$i}\] {
+    padding-right: #{$i}px;
+  }
+}
+
+// ---- Visibility ----
+.rs-hide {
+  display: none;
+}
+
+// ---- md: breakpoint variants (landscape, height <= 768px) ----
+@media (orientation: landscape) and (height <= 768px) {
+  @for $i from 1 through 30 {
+    .md\:fs-\[#{$i}\] {
+      font-size: #{$i}px !important;
+    }
+  }
+
+  @for $i from 0 through 500 {
+    .md\:rs-size-\[#{$i}\] {
+      width: #{$i}px !important;
+      height: #{$i}px !important;
+    }
+    .md\:rs-w-\[#{$i}\] {
+      width: #{$i}px !important;
+    }
+    .md\:rs-h-\[#{$i}\] {
+      height: #{$i}px !important;
+    }
+  }
+
+  @for $i from 1 through 30 {
+    .md\:rs-gap-\[#{$i}\] {
+      gap: #{$i}px !important;
+    }
+    .md\:rs-gap-x-\[#{$i}\] {
+      column-gap: #{$i}px !important;
+    }
+    .md\:rs-gap-y-\[#{$i}\] {
+      row-gap: #{$i}px !important;
+    }
+
+    .md\:rs-m-\[#{$i}\] {
+      margin: #{$i}px !important;
+    }
+    .md\:rs-mx-\[#{$i}\] {
+      margin-left: #{$i}px !important;
+      margin-right: #{$i}px !important;
+    }
+    .md\:rs-my-\[#{$i}\] {
+      margin-top: #{$i}px !important;
+      margin-bottom: #{$i}px !important;
+    }
+    .md\:rs-mt-\[#{$i}\] {
+      margin-top: #{$i}px !important;
+    }
+    .md\:rs-mb-\[#{$i}\] {
+      margin-bottom: #{$i}px !important;
+    }
+    .md\:rs-ml-\[#{$i}\] {
+      margin-left: #{$i}px !important;
+    }
+    .md\:rs-mr-\[#{$i}\] {
+      margin-right: #{$i}px !important;
+    }
+
+    .md\:rs-p-\[#{$i}\] {
+      padding: #{$i}px !important;
+    }
+    .md\:rs-px-\[#{$i}\] {
+      padding-left: #{$i}px !important;
+      padding-right: #{$i}px !important;
+    }
+    .md\:rs-py-\[#{$i}\] {
+      padding-top: #{$i}px !important;
+      padding-bottom: #{$i}px !important;
+    }
+    .md\:rs-pt-\[#{$i}\] {
+      padding-top: #{$i}px !important;
+    }
+    .md\:rs-pb-\[#{$i}\] {
+      padding-bottom: #{$i}px !important;
+    }
+    .md\:rs-pl-\[#{$i}\] {
+      padding-left: #{$i}px !important;
+    }
+    .md\:rs-pr-\[#{$i}\] {
+      padding-right: #{$i}px !important;
+    }
+  }
+
+  .md-rs-hide {
+    display: none !important;
+  }
+}

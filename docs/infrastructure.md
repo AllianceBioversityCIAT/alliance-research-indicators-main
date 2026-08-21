@@ -228,6 +228,8 @@ instead of silently connecting somewhere unintended.
 
 Run from `server/researchindicators/`. Ordering and governance are §6.4 — these are only the commands.
 
+**Shared dev database (`ARI_MYSQL_*`) — not disposable, never reset by an agent:**
+
 | Action | Command |
 | --- | --- |
 | Apply pending migrations (from TS sources) | `npm run migration:dev:execute` |
@@ -236,6 +238,26 @@ Run from `server/researchindicators/`. Ordering and governance are §6.4 — the
 | Generate a new migration | `npm run migration:generate -- ./src/db/migrations/<name>` |
 
 **`migration:revert` against the shared Dev database affects every other developer** — it is a coordinated action, never a unilateral one. Migrations are append-only (§6.4).
+
+**Disposable scratch schema (`ARI_TEST_MYSQL_*`) — added 2026-08-18 by `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id` (T-01b), for fixtures and migration testing only.** Run every command below from `server/researchindicators/`:
+
+| Action | Command |
+|---|---|
+| Bring up the scratch MySQL container | `npm run compose:test:up` |
+| Load the committed schema-only snapshot (`src/db/baseline/baseline.sql`) | `npm run baseline:test:load` |
+| Apply migrations against the TEST datasource | `npm run migration:test:execute` |
+| **Load, then apply — the only safe order** | `npm run migration:test:bootstrap` |
+| Roll back the last migration (TEST datasource) | `npm run migration:test:revert` |
+| Tear the scratch container down | `npm run compose:test:down` |
+| Run the fixture suite | `npm run test:fixtures` |
+
+⚠️ **Two traps, neither obvious from the command names alone:**
+1. **Order is not optional.** `migration:test:bootstrap` *is* `baseline:test:load && migration:test:execute`. Run `migration:test:execute` alone against a fresh scratch container and it fails immediately — the schema doesn't exist until the snapshot loads first.
+2. **The fixture runner is silently name-gated.** `npm run test:fixtures` (`test/jest-fixtures.json`) collects **only** files matching `*.fixture-spec.ts`. A fixture file named plain `*.spec.ts` is collected by **neither** this runner nor `npm test` — a silent zero-tests-collected pass that looks green and tested nothing.
+
+**Seed / reset, shared dev DB:** still true, unchanged by the above — **no seed or reset script exists for `ARI_MYSQL_*`, and none should be added.** It is a shared remote instance (§4 above); there is nothing an agent may safely reset there. Destructive schema or data operations against it remain a human decision (see *Boundary rule* below).
+
+**What the scratch schema is *not*:** it does not touch, seed, or reset the shared dev database. It is a separate, disposable MySQL container reachable only through `ARI_TEST_MYSQL_*`, loaded from a committed snapshot with **no business data** (its one row-level exception is the `migrations` bookkeeping table — see `server/researchindicators/src/db/baseline/README.md`). **A `TEST`-named variable is not evidence of a disposable target** — on at least one developer machine, `ARI_TEST_MYSQL_*` was found resolving to the same remote RDS instance as `ARI_MYSQL_*` (finding F-01, `docs/specs/archive/2026-08-18-bugfix--sp-versioning-roles-id/execution.md`). Always verify the **resolved host and port**, never the variable name, before treating a target as disposable.
 
 **A migration is only verified once it has been executed.** It can be valid TypeScript, lint-clean, type-clean and reviewed while still being unrunnable — this happened on 2026-08-13 and is recorded as Kaizen K-006. Run it against a disposable local MySQL of the same engine version before the PR.
 
@@ -251,10 +273,16 @@ Run from `server/researchindicators/`. Ordering and governance are §6.4 — the
 
 ## 7. Open Items (need ops sign-off)
 
-- OI-1. Document exact host allowlists (`app_secret_host_list`) for machine-token clients in Dev vs Prod.
-- OI-2. Confirm S3 evidence lifecycle policy and bucket encryption settings.
-- OI-3. Formalize the automated release tagging convention between `dev` and `main`.
-- OI-4. Ensure production admin guard is locked down prior to public routing of `/admin`.
+- OI-1. Confirm server hosting: Elastic Beanstalk vs ECS/Fargate vs other.
+- OI-2. Confirm IaC ownership and tool (Terraform / CDK / manual).
+- OI-3. Confirm S3 usage for evidence storage, its lifecycle policy, and bucket encryption settings.
+- OI-4. Define the admin-panel production auth guard before exposing `/admin`, and ensure it is locked down prior to public routing.
+- OI-5. Document rate-limit and machine-token rotation policies.
+- OI-6. Confirm region / data-residency constraints (PRD open question on PII / GDPR).
+- OI-7. **Partly answered 2026-08-18.** A seed/reset path now exists for *schema*: the disposable scratch container + committed snapshot at `server/researchindicators/src/db/baseline/` (`## Local Environment` -> *Data & migrations*). Still open: a working data seed.
+- OI-8. Publish a committed template for the client's `src/environments/environment.ts` (an `.example` counterpart to the server's `.env.example`), so a new developer can start the client without asking a teammate.
+- OI-9. Document exact host allowlists (`app_secret_host_list`) for machine-token clients in Dev vs Prod.
+- OI-10. Formalize the automated release tagging convention between `dev` and `main`.
 
 ---
 

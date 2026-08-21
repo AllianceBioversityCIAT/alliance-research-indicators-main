@@ -42,6 +42,9 @@ describe('CacheService', () => {
     expect(service.currentResultIndicatorSectionPath()).toBe('policy-change');
     service.currentMetadata.set({ indicator_id: 5 } as any);
     expect(service.currentResultIndicatorSectionPath()).toBe('oicr-details');
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    service.currentMetadata.set({ indicator_id: 6 } as any);
+    expect(service.currentResultIndicatorSectionPath()).toBe('innovation-use-details');
     service.currentMetadata.set({ indicator_id: 999 } as any);
     expect(service.currentResultIndicatorSectionPath()).toBe('');
   });
@@ -376,6 +379,11 @@ describe('CacheService', () => {
     // Test indicator_id = 4
     service.currentMetadata.set({ indicator_id: 4 });
     expect(service.currentResultIndicatorSectionPath()).toBe('policy-change');
+
+    // Test indicator_id = 6
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    service.currentMetadata.set({ indicator_id: 6 });
+    expect(service.currentResultIndicatorSectionPath()).toBe('innovation-use-details');
 
     // Test other indicator_id
     service.currentMetadata.set({ indicator_id: 3 });

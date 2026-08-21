@@ -64,6 +64,8 @@ import { AskForHelp } from '../components/all-modals/modals-content/ask-for-help
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { HttpParams } from '@angular/common/http';
 import { GetInnovationDetails } from '@shared/interfaces/get-innovation-details.interface';
+import { GetInnovationUseDetails } from '@shared/interfaces/get-innovation-use-details.interface';
+import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels.interface';
 import { InnovationCharacteristic, InnovationLevel, InnovationType } from '@shared/interfaces/get-innovation.interface';
 import { ActorType } from '@shared/interfaces/get-actor-types.interface';
 import { ClarisaInstitutionsSubTypes } from '@shared/interfaces/get-clarisa-institutions-subtypes.interface';
@@ -583,6 +585,21 @@ export class ApiService {
   PATCH_InnovationDetails = <T>(resultCode: number, body: T): Promise<MainResponse<GetInnovationDetails>> => {
     const url = () => `results/innovation-dev/${resultCode}`;
     return this.TP.patch(url(), body, { useResultInterceptor: true });
+  };
+
+  GET_InnovationUseDetails = (resultCode: number): Promise<MainResponse<GetInnovationUseDetails>> => {
+    const url = () => `results/innovation-use/${resultCode}`;
+    return this.TP.get(url(), { loadingTrigger: true, useResultInterceptor: true });
+  };
+
+  PATCH_InnovationUseDetails = <T>(resultCode: number, body: T): Promise<MainResponse<GetInnovationUseDetails>> => {
+    const url = () => `results/innovation-use/${resultCode}`;
+    return this.TP.patch(url(), body, { useResultInterceptor: true });
+  };
+
+  GET_InnovationUseLevels = (): Promise<MainResponse<InnovationUseLevel[]>> => {
+    const url = () => `tools/clarisa/innovation-use-levels`;
+    return this.TP.get(url(), {});
   };
 
   GET_ResultEvidences = (resultId: number): Promise<MainResponse<PatchResultEvidences>> => {

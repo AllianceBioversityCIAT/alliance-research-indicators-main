@@ -40,6 +40,8 @@ export class InputComponent {
   @Input() disabled = false;
   @Input() maxLength?: number;
   @Input() maxWords?: number;
+  // @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
+  @Input() maxFractionDigits?: number;
 
   body = signal<{ value: InputValueType }>({ value: null });
   firstTime = signal(true);

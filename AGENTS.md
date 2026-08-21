@@ -91,6 +91,7 @@ alliance-research-indicators-main/            # monorepo root (husky-management)
 │   │   ├── db/
 │   │   │   ├── config/mysql/        # TypeORM datasource + targets
 │   │   │   ├── config/dynamo/       # DynamoDB module + service
+│   │   │   ├── baseline/            # committed schema-only snapshot bootstrapping the disposable TEST scratch schema
 │   │   │   └── migrations/          # append-only (count lives in the folder, never here)
 │   │   └── domain/
 │   │       ├── routes/main.routes.ts        # RouterModule registration

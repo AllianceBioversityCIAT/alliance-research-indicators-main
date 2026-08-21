@@ -76,6 +76,10 @@ Your sole responsibility is to implement the technical scope of the active task 
 
 ---
 
+## 🧹 Correction sweeps (KZ-005 — added 2026-08-19)
+
+When a task asks you to correct a superseded claim, sweep **every phrasing of the claim and every file in scope**, not only the string you edited or the file you were already in. Then re-grep any **new** value your correction introduces, to confirm it created no false claim elsewhere. Report a **per-file tally including files with zero hits** — a flat list hides a whole-file miss.
+
 ## 📝 Reporting Completion
 
 When you finish implementing and verifying your task, provide a concise response to the Leader:

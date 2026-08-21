@@ -77,6 +77,7 @@ import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
+import { ResultInnovationUseService } from '../result-innovation-use/result-innovation-use.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
@@ -152,6 +153,7 @@ export class ResultsService {
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultInnovationUseService: ResultInnovationUseService,
     private readonly _resultSdgsService: ResultSdgsService,
     @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
@@ -564,6 +566,9 @@ export class ResultsService {
       case IndicatorsEnum.OICR:
         await this._resultOicrService.create(resultId, manager);
         break;
+      case IndicatorsEnum.INNOVATION_USE:
+        await this._resultInnovationUseService.create(resultId, manager);
+        break;
       case IndicatorsEnum.KNOWLEDGE_PRODUCT:
         await this._resultKnowledgeProductService.create(resultId, manager);
         break;
@@ -574,6 +579,7 @@ export class ResultsService {
     const ipAvailables = [
       IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
       IndicatorsEnum.INNOVATION_DEV,
+      IndicatorsEnum.INNOVATION_USE,
     ];
 
     if (ipAvailables?.includes(indicator)) {

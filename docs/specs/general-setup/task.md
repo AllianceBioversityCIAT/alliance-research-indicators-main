@@ -118,6 +118,8 @@ Per task, declare:
 **When a task realigns existing expectations, derive its site list from the failing suite, not from a grep (K-018).** Grep enumerates *mentions* of the value you are changing; only the run enumerates *breakages*. A list built by grep fails in three directions at once — it names sites that are already green for an unrelated reason, misses genuinely red ones, and can skip a whole file. Apply the change, run the suite, and let the failures write the list.
 
 A task is NOT done until:
+- **If the task delivers a harness, fixture, or any verification mechanism:** at least one criterion exercises the mechanism **end to end** (KZ-006). Per-piece checks can all pass while the mechanism cannot run at all.
+- **If a criterion is discharged by a human observation, quote what the observation actually covered** (KZ-002). A human's answer is the hardest proxy to spot, because it is genuine evidence — of something. Tick the criterion only if the quoted words cover the clause; if they cover an adjacent property, say which and re-class the criterion as blocked on whatever would cover it. Precedent: a criterion asserting a live `200` in a `ServerResponseDto` was ticked because a `/swagger` observation "released" it, and that observation covered the page *rendering*.
 - `npm run lint` passes.
 - `npm test` passes locally.
 - New endpoints appear correctly in `/swagger`.
