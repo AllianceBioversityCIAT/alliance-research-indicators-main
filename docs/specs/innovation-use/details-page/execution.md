@@ -1422,3 +1422,62 @@ The PrimeNG claim is **true**: `primeng-select.mjs` L2573/L2603 set `[attr.aria-
 **Remote-stylesheet caveat: closed.** The Implementer fetched the app's one external stylesheet and found it contains **no rule for any of the four classes under any selector**. The Reviewer, lacking network access, replaced that with an argument independent of the fetch: the file is **1074 bytes**, while the documented `rs-*` family spans p/m/gap/w/h/size over 0–500px with `md:` variants plus `fs-` over 1–30 — **tens of kilobytes minimum. 1074 bytes cannot physically contain it.** The conclusion holds either way.
 
 ---
+
+## RB-9 resolved — `responsive-size.scss` created (user-authorized, option A)
+
+**Not a numbered task.** A user-authorized change closing the blocking finding T-11's review surfaced: the `.rs-*` / `.fs-[n]` families mandated by **four constitutional documents** had no implementation anywhere, so the section rendered as unpadded, ungapped, unseparated boxes and **T-13 c7 could not pass**. The user chose to **make the documentation true** rather than amend five documents to match an absence.
+
+**Two files:** `src/styles/responsive-size.scss` (new, 193 lines, ~4,089 selectors) + one line in `angular.json`'s build `styles` array. **Reviewer: PASS.**
+
+### The Leader's brief was wrong on the ranges, and the correction is what made this viable
+
+The Leader's table assumed gap/margin/padding spanned **0–500**, which would have been ~20,000 selectors and 600–800 kB. The Implementer read the contract instead of the brief and found `README.md:258` — *"All values (n) range from 1 to 30 for most utilities (except size which goes up to 500)"* — a **general rule with one named exception**.
+
+**The Reviewer upheld it on three convergent grounds, including one neither the Leader nor the Implementer had cited:** only the two deviating families restate a range inline; **every** gap/margin/padding example in the README is ≤ 30; and `docs/ux-ui/design.md:364` settles the size question authoritatively — *"`.rs-size-[n]`, `.rs-w-[n]`, `.rs-h-[n]` — width/height (0–500 px)"*, one bullet, one range, all three families. **So the range table is not a judgment call — it is what both documents say when read together.** ~4,089 selectors, and the budget problem dissolved.
+
+### Measured outcome
+
+| | Before | After | Delta |
+| --- | --- | --- | --- |
+| `styles-*.css` | 97.66 kB / 10.56 kB transfer | 262.71 kB / 19.25 kB | +165.05 kB / **+8.69 kB transfer** |
+| Initial bundle | 1.16 MB / 265.70 kB | **1.32 MB / 274.39 kB** | +163.84 kB |
+
+**No budget warning or error fired** (2 MB warning / 3 MB error). Full suite 312/312 · 6510/6510. Lint clean. `s-lint`: 352 pre-existing errors unchanged elsewhere, **zero** in the new file.
+
+### The specificity question, answered concretely rather than in the abstract
+
+This was the Leader's chief worry — *"a utility layer that loses specificity ties is as useless as an absent one, and the failure would be silent."* The Reviewer settled every axis:
+
+- **vs Tailwind — always wins.** Tailwind v4 (CDN) emits everything inside native `@layer`s, and **unlayered normal declarations beat any layered declaration regardless of source order.** The new sheet is unlayered, so `.rs-p-[12]` beats `p-4` unconditionally.
+- **vs `custom-prime-force-styles.scss` — the feared inversion does not happen.** `!important` beats a later non-important rule, so placing that file *before* the utility layer cannot invert its forcing intent. Its non-important declarations share no property with any family. And its scariest rule, `body { font-size: 13px !important }`, is **inherited** — a direct rule on a descendant beats an inherited one however important.
+- **vs component styles — no competitor exists.** The four components have **zero** `.scss` files.
+- **Last position is *required*, not merely convenient:** `design.md:370` states the intent as *"per-element overrides via `.fs-[n]`"*, and an override can only override from a later position.
+
+**And the breakpoint risk is moot:** `@media (orientation: landscape) and (height <= 768px)` — the exact query — **already ships in production** at `custom-prime-force-styles.scss:31`.
+
+### Escaping verified without a build
+
+No `dist/` existed for the Reviewer, so instead of re-running the Implementer's proof it corroborated arithmetically: counting selectors from source gives **4,089**, matching the Implementer's ~4,088 within rounding — an independent check on the build excerpt. It confirmed every one of the 15 families is escaped (`\[`, `\]`, `\:`) with no unescaped bracket or colon, and that the documented **`md:` colon vs `md-rs-hide` hyphen inconsistency was preserved deliberately**, with a comment in the file explaining why so a future tidy-up does not break the contract.
+
+### The delta is wider than the Leader reported
+
+The Leader listed the five pre-existing usage sites. The Reviewer confirmed the list complete **and added the consequence the Leader missed**: `<app-form-header>` renders on **13 result-detail pages plus the platform shell**, so activating `fs-[12]`/`fs-[13]` is *"a visible typography change across essentially every result tab — the widest blast radius in this change"*, and `section-header`'s `rs-gap-x-[15]` changes header spacing app-wide.
+
+It also confirmed the **naming trap** the Implementer caught: **"Innovation Dev" (R-IUP-019) is `pages/result/pages/innovation-details/`** — a different, pre-existing page — and its three templates carry **zero** `fs-*`/`rs-*` usages of their own. Its exposure is indirect only, through the shared header. And **zero consumers exist anywhere** for `md:fs-*`, `md:rs-*`, `rs-hide` or `md-rs-hide`.
+
+### Honest limits, stated by both parties
+
+The Implementer volunteered that 6510 green tests are *"expected and uninformative about visual correctness — jsdom never loads global stylesheets, so a CSS-only change cannot move a spec either way."* The Reviewer confirmed the framing and found the spec authors had already written it down themselves at `innovation-use-level-stepper.component.spec.ts:192-194`. The Reviewer additionally disclosed which claims it could **not** verify under a read-only allowlist (the git-diff cleanliness, the test and build byte measurements) and offered circumstantial support: `src/styles/` holds six files with `responsive-size.scss` newest and **`custom-fields.scss` oldest by mtime** — consistent with one new file and T-11's dark-mode escalation left untouched.
+
+### Residuals — recorded, none blocking
+
+| Finding | Reachability | Disposition |
+| --- | --- | --- |
+| **The spacing range is tight at *both* ends.** `rs-p-[30]` sits exactly on the ceiling and is used **four** times, so the first designer wanting a roomier card writes `rs-p-[40]` and gets a silent no-op — the very defect class this change exists to kill. And **`0` is below the floor**: `rs-p-[0]`, `rs-m-[0]`, `rs-gap-[0]` emit nothing, though zero is the most-wanted spacing value and the size families *do* start at 0 | **Reachable, not currently reached** | Both are contract-faithful, *"which is exactly why the **contract** is what should move."* Needs a human blessing or a widened range in `README.md` **and** `design.md` together |
+| **New trap: `.fs-[n]` cannot override the canonical form-label classes.** `custom-fields.scss` matches `body .label` at specificity **(0,1,1)** with a non-important `font-size: 14px`, which beats `.fs-[16]` at (0,1,0) **regardless of load order** — so `class="label fs-[16]"` silently renders 14px | **Reachable, not reached** — the only `.label` + token combinations in the client set *margin*, not font-size, and those resolve correctly | Worth a sentence in `design.md` §7.1 |
+| **Two incompatible `md:` semantics now coexist in one class attribute.** `md:grid-cols-2` is Tailwind's `min-width: 48rem`; `md:rs-gap-[8]` would fire on *landscape and height ≤ 768px* | **Reached already** at `innovation-use-actor-item.component.html:76`, though harmless — nothing uses an `md:rs-*` class anywhere | A maintainer trap; deserves a sentence in §7.1 |
+| **Budget proportionality.** The size families are **74%** of selectors for **two** live usages, and the whole `md:` block is 50% with **zero** consumers | n/a | Users pay **+8.69 kB gzipped on 265.70 kB — ~3%**. The cheaper path is narrowing the *documented* range in both docs together, which is a product decision, not an implementation one |
+
+**→ T-13 c7 must now check an *unrelated* result tab, not only innovation-use**, because the widest consequence of this change is outside the spec's own section.
+
+---
