@@ -525,7 +525,7 @@ graph TD
 
 ### T-12 — Register the new component patterns in `docs/ux-ui/design.md`
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-11
+- **Status:** done · **Size:** S · **Dependencies:** T-11
 - **Requirements covered:** R-IUP-017 (AC.4)
 - **Design references:** §13 *Follow-up owed* (row corrected at Judgment Day round 1 — `judgment.md` → `C-3`)
 - **Skills:** `cognitive-doc-design`
@@ -540,10 +540,10 @@ graph TD
 
 **Done criteria**
 
-- [ ] c1 — §8.1 lists the level stepper, the actor card, and the organization card, and records `quantification-item`'s new `shared/` home.
-- [ ] c2 — §12's decisions log carries this spec's user-visible decisions (DD-1 page shape, DD-10 empty-state affordance, DD-8 no auto-save on Add).
-- [ ] c3 — Any token added by `T-11 c4` is registered in §7.1.
-- [ ] c4 — Forward sweep: grep the added names across `docs/ux-ui/design.md` and this spec folder; every hit is consistent. Backward sweep: grep for references *to* the edited sections and confirm none now asserts a falsehood.
+- [x] c1 — §8.1 lists the level stepper, the actor card, and the organization card, and records `quantification-item`'s new `shared/` home.
+- [x] c2 — §12's decisions log carries this spec's user-visible decisions (DD-1 page shape, DD-10 empty-state affordance, DD-8 no auto-save on Add).
+- [x] c3 — Any token added by `T-11 c4` is registered in §7.1.
+- [x] c4 — Forward sweep: grep the added names across `docs/ux-ui/design.md` and this spec folder; every hit is consistent. Backward sweep: grep for references *to* the edited sections and confirm none now asserts a falsehood.
 
 **Falsifying input** — this task's output is documentation, so its check is a grep, and a grep over the wrong file set cannot fail. **Name the file set in the evidence.** If c4 is discharged without stating which paths were swept, it is inconclusive (KZ-005, whose escalation is *fewer sites, not better sweeps*).
 

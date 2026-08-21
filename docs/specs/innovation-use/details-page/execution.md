@@ -1481,3 +1481,61 @@ The Implementer volunteered that 6510 green tests are *"expected and uninformati
 **→ T-13 c7 must now check an *unrelated* result tab, not only innovation-use**, because the widest consequence of this change is outside the spec's own section.
 
 ---
+
+### T-12 — Register the new component patterns in `docs/ux-ui/design.md`
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS on attempt 1** |
+| **Date** | 2026-08-21 |
+| **Implementer attempts** | **1** |
+| **Effort / skills** | `high` · `cognitive-doc-design` |
+| **Requirements covered** | R-IUP-017 (AC.4) |
+| **Review** | **None spawned** — see the deviation below |
+
+#### Leader deviation, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| **No Reviewer spawned** | The output is documentation in one file, its own criteria are self-verifying (c4 *is* a grep, reported with the file set named), the Implementer read each component **at source before writing its entry** rather than transcribing spec prose, and the Leader verified the one substantive claim — the residual false-claim sites — directly. `.agents/leader.md` → *Delegation Ceiling*: spawning a fresh context to re-read a 21-line doc diff whose evidence is already a named-file-set grep would be the ceiling's clearest violation. **The Leader did verify the diff and the residue itself rather than accepting the report** |
+
+#### What landed — `docs/ux-ui/design.md` only, §7.1 / §8.1 / §11 / §12.2, +18 / −3
+
+**c1 — five patterns, each citing its implementation file** (the Disqualifier requires the citation, since a registration that does not name its implementation cannot be checked against it). The three components, `quantification-item`'s new `shared/` home, **and the inline load-failure banner** — which c1's named list omits but **R-IUP-017 AC.4 binds**, since AC.4 covers *"patterns"*, not *"the four patterns c1 happened to list"*. T-07's review had flagged it as a genuinely new pattern for STAR's result pages, every other page surfacing load errors only through `ActionsService`.
+
+**Crucially, it described what the code does, not what the spec intended** — verified at source per entry, and it carried forward the two traps the run established a naive description would get wrong: the stepper's **label is `level`, emitted value is `id`**, and the actor card's total renders **empty, not `0`**, when all four counts are absent.
+
+**c2 — DD-1, DD-10, DD-8 in §12.2, with DD-8's rationale corrected rather than repeated.** `saveCurrentSectionValue` has **zero production consumers** (grep-confirmed), so DD-8's stated hazard does not exist today; the registered reason is the accurate one — the hazard is **retroactive**, firing the day that signal is wired, at which point this page is the only one already immune.
+
+**c3 — vacuous, and said so.** T-11's c4 added no token. It went further than asserting it: `colors.scss`'s last modification **pre-dates this spec**, and a fresh hex grep of the four templates returns zero. Stated explicitly so a reader can tell the criterion was **evaluated, not skipped**.
+
+**c4 — both directions, file sets named.** Forward: the five new names across `docs/ux-ui/design.md` (4 hits, all its own, self-consistent) and across `docs/specs/innovation-use/details-page/*.md` (52 hits over five files), spot-checked for contradiction. Backward: `docs/` grepped for references to §7.1 / §8.1 / §12 and for the literal false phrase.
+
+#### The backward sweep found a fourth instance — and the scope widening was flagged, not taken silently
+
+The brief named three known falsehoods. **The sweep surfaced a fourth: §11's Dark Mode table carried the *same* false `.dark-mode` claim independently, three lines from where the Implementer was already correcting §7.1.** It fixed both, *"so the document doesn't now contradict itself between two sections I both touched"*, and **flagged the widening explicitly** with the note that §11's edit is *"easily revertible in isolation — a single table-cell change"*. That is the right handling: the mandated sweep found it, leaving it would have made one document self-contradictory, and the disclosure makes the judgment reviewable.
+
+#### Its ruling on the three falsehoods — boundaries respected
+
+| # | Action | Reason |
+| --- | --- | --- |
+| 1 | **Corrected** — §7.1's `.dark-mode` claim, replaced with the verified mechanism plus a pointer to RB-8/RB-9. Plus §11's copy | Plainly false, inside its target section |
+| 2 | **Reported, not edited** — `requirements.md` §6.3 / R-IUP-005's *"five names"*. Confirmed by counting §6.3's own table: **six distinct names, four repeating** (`Partners`, `Connected next-user`, `Unconnected next-user`, `End-user / Beneficiaries`), two unique (`No use`, `Project lead organization`) | *"Amending an approved requirements doc is outside this task's authority"* — correct |
+| 3 | **Added, not "fixed"** — the three §7.1 traps were **missing, not wrong**: `.fs-[n]` cannot override `.label` on specificity; two incompatible `md:` semantics now coexist; the range is tight at both ends. **The range-widening question is recorded as OPEN, not resolved**, per instruction | The user has not blessed 1–30 nor widened it. Presenting it as settled would be exactly the registration the Disqualifier calls worse than none |
+
+#### ⚠️ The correction is now *relocated, not applied* — the KZ-005 shape, verified by the Leader
+
+The Implementer reported, and **the Leader confirmed directly**, that the false claim survives at **two sites it was forbidden to touch**:
+
+- `docs/specs/innovation-use/details-page/tasks.md:504` — T-11's Implementation notes: *"Tokens flip under `:root[data-theme="dark"]` and the `.dark-mode` body class."*
+- `docs/specs/innovation-use/details-page/design.md:311` — the local spec's §5.7 area, same sentence.
+
+It extended the authority boundary correctly on its own initiative: the prohibition on `requirements.md`/`tasks.md` *"extends by the same logic to the local spec's own `design.md`, which isn't one of my three named targets."*
+
+**The consequence is that the documents now contradict each other, which is a worse state than before.** Before T-12, all four sites were **consistently wrong**. Now the constitutional document correctly states the claim *"was never true"* while the spec folder still asserts it twice. **This is precisely KZ-005's recorded failure — a correction relocated rather than applied — and it was created by an authorized correction, which is what makes it worth naming.** Escalated to the user: two lines, same already-verified fact, and fixing them completes the correction rather than widening it.
+
+#### Verification
+
+**No test run, and the Implementer said so rather than reporting a green suite as evidence:** the change touches no code, so no suite applies and `npm run lint` is not applicable. The c4 greps *are* the verification, and they were reported with the file set named — which is what the Falsifying input demands, since *"a grep over the wrong file set cannot fail."*
+
+---
