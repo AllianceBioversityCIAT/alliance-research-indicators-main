@@ -100,16 +100,16 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - Guard empty-token strings per the `chartTokens()` no-fallback contract, as existing consumers do.
   - Option object is complete every recompute (wrapper uses `notMerge: true`).
 - **Acceptance / done check:**
-  - [ ] Spec asserts on the **generated option object** (KZ-001), not on call sequences: ramp array present in visualMap, series contains exactly the ISO-matched countries and no no-data entries, tooltip formatter output for a sample row, `roam:false`.
-  - [ ] **KZ-015 transition fixture:** construct with `countries=[]` first `detectChanges()`, assert no chart options emitted; **then** set data and assert the chart appears. Same pattern for the theme flip: light first, assert, flip signal, assert recomputed values.
-  - [ ] Spec proves: empty input ⇒ null options (no chart); theme-signal flip ⇒ option recomputed with re-resolved tokens. **Presence caveat declared:** these are option-object proofs; whether ECharts paints them is T-08's HITL scope, not this task's.
-  - [ ] Template passes `tableModel` and does **not** set `requireTable` to false (grep of the template).
-  - [ ] `geo-scope-card.component.spec.ts` passes **unmodified** (R-GEO-006 AC.1 / R-GEO-008 AC.1 by construction).
-  - [ ] Strings "Check the Mapbox access token" and "No geographic points could be resolved" absent from the component files.
+  - [x] Spec asserts on the **generated option object** (KZ-001), not on call sequences: ramp array present in visualMap, series contains exactly the ISO-matched countries and no no-data entries, tooltip formatter output for a sample row, `roam:false`.
+  - [x] **KZ-015 transition fixture:** construct with `countries=[]` first `detectChanges()`, assert no chart options emitted; **then** set data and assert the chart appears. Same pattern for the theme flip: light first, assert, flip signal, assert recomputed values.
+  - [x] Spec proves: empty input ⇒ null options (no chart); theme-signal flip ⇒ option recomputed with re-resolved tokens. **Presence caveat declared:** these are option-object proofs; whether ECharts paints them is T-08's HITL scope, not this task's.
+  - [x] Template passes `tableModel` and does **not** set `requireTable` to false (grep of the template).
+  - [x] `geo-scope-card.component.spec.ts` passes **unmodified** (R-GEO-006 AC.1 / R-GEO-008 AC.1 by construction).
+  - [x] Strings "Check the Mapbox access token" and "No geographic points could be resolved" absent from the component files.
 - **Dependencies:** T-02, T-03
 - **Estimated effort:** L
 - **Relevant skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** done
 
 ### T-05 — Card grid rebalance (D-GEO-5)
 

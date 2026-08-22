@@ -1,45 +1,42 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
-  ElementRef,
-  OnDestroy,
-  effect,
+  computed,
   inject,
-  input,
-  signal,
-  viewChild
+  input
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import mapboxgl, { GeoJSONSource, LngLatBounds, Map as MapboxMap, Popup } from 'mapbox-gl';
-import {
-  GeoScopeCountry,
-  GeoScopePointFeature,
-  GeoScopePointFeatureCollection,
-  GeoScopePointProperties,
-  GeocodedLocation
-} from '@interfaces/geo-scope.interface';
-import { MapboxGeocodingService } from '@shared/services/mapbox-geocoding.service';
+import * as echarts from 'echarts/core';
 import { DarkModeService } from '@shared/services/dark-mode.service';
+import { chartTokens } from '@shared/utils/chart-tokens.util';
 import {
-  GEO_SCOPE_LAYER_ID,
-  GEO_SCOPE_MAP_STYLE,
-  GEO_SCOPE_SOURCE_ID
-} from '@shared/constants/country-centroids.constants';
+  GEO_ISO_EXCEPTIONS_MAP,
+  buildGeoChoroplethSeriesData,
+  buildGeoChoroplethTableModel,
+  getGeoChoroplethMaxCount,
+  getGeometryValidIsoSet
+} from '@shared/utils/geo-choropleth.util';
 import {
-  buildGeoScopeFeatureCollection,
-  buildGeoScopePopupHtml,
-  buildGeoScopeResolutionPlan,
-  getGeoScopeMaxCount
-} from '@shared/utils/geo-scope-map.util';
-import { environment } from '../../../../../../../environments/environment';
-import { CustomProgressBarComponent } from '@shared/components/custom-progress-bar/custom-progress-bar.component';
+  EChartsOption,
+  VizChartComponent,
+  VizChartTableModel
+} from '@shared/components/viz-chart/viz-chart.component';
+import type { GeoScopeCountry } from '@interfaces/geo-scope.interface';
+import worldCountriesGeoJson from './world-countries.geo.json';
+
+// Idempotent map registration: register geometry once per application lifetime
+function ensureWorldMapRegistered(): void {
+  if (typeof echarts !== 'undefined' && typeof echarts.getMap === 'function' && !echarts.getMap('world')) {
+    echarts.registerMap('world', worldCountriesGeoJson as never);
+  }
+}
+ensureWorldMapRegistered();
+
+const validGeometryIsoSet = getGeometryValidIsoSet(worldCountriesGeoJson);
 
 @Component({
   selector: 'app-geo-scope-map',
   standalone: true,
-  imports: [CustomProgressBarComponent],
+  imports: [VizChartComponent],
   templateUrl: './geo-scope-map.component.html',
   styleUrl: './geo-scope-map.component.scss',
   host: {
@@ -47,313 +44,118 @@ import { CustomProgressBarComponent } from '@shared/components/custom-progress-b
   },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
-  readonly countries = input<readonly GeoScopeCountry[]>([]);
-
-  private readonly mapContainer = viewChild.required<ElementRef<HTMLElement>>('mapContainer');
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly geocoding = inject(MapboxGeocodingService);
+export class GeoScopeMapComponent {
   private readonly darkModeService = inject(DarkModeService);
+  readonly tokens = chartTokens(this.darkModeService.darkMode());
 
-  readonly geocodingLoading = signal(false);
-  readonly mapError = signal(false);
-  readonly hasResolvedPoints = signal(false);
-  readonly showEmptyState = signal(false);
+  readonly countries = input<readonly GeoScopeCountry[] | null | undefined>([]);
 
-  private map?: MapboxMap;
-  private popup?: Popup;
-  private resizeObserver?: ResizeObserver;
-  private refreshVersion = 0;
-  private viewReady = false;
-  private readonly hasMapboxToken = Boolean(environment.mapboxAccessToken?.trim());
+  readonly safeCountries = computed(() => {
+    const raw = this.countries();
+    return Array.isArray(raw) ? raw : [];
+  });
 
-  constructor() {
-    effect(() => {
-      const countries = this.countries();
-      if (!this.viewReady) {
-        return;
-      }
-      this.refreshMapPoints(countries);
-    });
+  readonly hasData = computed(() => this.safeCountries().length > 0);
 
-    effect(() => {
-      this.darkModeService.darkMode();
-      if (this.map && this.map.isStyleLoaded() && this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
-        this.updateMapPaintColors();
-      }
-    });
-  }
-
-  ngAfterViewInit(): void {
-    this.initMap();
-    this.observeContainerResize();
-    this.viewReady = true;
-    this.refreshMapPoints(this.countries());
-  }
-
-  ngOnDestroy(): void {
-    this.resizeObserver?.disconnect();
-    this.popup?.remove();
-    this.map?.remove();
-    this.map = undefined;
-  }
-
-  private initMap(): void {
-    if (!this.hasMapboxToken) {
-      this.mapError.set(true);
-      return;
+  readonly tableModel = computed<VizChartTableModel | null>(() => {
+    if (!this.hasData()) {
+      return null;
     }
+    return buildGeoChoroplethTableModel(this.safeCountries());
+  });
 
-    mapboxgl.accessToken = environment.mapboxAccessToken.trim();
-    this.map = new MapboxMap({
-      container: this.mapContainer().nativeElement,
-      style: GEO_SCOPE_MAP_STYLE,
-      center: [0, 20],
-      zoom: 1.2,
-      attributionControl: true
-    });
-
-    this.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
-    this.map.on('load', () => {
-      this.ensureMapLayers();
-      this.resizeMap();
-    });
-    this.map.on('click', GEO_SCOPE_LAYER_ID, event => this.openPopup(event));
-    this.map.on('mouseenter', GEO_SCOPE_LAYER_ID, () => {
-      if (this.map) {
-        this.map.getCanvas().style.cursor = 'pointer';
-      }
-    });
-    this.map.on('mouseleave', GEO_SCOPE_LAYER_ID, () => {
-      if (this.map) {
-        this.map.getCanvas().style.cursor = '';
-      }
-    });
-  }
-
-  private observeContainerResize(): void {
-    this.resizeObserver = new ResizeObserver(() => this.resizeMap());
-    this.resizeObserver.observe(this.mapContainer().nativeElement);
-  }
-
-  private resizeMap(): void {
-    globalThis.requestAnimationFrame(() => this.map?.resize());
-  }
-
-  private refreshMapPoints(countries: readonly GeoScopeCountry[]): void {
-    const version = ++this.refreshVersion;
-    const plan = buildGeoScopeResolutionPlan(countries);
-
-    if (!plan.displayTasks.length) {
-      this.geocodingLoading.set(false);
-      this.hasResolvedPoints.set(false);
-      this.showEmptyState.set(true);
-      this.updateSourceData({
-        type: 'FeatureCollection',
-        features: []
-      });
-      return;
-    }
-
-    this.showEmptyState.set(false);
-
-    const applyFeatures = (coordinatesByKey: Map<string, GeocodedLocation | null>) => {
-      if (version !== this.refreshVersion) {
-        return;
-      }
-
-      const featureCollection = buildGeoScopeFeatureCollection(
-        plan.displayTasks,
-        coordinatesByKey,
-        plan.staticCoordinates
-      );
-
-      this.geocodingLoading.set(false);
-      this.hasResolvedPoints.set(featureCollection.features.length > 0);
-      this.showEmptyState.set(featureCollection.features.length === 0 && !this.mapError());
-      this.updateSourceData(featureCollection);
-      this.resizeMap();
-      this.fitMapToFeatures(featureCollection.features);
-    };
-
-    if (!plan.geocodeTasks.length) {
-      this.geocodingLoading.set(false);
-      applyFeatures(new Map());
-      return;
-    }
-
-    this.geocodingLoading.set(true);
-
-    this.geocoding
-      .geocodeTasks(plan.geocodeTasks)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: applyFeatures,
-        error: () => {
-          if (version !== this.refreshVersion) {
-            return;
-          }
-          this.geocodingLoading.set(false);
-          applyFeatures(new Map());
+  private readonly countryNameByIso = computed(() => {
+    const map = new Map<string, string>();
+    for (const c of this.safeCountries()) {
+      if (c?.iso_alpha_2 && typeof c.iso_alpha_2 === 'string') {
+        const code = c.iso_alpha_2.trim().toUpperCase();
+        map.set(code, c.country_name);
+        const mappedException = GEO_ISO_EXCEPTIONS_MAP[code];
+        if (mappedException) {
+          map.set(mappedException, c.country_name);
         }
-      });
-  }
-
-  private getMapboxColors(): { country: string; subNational: string; stroke: string } {
-    if (typeof document === 'undefined') {
-      return {
-        country: 'rgb(22, 137, 202)',
-        subNational: 'rgb(124, 156, 185)',
-        stroke: 'rgb(255, 255, 255)'
-      };
+      }
     }
-    const styles = getComputedStyle(document.documentElement);
+    return map;
+  });
+
+  readonly options = computed<EChartsOption | null>(() => {
+    if (!this.hasData()) {
+      return null;
+    }
+
+    ensureWorldMapRegistered();
+
+    const countries = this.safeCountries();
+    const seriesData = buildGeoChoroplethSeriesData(countries, validGeometryIsoSet);
+    const maxCount = getGeoChoroplethMaxCount(countries);
+    const countryNames = this.countryNameByIso();
+    const ramp = this.tokens().ramp;
+
     return {
-      country: styles.getPropertyValue('--ac-light-blue-300').trim() || 'rgb(22, 137, 202)',
-      subNational: styles.getPropertyValue('--ac-primary-blue-200').trim() || 'rgb(124, 156, 185)',
-      stroke: styles.getPropertyValue('--ac-white-1').trim() || 'rgb(255, 255, 255)'
-    };
-  }
-
-  private updateMapPaintColors(): void {
-    if (!this.map || !this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
-      return;
-    }
-    const colors = this.getMapboxColors();
-    this.map.setPaintProperty(GEO_SCOPE_LAYER_ID, 'circle-color', [
-      'match',
-      ['get', 'level'],
-      'country',
-      colors.country,
-      'sub-national',
-      colors.subNational,
-      colors.country
-    ]);
-    this.map.setPaintProperty(GEO_SCOPE_LAYER_ID, 'circle-stroke-color', colors.stroke);
-  }
-
-  private ensureMapLayers(): void {
-    if (!this.map) {
-      return;
-    }
-
-    if (!this.map.getSource(GEO_SCOPE_SOURCE_ID)) {
-      this.map.addSource(GEO_SCOPE_SOURCE_ID, {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: unknown) => {
+          const item = params as {
+            name?: string;
+            value?: number;
+            data?: { name?: string; value?: number };
+          };
+          if (!item) return '';
+          const code = item.name ?? item.data?.name ?? '';
+          const countryName = countryNames.get(code) ?? code;
+          const value = item.value ?? item.data?.value;
+          if (value === undefined || value === null || isNaN(Number(value))) {
+            return '';
+          }
+          return `<strong>${countryName}</strong>: ${value}`;
         }
-      });
-    }
-
-    if (!this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
-      const colors = this.getMapboxColors();
-      this.map.addLayer({
-        id: GEO_SCOPE_LAYER_ID,
-        type: 'circle',
-        source: GEO_SCOPE_SOURCE_ID,
-        paint: {
-          'circle-color': [
-            'match',
-            ['get', 'level'],
-            'country',
-            colors.country,
-            'sub-national',
-            colors.subNational,
-            colors.country
-          ],
-          'circle-opacity': 0.88,
-          'circle-stroke-color': colors.stroke,
-          'circle-stroke-width': 1.5,
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['get', 'count'],
-            1,
-            6,
-            100,
-            22
-          ]
+      },
+      visualMap: {
+        type: 'continuous',
+        min: 1,
+        max: maxCount,
+        inRange: {
+          color: ramp
+        },
+        calculable: false,
+        orient: 'horizontal',
+        left: 'center',
+        bottom: 8,
+        text: ['High', 'Low'],
+        textStyle: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          fontSize: 11
+        },
+        itemWidth: 12,
+        itemHeight: 140
+      },
+      series: [
+        {
+          name: 'Geographic Reach',
+          type: 'map',
+          map: 'world',
+          nameProperty: 'ISO_A2',
+          roam: false,
+          emphasis: {
+            label: { show: false },
+            itemStyle: {
+              areaColor: 'var(--ac-primary-blue-400)',
+              borderColor: 'var(--ac-white-1)'
+            }
+          },
+          select: {
+            disabled: true
+          },
+          itemStyle: {
+            areaColor: 'var(--ac-grey-100)',
+            borderColor: 'var(--ac-grey-300)',
+            borderWidth: 0.5
+          },
+          data: seriesData
         }
-      });
-    }
-  }
-
-  private updateSourceData(data: GeoScopePointFeatureCollection): void {
-    if (!this.map) {
-      return;
-    }
-
-    if (!this.map.isStyleLoaded()) {
-      this.map.once('load', () => this.updateSourceData(data));
-      return;
-    }
-
-    this.ensureMapLayers();
-    const maxCount = getGeoScopeMaxCount(data.features);
-    const source = this.map.getSource(GEO_SCOPE_SOURCE_ID) as GeoJSONSource | undefined;
-    source?.setData(data);
-
-    if (this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
-      this.map.setPaintProperty(GEO_SCOPE_LAYER_ID, 'circle-radius', [
-        'interpolate',
-        ['linear'],
-        ['get', 'count'],
-        1,
-        6,
-        maxCount,
-        22
-      ]);
-    }
-  }
-
-  private fitMapToFeatures(features: GeoScopePointFeature[]): void {
-    if (!this.map || !features.length) {
-      return;
-    }
-
-    const bounds = new LngLatBounds();
-    for (const feature of features) {
-      if (feature.geometry.type !== 'Point') {
-        continue;
-      }
-      bounds.extend(feature.geometry.coordinates);
-    }
-
-    if (bounds.isEmpty()) {
-      return;
-    }
-
-    this.map.fitBounds(bounds, {
-      padding: 48,
-      maxZoom: 6,
-      duration: 700
-    });
-  }
-
-  private openPopup(event: mapboxgl.MapMouseEvent & { features?: unknown[] }): void {
-    if (!this.map || !event.features?.length) {
-      return;
-    }
-
-    const feature = event.features[0] as unknown as GeoScopePointFeature;
-    const raw = feature.properties;
-    const properties: GeoScopePointProperties = {
-      level: raw.level === 'sub-national' ? 'sub-national' : 'country',
-      name: String(raw.name ?? ''),
-      countryName: String(raw.countryName ?? ''),
-      count: Number(raw.count ?? 0)
+      ]
     };
-    if (!properties.name || feature.geometry.type !== 'Point') {
-      return;
-    }
-
-    const coordinates = [...feature.geometry.coordinates] as [number, number];
-    this.popup?.remove();
-    this.popup = new Popup({ closeButton: true, closeOnClick: true, offset: 12 })
-      .setLngLat(coordinates)
-      .setHTML(buildGeoScopePopupHtml(properties))
-      .addTo(this.map);
-  }
+  });
 }

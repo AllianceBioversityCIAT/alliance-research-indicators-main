@@ -77,3 +77,26 @@
 - **Reviewer Verdict:** PASS
 - **Reviewer Summary:** The diff successfully registers `MapChart` and `GeoComponent` with ECharts and correctly extends the `EChartsOption` union in `viz-chart.component.ts`. The sibling test mocks have been updated to include `registerMap` and `getMap`, preventing import-time failures. Verification evidence is complete and all requirements (R-GEO-005 AC.2, defect class prevention) hold without modifying the wrapper contract.
 
+
+### T-04 — Rewrite geo-scope-map component (+ new spec)
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-001 (config-error path removal), R-GEO-002 (AC.1, both BUT/MUST clauses), R-GEO-004 (AC.1, both BUT/MUST clauses), R-GEO-005 (AC.2, `BUT NOT requireTable=false`), R-GEO-006 (AC.1, AC.2, "must NOT blank pane")
+- **Files Changed / Created:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.ts` (rewritten: ECharts choropleth presenter, idempotent map registration, chartTokens ramp, tableModel)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.html` (rewritten: viz-chart host template)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.scss` (rewritten: standard host styling)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts` (created: 8 comprehensive unit tests)
+- **Implementer Verification:**
+  - `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts --coverage=false`: 16 passed, 16 total (exit code 0)
+  - KZ-015 transition fixture verified (empty init -> data transition)
+  - KZ-001 output asserted on generated option object
+  - Mapbox strings verified removed
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** The diff successfully rewrites `geo-scope-map.component` to render an ECharts choropleth map. All criteria from R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, and R-GEO-006 hold.
+- **Reviewer Advisory:**
+  - *Resilience:* `ensureWorldMapRegistered` executes safely behind a typeof safeguard, avoiding module collision.
+  - *Readability:* The separation of computing layout structure, data payload, and exceptions map provides declarative logic paths.
+
