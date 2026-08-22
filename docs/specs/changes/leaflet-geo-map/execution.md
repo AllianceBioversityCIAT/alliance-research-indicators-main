@@ -100,3 +100,18 @@
   - *Resilience:* `ensureWorldMapRegistered` executes safely behind a typeof safeguard, avoiding module collision.
   - *Readability:* The separation of computing layout structure, data payload, and exceptions map provides declarative logic paths.
 
+
+### T-05 — Card grid rebalance (D-GEO-5)
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-008 (AC.1, the `AND IT MAY` grid clause, "must NOT modify service"), R-GEO-006 ("keep retry affordance")
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.html` (rebalanced grid to `xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]`)
+- **Implementer Verification:**
+  - `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts --coverage=false`: 7 passed, 7 total (exit code 0)
+  - Layout-only check: no `.ts`, service, or list markup changed
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** The implementation exactly matches T-05's scope. It touches only the grid layout classes in `geo-scope-card.component.html`, safely rebalancing the map pane to `1.1fr` (55%, which satisfies the ≥50% requirement) while leaving all other markup, state handling, and retry affordances completely intact.
+

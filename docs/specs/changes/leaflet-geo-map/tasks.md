@@ -118,13 +118,13 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - `client/.../geo-scope-card/geo-scope-card.component.html` (grid classes only)
 - **Description:** Rebalance the xl two-column grid so the map pane gets ≥ 50% (today `minmax(280px,.5fr)` vs `1.6fr`), keeping the summary + three ranked lists workable. Exact fractions tuned at T-08.
 - **Acceptance / done check:**
-  - [ ] Diff touches only grid/layout classes in this template — no `.ts`, no service, no list markup. **Disqualifier:** any diff outside the grid container invalidates this task's "layout-only" claim.
-  - [ ] `geo-scope-card.component.spec.ts` passes unmodified; retry button markup untouched.
-  - [ ] **Declared gap:** jsdom cannot measure the resulting layout — final proportions are verified only at T-08 (HITL).
+  - [x] Diff touches only grid/layout classes in this template — no `.ts`, no service, no list markup. **Disqualifier:** any diff outside the grid container invalidates this task's "layout-only" claim.
+  - [x] `geo-scope-card.component.spec.ts` passes unmodified; retry button markup untouched.
+  - [x] **Declared gap:** jsdom cannot measure the resulting layout — final proportions are verified only at T-08 (HITL).
 - **Dependencies:** T-04
 - **Estimated effort:** S
 - **Relevant skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** done
 
 ### T-06 — Mapbox removal sweep
 

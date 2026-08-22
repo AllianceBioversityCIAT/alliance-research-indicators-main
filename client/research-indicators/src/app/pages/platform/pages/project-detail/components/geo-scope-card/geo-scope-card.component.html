@@ -3,7 +3,7 @@
   [compact]="true" [loading]="service.loading()" [error]="service.loadError()" [empty]="isEmpty()"
   errorMessage="We could not load geographic scope data. Please try again."
   emptyMessage="No geographic scope data was found for this project." (retry)="service.update()">
-  <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,.5fr)_minmax(0,1.6fr)]">
+  <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]">
     <div class="flex h-full min-w-0 items-stretch">
       <app-geo-scope-map [countries]="service.topCountries()"></app-geo-scope-map>
     </div>
