@@ -2,7 +2,7 @@
 
 - **Module:** project-detail (client) + agresso-contract (server)
 - **Spec id:** 2026-08-project-dashboard-redesign
-- **Status:** in-progress (T-01 done, T-02 automated done / manual deferred, T-03 done, T-06 done)
+- **Status:** in-progress (T-01..T-06 done)
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-judgment corrections; ledger ./judgment.md)
@@ -94,7 +94,7 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** `GET_ContractResultsSummary(contractId)` + a service with the sibling `list/loading/loadError` signal-triple + `main()/update()` shape.
 - **Dependencies:** T-02 (contract shape; may develop against the DTO in parallel) · **Skills:** `angular-developer`
 - **Acceptance / done check:**
-  - [ ] Spec via `HttpTestingController`: envelope handling, error → `loadError` signal, retry via `update()`. *Red input: respond with `successfulRequest: false` and assert `loadError()` is true — must fail if the error branch is dropped.*
+  - [x] Spec via `HttpTestingController`: envelope handling, error → `loadError` signal, retry via `update()`. *Red input: respond with `successfulRequest: false` and assert `loadError()` is true — must fail if the error branch is dropped.*
 
 ### T-06 — Client: shared project-detail service + dedupe (3 components / 4 invocations)
 

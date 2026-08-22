@@ -122,6 +122,7 @@ import {
   TopPartnersReport,
   TopPrimaryLeversReport
 } from '@shared/interfaces/project-dashboard.interface';
+import { ContractResultsSummary } from '@shared/interfaces/contract-results-summary.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -923,6 +924,11 @@ export class ApiService {
 
   GET_GeoScope = (contractId: string, limit = 5): Promise<MainResponse<GeoScopeReport>> => {
     const url = () => `agresso/contracts/reports/geo-scope?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
+    return this.TP.get(url(), {});
+  };
+
+  GET_ContractResultsSummary = (contractId: string): Promise<MainResponse<ContractResultsSummary>> => {
+    const url = () => `agresso/contracts/reports/results-summary?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
 

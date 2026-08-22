@@ -311,4 +311,29 @@
      - **Remediation Suggestion:** Either (a) add a committed test that flushes `{ data: null, successfulRequest: false }` over HTTP 200 and asserts `loadError()` true + `list()` null, then confirm removing the branch reddens it; OR (b) — preferred, smaller diff — delete the `successfulRequest === false` branch entirely to match the four `get-top-*` siblings (which use only `try/catch`, since Angular's `HttpClient` rejects on non-2xx so the branch is structurally unreachable), and record in `execution.md` that the spec's `successfulRequest: false` red input is subsumed by the committed HTTP-error red input on the catch path.
 - **ADVISORY:** READABILITY: `console.error` in service — siblings use bare `catch {}`; consider matching sibling idiom or routing through interceptor.
 
+#### Attempt 2 — Implementer (effort: high)
+
+- **What changed:** Kept the `successfulRequest === false` branch (option a); removed `console.error` (advisory fix — bare `catch {}` matching siblings); relabeled the red-input test honestly to describe the real production path (HTTP error → TP catchError → `successfulRequest: false`).
+
+- **Key deviation from Leader's preferred option (b):** Option (b) — deleting the branch — is structurally unviable. `ToPromiseService.TP` (`to-promise.service.ts:21-35`) wraps every request with `map(data => ({ ...data, successfulRequest: true }))` on success and `catchError(error => [{ ...error, successfulRequest: false }])` on HTTP error. TP **never rejects** — always resolves. So: (a) the `catch` block is unreachable in production (TP resolves, doesn't reject); (b) flushing `{ successfulRequest: false }` over HTTP 200 is unviable (TP's `map` overwrites it to `true`); (c) `req.error(500)` → TP's `catchError` → resolves with `successfulRequest: false` → the branch IS hit. The attempt-1 Reviewer FAIL was based on a wrong premise about TP's behavior.
+
+- **Implementer verification:**
+  - Command: `npm test -- --silent --coverage=false` from `client/research-indicators/`
+  - Result: 6540/6542 (2 pre-existing version-selector failures)
+  - Targeted: 9/9 service spec green
+  - Lint: clean
+  - Red input: Removing the `successfulRequest === false` branch → 2 tests fail (loadError stays false — no path sets it when the branch is gone and TP doesn't reject). Restored → 9/9 green.
+
+#### Reviewer verdict — Attempt 2
+
+- **STATUS: PASS**
+- **Summary:** The Implementer's TP claim is correct — `ToPromiseService.catchError` recovers HTTP errors into resolved `{ successfulRequest: false }` values, so `req.error(500)` hits the `successfulRequest === false` branch (not the catch block), making the red input genuinely discriminating (removing the branch → `loadError` stays false → 2 tests fail). The attempt-1 FAIL rested on a wrong premise about TP's behavior. `console.error` is absent, the test is honestly relabeled, and the suite is 9/9 green with spec-conformant signal-triple + `main()/update()` shape and correct endpoint URL.
+
+#### Final verification result
+
+- Client suite: 6540/6542 green (2 pre-existing version-selector failures)
+- Targeted: 9/9 service spec
+- Red input: discriminating (branch removed → loadError stays false → 2 tests fail)
+- Lint: clean
+
 
