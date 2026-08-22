@@ -65,8 +65,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** repository (+spec), `dto/contract-results-summary-report.dto.ts`
 - **Skills:** `nestjs-expert` · **Deps:** none (parallel with T-01)
 - **Done checks:**
-  - [ ] Reconciliation fixture: cell sums = indicator totals = `total`; null-year cell present; **no** cell for empty pairs. *Red input: emit zero-filled cells — the no-fabrication assertion must fail.*
-  - [ ] **D11:** the previous spec's summary specs run untouched and green. *Disqualifier: any edit to those spec files to make them pass = byte-compat violated, report instead of patching.*
+  - [x] Reconciliation fixture: cell sums = indicator totals = `total`; null-year cell present; **no** cell for empty pairs. *Red input: emit zero-filled cells — the no-fabrication assertion must fail.*
+  - [x] **D11:** the previous spec's summary specs run untouched and green. *Disqualifier: any edit to those spec files to make them pass = byte-compat violated, report instead of patching.*
 
 ### T-04 — Server: findOneContract payload extension
 - **Requirements:** R-DA-005 sources (funding_type, center_amount_usd, sdgs, cgiar_entities) · **Design:** §2.1.3, D-DA-3

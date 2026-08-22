@@ -46,3 +46,22 @@
     - Envelope & Error handling: PASS. Response formatted with `ResponseUtils.format`, 400 on empty contract-id verified.
     - 4R sweep clean. Swagger metadata presence verified via reflection tests.
 
+### T-03 — Server: results-summary matrix extension
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified:
+    - `server/researchindicators/src/domain/entities/agresso-contract/dto/contract-results-summary-report.dto.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts`
+  - Verification:
+    - Jest: `PASS src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts`, `PASS src/domain/entities/agresso-contract/agresso-contract.service.spec.ts`, `PASS src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts` (126 passed, 126 total)
+    - ESLint: `npx eslint src/domain/entities/agresso-contract/` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-002 AC.1 & Scenario: PASS. `by_indicator_year` matrix aggregate groups by `indicator_id` and `year`, no fabricated zero cells emitted, null year bucket mapped explicitly, cell sums reconcile with `total` and indicator/year totals.
+    - R-DA-002 AC.2 & D11: PASS. Existing fields (`total`, `by_status`, `by_year`, `partner_institutions`) byte-compatible and untouched.
+    - 4R sweep clean. SQL generation, parameter binding, and invariant tests verified.
+
+

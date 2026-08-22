@@ -54,6 +54,7 @@ import {
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import {
+  ContractResultsSummaryIndicatorYearBucketDto,
   ContractResultsSummaryReportDto,
   ContractResultsSummaryStatusBucketDto,
   ContractResultsSummaryYearBucketDto,
@@ -631,11 +632,13 @@ export class AgressoContractRepository
     includeGeoScope?: boolean;
     includeStatusId?: boolean;
     includeReportYearId?: boolean;
+    includeIndicatorId?: boolean;
   }): string {
     const columns = ['r.result_id'];
     if (options?.includeGeoScope) columns.push('r.geo_scope_id');
     if (options?.includeStatusId) columns.push('r.result_status_id');
     if (options?.includeReportYearId) columns.push('r.report_year_id');
+    if (options?.includeIndicatorId) columns.push('r.indicator_id');
     const selectColumns = columns.join(', ');
 
     return `
@@ -1085,6 +1088,10 @@ export class AgressoContractRepository
     const yearSubquery = this.buildPrimaryContractResultsSubquery({
       includeReportYearId: true,
     });
+    const indicatorYearSubquery = this.buildPrimaryContractResultsSubquery({
+      includeIndicatorId: true,
+      includeReportYearId: true,
+    });
     const baseSubquery = this.buildPrimaryContractResultsSubquery();
 
     const statusQuery = `
@@ -1118,11 +1125,24 @@ export class AgressoContractRepository
         AND result_institution.is_active = TRUE
     `;
 
-    const [statusRows, yearRows, partnerRows] = await Promise.all([
-      this.query(statusQuery, [contractId]),
-      this.query(yearQuery, [contractId]),
-      this.query(partnersQuery, [contractId, InstitutionRolesEnum.PARTNERS]),
-    ]);
+    const indicatorYearQuery = `
+      SELECT
+        contract_results.indicator_id AS indicator_id,
+        contract_results.report_year_id AS year,
+        COUNT(*) AS count
+      FROM (${indicatorYearSubquery}) contract_results
+      WHERE contract_results.indicator_id IS NOT NULL
+      GROUP BY contract_results.indicator_id, contract_results.report_year_id
+      ORDER BY contract_results.indicator_id, year
+    `;
+
+    const [statusRows, yearRows, partnerRows, indicatorYearRows] =
+      await Promise.all([
+        this.query(statusQuery, [contractId]),
+        this.query(yearQuery, [contractId]),
+        this.query(partnersQuery, [contractId, InstitutionRolesEnum.PARTNERS]),
+        this.query(indicatorYearQuery, [contractId]),
+      ]);
 
     const by_status: ContractResultsSummaryStatusBucketDto[] = (
       statusRows as Array<Record<string, unknown>>
@@ -1143,6 +1163,15 @@ export class AgressoContractRepository
       count: Number(row.count ?? 0),
     }));
 
+    const by_indicator_year: ContractResultsSummaryIndicatorYearBucketDto[] = (
+      (indicatorYearRows as Array<Record<string, unknown>>) ?? []
+    ).map((row) => ({
+      indicator_id: Number(row.indicator_id),
+      year:
+        row.year === null || row.year === undefined ? null : Number(row.year),
+      count: Number(row.count ?? 0),
+    }));
+
     const partner_institutions = Number(
       (partnerRows as Array<Record<string, unknown>>)[0]
         ?.partner_institutions ?? 0,
@@ -1155,6 +1184,7 @@ export class AgressoContractRepository
       by_status,
       by_year,
       partner_institutions,
+      by_indicator_year,
     };
   }
 

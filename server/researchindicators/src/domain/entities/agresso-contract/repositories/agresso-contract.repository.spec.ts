@@ -1251,7 +1251,7 @@ describe('AgressoContractRepository', () => {
       );
     });
 
-    it('should build results summary report with three grouped queries (asserts generated SQL text + bound params)', async () => {
+    it('should build results summary report with four grouped queries (asserts generated SQL text + bound params)', async () => {
       (repository.query as jest.Mock)
         .mockResolvedValueOnce([
           { status_id: 1, name: 'Approved', count: 5 },
@@ -1261,15 +1261,21 @@ describe('AgressoContractRepository', () => {
           { year: 2024, count: 6 },
           { year: 2023, count: 2 },
         ])
-        .mockResolvedValueOnce([{ partner_institutions: 7 }]);
+        .mockResolvedValueOnce([{ partner_institutions: 7 }])
+        .mockResolvedValueOnce([
+          { indicator_id: 1, year: 2023, count: 2 },
+          { indicator_id: 1, year: 2024, count: 3 },
+          { indicator_id: 2, year: 2024, count: 3 },
+        ]);
 
       const result = await repository.getResultsSummaryReport('A1676');
 
-      expect(repository.query).toHaveBeenCalledTimes(3);
+      expect(repository.query).toHaveBeenCalledTimes(4);
 
       const statusSql = (repository.query as jest.Mock).mock.calls[0][0];
       const yearSql = (repository.query as jest.Mock).mock.calls[1][0];
       const partnerSql = (repository.query as jest.Mock).mock.calls[2][0];
+      const indicatorYearSql = (repository.query as jest.Mock).mock.calls[3][0];
 
       // Shared subquery predicates appear in every grouped query (subquery is interpolated)
       expect(statusSql).toContain('is_primary = TRUE');
@@ -1281,15 +1287,19 @@ describe('AgressoContractRepository', () => {
       expect(partnerSql).toContain('is_primary = TRUE');
       expect(partnerSql).toContain('is_snapshot = FALSE');
       expect(partnerSql).toContain('is_active');
+      expect(indicatorYearSql).toContain('is_primary = TRUE');
+      expect(indicatorYearSql).toContain('is_snapshot = FALSE');
+      expect(indicatorYearSql).toContain('is_active');
 
       // LEFT JOIN appears in the by_status query (judgment SU2 — result_status_id is nullable)
       expect(statusSql).toContain('LEFT JOIN');
 
-      // Both grouped queries carry a GROUP BY
+      // Grouped queries carry a GROUP BY
       expect(statusSql).toContain('GROUP BY');
       expect(yearSql).toContain('GROUP BY');
+      expect(indicatorYearSql).toContain('GROUP BY');
 
-      // Bound params: status & year queries take only contractId; partners adds the role id
+      // Bound params: status, year & indicatorYear queries take only contractId; partners adds the role id
       expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
         'A1676',
       ]);
@@ -1299,6 +1309,9 @@ describe('AgressoContractRepository', () => {
       expect((repository.query as jest.Mock).mock.calls[2][1]).toEqual([
         'A1676',
         InstitutionRolesEnum.PARTNERS,
+      ]);
+      expect((repository.query as jest.Mock).mock.calls[3][1]).toEqual([
+        'A1676',
       ]);
 
       expect(result).toEqual({
@@ -1312,6 +1325,11 @@ describe('AgressoContractRepository', () => {
           { year: 2023, count: 2 },
         ],
         partner_institutions: 7,
+        by_indicator_year: [
+          { indicator_id: 1, year: 2023, count: 2 },
+          { indicator_id: 1, year: 2024, count: 3 },
+          { indicator_id: 2, year: 2024, count: 3 },
+        ],
       });
     });
 
@@ -1326,7 +1344,12 @@ describe('AgressoContractRepository', () => {
           { year: 2024, count: 6 },
           { year: null, count: 2 },
         ])
-        .mockResolvedValueOnce([{ partner_institutions: 4 }]);
+        .mockResolvedValueOnce([{ partner_institutions: 4 }])
+        .mockResolvedValueOnce([
+          { indicator_id: 1, year: 2024, count: 5 },
+          { indicator_id: 2, year: 2024, count: 1 },
+          { indicator_id: 2, year: null, count: 2 },
+        ]);
 
       const result = await repository.getResultsSummaryReport('A100');
 
@@ -1341,6 +1364,12 @@ describe('AgressoContractRepository', () => {
         year: null,
         count: 2,
       });
+      // NULL-year bucket in by_indicator_year preserved
+      expect(result.by_indicator_year).toContainEqual({
+        indicator_id: 2,
+        year: null,
+        count: 2,
+      });
 
       // AC.2 — bucket-sum invariant: by_status sums to total AND by_year sums to total
       const statusSum = result.by_status.reduce(
@@ -1348,16 +1377,99 @@ describe('AgressoContractRepository', () => {
         0,
       );
       const yearSum = result.by_year.reduce((sum, row) => sum + row.count, 0);
+      const matrixSum = result.by_indicator_year.reduce(
+        (sum, row) => sum + row.count,
+        0,
+      );
       expect(result.total).toBe(statusSum);
       expect(result.total).toBe(yearSum);
+      expect(result.total).toBe(matrixSum);
       expect(result.total).toBe(8);
+    });
+
+    it('should reconcile indicator-year matrix cell sums with total, indicator totals, and year totals without fabricated zero cells (R-DA-002 AC.1 / Scenario)', async () => {
+      // Contract with results across 2 indicators (1 and 2) and 2 years (2023, 2024) + null-year bucket:
+      // Indicator 1: 2023 (count: 3), 2024 (count: 4) -> indicator total = 7
+      // Indicator 2: 2024 (count: 2), null-year (count: 1) -> indicator total = 3
+      // Empty pair: Indicator 2 in 2023 has 0 results and MUST NOT be emitted (absent = no cell)
+      // Empty pair: Indicator 1 in null-year has 0 results and MUST NOT be emitted
+      // Year totals: 2023 = 3, 2024 = 6, null = 1 -> sum = 10
+      // Total = 10
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          { status_id: 1, name: 'Approved', count: 7 },
+          { status_id: 2, name: 'Submitted', count: 3 },
+        ])
+        .mockResolvedValueOnce([
+          { year: 2023, count: 3 },
+          { year: 2024, count: 6 },
+          { year: null, count: 1 },
+        ])
+        .mockResolvedValueOnce([{ partner_institutions: 5 }])
+        .mockResolvedValueOnce([
+          { indicator_id: 1, year: 2023, count: 3 },
+          { indicator_id: 1, year: 2024, count: 4 },
+          { indicator_id: 2, year: 2024, count: 2 },
+          { indicator_id: 2, year: null, count: 1 },
+        ]);
+
+      const result = await repository.getResultsSummaryReport('A1676');
+
+      expect(result.total).toBe(10);
+
+      // 1. Assert null-year cell is present and properly mapped
+      expect(result.by_indicator_year).toContainEqual({
+        indicator_id: 2,
+        year: null,
+        count: 1,
+      });
+
+      // 2. Assert no fabricated zero cells for empty pairs (Indicator 2 in 2023, Indicator 1 in null)
+      expect(result.by_indicator_year).not.toContainEqual(
+        expect.objectContaining({ indicator_id: 2, year: 2023 }),
+      );
+      expect(result.by_indicator_year).not.toContainEqual(
+        expect.objectContaining({ indicator_id: 1, year: null }),
+      );
+      expect(result.by_indicator_year.some((cell) => cell.count === 0)).toBe(
+        false,
+      );
+      expect(result.by_indicator_year).toHaveLength(4);
+
+      // 3. Assert cell sums reconcile with total
+      const totalCellSum = result.by_indicator_year.reduce(
+        (sum, cell) => sum + cell.count,
+        0,
+      );
+      expect(totalCellSum).toBe(result.total);
+
+      // 4. Assert cell sums per indicator reconcile with indicator totals
+      const indicator1Sum = result.by_indicator_year
+        .filter((cell) => cell.indicator_id === 1)
+        .reduce((sum, cell) => sum + cell.count, 0);
+      const indicator2Sum = result.by_indicator_year
+        .filter((cell) => cell.indicator_id === 2)
+        .reduce((sum, cell) => sum + cell.count, 0);
+
+      expect(indicator1Sum).toBe(7);
+      expect(indicator2Sum).toBe(3);
+      expect(indicator1Sum + indicator2Sum).toBe(result.total);
+
+      // 5. Assert cell sums per year reconcile with by_year counts
+      for (const yearBucket of result.by_year) {
+        const yearCellSum = result.by_indicator_year
+          .filter((cell) => cell.year === yearBucket.year)
+          .reduce((sum, cell) => sum + cell.count, 0);
+        expect(yearCellSum).toBe(yearBucket.count);
+      }
     });
 
     it('should return empty buckets for an unknown/inaccessible contract (sibling behavior)', async () => {
       (repository.query as jest.Mock)
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ partner_institutions: 0 }]);
+        .mockResolvedValueOnce([{ partner_institutions: 0 }])
+        .mockResolvedValueOnce([]);
 
       const result = await repository.getResultsSummaryReport('UNKNOWN');
 
@@ -1366,6 +1478,7 @@ describe('AgressoContractRepository', () => {
         by_status: [],
         by_year: [],
         partner_institutions: 0,
+        by_indicator_year: [],
       });
     });
   });

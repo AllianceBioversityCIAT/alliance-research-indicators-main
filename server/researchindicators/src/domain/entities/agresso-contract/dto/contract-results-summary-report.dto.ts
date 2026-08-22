@@ -36,6 +36,25 @@ export class ContractResultsSummaryYearBucketDto {
   count!: number;
 }
 
+export class ContractResultsSummaryIndicatorYearBucketDto {
+  @ApiProperty({ type: Number, description: 'indicator_id of the result' })
+  indicator_id!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'report_year_id of the bucket; null for explicit null-year bucket',
+  })
+  year!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Count of primary results for this indicator in this year',
+  })
+  count!: number;
+}
+
 export class ContractResultsSummaryReportDto {
   @ApiProperty({
     type: Number,
@@ -66,4 +85,12 @@ export class ContractResultsSummaryReportDto {
       'Distinct count of partner-role institutions linked to the contract results (judgment S2)',
   })
   partner_institutions!: number;
+
+  @ApiProperty({
+    type: ContractResultsSummaryIndicatorYearBucketDto,
+    isArray: true,
+    description:
+      'Result counts grouped by indicator_id and report_year_id for the matrix heatmap view',
+  })
+  by_indicator_year!: ContractResultsSummaryIndicatorYearBucketDto[];
 }
