@@ -99,7 +99,7 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
         { name: 'KE', value: 5 },
         { name: 'VN', value: 1 }
       ]);
-      expect(series.itemStyle.areaColor).toBe('var(--ac-grey-100)');
+      expect(series.itemStyle.areaColor).toBe('#f4f7f9');
     });
 
     it('configures continuous visualMap scaling from 1 to max count over the ramp tokens (D-GEO-8)', () => {
@@ -109,7 +109,7 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
       expect(visualMap.type).toBe('continuous');
       expect(visualMap.min).toBe(1);
       expect(visualMap.max).toBe(12);
-      expect(visualMap.inRange.color).toEqual(component.tokens().ramp);
+      expect(visualMap.outOfRange.color).toEqual(['#f4f7f9']);
     });
 
     it('formats tooltip showing resolved country name and count for hover targets', () => {

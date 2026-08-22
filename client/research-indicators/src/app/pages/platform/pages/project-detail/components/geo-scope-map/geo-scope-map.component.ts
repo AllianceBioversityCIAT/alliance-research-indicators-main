@@ -86,11 +86,18 @@ export class GeoScopeMapComponent {
 
     ensureWorldMapRegistered();
 
+    const isDark = this.darkModeService.darkMode()();
     const countries = this.safeCountries();
     const seriesData = buildGeoChoroplethSeriesData(countries, validGeometryIsoSet);
     const maxCount = getGeoChoroplethMaxCount(countries);
     const countryNames = this.countryNameByIso();
-    const ramp = this.tokens().ramp;
+    const tokenRamp = this.tokens().ramp;
+    const defaultLightRamp = ['#e1f0fa', '#90caf9', '#42a5f5', '#1976d2', '#0d47a1'];
+    const defaultDarkRamp = ['#102a43', '#184a77', '#276ab3', '#42a5f5', '#90caf9'];
+    const fallbackRamp = isDark ? defaultDarkRamp : defaultLightRamp;
+    const validRamp = tokenRamp.filter(c => !!c && c.trim().length > 0).length === 5 ? tokenRamp : fallbackRamp;
+    const neutralAreaColor = isDark ? '#2b2b2b' : '#f4f7f9';
+    const neutralBorderColor = isDark ? '#4c4c4c' : '#d1d6da';
 
     return {
       tooltip: {
@@ -114,9 +121,12 @@ export class GeoScopeMapComponent {
       visualMap: {
         type: 'continuous',
         min: 1,
-        max: maxCount,
+        max: maxCount > 1 ? maxCount : 2,
         inRange: {
-          color: ramp
+          color: validRamp
+        },
+        outOfRange: {
+          color: [neutralAreaColor]
         },
         calculable: false,
         orient: 'horizontal',
@@ -124,7 +134,7 @@ export class GeoScopeMapComponent {
         bottom: 8,
         text: ['High', 'Low'],
         textStyle: {
-          color: 'var(--ac-grey-700)',
+          color: isDark ? '#acacac' : '#777c83',
           fontFamily: 'Barlow',
           fontSize: 11
         },
@@ -138,19 +148,21 @@ export class GeoScopeMapComponent {
           map: 'world',
           nameProperty: 'ISO_A2',
           roam: false,
+          top: 8,
+          bottom: 38,
           emphasis: {
             label: { show: false },
             itemStyle: {
-              areaColor: 'var(--ac-primary-blue-400)',
-              borderColor: 'var(--ac-white-1)'
+              areaColor: isDark ? '#2e3e51' : '#b0c4dd',
+              borderColor: isDark ? '#e5e5e5' : '#ffffff'
             }
           },
           select: {
             disabled: true
           },
           itemStyle: {
-            areaColor: 'var(--ac-grey-100)',
-            borderColor: 'var(--ac-grey-300)',
+            areaColor: neutralAreaColor,
+            borderColor: neutralBorderColor,
             borderWidth: 0.5
           },
           data: seriesData

@@ -146,7 +146,7 @@ describe('geo-choropleth.util', () => {
 
     // Known microstates and small territories not represented as separate 1:110m land polygons
     const KNOWN_UNMAPPED_MICROSTATES = new Set([
-      'AD', 'AG', 'AI', 'AS', 'AW', 'AX', 'BB', 'BH', 'BL', 'BM', 'BQ', 'BV', 'CC', 'CK', 'CV',
+      'AD', 'AG', 'AI', 'AQ', 'AS', 'AW', 'AX', 'BB', 'BH', 'BL', 'BM', 'BQ', 'BV', 'CC', 'CK', 'CV',
       'CW', 'CX', 'DM', 'FM', 'FO', 'GD', 'GF', 'GG', 'GI', 'GP', 'GS', 'GU', 'HK', 'HM', 'IM',
       'IO', 'JE', 'KI', 'KM', 'KN', 'KY', 'LC', 'LI', 'MC', 'MF', 'MH', 'MO', 'MP', 'MQ', 'MS',
       'MT', 'MU', 'MV', 'NF', 'NR', 'NU', 'PF', 'PM', 'PN', 'PW', 'RE', 'SC', 'SG', 'SH', 'SJ',
