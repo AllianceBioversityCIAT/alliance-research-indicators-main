@@ -83,9 +83,9 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Private boolean → signal (readonly exposure; `isDarkModeEnabled()` preserved, delegating). Util resolves `--ac-viz-*` via `getComputedStyle` inside a `computed` keyed on the signal; no hex fallback.
 - **Dependencies:** T-03 · **Skills:** `angular-developer`
 - **Acceptance / done check:**
-  - [ ] Service spec: signal transitions on `toggleDarkMode`/`loadThemePreference` — arranged as **transitions**, initial state first (KZ-015). *Red input: assert the signal is `true` immediately after construction with a light `localStorage` — must fail.*
-  - [ ] Util spec asserts the **requested token names** only — jsdom returns `''` for custom properties, so resolved values are structurally unverifiable here (declared per KZ-017; visual correctness is T-12's D6 gate).
-  - [ ] No `isDarkMode()` branching for colors anywhere in the diff (`grep -rn "isDarkMode" <touched components>` → only the service/util).
+  - [x] Service spec: signal transitions on `toggleDarkMode`/`loadThemePreference` — arranged as **transitions**, initial state first (KZ-015). *Red input: assert the signal is `true` immediately after construction with a light `localStorage` — must fail.*
+  - [x] Util spec asserts the **requested token names** only — jsdom returns `''` for custom properties, so resolved values are structurally unverifiable here (declared per KZ-017; visual correctness is T-12's D6 gate).
+  - [x] No `isDarkMode()` branching for colors anywhere in the diff (`grep -rn "isDarkMode" <touched components>` → only the service/util).
 
 ### T-05 — Client: summary API method + service
 

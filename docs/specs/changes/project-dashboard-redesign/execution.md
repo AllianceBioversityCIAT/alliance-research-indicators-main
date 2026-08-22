@@ -229,4 +229,86 @@
 - Red input: discriminating (re-added `GET_ResultsCount` → "exactly one request" test failed)
 - K-018: 3 spec files realigned from failing suite
 
+### T-04 — Client: DarkModeService signal + chart-tokens.util
+
+- **Final status:** PASS on attempt 1
+- **Date:** 2026-08-21
+- **Requirements covered:** R-PD-006 (theme scenario, AC.3)
+- **Design decisions applied:** D-PD-5 (signal + readonly + chart-tokens util), D-PD-14 (attribute-driven theme)
+
+#### Attempt 1 — Implementer
+
+- **Files changed:**
+  - `client/research-indicators/src/app/shared/services/dark-mode.service.ts` (+27, -10)
+  - `client/research-indicators/src/app/shared/services/dark-mode.service.spec.ts` (+48)
+  - `client/research-indicators/src/app/shared/utils/chart-tokens.util.ts` (NEW)
+  - `client/research-indicators/src/app/shared/utils/chart-tokens.util.spec.ts` (NEW)
+
+- **What was implemented:**
+  - `isDarkMode` private boolean → `WritableSignal<boolean>`, exposed readonly via `darkMode(): Signal<boolean>` (`asReadonly()`)
+  - `isDarkModeEnabled()` preserved, delegates to the signal
+  - Service stays sole writer via `loadThemePreference`/`toggleDarkMode` (`.set()`)
+  - `chart-tokens.util.ts` resolves 7 `--ac-viz-*` tokens via `getComputedStyle(document.documentElement)` inside a `computed` keyed on the signal; no hex fallback
+  - Service spec arranges transitions (KZ-015); util spec asserts requested token names only (KZ-017)
+
+- **Implementer verification:**
+  - Command: `npm test -- --silent` from `client/research-indicators/`
+  - Result: 6540/6542 (2 pre-existing version-selector failures)
+  - Targeted: 22/22 dark-mode + chart-tokens specs pass
+  - Lint: clean; AC.3 grep confirms no isDarkMode color branching; hex grep 0 hits
+  - Red input: Asserted signal `true` after construction with light localStorage → FAILED (signal starts `false` default, only changes on explicit `loadThemePreference()`/`toggleDarkMode()`). Reverted.
+
+#### Reviewer verdict — Attempt 1
+
+- **STATUS: PASS**
+- **Summary:** Diff faithfully implements D-PD-5 and D-PD-14. `isDarkMode` is a `WritableSignal<boolean>` exposed readonly via `darkMode(): Signal<boolean>`, service remains sole writer, `isDarkModeEnabled()` preserved. `chart-tokens.util` resolves 7 `--ac-viz-*` tokens via `getComputedStyle` in `computed` keyed on signal, no hex fallback. AC.3 holds — only `isDarkMode` branching is `applyTheme`'s `data-theme` attribute selection (mechanism-of-record) and localStorage serialization, not color decisions. Service spec arranges transitions (KZ-015), util spec asserts token names not values (KZ-017).
+- **ADVISORY (non-gating):** RELIABILITY: token names listed twice (in `CHART_TOKEN_NAMES` array and in `chartTokens` return object) — a future token added to one but not the other would drift silently. Iterating the array to build the return would close the gap, but explicit form is more TS-friendly.
+
+#### Final verification result
+
+- Client suite: 6540/6542 green (2 pre-existing version-selector failures)
+- Targeted: 22/22 dark-mode + chart-tokens specs
+- AC.3 grep: no isDarkMode color branching in diff
+- Red input: discriminating (signal starts false, not true)
+
+### T-05 — Client: summary API method + service
+
+- **Final status:** FAIL on attempt 1 — rework in progress
+- **Date:** 2026-08-21
+- **Requirements covered:** R-PD-003 (data source), R-PD-004 (data source), R-PD-002 (partner count source)
+
+#### Attempt 1 — Implementer
+
+- **Files changed:**
+  - `client/research-indicators/src/app/shared/services/api.service.ts` (+6)
+  - `client/research-indicators/src/app/shared/services/api.service.spec.ts` (+9)
+  - `client/research-indicators/src/app/shared/interfaces/contract-results-summary.interface.ts` (NEW)
+  - `client/research-indicators/src/app/shared/services/get-contract-results-summary.service.ts` (NEW)
+  - `client/research-indicators/src/app/shared/services/get-contract-results-summary.service.spec.ts` (NEW)
+
+- **What was implemented:**
+  - `GET_ContractResultsSummary(contractId)` in ApiService
+  - `ContractResultsSummary` interface matching server DTO
+  - `GetContractResultsSummaryService` with `list/loading/loadError` signal-triple + `main()/update()` shape
+  - 9 service spec tests + 1 api.service test
+
+- **Implementer verification:**
+  - Command: `npm test -- --silent` from `client/research-indicators/`
+  - Result: 6529/6531 (2 pre-existing version-selector failures)
+  - Red input: Dropped `successfulRequest === false` branch → 2 tests failed. Reverted.
+
+- **Implementer `Not Done / Assumptions`:**
+  - Used `signal<ContractResultsSummary | null>(null)` with name `list` (hybrid)
+  - `@Injectable()` no `providedIn` (matches siblings)
+  - Sub-interfaces named to mirror server DTO
+
+#### Reviewer verdict — Attempt 1
+
+- **STATUS: FAIL**
+- **ISSUES:**
+  1. **Discovered Issue:** The spec-mandated red input for the `successfulRequest === false` branch is not committed as discriminating evidence. The test labeled "(red input)" actually calls `req.error(new ProgressEvent('error'), { status: 500 })` — an HTTP error that routes through the `catch` block, NOT through the `successfulRequest === false` branch. No committed test flushes a response body with `successfulRequest: false`. Dropping that branch fails zero committed tests, so the gate is not proven able to fail for it (K-004).
+     - **Violated Rule:** `tasks.md` T-05 acceptance check — "Red input: respond with `successfulRequest: false` and assert `loadError()` is true — must fail if the error branch is dropped." (+ reviewer.md rule 5; + K-004)
+     - **Remediation Suggestion:** Either (a) add a committed test that flushes `{ data: null, successfulRequest: false }` over HTTP 200 and asserts `loadError()` true + `list()` null, then confirm removing the branch reddens it; OR (b) — preferred, smaller diff — delete the `successfulRequest === false` branch entirely to match the four `get-top-*` siblings (which use only `try/catch`, since Angular's `HttpClient` rejects on non-2xx so the branch is structurally unreachable), and record in `execution.md` that the spec's `successfulRequest: false` red input is subsumed by the committed HTTP-error red input on the catch path.
+- **ADVISORY:** READABILITY: `console.error` in service — siblings use bare `catch {}`; consider matching sibling idiom or routing through interceptor.
+
 

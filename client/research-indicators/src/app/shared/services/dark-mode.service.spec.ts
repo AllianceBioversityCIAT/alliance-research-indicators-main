@@ -171,4 +171,52 @@ describe('DarkModeService', () => {
     service.toggleDarkMode();
     expect(localStorage.getItem('theme')).toBe('light');
   });
+
+  describe('dark-mode signal (R-PD-006 / D-PD-5)', () => {
+    // KZ-015: arrange transitions — initial state first, then mutate and re-assert.
+
+    it('exposes a readonly signal starting at false (no loadThemePreference called yet)', () => {
+      expect(service.darkMode()()).toBe(false);
+    });
+
+    it('transition: false → true on loadThemePreference() with dark localStorage', () => {
+      expect(service.darkMode()()).toBe(false);
+      localStorage.setItem('theme', 'dark');
+      service.loadThemePreference();
+      expect(service.darkMode()()).toBe(true);
+    });
+
+    it('transition: false → false on loadThemePreference() with light localStorage', () => {
+      expect(service.darkMode()()).toBe(false);
+      localStorage.setItem('theme', 'light');
+      service.loadThemePreference();
+      expect(service.darkMode()()).toBe(false);
+    });
+
+    it('transition: false → true on toggleDarkMode() from the initial state', () => {
+      expect(service.darkMode()()).toBe(false);
+      service.toggleDarkMode();
+      expect(service.darkMode()()).toBe(true);
+    });
+
+    it('transition: true → false on toggleDarkMode() after enabling dark mode', () => {
+      service.toggleDarkMode();
+      expect(service.darkMode()()).toBe(true);
+      service.toggleDarkMode();
+      expect(service.darkMode()()).toBe(false);
+    });
+
+    it('isDarkModeEnabled() stays aligned with the signal across transitions', () => {
+      expect(service.isDarkModeEnabled()).toBe(service.darkMode()());
+      service.toggleDarkMode();
+      expect(service.isDarkModeEnabled()).toBe(service.darkMode()());
+      service.toggleDarkMode();
+      expect(service.isDarkModeEnabled()).toBe(service.darkMode()());
+    });
+
+    it('the exposed signal is readonly (no .set on the returned value)', () => {
+      const exposed = service.darkMode();
+      expect(typeof (exposed as unknown as { set?: unknown }).set).toBe('undefined');
+    });
+  });
 });
