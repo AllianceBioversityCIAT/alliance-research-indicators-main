@@ -127,6 +127,31 @@
     - Gate D4: PASS. Zero hex literals across component files.
     - 4R sweep clean. Safe, accessible, and reactive foundation for advanced dataviz widgets.
 
+### T-07 — Client: services + interfaces
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified/created:
+    - `client/research-indicators/src/app/shared/interfaces/contract-sp-alignment.interface.ts` (NEW)
+    - `client/research-indicators/src/app/shared/interfaces/contract-results-summary.interface.ts`
+    - `client/research-indicators/src/app/shared/interfaces/find-contracts.interface.ts`
+    - `client/research-indicators/src/app/shared/interfaces/get-project-detail.interface.ts`
+    - `client/research-indicators/src/app/shared/services/api.service.ts`
+    - `client/research-indicators/src/app/shared/services/api.service.spec.ts`
+    - `client/research-indicators/src/app/shared/services/get-contract-sp-alignment.service.ts` (NEW)
+    - `client/research-indicators/src/app/shared/services/get-contract-sp-alignment.service.spec.ts` (NEW)
+  - Verification:
+    - Jest: `PASS src/app/shared/services/get-contract-sp-alignment.service.spec.ts`, `PASS src/app/shared/services/api.service.spec.ts` (232 passed, 232 total)
+    - Lint: `npm run lint -- --quiet` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-001: PASS. Interfaces `ContractSpAlignmentReport`, `ContractSpAlignmentSp`, `ContractSpAlignmentLink` with precise `'PRIMARY' | 'CONTRIBUTING' | 'UNKNOWN'` typing. `ApiService.GET_ContractSpAlignment` with encoded query param and `GetContractSpAlignmentService` with reactive signals.
+    - R-DA-002: PASS. `ContractResultsSummaryIndicatorYearBucket` with `year: number | null` and `by_indicator_year` added without breaking existing fields.
+    - R-DA-005: PASS. `GetProjectDetail` and `FindContracts` extended with `center_amount_usd`, `grant_amount_usd`, `funding_type`, `sdgs`, `cgiar_entities`.
+    - 4R sweep clean. Strict additive types and resilient signal state management.
+
+
 
 
 

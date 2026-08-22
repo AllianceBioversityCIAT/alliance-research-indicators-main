@@ -1,3 +1,5 @@
+import { ContractCgiarEntity } from './find-contracts.interface';
+
 export interface GetProjectDetail {
   agreement_id?: string;
   projectDescription?: string;
@@ -7,6 +9,9 @@ export interface GetProjectDetail {
   end_date?: string;
   extension_date?: string | null;
   grant_amount?: string | number;
+  grant_amount_usd?: string | number | null;
+  center_amount_usd?: string | number | null;
+  funding_type?: string | null;
   donor?: string;
   department?: string;
   division?: string;
@@ -17,6 +22,8 @@ export interface GetProjectDetail {
   indicators?: GetProjectDetailIndicator[];
   status_name?: string;
   contract_status?: string;
+  sdgs?: number[] | string[] | unknown[];
+  cgiar_entities?: ContractCgiarEntity[];
 }
 
 export interface GetProjectDetailIndicator {

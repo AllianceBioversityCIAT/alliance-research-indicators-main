@@ -123,6 +123,7 @@ import {
   TopPrimaryLeversReport
 } from '@shared/interfaces/project-dashboard.interface';
 import { ContractResultsSummary } from '@shared/interfaces/contract-results-summary.interface';
+import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -929,6 +930,11 @@ export class ApiService {
 
   GET_ContractResultsSummary = (contractId: string): Promise<MainResponse<ContractResultsSummary>> => {
     const url = () => `agresso/contracts/reports/results-summary?contract-id=${encodeURIComponent(contractId)}`;
+    return this.TP.get(url(), {});
+  };
+
+  GET_ContractSpAlignment = (contractId: string): Promise<MainResponse<ContractSpAlignmentReport>> => {
+    const url = () => `agresso/contracts/reports/sp-alignment?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
 

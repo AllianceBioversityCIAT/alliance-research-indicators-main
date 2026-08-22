@@ -99,8 +99,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `api.service.ts`, `get-contract-sp-alignment.service.ts` (NEW, +spec), interfaces (sp-alignment NEW; summary + GetProjectDetail extended)
 - **Skills:** `angular-developer` · **Deps:** T-02/T-03/T-04 shapes (parallel-dev vs DTOs allowed)
 - **Done checks:**
-  - [ ] `HttpTestingController` specs: envelope, error signal, retry. *Red input: `successfulRequest:false` with the error branch removed.*
-  - [ ] Interface extensions compile against strict TS (D1 gate covers).
+  - [x] `HttpTestingController` specs: envelope, error signal, retry. *Red input: `successfulRequest:false` with the error branch removed.*
+  - [x] Interface extensions compile against strict TS (D1 gate covers).
 
 ### T-08 — Client: trend-card engine swap + chart.js removal
 - **Requirements:** R-DA-006 (AC.1 greps, AC.2 behavior parity, Scenario `BUT` no-contract-change + `AND IT MUST` lazy) · **Design:** §6 Trend card; reversion-challenge row

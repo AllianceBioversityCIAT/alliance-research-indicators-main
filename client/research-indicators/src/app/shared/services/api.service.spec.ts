@@ -2173,6 +2173,15 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call GET_ContractSpAlignment with encoded contract id', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+      service.GET_ContractSpAlignment('A 100/1');
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(
+        'agresso/contracts/reports/sp-alignment?contract-id=A%20100%2F1',
+        {}
+      );
+    });
+
     it('should call GET_LinkedResults with id', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_LinkedResults(123);

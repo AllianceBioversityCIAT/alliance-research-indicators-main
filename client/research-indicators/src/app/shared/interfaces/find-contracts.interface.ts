@@ -8,6 +8,11 @@ export interface LeverData {
   lever_url: string;
 }
 
+export interface ContractCgiarEntity {
+  code?: string;
+  name?: string;
+}
+
 export interface FindContracts {
   agreement_id?: string;
   projectDescription?: string | null;
@@ -49,6 +54,8 @@ export interface FindContracts {
   /** Present when the find-contracts API loads pooled-funding relations (optional). */
   pooled_funding_contracts?: { is_active?: boolean }[];
   count_results?: number | null;
+  sdgs?: number[] | string[] | unknown[];
+  cgiar_entities?: ContractCgiarEntity[];
 }
 
 export interface FindContractsResponse {
