@@ -270,9 +270,9 @@
   - **Chart.js & PrimeNG Chart eradication (R-DA-006):**
     - Grep verification: 0 `chart.js` or `primeng/chart` imports in `src/`.
   - **API contracts & Swagger:**
-    - `GET /api/v1/agresso-contract/sp-alignment/:agreement_id` (R-DA-001)
-    - `GET /api/v1/agresso-contract/results-summary/:agreement_id` (R-DA-002 with `matrix` payload)
-    - `GET /api/v1/agresso-contract/:agreement_id` (R-DA-005 extended fields)
+    - `GET /api/v1/agresso/contracts/reports/sp-alignment?contract-id=` (R-DA-001) *(URL corrected 2026-08-22 post-hoc: this log originally recorded a path-param form that was never implemented — controller `@Get('reports/sp-alignment')` :293 and `api.service.ts:937` both use the query-param family form the spec mandates)*
+    - `GET /api/v1/agresso/contracts/reports/results-summary?contract-id=` (R-DA-002 with matrix payload) *(same correction; controller :276, api.service.ts:932)*
+    - `GET /api/v1/agresso/contracts/:contractId/results/count` (R-DA-005 extended fields on the existing findOneContract payload)
     - Swagger tags `@ApiTags('Agresso Contract')`, `@ApiOperation`, and DTO definitions registered.
 - **Reviewer Audit (Attempt 1):**
   - **Verdict:** STATUS: PASS

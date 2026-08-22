@@ -227,6 +227,25 @@ describe('ProjectContextStripComponent', () => {
       expect(component.sdgs()).toEqual(['SDG 4']);
     });
 
+    // Regression — validation F-1 (2026-08-22): the server sends ClarisaSdg OBJECTS
+    // (agresso_contracts.sdgs json column); String(object) rendered "SDG [object Object]".
+    it('maps ClarisaSdg objects to their short_name, never "[object Object]"', () => {
+      fixture.componentRef.setInput('project', {
+        sdgs: [
+          { id: 2, short_name: 'SDG 2', full_name: 'Zero Hunger' },
+          { id: 13, short_name: 'SDG 13', full_name: 'Climate Action' },
+          { id: 7, full_name: 'Affordable and Clean Energy' },
+          { id: 5 }
+        ] as any
+      });
+      fixture.detectChanges();
+
+      expect(component.sdgs()).toEqual(['SDG 2', 'SDG 13', 'SDG 7', 'SDG 5']);
+      const text = fixture.nativeElement.textContent;
+      expect(text).not.toContain('[object Object]');
+      expect(text).toContain('SDG 13');
+    });
+
     it('renders CGIAR entities with code or name', () => {
       fixture.componentRef.setInput('project', {
         cgiar_entities: [

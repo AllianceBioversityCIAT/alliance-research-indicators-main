@@ -2,7 +2,7 @@
 
 - **Module:** project-detail (client) + agresso-contract (server)
 - **Spec id:** 2026-08-dashboard-advanced-analytics
-- **Status:** not-started
+- **Status:** tasks done (T-01..T-13) — HITL validation pending (screenshots light+dark, morph decision, Dev cross-check, Swagger evidence)
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md

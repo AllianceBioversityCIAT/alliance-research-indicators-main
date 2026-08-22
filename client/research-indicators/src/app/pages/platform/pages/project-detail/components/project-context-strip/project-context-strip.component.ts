@@ -119,6 +119,12 @@ export class ProjectContextStripComponent {
     return rawSdgs
       .map(item => {
         if (item === null || item === undefined || item === '') return null;
+        // The AGRESSO json column carries ClarisaSdg objects; legacy rows may hold plain numbers/strings.
+        if (typeof item === 'object') {
+          const sdg = item as { id?: number; short_name?: string };
+          const label = sdg.short_name?.trim() || (sdg.id !== null && sdg.id !== undefined ? `SDG ${sdg.id}` : null);
+          return label ? label.toUpperCase() : null;
+        }
         const str = String(item).trim();
         if (!str) return null;
         const upper = str.toUpperCase();
