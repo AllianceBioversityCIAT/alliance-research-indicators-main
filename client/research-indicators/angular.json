@@ -32,7 +32,6 @@
               }
             ],
             "styles": [
-              "node_modules/mapbox-gl/dist/mapbox-gl.css",
               "src/styles/styles.scss",
               "src/styles/colors.scss",
               "src/styles/font.scss",

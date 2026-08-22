@@ -115,3 +115,29 @@
 - **Reviewer Verdict:** PASS
 - **Reviewer Summary:** The implementation exactly matches T-05's scope. It touches only the grid layout classes in `geo-scope-card.component.html`, safely rebalancing the map pane to `1.1fr` (55%, which satisfies the ≥50% requirement) while leaving all other markup, state handling, and retry affordances completely intact.
 
+
+### T-06 — Mapbox removal sweep
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-007 (all ACs + both BUT/MUST clauses), R-GEO-001 (AC.2, "no new npm dependency"), R-GEO-006 (AC.3)
+- **Files Changed / Deleted:**
+  - `client/research-indicators/package.json` (removed mapbox-gl)
+  - `client/research-indicators/package-lock.json` (updated)
+  - `client/research-indicators/angular.json` (removed mapbox-gl.css from styles)
+  - `client/research-indicators/src/app/shared/services/mapbox-geocoding.service.ts` (deleted)
+  - `client/research-indicators/src/app/shared/services/mapbox-geocoding.service.spec.ts` (deleted)
+  - `client/research-indicators/src/app/shared/utils/geo-scope-map.util.ts` (deleted)
+  - `client/research-indicators/src/app/shared/utils/geo-scope-map.util.spec.ts` (deleted)
+  - `client/research-indicators/src/app/shared/constants/country-centroids.constants.ts` (trimmed, retained `PROJECT_DASHBOARD_DEFAULT_LIMIT = 5`)
+  - `client/research-indicators/src/app/shared/constants/country-centroids.constants.spec.ts` (updated)
+  - `client/research-indicators/src/environments/environment.example.ts` (removed mapbox fields)
+- **Implementer Verification:**
+  - Grep verification: `git grep -i "mapbox" client/research-indicators/src client/research-indicators/angular.json client/research-indicators/package.json` returned 0 hits (exit code 1)
+  - Unit tests: `npm test -- src/app/shared/constants/country-centroids.constants.spec.ts --coverage=false` passed (exit code 0)
+  - Production build: `npm run build` succeeded with exit code 0; initial bundle raw size dropped to 1.12 MB (from 1.16 MB); `project-dashboard-component` chunk dropped to 1.03 MB (from 2.62 MB); Mapbox CommonJS warning eliminated
+  - Archive untouched: `docs/specs/archive/**` intact
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** The diff cleanly removes all specified Mapbox artifacts (dependencies, styles, services, utils, env fields) while preserving `PROJECT_DASHBOARD_DEFAULT_LIMIT` and archive files untouched. The verification evidence confirms zero Mapbox hits, passing tests, and reduced bundle sizes as required.
+

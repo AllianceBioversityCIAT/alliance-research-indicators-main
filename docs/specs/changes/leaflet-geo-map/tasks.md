@@ -138,14 +138,14 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - `client/src/environments/environment.example.ts` (remove the two Mapbox fields)
 - **Description:** Execute the requirements §R-GEO-007 removal inventory exactly. The inventory is scout-verified complete; do not improvise additions or skip entries.
 - **Acceptance / done check:**
-  - [ ] `grep -ri "mapbox" client/research-indicators/src client/research-indicators/angular.json client/research-indicators/package.json` ⇒ zero hits. **Failing input:** the grep is proven able to fail by running it before the sweep (it is red now by construction — capture that red).
-  - [ ] `PROJECT_DASHBOARD_DEFAULT_LIMIT` still resolves: `npm run build` green after `npm ci` on the pruned lockfile.
-  - [ ] `docs/specs/archive/**` untouched (git status shows no archive diff).
-  - [ ] Gitignored local `environment*.ts` explicitly NOT edited (they are developer-local; note stands in design §11). **Declared gap:** the grep cannot reach them — recorded, accepted.
+  - [x] `grep -ri "mapbox" client/research-indicators/src client/research-indicators/angular.json client/research-indicators/package.json` ⇒ zero hits. **Failing input:** the grep is proven able to fail by running it before the sweep (it is red now by construction — capture that red).
+  - [x] `PROJECT_DASHBOARD_DEFAULT_LIMIT` still resolves: `npm run build` green after `npm ci` on the pruned lockfile.
+  - [x] `docs/specs/archive/**` untouched (git status shows no archive diff).
+  - [x] Gitignored local `environment*.ts` explicitly NOT edited (they are developer-local; note stands in design §11). **Declared gap:** the grep cannot reach them — recorded, accepted.
 - **Dependencies:** T-04
 - **Estimated effort:** M
 - **Relevant skills:** `angular-developer`
-- **Status:** todo
+- **Status:** done
 
 ### T-07 — Gates + generated-output measurements
 

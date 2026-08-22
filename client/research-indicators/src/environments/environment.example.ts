@@ -83,8 +83,6 @@ export const environment = {
   cognitoIdentityProvider: '',
   cognitoRedirectUri: 'http://localhost:4200/auth',
   googleAnalyticsId: '',
-  mapboxAccessToken: '',
-  mapboxGeocodingUrl: '',
 
   // --- Numbers, not strings. See trap 1 above. -----------------------------
   hotjarId: 0,
