@@ -1,6 +1,18 @@
-<app-viz-chart
-  [options]="options()"
-  [tableModel]="tableModel()"
-  [requireTable]="true"
-  [height]="'340px'"
-/>
+@if (hasData()) {
+  <app-viz-chart
+    [options]="options()"
+    [tableModel]="tableModel()"
+    [requireTable]="true"
+    [height]="'340px'"
+  />
+} @else {
+  <div
+    class="flex h-full min-h-[220px] w-full flex-col items-center justify-center gap-2 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-8 text-center"
+    data-testid="geo-scope-map-fallback"
+  >
+    <i class="pi pi-globe text-2xl text-[var(--ac-grey-400)]" aria-hidden="true"></i>
+    <p class="m-0 font-['Barlow'] text-xs font-medium text-[var(--ac-grey-600)]">
+      No country-level data — this project's reach is global/regional.
+    </p>
+  </div>
+}

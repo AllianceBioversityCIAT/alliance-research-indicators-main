@@ -246,6 +246,13 @@ describe('GeoScopeCardComponent', () => {
       { id: '2', label: '—', count: 0 }
     ]);
   });
+
+  it('should not report empty for global/regional only project (R-GEO-006 AC.4 fixture)', () => {
+    service.topCountries.set([]);
+    service.summary.set({ global: 7, regional: 3 });
+
+    expect(component.isEmpty()).toBe(false);
+  });
 });
 
 function createGeoScopeServiceMock() {

@@ -55,7 +55,12 @@ export class GeoScopeMapComponent {
     return Array.isArray(raw) ? raw : [];
   });
 
-  readonly tableModel = computed<VizChartTableModel>(() => {
+  readonly hasData = computed(() => this.safeCountries().length > 0);
+
+  readonly tableModel = computed<VizChartTableModel | null>(() => {
+    if (!this.hasData()) {
+      return null;
+    }
     return buildGeoChoroplethTableModel(this.safeCountries());
   });
 
@@ -74,7 +79,11 @@ export class GeoScopeMapComponent {
     return map;
   });
 
-  readonly options = computed<EChartsOption>(() => {
+  readonly options = computed<EChartsOption | null>(() => {
+    if (!this.hasData()) {
+      return null;
+    }
+
     ensureWorldMapRegistered();
 
     const isDark = this.darkModeService.darkMode()();

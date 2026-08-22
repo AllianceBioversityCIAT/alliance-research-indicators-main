@@ -42,23 +42,29 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
     jest.restoreAllMocks();
   });
 
-  describe('KZ-015 Transition fixture & Initial empty state (R-GEO-006)', () => {
-    it('constructs with neutral world map when countries input is empty (KZ-015)', () => {
+  describe('KZ-015 Transition fixture & Initial empty state (R-GEO-006 / AC.4 / D-GEO-9)', () => {
+    it('constructs in empty state with static pane fallback in DOM and no chart options (AC.4 / D-GEO-9)', () => {
+      // Fixture: empty top_countries
       fixture.detectChanges();
 
-      expect(component.options()).toBeDefined();
-      expect(component.options().series?.[0]?.data).toEqual([]);
-      expect(component.options().visualMap).toBeUndefined();
-      expect(component.tableModel()?.rows).toEqual([]);
-      expect(fixture.nativeElement.querySelector('app-viz-chart')).not.toBeNull();
+      expect(component.hasData()).toBe(false);
+      expect(component.options()).toBeNull();
+      expect(component.tableModel()).toBeNull();
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
+
+      const fallback = fixture.nativeElement.querySelector('[data-testid="geo-scope-map-fallback"]');
+      expect(fallback).not.toBeNull();
+      expect(fallback.textContent).toContain("No country-level data — this project's reach is global/regional.");
+      expect(fallback.querySelector('.pi-globe')).not.toBeNull();
     });
 
-    it('transitions from empty initial state to populated input and renders shaded choropleth with visualMap (KZ-015)', () => {
-      // 1. Initial neutral map state
+    it('transitions from empty initial state to populated input and renders chart, removing fallback (KZ-015 / AC.4)', () => {
+      // 1. Initial country-less state
       fixture.detectChanges();
-      expect(component.options().visualMap).toBeUndefined();
+      expect(fixture.nativeElement.querySelector('[data-testid="geo-scope-map-fallback"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
 
-      // 2. Transition state with data
+      // 2. Transition state with country data
       const mockCountries: GeoScopeCountry[] = [
         { iso_alpha_2: 'CO', country_name: 'Colombia', count: 12 },
         { iso_alpha_2: 'KE', country_name: 'Kenya', count: 5 }
@@ -66,10 +72,11 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
       fixture.componentRef.setInput('countries', mockCountries);
       fixture.detectChanges();
 
+      expect(component.hasData()).toBe(true);
       expect(component.options()).not.toBeNull();
-      expect(component.options().visualMap).toBeDefined();
-      expect(component.tableModel()?.rows.length).toBe(2);
+      expect(component.tableModel()).not.toBeNull();
       expect(fixture.nativeElement.querySelector('app-viz-chart')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="geo-scope-map-fallback"]')).toBeNull();
     });
   });
 

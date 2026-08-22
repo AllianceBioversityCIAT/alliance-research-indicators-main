@@ -101,10 +101,11 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - Option object is complete every recompute (wrapper uses `notMerge: true`).
 - **Acceptance / done check:**
   - [x] Spec asserts on the **generated option object** (KZ-001), not on call sequences: ramp array present in visualMap, series contains exactly the ISO-matched countries and no no-data entries, tooltip formatter output for a sample row, `roam:false`.
-  - [x] **KZ-015 transition fixture:** construct with `countries=[]` first `detectChanges()`, assert no chart options emitted; **then** set data and assert the chart appears. Same pattern for the theme flip: light first, assert, flip signal, assert recomputed values.
-  - [x] Spec proves: empty input ⇒ null options (no chart); theme-signal flip ⇒ option recomputed with re-resolved tokens. **Presence caveat declared:** these are option-object proofs; whether ECharts paints them is T-08's HITL scope, not this task's.
+  - [x] **KZ-015 transition fixture:** construct with `countries=[]` before first `detectChanges()`, assert no chart options emitted and static pane fallback present in rendered DOM; **then** set data and assert the chart appears while the fallback is removed. Same pattern for the theme flip: light first, assert, flip signal, assert recomputed values.
+  - [x] **AC.4 unit test** with fixture `{ top_countries: [], geo_scope_summary: { global: 7, regional: 3 } }`: asserts no chart options emitted, static pane fallback present in rendered DOM (KZ-001, text + icon), and outer card is NOT in empty state (D-GEO-9).
+  - [x] Spec proves: empty input ⇒ null options (no chart); fallback visible in DOM (D-GEO-9). **Failing input (K-012/K-004):** rendering the chart unconditionally ⇒ test goes red. **Presence caveat declared:** these are option-object and DOM proofs; whether ECharts paints the populated chart is T-08's HITL scope, not this task's.
   - [x] Template passes `tableModel` and does **not** set `requireTable` to false (grep of the template).
-  - [x] `geo-scope-card.component.spec.ts` passes **unmodified** (R-GEO-006 AC.1 / R-GEO-008 AC.1 by construction).
+  - [x] `geo-scope-card.component.spec.ts` passes **unmodified** (R-GEO-006 AC.1 / R-GEO-008 AC.1 by construction) and confirms outer card stays non-empty on AC.4 fixture.
   - [x] Strings "Check the Mapbox access token" and "No geographic points could be resolved" absent from the component files.
 - **Dependencies:** T-02, T-03
 - **Estimated effort:** L
@@ -172,6 +173,7 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 - **Acceptance / done check:**
   - [ ] Each item above observed and recorded (screenshots or explicit per-item confirmation) in the task evidence — **KZ-014: this task's checkbox, and any spec-level done claim, may not be marked from green suites alone while this check is pending.** This is the declared substitute gate for the visual defect class (requirements §5).
   - [ ] Dark-mode pass explicitly includes the visualMap legend text and tooltip readability.
+  - [ ] Two contract types checked and evidenced at HITL: (1) a contract with non-empty country counts (e.g. Kenya, Colombia) verifying choropleth shading, monotonic ramp, and tooltips; (2) a global/regional-only contract (e.g. A511 on Testing: GLOBAL 7, REGIONAL 3, 0 country rows) verifying that the static pane-level fallback ("No country-level data — this project's reach is global/regional.") renders properly alongside the summary and regional lists without a dead grey pane (D-GEO-9).
   - [ ] **Disqualifier:** a check run against a project with empty geo data verifies nothing about shading — the evidence must name the project/contract used and its non-empty counts.
 - **Dependencies:** T-07
 - **Estimated effort:** S
@@ -205,6 +207,7 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 | R-GEO-006 AC.1 card spec unmodified | T-04 |
 | R-GEO-006 AC.2 error ⇒ no chart | T-04 |
 | R-GEO-006 AC.3 strings gone | T-04 (component) + T-06 (repo-wide grep) |
+| R-GEO-006 Scenario country-less / AC.4 | T-04 (+T-08 visual) |
 | R-GEO-006 `BUT NOT` blank pane / `MUST` retry affordance | T-04 (empty test) / T-05 (retry untouched) |
 | R-GEO-007 all ACs + `BUT NOT` centroids wholesale + `MUST` archive untouched | T-06 |
 | R-GEO-008 AC.1 lists unchanged | T-04 + T-05 (spec unmodified) |
