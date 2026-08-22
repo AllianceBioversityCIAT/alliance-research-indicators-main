@@ -41,6 +41,7 @@ describe('AgressoContractController', () => {
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
     getResultsSummaryReport: jest.fn(),
+    getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -357,6 +358,89 @@ describe('AgressoContractController', () => {
       expect(operation).toMatchObject({
         summary:
           'Results summary report for results linked to a primary contract',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'contract-id',
+            required: true,
+            type: String,
+          }),
+        ]),
+      );
+    });
+  });
+
+  describe('getSpAlignmentReport', () => {
+    it('should return formatted Science-Program alignment report with the aggregate data shape', async () => {
+      const mockReport = {
+        sps: [
+          {
+            sp_code: 'SP-01',
+            name: 'CGIAR Science Program 1',
+            category: 'Science programs',
+            icon_key: 'sp-01',
+            links: [
+              {
+                result_official_code: 'R-001',
+                result_title: 'Result 1',
+                role: 'PRIMARY' as const,
+              },
+            ],
+          },
+        ],
+        results_with_alignment: 1,
+        results_without_alignment: 0,
+      };
+
+      mockAgressoContractService.getSpAlignmentReport.mockResolvedValue(
+        mockReport,
+      );
+
+      const result = await controller.getSpAlignmentReport('A1676');
+
+      expect(
+        mockAgressoContractService.getSpAlignmentReport,
+      ).toHaveBeenCalledWith('A1676');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract Science-Program alignment report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+      expect(result).toEqual({
+        description: 'Contract Science-Program alignment report generated',
+        status: HttpStatus.OK,
+        data: mockReport,
+      });
+    });
+
+    it('should propagate BadRequestException when contract-id is empty', async () => {
+      mockAgressoContractService.getSpAlignmentReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(controller.getSpAlignmentReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(
+        mockAgressoContractService.getSpAlignmentReport,
+      ).toHaveBeenCalledWith('');
+    });
+
+    it('should declare Swagger operation and contract-id query param metadata (AC.1)', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getSpAlignmentReport,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getSpAlignmentReport,
+      );
+
+      expect(operation).toMatchObject({
+        summary:
+          'Science-Program alignments report for results linked to a primary contract',
       });
       expect(parameters).toEqual(
         expect.arrayContaining([

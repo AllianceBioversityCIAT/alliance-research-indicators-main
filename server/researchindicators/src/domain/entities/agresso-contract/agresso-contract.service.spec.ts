@@ -46,6 +46,7 @@ describe('AgressoContractService', () => {
     getTopMainContactPersonsReport: jest.fn(),
     getContractStaffReport: jest.fn(),
     getResultsSummaryReport: jest.fn(),
+    getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
   };
 
@@ -602,6 +603,47 @@ describe('AgressoContractService', () => {
         BadRequestException,
       );
       expect(repository.getResultsSummaryReport).toHaveBeenCalledWith('');
+    });
+  });
+
+  describe('getSpAlignmentReport', () => {
+    it('should delegate SP alignment report to repository', async () => {
+      const expectedReport = {
+        sps: [
+          {
+            sp_code: 'SP-01',
+            name: 'CGIAR Science Program 1',
+            category: 'Science programs',
+            icon_key: 'sp-01',
+            links: [
+              {
+                result_official_code: 'R-001',
+                result_title: 'Result 1',
+                role: 'PRIMARY' as const,
+              },
+            ],
+          },
+        ],
+        results_with_alignment: 1,
+        results_without_alignment: 0,
+      };
+      mockRepository.getSpAlignmentReport.mockResolvedValue(expectedReport);
+
+      const result = await service.getSpAlignmentReport('A1676');
+
+      expect(repository.getSpAlignmentReport).toHaveBeenCalledWith('A1676');
+      expect(result).toEqual(expectedReport);
+    });
+
+    it('should propagate BadRequestException when contract-id is empty', async () => {
+      mockRepository.getSpAlignmentReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(service.getSpAlignmentReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.getSpAlignmentReport).toHaveBeenCalledWith('');
     });
   });
 

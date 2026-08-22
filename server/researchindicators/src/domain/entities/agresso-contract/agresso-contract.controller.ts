@@ -290,6 +290,24 @@ export class AgressoContractController {
       );
   }
 
+  @Get('reports/sp-alignment')
+  @ApiOperation({
+    summary:
+      'Science-Program alignments report for results linked to a primary contract',
+  })
+  @ApiContractReportQueries()
+  async getSpAlignmentReport(@Query('contract-id') contractId: string) {
+    return this.agressoContractService
+      .getSpAlignmentReport(contractId)
+      .then((response) =>
+        ResponseUtils.format({
+          description: 'Contract Science-Program alignment report generated',
+          status: HttpStatus.OK,
+          data: response,
+        }),
+      );
+  }
+
   @Get('results/current-user')
   @ApiOperation({ summary: 'Find all contracts by current user' })
   async findContractsByCurrentUser() {

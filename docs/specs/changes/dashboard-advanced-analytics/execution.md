@@ -26,3 +26,23 @@
     - R-DA-001 / AC.3 & D-DA-4 (UNKNOWN Mapping): PASS. Enforced in SQL via `COALESCE(rpfas.sp_role, 'UNKNOWN') AS role`.
     - R-DA-001 / AC.4 (Counters & Empty Array): PASS. Empty alignments properly resolve to `sps: []` and correct total counts.
     - Error handling: Empty `contractId` yields `BadRequestException` (400).
+
+### T-02 — Server: sp-alignment endpoint + Swagger
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified:
+    - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.spec.ts`
+  - Verification:
+    - Jest: `PASS src/domain/entities/agresso-contract/agresso-contract.service.spec.ts`, `PASS src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts` (54 passed, 54 total)
+    - ESLint: `npx eslint src/domain/entities/agresso-contract/` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-001 AC.1: PASS. `GET reports/sp-alignment` endpoint declared with `@ApiOperation` and `@ApiContractReportQueries()`.
+    - Envelope & Error handling: PASS. Response formatted with `ResponseUtils.format`, 400 on empty contract-id verified.
+    - 4R sweep clean. Swagger metadata presence verified via reflection tests.
+

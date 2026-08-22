@@ -184,6 +184,10 @@ export class AgressoContractService {
     return this._agressoContractRepository.getResultsSummaryReport(contractId);
   }
 
+  async getSpAlignmentReport(contractId: string) {
+    return this._agressoContractRepository.getSpAlignmentReport(contractId);
+  }
+
   async getTopPartnersReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getTopPartnersReport(
       contractId,

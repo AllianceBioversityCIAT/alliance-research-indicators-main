@@ -57,8 +57,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `agresso-contract.controller.ts`, `agresso-contract.service.ts` (+specs)
 - **Skills:** `nestjs-expert`, `api-design-principles` · **Deps:** T-01
 - **Done checks:**
-  - [ ] Controller/service specs: happy path + empty `contract-id` → 400. *Red input: `''` with the guard removed.*
-  - [ ] Swagger presence deferred evidence → T-13 (manual screenshot).
+  - [x] Controller/service specs: happy path + empty `contract-id` → 400. *Red input: `''` with the guard removed.*
+  - [x] Swagger presence deferred evidence → T-13 (manual screenshot).
 
 ### T-03 — Server: results-summary matrix extension
 - **Requirements:** R-DA-002 (AC.1 sums, AC.2 byte-compat, Scenario `BUT` no-zero-cells + `AND IT MUST` null bucket) · **Design:** §2.1.2, D-DA-2
