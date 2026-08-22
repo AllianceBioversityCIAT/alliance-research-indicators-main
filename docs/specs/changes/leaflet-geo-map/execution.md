@@ -38,3 +38,23 @@
 - **Reviewer Verdict:** PASS
 - **Reviewer Summary:** The implementation fulfills all T-01 acceptance criteria. The baseline sizes are properly recorded, the geometry asset and its README contain the required provenance and properties (ISO_A2), the CLARISA fixture is added, and `resolveJsonModule: true` is enabled in the client's `tsconfig.json` with verification evidence included.
 
+
+### T-02 — geo-choropleth.util.ts + spec (join, exceptions, tableModel)
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-003 (AC.1, AC.2 test half, AC.3, both BUT/MUST clauses), R-GEO-005 (AC.1 tableModel completeness), R-GEO-002 (monotonic max-count input)
+- **Files Changed / Created:**
+  - `client/research-indicators/src/app/shared/utils/geo-choropleth.util.ts` (created: pure join, exceptions, tableModel, max count functions)
+  - `client/research-indicators/src/app/shared/utils/geo-choropleth.util.spec.ts` (created: 14 unit tests including fixture coverage and K-004 failing input check)
+- **Implementer Verification:**
+  - `npm test -- src/app/shared/utils/geo-choropleth.util.spec.ts --coverage=false`: 14 passed, 14 total (exit code 0)
+  - Grep verification: `country_name` never used as join key
+  - Failing input check (K-004): Verified fake code `'XX'` fails coverage test
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** The `geo-choropleth.util.ts` and its spec accurately implement the required ISO alpha-2 extraction, exceptions mapping, table model generation, and monotonic maximum count logic. The coverage test effectively uses a set of known unmapped microstates to validate the CLARISA fixture against the world geometry.
+- **Reviewer Advisory:**
+  - *Readability:* The tracking of `KNOWN_UNMAPPED_MICROSTATES` in the spec file is a clean way to satisfy the AC.2 test gate without polluting the production exceptions map with dead entries.
+  - *Reliability:* `buildGeoChoroplethSeriesData` returns `{ name: mappedCode, value: country.count }`. If T-04 needs the full country name in the tooltip formatter, T-04 can carry `country_name` or handle lookup in the formatter closure.
+

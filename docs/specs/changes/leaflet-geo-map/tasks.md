@@ -62,13 +62,13 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - Exceptions map is a code-level const here; **no name-based lookup anywhere** (R-GEO-003 `AND IT MUST NOT` — done-check greps the util for `country_name` used as a join key).
   - Coverage test: every fixture alpha-2 resolves to a feature or an exceptions entry.
 - **Acceptance / done check:**
-  - [ ] Named failing inputs observed RED before implementation (K-012/K-004): `{iso_alpha_2:'HK',count:3}` with HK absent from the geometry ⇒ excluded from series, present in tableModel; `FR` when the shipped edition carries `ISO_A2:'-99'` ⇒ red until the exceptions entry exists; `{iso_alpha_2: undefined}` ⇒ excluded without throwing; fake code `XX` added to the fixture ⇒ coverage test reddens (then remove it).
-  - [ ] Targeted run passes **with `--coverage=false`** (K-020). **Disqualifier:** an exit code from a targeted run without that flag is not a signal in either direction.
-  - [ ] Grep confirms no join path reads `country_name`.
+  - [x] Named failing inputs observed RED before implementation (K-012/K-004): `{iso_alpha_2:'HK',count:3}` with HK absent from the geometry ⇒ excluded from series, present in tableModel; `FR` when the shipped edition carries `ISO_A2:'-99'` ⇒ red until the exceptions entry exists; `{iso_alpha_2: undefined}` ⇒ excluded without throwing; fake code `XX` added to the fixture ⇒ coverage test reddens (then remove it).
+  - [x] Targeted run passes **with `--coverage=false`** (K-020). **Disqualifier:** an exit code from a targeted run without that flag is not a signal in either direction.
+  - [x] Grep confirms no join path reads `country_name`.
 - **Dependencies:** T-01
 - **Estimated effort:** M
 - **Relevant skills:** `angular-developer`, `tdd`
-- **Status:** todo
+- **Status:** done
 
 ### T-03 — viz-chart registration extension + sibling mock updates
 
