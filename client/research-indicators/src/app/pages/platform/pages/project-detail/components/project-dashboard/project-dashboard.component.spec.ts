@@ -20,8 +20,22 @@ import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.componen
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
+import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
+import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
+import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
+
+@Component({
+  selector: 'app-sp-alignment-graph',
+  standalone: true,
+  template: ''
+})
+class SpAlignmentGraphStubComponent {
+  @Input() report: ContractSpAlignmentReport | null = null;
+  @Input() loading = false;
+  @Input() error = false;
+}
 
 @Component({
   selector: 'app-results-trend-card',
@@ -233,6 +247,14 @@ describe('ProjectDashboardComponent', () => {
       update: jest.fn()
     };
 
+    const contractSpAlignmentMock = {
+      list: signal<ContractSpAlignmentReport | null>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      main: jest.fn(),
+      update: jest.fn()
+    };
+
     await TestBed.configureTestingModule({
       imports: [ProjectDashboardComponent],
       providers: [
@@ -255,25 +277,27 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent],
+          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent],
           providers: [
             GetTopContributorsContractsService,
             GetTopMainContactPersonsService,
             GetTopPartnersService,
             GetTopPrimaryLeversService,
             GetGeoScopeService,
-            GetContractResultsSummaryService
+            GetContractResultsSummaryService,
+            GetContractSpAlignmentService
           ]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent],
+          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent],
           providers: [
             { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
             { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
             { provide: GetTopPartnersService, useValue: topPartnersMock },
             { provide: GetTopPrimaryLeversService, useValue: topLeversMock },
             { provide: GetGeoScopeService, useValue: geoScopeMock },
-            { provide: GetContractResultsSummaryService, useValue: contractResultsSummaryMock }
+            { provide: GetContractResultsSummaryService, useValue: contractResultsSummaryMock },
+            { provide: GetContractSpAlignmentService, useValue: contractSpAlignmentMock }
           ]
         }
       })
@@ -1394,6 +1418,50 @@ describe('ProjectDashboardComponent', () => {
 
         expect(component.isAiSectionExpanded()).toBe(true);
       });
+    });
+  });
+
+  describe('SP alignment graph widget visibility (R-DA-003, D-DA-5, KZ-002)', () => {
+    it('renders app-sp-alignment-graph for bilateral project (KZ-002 bilateral fixture)', async () => {
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Bilateral',
+          grant_amount: 1000,
+          indicators: []
+        }
+      });
+
+      expect(component.isBilateral()).toBe(true);
+      const widget = fixture.nativeElement.querySelector('app-sp-alignment-graph');
+      expect(widget).not.toBeNull();
+    });
+
+    it('does NOT render app-sp-alignment-graph for non-bilateral project (KZ-002 non-bilateral fixture)', async () => {
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Pool Funding',
+          grant_amount: 1000,
+          indicators: []
+        }
+      });
+
+      expect(component.isBilateral()).toBe(false);
+      const widget = fixture.nativeElement.querySelector('app-sp-alignment-graph');
+      expect(widget).toBeNull();
+    });
+
+    it('does NOT render app-sp-alignment-graph when project has active pooled funding relation (KZ-002)', async () => {
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Bilateral',
+          grant_amount: 1000,
+          indicators: [],
+          pooled_funding_contracts: [{ is_active: true }]
+        } as any
+      });
+
+      expect(component.isBilateral()).toBe(false);
+      expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeNull();
     });
   });
 });

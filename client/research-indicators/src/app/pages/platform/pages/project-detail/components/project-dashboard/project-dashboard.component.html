@@ -351,6 +351,15 @@
         [error]="contractResultsSummary.loadError()"
         (retry)="contractResultsSummary.update()">
       </app-results-trend-card>
+
+      @if (isBilateral()) {
+      <app-sp-alignment-graph
+        [report]="contractSpAlignment.list()"
+        [loading]="contractSpAlignment.loading()"
+        [error]="contractSpAlignment.loadError()"
+        (retry)="contractSpAlignment.update()">
+      </app-sp-alignment-graph>
+      }
     </div>
   </div>
   <!-- Pending revision results -->

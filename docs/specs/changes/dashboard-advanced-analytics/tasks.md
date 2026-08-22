@@ -115,10 +115,10 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `sp-alignment-graph/` (NEW, +spec), dashboard template hook
 - **Skills:** `angular-developer`, `ui-ux-pro-max` · **Deps:** T-06, T-07
 - **Done checks:**
-  - [ ] Rendered-DOM: three role treatments incl. UNKNOWN legend entry (fixture with null-role rows — *red input: map null→CONTRIBUTING, the UNKNOWN assertion must fail*); tabular alternative enumerates SP↔result↔role incl. UNKNOWN rows.
-  - [ ] Bilateral fixture with `sps: []` → absent-state card; **non-bilateral fixture → widget absent from DOM** (KZ-002: both fixtures mandatory). *Disqualifier: testing only the bilateral path.*
-  - [ ] Result-node activation navigates (click + keyboard, router spy).
-  - [ ] Cap fixture (>150 result nodes) renders the "showing N of M" disclosure. *Red input: exceed the cap without the disclosure line.*
+  - [x] Rendered-DOM: three role treatments incl. UNKNOWN legend entry (fixture with null-role rows — *red input: map null→CONTRIBUTING, the UNKNOWN assertion must fail*); tabular alternative enumerates SP↔result↔role incl. UNKNOWN rows.
+  - [x] Bilateral fixture with `sps: []` → absent-state card; **non-bilateral fixture → widget absent from DOM** (KZ-002: both fixtures mandatory). *Disqualifier: testing only the bilateral path.*
+  - [x] Result-node activation navigates (click + keyboard, router spy).
+  - [x] Cap fixture (>150 result nodes) renders the "showing N of M" disclosure. *Red input: exceed the cap without the disclosure line.*
 
 ### T-10 — Client: bars↔heatmap toggle + morph
 - **Requirements:** R-DA-004 (all ACs, Scenario `BUT` no-refetch + `AND IT MUST` reduced-motion usability), R-DA-007 morph clauses · **Design:** §5.3, §6 Heatmap/Motion

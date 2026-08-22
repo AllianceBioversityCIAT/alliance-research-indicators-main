@@ -32,6 +32,9 @@ import { ResultsCenterTableComponent } from '../../../results-center/components/
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results-summary.interface';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
+import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
+import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
+import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 
 const MAX_GROUNDING_DOCS = 3;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
@@ -57,14 +60,15 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
 @Component({
   selector: 'app-project-dashboard',
   standalone: true,
-  imports: [ButtonModule, RouterLink, SkeletonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ResultsTrendCardComponent],
+  imports: [ButtonModule, RouterLink, SkeletonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ResultsTrendCardComponent, SpAlignmentGraphComponent],
   providers: [
     GetTopContributorsContractsService,
     GetTopMainContactPersonsService,
     GetTopPartnersService,
     GetTopPrimaryLeversService,
     GetGeoScopeService,
-    GetContractResultsSummaryService
+    GetContractResultsSummaryService,
+    GetContractSpAlignmentService
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -79,6 +83,7 @@ export class ProjectDashboardComponent {
   private readonly actions = inject(ActionsService);
   readonly getProjectDetailService = inject(GetProjectDetailService);
   readonly contractResultsSummary = inject(GetContractResultsSummaryService);
+  readonly contractSpAlignment = inject(GetContractSpAlignmentService);
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
@@ -94,6 +99,10 @@ export class ProjectDashboardComponent {
 
   readonly contractId = computed(() => this.route.parent?.snapshot.paramMap.get('id') ?? '');
   readonly project = signal<GetProjectDetail | null>(null);
+  readonly isBilateral = computed(() => {
+    const p = this.project();
+    return !!p && isBilateralFundingType(p.funding_type) && !hasActivePooledFundingContract(p);
+  });
   readonly canUploadMoreGroundingDocs = computed(() => this.groundedDocuments().length < MAX_GROUNDING_DOCS);
   readonly canGenerateExecutiveOverview = computed(
     () => this.hasGroundedDocuments() && !this.executiveOverviewLoading() && !this.uploadingGroundingDoc()
@@ -242,6 +251,14 @@ export class ProjectDashboardComponent {
         this.resultsCenterService.initializeProjectDashboardResultsTable(contractId);
 
         void this.loadExecutiveOverviewSummary();
+      }
+    });
+
+    effect(() => {
+      const contractId = this.contractId();
+      const isBilateral = this.isBilateral();
+      if (contractId && isBilateral) {
+        this.contractSpAlignment.main(contractId);
       }
     });
   }

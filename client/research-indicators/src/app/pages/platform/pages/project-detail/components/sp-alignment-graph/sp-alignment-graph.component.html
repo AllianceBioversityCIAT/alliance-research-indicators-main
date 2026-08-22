@@ -1,0 +1,88 @@
+<section class="box-border flex h-full min-h-[320px] flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  aria-labelledby="sp-alignment-title">
+  <header class="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <h2 id="sp-alignment-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+        Science Program Alignments
+      </h2>
+      <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
+        Bipartite view of primary results mapped to CLARISA Science Programs
+      </p>
+    </div>
+    @if (hasData()) {
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="inline-flex items-center gap-1.5 rounded-md bg-[var(--ac-grey-100)] px-2.5 py-1 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
+        <strong class="font-bold tabular-nums text-[var(--ac-primary-blue-600)]">{{ resultsWithAlignment() }}</strong> aligned
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-md bg-[var(--ac-grey-100)] px-2.5 py-1 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
+        <strong class="font-bold tabular-nums text-[var(--ac-primary-blue-600)]">{{ resultsWithoutAlignment() }}</strong> unaligned
+      </span>
+    </div>
+    }
+  </header>
+
+  <div class="flex min-h-0 flex-1 flex-col">
+    @if (loading()) {
+    <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading Science Program alignments">
+      <p-skeleton width="100%" height="20px" borderRadius="4px" />
+      <p-skeleton width="100%" height="14px" borderRadius="4px" />
+      <p-skeleton width="100%" height="240px" borderRadius="4px" />
+      <div class="flex justify-between gap-4 pt-2">
+        <p-skeleton width="25%" height="14px" borderRadius="4px" />
+        <p-skeleton width="25%" height="14px" borderRadius="4px" />
+        <p-skeleton width="25%" height="14px" borderRadius="4px" />
+      </div>
+    </div>
+    } @else if (error()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+      <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+        We could not load Science Program alignments. Please try again.
+      </p>
+      <button pButton type="button" severity="secondary" size="small"
+        class="!min-h-[44px] !min-w-[44px]"
+        aria-label="Retry loading Science Program alignments"
+        (click)="retry.emit()">Try again</button>
+    </div>
+    } @else if (isEmpty()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+      <i class="pi pi-share-alt text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+        No Science-Program alignments recorded for this project.
+      </p>
+    </div>
+    } @else if (hasData()) {
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+      @if (isCapped()) {
+      <div class="flex items-center gap-1.5 rounded-md bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
+        <i class="pi pi-info-circle text-[13px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+        <span>Showing {{ maxResultNodes }} of {{ totalResultNodesCount() }} results</span>
+      </div>
+      }
+
+      <app-viz-chart
+        [options]="chartOptions()"
+        [tableModel]="tableModel()"
+        [chartTitle]="'Science Program and Result Alignments bipartite graph'"
+        (chartClick)="onChartClick($event)"
+        height="360px" />
+
+      <!-- Role Legend (WCAG 1.4.1 non-color-alone: stroke pattern + weight + label) -->
+      <div class="flex flex-wrap items-center justify-center gap-5 pt-1" role="region" aria-label="Alignment role legend">
+        <div class="flex items-center gap-2">
+          <span class="inline-block h-0 w-5 border-t-[3px] border-solid border-[var(--ac-viz-role-primary)]" aria-hidden="true"></span>
+          <span class="font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-grey-700)]">Primary</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="inline-block h-0 w-5 border-t-2 border-dashed border-[var(--ac-viz-role-contributing)]" aria-hidden="true"></span>
+          <span class="font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-grey-700)]">Contributing</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="inline-block h-0 w-5 border-t-[1.5px] border-dotted border-[var(--ac-viz-role-unknown)]" aria-hidden="true"></span>
+          <span class="font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-grey-700)]">Role unknown</span>
+        </div>
+      </div>
+    </div>
+    }
+  </div>
+</section>

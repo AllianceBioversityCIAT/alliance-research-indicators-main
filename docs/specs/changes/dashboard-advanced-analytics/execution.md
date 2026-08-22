@@ -177,6 +177,24 @@
     - R-DA-009 AC.1: PASS. Paired `tableModel` and accessible chart label preserved via `app-viz-chart`.
     - 4R sweep clean. Low risk and clean engine swap.
 
+### Task T-09: Client: SP alignment graph widget
+- **Implementer Evidence:**
+  - Created `SpAlignmentGraphComponent` (`sp-alignment-graph.component.ts`, `html`, `spec.ts`) with bipartite force graph, accessible legend with 3 distinct roles, paired tableModel, node capping with global recency sorting, router navigation to `/result/:code`.
+  - Integrated into `ProjectDashboardComponent` with `GetContractSpAlignmentService` and bilateral gating (`isBilateral()`).
+  - Unit tests: `sp-alignment-graph.component.spec.ts` (14 tests) + `project-dashboard.component.spec.ts` (66 tests) = 80 passed.
+  - Lint: `npm run lint -- --quiet` (0 errors).
+  - Gate D4: Zero hex literals in component.
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: FAIL (Resolved in Rework)
+  - **Findings:** Template needed `Showing N of M` instead of `Showing top 150`, `uniqueResults` needed global recency sort before slicing.
+- **Reviewer Audit (Attempt 2 - Rework):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - NFR-DA-005: PASS (`Showing {{ maxResultNodes }} of {{ totalResultNodesCount() }} results` + global recency sorting).
+    - R-DA-003: PASS (bipartite force graph, 3 line styles, router navigation).
+    - R-DA-009: PASS (accessible tableModel + WCAG 1.4.1 non-color legend).
+    - KZ-002: PASS (bilateral and non-bilateral DOM tests present and passing).
+
 
 
 
