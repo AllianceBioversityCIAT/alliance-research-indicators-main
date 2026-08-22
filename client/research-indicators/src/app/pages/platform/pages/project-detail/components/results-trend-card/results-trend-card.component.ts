@@ -1,15 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
-import { ChartModule } from 'primeng/chart';
 import { SkeletonModule } from 'primeng/skeleton';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
 import { ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
+import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
 
 @Component({
   selector: 'app-results-trend-card',
   standalone: true,
-  imports: [ButtonModule, ChartModule, SkeletonModule],
+  imports: [ButtonModule, SkeletonModule, VizChartComponent],
   templateUrl: './results-trend-card.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -65,7 +65,16 @@ export class ResultsTrendCardComponent {
     return `Results per report year from ${minYear} to ${maxYear}: ${points}`;
   });
 
-  readonly chartData = computed(() => {
+  readonly tableModel = computed<VizChartTableModel>(() => {
+    const buckets = this.validBuckets();
+    return {
+      caption: 'Results over time by report year',
+      headers: ['Year', 'Results'],
+      rows: buckets.map(b => [String(b.year), b.count])
+    };
+  });
+
+  readonly chartOptions = computed<EChartsOption | null>(() => {
     const buckets = this.validBuckets();
     if (buckets.length < 2) {
       return null;
@@ -75,70 +84,76 @@ export class ResultsTrendCardComponent {
     const lastIndex = buckets.length - 1;
 
     return {
-      labels: buckets.map(b => String(b.year)),
-      datasets: [
+      grid: {
+        left: 8,
+        right: 16,
+        top: 24,
+        bottom: 8,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'line'
+        },
+        formatter: (params: unknown) => {
+          const item = Array.isArray(params) ? params[0] : (params as { name?: string; value?: unknown });
+          if (!item) return '';
+          return `Report Year ${item.name}: <strong>${item.value}</strong> results`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: buckets.map(b => String(b.year)),
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: {
+            color: 'var(--ac-grey-300)'
+          }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        minInterval: 1,
+        splitLine: {
+          lineStyle: {
+            color: 'var(--ac-grey-100)',
+            type: 'dashed'
+          }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        }
+      },
+      visualMap: {
+        show: false,
+        dimension: 0,
+        pieces: [
+          { lte: Math.max(0, lastIndex - 1), lineStyle: { type: 'solid', color: seriesColor, width: 2 } },
+          { gt: Math.max(0, lastIndex - 1), lineStyle: { type: 'dashed', color: seriesColor, width: 2 } }
+        ]
+      },
+      series: [
         {
-          label: 'Results',
+          name: 'Results',
+          type: 'line',
           data: buckets.map(b => b.count),
-          borderColor: seriesColor,
-          backgroundColor: 'transparent',
-          fill: false,
-          tension: 0.1,
-          borderWidth: 2,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: 'var(--ac-white-1)',
-          pointBorderColor: seriesColor,
-          pointBorderWidth: 2,
-          segment: {
-            borderDash: (ctx: { p1DataIndex: number }) => (ctx.p1DataIndex === lastIndex ? [5, 5] : undefined)
+          smooth: false,
+          symbol: 'circle',
+          symbolSize: 6,
+          itemStyle: {
+            color: 'var(--ac-white-1)',
+            borderColor: seriesColor,
+            borderWidth: 2
           }
         }
       ]
-    };
-  });
-
-  readonly chartOptions = computed(() => {
-    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: prefersReducedMotion ? false : { duration: 400 },
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          enabled: true,
-          displayColors: false,
-          callbacks: {
-            title: (items: { label: string }[]) => `Report Year ${items[0]?.label ?? ''}`,
-            label: (item: { raw: unknown }) => `${item.raw} results`
-          }
-        }
-      },
-      scales: {
-        x: {
-          grid: {
-            display: false
-          },
-          ticks: {
-            color: 'var(--ac-grey-700)'
-          }
-        },
-        y: {
-          min: 0,
-          beginAtZero: true,
-          ticks: {
-            precision: 0,
-            color: 'var(--ac-grey-700)'
-          },
-          grid: {
-            color: 'var(--ac-grey-100)'
-          }
-        }
-      }
     };
   });
 }

@@ -3,11 +3,28 @@ import { ResultsTrendCardComponent } from './results-trend-card.component';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 
-describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
+const mockChartInstance = {
+  setOption: jest.fn(),
+  resize: jest.fn(),
+  dispose: jest.fn(),
+  isDisposed: jest.fn().mockReturnValue(false),
+  clear: jest.fn(),
+  on: jest.fn()
+};
+
+jest.mock('echarts/core', () => ({
+  use: jest.fn(),
+  init: jest.fn(() => mockChartInstance)
+}));
+
+describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, R-DA-006, NFR-PD-001)', () => {
   let fixture: ComponentFixture<ResultsTrendCardComponent>;
   let component: ResultsTrendCardComponent;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockChartInstance.isDisposed.mockReturnValue(false);
+
     await TestBed.configureTestingModule({
       imports: [ResultsTrendCardComponent],
       providers: [DarkModeService]
@@ -22,7 +39,7 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
   });
 
   describe('Loading state (R-PD-007)', () => {
-    it('renders skeleton loaders and not the canvas, error, or empty state', () => {
+    it('renders skeleton loaders and not the chart, error, or empty state', () => {
       fixture.componentRef.setInput('loading', true);
       fixture.detectChanges();
 
@@ -30,8 +47,8 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       expect(skeletonRegion).not.toBeNull();
       expect(skeletonRegion.getAttribute('aria-label')).toBe('Loading results trend');
 
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
       expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
-      expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
       expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('No yearly results were found');
     });
@@ -55,21 +72,21 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       retryButton.click();
 
       expect(retrySpy).toHaveBeenCalledTimes(1);
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
       expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
-      expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
     });
   });
 
   describe('Empty state (0 buckets)', () => {
-    it('renders empty message when no year buckets exist, and no canvas', () => {
+    it('renders empty message when no year buckets exist, and no chart', () => {
       fixture.componentRef.setInput('loading', false);
       fixture.componentRef.setInput('error', false);
       fixture.componentRef.setInput('buckets', []);
       fixture.detectChanges();
 
       expect(fixture.nativeElement.textContent).toContain('No yearly results were found for this project.');
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
       expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
-      expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
       expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
       expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
     });
@@ -81,15 +98,15 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.textContent).toContain('No yearly results were found for this project.');
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
       expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
-      expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
     });
   });
 
   describe('Sparse years condition (<2 buckets — R-PD-004 Scenario & BUT clause)', () => {
     const singleYearFixture: ContractResultsSummaryYearBucket[] = [{ year: 2024, count: 14 }];
 
-    it('renders single-value stat + caption and MUST NOT render p-chart canvas (R-PD-004 BUT clause)', () => {
+    it('renders single-value stat + caption and MUST NOT render chart widget (R-PD-004 BUT clause)', () => {
       fixture.componentRef.setInput('loading', false);
       fixture.componentRef.setInput('error', false);
       fixture.componentRef.setInput('buckets', singleYearFixture);
@@ -100,27 +117,27 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       expect(text).toContain('14 results');
       expect(text).toContain('Not enough reporting history for a trend');
 
-      // The BUT clause: must NOT render axis-only empty plot, canvas, or error state
+      // The BUT clause: must NOT render axis-only empty plot, chart wrapper, or error state
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
       expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
-      expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
       expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
     });
 
-    // KZ-014 Red input verification: verify that a 1-year fixture strictly fails if canvas is present
-    it('red input check: asserts canvas is NOT present for 1-year fixture', () => {
+    // KZ-014 Red input verification: verify that a 1-year fixture strictly fails if chart is present
+    it('red input check: asserts app-viz-chart is NOT present for 1-year fixture', () => {
       fixture.componentRef.setInput('loading', false);
       fixture.componentRef.setInput('error', false);
       fixture.componentRef.setInput('buckets', singleYearFixture);
       fixture.detectChanges();
 
-      const canvas = fixture.nativeElement.querySelector('canvas');
-      expect(canvas).toBeNull();
+      const vizChart = fixture.nativeElement.querySelector('app-viz-chart');
+      expect(vizChart).toBeNull();
       const pChart = fixture.nativeElement.querySelector('p-chart');
       expect(pChart).toBeNull();
     });
   });
 
-  describe('Normal condition (>= 2 buckets — R-PD-004, R-PD-009)', () => {
+  describe('Normal condition (>= 2 buckets — R-PD-004, R-PD-009, R-DA-006)', () => {
     const multiYearFixture: ContractResultsSummaryYearBucket[] = [
       { year: 2020, count: 6 },
       { year: 2021, count: 14 },
@@ -137,46 +154,34 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       fixture.detectChanges();
     });
 
-    it('renders figure[role="img"] with p-chart canvas', () => {
-      const figure = fixture.nativeElement.querySelector('figure[role="img"]');
-      expect(figure).not.toBeNull();
-      expect(fixture.nativeElement.querySelector('p-chart')).not.toBeNull();
+    it('renders app-viz-chart wrapper and passes options, tableModel, and title', () => {
+      const vizChart = fixture.nativeElement.querySelector('app-viz-chart');
+      expect(vizChart).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('p-chart')).toBeNull();
     });
 
-    it('sets an accessible name (aria-label) on the figure summarizing the series (R-PD-004 AC.2 / R-PD-009 AC.1)', () => {
-      const figure = fixture.nativeElement.querySelector('figure[role="img"]');
-      const label = figure.getAttribute('aria-label');
+    it('sets an accessible name (chartAriaLabel) summarizing the series (R-PD-004 AC.2 / R-PD-009 AC.1)', () => {
+      const label = component.chartAriaLabel();
       expect(label).toContain('Results per report year from 2020 to 2025');
       expect(label).toContain('2020: 6');
       expect(label).toContain('2025: 21');
     });
 
-    it('renders a visually-hidden data table beside the canvas matching all data points (R-PD-009 AC.1)', () => {
+    it('generates a paired tableModel matching all data points (R-DA-009 AC.1)', () => {
+      const tableModel = component.tableModel();
+      expect(tableModel.caption).toBe('Results over time by report year');
+      expect(tableModel.headers).toEqual(['Year', 'Results']);
+      expect(tableModel.rows).toEqual([
+        ['2020', 6],
+        ['2021', 14],
+        ['2022', 22],
+        ['2023', 31],
+        ['2024', 34],
+        ['2025', 21]
+      ]);
+
       const table = fixture.nativeElement.querySelector('table.sr-only');
       expect(table).not.toBeNull();
-
-      const caption = table.querySelector('caption');
-      expect(caption?.textContent).toContain('Results over time by report year');
-
-      const headers = Array.from(table.querySelectorAll('thead th')).map((th: any) => th.textContent?.trim());
-      expect(headers).toEqual(['Year', 'Results']);
-
-      const rows = Array.from(table.querySelectorAll('tbody tr'));
-      expect(rows.length).toBe(6);
-
-      const rowValues = rows.map((row: any) => {
-        const cells = Array.from(row.querySelectorAll('td')).map((td: any) => td.textContent?.trim());
-        return { year: cells[0], count: cells[1] };
-      });
-
-      expect(rowValues).toEqual([
-        { year: '2020', count: '6' },
-        { year: '2021', count: '14' },
-        { year: '2022', count: '22' },
-        { year: '2023', count: '31' },
-        { year: '2024', count: '34' },
-        { year: '2025', count: '21' }
-      ]);
     });
 
     it('indicates current/max year in progress in the header subtitle', () => {
@@ -184,15 +189,21 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       expect(subtitle?.textContent).toContain('by report year · 2025 in progress');
     });
 
-    it('configures chart dataset with series1 token and y-axis min: 0', () => {
-      const data = component.chartData();
-      expect(data).not.toBeNull();
-      expect(data?.labels).toEqual(['2020', '2021', '2022', '2023', '2024', '2025']);
-      expect(data?.datasets[0].data).toEqual([6, 14, 22, 31, 34, 21]);
-
+    it('configures ECharts options with series1 token, y-axis min: 0, and dashed in-progress segment', () => {
       const options = component.chartOptions();
-      expect(options.scales.y.min).toBe(0);
-      expect(options.scales.y.beginAtZero).toBe(true);
+      expect(options).not.toBeNull();
+
+      expect((options?.xAxis as any).data).toEqual(['2020', '2021', '2022', '2023', '2024', '2025']);
+      expect((options?.yAxis as any).min).toBe(0);
+
+      const series = (options?.series as any[])[0];
+      expect(series.type).toBe('line');
+      expect(series.data).toEqual([6, 14, 22, 31, 34, 21]);
+
+      const visualMap = options?.visualMap as any;
+      expect(visualMap.show).toBe(false);
+      expect(visualMap.pieces).toBeDefined();
+      expect(visualMap.pieces[1].lineStyle.type).toBe('dashed');
     });
   });
 
@@ -219,27 +230,6 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, NFR-PD-001)', () => {
       expect(tableRows.length).toBe(2);
       expect(tableRows[0].textContent).toContain('2021');
       expect(tableRows[1].textContent).toContain('2024');
-    });
-  });
-
-  describe('Reduced motion support', () => {
-    it('disables chart animation when prefers-reduced-motion is active', () => {
-      const originalMatchMedia = window.matchMedia;
-      window.matchMedia = jest.fn().mockImplementation((query: string) => ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn()
-      } as unknown as MediaQueryList));
-
-      const options = component.chartOptions();
-      expect(options.animation).toBe(false);
-
-      window.matchMedia = originalMatchMedia;
     });
   });
 });

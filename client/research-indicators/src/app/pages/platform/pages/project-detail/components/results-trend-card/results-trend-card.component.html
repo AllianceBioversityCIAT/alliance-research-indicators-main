@@ -58,27 +58,11 @@
     </div>
     } @else if (hasChart()) {
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <figure class="m-0 flex h-full min-h-[200px] w-full flex-1 flex-col" role="img" [attr.aria-label]="chartAriaLabel()">
-        <p-chart type="line" [data]="chartData()" [options]="chartOptions()" class="block h-full w-full" />
-      </figure>
-
-      <table class="sr-only">
-        <caption>Results over time by report year</caption>
-        <thead>
-          <tr>
-            <th scope="col">Year</th>
-            <th scope="col">Results</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (bucket of validBuckets(); track bucket.year) {
-          <tr>
-            <td>{{ bucket.year }}</td>
-            <td>{{ bucket.count }}</td>
-          </tr>
-          }
-        </tbody>
-      </table>
+      <app-viz-chart
+        [options]="chartOptions()"
+        [tableModel]="tableModel()"
+        [chartTitle]="chartAriaLabel()"
+        height="220px" />
     </div>
     }
   </div>

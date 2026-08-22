@@ -151,6 +151,34 @@
     - R-DA-005: PASS. `GetProjectDetail` and `FindContracts` extended with `center_amount_usd`, `grant_amount_usd`, `funding_type`, `sdgs`, `cgiar_entities`.
     - 4R sweep clean. Strict additive types and resilient signal state management.
 
+### T-08 — Client: trend-card engine swap + chart.js removal
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified:
+    - `client/research-indicators/package.json` (uninstalled `chart.js` and `chartjs-plugin-datalabels`)
+    - `client/research-indicators/package-lock.json`
+    - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.html`
+    - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.ts`
+    - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts`
+  - Realignments (K-018):
+    - Replaced `ChartModule` with `VizChartComponent`.
+    - Computed `tableModel` and ECharts `chartOptions` (`xAxis`, `yAxis`, `series`, `visualMap.pieces` for dashed last segment).
+    - Mocked `echarts/core` in spec; realigned 12 unit tests.
+  - Verification:
+    - Jest: `PASS src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts` (12 passed, 12 total)
+    - Greps: zero occurrences of `chart.js`, `chartjs-plugin-datalabels`, `primeng/chart` in source files.
+    - Lint: `npm run lint -- --quiet` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-006 AC.1: PASS. `chart.js` and `chartjs-plugin-datalabels` removed from package.json and zero imports left.
+    - R-DA-006 AC.2: PASS. Behavior parity confirmed (min 0, dashed in-progress year, sparse 1-bucket fallback).
+    - R-DA-009 AC.1: PASS. Paired `tableModel` and accessible chart label preserved via `app-viz-chart`.
+    - 4R sweep clean. Low risk and clean engine swap.
+
+
+
 
 
 

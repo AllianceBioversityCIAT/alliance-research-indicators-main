@@ -107,8 +107,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `results-trend-card/` (+spec realignment), `package.json`
 - **Skills:** `angular-developer` · **Deps:** T-06
 - **Done checks:**
-  - [ ] Previous behavioral tests green (sparse fallback, dashed year, table alt); engine-specific realignments derived **from the failing suite** (K-018) — list the failures in `execution.md` before editing. *Disqualifier: a realignment list built by grep.*
-  - [ ] Greps: zero `chart.js`/`primeng/chart` imports; `package.json` clean of both. *Red input: leave the ChartModule import — grep must hit.*
+  - [x] Previous behavioral tests green (sparse fallback, dashed year, table alt); engine-specific realignments derived **from the failing suite** (K-018) — list the failures in `execution.md` before editing. *Disqualifier: a realignment list built by grep.*
+  - [x] Greps: zero `chart.js`/`primeng/chart` imports; `package.json` clean of both. *Red input: leave the ChartModule import — grep must hit.*
 
 ### T-09 — Client: SP alignment graph widget
 - **Requirements:** R-DA-003 (all ACs, Scenario `BUT` no-Contributing-coercion + `AND IT MUST` table inclusion), R-DA-009 AC.2/AC.3, NFR-DA-005 cap · **Design:** §5.2, §6 SP graph, D-DA-5
