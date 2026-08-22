@@ -234,3 +234,24 @@
     - R-DA-005 (no-fabrication): PASS. Null-field fixtures render without chips or placeholders.
     - R-DA-005 (stable layout): PASS. Gap collapse artifacts resolved via `hasPrimaryContext` and `hasSecondaryContext` guards.
     - Currency formatting and timeline clamping: PASS.
+
+### Task T-12: Client: dashboard integration + entry stagger
+- **Status:** PASS
+- **Attempts:** 2
+- **Implementer Evidence:**
+  - Integrated `ProjectContextStripComponent` into `ProjectDashboardComponent` under KPI summary strip.
+  - Exposed `staggerMs = WIDGET_ENTRY_STAGGER_MS` (kpi: 0ms, contextStrip: 100ms, indicatorStatus: 200ms, trend: 300ms, spGraph: 400ms) with total delay clamped to $\le 400$ms.
+  - Bound `[style.animation-delay.ms]` directly to widget root elements in template (`KPI strip`, `Project context strip`, `Results by indicator`, `Results by status`, `Results trend card`, and `SP alignment graph`).
+  - Added comprehensive test suite in `project-dashboard.component.spec.ts` testing DOM rendering order, region error isolation, and widget stagger delay bindings.
+  - Verification:
+    - Jest: `PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (80 passed, 80 total).
+    - Angular Lint: `npm run lint -- --quiet` (0 errors).
+    - Gate D4: Zero hex literals in component.
+- **Reviewer Audit (Attempt 2 - Rework):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-007 AC.2 & Motion: PASS. Stagger sequence defined and bound to widget roots with total delay $\le 400$ms.
+    - R-DA-003 / R-DA-005 Layout & DOM Order: PASS. KPI strip $\to$ Context strip $\to$ Analytics grid $\to$ Pending table $\to$ AI grounding section.
+    - Region Error Isolation: PASS. SP alignment service error isolates gracefully and does not affect sibling widgets.
+
+

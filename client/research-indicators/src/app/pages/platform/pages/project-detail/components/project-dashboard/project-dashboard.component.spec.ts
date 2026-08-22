@@ -16,7 +16,7 @@ import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ActionsService } from '@shared/services/actions.service';
-import { ProjectDashboardComponent } from './project-dashboard.component';
+import { ProjectDashboardComponent, WIDGET_ENTRY_STAGGER_MS } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
@@ -45,7 +45,7 @@ class VizChartStubComponent {
 @Component({
   selector: 'app-sp-alignment-graph',
   standalone: true,
-  template: ''
+  template: '@if (error) { <div>We could not load Science-Program alignments.</div> }'
 })
 class SpAlignmentGraphStubComponent {
   @Input() report: ContractSpAlignmentReport | null = null;
@@ -1672,6 +1672,99 @@ describe('ProjectDashboardComponent', () => {
 
       expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeTruthy();
       expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul')).toBeNull();
+    });
+  });
+
+  describe('T-12 dashboard integration and entry stagger (R-DA-003, R-DA-005, R-DA-007 AC.2)', () => {
+    it('should enforce DOM rendering order: KPI strip -> context strip -> analytics grid -> pending table -> AI block', async () => {
+      rolesServiceMock.isAdmin.mockReturnValue(true);
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Bilateral',
+          grant_amount_usd: 1000000,
+          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        }
+      });
+      component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement as HTMLElement;
+      const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]');
+      const contextStrip = root.querySelector('app-project-context-strip');
+      const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
+      const pendingSection = root.querySelector('#pending-revision-section');
+      const aiSection = root.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+      expect(kpiStrip).toBeTruthy();
+      expect(contextStrip).toBeTruthy();
+      expect(analyticsGrid).toBeTruthy();
+      expect(pendingSection).toBeTruthy();
+      expect(aiSection).toBeTruthy();
+
+      // Verify DOM document order
+      expect(kpiStrip!.compareDocumentPosition(contextStrip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(contextStrip!.compareDocumentPosition(analyticsGrid!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(analyticsGrid!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(pendingSection!.compareDocumentPosition(aiSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('should isolate SP alignment error so sibling regions continue rendering data (R-PD-007, R-DA-003)', async () => {
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Bilateral',
+          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        }
+      });
+
+      // Simulate SP alignment service error
+      (component.contractSpAlignment as any).loadError.set(true);
+      (component.contractSpAlignment as any).loading.set(false);
+      fixture.detectChanges();
+
+      // SP alignment graph displays its error state
+      const spGraph = fixture.nativeElement.querySelector('app-sp-alignment-graph');
+      expect(spGraph).toBeTruthy();
+      expect(spGraph.textContent).toContain('could not load');
+
+      // Sibling status, indicators, KPI cards remain intact
+      expect(fixture.nativeElement.querySelector('[aria-label="Key performance indicators"]')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeTruthy();
+    });
+
+    it('should configure and bind widget entry stagger delays to DOM elements with total duration <= 400ms (R-DA-007 AC.2)', async () => {
+      await setup('C-1', {
+        projectData: {
+          funding_type: 'Bilateral',
+          grant_amount_usd: 1000000,
+          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        }
+      });
+
+      expect(WIDGET_ENTRY_STAGGER_MS).toBeDefined();
+      expect(WIDGET_ENTRY_STAGGER_MS.kpi).toBe(0);
+      expect(WIDGET_ENTRY_STAGGER_MS.contextStrip).toBe(100);
+      expect(WIDGET_ENTRY_STAGGER_MS.indicatorStatus).toBe(200);
+      expect(WIDGET_ENTRY_STAGGER_MS.trend).toBe(300);
+      expect(WIDGET_ENTRY_STAGGER_MS.spGraph).toBe(400);
+
+      const maxDelay = Math.max(...Object.values(WIDGET_ENTRY_STAGGER_MS));
+      expect(maxDelay).toBeLessThanOrEqual(400);
+
+      const root = fixture.nativeElement as HTMLElement;
+      const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]') as HTMLElement;
+      const contextStrip = root.querySelector('app-project-context-strip') as HTMLElement;
+      const indicatorSection = root.querySelector('section[aria-labelledby="results-by-indicator-title"]') as HTMLElement;
+      const statusSection = root.querySelector('section[aria-labelledby="results-by-status-title"]') as HTMLElement;
+      const trendCard = root.querySelector('app-results-trend-card') as HTMLElement;
+      const spGraph = root.querySelector('app-sp-alignment-graph') as HTMLElement;
+
+      expect(kpiStrip?.style.animationDelay).toBe('0ms');
+      expect(contextStrip?.style.animationDelay).toBe('100ms');
+      expect(indicatorSection?.style.animationDelay).toBe('200ms');
+      expect(statusSection?.style.animationDelay).toBe('200ms');
+      expect(trendCard?.style.animationDelay).toBe('300ms');
+      expect(spGraph?.style.animationDelay).toBe('400ms');
     });
   });
 });

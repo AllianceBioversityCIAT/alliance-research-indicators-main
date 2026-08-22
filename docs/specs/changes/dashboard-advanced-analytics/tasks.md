@@ -143,9 +143,9 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `project-dashboard.component.{ts,html}` (+spec)
 - **Skills:** `angular-developer` · **Deps:** T-09, T-10, T-11
 - **Done checks:**
-  - [ ] Rendered order: KPI strip → context strip → analytics grid (graph among charts) → pending table → AI block (previous hierarchy preserved — its AC.1 test stays green).
-  - [ ] One region's error leaves siblings rendering (extend the existing isolation tests to the new regions).
-  - [ ] Stagger totals ≤400 ms across widgets (config assertion; visual feel → T-13).
+  - [x] Rendered order: KPI strip → context strip → analytics grid (graph among charts) → pending table → AI block (previous hierarchy preserved — its AC.1 test stays green).
+  - [x] One region's error leaves siblings rendering (extend the existing isolation tests to the new regions).
+  - [x] Stagger totals ≤400 ms across widgets (config assertion; visual feel → T-13).
 
 ### T-13 — Final gates + HITL validation
 - **Requirements:** NFR-DA-001/002/005, R-DA-006 AC.1 final, D6/D9 substitutes, R-DA-001 Dev cross-check, T-02 Swagger evidence · **Design:** §10, §11

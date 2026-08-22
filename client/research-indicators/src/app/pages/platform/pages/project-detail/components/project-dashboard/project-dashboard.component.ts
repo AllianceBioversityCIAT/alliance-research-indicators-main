@@ -34,6 +34,7 @@ import { ResultsCenterService } from '../../../results-center/results-center.ser
 import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results-summary.interface';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
+import { ProjectContextStripComponent } from '../project-context-strip/project-context-strip.component';
 import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
@@ -45,6 +46,14 @@ const MAX_GROUNDING_DOCS = 3;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
 const GROUNDING_MAX_SIZE_MB = 10;
 const GROUNDING_PAGE_LIMIT = 100;
+
+export const WIDGET_ENTRY_STAGGER_MS = {
+  kpi: 0,
+  contextStrip: 100,
+  indicatorStatus: 200,
+  trend: 300,
+  spGraph: 400
+} as const;
 
 // Semantic status -> `--ac-viz-*` chart-token name mapping keyed by `result_status_id`
 // (D-PD-3). The chart diverges from server-supplied config colors elsewhere — declared.
@@ -75,6 +84,7 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     DatePipe,
     ResultsTrendCardComponent,
     SpAlignmentGraphComponent,
+    ProjectContextStripComponent,
     VizChartComponent
   ],
   providers: [
@@ -112,6 +122,8 @@ export class ProjectDashboardComponent {
   readonly contractSpAlignment = inject(GetContractSpAlignmentService);
 
   readonly tokens = chartTokens(this.darkModeService.darkMode());
+
+  readonly staggerMs = WIDGET_ENTRY_STAGGER_MS;
 
   readonly indicatorView = signal<'bars' | 'heatmap'>('bars');
   readonly useCrossfadeFallback = signal<boolean>(true);

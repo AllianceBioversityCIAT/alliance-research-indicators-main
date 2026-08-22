@@ -35,7 +35,7 @@
   </div>
 
   <!-- KPI summary strip (R-PD-002) -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators" [style.animation-delay.ms]="staggerMs.kpi">
     <!-- Tile 1: Total results -->
     <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
@@ -119,6 +119,9 @@
     </div>
   </div>
 
+  <!-- Project Context strip (R-DA-005, T-11, T-12) -->
+  <app-project-context-strip [project]="project()" [style.animation-delay.ms]="staggerMs.contextStrip"></app-project-context-strip>
+
   <!-- Geo scope -->
   <div class="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_1fr]  lg:min-h-[520px] lg:items-stretch ">
     <div class="flex min-w-0 flex-col gap-5 lg:h-full lg:self-stretch ">
@@ -175,7 +178,8 @@
     </div>
     <div class="flex h-full min-w-0 flex-col gap-5 lg:min-h-0 lg:self-stretch">
       <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-        aria-labelledby="results-by-indicator-title">
+        aria-labelledby="results-by-indicator-title"
+        [style.animation-delay.ms]="staggerMs.indicatorStatus">
         <header class="flex flex-wrap items-start justify-between gap-3">
           <div class="flex flex-col gap-1">
             <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
@@ -342,7 +346,8 @@
         }
       </section>
       <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-        aria-labelledby="results-by-status-title">
+        aria-labelledby="results-by-status-title"
+        [style.animation-delay.ms]="staggerMs.indicatorStatus">
         <header class="flex flex-col gap-1">
           <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
           <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
@@ -431,6 +436,7 @@
         }
       </section>
       <app-results-trend-card
+        [style.animation-delay.ms]="staggerMs.trend"
         [buckets]="contractResultsSummary.list()?.by_year ?? []"
         [loading]="contractResultsSummary.loading()"
         [error]="contractResultsSummary.loadError()"
@@ -439,6 +445,7 @@
 
       @if (isBilateral()) {
       <app-sp-alignment-graph
+        [style.animation-delay.ms]="staggerMs.spGraph"
         [report]="contractSpAlignment.list()"
         [loading]="contractSpAlignment.loading()"
         [error]="contractSpAlignment.loadError()"
