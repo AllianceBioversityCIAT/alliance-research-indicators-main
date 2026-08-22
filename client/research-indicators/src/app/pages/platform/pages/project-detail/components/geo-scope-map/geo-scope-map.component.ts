@@ -55,12 +55,7 @@ export class GeoScopeMapComponent {
     return Array.isArray(raw) ? raw : [];
   });
 
-  readonly hasData = computed(() => this.safeCountries().length > 0);
-
-  readonly tableModel = computed<VizChartTableModel | null>(() => {
-    if (!this.hasData()) {
-      return null;
-    }
+  readonly tableModel = computed<VizChartTableModel>(() => {
     return buildGeoChoroplethTableModel(this.safeCountries());
   });
 
@@ -79,16 +74,13 @@ export class GeoScopeMapComponent {
     return map;
   });
 
-  readonly options = computed<EChartsOption | null>(() => {
-    if (!this.hasData()) {
-      return null;
-    }
-
+  readonly options = computed<EChartsOption>(() => {
     ensureWorldMapRegistered();
 
     const isDark = this.darkModeService.darkMode()();
     const countries = this.safeCountries();
     const seriesData = buildGeoChoroplethSeriesData(countries, validGeometryIsoSet);
+    const hasCountryData = seriesData.length > 0;
     const maxCount = getGeoChoroplethMaxCount(countries);
     const countryNames = this.countryNameByIso();
     const tokenRamp = this.tokens().ramp;
@@ -99,9 +91,10 @@ export class GeoScopeMapComponent {
     const neutralAreaColor = isDark ? '#2b2b2b' : '#f4f7f9';
     const neutralBorderColor = isDark ? '#4c4c4c' : '#d1d6da';
 
-    return {
+    const baseOptions: EChartsOption = {
       tooltip: {
         trigger: 'item',
+        show: hasCountryData,
         formatter: (params: unknown) => {
           const item = params as {
             name?: string;
@@ -118,7 +111,37 @@ export class GeoScopeMapComponent {
           return `<strong>${countryName}</strong>: ${value}`;
         }
       },
-      visualMap: {
+      series: [
+        {
+          name: 'Geographic Reach',
+          type: 'map',
+          map: 'world',
+          nameProperty: 'ISO_A2',
+          roam: false,
+          top: 8,
+          bottom: hasCountryData ? 38 : 8,
+          emphasis: {
+            label: { show: false },
+            itemStyle: {
+              areaColor: isDark ? '#2e3e51' : '#b0c4dd',
+              borderColor: isDark ? '#e5e5e5' : '#ffffff'
+            }
+          },
+          select: {
+            disabled: true
+          },
+          itemStyle: {
+            areaColor: neutralAreaColor,
+            borderColor: neutralBorderColor,
+            borderWidth: 0.5
+          },
+          data: seriesData
+        }
+      ]
+    };
+
+    if (hasCountryData) {
+      baseOptions.visualMap = {
         type: 'continuous',
         min: 1,
         max: maxCount > 1 ? maxCount : 2,
@@ -140,34 +163,9 @@ export class GeoScopeMapComponent {
         },
         itemWidth: 12,
         itemHeight: 140
-      },
-      series: [
-        {
-          name: 'Geographic Reach',
-          type: 'map',
-          map: 'world',
-          nameProperty: 'ISO_A2',
-          roam: false,
-          top: 8,
-          bottom: 38,
-          emphasis: {
-            label: { show: false },
-            itemStyle: {
-              areaColor: isDark ? '#2e3e51' : '#b0c4dd',
-              borderColor: isDark ? '#e5e5e5' : '#ffffff'
-            }
-          },
-          select: {
-            disabled: true
-          },
-          itemStyle: {
-            areaColor: neutralAreaColor,
-            borderColor: neutralBorderColor,
-            borderWidth: 0.5
-          },
-          data: seriesData
-        }
-      ]
-    };
+      };
+    }
+
+    return baseOptions;
   });
 }

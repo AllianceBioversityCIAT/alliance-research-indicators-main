@@ -43,19 +43,20 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
   });
 
   describe('KZ-015 Transition fixture & Initial empty state (R-GEO-006)', () => {
-    it('constructs in empty state with no chart options or rendered widget (KZ-015)', () => {
+    it('constructs with neutral world map when countries input is empty (KZ-015)', () => {
       fixture.detectChanges();
 
-      expect(component.hasData()).toBe(false);
-      expect(component.options()).toBeNull();
-      expect(component.tableModel()).toBeNull();
-      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
+      expect(component.options()).toBeDefined();
+      expect(component.options().series?.[0]?.data).toEqual([]);
+      expect(component.options().visualMap).toBeUndefined();
+      expect(component.tableModel()?.rows).toEqual([]);
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).not.toBeNull();
     });
 
-    it('transitions from empty initial state to populated input and renders chart (KZ-015)', () => {
-      // 1. Initial negative state
+    it('transitions from empty initial state to populated input and renders shaded choropleth with visualMap (KZ-015)', () => {
+      // 1. Initial neutral map state
       fixture.detectChanges();
-      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
+      expect(component.options().visualMap).toBeUndefined();
 
       // 2. Transition state with data
       const mockCountries: GeoScopeCountry[] = [
@@ -65,9 +66,9 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
       fixture.componentRef.setInput('countries', mockCountries);
       fixture.detectChanges();
 
-      expect(component.hasData()).toBe(true);
       expect(component.options()).not.toBeNull();
-      expect(component.tableModel()).not.toBeNull();
+      expect(component.options().visualMap).toBeDefined();
+      expect(component.tableModel()?.rows.length).toBe(2);
       expect(fixture.nativeElement.querySelector('app-viz-chart')).not.toBeNull();
     });
   });
