@@ -98,6 +98,18 @@ Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-modul
 - `--ac-pool-funding-fg`: `#1b5e20`
 - `--ac-pool-funding-border`: `#2e7d32`
 
+### Visualization (chart-token family)
+
+Used by the project-dashboard charts (see `docs/specs/changes/project-dashboard-redesign/` — design D-PD-13). These tokens are consumed at runtime via `getComputedStyle` (in `shared/utils/chart-tokens.util.ts`), not as `.abc-`/`.atc-` utility classes. Light values are independently authored and validated against the light card surface (`--ac-white-2`: `#fcfcfc`); dark values are independently authored (not formula-derived — the existing green/blue ramps invert in dark mode) and validated against the dark card surface (`--ac-background`: `#191919`).
+
+- `--ac-viz-status-approved`: `#2e7d32` (green — approved results)
+- `--ac-viz-status-submitted`: `#1565c0` (blue — submitted results)
+- `--ac-viz-status-draft`: `#616161` (grey — draft results)
+- `--ac-viz-status-pending`: `#e65100` (orange — pending revision)
+- `--ac-viz-status-rejected`: `#c62828` (red — rejected results)
+- `--ac-viz-status-no-status`: `#757575` (neutral grey — explicit "No status" bucket)
+- `--ac-viz-series-1`: `#035ba9` (single hue — indicator bars + trend line)
+
 ## Dark Mode Variables
 
 When the dark mode is active, the following variables will be applied:
@@ -109,6 +121,13 @@ When the dark mode is active, the following variables will be applied:
 - `--ac-light-blue-400`: `#23466b`
 - `--ac-light-blue-500`: `#1b3450`
   ... (Similar for all other variables)
+- `--ac-viz-status-approved`: `#66bb6a`
+- `--ac-viz-status-submitted`: `#42a5f5`
+- `--ac-viz-status-draft`: `#bdbdbd`
+- `--ac-viz-status-pending`: `#ffa726`
+- `--ac-viz-status-rejected`: `#ef5350`
+- `--ac-viz-status-no-status`: `#757575`
+- `--ac-viz-series-1`: `#42a5f5`
 
 ## Utility Classes
 

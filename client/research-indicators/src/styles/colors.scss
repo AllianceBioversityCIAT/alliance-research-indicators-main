@@ -47,6 +47,16 @@
   --ac-red-1: #cf0808;
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
+
+  // Visualization (chart-token family — D-PD-13; independently authored light values,
+  // validated against the light card surface --ac-white-2: #fcfcfc)
+  --ac-viz-status-approved: #2e7d32;
+  --ac-viz-status-submitted: #1565c0;
+  --ac-viz-status-draft: #616161;
+  --ac-viz-status-pending: #e65100;
+  --ac-viz-status-rejected: #c62828;
+  --ac-viz-status-no-status: #757575;
+  --ac-viz-series-1: #035ba9;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -154,4 +164,16 @@ $colors: (
   --ac-red-1: #ff4d4d;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
+
+  // Visualization (chart-token family — D-PD-13; independently authored dark values,
+  // not formula-derived from light — the existing green/blue ramps invert in dark mode
+  // (judgment S4: --ac-green-500 dark #14251a ≈ 1.10:1 on #191919); validated against
+  // the dark card surface --ac-background: #191919)
+  --ac-viz-status-approved: #66bb6a;
+  --ac-viz-status-submitted: #42a5f5;
+  --ac-viz-status-draft: #bdbdbd;
+  --ac-viz-status-pending: #ffa726;
+  --ac-viz-status-rejected: #ef5350;
+  --ac-viz-status-no-status: #757575;
+  --ac-viz-series-1: #42a5f5;
 }

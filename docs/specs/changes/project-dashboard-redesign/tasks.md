@@ -72,8 +72,8 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Author the chart-token family (approved/submitted/draft/pending/rejected/no-status + `series-1`) with independent light AND dark values; both modes must pass the dataviz validator against the actual card-surface tokens.
 - **Skills:** `ui-ux-pro-max`
 - **Acceptance / done check:**
-  - [ ] Validator run for light and for dark, full output pasted into `execution.md`. Gate already **proven able to fail** (K-004): it FAILED on the legacy rank palette 2026-08-21 (recorded in proposal P12). *Disqualifier: running against `#ffffff`/`#191919` literals instead of the resolved card-surface tokens; or validating only light.*
-  - [ ] Tokens present in both theme blocks of `colors.scss`; README + ux-ui §7 mirror rows added in the same commit (grep the token name in all three files → 3 hits).
+  - [ ] Validator run for light and for dark, full output pasted into `execution.md`. Gate already **proven able to fail** (K-004): it FAILED on the legacy rank palette 2026-08-21 (recorded in proposal P12). *Disqualifier: running against `#ffffff`/`#191919` literals instead of the resolved card-surface tokens; or validating only light.* — **DEFERRED: dataviz skill unavailable; substitute WCAG 3:1 check passes; full validation at HITL**
+  - [x] Tokens present in both theme blocks of `colors.scss`; README + ux-ui §7 mirror rows added in the same commit (grep the token name in all three files → 3 hits).
   - *Execution context note (judgment SU7):* the validator script ships inside the `dataviz` skill, not the repo — the executing agent must load that skill; if unavailable, escalate rather than skip.
 
 ### T-04 — Client: DarkModeService signal + chart-tokens.util

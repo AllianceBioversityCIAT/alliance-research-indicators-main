@@ -129,4 +129,54 @@
 - Lint: clean on 4 touched files (`npx eslint`, no `--fix`)
 - Red input: discriminating (guard removed → TypeError instead of BadRequestException)
 
+### T-03 — Client: `--ac-viz-*` token family + validation + registry mirrors
+
+- **Final status:** PASS on attempt 1 (validator DEFERRED — unavailable)
+- **Date:** 2026-08-21
+- **Requirements covered:** R-PD-006 (Details: token registration), NFR-PD-004
+- **Design decisions applied:** D-PD-13 (new `--ac-viz-*` chart-token family)
+
+#### Attempt 1 — Implementer
+
+- **Files changed:**
+  - `client/research-indicators/src/styles/colors.scss` (+22)
+  - `client/research-indicators/README.md` (+19)
+  - `docs/ux-ui/design.md` (+1)
+
+- **What was implemented:**
+  - 7 new `--ac-viz-*` CSS variables: `status-approved`, `status-submitted`, `status-draft`, `status-pending`, `status-rejected`, `status-no-status`, `series-1`
+  - Light values in `:root` block; dark values in `:root[data-theme="dark"]` block — independently authored (not formula-derived per D-PD-13)
+  - Mirror rows in README.md (light Visualization section + Dark Mode Variables section) and docs/ux-ui/design.md §7
+  - Purely additive: 42 insertions, 0 deletions
+
+- **Implementer verification:**
+  - Dataviz validator: **UNAVAILABLE** — no `dataviz` skill found in any skills directory. Escalated per task instruction ("if unavailable, escalate rather than skip") and KZ-017.
+  - Substitute: WCAG 3:1 contrast check against actual card-surface tokens (`--ac-white-2: #fcfcfc` light; `--ac-background: #191919` dark) — all 14 values pass.
+  - 3-file mirror grep: all 7 tokens present in all 3 files (3/3 per token).
+  - Did NOT run `npm test`/`npm run build` per parallel execution constraint (T-06 running client suite).
+
+- **Implementer `Not Done / Assumptions` (carried verbatim):**
+  - Dataviz validator UNAVAILABLE — NFR-PD-004 validator gate NOT discharged; pending HITL visual check (D6 gate) or validator availability
+  - Token values are best-effort, not validator-confirmed; CVD ΔE ≥ 8 and normal-vision floor ≥ 15 checks NOT run
+  - Judgment calls on values: light `no-status` darkened from `#9e9e9e` to `#757575` (2.61→4.49:1); light `pending` darkened from `#ef6c00` to `#e65100` (3.00→3.69:1); `series-1` reuses blue family
+  - Did NOT add viz tokens to `$colors` map (no utility classes) — followed `--ac-pool-funding-*` precedent
+
+#### Reviewer verdict — Attempt 1
+
+- **STATUS: PASS**
+- **Summary:** All 7 `--ac-viz-*` tokens registered in both `:root` (light) and `:root[data-theme="dark"]` (dark) blocks with independently authored dark values (D-PD-13 confirmed). All 7 mirrored in README.md and docs/ux-ui/design.md §7 — 3/3 files per token. Diff purely additive (42 insertions, 0 deletions). NFR-PD-004 validator DEFERRED per SU7 accommodation — Implementer escalated rather than skipped (KZ-017), recorded substitute WCAG contrast evidence. Remaining CVD/floor checks are an explicitly recorded gap for HITL.
+- **ADVISORY:** omitted per persona §7 (diff under 50-LOC threshold for checklist-style review).
+
+#### Deferred checks (HITL validation)
+
+| # | Check | Needs | Status |
+|---|---|---|---|
+| 1 | NFR-PD-004 dataviz validator (CVD ΔE ≥ 8, normal-vision ≥ 15) | `dataviz` skill / `validate_palette.js` | UNAVAILABLE — substitute WCAG 3:1 check passes; full validation at HITL or when skill available |
+
+#### Final verification result
+
+- 3-file mirror: 3/3 per token (grep confirmed)
+- WCAG 3:1 contrast: all 14 values pass against actual card-surface tokens
+- Diff: 42 insertions, 0 deletions (purely additive)
+
 
