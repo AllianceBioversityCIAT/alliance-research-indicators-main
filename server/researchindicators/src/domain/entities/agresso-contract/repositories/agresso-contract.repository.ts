@@ -58,6 +58,10 @@ import {
   ContractResultsSummaryStatusBucketDto,
   ContractResultsSummaryYearBucketDto,
 } from '../dto/contract-results-summary-report.dto';
+import {
+  ContractSpAlignmentReportDto,
+  ContractSpAlignmentSpDto,
+} from '../dto/contract-sp-alignment-report.dto';
 
 @Injectable()
 export class AgressoContractRepository
@@ -1151,6 +1155,108 @@ export class AgressoContractRepository
       by_status,
       by_year,
       partner_institutions,
+    };
+  }
+
+  async getSpAlignmentReport(
+    contractId: string,
+  ): Promise<ContractSpAlignmentReportDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
+
+    const alignmentsQuery = `
+      SELECT
+        csp.official_code AS sp_code,
+        csp.name AS name,
+        csp.category AS category,
+        csp.icon_key AS icon_key,
+        r.result_official_code AS result_official_code,
+        r.title AS result_title,
+        COALESCE(rpfas.sp_role, 'UNKNOWN') AS role
+      FROM (${primaryContractResultsSubquery}) primary_results
+      INNER JOIN results r
+        ON r.result_id = primary_results.result_id
+      INNER JOIN result_pool_funding_alignment rpfa
+        ON rpfa.result_id = primary_results.result_id
+        AND rpfa.is_active = TRUE
+      INNER JOIN result_pool_funding_alignment_sp rpfas
+        ON rpfas.alignment_id = rpfa.id
+        AND rpfas.is_active = TRUE
+      INNER JOIN clarisa_science_programs csp
+        ON csp.official_code = rpfas.sp_code
+        AND csp.is_active = TRUE
+      ORDER BY csp.official_code, r.result_official_code
+    `;
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT primary_results.result_id) AS total_results,
+        COUNT(DISTINCT CASE
+          WHEN csp.official_code IS NOT NULL THEN primary_results.result_id
+        END) AS results_with_alignment
+      FROM (${primaryContractResultsSubquery}) primary_results
+      LEFT JOIN result_pool_funding_alignment rpfa
+        ON rpfa.result_id = primary_results.result_id
+        AND rpfa.is_active = TRUE
+      LEFT JOIN result_pool_funding_alignment_sp rpfas
+        ON rpfas.alignment_id = rpfa.id
+        AND rpfas.is_active = TRUE
+      LEFT JOIN clarisa_science_programs csp
+        ON csp.official_code = rpfas.sp_code
+        AND csp.is_active = TRUE
+    `;
+
+    const [alignmentRows, countRows] = await Promise.all([
+      this.query(alignmentsQuery, [contractId]),
+      this.query(countQuery, [contractId]),
+    ]);
+
+    const spsMap = new Map<string, ContractSpAlignmentSpDto>();
+
+    for (const row of alignmentRows as Array<Record<string, unknown>>) {
+      const spCode = String(row.sp_code);
+      let spEntry = spsMap.get(spCode);
+
+      if (!spEntry) {
+        spEntry = {
+          sp_code: spCode,
+          name: String(row.name ?? ''),
+          category:
+            row.category === null || row.category === undefined
+              ? null
+              : String(row.category),
+          icon_key:
+            row.icon_key === null || row.icon_key === undefined
+              ? null
+              : String(row.icon_key),
+          links: [],
+        };
+        spsMap.set(spCode, spEntry);
+      }
+
+      spEntry.links.push({
+        result_official_code: String(row.result_official_code),
+        result_title: String(row.result_title ?? ''),
+        role: (row.role as 'PRIMARY' | 'CONTRIBUTING' | 'UNKNOWN') ?? 'UNKNOWN',
+      });
+    }
+
+    const summaryRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const totalResults = Number(summaryRow.total_results ?? 0);
+    const resultsWithAlignment = Number(summaryRow.results_with_alignment ?? 0);
+    const resultsWithoutAlignment = Math.max(
+      0,
+      totalResults - resultsWithAlignment,
+    );
+
+    return {
+      sps: Array.from(spsMap.values()),
+      results_with_alignment: resultsWithAlignment,
+      results_without_alignment: resultsWithoutAlignment,
     };
   }
 

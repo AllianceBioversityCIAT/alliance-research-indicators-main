@@ -1404,4 +1404,227 @@ describe('AgressoContractRepository', () => {
       expect(result).toBe('');
     });
   });
+
+  describe('getSpAlignmentReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getSpAlignmentReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should build SP alignment report with alignments and count queries (asserts generated SQL text + bound params)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            sp_code: 'SP-01',
+            name: 'Science Program 1',
+            category: 'Science programs',
+            icon_key: 'SP-01',
+            result_official_code: 100,
+            result_title: 'Result Title 100',
+            role: 'PRIMARY',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            total_results: 1,
+            results_with_alignment: 1,
+          },
+        ]);
+
+      const result = await repository.getSpAlignmentReport('A1676');
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const alignmentSql = (repository.query as jest.Mock).mock.calls[0][0];
+      const countSql = (repository.query as jest.Mock).mock.calls[1][0];
+
+      // Assert primary contract results subquery predicates
+      expect(alignmentSql).toContain('is_primary = TRUE');
+      expect(alignmentSql).toContain('is_snapshot = FALSE');
+      expect(alignmentSql).toContain('is_active');
+      expect(countSql).toContain('is_primary = TRUE');
+      expect(countSql).toContain('is_snapshot = FALSE');
+      expect(countSql).toContain('is_active');
+
+      // Assert required joins
+      expect(alignmentSql).toContain('result_pool_funding_alignment');
+      expect(alignmentSql).toContain('result_pool_funding_alignment_sp');
+      expect(alignmentSql).toContain('clarisa_science_programs');
+
+      // Assert COALESCE mapping to UNKNOWN in SQL
+      expect(alignmentSql).toContain(
+        "COALESCE(rpfas.sp_role, 'UNKNOWN') AS role",
+      );
+
+      // Assert parameter binding
+      expect((repository.query as jest.Mock).mock.calls[0][1]).toEqual([
+        'A1676',
+      ]);
+      expect((repository.query as jest.Mock).mock.calls[1][1]).toEqual([
+        'A1676',
+      ]);
+
+      expect(result).toEqual({
+        sps: [
+          {
+            sp_code: 'SP-01',
+            name: 'Science Program 1',
+            category: 'Science programs',
+            icon_key: 'SP-01',
+            links: [
+              {
+                result_official_code: '100',
+                result_title: 'Result Title 100',
+                role: 'PRIMARY',
+              },
+            ],
+          },
+        ],
+        results_with_alignment: 1,
+        results_without_alignment: 0,
+      });
+    });
+
+    it('should place a result linked to multiple SPs under each SP with its respective role (AC.2)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            sp_code: 'SP-01',
+            name: 'Science Program 1',
+            category: 'Science programs',
+            icon_key: 'SP-01',
+            result_official_code: 100,
+            result_title: 'Result 100',
+            role: 'PRIMARY',
+          },
+          {
+            sp_code: 'SP-02',
+            name: 'Science Program 2',
+            category: 'Accelerators',
+            icon_key: 'SP-02',
+            result_official_code: 100,
+            result_title: 'Result 100',
+            role: 'CONTRIBUTING',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            total_results: 1,
+            results_with_alignment: 1,
+          },
+        ]);
+
+      const result = await repository.getSpAlignmentReport('A100');
+
+      expect(result.sps).toHaveLength(2);
+      expect(result.sps[0]).toEqual({
+        sp_code: 'SP-01',
+        name: 'Science Program 1',
+        category: 'Science programs',
+        icon_key: 'SP-01',
+        links: [
+          {
+            result_official_code: '100',
+            result_title: 'Result 100',
+            role: 'PRIMARY',
+          },
+        ],
+      });
+      expect(result.sps[1]).toEqual({
+        sp_code: 'SP-02',
+        name: 'Science Program 2',
+        category: 'Accelerators',
+        icon_key: 'SP-02',
+        links: [
+          {
+            result_official_code: '100',
+            result_title: 'Result 100',
+            role: 'CONTRIBUTING',
+          },
+        ],
+      });
+      expect(result.results_with_alignment).toBe(1);
+      expect(result.results_without_alignment).toBe(0);
+    });
+
+    it('should preserve UNKNOWN role mapping for rows where sp_role was NULL (AC.3 / K-012)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            sp_code: 'SP-01',
+            name: 'Science Program 1',
+            category: null,
+            icon_key: null,
+            result_official_code: 200,
+            result_title: 'Legacy Result',
+            role: 'UNKNOWN',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            total_results: 2,
+            results_with_alignment: 1,
+          },
+        ]);
+
+      const result = await repository.getSpAlignmentReport('A100');
+
+      expect(result.sps).toEqual([
+        {
+          sp_code: 'SP-01',
+          name: 'Science Program 1',
+          category: null,
+          icon_key: null,
+          links: [
+            {
+              result_official_code: '200',
+              result_title: 'Legacy Result',
+              role: 'UNKNOWN',
+            },
+          ],
+        },
+      ]);
+      expect(result.results_with_alignment).toBe(1);
+      expect(result.results_without_alignment).toBe(1);
+    });
+
+    it('should return sps: [] and correct counters for a contract with zero alignments (AC.4)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            total_results: 5,
+            results_with_alignment: 0,
+          },
+        ]);
+
+      const result = await repository.getSpAlignmentReport('NON-BILATERAL');
+
+      expect(result).toEqual({
+        sps: [],
+        results_with_alignment: 0,
+        results_without_alignment: 5,
+      });
+    });
+
+    it('should return sps: [] and 0 counters when contract has no results at all', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            total_results: 0,
+            results_with_alignment: 0,
+          },
+        ]);
+
+      const result = await repository.getSpAlignmentReport('EMPTY-CONTRACT');
+
+      expect(result).toEqual({
+        sps: [],
+        results_with_alignment: 0,
+        results_without_alignment: 0,
+      });
+    });
+  });
 });
