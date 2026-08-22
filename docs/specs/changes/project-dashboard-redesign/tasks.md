@@ -2,7 +2,7 @@
 
 - **Module:** project-detail (client) + agresso-contract (server)
 - **Spec id:** 2026-08-project-dashboard-redesign
-- **Status:** in-progress (T-01 done, T-02 automated done / manual deferred to HITL)
+- **Status:** in-progress (T-01 done, T-02 automated done / manual deferred, T-03 done, T-06 done)
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-judgment corrections; ledger ./judgment.md)
@@ -103,10 +103,10 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Per-navigation dedupe keyed **by contract id** with `invalidate(id)`; migrate all four invocations; **delete** the `full_name` mutation (dead — D-PD-7); standardize empty state on `null`; guard the shell template's unguarded dereferences (latent crash).
 - **Dependencies:** none (parallel-safe with T-03/04/05) · **Skills:** `angular-developer`, `systematic-debugging`
 - **Acceptance / done check:**
-  - [ ] Test: navigating to `/project-detail/:id` issues **exactly one** `GET_ResultsCount` request (AC.2, asserted via `HttpTestingController` request count). *Red input: re-add the dashboard's own `loadProject` fetch — the count assertion must fail.*
-  - [ ] Test: two different ids (route id vs. alignments-derived id on a result page) produce two independent cache entries (judgment W6).
-  - [ ] Pinned-spec realignment: apply the change, run the suite, and **derive the edit list from the failures** (K-018) — expected reds include `project-detail.component.spec.ts:343-380` and `project-dashboard.component.spec.ts:274-281`; the realigned specs must encode the new `null` contract, not resurrect the old fallbacks.
-  - [ ] Full client suite `npm test -- --silent` green.
+  - [x] Test: navigating to `/project-detail/:id` issues **exactly one** `GET_ResultsCount` request (AC.2, asserted via `HttpTestingController` request count). *Red input: re-add the dashboard's own `loadProject` fetch — the count assertion must fail.*
+  - [x] Test: two different ids (route id vs. alignments-derived id on a result page) produce two independent cache entries (judgment W6).
+  - [x] Pinned-spec realignment: apply the change, run the suite, and **derive the edit list from the failures** (K-018) — expected reds include `project-detail.component.spec.ts:343-380` and `project-dashboard.component.spec.ts:274-281`; the realigned specs must encode the new `null` contract, not resurrect the old fallbacks.
+  - [x] Full client suite `npm test -- --silent` green. (6519/6521 — 2 pre-existing `version-selector` failures unrelated, confirmed at HEAD)
 
 ### T-07 — Client: status region rework + bulk-fetch removal
 

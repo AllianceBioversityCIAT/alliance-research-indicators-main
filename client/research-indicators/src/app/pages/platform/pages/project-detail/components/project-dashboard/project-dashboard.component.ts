@@ -14,6 +14,7 @@ import { ActionsService } from '@shared/services/actions.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
 import { RolesService } from '@shared/services/cache/roles.service';
+import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import {
   DocumentOverviewResponse,
   GroundedProjectDocument,
@@ -65,6 +66,7 @@ export class ProjectDashboardComponent {
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
   private readonly actions = inject(ActionsService);
+  private readonly getProjectDetailService = inject(GetProjectDetailService);
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
@@ -77,7 +79,7 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewError = signal(false);
 
   readonly contractId = computed(() => this.route.parent?.snapshot.paramMap.get('id') ?? '');
-  readonly project = signal<GetProjectDetail>({});
+  readonly project = signal<GetProjectDetail | null>(null);
   readonly canUploadMoreGroundingDocs = computed(() => this.groundedDocuments().length < MAX_GROUNDING_DOCS);
   readonly canGenerateExecutiveOverview = computed(
     () => this.hasGroundedDocuments() && !this.executiveOverviewLoading() && !this.uploadingGroundingDoc()
@@ -105,7 +107,7 @@ export class ProjectDashboardComponent {
   });
 
   readonly indicatorSummaries = computed(() => {
-    const indicators = this.projectUtils.sortIndicators([...(this.project().indicators ?? [])]);
+    const indicators = this.projectUtils.sortIndicators([...(this.project()?.indicators ?? [])]);
     const ranked = indicators
       .map((indicator, index) => ({
         id: indicator.indicator?.indicator_id ?? indicator.indicator_id ?? index,
@@ -205,7 +207,7 @@ export class ProjectDashboardComponent {
     effect(() => {
       const contractId = this.contractId();
       if (contractId) {
-        void this.loadProject(contractId);
+        void this.syncProjectFromSharedService(contractId);
         void this.loadProjectResultsByStatus(contractId);
         this.topContributors.main(contractId, 4);
         this.topMainContactPersons.main(contractId, 4);
@@ -219,13 +221,9 @@ export class ProjectDashboardComponent {
     });
   }
 
-  private async loadProject(contractId: string): Promise<void> {
-    const response = await this.api.GET_ResultsCount(contractId);
-    if (response?.data) {
-      this.project.set(response.data);
-    } else {
-      this.project.set({});
-    }
+  private async syncProjectFromSharedService(contractId: string): Promise<void> {
+    await this.getProjectDetailService.load(contractId);
+    this.project.set(this.getProjectDetailService.project());
   }
 
   indicatorSharePercent(value: number): number {

@@ -2,6 +2,7 @@ import { Component, Input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { ApiService } from '@shared/services/api.service';
+import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
@@ -17,6 +18,7 @@ import { ProjectDashboardComponent } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
+import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 
 @Component({
   selector: 'app-project-dashboard-card',
@@ -60,6 +62,7 @@ describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
+  let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let topContributorsMock: ReturnType<typeof createRankedServiceMock>;
   let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
   let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
@@ -98,7 +101,7 @@ describe('ProjectDashboardComponent', () => {
 
   async function setup(
     contractId: string | null = 'C-1',
-    options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }
+    options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean; projectData?: GetProjectDetail | null }
   ) {
     topContributorsMock = createRankedServiceMock();
     topMainContactsMock = createRankedServiceMock();
@@ -156,21 +159,30 @@ describe('ProjectDashboardComponent', () => {
     };
     actionsServiceMock = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
     rolesServiceMock = { isAdmin: jest.fn().mockReturnValue(options?.isAdmin ?? true) };
+
+    const defaultProjectData: GetProjectDetail = {
+      grant_amount: 1234,
+      divisionId: 'D1',
+      division: 'Division',
+      unitId: 'U1',
+      unit: 'Unit',
+      indicators: [
+        { indicator: { indicator_id: 1, name: 'Output' }, count_results: 2 } as any,
+        { indicator_id: 99, full_name: 'Fallback indicator', count_results: 4 } as any,
+        { indicator_id: null, count_results: undefined } as any
+      ]
+    };
+
+    getProjectDetailServiceMock = {
+      project: signal<GetProjectDetail | null>(options?.projectData === undefined ? defaultProjectData : options.projectData),
+      loading: signal(false),
+      loadError: signal(false),
+      load: jest.fn().mockResolvedValue(undefined),
+      invalidate: jest.fn()
+    };
+
     apiMock = {
-      GET_ResultsCount: jest.fn().mockResolvedValue({
-        data: {
-          grant_amount: 1234,
-          divisionId: 'D1',
-          division: 'Division',
-          unitId: 'U1',
-          unit: 'Unit',
-          indicators: [
-            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 2 },
-            { indicator_id: 99, full_name: 'Fallback indicator', count_results: 4 },
-            { indicator_id: null, count_results: undefined }
-          ]
-        }
-      }),
+      GET_ResultsCount: jest.fn(),
       GET_Results: jest.fn().mockResolvedValue({
         data: {
           results: [
@@ -188,6 +200,7 @@ describe('ProjectDashboardComponent', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { parent: { snapshot: { paramMap: convertToParamMap(contractId ? { id: contractId } : {}) } } } },
         { provide: ApiService, useValue: apiMock },
+        { provide: GetProjectDetailService, useValue: getProjectDetailServiceMock },
         {
           provide: ProjectUtilsService,
           useValue: {
@@ -237,10 +250,11 @@ describe('ProjectDashboardComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('should load project dashboard data for the parent contract', async () => {
+  it('should load project dashboard data for the parent contract via the shared service (not GET_ResultsCount directly)', async () => {
     await setup();
 
-    expect(apiMock.GET_ResultsCount).toHaveBeenCalledWith('C-1');
+    expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
+    expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
     expect(apiMock.GET_Results).toHaveBeenCalledWith(
       { 'contract-codes': ['C-1'] },
       undefined,
@@ -266,18 +280,16 @@ describe('ProjectDashboardComponent', () => {
   it('should handle empty project response and empty contract id', async () => {
     await setup(null);
 
+    expect(getProjectDetailServiceMock.load).not.toHaveBeenCalled();
     expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
     expect(component.contractId()).toBe('');
     expect(component.indicatorSharePercent(1)).toBe(0);
   });
 
-  it('should set empty project when the project endpoint has no data', async () => {
-    await setup();
-    apiMock.GET_ResultsCount.mockResolvedValueOnce({});
+  it('should set null project when the shared service has no project data (null contract — D-PD-7)', async () => {
+    await setup('C-1', { projectData: null });
 
-    await (component as any).loadProject('C-2');
-
-    expect(component.project()).toEqual({});
+    expect(component.project()).toBeNull();
   });
 
   it('should build and sort ranked service items', async () => {

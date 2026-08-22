@@ -179,4 +179,54 @@
 - WCAG 3:1 contrast: all 14 values pass against actual card-surface tokens
 - Diff: 42 insertions, 0 deletions (purely additive)
 
+### T-06 — Client: shared project-detail service + dedupe (3 components / 4 invocations)
+
+- **Final status:** PASS on attempt 1 (verification mode — previous run interrupted, changes verified)
+- **Date:** 2026-08-21
+- **Requirements covered:** R-PD-008 (AC.2 + duplicate-fetch REMOVED delta)
+- **Design decisions applied:** D-PD-7 (shared service + delete mutation + null standard + guard shell), D-PD-10 (per-navigation dedupe + invalidate, NOT TTL)
+
+#### Attempt 1 — Implementer (verification of pre-existing changes)
+
+- **Context:** A previous run was cancelled mid-work but left complete changes in the working tree. The Leader confirmed the full client suite passed (6519/6521, 2 pre-existing `version-selector` failures unrelated). The Implementer was re-spawned in verification mode.
+
+- **Files changed (10 total):**
+  - `client/research-indicators/src/app/shared/services/get-project-detail.service.ts` (NEW)
+  - `client/research-indicators/src/app/shared/services/get-project-detail.service.spec.ts` (NEW)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/project-detail.component.{ts,html,spec.ts}` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.{ts,html,spec.ts}` (modified)
+  - `client/research-indicators/src/app/shared/components/section-header/section-header.component.{ts,spec.ts}` (modified)
+
+- **What was implemented (verified by Implementer):**
+  - `GetProjectDetailService` with per-navigation dedupe keyed by contract id (`inFlightByContractId` Map + `loadedContractIds` Set), `invalidate(contractId?)` per-id
+  - 4 invocations migrated: shell (`getProjectDetail`), dashboard (`syncProjectFromSharedService`), section-header ×2 (`loadProjectData` + `loadProjectDataById`)
+  - `full_name` mutation DELETED (consumer uses `indicator.indicator?.name ?? indicator.full_name ?? 'Indicator'` — server value survives per D-PD-7)
+  - Empty state standardized on `null` (`signal<GetProjectDetail | null>(null)`) across all 3 consumers
+  - Shell template guarded: `currentProject()?.` optional chaining for all 6 dereferences
+  - Empty state `null` everywhere: service signal, `project-detail.component.ts:54`, `project-dashboard.component.ts:82`, `section-header.component.ts:51`
+
+- **Implementer verification:**
+  - Command: `npm test -- --silent` from `client/research-indicators/`
+  - Result: **6519 passed, 2 failed** (pre-existing `version-selector.component.spec.ts:413,422` — unrelated, confirmed by stash-test at HEAD)
+  - Red input (KZ-014): Re-added `this.api.GET_ResultsCount(contractId)` in `syncProjectFromSharedService` → `should load project dashboard data for the parent contract via the shared service` FAILED: `expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled()` → Expected 0, Received 1. Reverted; diff unchanged.
+
+- **K-018 realignment (derived from failing suite, not grep):**
+  - `project-detail.component.spec.ts`: 4 old tests rewritten — full_name assertion now `undefined`; `GET_ResultsCount` direct-call negation; `invalidate` on destroy; null contract test
+  - `project-dashboard.component.spec.ts`: setup fixture swapped `apiMock.GET_ResultsCount` for `getProjectDetailServiceMock` (signal-based `project`, `load`, `invalidate`); renamed tests to reflect shared-service delegation; null contract test
+  - `section-header.component.spec.ts`: 5 tests rewritten across `loadProjectData`, `loadResultData`, `loadProjectDataById`, `clearData` — all swap API mock for service mock, assert `not.toHaveBeenCalled()` on direct API, `toBeNull()` on empty
+
+#### Reviewer verdict — Attempt 1
+
+- **STATUS: PASS**
+- **Summary:** Shared `GetProjectDetailService` implements per-navigation dedupe keyed by contract id with `invalidate(id)` (no TTL), all four `GET_ResultsCount` invocations migrated, `full_name` mutation deleted, empty state `null`, shell + dashboard template guarded — all conforming to R-PD-008 AC.2, D-PD-7, D-PD-10. 3 pinned spec files realigned to encode `null` contract (K-018). New service goes through `ApiService`, uses signals, no hex literals. 2 pre-existing `version-selector` failures confirmed unrelated.
+- **ADVISORY (non-gating, recorded):**
+  1. RESILIENCE: `GetProjectDetailService.project()` is a single shared signal overwritten on each fetch. Safe under actual usage (all callers within one navigation share the same contract id; `invalidate(id)` on shell `ngOnDestroy` prevents cross-navigation stale reads), but would be fragile if used for two different ids concurrently. A per-id signal map would be more robust — noting for T-09/T-11 consumers.
+  2. RELIABILITY: The 2 `version-selector` spec failures are baseline noise unrelated to T-06. Recorded so T-12's "full suites green" gate knows these pre-exist.
+
+#### Final verification result
+
+- Client suite: 6519/6521 green (2 pre-existing `version-selector` failures, unrelated — confirmed by stash-test at HEAD)
+- Red input: discriminating (re-added `GET_ResultsCount` → "exactly one request" test failed)
+- K-018: 3 spec files realigned from failing suite
+
 

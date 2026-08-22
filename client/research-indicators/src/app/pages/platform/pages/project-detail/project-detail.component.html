@@ -7,10 +7,10 @@
           <div class="flex flex-col gap-3">
             <div class="min-w-0 flex flex-col gap-1">
               <span class="m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px] text-[#112F5C]">
-                {{ currentProject().agreement_id }} - {{ currentProject().description }}
+                {{ currentProject()?.agreement_id }} - {{ currentProject()?.description }}
               </span>
               <span class="font-['Barlow'] text-[15px] font-normal leading-[18px] text-[#8D9299]">
-                {{ currentProject().department }} Department
+                {{ currentProject()?.department }} Department
               </span>
               <div class="flex flex-wrap items-center gap-1">
                 @if (showPoolFundingBadge()) {
@@ -36,7 +36,7 @@
                 Start
                 date</dt>
               <dd class="m-0 truncate font-['Barlow'] text-[14px] font-semibold text-[#112F5C]">{{
-                (currentProject().start_date
+                (currentProject()?.start_date
                 | date: 'dd/MM/yyyy') || 'Not defined' }}</dd>
             </div>
 
@@ -44,7 +44,7 @@
               <dt class="!font-['Space_Grotesk'] text-[10px] font-[600] uppercase tracking-[0.03rem] text-[#8D9299]">End
                 date</dt>
               <dd class="m-0 truncate font-['Barlow'] text-[14px] font-semibold text-[#112F5C]">{{
-                (currentProject().end_date |
+                (currentProject()?.end_date |
                 date: 'dd/MM/yyyy') || 'Not defined' }}</dd>
             </div>
 
@@ -53,7 +53,7 @@
                 Extension
                 date</dt>
               <dd class="m-0 truncate font-['Barlow'] text-[14px] font-semibold text-[#112F5C]">{{
-                (currentProject().extension_date | date: 'dd/MM/yyyy') || 'Not defined' }}</dd>
+                (currentProject()?.extension_date | date: 'dd/MM/yyyy') || 'Not defined' }}</dd>
             </div>
 
             <div class="min-w-0">
@@ -69,7 +69,7 @@
               <dt class="!font-['Space_Grotesk'] text-[10px] font-[600] uppercase tracking-[0.03rem] text-[#8D9299]">
                 Foundress</dt>
               <dd class="m-0 truncate font-['Barlow'] text-[14px] font-semibold text-[#112F5C]"
-                [title]="currentProject().donor || '—'">{{ currentProject().donor || '—' }}</dd>
+                [title]="currentProject()?.donor || '—'">{{ currentProject()?.donor || '—' }}</dd>
             </div>
 
             <div class="min-w-0">

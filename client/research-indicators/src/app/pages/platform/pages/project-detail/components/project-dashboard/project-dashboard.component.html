@@ -312,7 +312,7 @@
       <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Pending revision</span>
       <span class="block font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Results pending revision on project
         {{
-        project().agreement_id || contractId() }}.</span>
+        project()?.agreement_id || contractId() }}.</span>
     </header>
     <app-results-center-table class="block min-h-0 flex-1 overflow-hidden" [hideFiltersToolbar]="true"
       [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"

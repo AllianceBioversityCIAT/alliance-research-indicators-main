@@ -9,13 +9,14 @@ import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ApiService } from '../../../../shared/services/api.service';
 import { ActivatedRoute, NavigationEnd, PRIMARY_OUTLET, Router, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { GetProjectDetail, GetProjectDetailIndicator } from '../../../../shared/interfaces/get-project-detail.interface';
+import { GetProjectDetail } from '../../../../shared/interfaces/get-project-detail.interface';
 import { ResultsCenterService } from '../results-center/results-center.service';
 import { RolesService } from '@services/cache/roles.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { filter } from 'rxjs';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
+import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 
 interface ViewTab {
   label: string;
@@ -47,9 +48,10 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
   readonly contractStaff = inject(GetContractStaffService);
   private readonly projectUtils = inject(ProjectUtilsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly getProjectDetailService = inject(GetProjectDetailService);
   contractId = signal('');
   lastSegment = signal('project-results');
-  currentProject = signal<GetProjectDetail>({});
+  currentProject = signal<GetProjectDetail | null>(null);
   readonly projectLeverName = computed(() => this.projectUtils.getLeverName(this.currentProject() ?? {}));
   readonly projectGrantAmount = computed(() => formatBudgetAmount(this.currentProject()?.grant_amount));
   readonly projectDivisionLabel = computed(() => formatCodeLabel(this.currentProject()?.divisionId, this.currentProject()?.division));
@@ -126,20 +128,12 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
     this.resultsCenterService.deactivateStatePersistence(stateKey);
     this.resultsCenterService.showFiltersSidebar.set(false);
     this.resultsCenterService.showConfigurationsSidebar.set(false);
+    this.getProjectDetailService.invalidate(this.contractId());
   }
 
   async getProjectDetail() {
-    const response = await this.api.GET_ResultsCount(this.contractId());
-    if (response?.data?.indicators) {
-      response.data.indicators.forEach((indicator: GetProjectDetailIndicator) => {
-        indicator.full_name = indicator.indicator.name;
-      });
-      this.currentProject.set(response.data);
-    } else if (response?.data) {
-      this.currentProject.set(response.data);
-    } else {
-      this.currentProject.set(undefined as unknown as GetProjectDetail);
-    }
+    await this.getProjectDetailService.load(this.contractId());
+    this.currentProject.set(this.getProjectDetailService.project());
   }
 
   onIndicatorClick(indicator: { indicator_id: number; name: string }): void {

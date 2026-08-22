@@ -10,6 +10,7 @@ import { MenuItem } from 'primeng/api';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '../../services/api.service';
 import { SubmissionService } from '../../services/submission.service';
+import { GetProjectDetailService } from '../../services/get-project-detail.service';
 import { GetProjectDetail } from '../../interfaces/get-project-detail.interface';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
@@ -47,8 +48,9 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   api = inject(ApiService);
   submissionService = inject(SubmissionService);
   whatsNewService = inject(WhatsNewService);
+  private readonly getProjectDetailService = inject(GetProjectDetailService);
 
-  private currentProject = signal<GetProjectDetail>({});
+  private currentProject = signal<GetProjectDetail | null>(null);
   private contractId = signal('');
   private currentUrl = signal('');
   private routerSubscription!: Subscription;
@@ -319,7 +321,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
   }
 
   private clearData() {
-    this.currentProject.set({});
+    this.currentProject.set(null);
     this.contractId.set('');
     this.currentResult.set({});
     this.currentResultId.set('');
@@ -341,11 +343,13 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     const projectId = detailIndex >= 0 && segments.length > detailIndex + 1 ? segments[detailIndex + 1] : '';
     this.contractId.set(projectId);
 
+    if (!projectId) {
+      return;
+    }
+
     try {
-      const response = await this.api.GET_ResultsCount(projectId);
-      if (response?.data) {
-        this.currentProject.set(response.data);
-      }
+      await this.getProjectDetailService.load(projectId);
+      this.currentProject.set(this.getProjectDetailService.project());
     } catch (error) {
       console.error('Error loading project data:', error);
     }
@@ -387,10 +391,8 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     this.contractId.set(projectId);
 
     try {
-      const response = await this.api.GET_ResultsCount(projectId);
-      if (response?.data) {
-        this.currentProject.set(response.data);
-      }
+      await this.getProjectDetailService.load(projectId);
+      this.currentProject.set(this.getProjectDetailService.project());
     } catch (error) {
       console.error('Error loading project data:', error);
     }

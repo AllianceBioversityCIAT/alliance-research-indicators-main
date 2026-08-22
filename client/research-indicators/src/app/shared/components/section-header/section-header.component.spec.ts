@@ -8,9 +8,11 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
+import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { MenuItemCommandEvent } from 'primeng/api';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
+import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 
 // Mock ResizeObserver
 class ResizeObserverMock {
@@ -35,6 +37,7 @@ describe('SectionHeaderComponent', () => {
   let cacheService: Partial<CacheService>;
   let actionsService: Partial<ActionsService>;
   let apiService: Partial<ApiService>;
+  let getProjectDetailService: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let rolesService: Partial<RolesService>;
   let whatsNewService: {
     getActiveReleaseNoteTitle: jest.Mock;
@@ -122,6 +125,14 @@ describe('SectionHeaderComponent', () => {
       GET_GeneralInformation: jest.fn()
     };
 
+    getProjectDetailService = {
+      project: signal<GetProjectDetail | null>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      load: jest.fn().mockResolvedValue(undefined),
+      invalidate: jest.fn()
+    };
+
     whatsNewService = {
       getActiveReleaseNoteTitle: jest.fn().mockReturnValue(''),
       getReleaseNoteTitle: jest.fn().mockReturnValue(''),
@@ -159,6 +170,10 @@ describe('SectionHeaderComponent', () => {
         {
           provide: ApiService,
           useValue: apiService
+        },
+        {
+          provide: GetProjectDetailService,
+          useValue: getProjectDetailService
         },
         {
           provide: RolesService,
@@ -697,7 +712,7 @@ describe('SectionHeaderComponent', () => {
       component.ngOnInit();
       routerEventsSubject.next(new NavigationEnd(1, '/home', '/home'));
 
-      expect(component['currentProject']()).toEqual({});
+      expect(component['currentProject']()).toBeNull();
       expect(component['contractId']()).toBe('');
     });
   });
@@ -870,30 +885,30 @@ describe('SectionHeaderComponent', () => {
 
   describe('Data loading methods', () => {
     beforeEach(() => {
-      // Mock API methods
-      apiService.GET_ResultsCount = jest.fn();
       apiService.GET_Alignments = jest.fn();
       apiService.GET_GeneralInformation = jest.fn();
+      getProjectDetailService.load.mockClear();
+      getProjectDetailService.project.set(null);
     });
 
     describe('loadProjectData', () => {
-      it('should load project data successfully', async () => {
+      it('should load project data successfully via the shared service (not GET_ResultsCount directly)', async () => {
         const mockProjectData = { projectDescription: 'Test Project', description: 'Test Description' };
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: mockProjectData });
+        getProjectDetailService.project.set(mockProjectData);
 
-        // Set up router URL for project detail page
         (routerSpy as any).url = '/project-detail/123';
         component['currentUrl'].set('/project-detail/123');
 
         await component['loadProjectData']();
 
-        expect(apiService.GET_ResultsCount).toHaveBeenCalledWith('123');
+        expect(getProjectDetailService.load).toHaveBeenCalledWith('123');
+        expect(apiService.GET_ResultsCount).not.toHaveBeenCalled();
         expect(component['contractId']()).toBe('123');
         expect(component['currentProject']()).toEqual(mockProjectData);
       });
 
-      it('should handle API error in loadProjectData', async () => {
-        apiService.GET_ResultsCount = jest.fn().mockRejectedValue(new Error('API Error'));
+      it('should handle error in loadProjectData when the shared service throws', async () => {
+        getProjectDetailService.load.mockRejectedValueOnce(new Error('API Error'));
 
         (routerSpy as any).url = '/project-detail/123';
         component['currentUrl'].set('/project-detail/123');
@@ -906,19 +921,19 @@ describe('SectionHeaderComponent', () => {
         consoleSpy.mockRestore();
       });
 
-      it('should handle API response without data', async () => {
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: null });
+      it('should handle null project from shared service (null empty-state contract — D-PD-7)', async () => {
+        getProjectDetailService.project.set(null);
 
         (routerSpy as any).url = '/project-detail/123';
         component['currentUrl'].set('/project-detail/123');
 
         await component['loadProjectData']();
 
-        expect(component['currentProject']()).toEqual({});
+        expect(component['currentProject']()).toBeNull();
       });
 
       it('should set empty contractId when URL has no project-detail segment', async () => {
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: {} });
+        getProjectDetailService.load.mockClear();
 
         (routerSpy as any).url = '/some-other-page';
         component['currentUrl'].set('/some-other-page');
@@ -926,11 +941,12 @@ describe('SectionHeaderComponent', () => {
         await component['loadProjectData']();
 
         expect(component['contractId']()).toBe('');
+        expect(getProjectDetailService.load).not.toHaveBeenCalled();
       });
     });
 
     describe('loadResultData', () => {
-      it('should load result data successfully', async () => {
+      it('should load result data successfully and load project via shared service', async () => {
         const mockResultData = { title: 'Test Result Title' };
         const mockAlignmentsData = {
           data: {
@@ -941,7 +957,7 @@ describe('SectionHeaderComponent', () => {
 
         apiService.GET_GeneralInformation = jest.fn().mockResolvedValue({ data: mockResultData });
         apiService.GET_Alignments = jest.fn().mockResolvedValue(mockAlignmentsData);
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: mockProjectData });
+        getProjectDetailService.project.set(mockProjectData);
 
         (routerSpy as any).url = '/result/789/general-information';
         component['currentUrl'].set('/result/789/general-information');
@@ -953,6 +969,8 @@ describe('SectionHeaderComponent', () => {
         expect(component['currentResultId']()).toBe('789');
         expect(component['resultTitle']()).toBe('Test Result Title');
         expect(component['contractId']()).toBe('456');
+        expect(getProjectDetailService.load).toHaveBeenCalledWith('456');
+        expect(apiService.GET_ResultsCount).not.toHaveBeenCalled();
         expect(component['currentProject']()).toEqual(mockProjectData);
       });
 
@@ -966,7 +984,7 @@ describe('SectionHeaderComponent', () => {
 
         apiService.GET_GeneralInformation = jest.fn().mockResolvedValue({ data: mockResultData });
         apiService.GET_Alignments = jest.fn().mockResolvedValue(mockAlignmentsData);
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: {} });
+        getProjectDetailService.project.set(null);
 
         (routerSpy as any).url = '/result/789/general-information';
         component['currentUrl'].set('/result/789/general-information');
@@ -1029,19 +1047,20 @@ describe('SectionHeaderComponent', () => {
     });
 
     describe('loadProjectDataById', () => {
-      it('should load project data by ID successfully', async () => {
+      it('should load project data by ID successfully via the shared service', async () => {
         const mockProjectData = { projectDescription: 'Test Project' };
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: mockProjectData });
+        getProjectDetailService.project.set(mockProjectData);
 
         await component['loadProjectDataById']('123');
 
-        expect(apiService.GET_ResultsCount).toHaveBeenCalledWith('123');
+        expect(getProjectDetailService.load).toHaveBeenCalledWith('123');
+        expect(apiService.GET_ResultsCount).not.toHaveBeenCalled();
         expect(component['contractId']()).toBe('123');
         expect(component['currentProject']()).toEqual(mockProjectData);
       });
 
-      it('should handle API error in loadProjectDataById', async () => {
-        apiService.GET_ResultsCount = jest.fn().mockRejectedValue(new Error('API Error'));
+      it('should handle error in loadProjectDataById when the shared service throws', async () => {
+        getProjectDetailService.load.mockRejectedValueOnce(new Error('API Error'));
 
         const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -1051,12 +1070,12 @@ describe('SectionHeaderComponent', () => {
         consoleSpy.mockRestore();
       });
 
-      it('should handle API response without data in loadProjectDataById', async () => {
-        apiService.GET_ResultsCount = jest.fn().mockResolvedValue({ data: null });
+      it('should handle null project from shared service (null empty-state contract — D-PD-7)', async () => {
+        getProjectDetailService.project.set(null);
 
         await component['loadProjectDataById']('123');
 
-        expect(component['currentProject']()).toEqual({});
+        expect(component['currentProject']()).toBeNull();
       });
     });
   });
@@ -1097,8 +1116,7 @@ describe('SectionHeaderComponent', () => {
   });
 
   describe('clearData method', () => {
-    it('should clear all data signals', () => {
-      // Set some data first
+    it('should clear all data signals (null empty-state contract — D-PD-7)', () => {
       component['currentProject'].set({ projectDescription: 'Test' });
       component['contractId'].set('123');
       component['currentResult'].set({ title: 'Test Result' });
@@ -1107,7 +1125,7 @@ describe('SectionHeaderComponent', () => {
 
       component['clearData']();
 
-      expect(component['currentProject']()).toEqual({});
+      expect(component['currentProject']()).toBeNull();
       expect(component['contractId']()).toBe('');
       expect(component['currentResult']()).toEqual({});
       expect(component['currentResultId']()).toBe('');

@@ -4,15 +4,18 @@ import { ActivatedRoute, NavigationEnd, PRIMARY_OUTLET, Router } from '@angular/
 import { Subject } from 'rxjs';
 import ProjectDetailComponent from './project-detail.component';
 import { ApiService } from '@services/api.service';
+import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { RolesService } from '@services/cache/roles.service';
 import { ResultsCenterService } from '../results-center/results-center.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
+import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 
 describe('ProjectDetailComponent', () => {
   let component: ProjectDetailComponent;
   let fixture: ComponentFixture<ProjectDetailComponent>;
   let apiService: { GET_ResultsCount: jest.Mock };
+  let getProjectDetailService: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let activatedRoute: { snapshot: { params: { id: string } } };
   let router: {
     url: string;
@@ -69,6 +72,16 @@ describe('ProjectDetailComponent', () => {
     apiService = {
       GET_ResultsCount: jest.fn().mockResolvedValue({ data: {} })
     };
+    getProjectDetailService = {
+      project: signal<GetProjectDetail | null>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      load: jest.fn().mockImplementation((id: string) => {
+        getProjectDetailService.load.mock.lastCall;
+        return Promise.resolve();
+      }),
+      invalidate: jest.fn()
+    };
     activatedRoute = {
       snapshot: {
         params: { id: 'mock-id' }
@@ -116,6 +129,7 @@ describe('ProjectDetailComponent', () => {
       imports: [ProjectDetailComponent],
       providers: [
         { provide: ApiService, useValue: apiService },
+        { provide: GetProjectDetailService, useValue: getProjectDetailService },
         { provide: ActivatedRoute, useValue: activatedRoute },
         { provide: Router, useValue: router },
         { provide: ResultsCenterService, useValue: resultsCenterService },
@@ -330,7 +344,7 @@ describe('ProjectDetailComponent', () => {
     dashboardFixture.destroy();
   });
 
-  it('should deactivate persisted state and close sidebars on destroy', () => {
+  it('should deactivate persisted state, close sidebars, and invalidate the shared project cache on destroy', () => {
     component.contractId.set('mock-id');
 
     component.ngOnDestroy();
@@ -338,45 +352,51 @@ describe('ProjectDetailComponent', () => {
     expect(resultsCenterService.deactivateStatePersistence).toHaveBeenCalledWith('project-detail:mock-id');
     expect(resultsCenterService.showFiltersSidebar()).toBe(false);
     expect(resultsCenterService.showConfigurationsSidebar()).toBe(false);
+    expect(getProjectDetailService.invalidate).toHaveBeenCalledWith('mock-id');
   });
 
-  it('should set currentProject with indicators and set full_name', async () => {
-    const mockResponse = {
-      data: {
-        indicators: [{ indicator: { name: 'Test' } }]
-      }
+  it('should load project detail via the shared service and sync currentProject (full_name mutation deleted — D-PD-7)', async () => {
+    const mockProject: GetProjectDetail = {
+      agreement_id: 'A-1',
+      indicators: [{ indicator: { name: 'Test' } } as any]
     };
-    apiService.GET_ResultsCount.mockResolvedValue(mockResponse);
+    component.contractId.set('mock-id');
+    getProjectDetailService.project.set(mockProject);
+    getProjectDetailService.load.mockResolvedValue(undefined);
 
     await component.getProjectDetail();
 
-    expect(component.currentProject()).toBe(mockResponse.data);
-    expect(component.currentProject()?.indicators?.[0]?.full_name).toBe('Test');
+    expect(getProjectDetailService.load).toHaveBeenCalledWith('mock-id');
+    expect(component.currentProject()).toBe(mockProject);
+    expect(component.currentProject()?.indicators?.[0]?.full_name).toBeUndefined();
   });
 
-  it('should set currentProject with no indicators', async () => {
-    const mockResponse = { data: {} };
-    apiService.GET_ResultsCount.mockResolvedValue(mockResponse);
+  it('should set currentProject from shared service when project has no indicators', async () => {
+    const mockProject: GetProjectDetail = { agreement_id: 'A-1' };
+    component.contractId.set('mock-id');
+    getProjectDetailService.project.set(mockProject);
 
     await component.getProjectDetail();
 
-    expect(component.currentProject()).toBe(mockResponse.data);
+    expect(component.currentProject()).toBe(mockProject);
   });
 
-  it('should clear currentProject for null responses', async () => {
-    apiService.GET_ResultsCount.mockResolvedValue(null);
+  it('should set currentProject to null when shared service has no project (null contract — D-PD-7)', async () => {
+    component.contractId.set('mock-id');
+    getProjectDetailService.project.set(null);
 
     await component.getProjectDetail();
 
-    expect(component.currentProject()).toBe(undefined);
+    expect(component.currentProject()).toBeNull();
   });
 
-  it('should clear currentProject for empty responses', async () => {
-    apiService.GET_ResultsCount.mockResolvedValue({});
+  it('should not call GET_ResultsCount directly (delegation to shared service)', async () => {
+    component.contractId.set('mock-id');
+    getProjectDetailService.project.set(null);
 
     await component.getProjectDetail();
 
-    expect(component.currentProject()).toBe(undefined);
+    expect(apiService.GET_ResultsCount).not.toHaveBeenCalled();
   });
 
   it('showPoolFundingBadge should reflect bilateralService.currentContract', () => {
