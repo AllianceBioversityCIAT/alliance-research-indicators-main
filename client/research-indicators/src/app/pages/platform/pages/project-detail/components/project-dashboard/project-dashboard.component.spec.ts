@@ -3,13 +3,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
+import { GetContractResultsSummaryService } from '@shared/services/get-contract-results-summary.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
-import { GetTopContributorsContractsService } from '@shared/services/get-top-contributors-contracts.service';
-import { GetTopMainContactPersonsService } from '@shared/services/get-top-main-contact-persons.service';
-import { GetTopPartnersService } from '@shared/services/get-top-partners.service';
-import { GetTopPrimaryLeversService } from '@shared/services/get-top-primary-levers.service';
+import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
+import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-persons.service';
+import { GetTopPartnersService } from '@services/get-top-partners.service';
+import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -18,7 +19,20 @@ import { ProjectDashboardComponent } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
+import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
+import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
+
+@Component({
+  selector: 'app-results-trend-card',
+  standalone: true,
+  template: ''
+})
+class ResultsTrendCardStubComponent {
+  @Input() buckets: ContractResultsSummaryYearBucket[] = [];
+  @Input() loading = false;
+  @Input() error = false;
+}
 
 @Component({
   selector: 'app-project-dashboard-card',
@@ -61,8 +75,15 @@ class ResultsCenterTableStubComponent {
 describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
-  let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
+  let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock; GET_ContractResultsSummary: jest.Mock };
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
+  let contractResultsSummaryMock: {
+    list: ReturnType<typeof signal<ContractResultsSummary | null>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    loadError: ReturnType<typeof signal<boolean>>;
+    main: jest.Mock;
+    update: jest.Mock;
+  };
   let topContributorsMock: ReturnType<typeof createRankedServiceMock>;
   let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
   let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
@@ -101,7 +122,15 @@ describe('ProjectDashboardComponent', () => {
 
   async function setup(
     contractId: string | null = 'C-1',
-    options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean; projectData?: GetProjectDetail | null }
+    options?: {
+      isAdmin?: boolean;
+      emptyOverview?: boolean;
+      rejectOverviewFetch?: boolean;
+      projectData?: GetProjectDetail | null;
+      summary?: ContractResultsSummary | null;
+      summaryLoading?: boolean;
+      summaryError?: boolean;
+    }
   ) {
     topContributorsMock = createRankedServiceMock();
     topMainContactsMock = createRankedServiceMock();
@@ -175,8 +204,8 @@ describe('ProjectDashboardComponent', () => {
 
     getProjectDetailServiceMock = {
       project: signal<GetProjectDetail | null>(options?.projectData === undefined ? defaultProjectData : options.projectData),
-      loading: signal(false),
-      loadError: signal(false),
+      loading: signal(options?.projectLoading ?? false),
+      loadError: signal(options?.projectError ?? false),
       load: jest.fn().mockResolvedValue(undefined),
       invalidate: jest.fn()
     };
@@ -186,13 +215,22 @@ describe('ProjectDashboardComponent', () => {
       GET_Results: jest.fn().mockResolvedValue({
         data: {
           results: [
-            { result_status: { result_status_id: 2, name: 'Submitted', config: { color: { text: '#111111' } } } },
-            { result_status: { result_status_id: 2, name: 'Submitted', config: { color: { text: '#111111' } } } },
+            { result_status: { result_status_id: 2, name: 'Submitted', config: { color: { text: 'var(--ac-primary-blue-600)' } } } },
+            { result_status: { result_status_id: 2, name: 'Submitted', config: { color: { text: 'var(--ac-primary-blue-600)' } } } },
             { result_status: { result_status_id: 1 } },
             { result_status: { result_status_id: 'invalid' } }
           ]
         }
-      })
+      }),
+      GET_ContractResultsSummary: jest.fn()
+    };
+
+    contractResultsSummaryMock = {
+      list: signal<ContractResultsSummary | null>(options?.summary === undefined ? null : options.summary),
+      loading: signal(options?.summaryLoading ?? false),
+      loadError: signal(options?.summaryError ?? false),
+      main: jest.fn(),
+      update: jest.fn()
     };
 
     await TestBed.configureTestingModule({
@@ -217,23 +255,25 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
+          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent],
           providers: [
             GetTopContributorsContractsService,
             GetTopMainContactPersonsService,
             GetTopPartnersService,
             GetTopPrimaryLeversService,
-            GetGeoScopeService
+            GetGeoScopeService,
+            GetContractResultsSummaryService
           ]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
+          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent],
           providers: [
             { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
             { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
             { provide: GetTopPartnersService, useValue: topPartnersMock },
             { provide: GetTopPrimaryLeversService, useValue: topLeversMock },
-            { provide: GetGeoScopeService, useValue: geoScopeMock }
+            { provide: GetGeoScopeService, useValue: geoScopeMock },
+            { provide: GetContractResultsSummaryService, useValue: contractResultsSummaryMock }
           ]
         }
       })
@@ -250,16 +290,13 @@ describe('ProjectDashboardComponent', () => {
     TestBed.resetTestingModule();
   });
 
-  it('should load project dashboard data for the parent contract via the shared service (not GET_ResultsCount directly)', async () => {
+  it('should load project dashboard data for the parent contract via the shared service and summary aggregate (not GET_ResultsCount or GET_Results bulk — R-PD-003 AC.2)', async () => {
     await setup();
 
     expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
     expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
-    expect(apiMock.GET_Results).toHaveBeenCalledWith(
-      { 'contract-codes': ['C-1'] },
-      undefined,
-      { page: 1, limit: 10000, sortField: 'code', sortOrder: 'DESC' }
-    );
+    expect(apiMock.GET_Results).not.toHaveBeenCalled();
+    expect(contractResultsSummaryMock.main).toHaveBeenCalledWith('C-1');
     expect(topContributorsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topMainContactsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topPartnersMock.main).toHaveBeenCalledWith('C-1', 4);
@@ -335,13 +372,8 @@ describe('ProjectDashboardComponent', () => {
     expect(component.leverItems().map(item => item.label)).toEqual(['L', '—', 'RA - RESEARCH AREA']);
   });
 
-  it('should handle status response without result rows and lever labels with empty prefixes', async () => {
+  it('should handle lever labels with empty prefixes (status region now fed by the aggregate — old bulk-fetch path removed)', async () => {
     await setup();
-    apiMock.GET_Results.mockResolvedValueOnce({});
-
-    await (component as any).loadProjectResultsByStatus('C-2');
-
-    expect(component.statusChartItems()).toEqual([]);
 
     topLeversMock.list.set([{ lever_id: 4, short_name: 'RA', full_name: ': Research area', count: 1 }]);
     expect(component.leverItems()[0].label).toBe('RA - RESEARCH AREA');
@@ -366,25 +398,135 @@ describe('ProjectDashboardComponent', () => {
     expect(component.leversEmpty()).toBe(false);
   });
 
-  it('should compute status chart values and handle failures', async () => {
-    await setup();
+  describe('status region — aggregate-fed (R-PD-003, R-PD-007, R-PD-009)', () => {
+    const sevenBuckets: ContractResultsSummary = {
+      total: 40,
+      by_status: [
+        { status_id: 6, name: 'Approved', count: 10 },
+        { status_id: 2, name: 'Submitted', count: 8 },
+        { status_id: 4, name: 'Draft', count: 6 },
+        { status_id: 5, name: 'Revised', count: 5 },
+        { status_id: 7, name: 'Rejected', count: 4 },
+        { status_id: 99, name: 'Custom Status', count: 3 },
+        { status_id: null, name: 'No status', count: 4 }
+      ],
+      by_year: [],
+      partner_institutions: 0
+    };
 
-    expect(component.statusChartItems()).toEqual([
-      { color: '#111111', label: 'Submitted', value: 2, result_status_id: 2 },
-      { color: '#1689CA', label: 'Unknown status', value: 1, result_status_id: 1 }
-    ]);
-    expect(component.statusBarsMax()).toBe(2);
-    expect(component.statusBarFillPercent(1)).toBe(50);
-    expect(component.statusBarFillPercent(5)).toBe(100);
+    it('should issue no GET_Results request from this page (R-PD-003 AC.2 / BUT clause)', async () => {
+      await setup('C-1', { summary: sevenBuckets });
 
-    apiMock.GET_Results.mockRejectedValueOnce(new Error('fail'));
-    await (component as any).loadProjectResultsByStatus('C-2');
+      expect(apiMock.GET_Results).not.toHaveBeenCalled();
+    });
 
-    expect(component.statusChartItems()).toEqual([]);
-    expect(component.statusChartError()).toBe(true);
-    expect(component.statusChartLoading()).toBe(false);
-    expect(component.statusBarsMax()).toBe(0);
-    expect(component.statusBarFillPercent(1)).toBe(0);
+    it('should feed the status region from the aggregate by_status (not from a bulk GET_Results fetch)', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      expect(component.statusBuckets().length).toBe(7);
+      expect(component.statusTotal()).toBe(40);
+      expect(component.statusChartEmpty()).toBe(false);
+    });
+
+    it('should render every returned status in the DOM — no scroll cap (R-PD-003 AND IT MUST render every returned status)', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      const rows = fixture.nativeElement.querySelectorAll('tbody tr');
+      expect(rows.length).toBe(7);
+
+      const scrollCap = fixture.nativeElement.querySelector('[class*="max-h-"]');
+      expect(scrollCap?.classList.toString() ?? '').not.toContain('max-h-');
+    });
+
+    it('should compute share percentages that sum to 100 (±1 rounding) (R-PD-003 AC.1)', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      const sum = component.statusBuckets().reduce((acc, bucket) => acc + component.statusSharePercent(bucket.count), 0);
+      expect(Math.abs(sum - 100)).toBeLessThanOrEqual(1);
+    });
+
+    it('should map status ids to semantic --ac-viz-* token names (D-PD-3) — no hex fallback', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      expect(component.statusTokenName(6)).toBe('--ac-viz-status-approved');
+      expect(component.statusTokenName(2)).toBe('--ac-viz-status-submitted');
+      expect(component.statusTokenName(4)).toBe('--ac-viz-status-draft');
+      expect(component.statusTokenName(5)).toBe('--ac-viz-status-pending');
+      expect(component.statusTokenName(7)).toBe('--ac-viz-status-rejected');
+      expect(component.statusTokenName(null)).toBe('--ac-viz-status-no-status');
+      expect(component.statusTokenName(99)).toBe('--ac-grey-500');
+      expect(component.statusColor(6)).toBe('var(--ac-viz-status-approved)');
+    });
+
+    it('should expose role="img" + aria-label summarizing the split (R-PD-009 AC.1) and a table data alternative', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      const figure = fixture.nativeElement.querySelector('figure[role="img"]');
+      expect(figure?.getAttribute('aria-label')).toContain('Results by status out of 40 total');
+      expect(figure?.getAttribute('aria-label')).toContain('approved');
+
+      const table = fixture.nativeElement.querySelector('table');
+      expect(table).toBeTruthy();
+      expect(table?.querySelector('caption')?.textContent).toContain('Results by status');
+    });
+
+    it('should render a drill link per row (T-11 shape — <a> with statusTab queryParams, R-PD-009 AC.2)', async () => {
+      await setup('C-1', { summary: sevenBuckets });
+
+      const links = fixture.nativeElement.querySelectorAll('tbody tr a[href]');
+      expect(links.length).toBe(7);
+
+      const firstLink = links[0];
+      expect(firstLink.getAttribute('aria-label')).toContain('Approved');
+      expect(firstLink.getAttribute('aria-label')).toContain('view filtered results');
+    });
+
+    it('should show a skeleton state while loading and transition to data (KZ-015 — arrange the transition, not the end state)', async () => {
+      await setup('C-1', { summary: null, summaryLoading: true });
+      expect(component.statusChartLoading()).toBe(true);
+
+      const skeleton = fixture.nativeElement.querySelector('p-skeleton');
+      expect(skeleton).toBeTruthy();
+
+      contractResultsSummaryMock.loading.set(false);
+      contractResultsSummaryMock.list.set(sevenBuckets);
+      fixture.detectChanges();
+
+      expect(component.statusChartLoading()).toBe(false);
+      expect(component.statusBuckets().length).toBe(7);
+    });
+
+    it('should show an error state with a Retry control distinct from the empty copy (R-PD-007 error≠empty Scenario)', async () => {
+      await setup('C-1', { summary: null, summaryLoading: true });
+      contractResultsSummaryMock.loading.set(false);
+      contractResultsSummaryMock.loadError.set(true);
+      fixture.detectChanges();
+
+      const errorRegion = fixture.nativeElement.querySelector('[role="alert"]');
+      expect(errorRegion).toBeTruthy();
+      expect(errorRegion.textContent).toContain('We could not load the status breakdown');
+
+      const retryButton = errorRegion.querySelector('button');
+      expect(retryButton).toBeTruthy();
+      retryButton.click();
+      expect(contractResultsSummaryMock.update).toHaveBeenCalled();
+
+      const emptyRegion = fixture.nativeElement.querySelector('[role="alert"]');
+      const emptyCopy = 'No result statuses were found for this project.';
+      expect(errorRegion.textContent).not.toContain(emptyCopy);
+    });
+
+    it('should show the empty state with distinct copy when the aggregate returns no statuses (R-PD-007)', async () => {
+      await setup('C-1', {
+        summary: { total: 0, by_status: [], by_year: [], partner_institutions: 0 }
+      });
+
+      expect(component.statusChartEmpty()).toBe(true);
+
+      const section = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
+      expect(section.textContent).toContain('No result statuses were found for this project.');
+      expect(section.textContent).not.toContain('We could not load the status breakdown');
+    });
   });
 
   it('should compute zero share when indicator value is not positive', async () => {
@@ -398,10 +540,10 @@ describe('ProjectDashboardComponent', () => {
       await setup();
       component.groundedDocuments.set([]);
 
-      expect(component.groundedDocumentsCountColor()).toBe('#8D9299');
+      expect(component.groundedDocumentsCountColor()).toBe('var(--ac-grey-600)');
 
       component.groundedDocuments.set([{ fileName: 'a.pdf', fileKey: 'folder/a.pdf' }]);
-      expect(component.groundedDocumentsCountColor()).toBe('#358540');
+      expect(component.groundedDocumentsCountColor()).toBe('var(--ac-green-500)');
       expect(component.hasGroundedDocuments()).toBe(true);
       expect(component.canUploadMoreGroundingDocs()).toBe(true);
 
@@ -410,7 +552,7 @@ describe('ProjectDashboardComponent', () => {
         { fileName: 'b.pdf', fileKey: 'folder/b.pdf' },
         { fileName: 'c.pdf', fileKey: 'folder/c.pdf' }
       ]);
-      expect(component.groundedDocumentsCountColor()).toBe('#CF0808');
+      expect(component.groundedDocumentsCountColor()).toBe('var(--ac-red-1)');
       expect(component.canUploadMoreGroundingDocs()).toBe(false);
     });
 
@@ -574,7 +716,7 @@ describe('ProjectDashboardComponent', () => {
           severity: 'warning',
           summary: 'Remove document',
           icon: 'pi pi-exclamation-triangle',
-          color: '#E69F00',
+          color: 'var(--ac-viz-status-pending)',
           confirmCallback: expect.objectContaining({ label: 'Continue' }),
           cancelCallback: expect.objectContaining({ label: 'Cancel' })
         })
@@ -857,4 +999,402 @@ describe('ProjectDashboardComponent', () => {
       expect(component.executiveOverviewLoading()).toBe(false);
     });
   });
+
+  describe('KPI strip (R-PD-002, R-PD-008, W7, S2)', () => {
+    it('should render values for all 4 KPI tiles when data is loaded (R-PD-002 AC.1)', async () => {
+      await setup('C-1', {
+        projectData: {
+          agreement_id: 'A1676',
+          divisionId: 'D1',
+          division: 'Division',
+          unitId: 'U1',
+          unit: 'Unit',
+          grant_amount: 1000,
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 10 } as any,
+            { indicator: { indicator_id: 2, name: 'Innovations' }, count_results: 5 } as any,
+            { indicator: { indicator_id: 3, name: 'Policies' }, count_results: 0 } as any
+          ]
+        },
+        summary: {
+          total: 15,
+          by_status: [
+            { status_id: 6, name: 'Approved', count: 12 },
+            { status_id: 5, name: 'Pending revision', count: 3 }
+          ],
+          by_year: [{ year: 2024, count: 15 }],
+          partner_institutions: 24
+        }
+      });
+
+      const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
+      expect(kpiRegion).not.toBeNull();
+
+      const text = kpiRegion.textContent;
+      expect(text).toContain('Total results');
+      expect(text).toContain('15');
+      expect(text).toContain('Indicators covered');
+      expect(text).toContain('2');
+      expect(text).toContain('of 3 indicator types');
+      expect(text).toContain('Pending revision');
+      expect(text).toContain('3');
+      expect(text).toContain('Review queue');
+      expect(text).toContain('Partner institutions');
+      expect(text).toContain('24');
+    });
+
+    it('should render partner institutions from aggregate partner_institutions and not top-4 list length (S2)', async () => {
+      await setup('C-1', {
+        summary: {
+          total: 50,
+          by_status: [],
+          by_year: [],
+          partner_institutions: 42
+        }
+      });
+
+      const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
+      expect(kpiRegion.textContent).toContain('42');
+    });
+
+    it('should show skeletons and NOT 0 while project data is in flight (R-PD-002 BUT clause / KZ-015)', async () => {
+      await setup('C-1', { projectLoading: true, projectData: null });
+
+      const totalResultsSkeleton = fixture.nativeElement.querySelector('[aria-label="Loading total results"]');
+      const indicatorsCoveredSkeleton = fixture.nativeElement.querySelector('[aria-label="Loading indicators covered"]');
+
+      expect(totalResultsSkeleton).not.toBeNull();
+      expect(indicatorsCoveredSkeleton).not.toBeNull();
+
+      // Red input: must NOT display 0 during loading (R-PD-002 Scenario: No fabricated zeros)
+      const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
+      const tile1 = kpiRegion.children[0];
+      expect(tile1.querySelector('strong')).toBeNull();
+
+      // Transition to data
+      const newProject = {
+        agreement_id: 'C-1',
+        grant_amount: 100,
+        divisionId: 'D1',
+        division: 'Division',
+        unitId: 'U1',
+        unit: 'Unit',
+        indicators: [{ indicator: { indicator_id: 1, name: 'Publications' }, count_results: 8 } as any]
+      };
+      getProjectDetailServiceMock.loading.set(false);
+      getProjectDetailServiceMock.project.set(newProject);
+      component.project.set(newProject);
+      fixture.detectChanges();
+
+      expect(tile1.querySelector('strong')?.textContent?.trim()).toBe('8');
+      expect(fixture.nativeElement.querySelector('[aria-label="Loading total results"]')).toBeNull();
+    });
+
+    it('should show skeletons and NOT 0 while summary aggregate is in flight (R-PD-002 BUT clause / KZ-015)', async () => {
+      await setup('C-1', { summaryLoading: true, summary: null });
+
+      const pendingSkeleton = fixture.nativeElement.querySelector('[aria-label="Loading pending revision count"]');
+      const partnersSkeleton = fixture.nativeElement.querySelector('[aria-label="Loading partner institutions count"]');
+
+      expect(pendingSkeleton).not.toBeNull();
+      expect(partnersSkeleton).not.toBeNull();
+
+      const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
+      const pendingTile = kpiRegion.children[2];
+      expect(pendingTile.querySelector('strong')).toBeNull();
+
+      // Transition to data
+      contractResultsSummaryMock.loading.set(false);
+      contractResultsSummaryMock.list.set({
+        total: 10,
+        by_status: [{ status_id: 5, name: 'Pending revision', count: 4 }],
+        by_year: [],
+        partner_institutions: 18
+      });
+      fixture.detectChanges();
+
+      expect(pendingTile.querySelector('strong')?.textContent?.trim()).toBe('4');
+      expect(fixture.nativeElement.querySelector('[aria-label="Loading pending revision count"]')).toBeNull();
+    });
+
+    it('should scroll smoothly to #pending-revision-section on Review queue click (R-PD-008, W7)', async () => {
+      await setup('C-1', {
+        summary: {
+          total: 10,
+          by_status: [{ status_id: 5, name: 'Pending revision', count: 2 }],
+          by_year: [],
+          partner_institutions: 5
+        }
+      });
+
+      const targetSection = fixture.nativeElement.querySelector('#pending-revision-section');
+      expect(targetSection).not.toBeNull();
+
+      const scrollSpy = jest.fn();
+      targetSection.scrollIntoView = scrollSpy;
+
+      const reviewQueueLink: HTMLElement = fixture.nativeElement.querySelector('a[href="#pending-revision-section"]');
+      expect(reviewQueueLink).not.toBeNull();
+
+      reviewQueueLink.click();
+      expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+    });
+
+    it('should use behavior: auto when prefers-reduced-motion is active (W7)', async () => {
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn()
+      } as unknown as MediaQueryList));
+
+      await setup('C-1', {
+        summary: {
+          total: 10,
+          by_status: [{ status_id: 5, name: 'Pending revision', count: 2 }],
+          by_year: [],
+          partner_institutions: 5
+        }
+      });
+
+      const targetSection = fixture.nativeElement.querySelector('#pending-revision-section');
+      const scrollSpy = jest.fn();
+      targetSection.scrollIntoView = scrollSpy;
+
+      component.scrollToPendingRevision();
+      expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'auto' }));
+
+      window.matchMedia = originalMatchMedia;
+    });
+  });
+
+  describe('Results by indicator region (R-PD-005, R-PD-007)', () => {
+    it('should render skeleton and NOT empty copy while indicator data is loading (R-PD-005 AC.2 / BUT clause)', async () => {
+      await setup('C-1', {
+        projectLoading: true,
+        projectData: null
+      });
+
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      expect(indicatorSection).not.toBeNull();
+
+      // Skeleton loading is present with role="status"
+      const skeletonEl = indicatorSection.querySelector('[role="status"][aria-label="Loading results by indicator"]');
+      expect(skeletonEl).not.toBeNull();
+      expect(skeletonEl.querySelector('p-skeleton')).not.toBeNull();
+
+      // Must NOT render empty copy while loading (R-PD-005 BUT clause)
+      const emptyCopy = 'No results were found for any indicator on this project.';
+      expect(indicatorSection.textContent).not.toContain(emptyCopy);
+    });
+
+    it('should render error state with retry button and re-invoke load on click (R-PD-007, R-PD-005)', async () => {
+      await setup('C-1', {
+        projectError: true,
+        projectData: null
+      });
+
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      expect(indicatorSection).not.toBeNull();
+
+      const alertEl = indicatorSection.querySelector('[role="alert"]');
+      expect(alertEl).not.toBeNull();
+      expect(alertEl.textContent).toContain('We could not load results by indicator. Please try again.');
+
+      const retrySpy = jest.spyOn(component, 'retryIndicatorBreakdown');
+      const retryBtn = alertEl.querySelector('button');
+      expect(retryBtn).not.toBeNull();
+      retryBtn.click();
+
+      expect(retrySpy).toHaveBeenCalled();
+      expect(getProjectDetailServiceMock.invalidate).toHaveBeenCalledWith('C-1');
+      expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
+    });
+
+    it('should render distinct empty state copy when total project results is 0 and not loading/error (R-PD-007, R-PD-005)', async () => {
+      await setup('C-1', {
+        projectData: {
+          grant_amount: 100,
+          divisionId: 'D1',
+          division: 'Division',
+          unitId: 'U1',
+          unit: 'Unit',
+          indicators: []
+        }
+      });
+
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      expect(indicatorSection.textContent).toContain('No results were found for any indicator on this project.');
+      expect(indicatorSection.textContent).not.toContain('We could not load results by indicator');
+      expect(indicatorSection.querySelector('[role="status"]')).toBeNull();
+      expect(indicatorSection.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    it('should keep sibling cards rendering data when one region fails with loadError (R-PD-007 AC.2)', async () => {
+      await setup('C-1', {
+        projectData: {
+          agreement_id: 'C-1',
+          grant_amount: 500,
+          divisionId: 'D1',
+          division: 'Division',
+          unitId: 'U1',
+          unit: 'Unit',
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 5 } as any
+          ]
+        },
+        summary: {
+          total: 5,
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [{ year: 2024, count: 5 }],
+          partner_institutions: 3
+        }
+      });
+
+      // Simulate topPartners failure
+      topPartnersMock.loadError.set(true);
+      topPartnersMock.loading.set(false);
+
+      // Simulate topPrimaryLevers success
+      topLeversMock.list.set([
+        { lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 4 }
+      ]);
+      topLeversMock.loading.set(false);
+      topLeversMock.loadError.set(false);
+
+      fixture.detectChanges();
+
+      // topPartners is in error
+      expect(topPartnersMock.loadError()).toBe(true);
+
+      // Indicators card still displays data
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      expect(indicatorSection.textContent).toContain('Total results');
+      expect(indicatorSection.textContent).toContain('5');
+      expect(indicatorSection.textContent).toContain('Publications');
+
+      // Status region still displays data
+      const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
+      expect(statusSection.textContent).toContain('Approved');
+      expect(statusSection.textContent).toContain('5');
+
+      // Top levers card still has its data items
+      expect(component.leverItems().length).toBe(1);
+      expect(component.leverItems()[0].label).toBe('LEVER 1');
+    });
+
+    it('should have distinct copy strings for error and empty states across regions (R-PD-007 AC.1)', async () => {
+      await setup();
+
+      expect(component.contributorsEmpty()).toBe(true);
+      expect(component.mainContactPersonsEmpty()).toBe(true);
+      expect(component.partnersEmpty()).toBe(true);
+      expect(component.leversEmpty()).toBe(true);
+      expect(component.statusChartEmpty()).toBe(true);
+    });
+
+    it('should render indicator breakdown rows as accessible drill-through links (R-PD-005 Details, R-PD-008)', async () => {
+      await setup('C-1', {
+        projectData: {
+          agreement_id: 'C-1',
+          grant_amount: 500,
+          divisionId: 'D1',
+          division: 'Division',
+          unitId: 'U1',
+          unit: 'Unit',
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 8 } as any,
+            { indicator: { indicator_id: 2, name: 'Innovations' }, count_results: 4 } as any
+          ]
+        }
+      });
+
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      const links = indicatorSection.querySelectorAll('ul li a');
+      expect(links.length).toBe(2);
+
+      const firstLink = links[0];
+      expect(firstLink.getAttribute('href')).toContain('/project-detail/C-1?indicatorTab=1');
+      expect(firstLink.getAttribute('aria-label')).toContain('Publications: 8 results, 67% — view filtered results');
+    });
+
+    describe('T-12 hierarchy and AI section relocation (R-PD-008, D-PD-8, D-PD-9)', () => {
+      it('should toggle caveat banner expansion (D-PD-8)', async () => {
+        await setup();
+
+        expect(component.isCaveatExpanded()).toBe(false);
+        const toggleBtn = fixture.nativeElement.querySelector('button[aria-controls="dashboard-caveat-details"]');
+        expect(toggleBtn).toBeTruthy();
+        expect(toggleBtn.textContent.trim()).toBe('Learn more');
+        expect(fixture.nativeElement.querySelector('#dashboard-caveat-details')).toBeNull();
+
+        toggleBtn.click();
+        fixture.detectChanges();
+
+        expect(component.isCaveatExpanded()).toBe(true);
+        expect(toggleBtn.textContent.trim()).toBe('Show less');
+        expect(fixture.nativeElement.querySelector('#dashboard-caveat-details')).toBeTruthy();
+      });
+
+      it('should position KPI strip and analytics before AI grounding section in DOM order (D-PD-9)', async () => {
+        await setup();
+        component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
+        fixture.detectChanges();
+
+        const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
+        const aiSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+        expect(kpiRegion).toBeTruthy();
+        expect(aiSection).toBeTruthy();
+
+        // Node.DOCUMENT_POSITION_FOLLOWING (4): aiSection comes after kpiRegion in DOM
+        const position = kpiRegion.compareDocumentPosition(aiSection);
+        expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+
+      it('should preserve file input in DOM when AI panel is collapsed via [hidden] (D-PD-9)', async () => {
+        await setup();
+        component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
+        component.isAiSectionExpanded.set(false);
+        fixture.detectChanges();
+
+        const fileInput = fixture.nativeElement.querySelector('#grounding-file-input');
+        expect(fileInput).toBeTruthy();
+        expect(fileInput.tagName.toLowerCase()).toBe('input');
+
+        // Verify container is hidden but still in DOM
+        const collapsibleContainer = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"] div[hidden]');
+        expect(collapsibleContainer).toBeTruthy();
+        expect(collapsibleContainer.hidden).toBe(true);
+      });
+
+      it('should show inline progress on collapsed AI header when generating (D-PD-9)', async () => {
+        await setup();
+        component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
+        component.isAiSectionExpanded.set(false);
+        component.executiveOverviewLoading.set(true);
+        fixture.detectChanges();
+
+        const headerStatus = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"] header [role="status"]');
+        expect(headerStatus).toBeTruthy();
+        expect(headerStatus.textContent).toContain('Generating summary…');
+      });
+
+      it('should auto-expand AI section when generateExecutiveOverview is called', async () => {
+        await setup();
+        component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
+        component.isAiSectionExpanded.set(false);
+
+        void component.generateExecutiveOverview();
+
+        expect(component.isAiSectionExpanded()).toBe(true);
+      });
+    });
+  });
 });
+

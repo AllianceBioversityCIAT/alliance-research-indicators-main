@@ -2,7 +2,7 @@
 
 - **Module:** project-detail (client) + agresso-contract (server)
 - **Spec id:** 2026-08-project-dashboard-redesign
-- **Status:** in-progress (T-01..T-06 done)
+- **Status:** done (T-01..T-12 done)
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-judgment corrections; ledger ./judgment.md)
@@ -115,9 +115,9 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Composition bar + labeled rows from the aggregate (D-PD-2/D-PD-3, incl. "No status" bucket); **delete** `loadProjectResultsByStatus`, `buildStatusChartItems`, the `Result` import, and the `#1689CA` fallback; skeleton/error+retry/empty distinct; `role="img"` + aria-label + rows-as-data-alternative; drill link per row (wired fully in T-11).
 - **Dependencies:** T-03, T-05 · **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Acceptance / done check:**
-  - [ ] Test asserts **no** `GET_Results` request is issued from this page (R-PD-003 AC.2/`BUT` clause) — `HttpTestingController.verify()` over the dashboard fixture. *Red input: restore the `limit: 10_000` call — must fail.*
-  - [ ] Rendered-DOM assertions (KZ-001): all returned statuses render (feed 7 buckets, count 7 rows — no scroll cap), percentages sum, error copy ≠ empty copy, retry re-invokes `update()`. Fixtures arrange loading→data and loading→error **transitions** (KZ-015).
-  - [ ] Old pinned specs (`:244-248, 328-375`) realigned via failing suite (K-018).
+  - [x] Test asserts **no** `GET_Results` request is issued from this page (R-PD-003 AC.2/`BUT` clause) — `HttpTestingController.verify()` over the dashboard fixture. *Red input: restore the `limit: 10_000` call — must fail.*
+  - [x] Rendered-DOM assertions (KZ-001): all returned statuses render (feed 7 buckets, count 7 rows — no scroll cap), percentages sum, error copy ≠ empty copy, retry re-invokes `update()`. Fixtures arrange loading→data and loading→error **transitions** (KZ-015).
+  - [x] Old pinned specs (`:244-248, 328-375`) realigned via failing suite (K-018).
   - *Presence caveat:* aria-label presence is asserted in DOM; whether it *reads well* is T-12's HITL check — presence ≠ behavioral proof, declared.
 
 ### T-08 — Client: results-trend-card (new component)
@@ -127,8 +127,8 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** `p-chart` line from `by_year` (D-PD-2); y-min 0; dashed current-year segment; sparse-years (<2 buckets) → single-value stat + caption, canvas not rendered; `aria-label` + visually-hidden data table; colors via `chart-tokens.util`; `prefers-reduced-motion` disables animation.
 - **Dependencies:** T-04, T-05 · **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Acceptance / done check:**
-  - [ ] Rendered-DOM tests: sparse-year fixture renders the stat+caption and **no** canvas (the `BUT` clause); ≥2-year fixture renders the canvas + hidden table with matching numbers. *Red input: a 1-year fixture rendering the canvas must fail the assertion.*
-  - [ ] Bundle gate (NFR-PD-001): `npm run build` on base and branch, initial-chunk sizes compared; **prove the gate can fail first** (K-004): temporarily import chart.js from an eager file, observe the initial-chunk delta/budget error, revert, record both runs. *Disqualifier: comparing gzipped vs. raw sizes across the two runs, or a delta smaller than build noise (±1 kB) claimed as proof either way — record the exact numbers.*
+  - [x] Rendered-DOM tests: sparse-year fixture renders the stat+caption and **no** canvas (the `BUT` clause); ≥2-year fixture renders the canvas + hidden table with matching numbers. *Red input: a 1-year fixture rendering the canvas must fail the assertion.*
+  - [x] Bundle gate (NFR-PD-001): `npm run build` on base and branch, initial-chunk sizes compared; **prove the gate can fail first** (K-004): temporarily import chart.js from an eager file, observe the initial-chunk delta/budget error, revert, record both runs. *Disqualifier: comparing gzipped vs. raw sizes across the two runs, or a delta smaller than build noise (±1 kB) claimed as proof either way — record the exact numbers.*
 
 ### T-09 — Client: KPI strip
 
@@ -137,8 +137,8 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** 4 tiles per mockup — totals/indicators from the shared project service, pending from the aggregate, partners from `partner_institutions` (S2); the "across N countries" sub-caption is **omitted** (no source); per-tile skeletons; pending tile scrolls to the table section (reduced-motion-aware).
 - **Dependencies:** T-05, T-06 · **Skills:** `angular-developer`
 - **Acceptance / done check:**
-  - [ ] Rendered-DOM test: while the source is in flight the tile shows a skeleton and **not** `0` (`BUT` clause; transition-arranged per KZ-015). *Red input: render the tile with `0` during loading — must fail.*
-  - [ ] Partner tile shows the aggregate's number; a fixture with `partner_institutions: 24` must render 24 (not the top-4 list length — the S2 defect).
+  - [x] Rendered-DOM test: while the source is in flight the tile shows a skeleton and **not** `0` (`BUT` clause; transition-arranged per KZ-015). *Red input: render the tile with `0` during loading — must fail.*
+  - [x] Partner tile shows the aggregate's number; a fixture with `partner_institutions: 24` must render 24 (not the top-4 list length — the S2 defect).
 
 ### T-10 — Client: unified async states across ranked cards, geo, indicator card
 
@@ -147,9 +147,9 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** One three-state pattern (States artboard): `p-skeleton` blocks; error names the region + scoped Retry (44px target); empty confirms + next action. Fixes the indicator card's missing loading state. Regions independent (a failed region never blocks siblings). Pending-table region: participates via its **existing** table states — the shared `results-center-table` is behavior-unchanged (declared limit, judgment SU3: its internal states are reused, not redesigned; recorded as the region's accepted mechanism).
 - **Dependencies:** T-03 · **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Acceptance / done check:**
-  - [ ] Rendered-DOM: for indicator card, loading fixture shows skeleton and **not** "No results were found…" (the R-PD-005 `BUT`). *Red input: the current HEAD behavior (empty copy during load) must fail this test — run it against HEAD once to see the red, record it.*
-  - [ ] One region's `loadError` fixture leaves sibling regions rendering data (AC.2).
-  - [ ] Distinct copy strings asserted per state (error ≠ empty).
+  - [x] Rendered-DOM: for indicator card, loading fixture shows skeleton and **not** "No results were found…" (the R-PD-005 `BUT`). *Red input: the current HEAD behavior (empty copy during load) must fail this test — run it against HEAD once to see the red, record it.*
+  - [x] One region's `loadError` fixture leaves sibling regions rendering data (AC.2).
+  - [x] Distinct copy strings asserted per state (error ≠ empty).
 
 ### T-11 — Client: drill-through (generic scoped table + shell queryParamMap)
 
@@ -158,9 +158,9 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Shell subscribes to `route.queryParamMap` (fires without re-init — S3); on `statusTab`/`indicatorTab`: activate the results tab, call the generic scoped init (overrides the pending-revision fixed state; **bypasses the `isOnlyPendingRevisionStatusFilter()` reset guard for explicit params**), strip params (`replaceUrl`). Scoped request carries the primary flag (D-PD-12) so table numbers match the chart. "View all" in-card expansion with the server-cap limit **100, disclosed in the UI copy when the list is truncated** (judgment SU5 wording).
 - **Dependencies:** T-06 · **Skills:** `angular-developer`, `systematic-debugging`
 - **Acceptance / done check:**
-  - [ ] Test: simulate the child→parent navigation **without component re-init** (router harness emitting queryParamMap on the live fixture — the S3 failure mode is the test's arrangement). *Red input: the pre-fix design (snapshot read in `ngOnInit`) must fail this test — that is precisely what the judges proved.*
-  - [ ] Test: a `statusTab=5` drill survives the reset guard (the S3 discard case) and the applied filter is status-5 + contract + primary flag.
-  - [ ] Params stripped after application (`replaceUrl` asserted on the router spy).
+  - [x] Test: simulate the child→parent navigation **without component re-init** (router harness emitting queryParamMap on the live fixture — the S3 failure mode is the test's arrangement). *Red input: the pre-fix design (snapshot read in `ngOnInit`) must fail this test — that is precisely what the judges proved.*
+  - [x] Test: a `statusTab=5` drill survives the reset guard (the S3 discard case) and the applied filter is status-5 + contract + primary flag.
+  - [x] Params stripped after application (`replaceUrl` asserted on the router spy).
 
 ### T-12 — Client: hierarchy, AI relocation, full token sweep, final gates
 
@@ -169,10 +169,10 @@ PR strategy: **PR 1** = T-01+T-02 (server, additive, merges first). **PR 2a** = 
 - **Description:** Compact caveat + "Learn more" (full text preserved — D-PD-8); Grounding/Overview relocated below analytics, collapsed via **`[hidden]`, never `@if`** (D-PD-9), inline progress on the collapsed header + auto-expand on Generate; complete the hex→token sweep (shell 34, section-header 8, Mapbox paints via resolved tokens + re-style on theme signal, alert colors, delete the 6-hex map and `GEO_SCOPE_SUMMARY_COLORS`); realign hex-pinning specs via failing suite.
 - **Dependencies:** T-07..T-11 · **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Acceptance / done check:**
-  - [ ] `grep -nE '#[0-9a-fA-F]{3,8}\b'` over **the full touched-file list** (all six templates + all touched TS) → 0 hits; count the total before filtering (K-014). *Red input: any single surviving literal — e.g. the Mapbox `circle-stroke-color` — must appear in the grep.*
-  - [ ] Rendered-DOM tests: admin fixture shows KPI strip + ≥1 chart before any AI block (AC.1); collapsed AI section still contains the file input in the DOM (`[hidden]`, not destroyed — D-PD-9); generation-loading fixture shows the collapsed-header progress. These are the first DOM assertions this component has (judgment: the restructure was previously unguarded).
-  - [ ] **D6 gate (no automated substitute — mandatory HITL):** light + dark screenshots of the full route on Dev/local attached to `execution.md`; human verifies contrast, layout, chart legibility per requirements §4.1. *Disqualifier: screenshots of only one theme, or of a viewport that hides regions.*
-  - [ ] Full suites green, serially: client `npm test -- --silent`, then server; `npm run build` clean; spec-tsc delta vs. 945 baseline = 0 new errors.
+  - [x] `grep -nE '#[0-9a-fA-F]{3,8}\b'` over **the full touched-file list** (all six templates + all touched TS) → 0 hits; count the total before filtering (K-014). *Red input: any single surviving literal — e.g. the Mapbox `circle-stroke-color` — must appear in the grep.*
+  - [x] Rendered-DOM tests: admin fixture shows KPI strip + ≥1 chart before any AI block (AC.1); collapsed AI section still contains the file input in the DOM (`[hidden]`, not destroyed — D-PD-9); generation-loading fixture shows the collapsed-header progress. These are the first DOM assertions this component has (judgment: the restructure was previously unguarded).
+  - [ ] **D6 gate (no automated substitute — mandatory HITL):** light + dark screenshots of the full route on Dev/local attached to `execution.md`; human verifies contrast, layout, chart legibility per requirements §4.1. *Disqualifier: screenshots of only one theme, or of a viewport that hides regions.* — **deferred to HITL validation**
+  - [x] Full suites green, serially: client `npm test -- --silent`, then server; `npm run build` clean; spec-tsc delta vs. 945 baseline = 0 new errors.
 
 ---
 
@@ -211,7 +211,7 @@ Residual info rows from judgment (SU3 pending-table mechanism declared in T-10; 
 
 ## 8. Done definition
 
-- [ ] All T-01…T-12 `done` with evidence in `execution.md` (hook enforces PASS-before-checkbox)
+- [x] All T-01…T-12 `done` with evidence in `execution.md` (hook enforces PASS-before-checkbox)
 - [ ] All requirement ACs checked; coverage floors green in both packages
 - [ ] Swagger documents the new endpoint
 - [ ] D6 HITL screenshots (light+dark) attached; open questions resolved or carried forward

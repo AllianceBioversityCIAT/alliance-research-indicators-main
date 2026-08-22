@@ -1,8 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
+import { SkeletonModule } from 'primeng/skeleton';
 import { TooltipModule } from 'primeng/tooltip';
-import { CustomProgressBarComponent } from '@shared/components/custom-progress-bar/custom-progress-bar.component';
 import { TruncatedTextTooltipDirective } from '@shared/directives/truncated-text-tooltip.directive';
 import { projectDashboardBarColor } from '@shared/constants/project-dashboard-chart-colors.constants';
 import {
@@ -13,7 +13,7 @@ import {
 @Component({
   selector: 'app-project-dashboard-card',
   standalone: true,
-  imports: [NgTemplateOutlet, ButtonModule, CustomProgressBarComponent, TooltipModule, TruncatedTextTooltipDirective],
+  imports: [NgTemplateOutlet, ButtonModule, SkeletonModule, TooltipModule, TruncatedTextTooltipDirective],
   templateUrl: './project-dashboard-card.component.html',
   host: {
     class: 'block h-full',

@@ -19,6 +19,7 @@ class MockProjectDashboardCardComponent {
   @Input() error = false;
   @Input() empty = false;
   @Input() emptyMessage = '';
+  @Input() errorMessage = '';
   @Input() variant = '';
   @Input() items: unknown[] = [];
   @Input() layout = '';

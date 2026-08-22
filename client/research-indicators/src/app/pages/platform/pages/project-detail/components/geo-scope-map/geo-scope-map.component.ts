@@ -21,6 +21,7 @@ import {
   GeocodedLocation
 } from '@interfaces/geo-scope.interface';
 import { MapboxGeocodingService } from '@shared/services/mapbox-geocoding.service';
+import { DarkModeService } from '@shared/services/dark-mode.service';
 import {
   GEO_SCOPE_LAYER_ID,
   GEO_SCOPE_MAP_STYLE,
@@ -52,6 +53,7 @@ export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
   private readonly mapContainer = viewChild.required<ElementRef<HTMLElement>>('mapContainer');
   private readonly destroyRef = inject(DestroyRef);
   private readonly geocoding = inject(MapboxGeocodingService);
+  private readonly darkModeService = inject(DarkModeService);
 
   readonly geocodingLoading = signal(false);
   readonly mapError = signal(false);
@@ -72,6 +74,13 @@ export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
         return;
       }
       this.refreshMapPoints(countries);
+    });
+
+    effect(() => {
+      this.darkModeService.darkMode();
+      if (this.map && this.map.isStyleLoaded() && this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
+        this.updateMapPaintColors();
+      }
     });
   }
 
@@ -190,6 +199,39 @@ export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
       });
   }
 
+  private getMapboxColors(): { country: string; subNational: string; stroke: string } {
+    if (typeof document === 'undefined') {
+      return {
+        country: 'rgb(22, 137, 202)',
+        subNational: 'rgb(124, 156, 185)',
+        stroke: 'rgb(255, 255, 255)'
+      };
+    }
+    const styles = getComputedStyle(document.documentElement);
+    return {
+      country: styles.getPropertyValue('--ac-light-blue-300').trim() || 'rgb(22, 137, 202)',
+      subNational: styles.getPropertyValue('--ac-primary-blue-200').trim() || 'rgb(124, 156, 185)',
+      stroke: styles.getPropertyValue('--ac-white-1').trim() || 'rgb(255, 255, 255)'
+    };
+  }
+
+  private updateMapPaintColors(): void {
+    if (!this.map || !this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
+      return;
+    }
+    const colors = this.getMapboxColors();
+    this.map.setPaintProperty(GEO_SCOPE_LAYER_ID, 'circle-color', [
+      'match',
+      ['get', 'level'],
+      'country',
+      colors.country,
+      'sub-national',
+      colors.subNational,
+      colors.country
+    ]);
+    this.map.setPaintProperty(GEO_SCOPE_LAYER_ID, 'circle-stroke-color', colors.stroke);
+  }
+
   private ensureMapLayers(): void {
     if (!this.map) {
       return;
@@ -206,6 +248,7 @@ export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
     }
 
     if (!this.map.getLayer(GEO_SCOPE_LAYER_ID)) {
+      const colors = this.getMapboxColors();
       this.map.addLayer({
         id: GEO_SCOPE_LAYER_ID,
         type: 'circle',
@@ -215,13 +258,13 @@ export class GeoScopeMapComponent implements AfterViewInit, OnDestroy {
             'match',
             ['get', 'level'],
             'country',
-            '#1689CA',
+            colors.country,
             'sub-national',
-            '#7C9CB9',
-            '#1689CA'
+            colors.subNational,
+            colors.country
           ],
           'circle-opacity': 0.88,
-          'circle-stroke-color': '#ffffff',
+          'circle-stroke-color': colors.stroke,
           'circle-stroke-width': 1.5,
           'circle-radius': [
             'interpolate',

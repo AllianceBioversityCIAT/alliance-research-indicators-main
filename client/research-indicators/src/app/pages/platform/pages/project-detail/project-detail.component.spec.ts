@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { ActivatedRoute, NavigationEnd, PRIMARY_OUTLET, Router } from '@angular/router';
-import { Subject } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, NavigationEnd, ParamMap, PRIMARY_OUTLET, Router } from '@angular/router';
+import { BehaviorSubject, Subject } from 'rxjs';
 import ProjectDetailComponent from './project-detail.component';
 import { ApiService } from '@services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
@@ -16,7 +16,8 @@ describe('ProjectDetailComponent', () => {
   let fixture: ComponentFixture<ProjectDetailComponent>;
   let apiService: { GET_ResultsCount: jest.Mock };
   let getProjectDetailService: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
-  let activatedRoute: { snapshot: { params: { id: string } } };
+  let queryParamMapSubject: BehaviorSubject<ParamMap>;
+  let activatedRoute: { snapshot: { params: { id: string }; queryParamMap: ParamMap }; queryParamMap: ReturnType<typeof queryParamMapSubject.asObservable> };
   let router: {
     url: string;
     events: Subject<NavigationEnd>;
@@ -40,6 +41,7 @@ describe('ProjectDetailComponent', () => {
     resetState: jest.Mock;
     main: jest.Mock;
     applyFilters: jest.Mock;
+    initializeScopedResultsTable: jest.Mock;
   };
   let bilateralService: {
     currentContract: ReturnType<typeof signal<{ is_pool_funding_contributor?: boolean } | null>>;
@@ -82,10 +84,13 @@ describe('ProjectDetailComponent', () => {
       }),
       invalidate: jest.fn()
     };
+    queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
     activatedRoute = {
       snapshot: {
-        params: { id: 'mock-id' }
-      }
+        params: { id: 'mock-id' },
+        queryParamMap: convertToParamMap({})
+      },
+      queryParamMap: queryParamMapSubject.asObservable()
     };
     router = {
       url: '/projects/mock-id/project-results',
@@ -117,7 +122,8 @@ describe('ProjectDetailComponent', () => {
       deactivateStatePersistence: jest.fn(),
       resetState: jest.fn(),
       main: jest.fn(),
-      applyFilters: jest.fn()
+      applyFilters: jest.fn(),
+      initializeScopedResultsTable: jest.fn()
     };
     bilateralService = {
       currentContract: signal(null),
@@ -503,6 +509,86 @@ describe('ProjectDetailComponent', () => {
       });
 
       expect(applyFiltersSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('queryParamMap drill-through (R-PD-003, R-PD-005, R-PD-008, S3)', () => {
+    it('should handle live queryParamMap emission without component re-init (S3 router reuse)', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      // Emit statusTab=2 on live fixture (child->parent navigation without re-init)
+      queryParamMapSubject.next(convertToParamMap({ statusTab: '2' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: 2,
+        indicatorId: undefined
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should survive reset guard when statusTab=5 is drilled (S3 discard case)', () => {
+      component.ngOnInit();
+      resultsCenterService.resetState.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ statusTab: '5' }));
+
+      expect(resultsCenterService.resetState).not.toHaveBeenCalled();
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: 5,
+        indicatorId: undefined
+      });
+    });
+
+    it('should handle indicatorTab drill-through and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ indicatorTab: '3' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: 3
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle no-status / null statusTab correctly', () => {
+      component.ngOnInit();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ statusTab: 'no-status' }));
+
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: null,
+        indicatorId: undefined
+      });
+    });
+
+    it('should do nothing if neither statusTab nor indicatorTab are present', () => {
+      component.ngOnInit();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ otherParam: 'val' }));
+
+      expect(resultsCenterService.initializeScopedResultsTable).not.toHaveBeenCalled();
     });
   });
 });

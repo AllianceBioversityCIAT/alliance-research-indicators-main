@@ -1,0 +1,85 @@
+<section class="box-border flex h-full min-h-[280px] flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  aria-labelledby="results-trend-title">
+  <header class="mb-4 flex items-start justify-between gap-3">
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <h2 id="results-trend-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+        Results over time
+      </h2>
+      <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
+        {{ subtitle() }}
+      </p>
+    </div>
+  </header>
+
+  <div class="flex min-h-0 flex-1 flex-col">
+    @if (loading()) {
+    <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results trend">
+      <p-skeleton width="100%" height="20px" borderRadius="4px" />
+      <p-skeleton width="100%" height="14px" borderRadius="4px" />
+      <p-skeleton width="100%" height="140px" borderRadius="4px" />
+      <div class="flex justify-between gap-4 pt-2">
+        <p-skeleton width="15%" height="12px" borderRadius="4px" />
+        <p-skeleton width="15%" height="12px" borderRadius="4px" />
+        <p-skeleton width="15%" height="12px" borderRadius="4px" />
+        <p-skeleton width="15%" height="12px" borderRadius="4px" />
+      </div>
+    </div>
+    } @else if (error()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+      <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+        We could not load the results trend. Please try again.
+      </p>
+      <button pButton type="button" severity="secondary" size="small"
+        class="!min-h-[44px] !min-w-[44px]"
+        aria-label="Retry loading results trend"
+        (click)="retry.emit()">Try again</button>
+    </div>
+    } @else if (isEmpty()) {
+    <div class="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+      <i class="pi pi-chart-line text-[24px] text-[var(--ac-viz-series-1)]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+        No yearly results were found for this project.
+      </p>
+    </div>
+    } @else if (isSparse()) {
+    <div class="flex flex-1 flex-col justify-center gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-5">
+      <div class="flex flex-col gap-1">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
+          Report year {{ singleBucket()!.year }}
+        </span>
+        <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ singleBucket()!.count }} results
+        </strong>
+      </div>
+      <span class="font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+        Not enough reporting history for a trend
+      </span>
+    </div>
+    } @else if (hasChart()) {
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+      <figure class="m-0 flex h-full min-h-[200px] w-full flex-1 flex-col" role="img" [attr.aria-label]="chartAriaLabel()">
+        <p-chart type="line" [data]="chartData()" [options]="chartOptions()" class="block h-full w-full" />
+      </figure>
+
+      <table class="sr-only">
+        <caption>Results over time by report year</caption>
+        <thead>
+          <tr>
+            <th scope="col">Year</th>
+            <th scope="col">Results</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (bucket of validBuckets(); track bucket.year) {
+          <tr>
+            <td>{{ bucket.year }}</td>
+            <td>{{ bucket.count }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    }
+  </div>
+</section>

@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
+import { SkeletonModule } from 'primeng/skeleton';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
@@ -9,7 +10,7 @@ import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-
 import { GetTopPartnersService } from '@services/get-top-partners.service';
 import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
 import { GetGeoScopeService } from '@services/get-geo-scope.service';
-import { ApiService } from '@shared/services/api.service';
+import { GetContractResultsSummaryService } from '@services/get-contract-results-summary.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
@@ -29,44 +30,55 @@ import { projectDashboardBarColor } from '@shared/constants/project-dashboard-ch
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
-import { Result } from '@shared/interfaces/result/result.interface';
+import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results-summary.interface';
+import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 
 const MAX_GROUNDING_DOCS = 3;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
 const GROUNDING_MAX_SIZE_MB = 10;
 const GROUNDING_PAGE_LIMIT = 100;
 
-interface ProjectStatusChartItem {
-  color: string;
-  label: string;
-  value: number;
-  result_status_id: number;
-}
+// Semantic status -> `--ac-viz-*` chart-token name mapping keyed by `result_status_id`
+// (D-PD-3). The chart diverges from server-supplied config colors elsewhere — declared.
+// Statuses outside the known set fall back to `--ac-grey-500`, never a hardcoded hex.
+// The status region is semantic HTML (D-PD-2), not canvas — colors are emitted as
+// `var(--ac-viz-*)` references so the browser auto-themes via colors.scss; no
+// runtime getComputedStyle resolution is needed here (that's T-08's canvas case).
+const STATUS_TOKEN_BY_ID: Record<number, string> = {
+  2: '--ac-viz-status-submitted',
+  4: '--ac-viz-status-draft',
+  5: '--ac-viz-status-pending',
+  6: '--ac-viz-status-approved',
+  7: '--ac-viz-status-rejected'
+};
+const STATUS_TOKEN_NO_STATUS = '--ac-viz-status-no-status';
+const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
 
 @Component({
   selector: 'app-project-dashboard',
   standalone: true,
-  imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe],
+  imports: [ButtonModule, RouterLink, SkeletonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ResultsTrendCardComponent],
   providers: [
     GetTopContributorsContractsService,
     GetTopMainContactPersonsService,
     GetTopPartnersService,
     GetTopPrimaryLeversService,
-    GetGeoScopeService
+    GetGeoScopeService,
+    GetContractResultsSummaryService
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProjectDashboardComponent {
   private readonly route = inject(ActivatedRoute);
-  private readonly api = inject(ApiService);
   private readonly projectUtils = inject(ProjectUtilsService);
   private readonly resultsCenterService = inject(ResultsCenterService);
   private readonly fileManagerService = inject(FileManagerService);
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
   private readonly actions = inject(ActionsService);
-  private readonly getProjectDetailService = inject(GetProjectDetailService);
+  readonly getProjectDetailService = inject(GetProjectDetailService);
+  readonly contractResultsSummary = inject(GetContractResultsSummaryService);
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
@@ -77,6 +89,8 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewParagraphs = signal<string[]>([]);
   readonly executiveOverviewLoading = signal(false);
   readonly executiveOverviewError = signal(false);
+  readonly isCaveatExpanded = signal(false);
+  readonly isAiSectionExpanded = signal(false);
 
   readonly contractId = computed(() => this.route.parent?.snapshot.paramMap.get('id') ?? '');
   readonly project = signal<GetProjectDetail | null>(null);
@@ -86,9 +100,9 @@ export class ProjectDashboardComponent {
   );
   readonly groundedDocumentsCountColor = computed(() => {
     const count = this.groundedDocuments().length;
-    if (count === 0) return '#8D9299';
-    if (count >= MAX_GROUNDING_DOCS) return '#CF0808';
-    return '#358540';
+    if (count === 0) return 'var(--ac-grey-600)';
+    if (count >= MAX_GROUNDING_DOCS) return 'var(--ac-red-1)';
+    return 'var(--ac-green-500)';
   });
   readonly hasGroundedDocuments = computed(() => this.groundedDocuments().length > 0);
   readonly canAccessGroundingSetup = computed(() => this.rolesService.isAdmin());
@@ -124,16 +138,27 @@ export class ProjectDashboardComponent {
   readonly indicatorsWithResults = computed(() => this.indicatorSummaries().filter(indicator => indicator.value > 0));
 
   readonly totalProjectResults = computed(() => this.indicatorSummaries().reduce((total, indicator) => total + indicator.value, 0));
-  readonly statusChartItems = signal<ProjectStatusChartItem[]>([]);
-  readonly statusChartLoading = signal(false);
-  readonly statusChartError = signal(false);
-  readonly statusBarsMax = computed(() => {
-    const items = this.statusChartItems();
-    if (!items.length) {
-      return 0;
-    }
-    return Math.max(...items.map(item => item.value), 0);
+
+  // KPI strip computed signals (R-PD-002)
+  readonly indicatorsCoveredCount = computed(() => this.indicatorsWithResults().length);
+  readonly indicatorsTotalCount = computed(() => this.indicatorSummaries().length);
+  readonly pendingRevisionCount = computed(() => {
+    const byStatus = this.contractResultsSummary.list()?.by_status ?? [];
+    const pending = byStatus.find(s => Number(s.status_id) === 5 || s.name?.toLowerCase().includes('pending'));
+    return pending?.count ?? 0;
   });
+  readonly partnerInstitutionsCount = computed(() => this.contractResultsSummary.list()?.partner_institutions ?? 0);
+
+  // Status region (R-PD-003): fed exclusively by the aggregate (R-PD-001 via
+  // GetContractResultsSummaryService — T-05). The bulk `GET results` fetch,
+  // `buildStatusChartItems`, and the hardcoded fallback are removed (D-PD-2/D-PD-3).
+  readonly statusBuckets = computed<ContractResultsSummaryStatusBucket[]>(() => this.contractResultsSummary.list()?.by_status ?? []);
+  readonly statusTotal = computed(() => this.contractResultsSummary.list()?.total ?? 0);
+  readonly statusChartLoading = computed(() => this.contractResultsSummary.loading());
+  readonly statusChartError = computed(() => this.contractResultsSummary.loadError());
+  readonly statusChartEmpty = computed(
+    () => !this.contractResultsSummary.loading() && !this.contractResultsSummary.loadError() && this.statusBuckets().length === 0
+  );
 
   readonly topContributors = inject(GetTopContributorsContractsService);
   readonly topMainContactPersons = inject(GetTopMainContactPersonsService);
@@ -208,7 +233,7 @@ export class ProjectDashboardComponent {
       const contractId = this.contractId();
       if (contractId) {
         void this.syncProjectFromSharedService(contractId);
-        void this.loadProjectResultsByStatus(contractId);
+        this.contractResultsSummary.main(contractId);
         this.topContributors.main(contractId, 4);
         this.topMainContactPersons.main(contractId, 4);
         this.topPartners.main(contractId, 4);
@@ -235,12 +260,81 @@ export class ProjectDashboardComponent {
     return Math.round((value / total) * 100);
   }
 
-  statusBarFillPercent(value: number): number {
-    const max = this.statusBarsMax();
-    if (max <= 0) {
+  // Status region helpers (R-PD-003). All statuses render — no scroll cap, no
+  // truncation (R-PD-003 `AND IT MUST render every returned status`).
+  statusSharePercent(count: number): number {
+    const total = this.statusTotal();
+    if (total <= 0 || count <= 0) {
       return 0;
     }
-    return Math.min(100, (value / max) * 100);
+    return Math.round((count / total) * 100);
+  }
+
+  // Returns the CSS variable reference (e.g. `var(--ac-viz-status-approved)`)
+  // so the bar/segment auto-themes without hex literals in component code
+  // (D-PD-3 / R-PD-006). Statuses outside the known set fall back to
+  // `--ac-grey-500`; null status id maps to the explicit "No status" bucket.
+  statusColor(statusId: number | null): string {
+    const tokenName = this.statusTokenName(statusId);
+    return `var(${tokenName})`;
+  }
+
+  // Exposed for tests so they assert the **requested token names** (KZ-001 /
+  // KZ-017) rather than resolved values (jsdom returns '' for custom props).
+  statusTokenName(statusId: number | null): string {
+    if (statusId === null || statusId === undefined) {
+      return STATUS_TOKEN_NO_STATUS;
+    }
+    return STATUS_TOKEN_BY_ID[Number(statusId)] ?? STATUS_TOKEN_FALLBACK;
+  }
+
+  // Accessible summary of the status split — consumed by the region's
+  // `aria-label` (R-PD-009 AC.1: every chart region has an accessible name).
+  statusAriaLabel(): string {
+    const total = this.statusTotal();
+    if (total <= 0) {
+      return 'Results by status: no data';
+    }
+    const segments = this.statusBuckets()
+      .map(bucket => `${bucket.count} ${bucket.name.toLowerCase()} (${this.statusSharePercent(bucket.count)}%)`)
+      .join(', ');
+    return `Results by status out of ${total} total: ${segments}`;
+  }
+
+  // Drill-through shape for T-11 — the row is a real `<a>` (R-PD-009 AC.2:
+  // drill-through rows are real interactive elements with visible focus).
+  statusRowQueryParams(bucket: ContractResultsSummaryStatusBucket): { statusTab: number | null } {
+    return { statusTab: bucket.status_id };
+  }
+
+  // Accessible label per drill row — never color-alone (WCAG 1.4.1): the label
+  // carries the status name, count, and share so screen readers announce the
+  // full context before navigation (R-PD-009 AC.1/AC.3).
+  statusRowAriaLabel(bucket: ContractResultsSummaryStatusBucket): string {
+    const share = this.statusSharePercent(bucket.count);
+    return `${bucket.name}: ${bucket.count} results, ${share}% — view filtered results`;
+  }
+
+  // Smooth scroll to pending revision table section (R-PD-008, judgment W7)
+  scrollToPendingRevision(event?: Event): void {
+    if (event) {
+      event.preventDefault();
+    }
+    const element = document.getElementById('pending-revision-section');
+    if (element) {
+      const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      element.focus?.({ preventScroll: true });
+    }
+  }
+
+  // Scoped retry for the indicator breakdown region (R-PD-005 AC.2 / R-PD-007)
+  retryIndicatorBreakdown(): void {
+    const contractId = this.contractId();
+    if (contractId) {
+      this.getProjectDetailService.invalidate(contractId);
+      void this.syncProjectFromSharedService(contractId);
+    }
   }
 
   triggerGroundingUpload(fileInput: HTMLInputElement): void {
@@ -358,7 +452,7 @@ export class ProjectDashboardComponent {
       severity: 'warning',
       summary: 'Remove document',
       icon: 'pi pi-exclamation-triangle',
-      color: '#E69F00',
+      color: 'var(--ac-viz-status-pending)',
       detail:
         'Removing this document may make the current Executive Overview outdated. ' +
         'We recommend regenerating it to update the grounded summary.',
@@ -371,7 +465,7 @@ export class ProjectDashboardComponent {
       cancelCallback: {
         label: 'Cancel'
       },
-      buttonColor: '#035BA9'
+      buttonColor: 'var(--ac-light-blue-400)'
     });
   }
 
@@ -402,6 +496,8 @@ export class ProjectDashboardComponent {
     if (!this.canAccessGroundingSetup() || !this.hasGroundedDocuments()) {
       return;
     }
+
+    this.isAiSectionExpanded.set(true);
 
     const projectId = this.contractId();
     if (!projectId) {
@@ -453,25 +549,6 @@ export class ProjectDashboardComponent {
     this.overviewSourceDocuments.set([]);
     this.executiveOverviewGeneratedAt.set(null);
   }
-
-  private async loadProjectResultsByStatus(contractId: string): Promise<void> {
-    this.statusChartLoading.set(true);
-    this.statusChartError.set(false);
-
-    try {
-      const response = await this.api.GET_Results(
-        { 'contract-codes': [contractId] },
-        undefined,
-        { page: 1, limit: 10_000, sortField: 'code', sortOrder: 'DESC' }
-      );
-      this.statusChartItems.set(buildStatusChartItems(response?.data?.results ?? []));
-    } catch {
-      this.statusChartItems.set([]);
-      this.statusChartError.set(true);
-    } finally {
-      this.statusChartLoading.set(false);
-    }
-  }
 }
 
 function formatLeverDisplayLabel(shortName: string, fullName: string): string {
@@ -505,33 +582,6 @@ function formatPartnerLabel(item: ProjectDashboardRankedItem): string {
   return acronym && name !== '—' ? `${acronym} - ${name}` : name;
 }
 
-function buildStatusChartItems(results: Result[]): ProjectStatusChartItem[] {
-  const statuses = new Map<number, ProjectStatusChartItem>();
-
-  for (const result of results) {
-    const status = result.result_status;
-    const statusId = Number(status?.result_status_id);
-    if (!Number.isFinite(statusId)) {
-      continue;
-    }
-
-    const current = statuses.get(statusId);
-    if (current) {
-      current.value += 1;
-      continue;
-    }
-
-    statuses.set(statusId, {
-      color: status?.config?.color?.text || '#1689CA',
-      label: status?.name || 'Unknown status',
-      value: 1,
-      result_status_id: statusId
-    });
-  }
-
-  return [...statuses.values()].sort((first, second) => second.value - first.value);
-}
-
 function getPartnerItemId(item: ProjectDashboardRankedItem, index: number): string {
   if (item.institution_id === null || item.institution_id === undefined) {
     return item.partner_name ?? String(index);
@@ -544,19 +594,19 @@ function formatIndicatorName(indicator: GetProjectDetailIndicator): string {
   return indicator.indicator?.name ?? indicator.full_name ?? 'Indicator';
 }
 
+const INDICATOR_COLOR_BY_ID: Record<number, string> = {
+  1: 'var(--ac-light-blue-300)',
+  2: 'var(--ac-green-300)',
+  3: 'var(--ac-viz-status-rejected)',
+  4: 'var(--ac-red-1)',
+  5: 'var(--ac-viz-status-pending)',
+  6: 'var(--ac-primary-blue-600)'
+};
+
 function getIndicatorChartColor(indicator: GetProjectDetailIndicator, fallbackIndex: number, totalIndicators: number): string {
   const indicatorId = indicator.indicator?.indicator_id ?? indicator.indicator_id;
-  const colorsByIndicatorId: Record<number, string> = {
-    1: '#1689CA',
-    2: '#7CB580',
-    3: '#78288c',
-    4: '#CF0808',
-    5: '#F58220',
-    6: '#173f6f'
-  };
-
   return typeof indicatorId === 'number'
-    ? (colorsByIndicatorId[indicatorId] ?? projectDashboardBarColor(fallbackIndex, totalIndicators))
+    ? (INDICATOR_COLOR_BY_ID[indicatorId] ?? projectDashboardBarColor(fallbackIndex, totalIndicators))
     : projectDashboardBarColor(fallbackIndex, totalIndicators);
 }
 

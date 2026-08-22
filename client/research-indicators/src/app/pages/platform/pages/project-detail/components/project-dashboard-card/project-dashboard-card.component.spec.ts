@@ -85,7 +85,8 @@ describe('ProjectDashboardCardComponent', () => {
     expect(component.fillPercent(5)).toBe(0);
   });
 
-  it('should expose rank colors and render every state branch', () => {
+  it('should expose rank colors and render every state branch (R-PD-007)', () => {
+    fixture.componentRef.setInput('title', 'Top partners');
     fixture.componentRef.setInput('items', [
       { id: 'a', label: 'A', count: 4 },
       { id: 'b', label: 'B', count: 3 },
@@ -94,21 +95,45 @@ describe('ProjectDashboardCardComponent', () => {
     ]);
     fixture.detectChanges();
 
-    expect(component.barColor(0)).toBe('#358540');
-    expect(component.barColor(3)).toBe('#112F5C');
+    expect(component.barColor(0)).toBe('var(--ac-green-500)');
+    expect(component.barColor(3)).toBe('var(--ac-primary-blue-600)');
 
+    // Loading state with skeleton and accessible status role
     fixture.componentRef.setInput('loading', true);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Loading chart');
+    const loadingEl = fixture.nativeElement.querySelector('[role="status"]');
+    expect(loadingEl).toBeTruthy();
+    expect(loadingEl.getAttribute('aria-label')).toBe('Loading Top partners');
+    expect(fixture.nativeElement.querySelector('p-skeleton')).toBeTruthy();
 
+    // Error state with alert role, custom message, and retry button
+    const retrySpy = jest.fn();
+    component.retry.subscribe(retrySpy);
     fixture.componentRef.setInput('loading', false);
     fixture.componentRef.setInput('error', true);
+    fixture.componentRef.setInput('errorMessage', 'We could not load top partner institutions. Please try again.');
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Try again');
 
+    const alertEl = fixture.nativeElement.querySelector('[role="alert"]');
+    expect(alertEl).toBeTruthy();
+    expect(alertEl.textContent).toContain('We could not load top partner institutions. Please try again.');
+    const retryButton = alertEl.querySelector('button');
+    expect(retryButton).toBeTruthy();
+    expect(retryButton.getAttribute('aria-label')).toBe('Retry loading Top partners');
+    retryButton.click();
+    expect(retrySpy).toHaveBeenCalledTimes(1);
+
+    // Empty state distinct from error state (error ≠ empty)
     fixture.componentRef.setInput('error', false);
     fixture.componentRef.setInput('empty', true);
+    fixture.componentRef.setInput('emptyMessage', 'No partner institutions were found for this project.');
+    fixture.componentRef.setInput('iconClass', 'pi pi-building');
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No data available');
+
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('No partner institutions were found for this project.');
+    expect(fixture.nativeElement.textContent).not.toContain('We could not load');
+    expect(fixture.nativeElement.querySelector('.pi-building')).toBeTruthy();
   });
 });

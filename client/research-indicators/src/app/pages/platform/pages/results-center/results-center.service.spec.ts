@@ -1177,22 +1177,57 @@ describe('ResultsCenterService', () => {
     });
   });
 
-  describe('initializeProjectDashboardResultsTable', () => {
-    it('sets pending revision status, contract context, and loads all results', () => {
+  describe('initializeScopedResultsTable', () => {
+    it('sets status, contract context, and loads all results', () => {
       const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
 
-      service.initializeProjectDashboardResultsTable('D514');
+      service.initializeScopedResultsTable({ contractId: 'D514', statusId: 2 });
 
       expect(service.primaryContractId()).toBe('D514');
       expect(service.myResultsFilterItem()?.id).toBe('all');
-      expect(service.resultsFilter()['status-codes']).toEqual([5]);
-      expect(service.appliedFilters()['status-codes']).toEqual([5]);
-      expect(service.resultsFilter()['create-user-codes']).toEqual([]);
-      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 5, name: 'Pending Revision' }]);
+      expect(service.resultsFilter()['status-codes']).toEqual([2]);
+      expect(service.appliedFilters()['status-codes']).toEqual([2]);
+      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 2, name: '' }]);
       expect(service.searchInput()).toBe('');
       expect(service.resultsTablePaginatorFirst()).toBe(0);
       expect(service.resultsTablePaginatorRows()).toBe(10);
       expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('sets indicator filter, contract context, and syncs indicator tabs', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      const syncSpy = jest.spyOn<any, any>(service, 'syncIndicatorTabSelection').mockImplementation(() => {});
+
+      service.initializeScopedResultsTable({ contractId: 'D514', indicatorId: 4 });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter()['indicator-codes']).toEqual([4]);
+      expect(service.resultsFilter()['indicator-codes-tabs']).toEqual([4]);
+      expect(service.appliedFilters()['indicator-codes']).toEqual([4]);
+      expect(service.tableFilters().indicators).toEqual([{ indicator_id: 4, name: '' }]);
+      expect(syncSpy).toHaveBeenCalledWith(4);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('handles no-status / null statusId correctly (contract scope with no status filter)', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.initializeScopedResultsTable({ contractId: 'D514', statusId: null });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter()['status-codes']).toEqual([]);
+      expect(service.tableFilters().statusCodes).toEqual([]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('initializeProjectDashboardResultsTable', () => {
+    it('delegates to initializeScopedResultsTable with status 5', () => {
+      const scopedSpy = jest.spyOn(service, 'initializeScopedResultsTable').mockImplementation(() => {});
+
+      service.initializeProjectDashboardResultsTable('D514');
+
+      expect(scopedSpy).toHaveBeenCalledWith({ contractId: 'D514', statusId: 5 });
     });
   });
 

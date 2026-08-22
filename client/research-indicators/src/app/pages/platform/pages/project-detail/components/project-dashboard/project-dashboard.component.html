@@ -1,154 +1,124 @@
 <section class="block flex w-full flex-col gap-6 p-1">
-  <div class="flex items-center gap-3 border-l-[5px] border-l-[#074b86] bg-[#fafafa] px-3 py-3">
-    <i class="pi pi-info-circle text-[#074b86] !text-[18px]" aria-hidden="true"></i>
-    <p class="m-0 text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[#777c83]">
-      The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
-      metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
-      enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
-      depending on the source platform. We are actively working to make information from these additional systems
-      available with the same level of detail and consistency.
-    </p>
-  </div>
-
-  @if (canAccessGroundingSetup()) {
-  <section class="rounded-xl border border-[#e8ebed] bg-[#fafafa] px-6 py-5 shadow-xs">
-    <div class="flex flex-col gap-4">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div class="min-w-0 flex-1">
-          <div class="mb-2 flex items-center gap-2.5">
-            <i class="pi pi-file !text-[18px] text-[#112f5c]" aria-hidden="true"></i>
-            <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[#112f5c]">Grounding &amp; Setup
-            </h2>
-          </div>
-          <p class="m-0 max-w-4xl font-['Barlow'] text-[14px] font-normal leading-4.5 text-[#777C83]">
-            Upload project foundational documents (Contract, Scope of Work, Theory of Change) to prime the AI. The system
-            will use these documents to better understand goals and context for generating insights and reports.
-          </p>
-        </div>
-
-        <div class="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
-          <button pButton type="button"
-            class="!h-9 !min-w-[8.75rem] !rounded-lg !border-[#1771b3] !bg-[#1771b3] !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-white"
-            [class.!justify-center]="uploadingGroundingDoc()"
-            [disabled]="!canUploadMoreGroundingDocs() || uploadingGroundingDoc()" [loading]="uploadingGroundingDoc()"
-            [attr.aria-label]="uploadingGroundingDoc() ? 'Uploading documents' : 'Upload Docs'"
-            (click)="triggerGroundingUpload(groundingFileInput)">
-            @if (!uploadingGroundingDoc()) {
-            <i class="pi pi-file-plus mr-1 !text-[14px]" aria-hidden="true"></i>
-            Upload Docs
-            }
-          </button>
-
-          @if (hasGroundedDocuments()) {
-          <button pButton type="button"
-            class="!h-9 !min-w-[7.25rem] !rounded-lg !border-[#1771b3] !bg-transparent !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-[#1771b3] hover:!bg-[#f0f7fc]"
-            [class.!justify-center]="executiveOverviewLoading()"
-            [disabled]="!canGenerateExecutiveOverview()" [loading]="executiveOverviewLoading()"
-            [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Generate'"
-            (click)="generateExecutiveOverview()">
-            @if (!executiveOverviewLoading()) {
-            <i class="pi pi-sparkles mr-1 !text-[14px]" aria-hidden="true"></i>
-            Generate
-            }
-          </button>
-          }
-
-          <label class="sr-only" for="grounding-file-input">Upload foundational project documents</label>
-          <input #groundingFileInput id="grounding-file-input" type="file" class="hidden"
-            [accept]="groundingAcceptedFormats.join(',')" multiple (change)="onGroundingFilesSelected($event)" />
-        </div>
-      </div>
-
-      @if (hasGroundedDocuments()) {
-      <span
-        class="font-['Barlow'] text-[12px] font-medium leading-none"
-        [attr.aria-label]="'Documents uploaded: ' + groundedDocuments().length + ' of ' + maxGroundingDocs">
-        <span class="text-[#8d9299]">Documents uploaded: </span>
-        <span [style.color]="groundedDocumentsCountColor()">{{ groundedDocuments().length }}/{{ maxGroundingDocs }}</span>
-      </span>
-
-      <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
-        @for (document of groundedDocuments(); track document.fileKey) {
-        <li
-          class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[#e8ebed] bg-white px-3 py-2.5">
-          <span class="flex min-w-0 flex-1 items-center gap-2">
-            <i class="pi pi-file !text-[14px] shrink-0 text-[#1689CA]" aria-hidden="true"></i>
-            <span class="truncate font-['Barlow'] text-[13px] font-medium text-[#112f5c]" [title]="document.fileName">{{
-              document.fileName }}</span>
-          </span>
-          <button type="button"
-            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-[#CF0808] transition-colors hover:bg-[#fdecec]"
-            [attr.aria-label]="'Remove ' + document.fileName" (click)="removeGroundingDocument(document.fileKey)">
-            <i class="pi pi-times !text-[14px]" aria-hidden="true"></i>
-          </button>
-        </li>
-        }
-      </ul>
-      }
-    </div>
-  </section>
-  }
-
-  @if (showExecutiveOverview()) {
-  <section class="flex flex-col gap-5 rounded-xl border border-[#e8ebed] bg-white px-6 py-6 shadow-xs">
-    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex min-w-0 flex-col gap-2">
-        <h2 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[#112f5c]">Executive Overview</h2>
-        @if (!executiveOverviewLoading() && executiveOverviewGeneratedAt()) {
-        <p class="m-0 font-['Barlow'] text-[13px] font-normal leading-snug text-[#777C83]">
-          Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+  <!-- Compact caveat banner with Learn More expansion (D-PD-8) -->
+  <div class="flex flex-col gap-2 rounded-lg border-l-4 border-l-[var(--ac-primary-blue-400)] bg-[var(--ac-grey-100)] p-3 text-left">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <i class="pi pi-info-circle text-[16px] text-[var(--ac-primary-blue-400)]" aria-hidden="true"></i>
+        <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug text-[var(--ac-grey-800)]">
+          Result analytics below summarize official indicator records. AI features use grounding documents and may contain inaccuracies.
         </p>
-        }
       </div>
-      @if (!executiveOverviewLoading()) {
-      <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#eef6ff] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[#1689CA]">
-          <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
-          Grounded AI Summary
-        </span>
-      </div>
-      }
-    </header>
-
-    @if (!executiveOverviewLoading() && overviewSourceDocuments().length > 0) {
-    <div class="flex flex-col gap-2 rounded-lg border border-[#e8ebed] bg-[#fafafa] px-4 py-3">
-      <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-[0.03rem] text-[#8D9299]">
-        Generated from</span>
-      <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
-        @for (document of overviewSourceDocuments(); track document.fileKey) {
-        <li class="flex min-w-0 items-center gap-2">
-          <i class="pi pi-file !text-[12px] shrink-0 text-[#1689CA]" aria-hidden="true"></i>
-          <span class="truncate font-['Barlow'] text-[13px] font-medium text-[#112f5c]" [title]="document.fileName">{{
-            document.fileName }}</span>
-        </li>
-        }
-      </ul>
+      <button type="button"
+        class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
+        (click)="isCaveatExpanded.set(!isCaveatExpanded())"
+        [attr.aria-expanded]="isCaveatExpanded()"
+        aria-controls="dashboard-caveat-details">
+        {{ isCaveatExpanded() ? 'Show less' : 'Learn more' }}
+      </button>
+    </div>
+    @if (isCaveatExpanded()) {
+    <div id="dashboard-caveat-details" class="border-t border-[var(--ac-grey-200)] pt-2 mt-1">
+      <p class="m-0 font-['Barlow'] text-[12px] leading-relaxed text-[var(--ac-grey-700)]">
+        The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
+        metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
+        enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
+        depending on the source platform. We are actively working to make information from these additional systems
+        available with the same level of detail and consistency.
+      </p>
     </div>
     }
+  </div>
 
-    <div class="flex flex-col gap-4">
-      @if (executiveOverviewLoading()) {
-      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#777C83]">Generating grounded summary...
-      </p>
-      } @else if (executiveOverviewError()) {
-      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#777C83]">Unable to generate the
-        executive overview. Please try again.</p>
+  <div class="flex items-center gap-2.5">
+    <i class="pi pi-chart-bar !text-[18px] text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+    <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Result analytics</h2>
+  </div>
+
+  <!-- KPI summary strip (R-PD-002) -->
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators">
+    <!-- Tile 1: Total results -->
+    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+        Total results
+      </span>
+      @if (getProjectDetailService.loading()) {
+      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading total results">
+        <p-skeleton width="60px" height="32px" borderRadius="4px" />
+        <p-skeleton width="110px" height="14px" borderRadius="4px" />
+      </div>
       } @else {
-      @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
-      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[#4c5158]">{{ paragraph }}</p>
-      }
+      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+        {{ totalProjectResults() }}
+      </strong>
+      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+        across all indicator types
+      </span>
       }
     </div>
-  </section>
-  }
 
+    <!-- Tile 2: Indicators covered -->
+    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+        Indicators covered
+      </span>
+      @if (getProjectDetailService.loading()) {
+      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading indicators covered">
+        <p-skeleton width="60px" height="32px" borderRadius="4px" />
+        <p-skeleton width="110px" height="14px" borderRadius="4px" />
+      </div>
+      } @else {
+      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+        {{ indicatorsCoveredCount() }}
+      </strong>
+      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+        of {{ indicatorsTotalCount() }} indicator types
+      </span>
+      }
+    </div>
 
-  <div class=" flex items-center gap-2.5">
-    <i class="pi pi-chart-bar !text-[18px] text-[#112f5c]" aria-hidden="true"></i>
-    <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[#112f5c]">Result analytics
-    </h2>
+    <!-- Tile 3: Pending revision -->
+    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+        Pending revision
+      </span>
+      @if (contractResultsSummary.loading()) {
+      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading pending revision count">
+        <p-skeleton width="60px" height="32px" borderRadius="4px" />
+        <p-skeleton width="110px" height="14px" borderRadius="4px" />
+      </div>
+      } @else {
+      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+        {{ pendingRevisionCount() }}
+      </strong>
+      <a href="#pending-revision-section"
+        class="inline-flex items-center gap-1 font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-light-blue-400)] transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+        (click)="scrollToPendingRevision($event)">
+        Review queue &rarr;
+      </a>
+      }
+    </div>
+
+    <!-- Tile 4: Partner institutions -->
+    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+        Partner institutions
+      </span>
+      @if (contractResultsSummary.loading()) {
+      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading partner institutions count">
+        <p-skeleton width="60px" height="32px" borderRadius="4px" />
+        <p-skeleton width="110px" height="14px" borderRadius="4px" />
+      </div>
+      } @else {
+      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+        {{ partnerInstitutionsCount() }}
+      </strong>
+      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+        linked to results
+      </span>
+      }
+    </div>
   </div>
+
   <!-- Geo scope -->
   <div class="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_1fr]  lg:min-h-[520px] lg:items-stretch ">
     <div class="flex min-w-0 flex-col gap-5 lg:h-full lg:self-stretch ">
@@ -161,6 +131,7 @@
             description="Partner institutions most frequently linked to results on this primary project."
             class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
             [error]="topPartners.loadError()" [empty]="partnersEmpty()"
+            errorMessage="We could not load top partner institutions. Please try again."
             emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
             layout="rows-partners" (retry)="topPartners.update()">
           </app-project-dashboard-card>
@@ -171,6 +142,7 @@
             description="Primary levers most frequently linked to results on this project." class="h-full w-full"
             iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
             [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
+            errorMessage="We could not load top primary levers. Please try again."
             emptyMessage="No primary levers were found for this project." [items]="leverItems()"
             layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
           </app-project-dashboard-card>
@@ -181,6 +153,7 @@
             description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
             iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
             [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
+            errorMessage="We could not load main contact persons. Please try again."
             emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
             layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
           </app-project-dashboard-card>
@@ -191,6 +164,7 @@
             description="Top projects contributing to results where this project is the primary project."
             class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
             [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
+            errorMessage="We could not load contributing projects. Please try again."
             emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
             [itemHeightPx]="43" (retry)="topContributors.update()">
           </app-project-dashboard-card>
@@ -200,35 +174,52 @@
       <app-geo-scope-card class="h-full w-full"></app-geo-scope-card>
     </div>
     <div class="flex h-full min-w-0 flex-col gap-5 lg:min-h-0 lg:self-stretch">
-      <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs">
+      <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+        aria-labelledby="results-by-indicator-title">
         <header class="flex flex-col gap-1">
-          <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Results by indicator</span>
-          <span class="font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Number of results linked to each indicator
+          <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
+          <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results linked to each indicator
             on this project.</span>
         </header>
 
-        @if (totalProjectResults() === 0) {
+        @if (getProjectDetailService.loading()) {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by indicator">
+          <p-skeleton width="100%" height="20px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="80%" height="14px" borderRadius="4px" />
+        </div>
+        } @else if (getProjectDetailService.loadError()) {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load results by indicator. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small"
+            class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading results by indicator"
+            (click)="retryIndicatorBreakdown()">Try again</button>
+        </div>
+        } @else if (totalProjectResults() === 0) {
         <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
-          <i class="pi pi-chart-pie text-[24px] text-[#1689CA]" aria-hidden="true"></i>
-          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">No results were found for any indicator
+          <i class="pi pi-chart-pie text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No results were found for any indicator
             on this project.</p>
         </div>
         } @else {
-        <div class="flex items-end justify-between gap-3 rounded-lg border border-[#e8ebed] bg-[#f4f7f9] px-4 py-3">
+        <div class="flex items-end justify-between gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
           <div class="flex flex-col gap-0.5">
-            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[#8D9299]">Total
+            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Total
               results</span>
-            <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[#112F5C]">{{
+            <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{
               totalProjectResults() }}</strong>
           </div>
-          <span class="pb-0.5 font-['Barlow'] text-[12px] text-[#777C83]">{{ indicatorsWithResults().length }}
+          <span class="pb-0.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">{{ indicatorsWithResults().length }}
             indicators</span>
         </div>
 
         <div class="flex flex-col gap-2">
           <span
-            class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[#8D9299]">Distribution</span>
-          <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[#e8ebed]"
+            class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Distribution</span>
+          <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[var(--ac-grey-200)]"
             [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
             @for (indicator of indicatorsWithResults(); track indicator.id) {
             <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
@@ -238,22 +229,25 @@
           </figure>
         </div>
 
-        <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[#e8ebed] p-0">
+        <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[var(--ac-grey-200)] p-0">
           @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
           <li class="py-3 first:pt-0 last:pb-0">
             <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
               <span
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E8F0F7] font-['Barlow'] text-[12px] font-bold tabular-nums text-[#345B8F]">{{
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ac-grey-100)] font-['Barlow'] text-[12px] font-bold tabular-nums text-[var(--ac-primary-blue-300)]">{{
                 rank + 1 }}</span>
-              <span class="flex min-w-0 items-center gap-2">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color"></span>
-                <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[#112F5C] line-clamp-2"
+              <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                [routerLink]="['/project-detail', contractId()]"
+                [queryParams]="{ indicatorTab: indicator.id }"
+                [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results, ' + indicatorSharePercent(indicator.value) + '% — view filtered results'">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
+                <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[var(--ac-primary-blue-600)] line-clamp-2"
                   [title]="indicator.label">{{ indicator.label }}</span>
-              </span>
+              </a>
               <span class="shrink-0 text-right">
-                <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[#112F5C]">{{
+                <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[var(--ac-primary-blue-600)]">{{
                   indicator.value }}</strong>
-                <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[#777C83]">{{
+                <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{
                   indicatorSharePercent(indicator.value) }}%</span>
               </span>
             </div>
@@ -262,55 +256,110 @@
         </ul>
         }
       </section>
-      <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[#e8ebed] bg-white p-5 shadow-xs">
+      <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+        aria-labelledby="results-by-status-title">
         <header class="flex flex-col gap-1">
-          <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Results by status</span>
-          <span class="font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Number of results by workflow status on
+          <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
+          <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
             this project.</span>
         </header>
 
         @if (statusChartLoading()) {
-        <div class="flex flex-col items-center justify-center gap-2 rounded-lg bg-[#f4f7f9] px-4 py-8 text-center">
-          <span class="font-['Barlow'] text-[13px] text-[#777C83]">Loading status data...</span>
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by status">
+          <p-skeleton width="100%" height="20px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="80%" height="14px" borderRadius="4px" />
         </div>
-        } @else if (statusChartError() || !statusChartItems().length) {
-        <div class="flex flex-col items-center justify-center gap-2 h-full px-4 py-8 text-center">
-          <i class="pi pi-chart-bar text-[24px] text-[#1689CA]" aria-hidden="true"></i>
-          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[#777C83]">No result statuses were found for this
-            project.</p>
+        } @else if (statusChartError()) {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load the status
+            breakdown. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small"
+            class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading results by status"
+            (click)="contractResultsSummary.update()">Try again</button>
+        </div>
+        } @else if (statusChartEmpty()) {
+        <div class="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+          <i class="pi pi-chart-bar text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No result statuses were found
+            for this project.</p>
         </div>
         } @else {
-        <ul class="m-0 flex max-h-[172px] min-h-0 list-none flex-col gap-3 overflow-y-auto p-0 pr-1 pt-1">
-          @for (item of statusChartItems(); track item.result_status_id) {
-          <li class="m-0 list-none p-0">
-            <div class="grid w-full items-center gap-2.5 text-left text-inherit"
-              style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
-              <span
-                class="min-w-0 overflow-hidden font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[#4c5158] line-clamp-2"
-                [title]="item.label">{{ item.label }}</span>
-              <span class="min-w-0 w-full overflow-hidden">
-                <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
-                  [style.width.%]="statusBarFillPercent(item.value)" [style.min-width.px]="item.value > 0 ? 32 : 0">
-                  <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="item.color"
-                    aria-hidden="true"></span>
-                  <span class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[#112F5C]">{{
-                    item.value }}</span>
-                </span>
-              </span>
+        <div class="flex flex-col gap-4">
+          <figure class="m-0 flex w-full flex-col gap-2" role="img" [attr.aria-label]="statusAriaLabel()">
+            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
+              Composition
+            </span>
+            <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
+              @for (bucket of statusBuckets(); track $index) {
+              <div class="h-full min-w-[2px] transition-[width] duration-300 ease-in-out"
+                [style.width.%]="statusSharePercent(bucket.count)"
+                [style.background-color]="statusColor(bucket.status_id)"
+                [attr.data-status-id]="bucket.status_id"
+                [attr.data-status-token]="statusTokenName(bucket.status_id)"
+                aria-hidden="true">
+              </div>
+              }
             </div>
-          </li>
-          }
-        </ul>
+          </figure>
+
+          <table class="m-0 w-full border-collapse text-left">
+            <caption class="sr-only">Results by status — count and percentage per workflow status</caption>
+            <thead class="sr-only">
+              <tr>
+                <th scope="col">Status</th>
+                <th scope="col">Results</th>
+                <th scope="col">Share</th>
+              </tr>
+            </thead>
+            <tbody class="m-0 flex list-none flex-col gap-3 p-0">
+              @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
+              <tr class="grid w-full items-center gap-2.5 text-left text-inherit"
+                style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
+                <td class="min-w-0">
+                  <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                    [routerLink]="['/project-detail', contractId()]"
+                    [queryParams]="statusRowQueryParams(bucket)"
+                    [attr.aria-label]="statusRowAriaLabel(bucket)">
+                    <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                    <span class="min-w-0 truncate font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[var(--ac-grey-800)]">{{ bucket.name }}</span>
+                  </a>
+                </td>
+                <td class="min-w-0 w-full overflow-hidden">
+                  <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
+                    [style.width.%]="statusSharePercent(bucket.count)" [style.min-width.px]="bucket.count > 0 ? 32 : 0">
+                    <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                    <strong class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{ bucket.count }}</strong>
+                    <span class="shrink-0 font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{ statusSharePercent(bucket.count) }}%</span>
+                  </span>
+                </td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
         }
       </section>
+      <app-results-trend-card
+        [buckets]="contractResultsSummary.list()?.by_year ?? []"
+        [loading]="contractResultsSummary.loading()"
+        [error]="contractResultsSummary.loadError()"
+        (retry)="contractResultsSummary.update()">
+      </app-results-trend-card>
     </div>
   </div>
   <!-- Pending revision results -->
   <section
-    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[#e8ebed] bg-white shadow-xs lg:flex-1">
-    <header class="border-b border-[#e8ebed] px-5 py-4">
-      <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[#112f5c]">Pending revision</span>
-      <span class="block font-['Barlow'] text-[14px] leading-4 text-[#777C83]">Results pending revision on project
+    id="pending-revision-section"
+    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] shadow-xs lg:flex-1">
+    <header class="border-b border-[var(--ac-grey-200)] px-5 py-4">
+      <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Pending revision</span>
+      <span class="block font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Results pending revision on project
         {{
         project()?.agreement_id || contractId() }}.</span>
     </header>
@@ -318,4 +367,179 @@
       [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"
       emptyMessage="No results pending revision"></app-results-center-table>
   </section>
+
+  <!-- AI Grounding & Setup + Executive Overview section relocated below analytics (R-PD-008, D-PD-8, D-PD-9) -->
+  @if (showExecutiveOverview()) {
+  <section class="flex flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+    aria-labelledby="ai-grounding-section-title">
+    <header class="flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--ac-grey-100)] text-[var(--ac-primary-blue-600)]">
+          <i class="pi pi-sparkles text-[16px]" aria-hidden="true"></i>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <div class="flex items-center gap-2">
+            <h2 id="ai-grounding-section-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
+              AI Grounding &amp; Executive Overview
+            </h2>
+            <span class="rounded-full bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Space_Grotesk'] text-[11px] font-semibold"
+              [style.color]="groundedDocumentsCountColor()">
+              {{ groundedDocuments().length }}/{{ maxGroundingDocs }} documents
+            </span>
+          </div>
+          <p class="m-0 font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+            Upload project documents to ground AI executive summary generation.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        @if (!isAiSectionExpanded() && executiveOverviewLoading()) {
+        <span class="flex items-center gap-2 font-['Barlow'] text-[12px] font-medium text-[var(--ac-primary-blue-400)]" role="status">
+          <i class="pi pi-spin pi-spinner text-[14px]" aria-hidden="true"></i>
+          Generating summary…
+        </span>
+        }
+        <button pButton type="button" severity="secondary" size="small"
+          class="!min-h-[44px] !min-w-[44px]"
+          (click)="isAiSectionExpanded.set(!isAiSectionExpanded())"
+          [attr.aria-expanded]="isAiSectionExpanded()"
+          aria-label="Toggle AI Grounding and Setup panel">
+          {{ isAiSectionExpanded() ? 'Collapse' : 'Expand' }}
+        </button>
+      </div>
+    </header>
+
+    <!-- Collapsible panel preserved in DOM with [hidden] (NEVER @if) (D-PD-9) -->
+    <div [hidden]="!isAiSectionExpanded()" class="flex flex-col gap-6 pt-5 mt-4 border-t border-[var(--ac-grey-200)]">
+      @if (canAccessGroundingSetup()) {
+      <div class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-6 py-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="mb-2 flex items-center gap-2.5">
+              <i class="pi pi-file !text-[18px] text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+              <h3 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Grounding &amp; Setup</h3>
+            </div>
+            <p class="m-0 max-w-4xl font-['Barlow'] text-[14px] font-normal leading-4.5 text-[var(--ac-grey-700)]">
+              Upload project foundational documents (Contract, Scope of Work, Theory of Change) to prime the AI. The system
+              will use these documents to better understand goals and context for generating insights and reports.
+            </p>
+          </div>
+
+          <div class="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
+            <button pButton type="button"
+              class="!h-9 !min-w-[8.75rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-[var(--ac-light-blue-400)] !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-white"
+              [class.!justify-center]="uploadingGroundingDoc()"
+              [disabled]="!canUploadMoreGroundingDocs() || uploadingGroundingDoc()" [loading]="uploadingGroundingDoc()"
+              [attr.aria-label]="uploadingGroundingDoc() ? 'Uploading documents' : 'Upload Docs'"
+              (click)="triggerGroundingUpload(groundingFileInput)">
+              @if (!uploadingGroundingDoc()) {
+              <i class="pi pi-file-plus mr-1 !text-[14px]" aria-hidden="true"></i>
+              Upload Docs
+              }
+            </button>
+
+            @if (hasGroundedDocuments()) {
+            <button pButton type="button"
+              class="!h-9 !min-w-[7.25rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-transparent !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-[var(--ac-light-blue-400)] hover:!bg-[var(--ac-grey-100)]"
+              [class.!justify-center]="executiveOverviewLoading()"
+              [disabled]="!canGenerateExecutiveOverview()" [loading]="executiveOverviewLoading()"
+              [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Generate'"
+              (click)="generateExecutiveOverview()">
+              @if (!executiveOverviewLoading()) {
+              <i class="pi pi-sparkles mr-1 !text-[14px]" aria-hidden="true"></i>
+              Generate
+              }
+            </button>
+            }
+
+            <label class="sr-only" for="grounding-file-input">Upload foundational project documents</label>
+            <input #groundingFileInput id="grounding-file-input" type="file" class="hidden"
+              [accept]="groundingAcceptedFormats.join(',')" multiple (change)="onGroundingFilesSelected($event)" />
+          </div>
+        </div>
+
+        @if (hasGroundedDocuments()) {
+        <span
+          class="font-['Barlow'] text-[12px] font-medium leading-none"
+          [attr.aria-label]="'Documents uploaded: ' + groundedDocuments().length + ' of ' + maxGroundingDocs">
+          <span class="text-[var(--ac-grey-600)]">Documents uploaded: </span>
+          <span [style.color]="groundedDocumentsCountColor()">{{ groundedDocuments().length }}/{{ maxGroundingDocs }}</span>
+        </span>
+
+        <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
+          @for (document of groundedDocuments(); track document.fileKey) {
+          <li
+            class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] px-3 py-2.5">
+            <span class="flex min-w-0 flex-1 items-center gap-2">
+              <i class="pi pi-file !text-[14px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                document.fileName }}</span>
+            </span>
+            <button type="button"
+              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-[var(--ac-red-1)] transition-colors hover:bg-[var(--ac-grey-100)]"
+              [attr.aria-label]="'Remove ' + document.fileName" (click)="removeGroundingDocument(document.fileKey)">
+              <i class="pi pi-times !text-[14px]" aria-hidden="true"></i>
+            </button>
+          </li>
+          }
+        </ul>
+        }
+      </div>
+      }
+
+      <div class="flex flex-col gap-5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] px-6 py-6 shadow-xs">
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex min-w-0 flex-col gap-2">
+            <h3 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Executive Overview</h3>
+            @if (!executiveOverviewLoading() && executiveOverviewGeneratedAt()) {
+            <p class="m-0 font-['Barlow'] text-[13px] font-normal leading-snug text-[var(--ac-grey-700)]">
+              Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+            </p>
+            }
+          </div>
+          @if (!executiveOverviewLoading()) {
+          <div class="flex flex-wrap items-center gap-2">
+            <span
+              class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[var(--ac-light-blue-300)]">
+              <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
+              Grounded AI Summary
+            </span>
+          </div>
+          }
+        </header>
+
+        @if (!executiveOverviewLoading() && overviewSourceDocuments().length > 0) {
+        <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
+          <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-[0.03rem] text-[var(--ac-grey-600)]">
+            Generated from</span>
+          <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+            @for (document of overviewSourceDocuments(); track document.fileKey) {
+            <li class="flex min-w-0 items-center gap-2">
+              <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                document.fileName }}</span>
+            </li>
+            }
+          </ul>
+        </div>
+        }
+
+        <div class="flex flex-col gap-4">
+          @if (executiveOverviewLoading()) {
+          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">Generating grounded summary...
+          </p>
+          } @else if (executiveOverviewError()) {
+          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">Unable to generate the
+            executive overview. Please try again.</p>
+          } @else {
+          @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
+          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ paragraph }}</p>
+          }
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+  }
 </section>

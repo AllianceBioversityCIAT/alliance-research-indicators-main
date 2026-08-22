@@ -9,16 +9,16 @@
     <div class=" {{ hss ? 'text-[14px]' : 'text-[14px]' }} text-slate-600 font-small md:py-2">
       @for (item of breadcrumb(); track $index) {
       @if ($index > 0) {
-      <i class="pi pi-chevron-right text-[#777C83] mx-2 !text-[12px]"></i>
+      <i class="pi pi-chevron-right text-[var(--ac-grey-700)] mx-2 !text-[12px]"></i>
       }
 
       @if (item.route && $index < breadcrumb().length - 1) { <a [routerLink]="item.route"
-        class="text-[#777C83] hover:underline cursor-pointer !font-[space_grotesk]" [pTooltip]="item.tooltip"
+        class="text-[var(--ac-grey-700)] hover:underline cursor-pointer !font-[space_grotesk]" [pTooltip]="item.tooltip"
         tooltipPosition="bottom">
         {{ item.label }}
         </a>
         } @else {
-        <span class="text-[#035BA9] !font-[space_grotesk]" [pTooltip]="item.tooltip" tooltipPosition="bottom">
+        <span class="text-[var(--ac-light-blue-400)] !font-[space_grotesk]" [pTooltip]="item.tooltip" tooltipPosition="bottom">
           {{ item.label }}
         </span>
         }
@@ -39,14 +39,14 @@
       }
       @if (showStarPdfReport()) {
       @if (starPdfReportDisabled()) {
-      <span aria-hidden="true" class="inline-flex px-2 opacity-40 text-[#777C83]">
+      <span aria-hidden="true" class="inline-flex px-2 opacity-40 text-[var(--ac-grey-700)]">
         <i class="pi pi-file-pdf !text-[17px]"></i>
       </span>
       } @else {
       <p-button variant="text" pTooltip="Open STAR PDF report" tooltipPosition="left" (onClick)="openStarPdfReport()"
         [attr.aria-label]="'Open PDF report for ' + cache.currentResultId()">
         <ng-template pTemplate="icon">
-          <i class="pi pi-file-pdf text-[#035BA9] !text-[17px]"></i>
+          <i class="pi pi-file-pdf text-[var(--ac-light-blue-400)] !text-[17px]"></i>
         </ng-template>
       </p-button>
       }
@@ -54,13 +54,13 @@
       <p-button variant="text" pTooltip="Submission history" tooltipPosition="left"
         (onClick)="cache.showSubmissionHistory.set(true)">
         <ng-template pTemplate="icon">
-          <i class="material-symbols-rounded text-[#035BA9] !text-[21px]">overview</i>
+          <i class="material-symbols-rounded text-[var(--ac-light-blue-400)] !text-[21px]">overview</i>
         </ng-template>
       </p-button>
       @if (showDeleteOption()) {
       <p-menu #menu [model]="items()" [popup]="true" [appendTo]="'body'" />
       <p-button (onClick)="menu.toggle($event)" [text]="true" size="small" icon="pi pi-ellipsis-v"
-        class="!text-[#112F5C]" [style]="{ color: '#112F5C' }" />
+        class="!text-[var(--ac-primary-blue-600)]" [style]="{ color: 'var(--ac-primary-blue-600)' }" />
       }
     </div>
   </div>

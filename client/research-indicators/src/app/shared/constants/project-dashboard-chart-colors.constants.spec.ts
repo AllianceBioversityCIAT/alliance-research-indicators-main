@@ -2,7 +2,7 @@ import { PROJECT_DASHBOARD_RANK_BAR_COLORS, projectDashboardBarColor } from './p
 
 describe('projectDashboardBarColor', () => {
   it('should return the single-value color when the chart has one item', () => {
-    expect(projectDashboardBarColor(0, 1)).toBe('#112f5c');
+    expect(projectDashboardBarColor(0, 1)).toBe('var(--ac-primary-blue-600)');
   });
 
   it('should return rank colors for the first three bars', () => {

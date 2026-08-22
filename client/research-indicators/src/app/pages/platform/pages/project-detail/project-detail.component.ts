@@ -75,7 +75,11 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
     }
     this.getLastSegment();
 
-    if (this.lastSegment() === 'project-results' && this.activateProjectResultsState()) {
+    const hasDrillParams =
+      this.activatedRoute.snapshot.queryParamMap?.has('statusTab') ||
+      this.activatedRoute.snapshot.queryParamMap?.has('indicatorTab');
+
+    if (!hasDrillParams && this.lastSegment() === 'project-results' && this.activateProjectResultsState()) {
       void this.resultsCenterService.main();
     }
 
@@ -89,6 +93,52 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
         takeUntilDestroyed(this.destroyRef)
       )
       .subscribe(() => this.getLastSegment());
+
+    this.activatedRoute.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => {
+        const hasStatusTab = params.has('statusTab');
+        const hasIndicatorTab = params.has('indicatorTab');
+
+        if (!hasStatusTab && !hasIndicatorTab) {
+          return;
+        }
+
+        let statusId: number | null | undefined = undefined;
+        if (hasStatusTab) {
+          const rawStatus = params.get('statusTab');
+          if (rawStatus === 'no-status' || rawStatus === 'null' || rawStatus === null) {
+            statusId = null;
+          } else if (rawStatus !== '') {
+            const parsed = Number(rawStatus);
+            statusId = Number.isFinite(parsed) ? parsed : null;
+          } else {
+            statusId = null;
+          }
+        }
+
+        let indicatorId: number | null | undefined = undefined;
+        if (hasIndicatorTab) {
+          const rawIndicator = params.get('indicatorTab');
+          if (rawIndicator !== null && rawIndicator !== '') {
+            const parsed = Number(rawIndicator);
+            indicatorId = Number.isFinite(parsed) ? parsed : undefined;
+          }
+        }
+
+        this.lastSegment.set('project-results');
+        this.resultsCenterService.initializeScopedResultsTable({
+          contractId: this.contractId(),
+          statusId,
+          indicatorId
+        });
+
+        void this.router.navigate([], {
+          relativeTo: this.activatedRoute,
+          queryParams: {},
+          replaceUrl: true
+        });
+      });
   }
 
   getLastSegment(): void {

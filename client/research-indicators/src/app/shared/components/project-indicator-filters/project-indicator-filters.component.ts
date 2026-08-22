@@ -10,7 +10,7 @@ import { ResultsCenterService } from '@pages/platform/pages/results-center/resul
   templateUrl: './project-indicator-filters.component.html'
 })
 export class ProjectIndicatorFiltersComponent implements OnInit, OnChanges {
-  @Input() project: GetContractsByUser | GetProjectDetail | FindContracts = {};
+  @Input() project: GetContractsByUser | GetProjectDetail | FindContracts | null = null;
   @Input() enableIndicatorFilter = false;
   @Input() isPoolFunding = false;
   @Input() enableFilter = false;

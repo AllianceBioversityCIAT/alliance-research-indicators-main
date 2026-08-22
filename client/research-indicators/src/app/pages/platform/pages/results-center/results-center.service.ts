@@ -751,10 +751,10 @@ export class ResultsCenterService {
     }
   }
 
-  /** Fixed pending-revision table on project dashboard: status 5, current contract, all results. */
-  initializeProjectDashboardResultsTable(contractId: string): void {
+  /** Scoped results table for project drill-through: status and/or indicator, primary contract context. */
+  initializeScopedResultsTable(options: { contractId: string; statusId?: number | null; indicatorId?: number | null }): void {
     this.invalidateResultsFetchDedupe();
-    this.primaryContractId.set(contractId);
+    this.primaryContractId.set(options.contractId);
     this.myResultsFilterItem.set(this.myResultsFilterItems[0]);
     this.searchInput.set('');
     this.resultsTablePaginatorFirst.set(0);
@@ -762,27 +762,43 @@ export class ResultsCenterService {
     this.resultsTableSortField.set('result_official_code');
     this.resultsTableSortOrder.set(-1);
 
-    this.tableFilters.set(new TableFilters());
-    this.tableFilters.update(prev => ({
-      ...prev,
-      statusCodes: [{ result_status_id: 5, name: 'Pending Revision' }]
-    }));
+    const hasStatus = typeof options.statusId === 'number' && Number.isFinite(options.statusId);
+    const hasIndicator = typeof options.indicatorId === 'number' && Number.isFinite(options.indicatorId);
 
-    const fixedFilter: ResultFilter = {
-      'indicator-codes': [],
+    const tableFilters = new TableFilters();
+    if (hasStatus) {
+      tableFilters.statusCodes = [{ result_status_id: Number(options.statusId), name: '' }];
+    }
+    if (hasIndicator) {
+      tableFilters.indicators = [{ indicator_id: Number(options.indicatorId), name: '' }];
+    }
+    this.tableFilters.set(tableFilters);
+
+    const scopedFilter: ResultFilter = {
+      'indicator-codes': hasIndicator ? [Number(options.indicatorId)] : [],
       'lever-codes': [],
-      'indicator-codes-tabs': [],
+      'indicator-codes-tabs': hasIndicator ? [Number(options.indicatorId)] : [],
       'indicator-codes-filter': [],
-      'status-codes': [5],
+      'status-codes': hasStatus ? [Number(options.statusId)] : [],
       'contract-codes': [],
       'platform-code': [],
       years: [],
       'create-user-codes': []
     };
 
-    this.resultsFilter.set(fixedFilter);
-    this.appliedFilters.set(fixedFilter);
+    this.resultsFilter.set(scopedFilter);
+    this.appliedFilters.set(scopedFilter);
+
+    if (hasIndicator) {
+      this.syncIndicatorTabSelection(Number(options.indicatorId));
+    }
+
     void this.main();
+  }
+
+  /** Fixed pending-revision table on project dashboard: status 5, current contract, all results. */
+  initializeProjectDashboardResultsTable(contractId: string): void {
+    this.initializeScopedResultsTable({ contractId, statusId: 5 });
   }
 
   cleanFilters() {
