@@ -134,9 +134,9 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `project-context-strip/` (NEW, +spec)
 - **Skills:** `angular-developer` · **Deps:** T-07 (T-04 shape)
 - **Done checks:**
-  - [ ] Null-field fixture renders without those chips and **without** `0`/`N/A` placeholders. *Red input: render `N/A` for null funding_type — must fail.*
-  - [ ] Elapsed % clamps at 0 and 100 (fixtures: pre-start and post-end dates). Currency formatted with USD unit.
-  - [ ] SDG chips reuse the existing SDG display convention (no new taxonomy — C-3).
+  - [x] Null-field fixture renders without those chips and **without** `0`/`N/A` placeholders. *Red input: render `N/A` for null funding_type — must fail.*
+  - [x] Elapsed % clamps at 0 and 100 (fixtures: pre-start and post-end dates). Currency formatted with USD unit.
+  - [x] SDG chips reuse the existing SDG display convention (no new taxonomy — C-3).
 
 ### T-12 — Client: dashboard integration + entry stagger
 - **Requirements:** R-DA-007 AC.2 + stagger, R-DA-003/005 placement, region independence (inherited three-state pattern) · **Design:** §2.2 layout, §6 Motion

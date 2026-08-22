@@ -215,6 +215,22 @@
   - **Findings:**
     - R-DA-004 (Toggle & Matrix): PASS. Zero refetch across toggle, totals reconcile, keyboard accessible.
     - R-DA-007 (Morph & Escape Valve): PASS. Engine-native morph configured via universalTransition and shared series id; escape valve switches to crossfade fallback.
-    - R-DA-008 (Tokens & Legend): PASS. Token-based 5-step ramp and legend in DOM.
-    - R-DA-009 (A11y): PASS. Paired matrix tableModel, drill links, accessible labels.
-
+### Task T-11: Client: project context strip
+- **Status:** PASS
+- **Attempts:** 2
+- **Implementer Evidence:**
+  - Created standalone component `ProjectContextStripComponent` in `project-context-strip/`.
+  - Implemented computeds for budget (`grant_amount_usd ?? grant_amount`), center budget (`center_amount_usd`), funding type (`funding_type`), contract status (`contract_status ?? status_name`), timeline (`startDate`, `endDate`, `extensionDate`, `elapsedPercent`, `isExtended`), SDGs (`sdgs`), and CGIAR entities (`cgiar_entities`).
+  - Strict S2 no-fabrication rule: fields absent in server response are omitted without `0`, `N/A`, or placeholder values.
+  - Layout stability: primary context (`grantAmount`, `centerAmount`, `fundingType`, `contractStatus`, `timeline`) and secondary context (`sdgs`, `cgiarEntities`) are conditionally rendered with `@if` guards so no empty container or orphan borders/gaps appear.
+  - Timeline progress bar with elapsed percentage clamped to [0, 100], and distinct extension date rendering.
+  - Zero hex literals in component (Gate D4).
+  - Verification:
+    - Jest: `PASS src/app/pages/platform/pages/project-detail/components/project-context-strip/project-context-strip.component.spec.ts` (15 passed, 15 total).
+    - Angular Lint: `npm run lint -- --quiet` (0 errors).
+- **Reviewer Audit (Attempt 2 - Rework):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-005 (no-fabrication): PASS. Null-field fixtures render without chips or placeholders.
+    - R-DA-005 (stable layout): PASS. Gap collapse artifacts resolved via `hasPrimaryContext` and `hasSecondaryContext` guards.
+    - Currency formatting and timeline clamping: PASS.
