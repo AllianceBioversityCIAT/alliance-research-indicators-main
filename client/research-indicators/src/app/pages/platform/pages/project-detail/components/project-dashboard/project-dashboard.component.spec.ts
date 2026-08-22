@@ -127,7 +127,7 @@ describe('ProjectDashboardComponent', () => {
     deleteDocumentOverviewFiles: jest.Mock;
   };
   let rolesServiceMock: { isAdmin: jest.Mock };
-  let actionsServiceMock: { showToast: jest.Mock };
+  let actionsServiceMock: any;
 
   function createFile(name: string, size = 1024, type = 'application/pdf'): File {
     return new File([new ArrayBuffer(size)], name, { type });
@@ -157,6 +157,8 @@ describe('ProjectDashboardComponent', () => {
       emptyOverview?: boolean;
       rejectOverviewFetch?: boolean;
       projectData?: GetProjectDetail | null;
+      projectLoading?: boolean;
+      projectError?: boolean;
       summary?: ContractResultsSummary | null;
       summaryLoading?: boolean;
       summaryError?: boolean;
@@ -216,7 +218,7 @@ describe('ProjectDashboardComponent', () => {
       }),
       deleteDocumentOverviewFiles: jest.fn().mockResolvedValue(undefined)
     };
-    actionsServiceMock = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
+    actionsServiceMock = { showToast: jest.fn(), showGlobalAlert: jest.fn() } as any;
     rolesServiceMock = { isAdmin: jest.fn().mockReturnValue(options?.isAdmin ?? true) };
 
     const defaultProjectData: GetProjectDetail = {
@@ -444,6 +446,7 @@ describe('ProjectDashboardComponent', () => {
   describe('status region — aggregate-fed (R-PD-003, R-PD-007, R-PD-009)', () => {
     const sevenBuckets: ContractResultsSummary = {
       total: 40,
+      by_indicator_year: [],
       by_status: [
         { status_id: 6, name: 'Approved', count: 10 },
         { status_id: 2, name: 'Submitted', count: 8 },
@@ -561,7 +564,7 @@ describe('ProjectDashboardComponent', () => {
 
     it('should show the empty state with distinct copy when the aggregate returns no statuses (R-PD-007)', async () => {
       await setup('C-1', {
-        summary: { total: 0, by_status: [], by_year: [], partner_institutions: 0 }
+        summary: { total: 0, by_indicator_year: [], by_status: [], by_year: [], partner_institutions: 0 }
       });
 
       expect(component.statusChartEmpty()).toBe(true);
@@ -1061,6 +1064,7 @@ describe('ProjectDashboardComponent', () => {
         },
         summary: {
           total: 15,
+          by_indicator_year: [],
           by_status: [
             { status_id: 6, name: 'Approved', count: 12 },
             { status_id: 5, name: 'Pending revision', count: 3 }
@@ -1090,6 +1094,7 @@ describe('ProjectDashboardComponent', () => {
       await setup('C-1', {
         summary: {
           total: 50,
+          by_indicator_year: [],
           by_status: [],
           by_year: [],
           partner_institutions: 42
@@ -1150,6 +1155,7 @@ describe('ProjectDashboardComponent', () => {
       contractResultsSummaryMock.loading.set(false);
       contractResultsSummaryMock.list.set({
         total: 10,
+        by_indicator_year: [],
         by_status: [{ status_id: 5, name: 'Pending revision', count: 4 }],
         by_year: [],
         partner_institutions: 18
@@ -1164,6 +1170,7 @@ describe('ProjectDashboardComponent', () => {
       await setup('C-1', {
         summary: {
           total: 10,
+          by_indicator_year: [],
           by_status: [{ status_id: 5, name: 'Pending revision', count: 2 }],
           by_year: [],
           partner_institutions: 5
@@ -1199,6 +1206,7 @@ describe('ProjectDashboardComponent', () => {
       await setup('C-1', {
         summary: {
           total: 10,
+          by_indicator_year: [],
           by_status: [{ status_id: 5, name: 'Pending revision', count: 2 }],
           by_year: [],
           partner_institutions: 5
@@ -1293,6 +1301,7 @@ describe('ProjectDashboardComponent', () => {
         },
         summary: {
           total: 5,
+          by_indicator_year: [],
           by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
           by_year: [{ year: 2024, count: 5 }],
           partner_institutions: 3

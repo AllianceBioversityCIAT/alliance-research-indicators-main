@@ -145,13 +145,13 @@ describe('VizChartComponent (R-DA-006, R-DA-007, R-DA-009, D-DA-1)', () => {
       const rows = Array.from(table.querySelectorAll('tbody tr'));
       expect(rows.length).toBe(2);
 
-      const firstRowHeader = rows[0].querySelector('th[scope="row"]')?.textContent?.trim();
-      const firstRowCell = rows[0].querySelector('td')?.textContent?.trim();
+      const firstRowHeader = (rows[0] as HTMLElement).querySelector('th[scope="row"]')?.textContent?.trim();
+      const firstRowCell = (rows[0] as HTMLElement).querySelector('td')?.textContent?.trim();
       expect(firstRowHeader).toBe('2023');
       expect(firstRowCell).toBe('10');
 
-      const secondRowHeader = rows[1].querySelector('th[scope="row"]')?.textContent?.trim();
-      const secondRowCell = rows[1].querySelector('td')?.textContent?.trim();
+      const secondRowHeader = (rows[1] as HTMLElement).querySelector('th[scope="row"]')?.textContent?.trim();
+      const secondRowCell = (rows[1] as HTMLElement).querySelector('td')?.textContent?.trim();
       expect(secondRowHeader).toBe('2024');
       expect(secondRowCell).toBe('25');
 

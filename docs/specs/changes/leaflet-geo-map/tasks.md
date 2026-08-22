@@ -153,16 +153,16 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 - **Files touched (intended):** none (verification only; evidence recorded in `execution.md` at execute time)
 - **Description:** Run the full gate set over the finished tree and record the measurements the requirements demand.
 - **Acceptance / done check:**
-  - [ ] `npm run build` green; budget output captured; **initial bundle ≤ baseline** (mapbox CSS left it) and project-dashboard chunk delta recorded vs T-01 baseline, both directions. **Disqualifier:** sizes measured while any delegated agent runs, or with spread exceeding the claimed delta, are not evidence — report the spread instead.
-  - [ ] Sentinel grep in `dist/`: a known geometry feature string found in the built dashboard chunk (NFR-GEO-102, KZ-001 — assert in generated output). **Failing input:** temporarily remove the geometry import and observe the grep return empty / the build redden; restore.
-  - [ ] Full `npm test` green (single run, no parallel suites — §4.3).
-  - [ ] `npx tsc -p tsconfig.spec.json --noEmit` — error count ≤ the 945 baseline (a rising count is the failure signal; "clean" is not the bar).
-  - [ ] `npm run tokens:validate` green. **Declared scope (KZ-017):** it enforces ramp monotonicity only; contrast is printed, not enforced — contrast lands on T-08.
-  - [ ] `git diff --stat origin/main -- server/` empty (R-GEO-008 AC.2).
+  - [x] `npm run build` green; budget output captured; **initial bundle ≤ baseline** (mapbox CSS left it) and project-dashboard chunk delta recorded vs T-01 baseline, both directions. **Disqualifier:** sizes measured while any delegated agent runs, or with spread exceeding the claimed delta, are not evidence — report the spread instead.
+  - [x] Sentinel grep in `dist/`: a known geometry feature string found in the built dashboard chunk (NFR-GEO-102, KZ-001 — assert in generated output). **Failing input:** temporarily remove the geometry import and observe the grep return empty / the build redden; restore.
+  - [x] Full `npm test` green (single run, no parallel suites — §4.3).
+  - [x] `npx tsc -p tsconfig.spec.json --noEmit` — error count ≤ the 945 baseline (a rising count is the failure signal; "clean" is not the bar).
+  - [x] `npm run tokens:validate` green. **Declared scope (KZ-017):** it enforces ramp monotonicity only; contrast is printed, not enforced — contrast lands on T-08.
+  - [x] `git diff --stat origin/main -- server/` empty (R-GEO-008 AC.2).
 - **Dependencies:** T-05, T-06
 - **Estimated effort:** S
 - **Relevant skills:** `systematic-debugging` (on any red)
-- **Status:** todo
+- **Status:** done
 
 ### T-08 — HITL visual verification (dominant defect class)
 

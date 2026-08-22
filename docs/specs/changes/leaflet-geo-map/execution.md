@@ -141,3 +141,24 @@
 - **Reviewer Verdict:** PASS
 - **Reviewer Summary:** The diff cleanly removes all specified Mapbox artifacts (dependencies, styles, services, utils, env fields) while preserving `PROJECT_DASHBOARD_DEFAULT_LIMIT` and archive files untouched. The verification evidence confirms zero Mapbox hits, passing tests, and reduced bundle sizes as required.
 
+
+### T-07 — Gates + generated-output measurements
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 2 (Attempt 1: requested exact tsc spec count; Attempt 2: 939 errors <= 945 baseline PASS)
+- **Requirements Covered:** NFR-GEO-101, NFR-GEO-102, NFR-GEO-103 (tokens half), R-GEO-002 (AC.2), R-GEO-008 (AC.2), requirements §5 type-gate rows
+- **Measurements Captured:**
+  - Production Build (`npm run build` in `client/research-indicators`): Exit code 0
+    - Initial Total: 1.12 MB raw / 261.32 kB transfer (Baseline: 1.16 MB raw / 265.81 kB transfer; Delta: -40 kB raw / -4.49 kB transfer)
+    - `project-dashboard-component` chunk: 1.03 MB raw / 275.92 kB transfer (Baseline: 2.62 MB raw / 624.86 kB transfer; Delta: -1.59 MB raw / -348.94 kB transfer)
+    - Mapbox CommonJS warning eliminated
+  - Sentinel Check in `dist/`: `"ISO_A2"` found in built `chunk-MHME7OSP.js`
+  - Full Test Suite (`npm test -- --silent`): 319/319 test suites passed, 6,653/6,653 tests passed (Exit code 0)
+    - Coverage: Statements 98.67%, Branches 95.85%, Functions 98.61%, Lines 98.99%
+  - Spec Type Gate (`npx tsc -p tsconfig.spec.json --noEmit`): 939 errors (strictly <= 945 baseline; 0 errors in touched files)
+  - Design Token Validator (`npm run tokens:validate`): 19 tokens verified, strictly monotonic ramps in light and dark mode, 0 errors
+  - Server Tree Diff (`git diff HEAD -- server/`): 0 diff
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** All measurement evidence for T-07 has been correctly provided and verified against the acceptance criteria. The tsc spec error count (939) successfully falls below the 945 baseline, and all build, bundle size, sentinel, test suite, and token validation requirements are met.
+

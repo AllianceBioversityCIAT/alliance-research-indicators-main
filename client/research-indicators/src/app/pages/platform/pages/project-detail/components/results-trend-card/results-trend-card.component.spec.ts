@@ -230,8 +230,8 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, R-DA-006, NFR-PD-001)',
 
       const tableRows = Array.from(fixture.nativeElement.querySelectorAll('table.sr-only tbody tr'));
       expect(tableRows.length).toBe(2);
-      expect(tableRows[0].textContent).toContain('2021');
-      expect(tableRows[1].textContent).toContain('2024');
+      expect((tableRows[0] as HTMLElement).textContent).toContain('2021');
+      expect((tableRows[1] as HTMLElement).textContent).toContain('2024');
     });
   });
 });
