@@ -252,6 +252,20 @@ export class AgressoContractRepository
     const query = `
     SELECT 
       ac.*,
+      COALESCE(
+        (
+          SELECT JSON_ARRAYAGG(
+            JSON_OBJECT(
+              'code', pfc.cgiar_entity_code,
+              'name', pfc.cgiar_entity_name
+            )
+          )
+          FROM pooled_funding_contracts pfc
+          WHERE pfc.agreement_id = ac.agreement_id
+            AND pfc.is_active = 1
+        ),
+        JSON_ARRAY()
+      ) AS cgiar_entities,
       JSON_ARRAYAGG(
         JSON_OBJECT(
           'indicator', JSON_OBJECT(
@@ -283,7 +297,51 @@ export class AgressoContractRepository
 
     return (
       this.query(query, [contract_id]) as Promise<ContractResultCountDto[]>
-    ).then((response) => (response.length > 0 ? response[0] : null));
+    ).then((response) => {
+      if (!response || response.length === 0) {
+        return null;
+      }
+      const contract = response[0];
+      let cgiarEntities = contract.cgiar_entities;
+      if (typeof cgiarEntities === 'string') {
+        try {
+          cgiarEntities = JSON.parse(cgiarEntities);
+        } catch {
+          cgiarEntities = [];
+        }
+      }
+      if (!Array.isArray(cgiarEntities)) {
+        cgiarEntities = [];
+      }
+
+      let indicators = contract.indicators;
+      if (typeof indicators === 'string') {
+        try {
+          indicators = JSON.parse(indicators);
+        } catch {
+          indicators = [];
+        }
+      }
+
+      let sdgs = contract.sdgs;
+      if (typeof sdgs === 'string') {
+        try {
+          sdgs = JSON.parse(sdgs);
+        } catch {
+          // ignore
+        }
+      }
+
+      const formattedContract: ContractResultCountDto = {
+        ...contract,
+        indicators,
+        cgiar_entities: cgiarEntities,
+      };
+      if (sdgs !== undefined) {
+        formattedContract.sdgs = sdgs;
+      }
+      return formattedContract;
+    });
   }
 
   /**

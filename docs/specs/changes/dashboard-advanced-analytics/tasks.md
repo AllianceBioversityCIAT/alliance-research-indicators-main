@@ -73,8 +73,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** repository `findOneContract` (+spec)
 - **Skills:** `nestjs-expert` · **Deps:** none
 - **Done checks:**
-  - [ ] New fields present; existing fields byte-identical (fixture diff old-vs-new shape — K-019 style comparison over a fixed input). *Red input: rename an existing field — the comparison must fail.*
-  - [ ] `pooled_funding_contracts` join returns `[]` (not null) when absent.
+  - [x] New fields present; existing fields byte-identical (fixture diff old-vs-new shape — K-019 style comparison over a fixed input). *Red input: rename an existing field — the comparison must fail.*
+  - [x] `pooled_funding_contracts` join returns `[]` (not null) when absent.
 
 ### T-05 — Client: token extension + validation + mirrors
 - **Requirements:** R-DA-008 (AC.1 validator both themes + ramp monotonicity, AC.2 registration) · **Design:** §6 Tokens, D-DA-8

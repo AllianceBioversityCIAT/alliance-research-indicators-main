@@ -402,15 +402,16 @@ describe('AgressoContractRepository', () => {
   });
 
   describe('findOneContract', () => {
-    it('should find one contract by contract ID', async () => {
+    it('should find one contract by contract ID and project cgiar_entities from pooled_funding_contracts', async () => {
       const contractId = 'CONTRACT123';
-      const expectedContract = {
+      const rawContract = {
         agreement_id: contractId,
         projectDescription: 'Single Contract',
         indicators: [],
+        cgiar_entities: [{ code: 'CR1', name: 'Entity 1' }],
       };
 
-      (repository.query as jest.Mock).mockResolvedValue([expectedContract]);
+      (repository.query as jest.Mock).mockResolvedValue([rawContract]);
 
       const result = await repository.findOneContract(contractId);
 
@@ -418,7 +419,126 @@ describe('AgressoContractRepository', () => {
         expect.stringContaining('WHERE ac.agreement_id = ?'),
         [contractId],
       );
-      expect(result).toEqual(expectedContract);
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM pooled_funding_contracts pfc'),
+        [contractId],
+      );
+      expect(repository.query).toHaveBeenCalledWith(
+        expect.stringContaining('AS cgiar_entities'),
+        [contractId],
+      );
+      expect(result).toEqual({
+        ...rawContract,
+        cgiar_entities: [{ code: 'CR1', name: 'Entity 1' }],
+      });
+    });
+
+    it('should return contract with extended fields (funding_type, center_amount_usd, sdgs, cgiar_entities) and byte-identical existing fields', async () => {
+      const contractId = 'CONTRACT123';
+      const rawContract = {
+        agreement_id: contractId,
+        projectDescription: 'Single Contract',
+        project_lead_description: 'Lead Investigator',
+        start_date: new Date('2023-01-01'),
+        end_date: new Date('2025-12-31'),
+        indicators: [
+          {
+            indicator: {
+              indicator_id: 1,
+              name: 'Indicator 1',
+              description: 'Desc 1',
+              indicator_type_id: 1,
+              long_description: 'Long desc',
+              icon_src: 'icon.png',
+              other_names: 'Other',
+              is_active: true,
+            },
+            count_results: 5,
+          },
+        ],
+        funding_type: 'BILATERAL',
+        center_amount_usd: 150000.5,
+        grant_amount_usd: 200000.0,
+        contract_status: 'ongoing',
+        status_name: 'Ongoing',
+        sdgs: [{ id: 1, name: 'No Poverty' }],
+        cgiar_entities: [
+          { code: 'CR1', name: 'Entity 1' },
+          { code: 'CR2', name: 'Entity 2' },
+        ],
+      };
+
+      (repository.query as jest.Mock).mockResolvedValue([rawContract]);
+
+      const result = await repository.findOneContract(contractId);
+
+      expect(result).toEqual({
+        agreement_id: contractId,
+        projectDescription: 'Single Contract',
+        project_lead_description: 'Lead Investigator',
+        start_date: new Date('2023-01-01'),
+        end_date: new Date('2025-12-31'),
+        indicators: rawContract.indicators,
+        funding_type: 'BILATERAL',
+        center_amount_usd: 150000.5,
+        grant_amount_usd: 200000.0,
+        contract_status: 'ongoing',
+        status_name: 'Ongoing',
+        sdgs: [{ id: 1, name: 'No Poverty' }],
+        cgiar_entities: [
+          { code: 'CR1', name: 'Entity 1' },
+          { code: 'CR2', name: 'Entity 2' },
+        ],
+      });
+    });
+
+    it('should return cgiar_entities as empty array [] when absent or null in DB response', async () => {
+      const contractId = 'CONTRACT123';
+      const rawContractWithoutCgiar = {
+        agreement_id: contractId,
+        projectDescription: 'Single Contract',
+        indicators: [],
+        cgiar_entities: null,
+      };
+
+      (repository.query as jest.Mock).mockResolvedValue([
+        rawContractWithoutCgiar,
+      ]);
+
+      const result = await repository.findOneContract(contractId);
+
+      expect(result.cgiar_entities).toEqual([]);
+    });
+
+    it('should parse JSON strings for cgiar_entities, indicators, and sdgs if returned as string from DB driver', async () => {
+      const contractId = 'CONTRACT123';
+      const rawContractWithStrings = {
+        agreement_id: contractId,
+        projectDescription: 'Single Contract',
+        indicators: JSON.stringify([
+          {
+            indicator: { indicator_id: 1, name: 'Ind' },
+            count_results: 3,
+          },
+        ]),
+        cgiar_entities: JSON.stringify([{ code: 'E1', name: 'Entity 1' }]),
+        sdgs: JSON.stringify([{ id: 2, name: 'Zero Hunger' }]),
+      };
+
+      (repository.query as jest.Mock).mockResolvedValue([
+        rawContractWithStrings,
+      ]);
+
+      const result = await repository.findOneContract(contractId);
+
+      expect(result.indicators).toEqual([
+        {
+          indicator: { indicator_id: 1, name: 'Ind' },
+          count_results: 3,
+        },
+      ]);
+      expect(result.cgiar_entities).toEqual([{ code: 'E1', name: 'Entity 1' }]);
+      expect(result.sdgs).toEqual([{ id: 2, name: 'Zero Hunger' }]);
     });
 
     it('should return null when contract is not found', async () => {

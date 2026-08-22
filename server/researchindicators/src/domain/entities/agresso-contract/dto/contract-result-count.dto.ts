@@ -1,3 +1,8 @@
+export class ContractCgiarEntityDto {
+  code!: string;
+  name!: string;
+}
+
 export class ContractResultIndicatorDto {
   indicator_id: number;
   name: string;
@@ -17,4 +22,11 @@ export class ContractResultCountDto {
   start_date: Date;
   end_date: Date;
   indicators: ContractResultIndicatorDto[];
+  funding_type?: string | null;
+  center_amount_usd?: number | null;
+  grant_amount_usd?: number | null;
+  sdgs?: any;
+  contract_status?: string | null;
+  status_name?: string | null;
+  cgiar_entities?: ContractCgiarEntityDto[];
 }

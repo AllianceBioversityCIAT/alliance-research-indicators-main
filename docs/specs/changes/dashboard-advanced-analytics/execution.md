@@ -64,4 +64,23 @@
     - R-DA-002 AC.2 & D11: PASS. Existing fields (`total`, `by_status`, `by_year`, `partner_institutions`) byte-compatible and untouched.
     - 4R sweep clean. SQL generation, parameter binding, and invariant tests verified.
 
+### T-04 — Server: findOneContract payload extension
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified:
+    - `server/researchindicators/src/domain/entities/agresso-contract/dto/contract-result-count.dto.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.ts`
+    - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts`
+  - Verification:
+    - Jest: `PASS src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts`, `PASS src/domain/entities/agresso-contract/agresso-contract.service.spec.ts` (100 passed, 100 total)
+    - ESLint: `npx eslint src/domain/entities/agresso-contract/` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-005 & D-DA-3: PASS. `ContractResultCountDto` and `findOneContract` payload extended with `funding_type`, `center_amount_usd`, `grant_amount_usd`, `sdgs`, `contract_status`, `status_name`, and `cgiar_entities`.
+    - Data Retrieval & S2: PASS. Subquery on `pooled_funding_contracts` aggregates active entities, defaults to `[]` when absent. Defensive JSON parsing ensures cross-driver stability.
+    - 4R sweep clean. Existing fields byte-identical; no breaking changes.
+
+
 
