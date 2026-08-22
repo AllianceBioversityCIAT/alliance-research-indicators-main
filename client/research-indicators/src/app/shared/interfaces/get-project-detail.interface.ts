@@ -1,4 +1,5 @@
 import { ContractCgiarEntity } from './find-contracts.interface';
+import { PooledFundingContractRef } from '@shared/constants/agresso-funding.constants';
 
 export interface GetProjectDetail {
   agreement_id?: string;
@@ -24,6 +25,7 @@ export interface GetProjectDetail {
   contract_status?: string;
   sdgs?: number[] | string[] | unknown[];
   cgiar_entities?: ContractCgiarEntity[];
+  pooled_funding_contracts?: PooledFundingContractRef[] | null;
 }
 
 export interface GetProjectDetailIndicator {
