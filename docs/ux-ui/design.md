@@ -425,7 +425,7 @@ Display-only labels; exact values come from the `result_status` table. **Both ST
 All shared, reusable components live under `client/research-indicators/src/app/shared/`. Reach for them before building new ones.
 
 - **Shell & navigation:** `alliance-navbar`, `alliance-sidebar`, `section-header`, `result-sidebar`, `section-sidebar`, `form-header`, `navigation-buttons`
-- **Data display:** `results-table`, `project-results-table`, `project-item`, `partner-selected-item`, `notification-item`, `custom-tag`, `custom-progress-bar`, `metadata-panel`, `alert-tag`
+- **Data display:** `results-table`, `project-results-table`, `project-item`, `partner-selected-item`, `notification-item`, `custom-tag`, `custom-progress-bar`, `metadata-panel`, `alert-tag`, `viz-chart` (a11y-paired chart wrapper)
 - **Forms & input:** `dropdowns`, `dropdown`, `custom-fields`, `search-export-controls`, `shared-result-form`
 - **Modals & overlays:** `all-modals` (host), `modal` (wrapper) — all dialogs route through these; never instantiate ad-hoc overlays.
 - **System feedback:** `global-alert`, `global-toast`, `alert-tag`

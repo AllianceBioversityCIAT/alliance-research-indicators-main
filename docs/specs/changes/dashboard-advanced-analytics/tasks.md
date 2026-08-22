@@ -89,10 +89,10 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `shared/components/viz-chart/` (NEW, +spec), `shared/utils/chart-tokens.util.ts` (+spec ext)
 - **Skills:** `angular-developer` · **Deps:** T-05
 - **Done checks:**
-  - [ ] Structural test: rendering without a `tableModel` fails/refuses (a chart cannot exist untabled). *Red input: omit tableModel — must fail.*
-  - [ ] Reduced-motion: init options carry `animation: false` under emulated `prefers-reduced-motion` (presence assertion — **cannot prove visual absence**; declared, visual half in T-13 HITL — D9 split).
-  - [ ] Theme signal flip re-resolves option colors (assert requested token names — jsdom returns `''`, KZ-017 declared).
-  - [ ] Bundle probe (K-004): eager-import echarts once, observe initial-chunk delta/budget error, revert, record both numbers. *Disqualifier: deltas within build noise read as proof.*
+  - [x] Structural test: rendering without a `tableModel` fails/refuses (a chart cannot exist untabled). *Red input: omit tableModel — must fail.*
+  - [x] Reduced-motion: init options carry `animation: false` under emulated `prefers-reduced-motion` (presence assertion — **cannot prove visual absence**; declared, visual half in T-13 HITL — D9 split).
+  - [x] Theme signal flip re-resolves option colors (assert requested token names — jsdom returns `''`, KZ-017 declared).
+  - [x] Bundle probe (K-004): eager-import echarts once, observe initial-chunk delta/budget error, revert, record both numbers. *Disqualifier: deltas within build noise read as proof.*
 
 ### T-07 — Client: services + interfaces
 - **Requirements:** R-DA-001/002/005 client data paths · **Design:** §2.2

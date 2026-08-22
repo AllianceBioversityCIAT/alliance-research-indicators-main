@@ -1,0 +1,39 @@
+<div class="viz-chart-wrapper relative w-full h-full" [style.height]="height()">
+  <div #chartContainer [style.height]="height()" class="w-full h-full relative" [attr.aria-hidden]="loading() ? 'true' : null"></div>
+
+  @if (loading()) {
+    <div class="viz-chart-loading-overlay absolute inset-0 flex items-center justify-center bg-[var(--ac-white-1)]/80 z-10" role="status" aria-live="polite" aria-label="Loading chart">
+      <p-skeleton width="100%" [height]="height()" borderRadius="8px" />
+    </div>
+  }
+
+  @if (tableModel(); as model) {
+    <table class="sr-only" [attr.aria-label]="chartTitle() || model.caption">
+      <caption>{{ model.caption }}</caption>
+      @if (model.headers && model.headers.length > 0) {
+        <thead>
+          <tr>
+            @for (header of model.headers; track $index) {
+              <th scope="col">{{ header }}</th>
+            }
+          </tr>
+        </thead>
+      }
+      <tbody>
+        @for (row of model.rows; track $index) {
+          <tr>
+            @for (cell of row; track $index) {
+              @if ($index === 0) {
+                <th scope="row">{{ cell }}</th>
+              } @else {
+                <td>{{ cell }}</td>
+              }
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  } @else if (options() && requireTable()) {
+    <div class="sr-only" role="alert">Warning: Chart rendered without required accessibility tableModel</div>
+  }
+</div>

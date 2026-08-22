@@ -100,7 +100,32 @@
   - **Findings:**
     - R-DA-008 AC.1 & D-DA-8: PASS. Automated validator script parses `colors.scss`, checks WCAG contrast, verifies strict ramp monotonicity per theme.
     - R-DA-008 AC.2 & Mirrors: PASS. 12 tokens registered in `colors.scss`, mirrored to client `README.md` and `docs/ux-ui/design.md` §7.1.
-    - 4R sweep clean. Safe declarative additions with automated CI-ready validation script.
+### T-06 — Client: viz-chart wrapper
+- **Status:** PASS
+- **Attempts:** 2 (Attempt 1: FAIL due to `#ffffff` fallback in overlay template; Attempt 2: PASS after replacing with `bg-[var(--ac-white-1)]/80`)
+- **Implementer (Attempt 1 & 2):**
+  - Files modified/created:
+    - `client/research-indicators/src/app/shared/utils/chart-tokens.util.ts`
+    - `client/research-indicators/src/app/shared/utils/chart-tokens.util.spec.ts`
+    - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.ts` (NEW)
+    - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.html` (NEW)
+    - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.scss` (NEW)
+    - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.spec.ts` (NEW)
+    - `client/research-indicators/jest.config.ts`
+    - `client/research-indicators/package.json`
+    - `docs/ux-ui/design.md`
+  - Verification:
+    - Jest: `PASS src/app/shared/components/viz-chart/viz-chart.component.spec.ts`, `PASS src/app/shared/utils/chart-tokens.util.spec.ts` (16 passed, 16 total)
+    - Lint: `npm run lint -- --quiet` (0 errors)
+    - Zero hex check: 0 hex literals in `viz-chart/`
+- **Reviewer Audit (Attempt 2):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-009 AC.1: PASS. Structural `tableModel` input renders `.sr-only` `<table>` with `<caption>`, `<thead>`, `<tbody>`, preventing charts from rendering without paired accessible data.
+    - R-DA-007 AC.1: PASS. Checks `prefers-reduced-motion: reduce` and sets `animation: false` on ECharts options.
+    - R-DA-006 & D-DA-1: PASS. Tree-shaken `echarts/core` with `SVGRenderer`, `ResizeObserver` lifecycle management, clean `dispose()` on destroy.
+    - Gate D4: PASS. Zero hex literals across component files.
+    - 4R sweep clean. Safe, accessible, and reactive foundation for advanced dataviz widgets.
 
 
 
