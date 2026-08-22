@@ -81,8 +81,8 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** `src/styles/colors.scss`, client `README.md`, `docs/ux-ui/design.md` §7
 - **Skills:** `ui-ux-pro-max`
 - **Done checks:**
-  - [ ] Validator outputs (light+dark, categorical additions + ramp) pasted in `execution.md`; gate previously seen red (P12 precedent stands). *Disqualifier: validating against literal surfaces instead of resolved card-surface tokens; skipping dark.* Executing agent must load the `dataviz` skill; unavailable → escalate (SU7 lesson).
-  - [ ] 3-file registration grep (colors.scss + README + ux-ui §7).
+  - [x] Validator outputs (light+dark, categorical additions + ramp) pasted in `execution.md`; gate previously seen red (P12 precedent stands). *Disqualifier: validating against literal surfaces instead of resolved card-surface tokens; skipping dark.* Executing agent must load the `dataviz` skill; unavailable → escalate (SU7 lesson).
+  - [x] 3-file registration grep (colors.scss + README + ux-ui §7).
 
 ### T-06 — Client: viz-chart wrapper
 - **Requirements:** R-DA-009 AC.1 (structural table pairing), R-DA-007 AC.1 (reduced-motion init), R-DA-006 lazy confinement grounds · **Design:** §6 viz-chart, D-DA-1

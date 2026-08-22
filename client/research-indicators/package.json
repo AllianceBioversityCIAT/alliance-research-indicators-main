@@ -11,6 +11,7 @@
     "test:watch": "jest --watch --config jest.config.ts",
     "test:coverage": "jest --coverage --config jest.config.ts",
     "lint": "ng lint",
+    "tokens:validate": "node scripts/validate-tokens.mjs",
     "s-lint": "stylelint '**/*.scss'",
     "docker:build": "docker build -t research_indicatiors_client .",
     "docker:run": "docker run --env-file ./.env -dti --name research_indicatiors_client_dev -p 4200:4200 research_indicatiors_client",

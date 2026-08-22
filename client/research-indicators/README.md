@@ -100,7 +100,7 @@ Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-modul
 
 ### Visualization (chart-token family)
 
-Used by the project-dashboard charts (see `docs/specs/changes/project-dashboard-redesign/` — design D-PD-13). These tokens are consumed at runtime via `getComputedStyle` (in `shared/utils/chart-tokens.util.ts`), not as `.abc-`/`.atc-` utility classes. Light values are independently authored and validated against the light card surface (`--ac-white-2`: `#fcfcfc`); dark values are independently authored (not formula-derived — the existing green/blue ramps invert in dark mode) and validated against the dark card surface (`--ac-background`: `#191919`).
+Used by the project-dashboard charts (see `docs/specs/changes/project-dashboard-redesign/` — design D-PD-13, and `docs/specs/changes/dashboard-advanced-analytics/` — design D-DA-8). These tokens are consumed at runtime via `getComputedStyle` (in `shared/utils/chart-tokens.util.ts`), not as `.abc-`/`.atc-` utility classes. Light values are independently authored and validated against the light card surface (`--ac-white-2`: `#fcfcfc`); dark values are independently authored (not formula-derived — the existing green/blue ramps invert in dark mode) and validated against the dark card surface (`--ac-background`: `#191919`).
 
 - `--ac-viz-status-approved`: `#2e7d32` (green — approved results)
 - `--ac-viz-status-submitted`: `#1565c0` (blue — submitted results)
@@ -108,7 +108,19 @@ Used by the project-dashboard charts (see `docs/specs/changes/project-dashboard-
 - `--ac-viz-status-pending`: `#e65100` (orange — pending revision)
 - `--ac-viz-status-rejected`: `#c62828` (red — rejected results)
 - `--ac-viz-status-no-status`: `#757575` (neutral grey — explicit "No status" bucket)
-- `--ac-viz-series-1`: `#035ba9` (single hue — indicator bars + trend line)
+- `--ac-viz-series-1`: `#035ba9` (primary blue — indicator bars + trend line)
+- `--ac-viz-series-2`: `#00838f` (teal — CONTRIBUTING treatment)
+- `--ac-viz-series-3`: `#546e7a` (grey-blue — UNKNOWN treatment)
+- `--ac-viz-series-4`: `#7b1fa2` (purple — Accelerators SP category accent)
+- `--ac-viz-series-5`: `#c2185b` (pink — Science Programs SP category accent)
+- `--ac-viz-role-primary`: `#035ba9` (primary alignment role)
+- `--ac-viz-role-contributing`: `#00838f` (contributing alignment role)
+- `--ac-viz-role-unknown`: `#757575` (unknown alignment role)
+- `--ac-viz-ramp-1`: `#e1f0fa` (heatmap sequential ramp step 1 — lowest density / lightest)
+- `--ac-viz-ramp-2`: `#90caf9` (heatmap sequential ramp step 2)
+- `--ac-viz-ramp-3`: `#42a5f5` (heatmap sequential ramp step 3)
+- `--ac-viz-ramp-4`: `#1976d2` (heatmap sequential ramp step 4)
+- `--ac-viz-ramp-5`: `#0d47a1` (heatmap sequential ramp step 5 — highest density / darkest)
 
 ## Dark Mode Variables
 
@@ -128,6 +140,18 @@ When the dark mode is active, the following variables will be applied:
 - `--ac-viz-status-rejected`: `#ef5350`
 - `--ac-viz-status-no-status`: `#757575`
 - `--ac-viz-series-1`: `#42a5f5`
+- `--ac-viz-series-2`: `#4dd0e1`
+- `--ac-viz-series-3`: `#90a4ae`
+- `--ac-viz-series-4`: `#ba68c8`
+- `--ac-viz-series-5`: `#f06292`
+- `--ac-viz-role-primary`: `#42a5f5`
+- `--ac-viz-role-contributing`: `#4dd0e1`
+- `--ac-viz-role-unknown`: `#9e9e9e`
+- `--ac-viz-ramp-1`: `#102a43` (heatmap dark ramp step 1 — lowest density / lowest contrast)
+- `--ac-viz-ramp-2`: `#184a77` (heatmap dark ramp step 2)
+- `--ac-viz-ramp-3`: `#276ab3` (heatmap dark ramp step 3)
+- `--ac-viz-ramp-4`: `#42a5f5` (heatmap dark ramp step 4)
+- `--ac-viz-ramp-5`: `#90caf9` (heatmap dark ramp step 5 — highest density / brightest)
 
 ## Utility Classes
 

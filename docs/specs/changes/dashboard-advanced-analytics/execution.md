@@ -82,5 +82,26 @@
     - Data Retrieval & S2: PASS. Subquery on `pooled_funding_contracts` aggregates active entities, defaults to `[]` when absent. Defensive JSON parsing ensures cross-driver stability.
     - 4R sweep clean. Existing fields byte-identical; no breaking changes.
 
+### T-05 — Client: token extension + validation + mirrors
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer (Attempt 1):**
+  - Files modified:
+    - `client/research-indicators/src/styles/colors.scss`
+    - `client/research-indicators/scripts/validate-tokens.mjs` (NEW)
+    - `client/research-indicators/package.json`
+    - `client/research-indicators/README.md`
+    - `docs/ux-ui/design.md`
+  - Verification:
+    - Validator: `npm run tokens:validate` (19/19 tokens valid, light ramp 93.1% > 77.1% > 61.0% > 46.1% > 34.1%, dark ramp 16.3% < 28.0% < 42.7% < 61.0% < 77.1%)
+    - Lint: `npm run lint -- --quiet` (0 errors)
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-008 AC.1 & D-DA-8: PASS. Automated validator script parses `colors.scss`, checks WCAG contrast, verifies strict ramp monotonicity per theme.
+    - R-DA-008 AC.2 & Mirrors: PASS. 12 tokens registered in `colors.scss`, mirrored to client `README.md` and `docs/ux-ui/design.md` §7.1.
+    - 4R sweep clean. Safe declarative additions with automated CI-ready validation script.
+
+
 
 
