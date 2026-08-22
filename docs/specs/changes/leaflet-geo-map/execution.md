@@ -58,3 +58,22 @@
   - *Readability:* The tracking of `KNOWN_UNMAPPED_MICROSTATES` in the spec file is a clean way to satisfy the AC.2 test gate without polluting the production exceptions map with dead entries.
   - *Reliability:* `buildGeoChoroplethSeriesData` returns `{ name: mappedCode, value: country.count }`. If T-04 needs the full country name in the tooltip formatter, T-04 can carry `country_name` or handle lookup in the formatter closure.
 
+
+### T-03 — viz-chart registration extension + sibling mock updates
+
+- **Status:** PASS
+- **Date:** 2026-08-22
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-005 (AC.2 wrapper contract intact), requirements §5 "broken echarts mocks" defect class
+- **Files Changed:**
+  - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.ts` (extended echarts.use with MapChart, GeoComponent; extended EChartsOption union)
+  - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.spec.ts` (updated jest.mock for echarts/core)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts` (updated jest.mock for echarts/core)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/sp-alignment-graph/sp-alignment-graph.component.spec.ts` (updated jest.mock for echarts/core)
+- **Implementer Verification:**
+  - Unit tests: 35/35 passed across the 3 suites (exit code 0)
+  - `npm run build` in `client/research-indicators`: exit code 0
+  - Failing input check (K-004): Verified mock isolation and `registerMap`/`getMap` requirements
+- **Reviewer Verdict:** PASS
+- **Reviewer Summary:** The diff successfully registers `MapChart` and `GeoComponent` with ECharts and correctly extends the `EChartsOption` union in `viz-chart.component.ts`. The sibling test mocks have been updated to include `registerMap` and `getMap`, preventing import-time failures. Verification evidence is complete and all requirements (R-GEO-005 AC.2, defect class prevention) hold without modifying the wrapper contract.
+

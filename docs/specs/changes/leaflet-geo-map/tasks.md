@@ -80,13 +80,13 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - `client/.../sp-alignment-graph/sp-alignment-graph.component.spec.ts`
 - **Description:** Add `MapChart` + `GeoComponent` to the single `echarts.use([...])` site and extend the `EChartsOption` ComposeOption union. Update the three spec files whose `jest.mock('echarts/core', …)` factories must now expose the new modules and `registerMap`.
 - **Acceptance / done check:**
-  - [ ] The import-time failure of the unmocked suites is **observed red first** (K-004): run the three suites after the `use([...])` edit and before the mock edit; capture the failure verbatim.
-  - [ ] After mock updates, the three suites pass; `viz-chart.component.spec.ts` still asserts SVG-renderer init and the tableModel pairing rule **unmodified in behavior** (presence of the new mock members is the only spec change — a presence edit, not a behavioral one; the pairing-rule assertions are the behavioral proof).
-  - [ ] `npm run build` passes (union extension type-checks).
+  - [x] The import-time failure of the unmocked suites is **observed red first** (K-004): run the three suites after the `use([...])` edit and before the mock edit; capture the failure verbatim.
+  - [x] After mock updates, the three suites pass; `viz-chart.component.spec.ts` still asserts SVG-renderer init and the tableModel pairing rule **unmodified in behavior** (presence of the new mock members is the only spec change — a presence edit, not a behavioral one; the pairing-rule assertions are the behavioral proof).
+  - [x] `npm run build` passes (union extension type-checks).
 - **Dependencies:** none
 - **Estimated effort:** S
 - **Relevant skills:** `angular-developer`
-- **Status:** todo
+- **Status:** done
 
 ### T-04 — Rewrite `geo-scope-map` component (+ new spec)
 

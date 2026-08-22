@@ -16,7 +16,9 @@ const mockChartInstance = {
 
 jest.mock('echarts/core', () => ({
   use: jest.fn(),
-  init: jest.fn(() => mockChartInstance)
+  init: jest.fn(() => mockChartInstance),
+  registerMap: jest.fn(),
+  getMap: jest.fn()
 }));
 
 describe('SpAlignmentGraphComponent (R-DA-003, R-DA-009, NFR-DA-005)', () => {

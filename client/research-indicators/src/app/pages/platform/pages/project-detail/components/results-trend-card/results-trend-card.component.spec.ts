@@ -14,7 +14,9 @@ const mockChartInstance = {
 
 jest.mock('echarts/core', () => ({
   use: jest.fn(),
-  init: jest.fn(() => mockChartInstance)
+  init: jest.fn(() => mockChartInstance),
+  registerMap: jest.fn(),
+  getMap: jest.fn()
 }));
 
 describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, R-DA-006, NFR-PD-001)', () => {

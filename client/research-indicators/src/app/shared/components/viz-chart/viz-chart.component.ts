@@ -19,7 +19,9 @@ import {
   GraphChart,
   GraphSeriesOption,
   HeatmapChart,
-  HeatmapSeriesOption
+  HeatmapSeriesOption,
+  MapChart,
+  MapSeriesOption
 } from 'echarts/charts';
 import {
   TitleComponent,
@@ -33,7 +35,9 @@ import {
   LegendComponent,
   LegendComponentOption,
   VisualMapComponent,
-  VisualMapComponentOption
+  VisualMapComponentOption,
+  GeoComponent,
+  GeoComponentOption
 } from 'echarts/components';
 import { SVGRenderer } from 'echarts/renderers';
 import { UniversalTransition } from 'echarts/features';
@@ -45,12 +49,14 @@ echarts.use([
   LineChart,
   GraphChart,
   HeatmapChart,
+  MapChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
   DatasetComponent,
   LegendComponent,
   VisualMapComponent,
+  GeoComponent,
   UniversalTransition
 ]);
 
@@ -66,12 +72,14 @@ export type EChartsOption = echarts.ComposeOption<
   | LineSeriesOption
   | GraphSeriesOption
   | HeatmapSeriesOption
+  | MapSeriesOption
   | TitleComponentOption
   | TooltipComponentOption
   | GridComponentOption
   | DatasetComponentOption
   | LegendComponentOption
   | VisualMapComponentOption
+  | GeoComponentOption
 >;
 
 @Component({
