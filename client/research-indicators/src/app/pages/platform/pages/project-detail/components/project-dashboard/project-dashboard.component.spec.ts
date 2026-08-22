@@ -1,6 +1,7 @@
 import { Component, Input, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { GetContractResultsSummaryService } from '@shared/services/get-contract-results-summary.service';
@@ -25,6 +26,21 @@ import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignme
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
+import { DarkModeService } from '@shared/services/dark-mode.service';
+import { Router } from '@angular/router';
+import { VizChartComponent } from '@shared/components/viz-chart/viz-chart.component';
+
+@Component({
+  selector: 'app-viz-chart',
+  standalone: true,
+  template: ''
+})
+class VizChartStubComponent {
+  @Input() options: unknown = null;
+  @Input() tableModel: unknown = null;
+  @Input() chartTitle = '';
+  @Input() height = '';
+}
 
 @Component({
   selector: 'app-sp-alignment-graph',
@@ -258,6 +274,9 @@ describe('ProjectDashboardComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ProjectDashboardComponent],
       providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
+        DarkModeService,
         { provide: ActivatedRoute, useValue: { parent: { snapshot: { paramMap: convertToParamMap(contractId ? { id: contractId } : {}) } } } },
         { provide: ApiService, useValue: apiMock },
         { provide: GetProjectDetailService, useValue: getProjectDetailServiceMock },
@@ -277,7 +296,7 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent],
+          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent, VizChartComponent],
           providers: [
             GetTopContributorsContractsService,
             GetTopMainContactPersonsService,
@@ -289,7 +308,7 @@ describe('ProjectDashboardComponent', () => {
           ]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent],
+          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent, VizChartStubComponent],
           providers: [
             { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
             { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
@@ -1462,6 +1481,197 @@ describe('ProjectDashboardComponent', () => {
 
       expect(component.isBilateral()).toBe(false);
       expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeNull();
+    });
+  });
+
+  describe('bars <-> heatmap toggle and matrix (R-DA-004, R-DA-007, T-10)', () => {
+    const summaryWithMatrix: ContractResultsSummary = {
+      total: 10,
+      by_status: [],
+      by_year: [
+        { year: 2022, count: 3 },
+        { year: 2023, count: 7 }
+      ],
+      by_indicator_year: [
+        { indicator_id: 1, year: 2022, count: 2 },
+        { indicator_id: 1, year: 2023, count: 4 },
+        { indicator_id: 99, year: 2022, count: 1 },
+        { indicator_id: 99, year: 2023, count: 3 }
+      ],
+      partner_institutions: 0
+    };
+
+    it('should default to bars view and toggle to heatmap view', async () => {
+      await setup('C-1', { summary: summaryWithMatrix });
+
+      expect(component.indicatorView()).toBe('bars');
+      component.setIndicatorView('heatmap');
+      expect(component.indicatorView()).toBe('heatmap');
+    });
+
+    it('should issue zero HTTP requests across the toggle (R-DA-004 BUT no-refetch)', async () => {
+      await setup('C-1', { summary: summaryWithMatrix });
+
+      contractResultsSummaryMock.main.mockClear();
+      contractResultsSummaryMock.update.mockClear();
+      getProjectDetailServiceMock.load.mockClear();
+      apiMock.GET_Results.mockClear();
+
+      component.setIndicatorView('heatmap');
+      fixture.detectChanges();
+
+      component.setIndicatorView('bars');
+      fixture.detectChanges();
+
+      expect(contractResultsSummaryMock.main).not.toHaveBeenCalled();
+      expect(contractResultsSummaryMock.update).not.toHaveBeenCalled();
+      expect(getProjectDetailServiceMock.load).not.toHaveBeenCalled();
+      expect(apiMock.GET_Results).not.toHaveBeenCalled();
+    });
+
+    it('should update aria-pressed states on toggle buttons upon user interaction', async () => {
+      await setup('C-1', { summary: summaryWithMatrix });
+
+      const buttons = fixture.nativeElement.querySelectorAll('header [role="group"] button');
+      expect(buttons.length).toBe(2);
+
+      const [barsBtn, heatmapBtn] = Array.from(buttons) as HTMLButtonElement[];
+      expect(barsBtn.getAttribute('aria-pressed')).toBe('true');
+      expect(heatmapBtn.getAttribute('aria-pressed')).toBe('false');
+
+      heatmapBtn.click();
+      fixture.detectChanges();
+
+      expect(component.indicatorView()).toBe('heatmap');
+      expect(barsBtn.getAttribute('aria-pressed')).toBe('false');
+      expect(heatmapBtn.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('should compute heatmap options and tableModel reconciling total results', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+
+      expect(component.heatmapYears()).toEqual([2022, 2023]);
+      expect(component.heatmapMinCount()).toBe(1);
+      expect(component.heatmapMaxCount()).toBe(4);
+
+      const tableModel = component.indicatorHeatmapTableModel();
+      expect(tableModel.caption).toBe('Results by indicator and year matrix');
+      expect(tableModel.headers).toEqual(['Indicator', '2022', '2023', 'Total']);
+      expect(tableModel.rows.length).toBe(2);
+
+      const rowSum = tableModel.rows.reduce((sum, row) => sum + (row[row.length - 1] as number), 0);
+      expect(rowSum).toBe(10);
+      expect(rowSum).toBe(component.totalProjectResults());
+
+      const options = component.indicatorHeatmapOptions();
+      expect(options).toBeTruthy();
+      expect((options?.series as any[])[0].type).toBe('heatmap');
+      expect((options?.series as any[])[0].data.length).toBe(4);
+    });
+
+    it('should render the ramp legend in DOM when heatmap view is active', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+      component.setIndicatorView('heatmap');
+      fixture.detectChanges();
+
+      const legend = fixture.nativeElement.querySelector('[aria-label="Heatmap density scale"]');
+      expect(legend).toBeTruthy();
+      expect(legend.textContent).toContain('1 results');
+      expect(legend.textContent).toContain('4 results');
+
+      const swatches = legend.querySelectorAll('span[class*="bg-[var(--ac-viz-ramp-"]');
+      expect(swatches.length).toBe(5);
+    });
+
+    it('should navigate to indicator tab on heatmap cell click', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      component.onIndicatorHeatmapClick({ data: [0, 0, 2] } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 1 }
+      });
+    });
+
+    it('should support engine-native morph via universalTransition sharing series id between bar and heatmap (R-DA-007)', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+
+      const barOpts = component.indicatorBarOptions();
+      const heatmapOpts = component.indicatorHeatmapOptions();
+
+      expect(barOpts).toBeTruthy();
+      expect(heatmapOpts).toBeTruthy();
+
+      const barSeries = (barOpts?.series as any[])[0];
+      const heatmapSeries = (heatmapOpts?.series as any[])[0];
+
+      // Assert shared series id and universalTransition enabled
+      expect(barSeries.id).toBe('indicator-series');
+      expect(heatmapSeries.id).toBe('indicator-series');
+      expect(barSeries.universalTransition.enabled).toBe(true);
+      expect(heatmapSeries.universalTransition.enabled).toBe(true);
+
+      // Active chart options updates seamlessly on toggle
+      component.setIndicatorView('bars');
+      expect(component.activeIndicatorChartOptions()).toBe(barOpts);
+      component.setIndicatorView('heatmap');
+      expect(component.activeIndicatorChartOptions()).toBe(heatmapOpts);
+    });
+
+    it('should toggle between native morph single viz-chart and HTML ranked list via useCrossfadeFallback (proposal §12)', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+
+      // Default is fallback mode
+      expect(component.useCrossfadeFallback()).toBe(true);
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul')).toBeTruthy();
+
+      // Switch to native morph mode (single app-viz-chart in DOM)
+      component.useCrossfadeFallback.set(false);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul')).toBeNull();
     });
   });
 });

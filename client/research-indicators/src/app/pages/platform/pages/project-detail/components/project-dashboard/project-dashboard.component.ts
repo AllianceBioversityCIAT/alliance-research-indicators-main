@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { trigger, transition, style, animate } from '@angular/animations';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
@@ -35,6 +36,10 @@ import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-c
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
 import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
+import { DarkModeService } from '@shared/services/dark-mode.service';
+import { chartTokens } from '@shared/utils/chart-tokens.util';
+import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+import type { ECElementEvent } from 'echarts/core';
 
 const MAX_GROUNDING_DOCS = 3;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
@@ -60,7 +65,18 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
 @Component({
   selector: 'app-project-dashboard',
   standalone: true,
-  imports: [ButtonModule, RouterLink, SkeletonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ResultsTrendCardComponent, SpAlignmentGraphComponent],
+  imports: [
+    ButtonModule,
+    RouterLink,
+    SkeletonModule,
+    ProjectDashboardCardComponent,
+    GeoScopeCardComponent,
+    ResultsCenterTableComponent,
+    DatePipe,
+    ResultsTrendCardComponent,
+    SpAlignmentGraphComponent,
+    VizChartComponent
+  ],
   providers: [
     GetTopContributorsContractsService,
     GetTopMainContactPersonsService,
@@ -71,19 +87,34 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     GetContractSpAlignmentService
   ],
   templateUrl: './project-dashboard.component.html',
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  animations: [
+    trigger('fadeView', [
+      transition(':enter', [
+        style({ opacity: 0 }),
+        animate('250ms cubic-bezier(0.4, 0, 0.2, 1)', style({ opacity: 1 }))
+      ])
+    ])
+  ]
 })
 export class ProjectDashboardComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly projectUtils = inject(ProjectUtilsService);
   private readonly resultsCenterService = inject(ResultsCenterService);
   private readonly fileManagerService = inject(FileManagerService);
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
   private readonly actions = inject(ActionsService);
+  private readonly darkModeService = inject(DarkModeService);
   readonly getProjectDetailService = inject(GetProjectDetailService);
   readonly contractResultsSummary = inject(GetContractResultsSummaryService);
   readonly contractSpAlignment = inject(GetContractSpAlignmentService);
+
+  readonly tokens = chartTokens(this.darkModeService.darkMode());
+
+  readonly indicatorView = signal<'bars' | 'heatmap'>('bars');
+  readonly useCrossfadeFallback = signal<boolean>(true);
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
@@ -147,6 +178,254 @@ export class ProjectDashboardComponent {
   readonly indicatorsWithResults = computed(() => this.indicatorSummaries().filter(indicator => indicator.value > 0));
 
   readonly totalProjectResults = computed(() => this.indicatorSummaries().reduce((total, indicator) => total + indicator.value, 0));
+
+  // Heatmap matrix computations (R-DA-004)
+  readonly heatmapYears = computed<(number | null)[]>(() => {
+    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+    const rawYears = Array.from(new Set(byIndYear.map(item => item.year)));
+    const numericYears = rawYears
+      .filter((y): y is number => y !== null && y !== undefined && !isNaN(Number(y)))
+      .sort((a, b) => a - b);
+    const hasNullYear = rawYears.some(y => y === null || y === undefined);
+    return hasNullYear ? [...numericYears, null] : numericYears;
+  });
+
+  readonly heatmapMatrixData = computed(() => {
+    const indicators = this.indicatorsWithResults();
+    const years = this.heatmapYears();
+    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+
+    const map = new Map<string, number>();
+    for (const item of byIndYear) {
+      const key = `${item.indicator_id}_${item.year ?? 'null'}`;
+      map.set(key, Number(item.count ?? 0));
+    }
+
+    const data: [number, number, number][] = [];
+    let max = 0;
+    let min = Infinity;
+
+    indicators.forEach((indicator, indicatorIndex) => {
+      const indId = indicator.indicatorId ?? indicator.id;
+      years.forEach((year, yearIndex) => {
+        const key = `${indId}_${year ?? 'null'}`;
+        const count = map.get(key) ?? 0;
+        data.push([yearIndex, indicatorIndex, count]);
+        if (count > max) max = count;
+        if (count < min) min = count;
+      });
+    });
+
+    if (min === Infinity) min = 0;
+
+    return { data, max, min, indicators, years };
+  });
+
+  readonly heatmapMinCount = computed(() => this.heatmapMatrixData().min);
+  readonly heatmapMaxCount = computed(() => this.heatmapMatrixData().max);
+
+  readonly indicatorHeatmapTableModel = computed<VizChartTableModel>(() => {
+    const { indicators, years } = this.heatmapMatrixData();
+    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+    const map = new Map<string, number>();
+    for (const item of byIndYear) {
+      const key = `${item.indicator_id}_${item.year ?? 'null'}`;
+      map.set(key, Number(item.count ?? 0));
+    }
+
+    const yearHeaders = years.map(y => (y === null ? 'No year' : String(y)));
+    const headers = ['Indicator', ...yearHeaders, 'Total'];
+
+    const rows = indicators.map(ind => {
+      const indId = ind.indicatorId ?? ind.id;
+      const yearCounts = years.map(y => map.get(`${indId}_${y ?? 'null'}`) ?? 0);
+      const rowTotal = yearCounts.reduce((sum, c) => sum + c, 0);
+      return [ind.label, ...yearCounts, rowTotal];
+    });
+
+    return {
+      caption: 'Results by indicator and year matrix',
+      headers,
+      rows
+    };
+  });
+
+  readonly indicatorHeatmapOptions = computed<EChartsOption | null>(() => {
+    const { data, max, indicators, years } = this.heatmapMatrixData();
+    if (indicators.length === 0 || years.length === 0) {
+      return null;
+    }
+
+    const tokenRamp = this.tokens().ramp.filter(Boolean);
+    const rampColors =
+      tokenRamp.length === 5
+        ? tokenRamp
+        : [
+            'var(--ac-viz-ramp-1)',
+            'var(--ac-viz-ramp-2)',
+            'var(--ac-viz-ramp-3)',
+            'var(--ac-viz-ramp-4)',
+            'var(--ac-viz-ramp-5)'
+          ];
+
+    const yearLabels = years.map(y => (y === null ? 'No year' : String(y)));
+    const indicatorLabels = indicators.map(i => i.label);
+
+    return {
+      grid: {
+        top: 16,
+        bottom: 32,
+        left: 12,
+        right: 16,
+        containLabel: true
+      },
+      tooltip: {
+        position: 'top',
+        formatter: (params: unknown) => {
+          const item = params as { data?: [number, number, number] };
+          const d = item?.data;
+          if (!d || !Array.isArray(d)) return '';
+          const [xIdx, yIdx, count] = d;
+          const yearLabel = yearLabels[xIdx] ?? '';
+          const indLabel = indicatorLabels[yIdx] ?? '';
+          return `<strong>${indLabel}</strong><br/>Year: ${yearLabel}<br/>Results: ${count}`;
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: yearLabels,
+        splitArea: { show: true },
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: indicatorLabels,
+        splitArea: { show: true },
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 140,
+          overflow: 'truncate'
+        }
+      },
+      visualMap: {
+        min: 0,
+        max: max > 0 ? max : 1,
+        calculable: false,
+        orient: 'horizontal',
+        show: false,
+        inRange: {
+          color: rampColors
+        }
+      },
+      series: [
+        {
+          id: 'indicator-series',
+          name: 'Results by indicator and year',
+          type: 'heatmap',
+          data,
+          universalTransition: {
+            enabled: true,
+            divideShape: 'clone'
+          },
+          label: {
+            show: true,
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+  });
+
+  readonly indicatorBarOptions = computed<EChartsOption | null>(() => {
+    const indicators = this.indicatorsWithResults();
+    if (indicators.length === 0) return null;
+
+    const labels = indicators.map(i => i.label).reverse();
+    const values = indicators.map(i => i.value).reverse();
+
+    return {
+      grid: {
+        top: 16,
+        bottom: 24,
+        left: 12,
+        right: 24,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' }
+      },
+      xAxis: {
+        type: 'value',
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        },
+        splitLine: {
+          lineStyle: { color: 'var(--ac-grey-200)' }
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: labels,
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 140,
+          overflow: 'truncate'
+        }
+      },
+      series: [
+        {
+          id: 'indicator-series',
+          name: 'Results by indicator',
+          type: 'bar',
+          data: values,
+          universalTransition: {
+            enabled: true,
+            divideShape: 'clone'
+          },
+          itemStyle: {
+            color: 'var(--ac-primary-blue-600)',
+            borderRadius: [0, 4, 4, 0]
+          },
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          }
+        }
+      ]
+    };
+  });
+
+  readonly activeIndicatorChartOptions = computed(() =>
+    this.indicatorView() === 'heatmap' ? this.indicatorHeatmapOptions() : this.indicatorBarOptions()
+  );
 
   // KPI strip computed signals (R-PD-002)
   readonly indicatorsCoveredCount = computed(() => this.indicatorsWithResults().length);
@@ -261,6 +540,22 @@ export class ProjectDashboardComponent {
         this.contractSpAlignment.main(contractId);
       }
     });
+  }
+
+  setIndicatorView(view: 'bars' | 'heatmap'): void {
+    this.indicatorView.set(view);
+  }
+
+  onIndicatorHeatmapClick(event: ECElementEvent): void {
+    const data = event.data as [number, number, number] | undefined;
+    if (!data || !Array.isArray(data)) return;
+    const [, indicatorIndex] = data;
+    const indicator = this.indicatorsWithResults()[indicatorIndex];
+    if (indicator?.id !== undefined && indicator?.id !== null) {
+      void this.router.navigate(['/project-detail', this.contractId()], {
+        queryParams: { indicatorTab: indicator.id }
+      });
+    }
   }
 
   private async syncProjectFromSharedService(contractId: string): Promise<void> {

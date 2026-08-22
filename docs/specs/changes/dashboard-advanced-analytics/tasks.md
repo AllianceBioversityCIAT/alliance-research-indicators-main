@@ -125,9 +125,9 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Files:** indicator card region in `project-dashboard.component.*` (+spec), viz-chart consumption
 - **Skills:** `angular-developer`, `ui-ux-pro-max` · **Deps:** T-06, T-07
 - **Done checks:**
-  - [ ] Toggle issues **zero** HTTP requests (`HttpTestingController.verify()` across the toggle — *red input: refetch on toggle, must fail*).
-  - [ ] Both views reconcile totals (rendered-DOM against one fixture); ramp legend present; toggle keyboard-operable with state announced.
-  - [ ] Reduced-motion fixture: instant swap (init-option assertion; visual → T-13). Crossfade fallback flag exists and switches the transition config. *Presence caveat declared: flag presence ≠ morph visual quality — that is T-13's HITL call.*
+  - [x] Toggle issues **zero** HTTP requests (`HttpTestingController.verify()` across the toggle — *red input: refetch on toggle, must fail*).
+  - [x] Both views reconcile totals (rendered-DOM against one fixture); ramp legend present; toggle keyboard-operable with state announced.
+  - [x] Reduced-motion fixture: instant swap (init-option assertion; visual → T-13). Crossfade fallback flag exists and switches the transition config. *Presence caveat declared: flag presence ≠ morph visual quality — that is T-13's HITL call.*
 
 ### T-11 — Client: project context strip
 - **Requirements:** R-DA-005 (all ACs, Scenario `BUT` no-fabrication + `AND IT MUST` stable layout) · **Design:** §6 Context strip

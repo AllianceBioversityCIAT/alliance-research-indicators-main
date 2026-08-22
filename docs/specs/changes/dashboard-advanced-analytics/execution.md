@@ -195,9 +195,26 @@
     - R-DA-009: PASS (accessible tableModel + WCAG 1.4.1 non-color legend).
     - KZ-002: PASS (bilateral and non-bilateral DOM tests present and passing).
 
-
-
-
-
-
+### Task T-10: Client: bars↔heatmap toggle + morph
+- **Status:** PASS
+- **Attempts:** 3
+- **Implementer Evidence:**
+  - Added `indicatorView = signal<'bars' | 'heatmap'>('bars')` in `ProjectDashboardComponent`.
+  - Added segmented view toggle buttons with `role="group"`, `aria-label="Indicator view mode"`, and dynamic `aria-pressed` states.
+  - Implemented `indicatorBarOptions` (horizontal bar series) and `indicatorHeatmapOptions` (matrix heatmap series) with shared series ID `indicator-series` and `universalTransition: { enabled: true, divideShape: 'clone' }` for engine-native morphing.
+  - Implemented `useCrossfadeFallback` signal (proposal §12 / design §6 escape valve) allowing toggle between native morphing `<app-viz-chart>` and fallback HTML ranked list / heatmap with `@fadeView` crossfade.
+  - Implemented paired `indicatorHeatmapTableModel` with indicator × year matrix and row/column totals reconciling with total project results.
+  - Implemented 5-step sequential ramp legend with min/max count labels for WCAG 1.4.1 compliance.
+  - Implemented click drill-through navigating to `/project-detail/:id?indicatorTab=:id`.
+  - Verification:
+    - Jest: `PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (77 passed, 77 total).
+    - Angular Lint: `npm run lint -- --quiet` (0 errors).
+    - Gate D4: Zero hex literals in component.
+- **Reviewer Audit (Attempt 3):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - R-DA-004 (Toggle & Matrix): PASS. Zero refetch across toggle, totals reconcile, keyboard accessible.
+    - R-DA-007 (Morph & Escape Valve): PASS. Engine-native morph configured via universalTransition and shared series id; escape valve switches to crossfade fallback.
+    - R-DA-008 (Tokens & Legend): PASS. Token-based 5-step ramp and legend in DOM.
+    - R-DA-009 (A11y): PASS. Paired matrix tableModel, drill links, accessible labels.
 
