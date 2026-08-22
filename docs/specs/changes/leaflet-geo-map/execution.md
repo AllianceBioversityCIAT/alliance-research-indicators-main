@@ -162,3 +162,69 @@
 - **Reviewer Verdict:** PASS
 - **Reviewer Summary:** All measurement evidence for T-07 has been correctly provided and verified against the acceptance criteria. The tsc spec error count (939) successfully falls below the 945 baseline, and all build, bundle size, sentinel, test suite, and token validation requirements are met.
 
+---
+
+## Addendum — In-Flight Spec Correction (2026-08-22)
+
+### Scope: Country-Less Reach Fallback (D-GEO-9, R-GEO-006 AC.4)
+
+- **Trigger / Context:** Live testing evidence on project A511 (`GLOBAL 7`, `REGIONAL 3`, `top_countries: []`). When a project has non-empty global or regional scope but zero country-specific results, the outer `geo-scope-card` remains non-empty (`isEmpty() === false`), but the map pane previously rendered a blank dead void. Spec updated in flight to add R-GEO-006 Scenario country-less + AC.4 and D-GEO-9 (static pane-level fallback in the standard empty idiom; outer card intact).
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.ts` (emits null options/tableModel when `hasData()` is false)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.html` (`@if (hasData())` renders `<app-viz-chart>`; `@else` renders static pane fallback with `pi-globe` and `"No country-level data — this project's reach is global/regional."`)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts` (AC.4 DOM fallback assertion + KZ-015 empty-to-data transition test)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts` (AC.4 fixture test: `isEmpty()` is false for `{ global: 7, regional: 3, top_countries: [] }`)
+  - `docs/specs/changes/leaflet-geo-map/tasks.md` (updated T-04 done-checks, coverage matrix AC.4 row, T-08 two-contract check)
+
+### Named Failing Input Proof (K-012 / K-004 / KZ-014)
+
+- **Probe Inversion:** Inverted the `hasData` guard in `geo-scope-map.component.ts` by setting `readonly hasData = computed(() => true);` (forcing unconditional chart mounting and bypassing the pane fallback).
+- **Verification Command:** `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts --coverage=false`
+- **Observed Verbatim Red Failure (Exit code 1):**
+
+```text
+FAIL src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts
+  GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GEO-006)
+    KZ-015 Transition fixture & Initial empty state (R-GEO-006 / AC.4 / D-GEO-9)
+      ✕ constructs in empty state with static pane fallback in DOM and no chart options (AC.4 / D-GEO-9) (300 ms)
+      ✕ transitions from empty initial state to populated input and renders chart, removing fallback (KZ-015 / AC.4) (31 ms)
+
+  ● GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GEO-006) › KZ-015 Transition fixture & Initial empty state (R-GEO-006 / AC.4 / D-GEO-9) › constructs in empty state with static pane fallback in DOM and no chart options (AC.4 / D-GEO-9)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      48 |       fixture.detectChanges();
+      49 |
+    > 50 |       expect(component.hasData()).toBe(false);
+         |                                   ^
+      51 |       expect(component.options()).toBeNull();
+      52 |       expect(component.tableModel()).toBeNull();
+      53 |       expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
+
+  ● GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GEO-006) › KZ-015 Transition fixture & Initial empty state (R-GEO-006 / AC.4 / D-GEO-9) › transitions from empty initial state to populated input and renders chart, removing fallback (KZ-015 / AC.4)
+
+    expect(received).not.toBeNull()
+
+    Received: null
+
+      62 |       // 1. Initial country-less state
+      63 |       fixture.detectChanges();
+    > 64 |       expect(fixture.nativeElement.querySelector('[data-testid="geo-scope-map-fallback"]')).not.toBeNull();
+         |                                                                                                 ^
+      65 |       expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeNull();
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 7 passed, 9 total
+```
+
+### Green Verification Evidence (Post-Restoration)
+
+- **Command:** `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts src/app/shared/utils/geo-choropleth.util.spec.ts --coverage=false`
+- **Output:** Exit Code 0 (3/3 suites passed, 31/31 tests passed).
+- **Production Build:** `npm run build` in `client/research-indicators` succeeded with exit code 0 (Initial total: 1.12 MB raw / 261.35 kB transfer; `project-dashboard-component` chunk: 1.02 MB raw / 272.78 kB transfer).
+- **Status:** PASS
+
+
