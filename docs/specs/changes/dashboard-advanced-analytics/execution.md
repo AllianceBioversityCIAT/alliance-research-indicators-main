@@ -254,4 +254,32 @@
     - R-DA-003 / R-DA-005 Layout & DOM Order: PASS. KPI strip $\to$ Context strip $\to$ Analytics grid $\to$ Pending table $\to$ AI grounding section.
     - Region Error Isolation: PASS. SP alignment service error isolates gracefully and does not affect sibling widgets.
 
+### Task T-13: Final gates + HITL validation
+- **Status:** PASS
+- **Attempts:** 1
+- **Implementer Evidence:**
+  - **Full test suites executed serially (K-018):**
+    - Client unit tests: `319 passed, 319 total suites (6,650 passed, 0 failed, 98.24% lines coverage)`.
+    - Server unit tests: `338 passed, 338 total suites (2,438 passed, 0 failed)`.
+  - **Production build verification:**
+    - Client build (`ng build`): PASS. Initial bundle transfer size: 265.84 kB (Initial raw total 1.16 MB $\le$ 3.00 MB budget). Lazy dashboard chunk 2.62 MB / 624.71 kB transfer.
+    - Server build (`nest build && vite build`): PASS. Clean build with Vite admin SSR asset compilation.
+  - **Gate D4 (Zero hex literals):**
+    - Grep verification over all touched/added frontend components, templates, and utilities: 0 hex literals found.
+    - Token validation script (`npm run tokens:validate`): PASS with 0 errors across all 19 tokens and strict light/dark ramp monotonicity checks.
+  - **Chart.js & PrimeNG Chart eradication (R-DA-006):**
+    - Grep verification: 0 `chart.js` or `primeng/chart` imports in `src/`.
+  - **API contracts & Swagger:**
+    - `GET /api/v1/agresso-contract/sp-alignment/:agreement_id` (R-DA-001)
+    - `GET /api/v1/agresso-contract/results-summary/:agreement_id` (R-DA-002 with `matrix` payload)
+    - `GET /api/v1/agresso-contract/:agreement_id` (R-DA-005 extended fields)
+    - Swagger tags `@ApiTags('Agresso Contract')`, `@ApiOperation`, and DTO definitions registered.
+- **Reviewer Audit (Attempt 1):**
+  - **Verdict:** STATUS: PASS
+  - **Findings:**
+    - All requirements (R-DA-001 through R-DA-009) and non-functional requirements (NFR-DA-001 through NFR-DA-005) completely satisfied.
+    - Spec-to-code traceability verified across all 13 tasks (T-01 through T-13).
+
+
+
 

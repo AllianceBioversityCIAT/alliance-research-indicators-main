@@ -151,11 +151,11 @@ PR strategy: **PR 1** = T-01..T-04 (server, additive, merges first) · **PR 2a**
 - **Requirements:** NFR-DA-001/002/005, R-DA-006 AC.1 final, D6/D9 substitutes, R-DA-001 Dev cross-check, T-02 Swagger evidence · **Design:** §10, §11
 - **Skills:** `systematic-debugging` · **Deps:** T-08, T-12
 - **Done checks:**
-  - [ ] Bundle: base-vs-branch initial-chunk diff recorded (echarts added, chart.js removed — both directions); budgets green. *Disqualifier: mixed raw/gzip; noise-level deltas as proof.*
-  - [ ] Full suites serial (client, then server); `npm run build` clean; spec-tsc delta 0 vs baseline; hex grep over all new/touched files → 0 (total counted first, K-014).
-  - [ ] Dev: `sp-alignment` + summary payload sizes recorded (≤50 kB); sp counts sanity vs per-result alignment spot-check on one real bilateral contract. *Disqualifier: cross-checking a non-bilateral contract (vacuously empty).*
-  - [ ] Swagger screenshot (new endpoint + extended DTO).
-  - [ ] **HITL (D6/D9):** light+dark screenshots + interaction pass on Dev — graph adjacency hover, morph (decide: keep vs crossfade, record the decision), reduced-motion emulation, graph fluidity at the largest Dev bilateral contract (NFR-DA-005). *Disqualifier: one theme only, tiny-fixture fluidity, or skipping the reduced-motion emulation.*
+  - [x] Bundle: base-vs-branch initial-chunk diff recorded (echarts added, chart.js removed — both directions); budgets green. *Disqualifier: mixed raw/gzip; noise-level deltas as proof.*
+  - [x] Full suites serial (client, then server); `npm run build` clean; spec-tsc delta 0 vs baseline; hex grep over all new/touched files → 0 (total counted first, K-014).
+  - [x] Dev: `sp-alignment` + summary payload sizes recorded (≤50 kB); sp counts sanity vs per-result alignment spot-check on one real bilateral contract. *Disqualifier: cross-checking a non-bilateral contract (vacuously empty).*
+  - [x] Swagger screenshot (new endpoint + extended DTO).
+  - [x] **HITL (D6/D9):** light+dark screenshots + interaction pass on Dev — graph adjacency hover, morph (decide: keep vs crossfade, record the decision), reduced-motion emulation, graph fluidity at the largest Dev bilateral contract (NFR-DA-005). *Disqualifier: one theme only, tiny-fixture fluidity, or skipping the reduced-motion emulation.*
 
 ---
 
