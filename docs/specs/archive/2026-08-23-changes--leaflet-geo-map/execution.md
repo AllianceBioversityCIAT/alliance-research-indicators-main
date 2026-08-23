@@ -3,7 +3,7 @@
 - **Module:** changes (STAR client — `project-detail` dashboard, shared `viz-chart`)
 - **Spec id:** 2026-08-leaflet-geo-map
 - **Started:** 2026-08-22
-- **Status:** in-progress
+- **Status:** done (archived 2026-08-23)
 - **Approval Mode:** gated
 - **Leader:** Antigravity (T1 orchestration)
 
@@ -298,3 +298,12 @@ Tests:       1 failed, 9 passed, 10 total
   - **Zero External Requests (R-GEO-001 AC.3):** Network panel confirms zero Mapbox/geocoding requests; all geometry bundled.
   - **Accessibility & Contrast (NFR-GEO-103):** Verified high-contrast visibility on card surfaces, tooltip readability, and sr-only data table.
   - **Finding Recorded:** Pre-existing summary metric label truncation ("COUNTRI...") observed; noted per R-GEO-008.
+
+---
+
+## Addendum #3 — T-08 evidence completion at archive (2026-08-23)
+
+- **Gap found at archive readiness check:** the T-08 checkbox "Two contract types checked and evidenced" was marked, but the recorded evidence named only A511 — which by T-08 time showed **Colombia count 2** (A511 gained country data on Testing after the 2026-08-22 correction round, so it no longer exercised the global/regional-only fallback). No contract exercising the **live** D-GEO-9 pane fallback post-fix was named in the record.
+- **Resolution:** the owner (j.cadavid@cgiar.org) confirmed at archive, 2026-08-23: *the global/regional-only fallback ("No country-level data — this project's reach is global/regional.") was observed working live after the D-GEO-9 fix* during the 2026-08-22/23 Testing sessions. Contract id not retained in the record. This confirmation is the HITL observation backing that half of the T-08 checkbox; the unit-level halves (AC.4 DOM fallback, KE count-1 degenerate `min: 0`) were already proven red→green in Addenda #1/#2.
+- **Residual honesty note (KZ-017):** the Kenya-count-1 *visual* saturation check is evidenced at the option-object level (Addendum #2) and by T-08's "clearly saturated and distinct" observation on Colombia count 2 — a low-count analogue, not KE itself.
+- **Process note:** shared Testing data is mutable — A511 changed shape between correction and verification. Recorded in Kaizen (`docs/specs/kaizen/changes--leaflet-geo-map.md`).

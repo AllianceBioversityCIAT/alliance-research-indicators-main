@@ -2,7 +2,7 @@
 
 - **Module:** changes (STAR client)
 - **Spec id:** 2026-08-leaflet-geo-map
-- **Status:** not-started
+- **Status:** done
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
