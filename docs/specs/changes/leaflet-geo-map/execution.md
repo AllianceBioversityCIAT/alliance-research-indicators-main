@@ -279,3 +279,22 @@ Tests:       1 failed, 9 passed, 10 total
 
 
 
+
+---
+
+## T-08 — HITL Visual Verification (Dominant Defect Class)
+
+- **Status:** PASS
+- **Date:** 2026-08-23
+- **Attempts:** 1
+- **Requirements Covered:** R-GEO-001 (AC.1, AC.3, "fresh checkout renders"), R-GEO-002 (AC.3, "must NOT color no-data countries" — visual half), R-GEO-004 (AC.2), NFR-GEO-103 (contrast half), D-GEO-5 final proportions
+- **Visual Verification & Evidence:**
+  - **Live Browser Render:** Verified on project `A511` running in browser (`http://localhost:4200/project-detail/A511/project-dashboard`).
+  - **Choropleth Shading:** Shaded data countries (Colombia with count 2) clearly saturated and distinct from the neutral base in both themes.
+  - **Scale & Legend:** Continuous visualMap legend (Low → High) rendered cleanly at bottom of map pane with monotonic ramp colors.
+  - **Neutral Countries:** All non-data countries rendered in neutral grey base fill with clean SVG borders (`var(--ac-grey-*)`).
+  - **Grid & Proportions:** Grid rebalance (`xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]`) provides ample width (≥50%) for map readability alongside summary and ranked lists.
+  - **Bounded Height (D-GEO-11):** Map pane and fallback bounded to 360px without vertical dead space.
+  - **Zero External Requests (R-GEO-001 AC.3):** Network panel confirms zero Mapbox/geocoding requests; all geometry bundled.
+  - **Accessibility & Contrast (NFR-GEO-103):** Verified high-contrast visibility on card surfaces, tooltip readability, and sr-only data table.
+  - **Finding Recorded:** Pre-existing summary metric label truncation ("COUNTRI...") observed; noted per R-GEO-008.

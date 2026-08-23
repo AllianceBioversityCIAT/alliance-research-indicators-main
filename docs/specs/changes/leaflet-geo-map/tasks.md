@@ -172,16 +172,16 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 - **Files touched (intended):** possibly `geo-scope-card.component.html` (final grid fractions only, within T-05's scope rule)
 - **Description:** Human check in a real browser (`npm start`, a project with geo data): choropleth paints; shading order matches counts; tooltip shows name+count; no-data countries neutral; **both themes** legible (ramp contrast against the card surface); grid proportions sane at xl and at the `md:` constrained breakpoint; network panel shows only same-origin requests during card load.
 - **Acceptance / done check:**
-  - [ ] Each item above observed and recorded (screenshots or explicit per-item confirmation) in the task evidence — **KZ-014: this task's checkbox, and any spec-level done claim, may not be marked from green suites alone while this check is pending.** This is the declared substitute gate for the visual defect class (requirements §5).
-  - [ ] Dark-mode pass explicitly includes the visualMap legend text and tooltip readability.
-  - [ ] Two contract types checked and evidenced at HITL: (1) a contract with non-empty country counts — including single-country low-count cases like Kenya (count 1) — verifying that data countries are clearly distinct from the neutral base in both themes, with correct shading order, monotonic ramp, and tooltips; (2) a global/regional-only contract (e.g. A511 on Testing: GLOBAL 7, REGIONAL 3, 0 country rows) verifying that the static pane-level fallback ("No country-level data — this project's reach is global/regional.") renders properly alongside the summary and regional lists without a dead grey pane (D-GEO-9).
-  - [ ] Bounded pane height verified (D-GEO-11, ~360px): no dead whitespace column below chart or fallback.
-  - [ ] Summary metric truncation ("COUNTRI…") checked: verify if pre-existing; if so, report as finding without modifying (out of scope for R-GEO-008).
-  - [ ] **Disqualifier:** a check run against a project with empty geo data verifies nothing about shading — the evidence must name the project/contract used and its non-empty counts.
+  - [x] Each item above observed and recorded (screenshots or explicit per-item confirmation) in the task evidence — **KZ-014: this task's checkbox, and any spec-level done claim, may not be marked from green suites alone while this check is pending.** This is the declared substitute gate for the visual defect class (requirements §5).
+  - [x] Dark-mode pass explicitly includes the visualMap legend text and tooltip readability.
+  - [x] Two contract types checked and evidenced at HITL: (1) a contract with non-empty country counts — including single-country low-count cases like Kenya (count 1) — verifying that data countries are clearly distinct from the neutral base in both themes, with correct shading order, monotonic ramp, and tooltips; (2) a global/regional-only contract (e.g. A511 on Testing: GLOBAL 7, REGIONAL 3, 0 country rows) verifying that the static pane-level fallback ("No country-level data — this project's reach is global/regional.") renders properly alongside the summary and regional lists without a dead grey pane (D-GEO-9).
+  - [x] Bounded pane height verified (D-GEO-11, ~360px): no dead whitespace column below chart or fallback.
+  - [x] Summary metric truncation ("COUNTRI…") checked: verify if pre-existing; if so, report as finding without modifying (out of scope for R-GEO-008).
+  - [x] **Disqualifier:** a check run against a project with empty geo data verifies nothing about shading — the evidence must name the project/contract used and its non-empty counts.
 - **Dependencies:** T-07
 - **Estimated effort:** S
 - **Relevant skills:** `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** done
 
 ---
 
@@ -243,12 +243,12 @@ Per template §6: one PR per boundary below; commit style `<type>(<module>): <su
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
-| RB-1 | 2026-08-22 | Geometry edition quirks (`ISO_A2:'-99'`) surface late | T-02's named failing input forces the exceptions entry before implementation completes | Implementer | open |
-| RB-2 | 2026-08-22 | Full-suite runs colliding with parallel agents produce phantom failures (§4.3) | T-07 runs in the post-worker window, single suite at a time | Leader | open |
+| RB-1 | 2026-08-22 | Geometry edition quirks (`ISO_A2:'-99'`) surface late | T-02's named failing input forces the exceptions entry before implementation completes | Implementer | closed |
+| RB-2 | 2026-08-22 | Full-suite runs colliding with parallel agents produce phantom failures (§4.3) | T-07 runs in the post-worker window, single suite at a time | Leader | closed |
 
 ## 7. Done definition
 
-- [ ] All T-01…T-08 done (T-08 requires recorded human observation — KZ-014).
-- [ ] All requirement ACs checked; coverage matrix above has no orphan.
-- [ ] Coverage floors green; `tsc` spec baseline not exceeded; budgets hold with recorded sizes.
-- [ ] Rollout note honored: no flag; DevOps token-provisioning note delivered at release.
+- [x] All T-01…T-08 done (T-08 requires recorded human observation — KZ-014).
+- [x] All requirement ACs checked; coverage matrix above has no orphan.
+- [x] Coverage floors green; `tsc` spec baseline not exceeded; budgets hold with recorded sizes.
+- [x] Rollout note honored: no flag; DevOps token-provisioning note delivered at release.
