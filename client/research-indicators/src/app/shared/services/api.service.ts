@@ -124,6 +124,7 @@ import {
 } from '@shared/interfaces/project-dashboard.interface';
 import { ContractResultsSummary } from '@shared/interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
+import { ContractDashboardReport } from '@shared/interfaces/contract-dashboard.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -937,6 +938,12 @@ export class ApiService {
     const url = () => `agresso/contracts/reports/sp-alignment?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
+
+  GET_ContractDashboard = (contractId: string): Promise<MainResponse<ContractDashboardReport>> => {
+    const url = () => `agresso/contracts/reports/dashboard?contract-id=${encodeURIComponent(contractId)}`;
+    return this.TP.get(url(), {});
+  };
+
 
   GET_GeneralReport = (): Promise<MainResponse<GeneralReportItem[]>> => {
     const url = () => `results/general-report/all`;

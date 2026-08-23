@@ -17,6 +17,7 @@ import { filter } from 'rxjs';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
+import { ExecutiveOverviewComponent } from './components/executive-overview/executive-overview.component';
 
 interface ViewTab {
   label: string;
@@ -33,7 +34,8 @@ interface ViewTab {
     SectionSidebarComponent,
     CustomTagComponent,
     DatePipe,
-    RouterOutlet
+    RouterOutlet,
+    ExecutiveOverviewComponent
   ],
   providers: [GetContractStaffService],
   templateUrl: './project-detail.component.html'

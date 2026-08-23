@@ -89,3 +89,44 @@
 - **Notes:** All acceptance criteria for T-02 verified.
 
 ---
+
+## Task: T-03 — Client Interface & `GetContractDashboardService`
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `tdd`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/shared/interfaces/contract-dashboard.interface.ts` (created)
+  - `client/research-indicators/src/app/shared/interfaces/contract-sp-alignment.interface.ts` (modified)
+  - `client/research-indicators/src/app/shared/interfaces/geo-scope.interface.ts` (modified)
+  - `client/research-indicators/src/app/shared/services/api.service.ts` (modified)
+  - `client/research-indicators/src/app/shared/services/api.service.spec.ts` (modified)
+  - `client/research-indicators/src/app/shared/services/get-contract-dashboard.service.ts` (created)
+  - `client/research-indicators/src/app/shared/services/get-contract-dashboard.service.spec.ts` (created)
+- **Summary:** Created client interfaces `ContractDashboardReport` and `ContractDashboardTops`. Added `GET_ContractDashboard` in `ApiService`. Implemented `GetContractDashboardService` with signals (`data`, `loading`, `loadError`, `loadedContractId`) and computed signals for all analytic sections. Handled cache deduplication, force reloads, and error transitions. Added comprehensive unit tests.
+- **Verification Command:** `npx jest src/app/shared/services/get-contract-dashboard.service.spec.ts src/app/shared/services/api.service.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/shared/services/get-contract-dashboard.service.spec.ts
+  PASS src/app/shared/services/api.service.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests:       234 passed, 234 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Interfaces and service implementation conform to design. Signal reactive pattern, computed accessors, error handling, and test suites are verified.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-03)
+- **Notes:** All acceptance criteria for T-03 verified.
+
+---

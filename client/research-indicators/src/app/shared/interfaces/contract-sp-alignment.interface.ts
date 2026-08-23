@@ -17,3 +17,6 @@ export interface ContractSpAlignmentReport {
   results_with_alignment: number;
   results_without_alignment: number;
 }
+
+export type ContractSpAlignment = ContractSpAlignmentReport;
+

@@ -71,11 +71,11 @@ graph TD
   - `client/research-indicators/src/app/shared/services/get-contract-dashboard.service.ts` (new +spec)
 - **Description:** Define client TypeScript interfaces matching the backend composite DTO. Add `GET_ContractDashboard(contractId)` to `ApiService`. Implement `GetContractDashboardService` with signals for `dashboard`, `summary`, `tops`, `geoScope`, `spAlignment`, `loading`, `loadError`, and methods `load()` and `update()`.
 - **Acceptance / done check:**
-  - [ ] Spec: `load(contractId)` sets `loading` to true, fetches composite data, and populates computed signals simultaneously (KZ-015: transition test).
-  - [ ] Spec: `update()` re-fetches with `force: true`.
-  - [ ] Spec: network error transitions `loadError` to true and `loading` to false.
-  - [ ] `npx jest src/app/shared/services/get-contract-dashboard.service.spec.ts src/app/shared/services/api.service.spec.ts --coverage=false` passes.
-- **Dependencies:** T-02 · **Effort:** M · **Status:** todo
+  - [x] Spec: `load(contractId)` sets `loading` to true, fetches composite data, and populates computed signals simultaneously (KZ-015: transition test).
+  - [x] Spec: `update()` re-fetches with `force: true`.
+  - [x] Spec: network error transitions `loadError` to true and `loading` to false.
+  - [x] `npx jest src/app/shared/services/get-contract-dashboard.service.spec.ts src/app/shared/services/api.service.spec.ts --coverage=false` passes.
+- **Dependencies:** T-02 · **Effort:** M · **Status:** done
 
 ---
 

@@ -1,3 +1,5 @@
+import type { GeoScopeReport } from '@interfaces/project-dashboard.interface';
+
 export interface GeoScopeSubNational {
   sub_national_id: number | string;
   sub_national_name: string;
@@ -50,3 +52,6 @@ export interface GeoScopePointFeatureCollection {
   type: 'FeatureCollection';
   features: GeoScopePointFeature[];
 }
+
+export type GeoScopeResponse = GeoScopeReport;
+
