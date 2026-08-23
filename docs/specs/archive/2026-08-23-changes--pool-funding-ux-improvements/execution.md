@@ -5,7 +5,7 @@
 | Property | Value |
 | --- | --- |
 | **Spec Path** | `docs/specs/changes/pool-funding-ux-improvements` |
-| **Status** | completed |
+| **Status** | done (archived 2026-08-23) |
 | **Leader** | Antigravity (T1 Architect) |
 | **Date Started** | 2026-08-20 |
 | **Last Updated** | 2026-08-20 |
