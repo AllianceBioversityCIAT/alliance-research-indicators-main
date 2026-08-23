@@ -120,10 +120,10 @@ graph TD
 - **Files touched (intended):** `results-trend-card.component.{html,ts}` (+spec), `project-dashboard.component.{html,ts}` (+spec).
 - **Description:** Trend chart emits chartClick → navigate with `yearTab` (data-point clicks only); status composition segments become interactive twins of the existing row links (`statusTab`).
 - **Acceptance / done check:**
-  - [ ] Spec: clicking a year data point navigates with that year; an axis-label/blank-area click event does NOT navigate (**named failing input:** handler that navigates on any `chartClick` regardless of `componentType` → must fail).
-  - [ ] Spec: status segment activation navigates with the bucket's `statusTab`; keyboard activation path asserted on the row link twin.
-  - [ ] Trend `tableModel` still present and correct.
-- **Dependencies:** T-01 · **Effort:** M · **Status:** todo
+  - [x] Spec: clicking a year data point navigates with that year; an axis-label/blank-area click event does NOT navigate (**named failing input:** handler that navigates on any `chartClick` regardless of `componentType` → must fail).
+  - [x] Spec: status segment activation navigates with the bucket's `statusTab`; keyboard activation path asserted on the row link twin.
+  - [x] Trend `tableModel` still present and correct.
+- **Dependencies:** T-01 · **Effort:** M · **Status:** done
 
 ### T-08 — Enable native morph + sr-only indicator link list
 

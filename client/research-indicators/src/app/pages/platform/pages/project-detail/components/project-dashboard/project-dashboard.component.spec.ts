@@ -62,6 +62,8 @@ class ResultsTrendCardStubComponent {
   @Input() buckets: ContractResultsSummaryYearBucket[] = [];
   @Input() loading = false;
   @Input() error = false;
+  @Output() chartClick = new EventEmitter<unknown>();
+  @Output() retry = new EventEmitter<void>();
 }
 
 @Component({
@@ -3266,6 +3268,87 @@ describe('ProjectDashboardComponent', () => {
 
         const contributorSeries = (component.contributorChartOptions()?.series as any[])[0];
         expect(contributorSeries.cursor).toBe('pointer');
+      });
+    });
+
+    describe('Trend and status interactivity (T-07 / R-HL-006 / R-HL-009 / D-F1-6)', () => {
+      const summaryWithYearsAndStatuses: ContractResultsSummary = {
+        total: 25,
+        by_indicator_year: [],
+        by_status: [
+          { status_id: 6, name: 'Approved', count: 15 },
+          { status_id: 2, name: 'Submitted', count: 10 }
+        ],
+        by_year: [
+          { year: 2023, count: 5 },
+          { year: 2024, count: 12 },
+          { year: 2025, count: 8 }
+        ],
+        partner_institutions: 3
+      };
+
+      it('navigates to project-results with yearTab on trend chartClick with series event (transition-arranged KZ-015)', async () => {
+        await setup('C-TEST', { summary: summaryWithYearsAndStatuses });
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        // KZ-015: initial state — no navigation has occurred
+        expect(navSpy).not.toHaveBeenCalled();
+
+        // Act: click on a trend data point (e.g. 2024)
+        component.onTrendChartClick({
+          componentType: 'series',
+          name: '2024',
+          dataIndex: 1
+        } as any);
+
+        // Assert: navigated with yearTab = 2024
+        expect(navSpy).toHaveBeenCalledTimes(1);
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+          queryParams: { yearTab: 2024 }
+        });
+      });
+
+      it('does NOT navigate on trend chartClick when clicked on axis label, blank area, or non-series element (named failing input check)', async () => {
+        await setup('C-TEST', { summary: summaryWithYearsAndStatuses });
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        // Act on axis / grid / yAxis clicks
+        component.onTrendChartClick({ componentType: 'xAxis', name: '2024' } as any);
+        expect(navSpy).not.toHaveBeenCalled();
+
+        component.onTrendChartClick({ componentType: 'grid' } as any);
+        expect(navSpy).not.toHaveBeenCalled();
+
+        component.onTrendChartClick({ componentType: 'yAxis' } as any);
+        expect(navSpy).not.toHaveBeenCalled();
+      });
+
+      it('renders interactive <a> links for status composition bar segments with statusTab and accessible label', async () => {
+        await setup('C-TEST', { summary: summaryWithYearsAndStatuses });
+
+        const compositionLinks = fixture.nativeElement.querySelectorAll('figure[role="img"] a');
+        expect(compositionLinks.length).toBe(2);
+
+        const firstSegment = compositionLinks[0] as HTMLAnchorElement;
+        expect(firstSegment.getAttribute('aria-label')).toContain('Approved');
+        expect(firstSegment.getAttribute('aria-label')).toContain('15 results');
+        expect(firstSegment.getAttribute('aria-label')).toContain('view filtered results');
+        expect(firstSegment.getAttribute('data-status-id')).toBe('6');
+      });
+
+      it('maintains accessible row link twins in status table for keyboard navigation with visible focus styling', async () => {
+        await setup('C-TEST', { summary: summaryWithYearsAndStatuses });
+
+        const tableLinks = fixture.nativeElement.querySelectorAll('table tbody tr a');
+        expect(tableLinks.length).toBe(2);
+
+        const firstTableLink = tableLinks[0] as HTMLAnchorElement;
+        expect(firstTableLink.getAttribute('aria-label')).toContain('Approved');
+        expect(firstTableLink.getAttribute('aria-label')).toContain('view filtered results');
       });
     });
   });

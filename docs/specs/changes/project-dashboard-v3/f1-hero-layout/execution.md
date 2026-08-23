@@ -350,3 +350,43 @@
 - **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
 
 ---
+
+## Task: T-07 — Trend and status interactivity
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Added `cursor: 'pointer'` and series point click handling on Results over time trend chart to navigate to `project-results` with `yearTab`, ignoring axis/blank clicks. Converted status composition bar segments into interactive `<a>` links twins of table rows with `statusTab` navigation and accessible labels. Retained table row links for keyboard navigation.
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/results-trend-card/results-trend-card.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 145 passed, 145 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Trend chart click handler filters strictly for `componentType === 'series'` and navigates to `project-results` with `yearTab`. Status composition bar segments are interactive `<a>` elements mirroring `statusTab` query params with accessible labels. All negative test cases (axis/blank clicks) and keyboard navigation paths verified.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-07)
+- **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
+
+---

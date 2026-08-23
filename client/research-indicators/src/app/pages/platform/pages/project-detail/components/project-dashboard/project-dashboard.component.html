@@ -444,6 +444,7 @@
       [buckets]="contractResultsSummary.list()?.by_year ?? []"
       [loading]="contractResultsSummary.loading()"
       [error]="contractResultsSummary.loadError()"
+      (chartClick)="onTrendChartClick($event)"
       (retry)="contractResultsSummary.update()">
     </app-results-trend-card>
     }
@@ -482,14 +483,16 @@
             Composition
           </span>
           <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
-            @for (bucket of statusBuckets(); track $index) {
-            <div class="h-full min-w-[2px] transition-[width] duration-300 ease-in-out"
+            @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
+            <a class="block h-full min-w-[2px] transition-all duration-300 ease-in-out hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
               [style.width.%]="statusSharePercent(bucket.count)"
               [style.background-color]="statusColor(bucket.status_id)"
+              [routerLink]="['/project-detail', contractId()]"
+              [queryParams]="statusRowQueryParams(bucket)"
+              [attr.aria-label]="statusRowAriaLabel(bucket)"
               [attr.data-status-id]="bucket.status_id"
-              [attr.data-status-token]="statusTokenName(bucket.status_id)"
-              aria-hidden="true">
-            </div>
+              [attr.data-status-token]="statusTokenName(bucket.status_id)">
+            </a>
             }
           </div>
         </figure>

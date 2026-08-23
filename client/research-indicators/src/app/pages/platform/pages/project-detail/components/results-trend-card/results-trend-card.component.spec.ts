@@ -200,12 +200,37 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, R-DA-006, NFR-PD-001)',
 
       const series = (options?.series as any[])[0];
       expect(series.type).toBe('line');
+      expect(series.cursor).toBe('pointer');
       expect(series.data).toEqual([6, 14, 22, 31, 34, 21]);
 
       const visualMap = options?.visualMap as any;
       expect(visualMap.show).toBe(false);
       expect(visualMap.pieces).toBeDefined();
       expect(visualMap.pieces[1].lineStyle.type).toBe('dashed');
+    });
+
+    describe('Interactivity and click handling (R-HL-006)', () => {
+      it('emits chartClick when a series data point is clicked (componentType === "series")', () => {
+        const clickSpy = jest.fn();
+        component.chartClick.subscribe(clickSpy);
+
+        const seriesEvent = { componentType: 'series', name: '2024', dataIndex: 4, value: 34 } as any;
+        component.onChartClick(seriesEvent);
+
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        expect(clickSpy).toHaveBeenCalledWith(seriesEvent);
+      });
+
+      it('does NOT emit chartClick when a non-series element is clicked (e.g. axis label, blank area)', () => {
+        const clickSpy = jest.fn();
+        component.chartClick.subscribe(clickSpy);
+
+        component.onChartClick({ componentType: 'xAxis', name: '2024' } as any);
+        component.onChartClick({ componentType: 'grid' } as any);
+        component.onChartClick({ componentType: 'yAxis' } as any);
+
+        expect(clickSpy).not.toHaveBeenCalled();
+      });
     });
   });
 

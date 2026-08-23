@@ -62,7 +62,8 @@
         [options]="chartOptions()"
         [tableModel]="tableModel()"
         [chartTitle]="chartAriaLabel()"
-        height="220px" />
+        height="220px"
+        (chartClick)="onChartClick($event)" />
     </div>
     }
   </div>

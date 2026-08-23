@@ -1167,6 +1167,20 @@ export class ProjectDashboardComponent {
     }
   }
 
+  onTrendChartClick(event: ECElementEvent): void {
+    if (event.componentType !== 'series') {
+      return;
+    }
+    const yearStr = event.name ?? (typeof event.dataIndex === 'number' ? this.contractResultsSummary.list()?.by_year?.[event.dataIndex]?.year : undefined);
+    const year = yearStr !== undefined && yearStr !== null && yearStr !== '' ? Number(yearStr) : undefined;
+    const contractId = this.contractId();
+    if (contractId && year !== undefined && !isNaN(year)) {
+      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+        queryParams: { yearTab: year }
+      });
+    }
+  }
+
   onLeverChartClick(event: ECElementEvent): void {
     const data = event.data as { leverId?: string } | undefined;
     const index = typeof event.dataIndex === 'number' ? event.dataIndex : undefined;

@@ -5,6 +5,7 @@ import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
 import { ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+import type { ECElementEvent } from 'echarts/core';
 
 @Component({
   selector: 'app-results-trend-card',
@@ -21,6 +22,7 @@ export class ResultsTrendCardComponent {
   readonly loading = input<boolean>(false);
   readonly error = input<boolean>(false);
   readonly retry = output<void>();
+  readonly chartClick = output<ECElementEvent>();
 
   // Filter out null or invalid year values and sort ascending by year
   readonly validBuckets = computed(() => {
@@ -143,6 +145,7 @@ export class ResultsTrendCardComponent {
         {
           name: 'Results',
           type: 'line',
+          cursor: 'pointer',
           data: buckets.map(b => b.count),
           smooth: false,
           symbol: 'circle',
@@ -156,4 +159,10 @@ export class ResultsTrendCardComponent {
       ]
     };
   });
+
+  onChartClick(event: ECElementEvent): void {
+    if (event.componentType === 'series') {
+      this.chartClick.emit(event);
+    }
+  }
 }
