@@ -636,7 +636,8 @@ describe('ProjectDashboardComponent', () => {
         }
       ]);
       expect(component.executiveOverviewGeneratedAt()).toBe('2026-07-09T20:10:56.921192+00:00');
-      expect(component.showExecutiveOverview()).toBe(true);
+      expect(component.hasExecutiveOverviewData()).toBe(true);
+      expect(component.showGroundingSection()).toBe(true);
     });
 
     it('should load executive overview summary for non-admin users when data exists', async () => {
@@ -648,14 +649,16 @@ describe('ProjectDashboardComponent', () => {
         'Stored overview paragraph.',
         'Second stored paragraph.'
       ]);
-      expect(component.showExecutiveOverview()).toBe(true);
+      expect(component.hasExecutiveOverviewData()).toBe(true);
+      expect(component.showGroundingSection()).toBe(false);
     });
 
     it('should hide executive overview for non-admin users when no data exists', async () => {
       await setup('C-1', { isAdmin: false, emptyOverview: true });
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
-      expect(component.showExecutiveOverview()).toBe(false);
+      expect(component.hasExecutiveOverviewData()).toBe(false);
+      expect(component.showGroundingSection()).toBe(false);
     });
 
     it('should block grounding upload actions for non-admin users', async () => {
@@ -724,15 +727,58 @@ describe('ProjectDashboardComponent', () => {
       expect(component.executiveOverviewError()).toBe(false);
     });
 
-    it('should set executive overview error when document overview generation fails', async () => {
+    it('should set executive overview error, show toast, and render error alert in DOM when document overview generation fails', async () => {
       await setup();
       component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'folder/contract.pdf' }]);
       documentOverviewServiceMock.generateDocumentOverview.mockRejectedValueOnce(new Error('overview failed'));
 
       await component.generateExecutiveOverview();
+      fixture.detectChanges();
 
       expect(component.executiveOverviewError()).toBe(true);
       expect(component.executiveOverviewLoading()).toBe(false);
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Generation failed',
+          detail: 'Unable to generate the executive overview. Please try again.'
+        })
+      );
+
+      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+      expect(bottomSection).toBeTruthy();
+      const errorAlert = bottomSection.querySelector('[role="alert"]');
+      expect(errorAlert).toBeTruthy();
+      expect(errorAlert.textContent).toContain('Unable to generate the executive overview. Please try again.');
+    });
+
+    it('should reset executive overview error when a new upload or generation is triggered', async () => {
+      await setup();
+      component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'folder/contract.pdf' }]);
+      component.executiveOverviewError.set(true);
+      fixture.detectChanges();
+
+      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+      expect(bottomSection.querySelector('[role="alert"]')).toBeTruthy();
+
+      // Trigger new upload
+      await component.onGroundingFilesSelected({
+        target: createFileInput([createFile('new.pdf')])
+      } as unknown as Event);
+
+      expect(component.executiveOverviewError()).toBe(false);
+
+      // Re-trigger error and verify reset on generate
+      component.executiveOverviewError.set(true);
+      documentOverviewServiceMock.generateDocumentOverview.mockResolvedValueOnce({
+        overview: { project_summary: 'Regenerated summary' },
+        generated_at: '2026-08-22T15:00:00.000Z',
+        available_files: [],
+        documents_processed: []
+      });
+
+      await component.generateExecutiveOverview();
+      expect(component.executiveOverviewError()).toBe(false);
     });
 
     it('should skip executive overview generation when contract id is missing', async () => {
@@ -1774,6 +1820,187 @@ describe('ProjectDashboardComponent', () => {
       expect(statusSection?.style.animationDelay).toBe('200ms');
       expect(trendCard?.style.animationDelay).toBe('300ms');
       expect(spGraph?.style.animationDelay).toBe('400ms');
+    });
+  });
+
+  describe('Executive Overview Clear Placement (R-AIP-001, R-AIP-002, R-AIP-003, D-AIP-1..6)', () => {
+    describe('Four-cell rendered-DOM matrix (R-AIP-002, KZ-001, KZ-015)', () => {
+      it('Cell 1: non-admin + no summary -> card ABSENT, bottom AI section ABSENT, no placeholder (KZ-001, KZ-015)', async () => {
+        await setup('C-1', { isAdmin: false, emptyOverview: true });
+
+        expect(component.canAccessGroundingSetup()).toBe(false);
+        expect(component.hasExecutiveOverviewData()).toBe(false);
+        expect(component.showGroundingSection()).toBe(false);
+
+        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
+        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+        expect(topCard).toBeNull();
+        expect(bottomSection).toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('Executive Overview');
+        expect(fixture.nativeElement.textContent).not.toContain('AI Grounding');
+      });
+
+      it('Cell 2: non-admin + summary exists -> card PRESENT, bottom AI section ABSENT (KZ-015 transition)', async () => {
+        await setup('C-1', { isAdmin: false, emptyOverview: true });
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).toBeNull();
+
+        component.executiveOverviewParagraphs.set(['First summary paragraph.', 'Second summary paragraph.']);
+        component.executiveOverviewGeneratedAt.set('2026-08-22T14:30:00.000Z');
+        fixture.detectChanges();
+
+        expect(component.hasExecutiveOverviewData()).toBe(true);
+        expect(component.showGroundingSection()).toBe(false);
+
+        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
+        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+        expect(topCard).not.toBeNull();
+        expect(bottomSection).toBeNull();
+        expect(topCard.textContent).toContain('Executive Overview');
+        expect(topCard.textContent).toContain('Grounded AI Summary');
+        expect(topCard.textContent).toContain('First summary paragraph.');
+      });
+
+      it('Cell 3: admin + no summary + docs present -> card ABSENT, bottom AI section PRESENT with setup only (KZ-015)', async () => {
+        await setup('C-1', { isAdmin: true, emptyOverview: true });
+        component.groundedDocuments.set([]);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).toBeNull();
+
+        component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'k/contract.pdf' }]);
+        fixture.detectChanges();
+
+        expect(component.hasExecutiveOverviewData()).toBe(false);
+        expect(component.showGroundingSection()).toBe(true);
+
+        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
+        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+        expect(topCard).toBeNull();
+        expect(bottomSection).not.toBeNull();
+        expect(bottomSection.textContent).toContain('AI Grounding & Setup');
+        expect(bottomSection.querySelector('#grounding-file-input')).toBeTruthy();
+        expect(bottomSection.textContent).not.toContain('Grounded AI Summary');
+      });
+
+      it('Cell 4: admin + summary exists -> card PRESENT, bottom AI section PRESENT (setup only) (KZ-015)', async () => {
+        await setup('C-1', { isAdmin: true, emptyOverview: true });
+        component.groundedDocuments.set([]);
+        fixture.detectChanges();
+
+        component.executiveOverviewParagraphs.set(['Admin summary paragraph.']);
+        component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'k/contract.pdf' }]);
+        component.executiveOverviewGeneratedAt.set('2026-08-22T14:30:00.000Z');
+        fixture.detectChanges();
+
+        expect(component.hasExecutiveOverviewData()).toBe(true);
+        expect(component.showGroundingSection()).toBe(true);
+
+        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
+        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+
+        expect(topCard).not.toBeNull();
+        expect(bottomSection).not.toBeNull();
+        expect(topCard.textContent).toContain('Executive Overview');
+        expect(bottomSection.textContent).toContain('AI Grounding & Setup');
+      });
+    });
+
+    describe('DOM document order (R-AIP-001, D-AIP-2, KZ-017)', () => {
+      it('should render top card between context strip and analytics grid (KZ-017 declared limit: proves DOM order, not visual layout)', async () => {
+        await setup('C-1', { isAdmin: false });
+        component.executiveOverviewParagraphs.set(['Executive overview summary paragraph.']);
+        fixture.detectChanges();
+
+        const root = fixture.nativeElement as HTMLElement;
+        const contextStrip = root.querySelector('app-project-context-strip');
+        const topCard = root.querySelector('section[aria-labelledby="executive-overview-title"]');
+        const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
+
+        expect(contextStrip).toBeTruthy();
+        expect(topCard).toBeTruthy();
+        expect(analyticsGrid).toBeTruthy();
+
+        expect(contextStrip!.compareDocumentPosition(topCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(topCard!.compareDocumentPosition(analyticsGrid!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      });
+    });
+
+    describe('View more expansion and provenance sources (R-AIP-001, D-AIP-3, D-AIP-4)', () => {
+      it('should collapse to 1 paragraph by default and expand remaining paragraphs + sources on View more click', async () => {
+        await setup('C-1', { isAdmin: false });
+        component.executiveOverviewParagraphs.set([
+          'First overview paragraph.',
+          'Second overview paragraph.',
+          'Third overview paragraph.'
+        ]);
+        component.overviewSourceDocuments.set([
+          { fileName: 'Contract_2026.pdf', fileKey: 'k/contract.pdf' },
+          { fileName: 'Scope_of_Work.docx', fileKey: 'k/sow.docx' }
+        ]);
+        component.executiveOverviewGeneratedAt.set('2026-08-22T12:00:00.000Z');
+        component.executiveOverviewExpanded.set(false);
+        fixture.detectChanges();
+
+        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
+        expect(topCard).toBeTruthy();
+
+        const toggleBtn = topCard.querySelector('button[aria-controls="executive-overview-details"]') as HTMLButtonElement;
+        expect(toggleBtn).toBeTruthy();
+        expect(toggleBtn.textContent?.trim()).toBe('View more');
+        expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+
+        const collapsedParagraphs = topCard.querySelectorAll('p');
+        expect(collapsedParagraphs.length).toBe(1);
+        expect(collapsedParagraphs[0].textContent?.trim()).toBe('First overview paragraph.');
+        expect(topCard.querySelector('#executive-overview-details')).toBeNull();
+
+        toggleBtn.click();
+        fixture.detectChanges();
+
+        expect(component.executiveOverviewExpanded()).toBe(true);
+        expect(toggleBtn.textContent?.trim()).toBe('Show less');
+        expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
+
+        const expandedParagraphs = topCard.querySelectorAll('p');
+        expect(expandedParagraphs.length).toBe(3);
+        expect(expandedParagraphs[0].textContent?.trim()).toBe('First overview paragraph.');
+        expect(expandedParagraphs[1].textContent?.trim()).toBe('Second overview paragraph.');
+        expect(expandedParagraphs[2].textContent?.trim()).toBe('Third overview paragraph.');
+
+        const sourceSection = topCard.querySelector('#executive-overview-details');
+        expect(sourceSection).toBeTruthy();
+        expect(sourceSection.textContent).toContain('Generated from');
+        expect(sourceSection.textContent).toContain('Contract_2026.pdf');
+        expect(sourceSection.textContent).toContain('Scope_of_Work.docx');
+
+        toggleBtn.click();
+        fixture.detectChanges();
+
+        expect(component.executiveOverviewExpanded()).toBe(false);
+        expect(toggleBtn.textContent?.trim()).toBe('View more');
+        expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
+        expect(topCard.querySelectorAll('p').length).toBe(1);
+      });
+    });
+
+    describe('Admin bottom-section gate combinations (D-AIP-5, R-AIP-002)', () => {
+      it('should keep bottom section visible for admin when docs removed after generation (D-AIP-5)', async () => {
+        await setup('C-1', { isAdmin: true });
+        component.groundedDocuments.set([]);
+        component.executiveOverviewLoading.set(false);
+        component.executiveOverviewError.set(false);
+        component.executiveOverviewParagraphs.set(['Persisted summary']);
+        fixture.detectChanges();
+
+        expect(component.hasExecutiveOverviewData()).toBe(true);
+        expect(component.hasGroundedDocuments()).toBe(false);
+        expect(component.showGroundingSection()).toBe(true);
+      });
     });
   });
 });

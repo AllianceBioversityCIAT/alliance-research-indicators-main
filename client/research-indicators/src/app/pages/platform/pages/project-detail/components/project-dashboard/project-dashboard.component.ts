@@ -50,6 +50,7 @@ const GROUNDING_PAGE_LIMIT = 100;
 export const WIDGET_ENTRY_STAGGER_MS = {
   kpi: 0,
   contextStrip: 100,
+  executiveOverview: 150,
   indicatorStatus: 200,
   trend: 300,
   spGraph: 400
@@ -137,6 +138,7 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewParagraphs = signal<string[]>([]);
   readonly executiveOverviewLoading = signal(false);
   readonly executiveOverviewError = signal(false);
+  readonly executiveOverviewExpanded = signal(false);
   readonly isCaveatExpanded = signal(false);
   readonly isAiSectionExpanded = signal(false);
 
@@ -159,17 +161,17 @@ export class ProjectDashboardComponent {
   readonly hasGroundedDocuments = computed(() => this.groundedDocuments().length > 0);
   readonly canAccessGroundingSetup = computed(() => this.rolesService.isAdmin());
   readonly hasExecutiveOverviewData = computed(() => this.executiveOverviewParagraphs().length > 0);
-  readonly showExecutiveOverview = computed(() => {
-    if (this.canAccessGroundingSetup()) {
-      return (
-        this.hasGroundedDocuments() ||
+  readonly hasExecutiveOverviewExpandableContent = computed(
+    () => this.executiveOverviewParagraphs().length > 1 || this.overviewSourceDocuments().length > 0
+  );
+  readonly showGroundingSection = computed(() => {
+    return (
+      this.canAccessGroundingSetup() &&
+      (this.hasGroundedDocuments() ||
         this.executiveOverviewLoading() ||
         this.executiveOverviewError() ||
-        this.hasExecutiveOverviewData()
-      );
-    }
-
-    return this.hasExecutiveOverviewData();
+        this.hasExecutiveOverviewData())
+    );
   });
 
   readonly indicatorSummaries = computed(() => {
@@ -703,6 +705,7 @@ export class ProjectDashboardComponent {
     }
 
     this.uploadingGroundingDoc.set(true);
+    this.executiveOverviewError.set(false);
 
     try {
       for (const file of filesToUpload) {
@@ -836,6 +839,11 @@ export class ProjectDashboardComponent {
       this.applyDocumentOverviewResponse(response);
     } catch {
       this.executiveOverviewError.set(true);
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Generation failed',
+        detail: 'Unable to generate the executive overview. Please try again.'
+      });
     } finally {
       this.executiveOverviewLoading.set(false);
     }

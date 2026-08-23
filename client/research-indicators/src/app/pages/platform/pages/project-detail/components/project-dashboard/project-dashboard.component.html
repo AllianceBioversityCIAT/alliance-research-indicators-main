@@ -122,6 +122,75 @@
   <!-- Project Context strip (R-DA-005, T-11, T-12) -->
   <app-project-context-strip [project]="project()" [style.animation-delay.ms]="staggerMs.contextStrip"></app-project-context-strip>
 
+  <!-- Top Executive Overview prominent card (R-AIP-001, D-AIP-1, D-AIP-2) -->
+  @if (hasExecutiveOverviewData()) {
+  <section class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+    aria-labelledby="executive-overview-title"
+    [style.animation-delay.ms]="staggerMs.executiveOverview">
+    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="flex min-w-0 flex-col gap-1">
+        <div class="flex items-center gap-2">
+          <h2 id="executive-overview-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
+            Executive Overview
+          </h2>
+        </div>
+        @if (executiveOverviewGeneratedAt()) {
+        <span class="block font-['Barlow'] text-[13px] font-normal leading-snug text-[var(--ac-grey-700)]">
+          Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+        </span>
+        }
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[var(--ac-light-blue-300)]">
+          <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
+          Grounded AI Summary
+        </span>
+        @if (hasExecutiveOverviewExpandableContent()) {
+        <button type="button"
+          class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
+          (click)="executiveOverviewExpanded.set(!executiveOverviewExpanded())"
+          [attr.aria-expanded]="executiveOverviewExpanded()"
+          aria-controls="executive-overview-details">
+          {{ executiveOverviewExpanded() ? 'Show less' : 'View more' }}
+        </button>
+        }
+      </div>
+    </header>
+
+    <div class="flex flex-col gap-4">
+      @if (executiveOverviewParagraphs().length > 0) {
+      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ executiveOverviewParagraphs()[0] }}</p>
+      }
+
+      @if (executiveOverviewExpanded()) {
+      <div id="executive-overview-details" class="flex flex-col gap-4">
+        @for (paragraph of executiveOverviewParagraphs().slice(1); track paragraph) {
+        <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ paragraph }}</p>
+        }
+
+        @if (overviewSourceDocuments().length > 0) {
+        <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
+          <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-[0.03rem] text-[var(--ac-grey-600)]">
+            Generated from</span>
+          <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
+            @for (document of overviewSourceDocuments(); track document.fileKey) {
+            <li class="flex min-w-0 items-center gap-2">
+              <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                document.fileName }}</span>
+            </li>
+            }
+          </ul>
+        </div>
+        }
+      </div>
+      }
+    </div>
+  </section>
+  }
+
   <!-- Geo scope -->
   <div class="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_1fr] lg:items-start">
     <div class="flex min-w-0 flex-col gap-5">
@@ -469,8 +538,8 @@
       emptyMessage="No results pending revision"></app-results-center-table>
   </section>
 
-  <!-- AI Grounding & Setup + Executive Overview section relocated below analytics (R-PD-008, D-PD-8, D-PD-9) -->
-  @if (showExecutiveOverview()) {
+  <!-- AI Grounding & Setup section relocated below analytics (R-PD-008, D-PD-8, D-PD-9, R-AIP-002) -->
+  @if (showGroundingSection()) {
   <section class="flex flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
     aria-labelledby="ai-grounding-section-title">
     <header class="flex flex-wrap items-center justify-between gap-4">
@@ -481,7 +550,7 @@
         <div class="flex flex-col gap-0.5">
           <div class="flex items-center gap-2">
             <h2 id="ai-grounding-section-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
-              AI Grounding &amp; Executive Overview
+              AI Grounding &amp; Setup
             </h2>
             <span class="rounded-full bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Space_Grotesk'] text-[11px] font-semibold"
               [style.color]="groundedDocumentsCountColor()">
@@ -560,6 +629,15 @@
           </div>
         </div>
 
+        @if (executiveOverviewError()) {
+        <div class="flex items-center gap-2 rounded-lg border border-[var(--ac-red-1)] bg-[var(--ac-white-1)] px-4 py-3 text-[var(--ac-red-1)] shadow-xs" role="alert">
+          <i class="pi pi-exclamation-triangle text-[16px] shrink-0" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug">
+            Unable to generate the executive overview. Please try again.
+          </p>
+        </div>
+        }
+
         @if (hasGroundedDocuments()) {
         <span
           class="font-['Barlow'] text-[12px] font-medium leading-none"
@@ -588,58 +666,6 @@
         }
       </div>
       }
-
-      <div class="flex flex-col gap-5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] px-6 py-6 shadow-xs">
-        <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div class="flex min-w-0 flex-col gap-2">
-            <h3 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Executive Overview</h3>
-            @if (!executiveOverviewLoading() && executiveOverviewGeneratedAt()) {
-            <p class="m-0 font-['Barlow'] text-[13px] font-normal leading-snug text-[var(--ac-grey-700)]">
-              Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
-            </p>
-            }
-          </div>
-          @if (!executiveOverviewLoading()) {
-          <div class="flex flex-wrap items-center gap-2">
-            <span
-              class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[var(--ac-light-blue-300)]">
-              <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
-              Grounded AI Summary
-            </span>
-          </div>
-          }
-        </header>
-
-        @if (!executiveOverviewLoading() && overviewSourceDocuments().length > 0) {
-        <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
-          <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-[0.03rem] text-[var(--ac-grey-600)]">
-            Generated from</span>
-          <ul class="m-0 flex list-none flex-col gap-1.5 p-0">
-            @for (document of overviewSourceDocuments(); track document.fileKey) {
-            <li class="flex min-w-0 items-center gap-2">
-              <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
-                document.fileName }}</span>
-            </li>
-            }
-          </ul>
-        </div>
-        }
-
-        <div class="flex flex-col gap-4">
-          @if (executiveOverviewLoading()) {
-          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">Generating grounded summary...
-          </p>
-          } @else if (executiveOverviewError()) {
-          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">Unable to generate the
-            executive overview. Please try again.</p>
-          } @else {
-          @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
-          <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ paragraph }}</p>
-          }
-          }
-        </div>
-      </div>
     </div>
   </section>
   }
