@@ -185,7 +185,7 @@ Branch: `bilateral-visual-improvements` (current). Commits `<type>(project-dashb
 
 ## 8. Done definition
 
-- [ ] All T-01…T-09 done (checkbox flips only with `execution.md` PASS evidence — repo guardrail hook).
-- [ ] Coverage-closure table verified against final code.
-- [ ] `docs/ux-ui/design.md` §12.2 delta recorded at archive (KZ-013 backward sweep for the deleted strip).
-- [ ] Rollout note: normal dev-branch pipeline; rollback = revert.
+- [x] All T-01…T-09 done (checkbox flips only with `execution.md` PASS evidence — repo guardrail hook).
+- [x] Coverage-closure table verified against final code (post-rework suite 6731/6731 green, 2026-08-23).
+- [ ] `docs/ux-ui/design.md` §12.2 delta recorded at archive (KZ-013 backward sweep for the deleted strip). **Carried as `guide-sync` pending item — spec branch, applied on default-branch kaizen apply.**
+- [x] Rollout note: normal dev-branch pipeline; rollback = revert.
