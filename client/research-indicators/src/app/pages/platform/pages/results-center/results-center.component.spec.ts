@@ -63,7 +63,10 @@ describe('ResultsCenterComponent', () => {
       activateStatePersistence: jest.fn(),
       deactivateStatePersistence: jest.fn(),
       restorePersistedState: jest.fn().mockReturnValue(false),
-      applyStatusFilterFromHomeLink: jest.fn()
+      applyStatusFilterFromHomeLink: jest.fn(),
+      applyLeverFilterFromLink: jest.fn(),
+      applyContractFilterFromLink: jest.fn(),
+      applyYearFilterFromLink: jest.fn()
     } as any;
 
     mockCacheService = {
@@ -224,7 +227,7 @@ describe('ResultsCenterComponent', () => {
       expect(mockRouter.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null },
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
           queryParamsHandling: 'merge',
           replaceUrl: true
         })
@@ -256,7 +259,7 @@ describe('ResultsCenterComponent', () => {
       expect(mockRouter.navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null },
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
           queryParamsHandling: 'merge',
           replaceUrl: true
         })
@@ -299,6 +302,194 @@ describe('ResultsCenterComponent', () => {
         skipMain: true
       });
       expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+    });
+
+    it('should apply lever filter from query param, load My Results, and clear URL', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'leverTab' ? '2' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
+      expect(mockResultsCenterService.applyLeverFilterFromLink).toHaveBeenCalledWith(2, undefined, { skipMain: true });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should apply contract filter from query param, load My Results, and clear URL', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'contractTab' ? 'CON-001' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
+      expect(mockResultsCenterService.applyContractFilterFromLink).toHaveBeenCalledWith('CON-001', undefined, { skipMain: true });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should apply year filter from query param, load My Results, and clear URL', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'yearTab' ? '2025' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      const loadMyResultsSpy = jest.spyOn(component, 'loadMyResults');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.restorePersistedState).not.toHaveBeenCalled();
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(loadMyResultsSpy).toHaveBeenCalledWith(true);
+      expect(mockResultsCenterService.applyYearFilterFromLink).toHaveBeenCalledWith(2025, { skipMain: true });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should apply multiple valid drill filters simultaneously and clear URL', async () => {
+      queryParamGet.mockImplementation((key: string) => {
+        switch (key) {
+          case 'indicatorTab':
+            return '3';
+          case 'statusTab':
+            return '6';
+          case 'statusLabel':
+            return 'Submitted';
+          case 'leverTab':
+            return '1';
+          case 'contractTab':
+            return 'CON-500';
+          case 'yearTab':
+            return '2024';
+          default:
+            return null;
+        }
+      });
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      jest.spyOn(component, 'loadMyResults');
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.onSelectFilterTab).toHaveBeenCalledWith(3, { skipMain: true });
+      expect(mockResultsCenterService.applyStatusFilterFromHomeLink).toHaveBeenCalledWith(6, 'Submitted', { skipMain: true });
+      expect(mockResultsCenterService.applyLeverFilterFromLink).toHaveBeenCalledWith(1, undefined, { skipMain: true });
+      expect(mockResultsCenterService.applyContractFilterFromLink).toHaveBeenCalledWith('CON-500', undefined, { skipMain: true });
+      expect(mockResultsCenterService.applyYearFilterFromLink).toHaveBeenCalledWith(2024, { skipMain: true });
+      expect(mockResultsCenterService.main).toHaveBeenCalledTimes(1);
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should not apply filters and clear URL when malformed leverTab is provided', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'leverTab' ? 'abc' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      const loadPinnedTabPreferenceSpy = jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      const loadAllResultsSpy = jest.spyOn(component, 'loadAllResults').mockImplementation();
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.applyLeverFilterFromLink).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+      expect(loadPinnedTabPreferenceSpy).toHaveBeenCalled();
+      expect(loadAllResultsSpy).toHaveBeenCalled();
+    });
+
+    it('should not apply filters and clear URL when non-positive leverTab is provided', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'leverTab' ? '0' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      jest.spyOn(component, 'loadAllResults').mockImplementation();
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.applyLeverFilterFromLink).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should not apply filters and clear URL when empty contractTab is provided', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'contractTab' ? '   ' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      jest.spyOn(component, 'loadAllResults').mockImplementation();
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.applyContractFilterFromLink).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
+    });
+
+    it('should not apply filters and clear URL when invalid yearTab is provided', async () => {
+      queryParamGet.mockImplementation((key: string) => (key === 'yearTab' ? 'invalid-year' : null));
+      mockResultsCenterService.restorePersistedState.mockReturnValue(false);
+      jest.spyOn(component as any, 'loadPinnedTabPreference').mockResolvedValue('all');
+      jest.spyOn(component, 'loadAllResults').mockImplementation();
+
+      await (component as any).initializeState();
+
+      expect(mockResultsCenterService.applyYearFilterFromLink).not.toHaveBeenCalled();
+      expect(mockRouter.navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { indicatorTab: null, statusTab: null, statusLabel: null, leverTab: null, contractTab: null, yearTab: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        })
+      );
     });
   });
 

@@ -77,7 +77,10 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
 
     const hasDrillParams =
       this.activatedRoute.snapshot.queryParamMap?.has('statusTab') ||
-      this.activatedRoute.snapshot.queryParamMap?.has('indicatorTab');
+      this.activatedRoute.snapshot.queryParamMap?.has('indicatorTab') ||
+      this.activatedRoute.snapshot.queryParamMap?.has('leverTab') ||
+      this.activatedRoute.snapshot.queryParamMap?.has('contractTab') ||
+      this.activatedRoute.snapshot.queryParamMap?.has('yearTab');
 
     if (!hasDrillParams && this.lastSegment() === 'project-results' && this.activateProjectResultsState()) {
       void this.resultsCenterService.main();
@@ -99,8 +102,11 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
       .subscribe(params => {
         const hasStatusTab = params.has('statusTab');
         const hasIndicatorTab = params.has('indicatorTab');
+        const hasLeverTab = params.has('leverTab');
+        const hasContractTab = params.has('contractTab');
+        const hasYearTab = params.has('yearTab');
 
-        if (!hasStatusTab && !hasIndicatorTab) {
+        if (!hasStatusTab && !hasIndicatorTab && !hasLeverTab && !hasContractTab && !hasYearTab) {
           return;
         }
 
@@ -126,11 +132,40 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
           }
         }
 
+        let leverId: number | null | undefined = undefined;
+        if (hasLeverTab) {
+          const rawLever = params.get('leverTab');
+          if (rawLever !== null && rawLever !== '') {
+            const parsed = Number(rawLever);
+            leverId = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+          }
+        }
+
+        let contractCode: string | null | undefined = undefined;
+        if (hasContractTab) {
+          const rawContract = params.get('contractTab');
+          if (rawContract !== null && rawContract.trim() !== '') {
+            contractCode = rawContract.trim();
+          }
+        }
+
+        let year: number | null | undefined = undefined;
+        if (hasYearTab) {
+          const rawYear = params.get('yearTab');
+          if (rawYear !== null && rawYear !== '') {
+            const parsed = Number(rawYear);
+            year = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+          }
+        }
+
         this.lastSegment.set('project-results');
         this.resultsCenterService.initializeScopedResultsTable({
           contractId: this.contractId(),
           statusId,
-          indicatorId
+          indicatorId,
+          leverId,
+          contractCode,
+          year
         });
 
         void this.router.navigate([], {

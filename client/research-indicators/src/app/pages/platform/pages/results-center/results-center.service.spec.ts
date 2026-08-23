@@ -1209,6 +1209,70 @@ describe('ResultsCenterService', () => {
       expect(mainSpy).toHaveBeenCalled();
     });
 
+    it('sets lever filter and contract context', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.initializeScopedResultsTable({ contractId: 'D514', leverId: 3 });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter()['lever-codes']).toEqual([3]);
+      expect(service.appliedFilters()['lever-codes']).toEqual([3]);
+      expect(service.tableFilters().levers).toEqual([{ id: 3, name: '', short_name: '' }]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('sets contract code filter and contract context', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.initializeScopedResultsTable({ contractId: 'D514', contractCode: 'CON-999' });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter()['contract-codes']).toEqual(['CON-999']);
+      expect(service.appliedFilters()['contract-codes']).toEqual(['CON-999']);
+      expect(service.tableFilters().contracts).toEqual([{ agreement_id: 'CON-999', display_label: 'CON-999' }]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('sets year filter and contract context', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.initializeScopedResultsTable({ contractId: 'D514', year: 2025 });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter().years).toEqual([2025]);
+      expect(service.appliedFilters().years).toEqual([2025]);
+      expect(service.tableFilters().years).toEqual([{ report_year: 2025 }]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('handles multiple filters simultaneously', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+      const syncSpy = jest.spyOn<any, any>(service, 'syncIndicatorTabSelection').mockImplementation(() => {});
+
+      service.initializeScopedResultsTable({
+        contractId: 'D514',
+        statusId: 2,
+        indicatorId: 4,
+        leverId: 1,
+        contractCode: 'CON-100',
+        year: 2024
+      });
+
+      expect(service.primaryContractId()).toBe('D514');
+      expect(service.resultsFilter()['status-codes']).toEqual([2]);
+      expect(service.resultsFilter()['indicator-codes']).toEqual([4]);
+      expect(service.resultsFilter()['lever-codes']).toEqual([1]);
+      expect(service.resultsFilter()['contract-codes']).toEqual(['CON-100']);
+      expect(service.resultsFilter().years).toEqual([2024]);
+      expect(service.tableFilters().statusCodes).toEqual([{ result_status_id: 2, name: '' }]);
+      expect(service.tableFilters().indicators).toEqual([{ indicator_id: 4, name: '' }]);
+      expect(service.tableFilters().levers).toEqual([{ id: 1, name: '', short_name: '' }]);
+      expect(service.tableFilters().contracts).toEqual([{ agreement_id: 'CON-100', display_label: 'CON-100' }]);
+      expect(service.tableFilters().years).toEqual([{ report_year: 2024 }]);
+      expect(syncSpy).toHaveBeenCalledWith(4);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
     it('handles no-status / null statusId correctly (contract scope with no status filter)', () => {
       const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
 
@@ -1266,6 +1330,106 @@ describe('ResultsCenterService', () => {
       service.applyStatusFilterFromHomeLink(2, '  Submitted  ');
 
       expect(service.tableFilters().statusCodes[0].name).toBe('Submitted');
+    });
+  });
+
+  describe('applyLeverFilterFromLink', () => {
+    it('sets lever on tableFilters and results filters and calls main by default', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyLeverFilterFromLink(2, 'Lever B');
+
+      expect(service.tableFilters().levers).toEqual([{ id: 2, name: 'Lever B', short_name: 'Lever B' }]);
+      expect(service.resultsFilter()['lever-codes']).toEqual([2]);
+      expect(service.appliedFilters()['lever-codes']).toEqual([2]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('does not call main when skipMain is true', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyLeverFilterFromLink(3, 'Lever C', { skipMain: true });
+
+      expect(service.tableFilters().levers[0]).toEqual({ id: 3, name: 'Lever C', short_name: 'Lever C' });
+      expect(mainSpy).not.toHaveBeenCalled();
+    });
+
+    it('uses empty string when leverName is omitted', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyLeverFilterFromLink(5);
+
+      expect(service.tableFilters().levers[0].name).toBe('');
+      expect(service.tableFilters().levers[0].short_name).toBe('');
+    });
+
+    it('trims leverName', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyLeverFilterFromLink(1, '  Lever A  ');
+
+      expect(service.tableFilters().levers[0].name).toBe('Lever A');
+      expect(service.tableFilters().levers[0].short_name).toBe('Lever A');
+    });
+  });
+
+  describe('applyContractFilterFromLink', () => {
+    it('sets contract on tableFilters and results filters and calls main by default', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyContractFilterFromLink('CON-001', 'Project Alpha');
+
+      expect(service.tableFilters().contracts).toEqual([{ agreement_id: 'CON-001', display_label: 'Project Alpha' }]);
+      expect(service.resultsFilter()['contract-codes']).toEqual(['CON-001']);
+      expect(service.appliedFilters()['contract-codes']).toEqual(['CON-001']);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('does not call main when skipMain is true', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyContractFilterFromLink('CON-002', 'Project Beta', { skipMain: true });
+
+      expect(service.tableFilters().contracts[0]).toEqual({ agreement_id: 'CON-002', display_label: 'Project Beta' });
+      expect(mainSpy).not.toHaveBeenCalled();
+    });
+
+    it('uses contractCode as display_label when displayLabel is omitted', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyContractFilterFromLink('CON-003');
+
+      expect(service.tableFilters().contracts[0].display_label).toBe('CON-003');
+    });
+
+    it('trims displayLabel', () => {
+      jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyContractFilterFromLink('CON-004', '  Project Gamma  ');
+
+      expect(service.tableFilters().contracts[0].display_label).toBe('Project Gamma');
+    });
+  });
+
+  describe('applyYearFilterFromLink', () => {
+    it('sets year on tableFilters and results filters and calls main by default', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyYearFilterFromLink(2025);
+
+      expect(service.tableFilters().years).toEqual([{ report_year: 2025 }]);
+      expect(service.resultsFilter().years).toEqual([2025]);
+      expect(service.appliedFilters().years).toEqual([2025]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('does not call main when skipMain is true', () => {
+      const mainSpy = jest.spyOn(service, 'main').mockImplementation(() => Promise.resolve());
+
+      service.applyYearFilterFromLink(2024, { skipMain: true });
+
+      expect(service.tableFilters().years[0].report_year).toBe(2024);
+      expect(mainSpy).not.toHaveBeenCalled();
     });
   });
 

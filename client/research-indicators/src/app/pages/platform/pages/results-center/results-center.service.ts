@@ -17,6 +17,7 @@ import { GetAllIndicators } from '../../../../shared/interfaces/get-all-indicato
 import { Table, TableLazyLoadEvent } from 'primeng/table';
 import { ApiService } from '../../../../shared/services/api.service';
 import { MultiselectComponent } from '../../../../shared/components/custom-fields/multiselect/multiselect.component';
+import { GetYear } from '../../../../shared/interfaces/get-year.interface';
 
 interface ResultsCenterPersistedState {
   myResultsFilterItemId: string;
@@ -751,8 +752,77 @@ export class ResultsCenterService {
     }
   }
 
-  /** Scoped results table for project drill-through: status and/or indicator, primary contract context. */
-  initializeScopedResultsTable(options: { contractId: string; statusId?: number | null; indicatorId?: number | null }): void {
+  applyLeverFilterFromLink(leverId: number, leverName?: string, options?: { skipMain?: boolean }) {
+    this.invalidateResultsFetchDedupe();
+    const displayName = leverName?.trim() ? leverName.trim() : '';
+    this.tableFilters.update(prev => ({
+      ...prev,
+      levers: [{ id: leverId, name: displayName, short_name: displayName }]
+    }));
+    this.resultsFilter.update(prev => ({
+      ...prev,
+      'lever-codes': [leverId]
+    }));
+    this.appliedFilters.update(prev => ({
+      ...prev,
+      'lever-codes': [leverId]
+    }));
+    this.resetResultsTablePaginatorToFirstPage();
+    if (!options?.skipMain) {
+      void this.main();
+    }
+  }
+
+  applyContractFilterFromLink(contractCode: string, displayLabel?: string, options?: { skipMain?: boolean }) {
+    this.invalidateResultsFetchDedupe();
+    const label = displayLabel?.trim() ? displayLabel.trim() : contractCode;
+    this.tableFilters.update(prev => ({
+      ...prev,
+      contracts: [{ agreement_id: contractCode, display_label: label }]
+    }));
+    this.resultsFilter.update(prev => ({
+      ...prev,
+      'contract-codes': [contractCode]
+    }));
+    this.appliedFilters.update(prev => ({
+      ...prev,
+      'contract-codes': [contractCode]
+    }));
+    this.resetResultsTablePaginatorToFirstPage();
+    if (!options?.skipMain) {
+      void this.main();
+    }
+  }
+
+  applyYearFilterFromLink(year: number, options?: { skipMain?: boolean }) {
+    this.invalidateResultsFetchDedupe();
+    this.tableFilters.update(prev => ({
+      ...prev,
+      years: [{ report_year: year } as GetYear]
+    }));
+    this.resultsFilter.update(prev => ({
+      ...prev,
+      years: [year]
+    }));
+    this.appliedFilters.update(prev => ({
+      ...prev,
+      years: [year]
+    }));
+    this.resetResultsTablePaginatorToFirstPage();
+    if (!options?.skipMain) {
+      void this.main();
+    }
+  }
+
+  /** Scoped results table for project drill-through: status, indicator, lever, contract, and/or year, primary contract context. */
+  initializeScopedResultsTable(options: {
+    contractId: string;
+    statusId?: number | null;
+    indicatorId?: number | null;
+    leverId?: number | null;
+    contractCode?: string | null;
+    year?: number | null;
+  }): void {
     this.invalidateResultsFetchDedupe();
     this.primaryContractId.set(options.contractId);
     this.myResultsFilterItem.set(this.myResultsFilterItems[0]);
@@ -764,6 +834,9 @@ export class ResultsCenterService {
 
     const hasStatus = typeof options.statusId === 'number' && Number.isFinite(options.statusId);
     const hasIndicator = typeof options.indicatorId === 'number' && Number.isFinite(options.indicatorId);
+    const hasLever = typeof options.leverId === 'number' && Number.isFinite(options.leverId) && options.leverId > 0;
+    const hasContract = typeof options.contractCode === 'string' && options.contractCode.trim().length > 0;
+    const hasYear = typeof options.year === 'number' && Number.isFinite(options.year) && options.year > 0;
 
     const tableFilters = new TableFilters();
     if (hasStatus) {
@@ -772,17 +845,26 @@ export class ResultsCenterService {
     if (hasIndicator) {
       tableFilters.indicators = [{ indicator_id: Number(options.indicatorId), name: '' }];
     }
+    if (hasLever) {
+      tableFilters.levers = [{ id: Number(options.leverId), name: '', short_name: '' }];
+    }
+    if (hasContract) {
+      tableFilters.contracts = [{ agreement_id: options.contractCode!.trim(), display_label: options.contractCode!.trim() }];
+    }
+    if (hasYear) {
+      tableFilters.years = [{ report_year: Number(options.year) } as GetYear];
+    }
     this.tableFilters.set(tableFilters);
 
     const scopedFilter: ResultFilter = {
       'indicator-codes': hasIndicator ? [Number(options.indicatorId)] : [],
-      'lever-codes': [],
+      'lever-codes': hasLever ? [Number(options.leverId)] : [],
       'indicator-codes-tabs': hasIndicator ? [Number(options.indicatorId)] : [],
       'indicator-codes-filter': [],
       'status-codes': hasStatus ? [Number(options.statusId)] : [],
-      'contract-codes': [],
+      'contract-codes': hasContract ? [options.contractCode!.trim()] : [],
       'platform-code': [],
-      years: [],
+      years: hasYear ? [Number(options.year)] : [],
       'create-user-codes': []
     };
 

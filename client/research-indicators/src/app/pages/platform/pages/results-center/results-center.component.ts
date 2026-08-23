@@ -84,6 +84,18 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
     return Number.isFinite(id) && id >= 0;
   }
 
+  private isValidPositiveNumericQueryParam(raw: string | null): raw is string {
+    if (raw == null || raw === '') {
+      return false;
+    }
+    const id = Number(raw);
+    return Number.isFinite(id) && id > 0;
+  }
+
+  private isValidNonEmptyStringQueryParam(raw: string | null): raw is string {
+    return typeof raw === 'string' && raw.trim().length > 0;
+  }
+
   private async initializeState(): Promise<void> {
     this.resultsCenterService.primaryContractId.set(null);
     this.resultsCenterService.showFiltersSidebar.set(false);
@@ -92,11 +104,25 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
     const indicatorTabParam = this.route.snapshot.queryParamMap.get('indicatorTab');
     const statusTabParam = this.route.snapshot.queryParamMap.get('statusTab');
     const statusLabelParam = this.route.snapshot.queryParamMap.get('statusLabel');
+    const leverTabParam = this.route.snapshot.queryParamMap.get('leverTab');
+    const contractTabParam = this.route.snapshot.queryParamMap.get('contractTab');
+    const yearTabParam = this.route.snapshot.queryParamMap.get('yearTab');
 
     const hasIndicator = this.isValidNumericIdQueryParam(indicatorTabParam);
     const hasStatus = this.isValidNumericIdQueryParam(statusTabParam);
+    const hasLever = this.isValidPositiveNumericQueryParam(leverTabParam);
+    const hasContract = this.isValidNonEmptyStringQueryParam(contractTabParam);
+    const hasYear = this.isValidPositiveNumericQueryParam(yearTabParam);
 
-    if (hasIndicator || hasStatus) {
+    const hasAnyDrillParam =
+      indicatorTabParam !== null ||
+      statusTabParam !== null ||
+      statusLabelParam !== null ||
+      leverTabParam !== null ||
+      contractTabParam !== null ||
+      yearTabParam !== null;
+
+    if (hasIndicator || hasStatus || hasLever || hasContract || hasYear) {
       this.resultsCenterService.activateStatePersistence(this.stateKey);
       await this.loadPinnedTabPreference();
       this.loadMyResults(true);
@@ -108,18 +134,46 @@ export default class ResultsCenterComponent implements OnInit, OnDestroy {
           skipMain: true
         });
       }
+      if (hasLever) {
+        this.resultsCenterService.applyLeverFilterFromLink(Number(leverTabParam), undefined, { skipMain: true });
+      }
+      if (hasContract) {
+        this.resultsCenterService.applyContractFilterFromLink(contractTabParam!.trim(), undefined, { skipMain: true });
+      }
+      if (hasYear) {
+        this.resultsCenterService.applyYearFilterFromLink(Number(yearTabParam), { skipMain: true });
+      }
       void this.resultsCenterService.main();
       await this.router.navigate([], {
         relativeTo: this.route,
         queryParams: {
           indicatorTab: null,
           statusTab: null,
-          statusLabel: null
+          statusLabel: null,
+          leverTab: null,
+          contractTab: null,
+          yearTab: null
         },
         queryParamsHandling: 'merge',
         replaceUrl: true
       });
       return;
+    }
+
+    if (hasAnyDrillParam) {
+      await this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: {
+          indicatorTab: null,
+          statusTab: null,
+          statusLabel: null,
+          leverTab: null,
+          contractTab: null,
+          yearTab: null
+        },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
     }
 
     const openMyFromQuery = this.route.snapshot.queryParamMap.get('tab') === 'my';

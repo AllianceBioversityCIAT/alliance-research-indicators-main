@@ -512,7 +512,7 @@ describe('ProjectDetailComponent', () => {
     });
   });
 
-  describe('queryParamMap drill-through (R-PD-003, R-PD-005, R-PD-008, S3)', () => {
+  describe('queryParamMap drill-through (R-PD-003, R-PD-005, R-PD-008, S3, R-HL-005, R-HL-006)', () => {
     it('should handle live queryParamMap emission without component re-init (S3 router reuse)', () => {
       component.ngOnInit();
       router.navigate.mockClear();
@@ -525,7 +525,10 @@ describe('ProjectDetailComponent', () => {
       expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
         contractId: 'mock-id',
         statusId: 2,
-        indicatorId: undefined
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
       });
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: activatedRoute,
@@ -545,7 +548,10 @@ describe('ProjectDetailComponent', () => {
       expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
         contractId: 'mock-id',
         statusId: 5,
-        indicatorId: undefined
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
       });
     });
 
@@ -560,12 +566,167 @@ describe('ProjectDetailComponent', () => {
       expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
         contractId: 'mock-id',
         statusId: undefined,
-        indicatorId: 3
+        indicatorId: 3,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
       });
       expect(router.navigate).toHaveBeenCalledWith([], {
         relativeTo: activatedRoute,
         queryParams: {},
         replaceUrl: true
+      });
+    });
+
+    it('should handle leverTab drill-through and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ leverTab: '4' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: 4,
+        contractCode: undefined,
+        year: undefined
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle contractTab drill-through and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ contractTab: 'CON-888' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: 'CON-888',
+        year: undefined
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle yearTab drill-through and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ yearTab: '2026' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: 2026
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle combined drill-through with all params and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(
+        convertToParamMap({
+          statusTab: '1',
+          indicatorTab: '2',
+          leverTab: '3',
+          contractTab: 'CON-99',
+          yearTab: '2025'
+        })
+      );
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: 1,
+        indicatorId: 2,
+        leverId: 3,
+        contractCode: 'CON-99',
+        year: 2025
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle malformed leverTab, empty contractTab, and invalid yearTab gracefully', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(
+        convertToParamMap({
+          leverTab: 'abc',
+          contractTab: '   ',
+          yearTab: 'invalid'
+        })
+      );
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
+    it('should handle non-positive leverTab and zero yearTab as undefined', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(
+        convertToParamMap({
+          leverTab: '0',
+          yearTab: '0'
+        })
+      );
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
       });
     });
 
@@ -578,11 +739,14 @@ describe('ProjectDetailComponent', () => {
       expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
         contractId: 'mock-id',
         statusId: null,
-        indicatorId: undefined
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
       });
     });
 
-    it('should do nothing if neither statusTab nor indicatorTab are present', () => {
+    it('should do nothing if neither statusTab nor indicatorTab nor leverTab nor contractTab nor yearTab are present', () => {
       component.ngOnInit();
       resultsCenterService.initializeScopedResultsTable.mockClear();
 
