@@ -34,13 +34,21 @@ import { ResultsCenterService } from '../../../results-center/results-center.ser
 import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results-summary.interface';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
-import { ProjectContextStripComponent } from '../project-context-strip/project-context-strip.component';
 import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
 import type { ECElementEvent } from 'echarts/core';
+import { ContractCgiarEntity } from '@shared/interfaces/find-contracts.interface';
+
+export interface ProjectContextTimeline {
+  startDate: string;
+  endDate: string;
+  extensionDate: string | null;
+  elapsedPercent: number;
+  isExtended: boolean;
+}
 
 const MAX_GROUNDING_DOCS = 3;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
@@ -85,7 +93,6 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     DatePipe,
     ResultsTrendCardComponent,
     SpAlignmentGraphComponent,
-    ProjectContextStripComponent,
     VizChartComponent
   ],
   providers: [
@@ -147,6 +154,141 @@ export class ProjectDashboardComponent {
   readonly isBilateral = computed(() => {
     const p = this.project();
     return !!p && isBilateralFundingType(p.funding_type) && !hasActivePooledFundingContract(p);
+  });
+
+  readonly grantAmount = computed<string | null>(() => {
+    const p = this.project();
+    const raw = p?.grant_amount_usd ?? p?.grant_amount;
+    return formatCurrencyUSD(raw);
+  });
+
+  readonly centerAmount = computed<string | null>(() => {
+    const p = this.project();
+    const raw = p?.center_amount_usd;
+    return formatCurrencyUSD(raw);
+  });
+
+  readonly fundingType = computed<string | null>(() => {
+    const ft = this.project()?.funding_type;
+    if (ft === null || ft === undefined || ft.trim() === '') {
+      return null;
+    }
+    return ft.trim();
+  });
+
+  readonly projectLeverName = computed(() => this.projectUtils.getLeverName(this.project() ?? {}));
+  readonly hasLever = computed(() => {
+    const lever = this.projectLeverName();
+    return !!lever && lever !== '-' && lever.trim() !== '';
+  });
+
+  readonly donor = computed<string | null>(() => {
+    const d = this.project()?.donor;
+    return d?.trim() || null;
+  });
+
+  readonly projectDivisionLabel = computed(() => formatCodeLabel(this.project()?.divisionId, this.project()?.division));
+  readonly hasDivision = computed(() => {
+    const div = this.projectDivisionLabel();
+    return !!div && div !== '—' && div.trim() !== '';
+  });
+
+  readonly projectUnitLabel = computed(() => formatCodeLabel(this.project()?.unitId, this.project()?.unit));
+  readonly hasUnit = computed(() => {
+    const unit = this.projectUnitLabel();
+    return !!unit && unit !== '—' && unit.trim() !== '';
+  });
+
+  readonly timeline = computed<ProjectContextTimeline | null>(() => {
+    const p = this.project();
+    const startDateRaw = p?.start_date?.trim();
+    const endDateRaw = p?.end_date?.trim();
+    if (!startDateRaw || !endDateRaw) {
+      return null;
+    }
+
+    const start = new Date(startDateRaw).getTime();
+    const end = new Date(endDateRaw).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end)) {
+      return null;
+    }
+
+    const extensionDateRaw = p?.extension_date?.trim();
+    const hasExt = !!extensionDateRaw && extensionDateRaw !== '';
+    const ext = hasExt ? new Date(extensionDateRaw!).getTime() : NaN;
+    const isExtended = hasExt && !Number.isNaN(ext);
+    const extensionDate = isExtended ? extensionDateRaw! : null;
+
+    const targetEnd = isExtended ? ext : end;
+    const totalDuration = targetEnd - start;
+
+    let elapsedPercent = 0;
+    if (totalDuration > 0) {
+      const now = Date.now();
+      const elapsed = ((now - start) / totalDuration) * 100;
+      elapsedPercent = Math.max(0, Math.min(100, Math.round(elapsed)));
+    } else {
+      const now = Date.now();
+      elapsedPercent = now >= start ? 100 : 0;
+    }
+
+    return {
+      startDate: startDateRaw,
+      endDate: endDateRaw,
+      extensionDate,
+      elapsedPercent,
+      isExtended
+    };
+  });
+
+  readonly sdgs = computed<string[]>(() => {
+    const rawSdgs = this.project()?.sdgs;
+    if (!Array.isArray(rawSdgs) || rawSdgs.length === 0) {
+      return [];
+    }
+    return rawSdgs
+      .map(item => {
+        if (item === null || item === undefined || item === '') return null;
+        if (typeof item === 'object') {
+          const sdg = item as { id?: number; short_name?: string };
+          const label = sdg.short_name?.trim() || (sdg.id !== null && sdg.id !== undefined ? `SDG ${sdg.id}` : null);
+          return label ? label.toUpperCase() : null;
+        }
+        const str = String(item).trim();
+        if (!str) return null;
+        const upper = str.toUpperCase();
+        return upper.startsWith('SDG') ? upper : `SDG ${str}`;
+      })
+      .filter((label): label is string => label !== null && label !== '');
+  });
+
+  readonly cgiarEntities = computed<ContractCgiarEntity[]>(() => {
+    const entities = this.project()?.cgiar_entities;
+    if (!Array.isArray(entities)) {
+      return [];
+    }
+    return entities.filter(e => !!(e && (e.code?.trim() || e.name?.trim())));
+  });
+
+  readonly hasPrimaryContext = computed<boolean>(() => {
+    return !!(
+      this.grantAmount() ||
+      this.centerAmount() ||
+      this.fundingType() ||
+      this.hasLever() ||
+      this.donor() ||
+      this.hasDivision() ||
+      this.hasUnit() ||
+      this.timeline()
+    );
+  });
+
+  readonly hasSecondaryContext = computed<boolean>(() => {
+    return this.sdgs().length > 0 || this.cgiarEntities().length > 0;
+  });
+
+  readonly hasAnyContext = computed<boolean>(() => {
+    return this.hasPrimaryContext() || this.hasSecondaryContext();
   });
   readonly canUploadMoreGroundingDocs = computed(() => this.groundedDocuments().length < MAX_GROUNDING_DOCS);
   readonly canGenerateExecutiveOverview = computed(
@@ -933,4 +1075,30 @@ function getIndicatorChartColor(indicator: GetProjectDetailIndicator, fallbackIn
     ? (INDICATOR_COLOR_BY_ID[indicatorId] ?? projectDashboardBarColor(fallbackIndex, totalIndicators))
     : projectDashboardBarColor(fallbackIndex, totalIndicators);
 }
+
+function formatCurrencyUSD(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const amount = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]+/g, ''));
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  }).format(amount);
+  return `${formatted} USD`;
+}
+
+function formatCodeLabel(code: string | undefined, label: string | undefined): string {
+  const cleanCode = code?.trim();
+  const cleanLabel = label?.trim();
+  if (cleanCode && cleanLabel) {
+    return `${cleanCode} - ${cleanLabel}`;
+  }
+  return cleanLabel || cleanCode || '—';
+}
+
 

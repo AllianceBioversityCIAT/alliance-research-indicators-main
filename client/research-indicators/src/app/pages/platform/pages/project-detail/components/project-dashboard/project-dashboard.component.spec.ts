@@ -285,7 +285,19 @@ describe('ProjectDashboardComponent', () => {
         {
           provide: ProjectUtilsService,
           useValue: {
-            getLeverName: jest.fn().mockReturnValue('Lever name'),
+            getLeverName: jest.fn((project: any) => {
+              if (project?.levers) {
+                const leversArray = Array.isArray(project.levers) ? project.levers : [project.levers];
+                const names = leversArray.map((l: any) => l.short_name).filter(Boolean);
+                if (names.length) return names.join(', ');
+              }
+              if (project?.lever) {
+                if (typeof project.lever === 'string') return project.lever;
+                return project.lever.short_name || project.lever.name || '-';
+              }
+              if (project?.lever_name) return project.lever_name;
+              return '-';
+            }),
             sortIndicators: jest.fn((items: any[]) => items)
           }
         },
@@ -1745,7 +1757,7 @@ describe('ProjectDashboardComponent', () => {
 
       const root = fixture.nativeElement as HTMLElement;
       const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]');
-      const contextStrip = root.querySelector('app-project-context-strip');
+      const contextStrip = root.querySelector('[aria-label="Project context summary"]');
       const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
       const pendingSection = root.querySelector('#pending-revision-section');
       const aiSection = root.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
@@ -1808,7 +1820,7 @@ describe('ProjectDashboardComponent', () => {
 
       const root = fixture.nativeElement as HTMLElement;
       const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]') as HTMLElement;
-      const contextStrip = root.querySelector('app-project-context-strip') as HTMLElement;
+      const contextStrip = root.querySelector('[aria-label="Project context summary"]') as HTMLElement;
       const indicatorSection = root.querySelector('section[aria-labelledby="results-by-indicator-title"]') as HTMLElement;
       const statusSection = root.querySelector('section[aria-labelledby="results-by-status-title"]') as HTMLElement;
       const trendCard = root.querySelector('app-results-trend-card') as HTMLElement;
@@ -1917,7 +1929,7 @@ describe('ProjectDashboardComponent', () => {
         fixture.detectChanges();
 
         const root = fixture.nativeElement as HTMLElement;
-        const contextStrip = root.querySelector('app-project-context-strip');
+        const contextStrip = root.querySelector('[aria-label="Project context summary"]');
         const topCard = root.querySelector('section[aria-labelledby="executive-overview-title"]');
         const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
 
@@ -2000,6 +2012,340 @@ describe('ProjectDashboardComponent', () => {
         expect(component.hasExecutiveOverviewData()).toBe(true);
         expect(component.hasGroundedDocuments()).toBe(false);
         expect(component.showGroundingSection()).toBe(true);
+      });
+    });
+  });
+
+  describe('Unified Hero Context Chips (R-HL-001, D-F1-1, RC-1, KZ-001, KZ-015)', () => {
+    const fullProject: GetProjectDetail = {
+      agreement_id: 'AG-100',
+      grant_amount_usd: 1500000,
+      center_amount_usd: 500000,
+      funding_type: 'Bilateral',
+      start_date: '2023-01-01',
+      end_date: '2025-12-31',
+      extension_date: '2026-06-30',
+      donor: 'Gates Foundation',
+      divisionId: 'DIV-10',
+      division: 'Agronomy',
+      unitId: 'U-20',
+      unit: 'Plant Breeding',
+      sdgs: [
+        { id: 1, short_name: 'SDG 1', full_name: 'No Poverty' },
+        { id: 2, short_name: 'SDG 2', full_name: 'Zero Hunger' },
+        { id: 13, short_name: 'SDG 13', full_name: 'Climate Action' }
+      ] as any,
+      cgiar_entities: [
+        { code: 'CIAT', name: 'International Center for Tropical Agriculture' },
+        { code: 'CIP', name: 'International Potato Center' }
+      ],
+      ...({ levers: [{ short_name: 'Climate Resilience' }] } as any)
+    };
+
+    it('renders all hero context facts with correct values when full project data is provided', async () => {
+      await setup('C-1', { projectData: fullProject });
+
+      expect(component.hasAnyContext()).toBe(true);
+      expect(component.grantAmount()).toBe('$1,500,000 USD');
+      expect(component.centerAmount()).toBe('$500,000 USD');
+      expect(component.fundingType()).toBe('Bilateral');
+      expect(component.projectLeverName()).toBe('Climate Resilience');
+      expect(component.donor()).toBe('Gates Foundation');
+      expect(component.projectDivisionLabel()).toBe('DIV-10 - Agronomy');
+      expect(component.projectUnitLabel()).toBe('U-20 - Plant Breeding');
+      expect(component.sdgs()).toEqual(['SDG 1', 'SDG 2', 'SDG 13']);
+      expect(component.cgiarEntities().length).toBe(2);
+
+      const section = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+      expect(section).toBeTruthy();
+      const text = section.textContent;
+
+      expect(text).toContain('Total Budget');
+      expect(text).toContain('$1,500,000 USD');
+      expect(text).toContain('Center Budget');
+      expect(text).toContain('$500,000 USD');
+      expect(text).toContain('Funding Type');
+      expect(text).toContain('Bilateral');
+      expect(text).toContain('Lever');
+      expect(text).toContain('Climate Resilience');
+      expect(text).toContain('Foundress');
+      expect(text).toContain('Gates Foundation');
+      expect(text).toContain('Division');
+      expect(text).toContain('DIV-10 - Agronomy');
+      expect(text).toContain('Unit');
+      expect(text).toContain('U-20 - Plant Breeding');
+      expect(text).toContain('Timeline');
+      expect(text).toContain('SDGs:');
+      expect(text).toContain('SDG 1');
+      expect(text).toContain('SDG 2');
+      expect(text).toContain('SDG 13');
+      expect(text).toContain('Entities:');
+      expect(text).toContain('CIAT');
+      expect(text).toContain('CIP');
+
+      const progressBar = section.querySelector('[role="progressbar"]');
+      expect(progressBar).not.toBeNull();
+      expect(text).toContain('Extension:');
+    });
+
+    it('asserts each hero context inventory field is rendered exactly once on the dashboard (R-HL-001 checklist)', async () => {
+      await setup('C-1', { projectData: fullProject });
+
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('[aria-label="Project context summary"]').length).toBe(1);
+
+      const contextSection = root.querySelector('[aria-label="Project context summary"]')!;
+      const labels = ['Total Budget', 'Center Budget', 'Funding Type', 'Lever', 'Foundress', 'Division', 'Unit', 'Timeline', 'SDGs:', 'Entities:'];
+      labels.forEach(label => {
+        const matches = Array.from(contextSection.querySelectorAll('span, dt, h3')).filter(el => el.textContent?.trim() === label);
+        expect(matches.length).toBe(1);
+      });
+    });
+
+    describe('S2 No-fabrication rule', () => {
+      it('does not render chips or placeholders (0, N/A, -) when fields are null', async () => {
+        const nullFieldsProject: GetProjectDetail = {
+          agreement_id: 'AG-200',
+          grant_amount: null as any,
+          grant_amount_usd: null,
+          center_amount_usd: null,
+          funding_type: null,
+          contract_status: null as any,
+          start_date: undefined,
+          end_date: undefined,
+          extension_date: null,
+          donor: undefined,
+          division: undefined,
+          divisionId: undefined,
+          unit: undefined,
+          unitId: undefined,
+          sdgs: null as any,
+          cgiar_entities: null as any
+        };
+
+        await setup('C-1', { projectData: nullFieldsProject });
+
+        expect(component.hasAnyContext()).toBe(false);
+        expect(component.grantAmount()).toBeNull();
+        expect(component.centerAmount()).toBeNull();
+        expect(component.fundingType()).toBeNull();
+        expect(component.hasLever()).toBe(false);
+        expect(component.donor()).toBeNull();
+        expect(component.hasDivision()).toBe(false);
+        expect(component.hasUnit()).toBe(false);
+        expect(component.timeline()).toBeNull();
+        expect(component.sdgs()).toEqual([]);
+        expect(component.cgiarEntities()).toEqual([]);
+        expect(fixture.nativeElement.querySelector('[aria-label="Project context summary"]')).toBeNull();
+      });
+
+      it('renders only present fields for partial data without placeholder chips', async () => {
+        const partialProject: GetProjectDetail = {
+          agreement_id: 'AG-300',
+          grant_amount_usd: 2500000,
+          funding_type: 'Pool Funding',
+          center_amount_usd: null,
+          start_date: undefined,
+          end_date: undefined,
+          donor: undefined,
+          division: undefined,
+          unit: undefined,
+          sdgs: [],
+          cgiar_entities: []
+        };
+
+        await setup('C-1', { projectData: partialProject });
+
+        const section = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+        expect(section).toBeTruthy();
+        const text = section.textContent;
+
+        expect(component.hasAnyContext()).toBe(true);
+        expect(text).toContain('$2,500,000 USD');
+        expect(text).toContain('Pool Funding');
+        expect(text).not.toContain('Center Budget');
+        expect(text).not.toContain('Timeline');
+        expect(text).not.toContain('SDGs:');
+        expect(text).not.toContain('Entities:');
+        expect(text).not.toContain('Foundress');
+        expect(text).not.toContain('Division');
+        expect(text).not.toContain('Unit');
+        expect(text).not.toContain('N/A');
+        expect(text).not.toContain('$0');
+      });
+    });
+
+    describe('Timeline computation and clamping', () => {
+      it('clamps elapsed percent to 0 for future dates', async () => {
+        const futureProject: GetProjectDetail = {
+          start_date: '2090-01-01',
+          end_date: '2095-01-01'
+        };
+
+        await setup('C-1', { projectData: futureProject });
+
+        const tl = component.timeline();
+        expect(tl).not.toBeNull();
+        expect(tl!.elapsedPercent).toBe(0);
+        expect(tl!.isExtended).toBe(false);
+        expect(tl!.extensionDate).toBeNull();
+      });
+
+      it('clamps elapsed percent to 100 for past dates', async () => {
+        const pastProject: GetProjectDetail = {
+          start_date: '2010-01-01',
+          end_date: '2015-01-01'
+        };
+
+        await setup('C-1', { projectData: pastProject });
+
+        const tl = component.timeline();
+        expect(tl).not.toBeNull();
+        expect(tl!.elapsedPercent).toBe(100);
+        expect(tl!.isExtended).toBe(false);
+      });
+
+      it('returns null timeline if start or end date is invalid or missing', async () => {
+        await setup('C-1', { projectData: { start_date: 'invalid-date', end_date: '2025-01-01' } });
+        expect(component.timeline()).toBeNull();
+
+        component.project.set({ start_date: '2023-01-01', end_date: undefined });
+        fixture.detectChanges();
+        expect(component.timeline()).toBeNull();
+      });
+
+      it('renders extension date distinctly when extension_date is present', async () => {
+        const extendedProject: GetProjectDetail = {
+          start_date: '2020-01-01',
+          end_date: '2024-12-31',
+          extension_date: '2025-12-31'
+        };
+
+        await setup('C-1', { projectData: extendedProject });
+
+        const tl = component.timeline();
+        expect(tl).not.toBeNull();
+        expect(tl!.isExtended).toBe(true);
+        expect(tl!.extensionDate).toBe('2025-12-31');
+
+        const text = fixture.nativeElement.querySelector('[aria-label="Project context summary"]').textContent;
+        expect(text).toContain('Extension: 31/12/2025');
+      });
+    });
+
+    describe('Currency formatting', () => {
+      it('formats numeric values and valid numeric strings with USD unit', async () => {
+        await setup('C-1', { projectData: { grant_amount_usd: 1250000, center_amount_usd: '450000' } });
+
+        expect(component.grantAmount()).toBe('$1,250,000 USD');
+        expect(component.centerAmount()).toBe('$450,000 USD');
+      });
+
+      it('falls back to grant_amount if grant_amount_usd is not provided', async () => {
+        await setup('C-1', { projectData: { grant_amount: 800000 } });
+
+        expect(component.grantAmount()).toBe('$800,000 USD');
+      });
+
+      it('returns null for unparseable amounts', async () => {
+        await setup('C-1', { projectData: { grant_amount_usd: 'not-a-number' } });
+
+        expect(component.grantAmount()).toBeNull();
+      });
+    });
+
+    describe('SDG and CGIAR entity chips (KZ-001)', () => {
+      it('maps SDG numbers and strings to SDG labels', async () => {
+        await setup('C-1', { projectData: { sdgs: [1, '2', 'SDG 13', 'sdg 15'] } });
+
+        expect(component.sdgs()).toEqual(['SDG 1', 'SDG 2', 'SDG 13', 'SDG 15']);
+        const text = fixture.nativeElement.querySelector('[aria-label="Project context summary"]').textContent;
+        expect(text).toContain('SDG 1');
+        expect(text).toContain('SDG 15');
+      });
+
+      it('filters out empty SDG entries', async () => {
+        await setup('C-1', { projectData: { sdgs: [null as any, '', '  ', 4] } });
+
+        expect(component.sdgs()).toEqual(['SDG 4']);
+      });
+
+      it('maps ClarisaSdg objects to their short_name, never "[object Object]" (KZ-001)', async () => {
+        await setup('C-1', {
+          projectData: {
+            sdgs: [
+              { id: 2, short_name: 'SDG 2', full_name: 'Zero Hunger' },
+              { id: 13, short_name: 'SDG 13', full_name: 'Climate Action' },
+              { id: 7, full_name: 'Affordable and Clean Energy' },
+              { id: 5 }
+            ] as any
+          }
+        });
+
+        expect(component.sdgs()).toEqual(['SDG 2', 'SDG 13', 'SDG 7', 'SDG 5']);
+        const text = fixture.nativeElement.querySelector('[aria-label="Project context summary"]').textContent;
+        expect(text).not.toContain('[object Object]');
+        expect(text).toContain('SDG 13');
+      });
+
+      it('renders CGIAR entities with code or name', async () => {
+        await setup('C-1', {
+          projectData: {
+            cgiar_entities: [
+              { code: 'CIAT', name: 'International Center for Tropical Agriculture' },
+              { name: 'Bioversity' }
+            ]
+          }
+        });
+
+        expect(component.cgiarEntities().length).toBe(2);
+        const text = fixture.nativeElement.querySelector('[aria-label="Project context summary"]').textContent;
+        expect(text).toContain('CIAT');
+        expect(text).toContain('Bioversity');
+      });
+
+      it('renders secondary context without primary context or gap artifacts when only SDGs exist', async () => {
+        await setup('C-1', { projectData: { sdgs: [1, 2] } });
+
+        expect(component.hasPrimaryContext()).toBe(false);
+        expect(component.hasSecondaryContext()).toBe(true);
+        expect(component.hasAnyContext()).toBe(true);
+
+        const section = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+        expect(section).toBeTruthy();
+
+        // Primary container should not exist in DOM
+        const primaryContainer = section.querySelector('.flex.flex-wrap.items-stretch.gap-3');
+        expect(primaryContainer).toBeNull();
+
+        // Secondary container should exist without border-t
+        const secondaryContainer = section.querySelector('[aria-label="Sustainable Development Goals"]')?.parentElement;
+        expect(secondaryContainer).toBeTruthy();
+        expect(secondaryContainer?.classList.contains('border-t')).toBe(false);
+      });
+    });
+
+    describe('Skeleton transitions (KZ-015)', () => {
+      it('renders skeleton during loading and transitions to resolved context facts', async () => {
+        // Construct with source unresolved / loading (KZ-015)
+        await setup('C-1', { projectData: null, projectLoading: true });
+
+        // Assert skeleton is rendered
+        const skeletonContainer = fixture.nativeElement.querySelector('[aria-label="Loading project context"]');
+        expect(skeletonContainer).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('[aria-label="Project context summary"]')).toBeNull();
+
+        // Resolve data
+        getProjectDetailServiceMock.loading.set(false);
+        component.project.set(fullProject);
+        fixture.detectChanges();
+
+        // Assert skeleton removed and facts rendered
+        expect(fixture.nativeElement.querySelector('[aria-label="Loading project context"]')).toBeNull();
+        const resolvedSummary = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+        expect(resolvedSummary).toBeTruthy();
+        expect(resolvedSummary.textContent).toContain('$1,500,000 USD');
+        expect(resolvedSummary.textContent).toContain('Gates Foundation');
       });
     });
   });

@@ -1,6 +1,7 @@
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
-import { ActivatedRoute, convertToParamMap, NavigationEnd, ParamMap, PRIMARY_OUTLET, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, NavigationEnd, ParamMap, PRIMARY_OUTLET, Router, RouterOutlet } from '@angular/router';
+import { DatePipe } from '@angular/common';
 import { BehaviorSubject, Subject } from 'rxjs';
 import ProjectDetailComponent from './project-detail.component';
 import { ApiService } from '@services/api.service';
@@ -10,6 +11,70 @@ import { ResultsCenterService } from '../results-center/results-center.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
+
+@Component({
+  selector: 'app-results-center-table',
+  standalone: true,
+  template: ''
+})
+class ResultsCenterTableStubComponent {
+  @Input() showNewProjectResultButton = false;
+  @Input() roundedBottom = false;
+}
+
+@Component({
+  selector: 'app-project-indicator-filters',
+  standalone: true,
+  template: ''
+})
+class ProjectIndicatorFiltersStubComponent {
+  @Input() project: any;
+  @Input() enableFilter = false;
+  @Output() indicatorClick = new EventEmitter();
+}
+
+@Component({
+  selector: 'app-table-filters-sidebar',
+  standalone: true,
+  template: ''
+})
+class TableFiltersSidebarStubComponent {
+  @Input() hideProjectFilter = false;
+}
+
+@Component({
+  selector: 'app-table-configuration',
+  standalone: true,
+  template: ''
+})
+class TableConfigurationStubComponent {
+  @Input() excludedColumns: string[] = [];
+  applyConfigurations = jest.fn();
+}
+
+@Component({
+  selector: 'app-section-sidebar',
+  standalone: true,
+  template: '<ng-content></ng-content>'
+})
+class SectionSidebarStubComponent {
+  @Input() title = '';
+  @Input() description = '';
+  @Input() showSignal = signal(false);
+  @Input() confirmText = '';
+  @Output() confirm = new EventEmitter();
+}
+
+@Component({
+  selector: 'app-custom-tag',
+  standalone: true,
+  template: ''
+})
+class CustomTagStubComponent {
+  @Input() statusId: any;
+  @Input() statusName = '';
+  @Input() tiny = false;
+}
 
 describe('ProjectDetailComponent', () => {
   let component: ProjectDetailComponent;
@@ -148,9 +213,17 @@ describe('ProjectDetailComponent', () => {
     })
       .overrideComponent(ProjectDetailComponent, {
         set: {
-          imports: [],
-          providers: [{ provide: GetContractStaffService, useValue: contractStaffService }],
-          template: `<div class="w-full"></div>`
+          imports: [
+            ResultsCenterTableStubComponent,
+            ProjectIndicatorFiltersStubComponent,
+            TableFiltersSidebarStubComponent,
+            TableConfigurationStubComponent,
+            SectionSidebarStubComponent,
+            CustomTagStubComponent,
+            DatePipe,
+            RouterOutlet
+          ],
+          providers: [{ provide: GetContractStaffService, useValue: contractStaffService }]
         }
       })
       .compileComponents();
@@ -753,6 +826,78 @@ describe('ProjectDetailComponent', () => {
       queryParamMapSubject.next(convertToParamMap({ otherParam: 'val' }));
 
       expect(resultsCenterService.initializeScopedResultsTable).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Hero fact rows conditional rendering (R-HL-001, D-F1-1, RC-4)', () => {
+    it('should render fact rows <dl> when on project-results tab (RC-4 regression)', () => {
+      router.url = '/projects/mock-id/project-results';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-results'));
+      component.ngOnInit();
+      component.currentProject.set({
+        agreement_id: 'AG-123',
+        description: 'Test Project',
+        department: 'Science',
+        grant_amount: 1500000,
+        start_date: '2024-01-01',
+        end_date: '2026-12-31',
+        extension_date: '2027-06-30',
+        donor: 'Donor Foundation',
+        divisionId: 'DIV-1',
+        division: 'Research',
+        unitId: 'U-2',
+        unit: 'Crops'
+      });
+      fixture.detectChanges();
+
+      const dlElements = fixture.nativeElement.querySelectorAll('header dl');
+      expect(dlElements.length).toBe(2);
+
+      const text = fixture.nativeElement.querySelector('header').textContent;
+      expect(text).toContain('Budget');
+      expect(text).toContain('$1,500,000');
+      expect(text).toContain('Start date');
+      expect(text).toContain('01/01/2024');
+      expect(text).toContain('End date');
+      expect(text).toContain('31/12/2026');
+      expect(text).toContain('Extension date');
+      expect(text).toContain('30/06/2027');
+      expect(text).toContain('Lever');
+      expect(text).toContain('Foundress');
+      expect(text).toContain('Donor Foundation');
+      expect(text).toContain('Division');
+      expect(text).toContain('DIV-1 - Research');
+      expect(text).toContain('Unit');
+      expect(text).toContain('U-2 - Crops');
+    });
+
+    it('should hide fact rows <dl> when on project-dashboard tab (D-F1-1)', () => {
+      router.url = '/projects/mock-id/project-dashboard';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
+      component.ngOnInit();
+      component.currentProject.set({
+        agreement_id: 'AG-123',
+        description: 'Test Project',
+        department: 'Science',
+        grant_amount: 1500000,
+        start_date: '2024-01-01',
+        end_date: '2026-12-31',
+        extension_date: '2027-06-30',
+        donor: 'Donor Foundation',
+        divisionId: 'DIV-1',
+        division: 'Research',
+        unitId: 'U-2',
+        unit: 'Crops'
+      });
+      fixture.detectChanges();
+
+      const dlElements = fixture.nativeElement.querySelectorAll('header dl');
+      expect(dlElements.length).toBe(0);
+
+      // Identity band remains rendered on both tabs (R-HL-001)
+      const headerText = fixture.nativeElement.querySelector('header').textContent;
+      expect(headerText).toContain('AG-123 - Test Project');
+      expect(headerText).toContain('Science Department');
     });
   });
 });

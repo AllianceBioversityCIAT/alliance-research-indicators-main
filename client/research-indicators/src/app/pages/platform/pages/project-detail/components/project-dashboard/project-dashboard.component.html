@@ -119,8 +119,196 @@
     </div>
   </div>
 
-  <!-- Project Context strip (R-DA-005, T-11, T-12) -->
-  <app-project-context-strip [project]="project()" [style.animation-delay.ms]="staggerMs.contextStrip"></app-project-context-strip>
+  <!-- Hero context chips row (R-HL-001) -->
+  @if (getProjectDetailService.loading()) {
+  <div class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
+    role="status" aria-label="Loading project context" [style.animation-delay.ms]="staggerMs.contextStrip">
+    <div class="flex flex-wrap items-stretch gap-3">
+      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
+        <p-skeleton width="70px" height="12px" borderRadius="4px" />
+        <p-skeleton width="100px" height="18px" borderRadius="4px" />
+      </div>
+      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
+        <p-skeleton width="80px" height="12px" borderRadius="4px" />
+        <p-skeleton width="110px" height="18px" borderRadius="4px" />
+      </div>
+      <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
+        <p-skeleton width="75px" height="12px" borderRadius="4px" />
+        <p-skeleton width="90px" height="18px" borderRadius="4px" />
+      </div>
+      <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2 gap-2">
+        <div class="flex items-center justify-between">
+          <p-skeleton width="60px" height="12px" borderRadius="4px" />
+          <p-skeleton width="70px" height="12px" borderRadius="4px" />
+        </div>
+        <p-skeleton width="100%" height="8px" borderRadius="9999px" />
+        <div class="flex items-center justify-between">
+          <p-skeleton width="80px" height="12px" borderRadius="4px" />
+          <p-skeleton width="80px" height="12px" borderRadius="4px" />
+        </div>
+      </div>
+    </div>
+  </div>
+  } @else if (hasAnyContext()) {
+  <section class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
+    role="region" aria-label="Project context summary" [style.animation-delay.ms]="staggerMs.contextStrip">
+    @if (hasPrimaryContext()) {
+    <div class="flex flex-wrap items-stretch gap-3">
+      @if (grantAmount()) {
+      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Total Budget
+        </span>
+        <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ grantAmount() }}
+        </span>
+      </div>
+      }
+
+      @if (centerAmount()) {
+      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Center Budget
+        </span>
+        <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ centerAmount() }}
+        </span>
+      </div>
+      }
+
+      @if (fundingType()) {
+      <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Funding Type
+        </span>
+        <span class="font-['Barlow'] text-[14px] font-semibold text-[var(--ac-grey-800)]">
+          {{ fundingType() }}
+        </span>
+      </div>
+      }
+
+      @if (hasLever()) {
+      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Lever
+        </span>
+        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-300)]"
+          [title]="projectLeverName()">
+          {{ projectLeverName() }}
+        </span>
+      </div>
+      }
+
+      @if (donor()) {
+      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Foundress
+        </span>
+        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+          [title]="donor()!">
+          {{ donor() }}
+        </span>
+      </div>
+      }
+
+      @if (hasDivision()) {
+      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Division
+        </span>
+        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+          [title]="projectDivisionLabel()">
+          {{ projectDivisionLabel() }}
+        </span>
+      </div>
+      }
+
+      @if (hasUnit()) {
+      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Unit
+        </span>
+        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+          [title]="projectUnitLabel()">
+          {{ projectUnitLabel() }}
+        </span>
+      </div>
+      }
+
+      <!-- Timeline Tile -->
+      @if (timeline(); as tl) {
+      <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2">
+        <div class="mb-1.5 flex items-center justify-between gap-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Timeline
+          </span>
+          <span class="font-['Barlow'] text-[12px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+            {{ tl.elapsedPercent }}% elapsed
+          </span>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="relative h-2 w-full overflow-hidden rounded-full bg-[var(--ac-grey-300)]"
+          role="progressbar"
+          [attr.aria-valuenow]="tl.elapsedPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          [attr.aria-label]="tl.elapsedPercent + '% timeline elapsed'">
+          <div class="h-full rounded-full bg-[var(--ac-primary-blue-400)] transition-all duration-300 ease-out"
+            [style.width.%]="tl.elapsedPercent"></div>
+        </div>
+
+        <!-- Date labels -->
+        <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
+          <span>Start: {{ tl.startDate | date: 'dd/MM/yyyy' }}</span>
+          <span>End: {{ tl.endDate | date: 'dd/MM/yyyy' }}</span>
+          @if (tl.isExtended && tl.extensionDate) {
+          <span class="inline-flex items-center gap-1 font-medium text-[var(--ac-orange-1)]">
+            <i class="pi pi-clock text-[11px]" aria-hidden="true"></i>
+            <span>Extension: {{ tl.extensionDate | date: 'dd/MM/yyyy' }}</span>
+          </span>
+          }
+        </div>
+      </div>
+      }
+    </div>
+    }
+
+    <!-- SDG & CGIAR Entities row if present -->
+    @if (hasSecondaryContext()) {
+    <div class="flex flex-wrap items-center gap-2"
+      [class.border-t]="hasPrimaryContext()"
+      [class.border-[var(--ac-grey-200)]]="hasPrimaryContext()"
+      [class.pt-3]="hasPrimaryContext()">
+      @if (sdgs().length > 0) {
+      <div class="flex flex-wrap items-center gap-1.5" aria-label="Sustainable Development Goals">
+        <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          SDGs:
+        </span>
+        @for (sdg of sdgs(); track sdg) {
+        <span class="inline-flex items-center rounded-md border border-[var(--ac-light-blue-200)] bg-[var(--ac-light-blue-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-light-blue-500)]">
+          {{ sdg }}
+        </span>
+        }
+      </div>
+      }
+
+      @if (cgiarEntities().length > 0) {
+      <div class="flex flex-wrap items-center gap-1.5" aria-label="CGIAR Entities">
+        <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Entities:
+        </span>
+        @for (entity of cgiarEntities(); track entity.code ?? entity.name) {
+        <span class="inline-flex items-center rounded-md border border-[var(--ac-green-200)] bg-[var(--ac-green-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-green-700)]">
+          {{ entity.code || entity.name }}
+        </span>
+        }
+      </div>
+      }
+    </div>
+    }
+  </section>
+  }
 
   <!-- Top Executive Overview prominent card (R-AIP-001, D-AIP-1, D-AIP-2) -->
   @if (hasExecutiveOverviewData()) {

@@ -23,6 +23,7 @@
             </div>
           </div>
 
+          @if (lastSegment() !== 'project-dashboard') {
           <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-2 xl:grid-cols-5">
             <div class="min-w-0">
               <dt class="!font-['Space_Grotesk'] text-[10px] font-[600] uppercase tracking-[0.03rem] text-[var(--ac-grey-600)]">
@@ -86,6 +87,7 @@
                 [title]="projectUnitLabel()">{{ projectUnitLabel() }}</dd>
             </div>
           </dl>
+          }
         </header>
 
         <aside class="min-w-0 lg:basis-[20%] lg:pl-4">

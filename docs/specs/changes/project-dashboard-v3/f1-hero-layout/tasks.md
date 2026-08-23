@@ -55,12 +55,12 @@ graph TD
   - Three independent skeleton regions (project detail / contract payload / staff) — never one global skeleton.
   - KZ-001: hero specs use object-shaped SDG/entity fixtures mirroring the live payload.
 - **Acceptance / done check:**
-  - [ ] Spec (dashboard tab): each inventory field asserted rendered **exactly once** (query by label, expect length 1).
-  - [ ] Spec (RC-4 regression): on `project-results` segment the shell fact rows are present, unchanged.
-  - [ ] Spec (KZ-015): construct with sources unresolved → skeletons; resolve → facts. Not pre-resolved fixtures.
-  - [ ] `grep -rn "project-context-strip" client/research-indicators/src` returns zero hits (deletion closure; **failing input:** any lingering import/selector).
-  - [ ] Presence caveat: "exactly once" DOM queries prove presence/count only — visual placement is T-09 HITL's to prove.
-- **Dependencies:** none · **Effort:** L · **Status:** todo
+  - [x] Spec (dashboard tab): each inventory field asserted rendered **exactly once** (query by label, expect length 1).
+  - [x] Spec (RC-4 regression): on `project-results` segment the shell fact rows are present, unchanged.
+  - [x] Spec (KZ-015): construct with sources unresolved → skeletons; resolve → facts. Not pre-resolved fixtures.
+  - [x] `grep -rn "project-context-strip" client/research-indicators/src` returns zero hits (deletion closure; **failing input:** any lingering import/selector).
+  - [x] Presence caveat: "exactly once" DOM queries prove presence/count only — visual placement is T-09 HITL's to prove.
+- **Dependencies:** none · **Effort:** L · **Status:** done
 
 ### T-03 — KPI tile actions
 
