@@ -100,6 +100,7 @@ The platform is deliberately **robust-tier** (multi-integration, multi-store, re
 | ADR-8 | **Client state: service-per-domain + Angular Signals, no NgRx** | Fine-grained reactivity without a global store; RxJS only for streams (HTTP/WS). |
 | ADR-9 | **Two IdPs, one intent** — server trusts ROAR JWT + machine tokens; client authenticates via Cognito JWT | Human sessions via Cognito/ROAR; partner platforms via `client_id/secret` (see §10). |
 | ADR-10 | **Real-time over Socket.IO** (server gateway ↔ `ngx-socket-io` client) | Presence, notifications, per-result change events; REST fallback when disconnected. |
+| ADR-11 | **Client charts: one engine — tree-shaken `echarts/core` (SVG) behind `viz-chart`** | Replaces Chart.js/`p-chart`. Wrapper enforces accessible `tableModel` pairing and reduced-motion `animation: false`. Lazy-chunk only. Spec: `docs/specs/archive/2026-08-22-changes--dashboard-advanced-analytics/` (D-DA-1). |
 
 ---
 
@@ -190,7 +191,7 @@ Organized by **page domain** under `src/app/pages/`, cross-cutting code under `s
 | **Indicator** | `pages/platform/pages/indicator/`, `about-indicators/` | Indicator catalog & detail |
 | **Results** | `pages/platform/pages/result/`, `results-center/`, `search-a-result/`, `load-result/` | Result lifecycle: create, edit (11 tabs + conditional Pool Funding alignment tab), search, hub |
 | **Projects** | `pages/platform/pages/my-projects/`, `project-detail/` | Project portfolio & detail |
-| **Dashboard** | `pages/platform/pages/dashboard/` | Aggregate analytics, Chart.js views |
+| **Dashboard** | `pages/platform/pages/dashboard/` | Aggregate analytics. Project-detail dashboard charts use shared `viz-chart` (ECharts, ADR-11); Chart.js is not a client dependency. |
 | **Notifications** | `pages/platform/pages/notifications/` | Real-time feed |
 | **Profile / About** | `pages/platform/pages/profile/`, `about/` | User settings, theme, app info |
 | **Administration / Center Admin** | `pages/platform/pages/administration/center-admin/` | Bulk upload, SDG management, portfolio management, AGRESSO Pool Funding tag override, Bilateral Mapping (AGRESSO↔CLARISA project mapping CRUD). All gated by `centerAdminGuard` |

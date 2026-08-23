@@ -100,7 +100,7 @@ Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-modul
 
 ### Visualization (chart-token family)
 
-Used by the project-dashboard charts (see `docs/specs/changes/project-dashboard-redesign/` — design D-PD-13, and `docs/specs/changes/dashboard-advanced-analytics/` — design D-DA-8). These tokens are consumed at runtime via `getComputedStyle` (in `shared/utils/chart-tokens.util.ts`), not as `.abc-`/`.atc-` utility classes. Light values are independently authored and validated against the light card surface (`--ac-white-2`: `#fcfcfc`); dark values are independently authored (not formula-derived — the existing green/blue ramps invert in dark mode) and validated against the dark card surface (`--ac-background`: `#191919`).
+Used by the project-dashboard charts (see `docs/specs/archive/2026-08-22-changes--project-dashboard-redesign/` — design D-PD-13, and `docs/specs/archive/2026-08-22-changes--dashboard-advanced-analytics/` — design D-DA-8). These tokens are consumed at runtime via `getComputedStyle` (in `shared/utils/chart-tokens.util.ts`), not as `.abc-`/`.atc-` utility classes. Light values are independently authored and validated against the light card surface (`--ac-white-2`: `#fcfcfc`); dark values are independently authored (not formula-derived — the existing green/blue ramps invert in dark mode) and validated against the dark card surface (`--ac-background`: `#191919`).
 
 - `--ac-viz-status-approved`: `#2e7d32` (green — approved results)
 - `--ac-viz-status-submitted`: `#1565c0` (blue — submitted results)

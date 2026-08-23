@@ -11,7 +11,7 @@
 | Author | j.cadavid@cgiar.org |
 | Date | 2026-08-22 |
 | Status | Draft v2 — pending approval (v2 2026-08-22: user mandate — open library evaluation, freedom to reshape reports, motion as a design dimension) |
-| Depends on | `changes/project-dashboard-redesign` (**done** — T-01..T-12 executed; this proposal builds on its endpoint, tokens, and layout) |
+| Depends on | `docs/specs/archive/2026-08-22-changes--project-dashboard-redesign/` (**done** — T-01..T-12 executed; this proposal builds on its endpoint, tokens, and layout) |
 | Parallel-safe | **no** (same route, same components, extends the same reports endpoint family) |
 
 ## 2. Intent
@@ -62,12 +62,12 @@ A Center Admin / MEL expert opening the dashboard of a bilateral project additio
 | Center Admins / MEL of bilateral projects | Primary beneficiaries — first project-level view of SP alignment (PRD G8, bilateral phase continuity) |
 | `client/research-indicators` | New dependency **echarts** (tree-shaken, lazy) replacing chart.js; bundle budgets (C-5) verified both ways |
 | `server/researchindicators` | 1–2 read-only reports endpoints; no schema changes, no migrations |
-| Specs | Extends `changes/project-dashboard-redesign` (done); no overlap with active work |
+| Specs | Extends archived `project-dashboard-redesign` (done); no overlap with active work |
 
 ## 8. Visual Reference
 
 - Source: External reference (user-provided) + prior approved mockup
-- Location: ECharts gallery — heatmap (`…/examples/en/index.html#chart-type-heatmap`) and the force-graph family (the `graph-webkit-dep` example is the named target aesthetic for the SP graph) · prior canvas sources at `../project-dashboard-redesign/mockup/`
+- Location: ECharts gallery — heatmap (`…/examples/en/index.html#chart-type-heatmap`) and the force-graph family (the `graph-webkit-dep` example is the named target aesthetic for the SP graph) · prior canvas sources at `../2026-08-22-changes--project-dashboard-redesign/mockup/`
 - Notes: a new mockup (design canvas) for the three new widgets is **offered at approval** — recommended, since the graph and heatmap are net-new visual patterns for the app; the spec can proceed without it if declined.
 
 ## 9. Requirement Delta Preview
@@ -127,7 +127,7 @@ Criteria: single engine covering graph + heatmap + line (the forms this data nee
 | Risk | **Legacy `sp_role = null`** (no backfill): the graph must show "role unknown" edges — pinned by test, mirroring the read-only `Contributing`-badge lesson from the bilateral tab (ux-ui §12.2 2026-08-13). |
 | Risk | **SP catalog `color` column is raw hex** (dark-blind, unvalidated) — chart marks use validated `--ac-viz-*` tokens; the catalog color stays for badges only (mirrors D-PD-3's reasoning). |
 | Risk | KZ-002: widgets render conditionally per contract type — enumerate test scope by *what renders* (bilateral vs non-bilateral fixtures). |
-| Dependency | `changes/project-dashboard-redesign` merged (done) — wrapper reuses its `chart-tokens.util` + theme signal. |
+| Dependency | archived `project-dashboard-redesign` merged (done) — wrapper reuses its `chart-tokens.util` + theme signal. |
 | Resolved | ~~Which library?~~ → **ECharts, SVG renderer** — open-field evaluation in §10.1 (v2 mandate). |
 | OQ-1 | ngx-echarts wrapper vs thin in-house wrapper over `echarts/core`? (leaning in-house: one component, no extra dep, full tree-shake + renderer control — decide at design) |
 | OQ-2 | Indicator×year matrix: extend `results-summary` or new sibling endpoint? (additive either way — existing consumers never break) |

@@ -134,6 +134,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - **Modals**: route through `all-modals` host + `modal` wrapper; no ad-hoc overlays.
 - **Forms**: reactive forms; wrapped PrimeNG inputs from `styles/custom-fields.scss` & `styles/custom-prime-force-styles.scss` — not raw PrimeNG controls.
 - **Colors & spacing**: token utility classes (`.abc-*`, `.atc-*`, `.rs-*`, `.fs-*`) or CSS variables (`var(--ac-*)`). **No hex literals in component code.**
+- **Charts:** one engine — `shared/components/viz-chart` over tree-shaken `echarts/core` (SVG). Do not add `chart.js` / `primeng/chart`. Every chart takes a `tableModel`. Keep echarts imports inside the lazy project-dashboard chunk. Validate viz tokens with `npm run tokens:validate`.
 - **Dark mode**: rely on tokens — never branch on `isDarkMode()` for color decisions.
 - **i18n**: not yet wired. Don't add a parallel i18n mechanism — file an open question instead.
 - **Strict TS**: `strict`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `strictTemplates`. Don't loosen these in `tsconfig.json`.
@@ -163,6 +164,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 | Coverage | `npm run test:coverage` |
 | Lint (TS/HTML) | `npm run lint` |
 | Lint (SCSS) | `npm run s-lint` |
+| Viz token contrast + ramp monotonicity | `npm run tokens:validate` |
 | Docker dev compose | `npm run compose:up:dev` |
 
 ---

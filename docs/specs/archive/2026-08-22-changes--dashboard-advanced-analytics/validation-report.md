@@ -28,6 +28,8 @@
 - **Evidence:** user report + screenshot (inner scrollbar visible beside the browser's). Candidate containers found: `project-detail.component.html:141` (`overflow-x-auto` tab-body wrapper), `:105` (`max-h-[132px] overflow-y-auto` contacts aside), plus the platform shell's own scroll region. Exact stack needs one live-DOM inspection.
 - **Remediation R-2:** live-DOM audit of the scroll chain; collapse to **one** vertical scroll (the page); inner containers keep only horizontal overflow where tables genuinely need it.
 
+> **Update 2026-08-22 (second user screenshot set):** SDG fix **confirmed live** ("GOAL 2: ZERO HUNGER" renders); **SP Alignment Graph confirmed live** — bipartite nodes with the three edge treatments + legend (Primary / Contributing / Role unknown), aligned/unaligned counters. Also confirmed live: the Mapbox map failure ("Check the Mapbox access token") leaving a large dead area in the geo card — now tracked as the `leaflet-geo-map` follow-up proposal. Still pending: dark theme, morph decision, reduced-motion, scroll-fix visual confirmation.
+
 ### F-3 · WARN · HITL gate D6/D9 half-open
 - Light-theme layout/hierarchy/KPI/context/toggle **verified** by the screenshots (order matches T-12's contract; caveat one-line + Learn more ✓; Bars|Heatmap toggle present ✓).
 - **Missing:** dark-theme screenshots, morph keep-vs-crossfade decision, adjacency + `prefers-reduced-motion` emulation, graph fluidity on the largest Dev bilateral contract, Swagger screenshot, Dev count cross-check. SP graph itself not visible in the provided captures (below the fold) — unverified visually.
@@ -65,8 +67,8 @@
 
 | # | Action | Route |
 |---|---|---|
-| R-1 | Fix SDG mapper + ClarisaSdg-object regression test (red-before-green) | Bug-mode fix within this spec (rework of T-11) — blocks archive |
-| R-2 | Scroll-chain live audit + single-scroll fix | Rework of T-12 — blocks archive |
+| R-1 | Fix SDG mapper + ClarisaSdg-object regression test (red-before-green) | **RESOLVED 2026-08-22** (`ad92ca6f`): regression test observed RED on the old mapper (1 failed/15 passed), mapper now handles ClarisaSdg objects (`short_name` → `SDG {id}` fallback), 16/16 green |
+| R-2 | Scroll-chain live audit + single-scroll fix | **RESOLVED 2026-08-22** (`ad92ca6f`, static-analysis fix — enumeration of scroll containers in the feature was grep-complete): dashboard tab no longer wrapped in `overflow-x-auto` (results tab keeps it for its tables); contacts aside cap (`max-h-[132px]`) removed. 171/171 feature tests + production build green. **Visual confirmation of single-scroll pending in R-3's HITL pass** |
 | R-3 | Complete HITL: dark screenshots, morph decision, reduced-motion, SP-graph visual + fluidity, Swagger, Dev cross-check | T-13 completion — blocks archive |
 | R-4 | Resolve the "6 indicator types" denominator vs PRD "five" | Verify + doc-sync note for archive |
 | R-5 | Leaflet swap + chart-variety wave | New proposal (`/akili-propose`) — does not block archive |

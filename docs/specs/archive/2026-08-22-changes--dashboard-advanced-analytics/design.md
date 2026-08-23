@@ -5,8 +5,8 @@
 - **Status:** draft
 - **Owner:** j.cadavid@cgiar.org
 - **Linked requirements:** ./requirements.md
-- **Linked TRD:** ../../../trd/trd.md §4.2, §6, §8 · **Baseline spec:** ../project-dashboard-redesign/ (tokens D-PD-13, theme signal D-PD-5, async pattern, a11y contract)
-- **Visual reference:** ECharts gallery (heatmap + `graph-webkit-dep`) per proposal §8; prior mockup sources `../project-dashboard-redesign/mockup/`
+- **Linked TRD:** ../../../trd/trd.md §4.2, §6, §8 · **Baseline spec:** ../2026-08-22-changes--project-dashboard-redesign/ (tokens D-PD-13, theme signal D-PD-5, async pattern, a11y contract)
+- **Visual reference:** ECharts gallery (heatmap + `graph-webkit-dep`) per proposal §8; prior mockup sources `../2026-08-22-changes--project-dashboard-redesign/mockup/`
 - **Last updated:** 2026-08-22
 
 ---

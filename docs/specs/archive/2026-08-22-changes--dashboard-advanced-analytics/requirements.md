@@ -5,7 +5,7 @@
 - **Status:** draft
 - **Owner:** j.cadavid@cgiar.org
 - **Linked PRD section:** `docs/prd.md` G8, M12, AC-Accessibility, AC-Theming, AC-Performance, C-1/C-4/C-5
-- **Extends:** `docs/specs/changes/project-dashboard-redesign/` (done — its endpoint, tokens, async-state pattern, and a11y contract are the baseline)
+- **Extends:** `docs/specs/archive/2026-08-22-changes--project-dashboard-redesign/` (done — its endpoint, tokens, async-state pattern, and a11y contract are the baseline)
 - **Linked tickets:** — (originates from `proposal.md` v2, approved 2026-08-22)
 - **Last updated:** 2026-08-22
 - **Approval Mode:** gated
@@ -284,7 +284,7 @@ Client: `project-detail` feature + new shared chart wrapper + token registry. Se
 | Type | Item | Mitigation |
 |---|---|---|
 | Assumption | ECharts (SVG renderer) per proposal §10.1; wrapper form decided at design (OQ-1) | requirements stay engine-behavioral |
-| Dependency | `changes/project-dashboard-redesign` merged (tokens, util, async pattern) | verified done |
+| Dependency | `docs/specs/archive/2026-08-22-changes--project-dashboard-redesign/` merged (tokens, util, async pattern) | verified done |
 | Risk | Graph illegible at high result counts | NFR-DA-005 cap-with-disclosure |
 | Risk | Morph confuses instead of clarifies | R-DA-007 escape valve → crossfade; decided at HITL, recorded |
 | Risk | KZ-002: widgets conditional per contract type | bilateral AND non-bilateral fixtures mandatory |

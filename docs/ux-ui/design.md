@@ -237,7 +237,7 @@ One table across both surfaces. **Owner/Package** column distinguishes STAR clie
 | 10 | Result Detail | `/result/:id/...` | STAR client | Yes (+ 2nd-level sidebar) | 11 sub-tabs |
 | 11 | My Projects | `/projects` | STAR client | Yes | Portfolio |
 | 12 | Project Detail | `/project-detail/:id` | STAR client | Yes | Project metadata + results |
-| 13 | Dashboard | `/dashboard` | STAR client | Yes | Chart.js visualizations |
+| 13 | Dashboard | `/dashboard` | STAR client | Yes | Aggregate analytics. Chart engine for project-detail widgets is ECharts via `viz-chart` (ADR-11); Chart.js is gone. |
 | 14 | Notifications | `/notifications` | STAR client | Yes | Real-time feed |
 | 15 | Profile | `/profile` | STAR client | Yes | User settings & theme |
 | 16 | About | `/about` | STAR client | Yes | App info |
@@ -354,7 +354,7 @@ Tokens live in `client/research-indicators/src/styles/colors.scss`, `src/styles/
 | White | `--ac-white-1`, `--ac-white-2` | Surfaces |
 | Background | `--ac-background` | Page background (flips in dark mode) |
 | Pool Funding | `--ac-pool-funding-fg`, `--ac-pool-funding-border` | Bilateral "Pool Funding" tag |
-| Visualization (chart) | `--ac-viz-status-approved`, `--ac-viz-status-submitted`, `--ac-viz-status-draft`, `--ac-viz-status-pending`, `--ac-viz-status-rejected`, `--ac-viz-status-no-status`, `--ac-viz-series-1` … `-5`, `--ac-viz-role-primary`, `--ac-viz-role-contributing`, `--ac-viz-role-unknown`, `--ac-viz-ramp-1` … `-5` | Project-dashboard chart marks (status composition, indicator bars, trend line, multi-series SP graph, alignment roles, and 5-step heatmap sequential blue ramp). Independently authored light AND dark values (D-PD-13 of `project-dashboard-redesign`, D-DA-8 of `dashboard-advanced-analytics`); validated against card surfaces (`--ac-white-2` light, `--ac-background` dark) with ramp monotonicity strictly preserved in both modes. Consumed via `getComputedStyle` in `shared/utils/chart-tokens.util.ts`, not as `.abc-`/`.atc-` utility classes. |
+| Visualization (chart) | `--ac-viz-status-approved`, `--ac-viz-status-submitted`, `--ac-viz-status-draft`, `--ac-viz-status-pending`, `--ac-viz-status-rejected`, `--ac-viz-status-no-status`, `--ac-viz-series-1` … `-5`, `--ac-viz-role-primary`, `--ac-viz-role-contributing`, `--ac-viz-role-unknown`, `--ac-viz-ramp-1` … `-5` | Project-dashboard chart marks (status composition, indicator bars, trend line, multi-series SP graph, alignment roles, and 5-step heatmap sequential blue ramp). Independently authored light AND dark values (D-PD-13 of `docs/specs/archive/2026-08-22-changes--project-dashboard-redesign/`, D-DA-8 of `docs/specs/archive/2026-08-22-changes--dashboard-advanced-analytics/`); validated against card surfaces (`--ac-white-2` light, `--ac-background` dark) with ramp monotonicity strictly preserved in both modes. Consumed via `getComputedStyle` in `shared/utils/chart-tokens.util.ts`, not as `.abc-`/`.atc-` utility classes. |
 
 Dark mode overrides the same token names under `:root[data-theme="dark"]`. The PrimeNG Aura preset (`roartheme.ts`) flips via the `.dark-mode` body class.
 

@@ -17,8 +17,8 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 | ID | Lesson | Severity | Recurrence | Target | Status |
 | --- | --- | --- | --- | --- | --- |
 | **K-005** | Config values the code uses as **discriminators** (branch selectors), not just destinations, must never be collapsed onto one value "to simplify" | **High** | 2 (same edit) | Product | Proposed |
-| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **13** (+1 in `bilateral-mapping-table-enhancements`: testing sort logic on component instance without template binding `[customSort]` on `<p-table>`) | Product | Proposed |
-| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note. **A red that would pass with the defect reintroduced is not evidence** | **High** | **2** (+5 in `pool-funding-sp-picker-empty`: an unrun comparison claimed verbatim; an assertion inverted against its own title; behavioural tests green with the defect restored; a mutated *assertion* offered as a code mutation; prose offered as screenshots) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
+| **KZ-001** | A test double **or a cohort assertion** that doesn't evaluate what it stands in for produces a green suite over broken behavior. Verify the gate still *discriminates*, not just that it passes. **A property that lives in generated output (SQL, DOM, `dist/`) must be asserted there, never on the call sequence** | **Critical** | **14** (+1 in `dashboard-advanced-analytics`: SDG chips used `String(item)` green on primitive fixtures; live payload is `ClarisaSdg` objects → `SDG [object Object]`) | Product | Proposed |
+| **KZ-014** | **K-004 binds the ARGUMENT as tightly as the command.** If the red has not been *seen*, it may not be asserted — not in a comment, a dispatch brief, a review verdict, or a budget note. **A red that would pass with the defect reintroduced is not evidence** | **High** | **3** (+1 in `dashboard-advanced-analytics`: T-13 HITL `[x]` / Reviewer PASS from suites while dark/motion/SP-graph HITL never landed; light screenshots then found F-1/F-2) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
 | **KZ-015** | **A component fixture must arrange the TRANSITION the product performs, not the end state.** Setting an input before the first `detectChanges()` tests a state the product may never reach | **High** | 1 | Product + Methodology | **Applied** — `client/.../src/CLAUDE.md` (+ upstream owed) |
 | **KZ-017** | **A verification must declare what it CANNOT reach.** K-014 governs a command's output; this governs its **scope**. A check narrower than its claim returns a confident green | **High** | 1 (**5 instances in one spec**, 2 of them the auditor's) | Product + Methodology | **Applied** — root `CLAUDE.md` §4.3 (+ upstream owed) |
 | **KZ-002** | Enumerating scope by feature folder misses shared components rendered on the same route. Enumerate by *what renders*, not by *where the feature lives* | **High** | 3 | Product | Proposed |
@@ -73,6 +73,36 @@ Continuous-improvement record across AKILI-SPECS specs. Newest entry first.
 ---
 
 ## Entries
+
+### 2026-08-22 — changes/dashboard-advanced-analytics
+
+**Metrics**
+
+| Signal | Value | Source |
+|---|---|---|
+| Tasks executed | 13 | tasks.md |
+| Reviewer FAIL rework attempts | **6** (T-06×1, T-09×1, T-10×2, T-11×1, T-12×1) | execution.md |
+| HALTs / FATAL_FAILs | 0 | execution.md |
+| Pivots | 0 | execution.md |
+| PRODUCT_BUGs | 1 found at validate, then fixed (F-1 SDG chips) | validation-report.md |
+| Judgment-day severe findings | n/a (no judgment.md this spec) | — |
+| Validation FAIL / WARN | 2 FAIL (both resolved) / 3 WARN (F-3, F-4 accepted at archive; F-5 advisory) | validation-report.md |
+| `/akili-quick` escalations | 0 | quick-log.md (no hit) |
+| Drift attributable | F-4 (constitution “five indicator types” vs live KPI “of 6”) — follow-up, not patched | validation-report.md F-4 |
+
+**Lessons**
+
+- **KZ-001 recurrence — fixture shape ≠ live payload.** (Product, Critical)
+  - Root cause: SDG mapper tested with primitives; server sends `ClarisaSdg` objects; `String(item)` greened the suite and shipped `[object Object]`.
+  - Evidence: validation-report.md — F-1; `project-context-strip` mapper vs `lever-sdg-target.interface.ts`.
+  - Standardization: already in digest (Proposed). No new edit. Recurrence **13 → 14**.
+
+- **KZ-014 recurrence — HITL asserted without the HITL.** (Product + Methodology, High)
+  - Root cause: T-13 done-checks and Reviewer PASS treated suite/build evidence as the D6/D9 visual gate.
+  - Evidence: execution.md — Task T-13 Reviewer “all NFRs satisfied”; validation-report.md — F-3 HITL half-open; user archived with override.
+  - Standardization: already Applied in root `CLAUDE.md` §4.3. Recurrence **2 → 3**. No new local edit this cycle (Defer).
+
+No new lesson IDs. Standardization menu skipped (recurrence only).
 
 ### 2026-08-20 — changes/bilateral-mapping-table-enhancements
 
