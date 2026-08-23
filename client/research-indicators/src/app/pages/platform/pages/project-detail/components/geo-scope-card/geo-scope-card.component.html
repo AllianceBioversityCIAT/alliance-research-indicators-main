@@ -1,10 +1,10 @@
-<app-project-dashboard-card class="h-full w-full" title="Top geographic scope"
+<app-project-dashboard-card class="w-full" title="Top geographic scope"
   description="Distribution of geographic reach for results linked to this primary project." iconClass="pi pi-globe"
   [compact]="true" [loading]="service.loading()" [error]="service.loadError()" [empty]="isEmpty()"
   errorMessage="We could not load geographic scope data. Please try again."
   emptyMessage="No geographic scope data was found for this project." (retry)="service.update()">
-  <div class="grid min-h-0 flex-1 grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]">
-    <div class="flex h-full min-w-0 items-stretch">
+  <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]">
+    <div class="flex min-w-0">
       <app-geo-scope-map [countries]="service.topCountries()"></app-geo-scope-map>
     </div>
 

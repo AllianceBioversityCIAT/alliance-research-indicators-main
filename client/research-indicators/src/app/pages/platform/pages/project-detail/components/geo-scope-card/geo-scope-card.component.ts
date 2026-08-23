@@ -14,7 +14,7 @@ import {
   imports: [ProjectDashboardCardComponent, GeoScopeMapComponent],
   templateUrl: './geo-scope-card.component.html',
   host: {
-    class: 'flex h-full w-full'
+    class: 'block w-full'
   },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
