@@ -34,10 +34,18 @@
     <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Result analytics</h2>
   </div>
 
-  <!-- KPI summary strip (R-PD-002) -->
+  <!-- KPI summary strip (R-PD-002, R-HL-002) -->
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators" [style.animation-delay.ms]="staggerMs.kpi">
     <!-- Tile 1: Total results -->
-    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+    <button type="button"
+      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+      [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
+      [class.hover:shadow-sm]="!getProjectDetailService.loading()"
+      [class.cursor-pointer]="!getProjectDetailService.loading()"
+      [class.cursor-default]="getProjectDetailService.loading()"
+      [attr.disabled]="getProjectDetailService.loading() ? true : null"
+      [attr.aria-label]="getProjectDetailService.loading() ? 'Loading total results' : 'Total results: ' + totalProjectResults() + ' across all indicator types — view project results'"
+      (click)="navigateToTotalResults()">
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
         Total results
       </span>
@@ -54,10 +62,18 @@
         across all indicator types
       </span>
       }
-    </div>
+    </button>
 
     <!-- Tile 2: Indicators covered -->
-    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+    <button type="button"
+      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+      [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
+      [class.hover:shadow-sm]="!getProjectDetailService.loading()"
+      [class.cursor-pointer]="!getProjectDetailService.loading()"
+      [class.cursor-default]="getProjectDetailService.loading()"
+      [attr.disabled]="getProjectDetailService.loading() ? true : null"
+      [attr.aria-label]="getProjectDetailService.loading() ? 'Loading indicators covered' : 'Indicators covered: ' + indicatorsCoveredCount() + ' of ' + indicatorsTotalCount() + ' indicator types — click to view breakdown'"
+      (click)="!getProjectDetailService.loading() && indicatorsOp.toggle($event)">
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
         Indicators covered
       </span>
@@ -74,7 +90,7 @@
         of {{ indicatorsTotalCount() }} indicator types
       </span>
       }
-    </div>
+    </button>
 
     <!-- Tile 3: Pending revision -->
     <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
@@ -99,7 +115,15 @@
     </div>
 
     <!-- Tile 4: Partner institutions -->
-    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+    <button type="button"
+      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+      [class.hover:border-[var(--ac-primary-blue-400)]]="!contractResultsSummary.loading()"
+      [class.hover:shadow-sm]="!contractResultsSummary.loading()"
+      [class.cursor-pointer]="!contractResultsSummary.loading()"
+      [class.cursor-default]="contractResultsSummary.loading()"
+      [attr.disabled]="contractResultsSummary.loading() ? true : null"
+      [attr.aria-label]="contractResultsSummary.loading() ? 'Loading partner institutions count' : 'Partner institutions: ' + partnerInstitutionsCount() + ' linked to results — scroll to top partner institutions'"
+      (click)="scrollToPartners($event)">
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
         Partner institutions
       </span>
@@ -116,8 +140,45 @@
         linked to results
       </span>
       }
-    </div>
+    </button>
   </div>
+
+  <p-popover #indicatorsOp [style]="{ width: '340px' }" appendTo="body">
+    <div class="flex flex-col gap-2 p-1.5 text-sm" data-testid="indicators-covered-popover" role="region" aria-label="Covered indicators breakdown">
+      <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
+        <span class="font-semibold text-[13px] font-['Barlow'] text-[var(--ac-primary-blue-600)]">Covered Indicators</span>
+        <span class="font-['Barlow'] text-[12px] font-medium text-[var(--ac-grey-600)]">
+          {{ indicatorsCoveredCount() }} of {{ indicatorsTotalCount() }}
+        </span>
+      </div>
+      @if (indicatorsWithResults().length === 0) {
+      <p class="m-0 py-2 text-center font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+        No indicators with results
+      </p>
+      } @else {
+      <ul class="m-0 flex list-none flex-col gap-1 p-0" role="list">
+        @for (indicator of indicatorsWithResults(); track indicator.id) {
+        <li>
+          <button type="button"
+            class="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] cursor-pointer bg-transparent border-0"
+            [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'"
+            (click)="navigateToIndicatorResults(indicator, indicatorsOp)">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
+              <span class="min-w-0 font-['Barlow'] text-[13px] font-medium text-[var(--ac-grey-800)] truncate" [title]="indicator.label">
+                {{ indicator.label }}
+              </span>
+            </div>
+            <strong class="shrink-0 font-['Barlow'] text-[13px] font-bold tabular-nums text-[var(--ac-primary-blue-600)]">
+              {{ indicator.value }}
+            </strong>
+          </button>
+        </li>
+        }
+      </ul>
+      }
+    </div>
+  </p-popover>
 
   <!-- Hero context chips row (R-HL-001) -->
   @if (getProjectDetailService.loading()) {
@@ -386,7 +447,7 @@
       <!-- Results by indicator -->
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
 
-        <div class="flex flex-1">
+        <div id="partners-card" class="flex flex-1">
           <app-project-dashboard-card title="Top partner institution"
             description="Partner institutions most frequently linked to results on this primary project."
             class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"

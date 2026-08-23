@@ -3,6 +3,7 @@ import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { trigger, transition, style, animate } from '@angular/animations';
 import { ButtonModule } from 'primeng/button';
+import { PopoverModule } from 'primeng/popover';
 import { SkeletonModule } from 'primeng/skeleton';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
@@ -85,6 +86,7 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
   standalone: true,
   imports: [
     ButtonModule,
+    PopoverModule,
     RouterLink,
     SkeletonModule,
     ProjectDashboardCardComponent,
@@ -773,6 +775,46 @@ export class ProjectDashboardComponent {
   statusRowAriaLabel(bucket: ContractResultsSummaryStatusBucket): string {
     const share = this.statusSharePercent(bucket.count);
     return `${bucket.name}: ${bucket.count} results, ${share}% — view filtered results`;
+  }
+
+  // KPI tile navigation & scroll actions (R-HL-002, T-03)
+  navigateToTotalResults(): void {
+    if (this.getProjectDetailService.loading()) {
+      return;
+    }
+    const contractId = this.contractId();
+    if (contractId) {
+      void this.router.navigate(['/project-detail', contractId, 'project-results']);
+    }
+  }
+
+  navigateToIndicatorResults(
+    indicator: { id?: number | string | null; indicatorId?: number | string | null },
+    popover?: { hide?: () => void }
+  ): void {
+    popover?.hide?.();
+    const contractId = this.contractId();
+    const targetId = indicator.indicatorId ?? indicator.id;
+    if (contractId && targetId !== null && targetId !== undefined) {
+      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+        queryParams: { indicatorTab: targetId }
+      });
+    }
+  }
+
+  scrollToPartners(event?: Event): void {
+    if (this.contractResultsSummary.loading()) {
+      return;
+    }
+    if (event) {
+      event.preventDefault();
+    }
+    const element = document.getElementById('partners-card') ?? document.getElementById('top-partners-section');
+    if (element) {
+      const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      element.focus?.({ preventScroll: true });
+    }
   }
 
   // Smooth scroll to pending revision table section (R-PD-008, judgment W7)

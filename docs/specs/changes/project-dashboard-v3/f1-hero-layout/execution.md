@@ -126,3 +126,39 @@
 - **Notes:** All acceptance criteria satisfied and verified.
 
 ---
+
+## Task: T-03 — KPI tile actions
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Made Total Results, Indicators Covered, and Partner Institutions tiles interactive with accessible labels, disabled loading states, PrimeNG Popover for indicators breakdown with navigation to `project-results`, and smooth-scroll to `#partners-card` with reduced-motion support.
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 1 passed, 1 total
+  Tests: 111 passed, 111 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Total results, Indicators covered, and Partner institutions tiles converted to accessible interactive `<button>` elements with loading guards. Popover implemented via `<p-popover>` displaying indicators with results and navigating to filtered results. Pending revision anchor preserved. Tests, linting, and build pass cleanly.
+- **Issues Found:** none
+- **Advisory:** Listbox role on popover container can be verified in T-09 HITL for optimal screen reader announcements.
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-03)
+- **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
+
+---

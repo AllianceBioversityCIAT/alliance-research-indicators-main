@@ -1280,6 +1280,157 @@ describe('ProjectDashboardComponent', () => {
 
       window.matchMedia = originalMatchMedia;
     });
+
+    it('should navigate to project-results on Total results tile click (transition KZ-015 / R-HL-002)', async () => {
+      await setup('C-1', {
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 8 } as any
+          ]
+        }
+      });
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      // Initial state: no navigation
+      expect(navSpy).not.toHaveBeenCalled();
+
+      const totalResultsBtn: HTMLElement = fixture.nativeElement.querySelector('button[aria-label*="Total results"]');
+      expect(totalResultsBtn).not.toBeNull();
+
+      totalResultsBtn.click();
+      fixture.detectChanges();
+
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1', 'project-results']);
+    });
+
+    it('should not navigate to project-results when Total results tile is clicked while loading (R-HL-002)', async () => {
+      await setup('C-1', { projectLoading: true, projectData: null });
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      const totalResultsTile = fixture.nativeElement.querySelector('[aria-label*="Loading total results"]');
+      expect(totalResultsTile).not.toBeNull();
+
+      totalResultsTile.click();
+      component.navigateToTotalResults();
+      fixture.detectChanges();
+
+      expect(navSpy).not.toHaveBeenCalled();
+    });
+
+    it('should open popover listing only indicators with value > 0 and navigate on row click (R-HL-002, D-F1-5)', async () => {
+      await setup('C-1', {
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 5 } as any,
+            { indicator: { indicator_id: 2, name: 'Innovations' }, count_results: 3 } as any,
+            { indicator: { indicator_id: 3, name: 'Zero Count Indicator' }, count_results: 0 } as any
+          ]
+        }
+      });
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      // Initial state: no navigation
+      expect(navSpy).not.toHaveBeenCalled();
+
+      const indicatorsBtn: HTMLElement = fixture.nativeElement.querySelector('button[aria-label*="Indicators covered"]');
+      expect(indicatorsBtn).not.toBeNull();
+
+      indicatorsBtn.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const popoverContent = document.querySelector('[data-testid="indicators-covered-popover"]') ?? fixture.nativeElement.querySelector('[data-testid="indicators-covered-popover"]');
+      expect(popoverContent).not.toBeNull();
+
+      // Assert indicators with value > 0 appear
+      expect(popoverContent?.textContent).toContain('Publications');
+      expect(popoverContent?.textContent).toContain('Innovations');
+      // Zero-count indicator MUST NOT appear (named failing input)
+      expect(popoverContent?.textContent).not.toContain('Zero Count Indicator');
+
+      // Click on Publications indicator row in popover
+      const publicationBtn: HTMLElement = popoverContent?.querySelector('button[aria-label*="Publications"]') as HTMLElement;
+      expect(publicationBtn).not.toBeNull();
+
+      publicationBtn.click();
+      fixture.detectChanges();
+
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1', 'project-results'], {
+        queryParams: { indicatorTab: 1 }
+      });
+    });
+
+    it('should smooth-scroll to #partners-card on Partner institutions tile click (R-HL-002)', async () => {
+      await setup('C-1', {
+        summary: {
+          total: 10,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [],
+          partner_institutions: 8
+        }
+      });
+
+      const partnersTarget = fixture.nativeElement.querySelector('#partners-card') ?? document.getElementById('partners-card');
+      expect(partnersTarget).not.toBeNull();
+      const scrollSpy = jest.fn();
+      partnersTarget.scrollIntoView = scrollSpy;
+
+      const partnersBtn: HTMLElement = fixture.nativeElement.querySelector('button[aria-label*="Partner institutions"]');
+      expect(partnersBtn).not.toBeNull();
+
+      partnersBtn.click();
+      expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+    });
+
+    it('should use behavior: auto for Partner institutions scroll when prefers-reduced-motion is active (R-HL-002)', async () => {
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn()
+      } as unknown as MediaQueryList));
+
+      await setup('C-1', {
+        summary: {
+          total: 10,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [],
+          partner_institutions: 8
+        }
+      });
+
+      const partnersTarget = fixture.nativeElement.querySelector('#partners-card') ?? document.getElementById('partners-card');
+      const scrollSpy = jest.fn();
+      partnersTarget.scrollIntoView = scrollSpy;
+
+      component.scrollToPartners();
+      expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'auto' }));
+
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('should not scroll when Partner institutions tile is clicked while loading (R-HL-002)', async () => {
+      await setup('C-1', { summaryLoading: true, summary: null });
+
+      const partnersTarget = fixture.nativeElement.querySelector('#partners-card') ?? document.getElementById('partners-card');
+      const scrollSpy = jest.fn();
+      if (partnersTarget) {
+        partnersTarget.scrollIntoView = scrollSpy;
+      }
+
+      component.scrollToPartners();
+      expect(scrollSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('Results by indicator region (R-PD-005, R-PD-007)', () => {

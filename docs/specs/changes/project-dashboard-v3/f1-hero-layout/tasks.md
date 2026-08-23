@@ -71,11 +71,11 @@ graph TD
   - Tiles become real `<a>`/`<button>` with accessible names naming destination; disabled (non-interactive) while their source is loading.
   - Popover: focus management + Escape verified in spec via PrimeNG API; if a11y review at T-09 fails, fall back to inline disclosure (D-F1-5).
 - **Acceptance / done check:**
-  - [ ] Spec: activating Total results calls `Router.navigate` to `.../project-results` — arranged as transition (KZ-015): initial render, no navigation; click, navigation.
-  - [ ] Spec: popover lists exactly indicators with `value > 0` (fixture includes a zero-count indicator that must NOT appear — the named failing input).
-  - [ ] Spec: tile in loading state does not navigate on click.
-  - [ ] `npx jest <spec> --coverage=false` green; disqualifier: any navigation assertion that passes without the click event.
-- **Dependencies:** T-02 · **Effort:** M · **Status:** todo
+  - [x] Spec: activating Total results calls `Router.navigate` to `.../project-results` — arranged as transition (KZ-015): initial render, no navigation; click, navigation.
+  - [x] Spec: popover lists exactly indicators with `value > 0` (fixture includes a zero-count indicator that must NOT appear — the named failing input).
+  - [x] Spec: tile in loading state does not navigate on click.
+  - [x] `npx jest <spec> --coverage=false` green; disqualifier: any navigation assertion that passes without the click event.
+- **Dependencies:** T-02 · **Effort:** M · **Status:** done
 
 ### T-04 — Section reorder, spacing normalization, caveat compression
 
