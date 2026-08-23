@@ -110,12 +110,12 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
       expect(series.itemStyle.areaColor).toBe('#f4f7f9');
     });
 
-    it('configures continuous visualMap scaling from 1 to max count over the ramp tokens (D-GEO-8)', () => {
+    it('configures continuous visualMap scaling from 0 to max count over the ramp tokens (D-GEO-8, D-GEO-10)', () => {
       const opts = component.options() as any;
       const visualMap = opts.visualMap;
 
       expect(visualMap.type).toBe('continuous');
-      expect(visualMap.min).toBe(1);
+      expect(visualMap.min).toBe(0);
       expect(visualMap.max).toBe(12);
       expect(visualMap.outOfRange.color).toEqual(['#f4f7f9']);
     });
@@ -128,6 +128,17 @@ describe('GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GE
       expect(formatter({ name: 'KE', value: 5 })).toBe('<strong>Kenya</strong>: 5');
       expect(formatter({ name: 'UNKNOWN' })).toBe('');
       expect(formatter(null)).toBe('');
+    });
+
+    it('resolves single-country degenerate fixture to saturated ramp stop and min 0 (R-GEO-002 AC.4 / D-GEO-10)', () => {
+      fixture.componentRef.setInput('countries', [{ iso_alpha_2: 'KE', country_name: 'Kenya', count: 1 }]);
+      fixture.detectChanges();
+
+      const opts = component.options() as any;
+      expect(opts).not.toBeNull();
+      expect(opts.visualMap.min).toBe(0);
+      expect(opts.visualMap.max).toBe(1);
+      expect(opts.series[0].data).toEqual([{ name: 'KE', value: 1 }]);
     });
 
     it('excludes countries absent from geometry from series data but retains them in tableModel (R-GEO-003, R-GEO-005)', () => {

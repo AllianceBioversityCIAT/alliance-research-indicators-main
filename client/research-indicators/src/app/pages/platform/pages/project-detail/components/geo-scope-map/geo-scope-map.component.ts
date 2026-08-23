@@ -152,8 +152,8 @@ export class GeoScopeMapComponent {
     if (hasCountryData) {
       baseOptions.visualMap = {
         type: 'continuous',
-        min: 1,
-        max: maxCount > 1 ? maxCount : 2,
+        min: 0,
+        max: maxCount,
         inRange: {
           color: validRamp
         },

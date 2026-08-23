@@ -103,8 +103,9 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
   - [x] Spec asserts on the **generated option object** (KZ-001), not on call sequences: ramp array present in visualMap, series contains exactly the ISO-matched countries and no no-data entries, tooltip formatter output for a sample row, `roam:false`.
   - [x] **KZ-015 transition fixture:** construct with `countries=[]` before first `detectChanges()`, assert no chart options emitted and static pane fallback present in rendered DOM; **then** set data and assert the chart appears while the fallback is removed. Same pattern for the theme flip: light first, assert, flip signal, assert recomputed values.
   - [x] **AC.4 unit test** with fixture `{ top_countries: [], geo_scope_summary: { global: 7, regional: 3 } }`: asserts no chart options emitted, static pane fallback present in rendered DOM (KZ-001, text + icon), and outer card is NOT in empty state (D-GEO-9).
+  - [x] **R-GEO-002 AC.4 degenerate domain test** on generated option object (KZ-001) for fixture `[{iso_alpha_2:'KE', count:1}]`: visualMap scales 0→maxCount (D-GEO-10) resolving KE to a visibly saturated ramp stop, never scale floor nor neutral base. **Failing input (K-012):** min:1 scale collapsed onto floor ⇒ test failed verbatim before fix.
   - [x] Spec proves: empty input ⇒ null options (no chart); fallback visible in DOM (D-GEO-9). **Failing input (K-012/K-004):** rendering the chart unconditionally ⇒ test goes red. **Presence caveat declared:** these are option-object and DOM proofs; whether ECharts paints the populated chart is T-08's HITL scope, not this task's.
-  - [x] Template passes `tableModel` and does **not** set `requireTable` to false (grep of the template).
+  - [x] Template passes `tableModel` and does **not** set `requireTable` to false (grep of the template); height bounded to 360px (D-GEO-11).
   - [x] `geo-scope-card.component.spec.ts` passes **unmodified** (R-GEO-006 AC.1 / R-GEO-008 AC.1 by construction) and confirms outer card stays non-empty on AC.4 fixture.
   - [x] Strings "Check the Mapbox access token" and "No geographic points could be resolved" absent from the component files.
 - **Dependencies:** T-02, T-03
@@ -173,7 +174,9 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 - **Acceptance / done check:**
   - [ ] Each item above observed and recorded (screenshots or explicit per-item confirmation) in the task evidence — **KZ-014: this task's checkbox, and any spec-level done claim, may not be marked from green suites alone while this check is pending.** This is the declared substitute gate for the visual defect class (requirements §5).
   - [ ] Dark-mode pass explicitly includes the visualMap legend text and tooltip readability.
-  - [ ] Two contract types checked and evidenced at HITL: (1) a contract with non-empty country counts (e.g. Kenya, Colombia) verifying choropleth shading, monotonic ramp, and tooltips; (2) a global/regional-only contract (e.g. A511 on Testing: GLOBAL 7, REGIONAL 3, 0 country rows) verifying that the static pane-level fallback ("No country-level data — this project's reach is global/regional.") renders properly alongside the summary and regional lists without a dead grey pane (D-GEO-9).
+  - [ ] Two contract types checked and evidenced at HITL: (1) a contract with non-empty country counts — including single-country low-count cases like Kenya (count 1) — verifying that data countries are clearly distinct from the neutral base in both themes, with correct shading order, monotonic ramp, and tooltips; (2) a global/regional-only contract (e.g. A511 on Testing: GLOBAL 7, REGIONAL 3, 0 country rows) verifying that the static pane-level fallback ("No country-level data — this project's reach is global/regional.") renders properly alongside the summary and regional lists without a dead grey pane (D-GEO-9).
+  - [ ] Bounded pane height verified (D-GEO-11, ~360px): no dead whitespace column below chart or fallback.
+  - [ ] Summary metric truncation ("COUNTRI…") checked: verify if pre-existing; if so, report as finding without modifying (out of scope for R-GEO-008).
   - [ ] **Disqualifier:** a check run against a project with empty geo data verifies nothing about shading — the evidence must name the project/contract used and its non-empty counts.
 - **Dependencies:** T-07
 - **Estimated effort:** S
@@ -194,6 +197,7 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 | R-GEO-002 `BUT NOT` color no-data countries | T-04 (series content assertion) + T-08 (visual) |
 | R-GEO-002 `AND IT MUST` monotonic ramp / AC.2 | T-02 (max-count) + T-07 (`tokens:validate`) |
 | R-GEO-002 AC.3 visual order | T-08 |
+| R-GEO-002 AND-IT-MUST visible-at-any-count / AC.4 | T-04 (+T-08 visual) |
 | R-GEO-003 AC.1 (HK fixture) / AC.3 (undefined code) | T-02 |
 | R-GEO-003 AC.2 fixture coverage | T-01 (fixture) + T-02 (test) |
 | R-GEO-003 `BUT NOT` throw/blank/wrong-shade | T-02 (no-throw) + T-04 (render with partial series) |
@@ -213,6 +217,7 @@ T-01, T-02, T-03 are parallel-safe with each other except T-01→T-02 (the util'
 | R-GEO-008 AC.1 lists unchanged | T-04 + T-05 (spec unmodified) |
 | R-GEO-008 AC.2 no server diff / `BUT NOT` service change | T-07 |
 | R-GEO-008 `AND IT MAY` grid only | T-05 (+T-08 final fractions) |
+| R-GEO-008 AND-IT-MUST bounded height | T-08 |
 | NFR-GEO-101 | T-01 (baseline) + T-07 (after) |
 | NFR-GEO-102 | T-07 (sentinel grep) |
 | NFR-GEO-103 | T-07 (monotonicity) + T-08 (contrast) |

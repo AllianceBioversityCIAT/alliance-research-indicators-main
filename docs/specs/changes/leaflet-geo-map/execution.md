@@ -227,4 +227,55 @@ Tests:       2 failed, 7 passed, 9 total
 - **Production Build:** `npm run build` in `client/research-indicators` succeeded with exit code 0 (Initial total: 1.12 MB raw / 261.35 kB transfer; `project-dashboard-component` chunk: 1.02 MB raw / 272.78 kB transfer).
 - **Status:** PASS
 
+---
+
+## Addendum #2 — In-Flight Spec Correction (2026-08-22)
+
+### Scope: Degenerate Domain Shading & Bounded Pane Height (D-GEO-10, D-GEO-11, R-GEO-002 AC.4, R-GEO-008)
+
+- **Trigger / Context:** Live testing evidence from single-country results (Kenya count 1) showed that a scale starting at `min: 1` collapsed the single count onto the faint floor stop (`ramp[0]`), making it visually indistinguishable from the neutral base. In addition, unbounded height in chart and fallback left dead vertical space below the left column. Spec corrected with D-GEO-10 (`visualMap.min = 0`, scaling 0→maxCount so degenerate values map to saturated ramp stops), D-GEO-11 (bounded 360px height for both chart and fallback), R-GEO-002 AC.4, and R-GEO-008 bounded height clause.
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.ts` (configured `visualMap.min = 0, max = maxCount` per D-GEO-10)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.html` (set `height="360px"` on `<app-viz-chart>` and `h-[360px]` on fallback div per D-GEO-11)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts` (added R-GEO-002 AC.4 degenerate fixture test, updated min: 0 expectation)
+  - `docs/specs/changes/leaflet-geo-map/tasks.md` (updated T-04 done-checks, coverage matrix, and T-08 checks)
+
+### Named Failing Input Proof (K-012 / K-004 / KZ-014)
+
+- **Probe Execution:** Added AC.4 degenerate domain test for fixture `[{ iso_alpha_2: 'KE', count: 1 }]` expecting `min: 0, max: 1` and ran against the un-fixed code (`min: 1, max: 2`).
+- **Command:** `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts --coverage=false`
+- **Observed Verbatim Red Failure (Exit code 1):**
+
+```text
+FAIL src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts
+  GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GEO-006)
+    Generated ECharts option structure (KZ-001 / R-GEO-001, R-GEO-002, D-GEO-6, D-GEO-7, D-GEO-8)
+      ✕ resolves single-country degenerate fixture to saturated ramp stop and min 0 (R-GEO-002 AC.4 / D-GEO-10) (18 ms)
+
+  ● GeoScopeMapComponent (R-GEO-001, R-GEO-002, R-GEO-004, R-GEO-005, R-GEO-006) › Generated ECharts option structure (KZ-001 / R-GEO-001, R-GEO-002, D-GEO-6, D-GEO-7, D-GEO-8) › resolves single-country degenerate fixture to saturated ramp stop and min 0 (R-GEO-002 AC.4 / D-GEO-10)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 1
+
+      137 |       const opts = component.options() as any;
+      138 |       expect(opts).not.toBeNull();
+    > 139 |       expect(opts.visualMap.min).toBe(0);
+          |                                  ^
+      140 |       expect(opts.visualMap.max).toBe(1);
+      141 |       expect(opts.series[0].data).toEqual([{ name: 'KE', value: 1 }]);
+      142 |     });
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 9 passed, 10 total
+```
+
+### Green Verification Evidence (Post-Fix)
+
+- **Command:** `npm test -- src/app/pages/platform/pages/project-detail/components/geo-scope-map/geo-scope-map.component.spec.ts src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts src/app/shared/utils/geo-choropleth.util.spec.ts --coverage=false`
+- **Output:** Exit Code 0 (3/3 suites passed, 32/32 tests passed).
+- **Status:** PASS
+
+
 
