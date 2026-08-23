@@ -20,6 +20,11 @@
   grid-column: 2;
   grid-row: 2;
   overflow-y: auto;
+
+  /* Containing block for absolute descendants (e.g. Tailwind sr-only tables in viz-chart):
+     without this they anchor to .grid-container, escape this scroll clip, and inflate the
+     document with a second page scrollbar (measured: +376px on project-dashboard). */
+  position: relative;
 }
 
 .spinner {
