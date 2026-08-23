@@ -1,7 +1,7 @@
 # Tasks — Changes / Executive Overview Clear Placement (`ai-overview-placement`)
 
 - **Module:** changes (STAR client) · **Spec id:** 2026-08-ai-overview-placement
-- **Status:** not-started · **Owner:** j.cadavid@cgiar.org · **Last updated:** 2026-08-22
+- **Status:** done · **Owner:** j.cadavid@cgiar.org · **Last updated:** 2026-08-22
 - **Linked requirements:** ./requirements.md · **Linked design:** ./design.md
 - **Budget (design §2.4):** 2 tasks · ~150 net LOC · 1 review round — exceeding it escalates, never continues silently
 

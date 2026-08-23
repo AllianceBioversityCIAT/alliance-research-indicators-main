@@ -2,7 +2,7 @@
 
 - **Module:** changes (STAR client)
 - **Spec id:** 2026-08-ai-overview-placement
-- **Status:** in-progress
+- **Status:** done (archived 2026-08-23)
 - **Owner:** j.cadavid@cgiar.org
 - **Last updated:** 2026-08-22
 
@@ -53,3 +53,14 @@
 - **Accessibility Verification:**
   - "View more" button is keyboard accessible (Tab, Enter/Space).
   - `aria-expanded` and `aria-controls="executive-overview-details"` properly reflect state.
+
+---
+
+## Addendum — Post-spec drift recorded at archive (2026-08-23)
+
+- **Commit:** `04599a35` — `fix(project-dashboard): ensure AI Grounding & Setup is always accessible for admins on projects with 0 initial files` (2026-08-22 22:12, **untagged**, landed after T-02 PASS).
+- **What changed:** `showGroundingSection` collapsed from `canAccessGroundingSetup() && (docs || loading || error || data)` to `canAccessGroundingSetup()` alone. The Cell-3 spec test was rewritten: it no longer asserts the bottom section is **absent** for an admin with zero docs; it now asserts presence, then persistence after a doc is added.
+- **Spec clauses affected:** R-AIP-002 `AND IT MUST keep the admin bottom section's visibility condition semantically identical to today's admin branch` and **D-AIP-5** are **superseded** by this commit. The D-AIP-5 "failing input" (drop `hasExecutiveOverviewData` from the OR ⇒ red) no longer exists because the OR no longer exists.
+- **Why it was right to change:** the frozen gate had a bootstrap hole — an admin on a project with **0 documents** could never reach the only UI that uploads the first document. Preserving "today's gate" preserved that defect. Product call, taken by the owner in-browser; recorded here so the archive does not read as if D-AIP-5 still holds.
+- **Not affected:** R-AIP-001, R-AIP-003 (D-PD-9 `[hidden]` collapse, progress-on-collapsed, auto-expand — untouched by `04599a35`), the four-cell card matrix (card presence is still summary-gated).
+- **Kaizen:** see `docs/specs/kaizen/changes--ai-overview-placement.md` (KZ-changes--ai-overview-placement-1).
