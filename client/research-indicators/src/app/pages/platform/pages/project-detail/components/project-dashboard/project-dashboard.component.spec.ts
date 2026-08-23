@@ -1579,7 +1579,7 @@ describe('ProjectDashboardComponent', () => {
 
       // Indicators card still displays data
       const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
-      expect(indicatorSection.textContent).toContain('Total results');
+      expect(indicatorSection.textContent).toContain('Results by indicator');
       expect(indicatorSection.textContent).toContain('5');
       expect(indicatorSection.textContent).toContain('Publications');
 
@@ -1625,7 +1625,7 @@ describe('ProjectDashboardComponent', () => {
 
       const firstLink = links[0];
       expect(firstLink.getAttribute('href')).toContain('/project-detail/C-1?indicatorTab=1');
-      expect(firstLink.getAttribute('aria-label')).toContain('Publications: 8 results, 67% — view filtered results');
+      expect(firstLink.getAttribute('aria-label')).toContain('Publications: 8 results — view filtered results');
     });
 
     describe('T-12 hierarchy and AI section relocation (R-PD-008, D-PD-8, D-PD-9)', () => {
@@ -1919,6 +1919,157 @@ describe('ProjectDashboardComponent', () => {
       expect(component.activeIndicatorChartOptions()).toBe(heatmapOpts);
     });
 
+    it('should default to engine-native morph path and switch to fallback path when prefers-reduced-motion matches (R-HL-007, KZ-015)', async () => {
+      let reducedMotion = false;
+      const listeners: ((e: any) => void)[] = [];
+      const mql: any = {
+        get matches() {
+          return reducedMotion;
+        },
+        media: '(prefers-reduced-motion: reduce)',
+        onchange: null,
+        addListener: (fn: any) => listeners.push(fn),
+        removeListener: jest.fn(),
+        addEventListener: (_type: string, fn: any) => listeners.push(fn),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn()
+      };
+      const origMatchMedia = window.matchMedia;
+      window.matchMedia = jest.fn().mockImplementation((query: string) => {
+        if (query === '(prefers-reduced-motion: reduce)') {
+          return mql;
+        }
+        return { matches: false, media: query, addEventListener: jest.fn(), removeEventListener: jest.fn() } as any;
+      });
+
+      try {
+        await setup('C-1', {
+          summary: summaryWithMatrix,
+          projectData: {
+            indicators: [
+              { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+              { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+            ]
+          }
+        });
+
+        // 1. Default state: engine-native morph path (useCrossfadeFallback is false)
+        expect(component.useCrossfadeFallback()).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('ul.sr-only')).toBeTruthy();
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul:not(.sr-only)')).toBeNull();
+
+        // 2. KZ-015 transition: toggle reduced-motion state
+        reducedMotion = true;
+        listeners.forEach(fn => fn({ matches: true } as MediaQueryListEvent));
+        component.updateReducedMotionPreference();
+        fixture.detectChanges();
+
+        // 3. Fallback path renders
+        expect(component.useCrossfadeFallback()).toBe(true);
+        expect(fixture.nativeElement.querySelector('ul.sr-only')).toBeNull();
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul:not(.sr-only)')).toBeTruthy();
+      } finally {
+        window.matchMedia = origMatchMedia;
+      }
+    });
+
+    it('should render sr-only indicator drill-through links for all indicators with results, excluding zero-count indicators (R-HL-007, R-HL-009, D-F1-2)', async () => {
+      await setup('C-1', {
+        projectData: {
+          agreement_id: 'C-1',
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Publications' }, count_results: 8 } as any,
+            { indicator: { indicator_id: 2, name: 'Innovations' }, count_results: 4 } as any,
+            { indicator: { indicator_id: 3, name: 'Zero Count Indicator' }, count_results: 0 } as any
+          ]
+        }
+      });
+
+      expect(component.useCrossfadeFallback()).toBe(false);
+
+      const srOnlyUl = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul.sr-only');
+      expect(srOnlyUl).toBeTruthy();
+      expect(srOnlyUl.getAttribute('aria-label')).toBe('Results by indicator drill-through links');
+
+      const links = Array.from(srOnlyUl.querySelectorAll('li a')) as HTMLAnchorElement[];
+      expect(links.length).toBe(2); // Zero-count indicator excluded!
+
+      const link1 = links[0];
+      expect(link1.getAttribute('href')).toContain('/project-detail/C-1?indicatorTab=1');
+      expect(link1.getAttribute('aria-label')).toBe('Publications: 8 results — view filtered results');
+      expect(link1.textContent?.trim()).toBe('Publications (8 results)');
+
+      const link2 = links[1];
+      expect(link2.getAttribute('href')).toContain('/project-detail/C-1?indicatorTab=2');
+      expect(link2.getAttribute('aria-label')).toBe('Innovations: 4 results — view filtered results');
+      expect(link2.textContent?.trim()).toBe('Innovations (4 results)');
+
+      // Verify zero-count indicator does not exist in the list
+      const allText = srOnlyUl.textContent ?? '';
+      expect(allText).not.toContain('Zero Count Indicator');
+    });
+
+    it('should navigate to indicatorTab on both bar and heatmap chart clicks in native morph mode across view toggle (R-HL-007, R-HL-009)', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 10, name: 'Policy Changes' }, count_results: 5 } as any,
+            { indicator: { indicator_id: 20, name: 'Capacity Sharing' }, count_results: 3 } as any
+          ]
+        }
+      });
+
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      expect(component.useCrossfadeFallback()).toBe(false);
+      expect(component.indicatorView()).toBe('bars');
+
+      // 1. Click bar in 'bars' view (Policy Changes, id 10)
+      component.onIndicatorHeatmapClick({ dataIndex: 1, name: 'Policy Changes' } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 10 }
+      });
+      navSpy.mockClear();
+
+      // Click second bar in 'bars' view (Capacity Sharing, id 20)
+      component.onIndicatorHeatmapClick({ dataIndex: 0, name: 'Capacity Sharing' } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 20 }
+      });
+      navSpy.mockClear();
+
+      // 2. Toggle to 'heatmap' view
+      component.setIndicatorView('heatmap');
+      expect(component.indicatorView()).toBe('heatmap');
+
+      // Click cell in heatmap view (indicator index 0 -> Policy Changes, id 10)
+      component.onIndicatorHeatmapClick({ data: [0, 0, 5] } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 10 }
+      });
+      navSpy.mockClear();
+
+      // Click cell in heatmap view (indicator index 1 -> Capacity Sharing, id 20)
+      component.onIndicatorHeatmapClick({ data: [1, 1, 3] } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 20 }
+      });
+      navSpy.mockClear();
+
+      // 3. Toggle back to 'bars' view
+      component.setIndicatorView('bars');
+      expect(component.indicatorView()).toBe('bars');
+
+      // Re-assert bar click still navigates after toggle
+      component.onIndicatorHeatmapClick({ dataIndex: 1, name: 'Policy Changes' } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 10 }
+      });
+    });
+
     it('should toggle between native morph single viz-chart and HTML ranked list via useCrossfadeFallback (proposal §12)', async () => {
       await setup('C-1', {
         summary: summaryWithMatrix,
@@ -1930,16 +2081,18 @@ describe('ProjectDashboardComponent', () => {
         }
       });
 
-      // Default is fallback mode
-      expect(component.useCrossfadeFallback()).toBe(true);
-      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul')).toBeTruthy();
+      // Default is native morph mode
+      expect(component.useCrossfadeFallback()).toBe(false);
+      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('ul.sr-only')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul:not(.sr-only)')).toBeNull();
 
-      // Switch to native morph mode (single app-viz-chart in DOM)
-      component.useCrossfadeFallback.set(false);
+      // Switch to crossfade fallback mode (HTML ranked list in DOM)
+      component.useCrossfadeFallback.set(true);
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.querySelector('app-viz-chart')).toBeTruthy();
-      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul')).toBeNull();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"] ul:not(.sr-only)')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('ul.sr-only')).toBeNull();
     });
   });
 

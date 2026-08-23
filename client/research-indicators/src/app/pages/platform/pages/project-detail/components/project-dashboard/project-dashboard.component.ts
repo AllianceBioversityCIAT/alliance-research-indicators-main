@@ -138,7 +138,7 @@ export class ProjectDashboardComponent {
   readonly staggerMs = WIDGET_ENTRY_STAGGER_MS;
 
   readonly indicatorView = signal<'bars' | 'heatmap'>('bars');
-  readonly useCrossfadeFallback = signal<boolean>(true);
+  readonly useCrossfadeFallback = signal<boolean>(this.checkReducedMotion());
 
   readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
   readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
@@ -490,6 +490,7 @@ export class ProjectDashboardComponent {
           id: 'indicator-series',
           name: 'Results by indicator and year',
           type: 'heatmap',
+          cursor: 'pointer',
           data,
           universalTransition: {
             enabled: true,
@@ -559,6 +560,7 @@ export class ProjectDashboardComponent {
           id: 'indicator-series',
           name: 'Results by indicator',
           type: 'bar',
+          cursor: 'pointer',
           data: values,
           universalTransition: {
             enabled: true,
@@ -1126,6 +1128,8 @@ export class ProjectDashboardComponent {
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;
 
   constructor() {
+    this.initReducedMotionDetection();
+
     effect(() => {
       const contractId = this.contractId();
       if (contractId) {
@@ -1151,20 +1155,76 @@ export class ProjectDashboardComponent {
     });
   }
 
+  initReducedMotionDetection(): void {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
+    try {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      if (mediaQuery.matches) {
+        this.useCrossfadeFallback.set(true);
+      }
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', (event: MediaQueryListEvent) => {
+          this.useCrossfadeFallback.set(event.matches);
+        });
+      } else if (typeof mediaQuery.addListener === 'function') {
+        mediaQuery.addListener((event: MediaQueryListEvent) => {
+          this.useCrossfadeFallback.set(event.matches);
+        });
+      }
+    } catch {
+      // Fallback if matchMedia is not supported in environment
+    }
+  }
+
+  checkReducedMotion(): boolean {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      return false;
+    }
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  updateReducedMotionPreference(): void {
+    this.useCrossfadeFallback.set(this.checkReducedMotion());
+  }
+
   setIndicatorView(view: 'bars' | 'heatmap'): void {
     this.indicatorView.set(view);
   }
 
   onIndicatorHeatmapClick(event: ECElementEvent): void {
-    const data = event.data as [number, number, number] | undefined;
-    if (!data || !Array.isArray(data)) return;
-    const [, indicatorIndex] = data;
-    const indicator = this.indicatorsWithResults()[indicatorIndex];
-    if (indicator?.id !== undefined && indicator?.id !== null) {
-      void this.router.navigate(['/project-detail', this.contractId()], {
-        queryParams: { indicatorTab: indicator.id }
+    let targetId: number | string | null | undefined;
+
+    if (Array.isArray(event.data)) {
+      const rawIndex = event.data[1];
+      const indicatorIndex = typeof rawIndex === 'number' ? rawIndex : Number(rawIndex);
+      if (Number.isFinite(indicatorIndex)) {
+        const indicator = this.indicatorsWithResults()[indicatorIndex];
+        targetId = indicator?.indicatorId ?? indicator?.id;
+      }
+    } else if (event.data && typeof event.data === 'object' && 'indicatorId' in event.data) {
+      targetId = (event.data as { indicatorId?: number | string }).indicatorId;
+    } else if (typeof event.dataIndex === 'number' && event.dataIndex >= 0) {
+      const indicators = this.indicatorsWithResults();
+      const reversedIndex = indicators.length - 1 - event.dataIndex;
+      const indicator = indicators[reversedIndex] ?? (event.name ? indicators.find(i => i.label === event.name) : undefined);
+      targetId = indicator?.indicatorId ?? indicator?.id;
+    } else if (event.name) {
+      const indicator = this.indicatorsWithResults().find(i => i.label === event.name);
+      targetId = indicator?.indicatorId ?? indicator?.id;
+    }
+
+    const contractId = this.contractId();
+    if (contractId && targetId !== undefined && targetId !== null) {
+      void this.router.navigate(['/project-detail', contractId], {
+        queryParams: { indicatorTab: targetId }
       });
     }
+  }
+
+  onIndicatorChartClick(event: ECElementEvent): void {
+    this.onIndicatorHeatmapClick(event);
   }
 
   onTrendChartClick(event: ECElementEvent): void {

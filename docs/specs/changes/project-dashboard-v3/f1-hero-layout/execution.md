@@ -390,3 +390,39 @@
 - **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
 
 ---
+
+## Task: T-08 — Enable native morph + sr-only indicator link list
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Enabled engine-native morph as the default for Results by indicator (`useCrossfadeFallback` defaults to `false`). Added runtime `prefers-reduced-motion` detection to fallback to crossfade when reduced motion is preferred. Rendered `sr-only` list of per-indicator drill links in native morph mode with `indicatorTab` targets and accessible labels, excluding zero-count indicators. Verified chart click drill-through across bars <-> heatmap view toggles.
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 1 passed, 1 total
+  Tests: 134 passed, 134 total
+  ```
+- **Not Done / Assumptions:** Morph animation visual validation is deferred to T-09 HITL.
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Implementation satisfies all requirements for T-08. Runtime reduced-motion detection is active, native morph defaults to single `app-viz-chart`, `sr-only` list provides full accessible indicator navigation without zero-count items, and chart click drill works smoothly across view toggles.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-08)
+- **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
+
+---

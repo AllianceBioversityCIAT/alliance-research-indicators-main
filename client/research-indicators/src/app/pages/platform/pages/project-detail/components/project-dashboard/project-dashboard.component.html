@@ -614,6 +614,18 @@
         (chartClick)="onIndicatorHeatmapClick($event)">
       </app-viz-chart>
 
+      <ul class="sr-only" aria-label="Results by indicator drill-through links">
+        @for (indicator of indicatorsWithResults(); track indicator.id) {
+        <li>
+          <a [routerLink]="['/project-detail', contractId()]"
+            [queryParams]="{ indicatorTab: indicator.id }"
+            [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'">
+            {{ indicator.label }} ({{ indicator.value }} results)
+          </a>
+        </li>
+        }
+      </ul>
+
       @if (indicatorView() === 'heatmap') {
       <!-- Ramp Legend (WCAG 1.4.1) -->
       <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">

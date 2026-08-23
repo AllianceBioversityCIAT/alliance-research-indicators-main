@@ -131,11 +131,11 @@ graph TD
 - **Files touched (intended):** `project-dashboard.component.{html,ts}` (+spec).
 - **Description:** Default `useCrossfadeFallback` to `false`; reduced-motion resolves to the crossfade/no-animation path at runtime; add the sr-only list of real per-indicator links (indicatorTab targets) alongside the morphing chart; both views keep chartClick drill.
 - **Acceptance / done check:**
-  - [ ] Spec: default state uses engine-native path (single viz-chart with `activeIndicatorChartOptions`); with reduced-motion mocked, fallback path renders (KZ-015: toggle the media-query state, not pre-set it).
-  - [ ] Spec: sr-only list contains one real link per indicator-with-results with correct `indicatorTab` params (**failing input:** zero-count indicator in fixture must not appear).
-  - [ ] Spec: heatmap click drill still navigates after a bars→heatmap toggle.
-  - [ ] Presence caveat: specs prove options/DOM presence; the morph **animation itself** is unprovable in jsdom — owned by T-09 HITL (declared in requirements defect table).
-- **Dependencies:** none · **Effort:** M · **Status:** todo
+  - [x] Spec: default state uses engine-native path (single viz-chart with `activeIndicatorChartOptions`); with reduced-motion mocked, fallback path renders (KZ-015: toggle the media-query state, not pre-set it).
+  - [x] Spec: sr-only list contains one real link per indicator-with-results with correct `indicatorTab` params (**failing input:** zero-count indicator in fixture must not appear).
+  - [x] Spec: heatmap click drill still navigates after a bars→heatmap toggle.
+  - [x] Presence caveat: specs prove options/DOM presence; the morph **animation itself** is unprovable in jsdom — owned by T-09 HITL (declared in requirements defect table).
+- **Dependencies:** none · **Effort:** M · **Status:** done
 
 ### T-09 — Suite realignment, full gates, HITL visual close
 
