@@ -204,3 +204,44 @@
 - **Notes:** All acceptance criteria for T-05 verified.
 
 ---
+
+## Task: T-06 — Full Gates & End-to-End Verification Close
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `nestjs-expert`, `angular-developer`, `tdd`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/shared/interfaces/project-dashboard.interface.ts` (modified)
+- **Summary:** Executed full verification gates across server and client tiers. Augmented `ProjectDashboardRankedItem` with optional icon properties (`icon`, `icon_src`, `icon_key`) for full template type-safety under strict production build. Verified 100% test pass rate on both packages.
+- **Verification Commands & Evidence:**
+  - **Server Tests (`npm test`):**
+    - 338/338 suites passed (100%), 2,437/2,437 tests passed (100%).
+  - **Server Lint (`npx eslint src/domain/entities/agresso-contract/`):**
+    - 0 errors, 0 warnings.
+  - **Server Build (`npm run build`):**
+    - Clean build.
+  - **Client Tests (`npm test -- --silent`):**
+    - 314/314 suites passed (100%), 6,678/6,678 tests passed (100%).
+    - Statements: 98.65%, Branches: 95.14%, Functions: 98.52%, Lines: 98.97%.
+  - **Client Lint (`npx eslint src/app/pages/platform/pages/project-detail/ src/app/shared/services/`):**
+    - 0 errors, 0 warnings.
+  - **Client Build (`npm run build`):**
+    - Clean build, bundle budgets satisfied.
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Verified full verification gates across both packages. NFR-CE-001, NFR-CE-002, and NFR-CE-003 are fully satisfied. Tests, linters, and builds are clean.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-06 & close spec execution)
+- **Notes:** All 6 tasks of `f2-consolidated-endpoint` are now completed and verified.
+
+---

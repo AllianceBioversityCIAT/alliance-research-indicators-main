@@ -116,11 +116,11 @@ graph TD
 - **Files touched (intended):** any spec requiring alignment.
 - **Description:** Run full backend and frontend test suites, linting, and build gates. Verify single HTTP request in network inspection.
 - **Acceptance / done check:**
-  - [ ] Backend tests (`npm test` in `server/researchindicators`) green.
-  - [ ] Frontend tests (`npm test -- --silent` in `client/research-indicators`) green with coverage thresholds satisfied.
-  - [ ] Production build (`npm run build` in both packages) green.
-  - [ ] ESLint clean on all touched paths.
-- **Dependencies:** T-05 · **Effort:** M · **Status:** todo
+  - [x] Backend tests (`npm test` in `server/researchindicators`) green.
+  - [x] Frontend tests (`npm test -- --silent` in `client/research-indicators`) green with coverage thresholds satisfied.
+  - [x] Production build (`npm run build` in both packages) green.
+  - [x] ESLint clean on all touched paths.
+- **Dependencies:** T-05 · **Effort:** M · **Status:** done
 
 ---
 

@@ -46,6 +46,9 @@ export interface ProjectDashboardRankedItem {
   contribution_count?: number;
   count?: number;
   value?: number;
+  icon?: string | null;
+  icon_src?: string | null;
+  icon_key?: string | null;
 }
 
 export interface TopContributorsContractReport {
