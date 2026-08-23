@@ -95,11 +95,11 @@ graph TD
 - **Files touched (intended):** `components/no-data-group/*` (new, +spec), `project-dashboard.component.{html,ts}` (+spec).
 - **Description:** Widgets listed in R-HL-004 render in place for loading/error/data; confirmed-empty feeds `{name, reason}` into the no-data-group after the pending table. Fixed reason strings per widget (copy reviewed at HITL). Trend with exactly one bucket stays in place (existing sparse presentation).
 - **Acceptance / done check:**
-  - [ ] Spec (KZ-015 transitions): loading → widget in place with skeleton; resolve-empty → collapsed row; resolve-data → widget in place. Error → widget in place with retry.
-  - [ ] Spec: retry after empty that then yields data re-expands the widget (**failing input:** cache the collapsed state → spec must fail).
-  - [ ] Spec: single-year trend renders in place, not in the group.
-  - [ ] `npx jest <specs> --coverage=false` green; disqualifier: fixtures that resolve before first `detectChanges()`.
-- **Dependencies:** T-04 · **Effort:** M · **Status:** todo
+  - [x] Spec (KZ-015 transitions): loading → widget in place with skeleton; resolve-empty → collapsed row; resolve-data → widget in place. Error → widget in place with retry.
+  - [x] Spec: retry after empty that then yields data re-expands the widget (**failing input:** cache the collapsed state → spec must fail).
+  - [x] Spec: single-year trend renders in place, not in the group.
+  - [x] `npx jest <specs> --coverage=false` green; disqualifier: fixtures that resolve before first `detectChanges()`.
+- **Dependencies:** T-04 · **Effort:** M · **Status:** done
 
 ### T-06 — Ranking cards on viz-chart with lever/contract drill-through
 

@@ -436,7 +436,9 @@
   }
 
   <!-- Trend & Status row (R-HL-003, design §6) -->
-  <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+  @if (!trendEmpty() || !statusChartEmpty()) {
+  <div class="grid grid-cols-1 gap-5" [class.lg:grid-cols-2]="!trendEmpty() && !statusChartEmpty()" [class.lg:items-stretch]="!trendEmpty() && !statusChartEmpty()">
+    @if (!trendEmpty()) {
     <app-results-trend-card
       [style.animation-delay.ms]="staggerMs.trend"
       [buckets]="contractResultsSummary.list()?.by_year ?? []"
@@ -444,7 +446,9 @@
       [error]="contractResultsSummary.loadError()"
       (retry)="contractResultsSummary.update()">
     </app-results-trend-card>
+    }
 
+    @if (!statusChartEmpty()) {
     <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
       aria-labelledby="results-by-status-title"
       [style.animation-delay.ms]="staggerMs.indicatorStatus">
@@ -470,12 +474,6 @@
           class="!min-h-[44px] !min-w-[44px]"
           aria-label="Retry loading results by status"
           (click)="contractResultsSummary.update()">Try again</button>
-      </div>
-      } @else if (statusChartEmpty()) {
-      <div class="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-        <i class="pi pi-chart-bar text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No result statuses were found
-          for this project.</p>
       </div>
       } @else {
       <div class="flex flex-col gap-4">
@@ -535,9 +533,12 @@
       </div>
       }
     </section>
+    }
   </div>
+  }
 
   <!-- Results by indicator section (R-HL-003, design §6) -->
+  @if (!indicatorsEmpty()) {
   <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
     aria-labelledby="results-by-indicator-title"
     [style.animation-delay.ms]="staggerMs.indicatorStatus">
@@ -708,13 +709,21 @@
 
     <!-- Reserved slot for F3 Indicator Deep Dive -->
   </section>
+  }
 
   <!-- Geographic scope -->
+  @if (!geoScopeEmpty()) {
   <app-geo-scope-card class="w-full"></app-geo-scope-card>
+  }
 
   <!-- Rankings & SP alignment row (R-HL-003, design §6) -->
-  <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+  @if (hasVisibleRankingCards() || (isBilateral() && !spAlignmentEmpty())) {
+  <div class="grid grid-cols-1 gap-5"
+    [class.lg:grid-cols-2]="hasVisibleRankingCards() && (isBilateral() && !spAlignmentEmpty())"
+    [class.lg:items-start]="hasVisibleRankingCards() && (isBilateral() && !spAlignmentEmpty())">
+    @if (hasVisibleRankingCards()) {
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      @if (!partnersEmpty()) {
       <div id="partners-card" class="flex flex-1">
         <app-project-dashboard-card title="Top partner institution"
           description="Partner institutions most frequently linked to results on this primary project."
@@ -725,7 +734,9 @@
           layout="rows-partners" (retry)="topPartners.update()">
         </app-project-dashboard-card>
       </div>
+      }
 
+      @if (!leversEmpty()) {
       <div class="flex flex-1">
         <app-project-dashboard-card title="Top primary levers"
           description="Primary levers most frequently linked to results on this project." class="h-full w-full"
@@ -736,7 +747,9 @@
           layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
         </app-project-dashboard-card>
       </div>
+      }
 
+      @if (!mainContactPersonsEmpty()) {
       <div class="flex flex-1">
         <app-project-dashboard-card title="Top main contact person"
           description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
@@ -747,7 +760,9 @@
           layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
         </app-project-dashboard-card>
       </div>
+      }
 
+      @if (!contributorsEmpty()) {
       <div class="flex lg:flex-1 [&>*]:w-full">
         <app-project-dashboard-card title="Top contributing projects"
           description="Top projects contributing to results where this project is the primary project."
@@ -758,9 +773,11 @@
           [itemHeightPx]="43" (retry)="topContributors.update()">
         </app-project-dashboard-card>
       </div>
+      }
     </div>
+    }
 
-    @if (isBilateral()) {
+    @if (isBilateral() && !spAlignmentEmpty()) {
     <app-sp-alignment-graph
       [style.animation-delay.ms]="staggerMs.spGraph"
       [report]="contractSpAlignment.list()"
@@ -770,6 +787,7 @@
     </app-sp-alignment-graph>
     }
   </div>
+  }
 
   <!-- Pending revision results -->
   <section
@@ -785,6 +803,9 @@
       [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"
       emptyMessage="No results pending revision"></app-results-center-table>
   </section>
+
+  <!-- Collapsed empty widgets group (R-HL-004, D-F1-3) -->
+  <app-no-data-group [items]="collapsedEmptyWidgets()"></app-no-data-group>
 
   <!-- AI Grounding & Setup section relocated below analytics (R-PD-008, D-PD-8, D-PD-9, R-AIP-002) -->
   @if (showGroundingSection()) {

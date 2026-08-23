@@ -1,0 +1,41 @@
+@if (items().length > 0) {
+<section class="box-border flex w-full flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  aria-labelledby="no-data-group-title">
+  <header class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--ac-grey-200)] pb-3">
+    <div class="flex items-center gap-2.5">
+      <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--ac-grey-100)] text-[var(--ac-grey-600)]">
+        <i class="pi pi-eye-slash text-[14px]" aria-hidden="true"></i>
+      </div>
+      <div class="flex flex-col gap-0.5">
+        <h2 id="no-data-group-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+          No data yet
+        </h2>
+        <p class="m-0 font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+          Some visualizations are hidden because no data has been reported yet.
+        </p>
+      </div>
+    </div>
+    <span class="inline-flex items-center rounded-full bg-[var(--ac-grey-100)] px-2.5 py-1 font-['Space_Grotesk'] text-[11px] font-semibold text-[var(--ac-grey-600)]">
+      {{ items().length }} {{ items().length === 1 ? 'section' : 'sections' }} hidden
+    </span>
+  </header>
+
+  <ul class="m-0 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-2" role="list">
+    @for (item of items(); track item.name) {
+    <li class="flex items-start gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-3.5">
+      <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--ac-white-1)] text-[var(--ac-grey-600)] shadow-xs">
+        <i [class]="item.iconClass || 'pi pi-info-circle'" class="text-[13px]" aria-hidden="true"></i>
+      </div>
+      <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <strong class="font-['Barlow'] text-[13.5px] font-semibold text-[var(--ac-grey-800)]">
+          {{ item.name }}
+        </strong>
+        <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+          {{ item.reason }}
+        </p>
+      </div>
+    </li>
+    }
+  </ul>
+</section>
+}

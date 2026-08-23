@@ -118,7 +118,22 @@ describe('ProjectDashboardComponent', () => {
   let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
   let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
   let topLeversMock: ReturnType<typeof createRankedServiceMock>;
-  let geoScopeMock: { main: jest.Mock };
+  let geoScopeMock: {
+    summary: ReturnType<typeof signal<any>>;
+    topRegionsList: ReturnType<typeof signal<any[]>>;
+    topCountries: ReturnType<typeof signal<any[]>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    loadError: ReturnType<typeof signal<boolean>>;
+    main: jest.Mock;
+    update: jest.Mock;
+  };
+  let contractSpAlignmentMock: {
+    list: ReturnType<typeof signal<ContractSpAlignmentReport | null>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    loadError: ReturnType<typeof signal<boolean>>;
+    main: jest.Mock;
+    update: jest.Mock;
+  };
   let resultsCenterServiceMock: { initializeProjectDashboardResultsTable: jest.Mock };
   let fileManagerServiceMock: { uploadFile: jest.Mock };
   let documentOverviewServiceMock: {
@@ -168,7 +183,22 @@ describe('ProjectDashboardComponent', () => {
     topMainContactsMock = createRankedServiceMock();
     topPartnersMock = createRankedServiceMock();
     topLeversMock = createRankedServiceMock();
-    geoScopeMock = { main: jest.fn() };
+    geoScopeMock = {
+      summary: signal({}),
+      topRegionsList: signal([]),
+      topCountries: signal([]),
+      loading: signal(false),
+      loadError: signal(false),
+      main: jest.fn(),
+      update: jest.fn()
+    };
+    contractSpAlignmentMock = {
+      list: signal<ContractSpAlignmentReport | null>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      main: jest.fn(),
+      update: jest.fn()
+    };
     resultsCenterServiceMock = { initializeProjectDashboardResultsTable: jest.fn() };
     fileManagerServiceMock = {
       uploadFile: jest.fn().mockResolvedValue({ data: { filename: 'stored-file.pdf' } })
@@ -261,14 +291,6 @@ describe('ProjectDashboardComponent', () => {
       list: signal<ContractResultsSummary | null>(options?.summary === undefined ? null : options.summary),
       loading: signal(options?.summaryLoading ?? false),
       loadError: signal(options?.summaryError ?? false),
-      main: jest.fn(),
-      update: jest.fn()
-    };
-
-    const contractSpAlignmentMock = {
-      list: signal<ContractSpAlignmentReport | null>(null),
-      loading: signal(false),
-      loadError: signal(false),
       main: jest.fn(),
       update: jest.fn()
     };
@@ -574,7 +596,7 @@ describe('ProjectDashboardComponent', () => {
       expect(errorRegion.textContent).not.toContain(emptyCopy);
     });
 
-    it('should show the empty state with distinct copy when the aggregate returns no statuses (R-PD-007)', async () => {
+    it('should collapse the status region into no-data-group when aggregate returns no statuses (R-PD-007, R-HL-004)', async () => {
       await setup('C-1', {
         summary: { total: 0, by_indicator_year: [], by_status: [], by_year: [], partner_institutions: 0 }
       });
@@ -582,8 +604,12 @@ describe('ProjectDashboardComponent', () => {
       expect(component.statusChartEmpty()).toBe(true);
 
       const section = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
-      expect(section.textContent).toContain('No result statuses were found for this project.');
-      expect(section.textContent).not.toContain('We could not load the status breakdown');
+      expect(section).toBeNull();
+
+      const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+      expect(noDataGroup).not.toBeNull();
+      expect(noDataGroup.textContent).toContain('Results by status');
+      expect(noDataGroup.textContent).toContain('No result statuses were found for this project.');
     });
   });
 
@@ -1373,6 +1399,8 @@ describe('ProjectDashboardComponent', () => {
           partner_institutions: 8
         }
       });
+      topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 8 }]);
+      fixture.detectChanges();
 
       const partnersTarget = fixture.nativeElement.querySelector('#partners-card') ?? document.getElementById('partners-card');
       expect(partnersTarget).not.toBeNull();
@@ -1408,6 +1436,8 @@ describe('ProjectDashboardComponent', () => {
           partner_institutions: 8
         }
       });
+      topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 8 }]);
+      fixture.detectChanges();
 
       const partnersTarget = fixture.nativeElement.querySelector('#partners-card') ?? document.getElementById('partners-card');
       const scrollSpy = jest.fn();
@@ -1476,7 +1506,7 @@ describe('ProjectDashboardComponent', () => {
       expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
     });
 
-    it('should render distinct empty state copy when total project results is 0 and not loading/error (R-PD-007, R-PD-005)', async () => {
+    it('should collapse into no-data-group when total project results is 0 and not loading/error (R-PD-007, R-PD-005, R-HL-004)', async () => {
       await setup('C-1', {
         projectData: {
           grant_amount: 100,
@@ -1488,11 +1518,16 @@ describe('ProjectDashboardComponent', () => {
         }
       });
 
+      expect(component.indicatorsEmpty()).toBe(true);
+      expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by indicator')).toBe(true);
+
       const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
-      expect(indicatorSection.textContent).toContain('No results were found for any indicator on this project.');
-      expect(indicatorSection.textContent).not.toContain('We could not load results by indicator');
-      expect(indicatorSection.querySelector('[role="status"]')).toBeNull();
-      expect(indicatorSection.querySelector('[role="alert"]')).toBeNull();
+      expect(indicatorSection).toBeNull();
+
+      const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+      expect(noDataGroup).not.toBeNull();
+      expect(noDataGroup.textContent).toContain('Results by indicator');
+      expect(noDataGroup.textContent).toContain('No results were found for any indicator on this project.');
     });
 
     it('should keep sibling cards rendering data when one region fails with loadError (R-PD-007 AC.2)', async () => {
@@ -1667,6 +1702,12 @@ describe('ProjectDashboardComponent', () => {
           indicators: []
         }
       });
+      contractSpAlignmentMock.list.set({
+        sps: [{ sp_code: 'SP1', name: 'SP 1', category: null, icon_key: null, links: [] }],
+        results_with_alignment: 1,
+        results_without_alignment: 0
+      });
+      fixture.detectChanges();
 
       expect(component.isBilateral()).toBe(true);
       const widget = fixture.nativeElement.querySelector('app-sp-alignment-graph');
@@ -1901,8 +1942,22 @@ describe('ProjectDashboardComponent', () => {
           funding_type: 'Bilateral',
           grant_amount_usd: 1000000,
           indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        },
+        summary: {
+          total: 10,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [{ year: 2024, count: 5 }, { year: 2025, count: 5 }],
+          partner_institutions: 2
         }
       });
+      topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 3 }]);
+      contractSpAlignmentMock.list.set({
+        sps: [{ sp_code: 'SP1', name: 'SP 1', category: null, icon_key: null, links: [] }],
+        results_with_alignment: 1,
+        results_without_alignment: 0
+      });
+      geoScopeMock.topCountries.set([{ country_name: 'Colombia', iso_alpha_2: 'CO', count: 2 } as any]);
       component.executiveOverviewParagraphs.set(['Summary paragraph.']);
       component.executiveOverviewGeneratedAt.set('2026-08-23T12:00:00.000Z');
       component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
@@ -1920,6 +1975,7 @@ describe('ProjectDashboardComponent', () => {
       const partnersCard = root.querySelector('#partners-card');
       const spGraph = root.querySelector('app-sp-alignment-graph');
       const pendingSection = root.querySelector('#pending-revision-section');
+      const noDataGroup = root.querySelector('app-no-data-group');
       const aiSection = root.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
 
       expect(kpiStrip).toBeTruthy();
@@ -1933,10 +1989,11 @@ describe('ProjectDashboardComponent', () => {
       expect(partnersCard).toBeTruthy();
       expect(spGraph).toBeTruthy();
       expect(pendingSection).toBeTruthy();
+      expect(noDataGroup).toBeTruthy();
       expect(aiSection).toBeTruthy();
 
       // Verify DOM document order:
-      // Hero (KPI -> Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI
+      // Hero (KPI -> Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> No data yet -> AI
       expect(kpiStrip!.compareDocumentPosition(contextStrip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(contextStrip!.compareDocumentPosition(caveat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(caveat!.compareDocumentPosition(executiveOverview!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1947,7 +2004,8 @@ describe('ProjectDashboardComponent', () => {
       expect(geoCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(partnersCard!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(spGraph!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(pendingSection!.compareDocumentPosition(aiSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(pendingSection!.compareDocumentPosition(noDataGroup!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(noDataGroup!.compareDocumentPosition(aiSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
       // Assert trend & status sections precede ranking cards in DOM
       expect(trendCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -1966,6 +2024,13 @@ describe('ProjectDashboardComponent', () => {
         projectData: {
           funding_type: 'Bilateral',
           indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        },
+        summary: {
+          total: 5,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [{ year: 2024, count: 5 }],
+          partner_institutions: 0
         }
       });
 
@@ -1991,8 +2056,21 @@ describe('ProjectDashboardComponent', () => {
           funding_type: 'Bilateral',
           grant_amount_usd: 1000000,
           indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        },
+        summary: {
+          total: 5,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [{ year: 2024, count: 5 }],
+          partner_institutions: 0
         }
       });
+      contractSpAlignmentMock.list.set({
+        sps: [{ sp_code: 'SP1', name: 'SP 1', category: null, icon_key: null, links: [] }],
+        results_with_alignment: 1,
+        results_without_alignment: 0
+      });
+      fixture.detectChanges();
 
       expect(WIDGET_ENTRY_STAGGER_MS).toBeDefined();
       expect(WIDGET_ENTRY_STAGGER_MS.kpi).toBe(0);
@@ -2110,7 +2188,16 @@ describe('ProjectDashboardComponent', () => {
 
     describe('DOM document order (R-AIP-001, D-AIP-2, KZ-017, R-HL-003)', () => {
       it('should render top card between caveat and trend/status row (KZ-017 declared limit: proves DOM order, not visual layout)', async () => {
-        await setup('C-1', { isAdmin: false });
+        await setup('C-1', {
+          isAdmin: false,
+          summary: {
+            total: 5,
+            by_indicator_year: [],
+            by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+            by_year: [{ year: 2024, count: 5 }],
+            partner_institutions: 0
+          }
+        });
         component.executiveOverviewParagraphs.set(['Executive overview summary paragraph.']);
         fixture.detectChanges();
 
@@ -2535,5 +2622,437 @@ describe('ProjectDashboardComponent', () => {
       });
     });
   });
+
+  describe('Empty-collapse rule and no-data-group component (R-HL-004, D-F1-3, T-05)', () => {
+    describe('Transitions (KZ-015)', () => {
+      it('handles loading -> error -> resolve-empty -> re-expand for ranking widgets', async () => {
+        await setup('C-1');
+
+        // 1. Initial state: topPartners loading
+        topPartnersMock.loading.set(true);
+        topPartnersMock.list.set([]);
+        topPartnersMock.loadError.set(false);
+        fixture.detectChanges();
+
+        expect(component.partnersEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top partner institutions')).toBe(false);
+        expect(fixture.nativeElement.querySelector('#partners-card')).toBeTruthy();
+
+        // 2. Error state: topPartners fails
+        topPartnersMock.loading.set(false);
+        topPartnersMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.partnersEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top partner institutions')).toBe(false);
+        expect(fixture.nativeElement.querySelector('#partners-card')).toBeTruthy();
+
+        // 3. Resolve-empty: confirmed empty dataset
+        topPartnersMock.loadError.set(false);
+        topPartnersMock.list.set([]);
+        fixture.detectChanges();
+
+        expect(component.partnersEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top partner institutions')).toBe(true);
+        expect(fixture.nativeElement.querySelector('#partners-card')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup).toBeTruthy();
+        expect(noDataGroup.textContent).toContain('Top partner institutions');
+        expect(noDataGroup.textContent).toContain('No partner institutions are linked to results on this project yet.');
+
+        // 4. Resolve-data / Retry: data arrives, widget re-expands in normal grid position
+        topPartnersMock.list.set([{ institution_id: 10, institution_name: 'CIAT', count: 5 }]);
+        fixture.detectChanges();
+
+        expect(component.partnersEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top partner institutions')).toBe(false);
+        expect(fixture.nativeElement.querySelector('#partners-card')).toBeTruthy();
+      });
+
+      it('handles loading -> error -> resolve-empty -> single-year -> multi-year for results trend', async () => {
+        await setup('C-1', {
+          summaryLoading: true,
+          summary: null
+        });
+
+        // 1. Loading state: trend card rendered in place
+        expect(component.trendEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results over time')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-results-trend-card')).toBeTruthy();
+
+        // 2. Error state: trend card rendered in place
+        contractResultsSummaryMock.loading.set(false);
+        contractResultsSummaryMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.trendEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results over time')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-results-trend-card')).toBeTruthy();
+
+        // 3. Resolve-empty (zero valid buckets): collapses to no-data-group
+        contractResultsSummaryMock.loadError.set(false);
+        contractResultsSummaryMock.list.set({
+          total: 0,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [],
+          partner_institutions: 0
+        });
+        fixture.detectChanges();
+
+        expect(component.trendEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results over time')).toBe(true);
+        expect(fixture.nativeElement.querySelector('app-results-trend-card')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup.textContent).toContain('Results over time');
+        expect(noDataGroup.textContent).toContain('No yearly result trends have been recorded yet.');
+
+        // 4. Single-year trend (1 bucket) -> NOT empty! Renders in place with sparse layout
+        contractResultsSummaryMock.list.set({
+          total: 3,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [{ year: 2025, count: 3 }],
+          partner_institutions: 0
+        });
+        fixture.detectChanges();
+
+        expect(component.trendEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results over time')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-results-trend-card')).toBeTruthy();
+
+        // 5. Multi-year trend (2+ buckets) -> NOT empty, renders chart in place
+        contractResultsSummaryMock.list.set({
+          total: 7,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [
+            { year: 2024, count: 4 },
+            { year: 2025, count: 3 }
+          ],
+          partner_institutions: 0
+        });
+        fixture.detectChanges();
+
+        expect(component.trendEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results over time')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-results-trend-card')).toBeTruthy();
+      });
+
+      it('handles loading -> error -> resolve-empty -> resolve-data for status breakdown', async () => {
+        await setup('C-1', {
+          summaryLoading: true,
+          summary: null
+        });
+
+        // 1. Loading state: status section rendered in place
+        expect(component.statusChartEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by status')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeTruthy();
+
+        // 2. Error state: status section rendered in place
+        contractResultsSummaryMock.loading.set(false);
+        contractResultsSummaryMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.statusChartEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by status')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeTruthy();
+
+        // 3. Resolve-empty: collapses to no-data-group
+        contractResultsSummaryMock.loadError.set(false);
+        contractResultsSummaryMock.list.set({
+          total: 0,
+          by_indicator_year: [],
+          by_status: [],
+          by_year: [],
+          partner_institutions: 0
+        });
+        fixture.detectChanges();
+
+        expect(component.statusChartEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by status')).toBe(true);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup.textContent).toContain('Results by status');
+        expect(noDataGroup.textContent).toContain('No result statuses were found for this project.');
+
+        // 4. Resolve-data: re-expands in normal grid position
+        contractResultsSummaryMock.list.set({
+          total: 5,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [],
+          partner_institutions: 0
+        });
+        fixture.detectChanges();
+
+        expect(component.statusChartEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by status')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeTruthy();
+      });
+
+      it('handles loading -> error -> resolve-empty -> resolve-data for results by indicator', async () => {
+        await setup('C-1', {
+          projectLoading: true,
+          projectData: null
+        });
+
+        // 1. Loading state: indicators section rendered in place with skeleton
+        expect(component.indicatorsEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by indicator')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]')).toBeTruthy();
+
+        // 2. Error state: indicators section rendered in place with error alert
+        getProjectDetailServiceMock.loading.set(false);
+        getProjectDetailServiceMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.indicatorsEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by indicator')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]')).toBeTruthy();
+
+        // 3. Resolve-empty: collapses to no-data-group
+        getProjectDetailServiceMock.loadError.set(false);
+        getProjectDetailServiceMock.project.set({
+          grant_amount: 100,
+          indicators: []
+        } as any);
+        component.project.set(getProjectDetailServiceMock.project());
+        fixture.detectChanges();
+
+        expect(component.totalProjectResults()).toBe(0);
+        expect(component.indicatorsEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by indicator')).toBe(true);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup.textContent).toContain('Results by indicator');
+        expect(noDataGroup.textContent).toContain('No results were found for any indicator on this project.');
+
+        // 4. Resolve-data: re-expands in normal grid position
+        getProjectDetailServiceMock.project.set({
+          grant_amount: 100,
+          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        } as any);
+        component.project.set(getProjectDetailServiceMock.project());
+        fixture.detectChanges();
+
+        expect(component.totalProjectResults()).toBe(5);
+        expect(component.indicatorsEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Results by indicator')).toBe(false);
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]')).toBeTruthy();
+      });
+
+      it('handles loading -> error -> resolve-empty -> resolve-data for geographic scope', async () => {
+        await setup('C-1');
+
+        // 1. Loading state: geo-scope card rendered in place
+        geoScopeMock.loading.set(true);
+        geoScopeMock.summary.set({});
+        geoScopeMock.topCountries.set([]);
+        geoScopeMock.topRegionsList.set([]);
+        fixture.detectChanges();
+
+        expect(component.geoScopeEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top geographic scope')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-geo-scope-card')).toBeTruthy();
+
+        // 2. Error state: geo-scope card rendered in place
+        geoScopeMock.loading.set(false);
+        geoScopeMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.geoScopeEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top geographic scope')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-geo-scope-card')).toBeTruthy();
+
+        // 3. Resolve-empty: collapses to no-data-group
+        geoScopeMock.loadError.set(false);
+        geoScopeMock.summary.set({ global: 0, regional: 0, countries: 0, sub_national: 0, yet_to_be_determined: 0 });
+        geoScopeMock.topCountries.set([]);
+        geoScopeMock.topRegionsList.set([]);
+        fixture.detectChanges();
+
+        expect(component.geoScopeEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top geographic scope')).toBe(true);
+        expect(fixture.nativeElement.querySelector('app-geo-scope-card')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup.textContent).toContain('Top geographic scope');
+        expect(noDataGroup.textContent).toContain('No geographic scope data has been reported for this project yet.');
+
+        // 4. Resolve-data: re-expands in normal grid position
+        geoScopeMock.topCountries.set([{ country_name: 'Kenya', count: 3 } as any]);
+        fixture.detectChanges();
+
+        expect(component.geoScopeEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Top geographic scope')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-geo-scope-card')).toBeTruthy();
+      });
+
+      it('handles bilateral SP alignment graph collapse vs non-bilateral exclusion', async () => {
+        // Bilateral project
+        await setup('C-1', {
+          projectData: {
+            funding_type: 'Bilateral',
+            indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+          }
+        });
+
+        // 1. Bilateral + loading -> rendered in place
+        contractSpAlignmentMock.loading.set(true);
+        contractSpAlignmentMock.list.set(null);
+        fixture.detectChanges();
+
+        expect(component.isBilateral()).toBe(true);
+        expect(component.spAlignmentEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Strategic Plan alignment')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeTruthy();
+
+        // 2. Bilateral + error -> rendered in place
+        contractSpAlignmentMock.loading.set(false);
+        contractSpAlignmentMock.loadError.set(true);
+        fixture.detectChanges();
+
+        expect(component.spAlignmentEmpty()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Strategic Plan alignment')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeTruthy();
+
+        // 3. Bilateral + resolve-empty -> collapses into no-data-group
+        contractSpAlignmentMock.loadError.set(false);
+        contractSpAlignmentMock.list.set({ sps: [], results_with_alignment: 0, results_without_alignment: 0 });
+        fixture.detectChanges();
+
+        expect(component.spAlignmentEmpty()).toBe(true);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Strategic Plan alignment')).toBe(true);
+        expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeNull();
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group');
+        expect(noDataGroup.textContent).toContain('Strategic Plan alignment');
+        expect(noDataGroup.textContent).toContain('No Strategic Plan alignments have been mapped yet.');
+
+        // 4. Non-bilateral project + empty report -> NOT in no-data-group at all
+        component.project.set({
+          funding_type: 'Pooled Funding',
+          indicators: []
+        } as any);
+        fixture.detectChanges();
+
+        expect(component.isBilateral()).toBe(false);
+        expect(component.collapsedEmptyWidgets().some(w => w.name === 'Strategic Plan alignment')).toBe(false);
+        expect(fixture.nativeElement.querySelector('app-sp-alignment-graph')).toBeNull();
+      });
+    });
+
+    describe('Individual ranking cards empty-collapse mapping and copy verification', () => {
+      it('maps all 4 ranking widgets to their exact names, reasons, and icons when confirmed empty', async () => {
+        await setup('C-1');
+
+        topPartnersMock.loading.set(false);
+        topPartnersMock.loadError.set(false);
+        topPartnersMock.list.set([]);
+
+        topLeversMock.loading.set(false);
+        topLeversMock.loadError.set(false);
+        topLeversMock.list.set([]);
+
+        topMainContactsMock.loading.set(false);
+        topMainContactsMock.loadError.set(false);
+        topMainContactsMock.list.set([]);
+
+        topContributorsMock.loading.set(false);
+        topContributorsMock.loadError.set(false);
+        topContributorsMock.list.set([]);
+
+        const widgets = component.collapsedEmptyWidgets();
+
+        const partnersWidget = widgets.find(w => w.name === 'Top partner institutions');
+        expect(partnersWidget).toEqual({
+          name: 'Top partner institutions',
+          reason: 'No partner institutions are linked to results on this project yet.',
+          iconClass: 'pi pi-building'
+        });
+
+        const leversWidget = widgets.find(w => w.name === 'Top primary levers');
+        expect(leversWidget).toEqual({
+          name: 'Top primary levers',
+          reason: 'No primary levers are linked to results on this project yet.',
+          iconClass: 'pi pi-sliders-h'
+        });
+
+        const contactsWidget = widgets.find(w => w.name === 'Top main contact persons');
+        expect(contactsWidget).toEqual({
+          name: 'Top main contact persons',
+          reason: 'No main contact persons are linked to results on this project yet.',
+          iconClass: 'pi pi-users'
+        });
+
+        const contributorsWidget = widgets.find(w => w.name === 'Top contributing projects');
+        expect(contributorsWidget).toEqual({
+          name: 'Top contributing projects',
+          reason: 'No other projects contribute to this one yet.',
+          iconClass: 'pi pi-briefcase'
+        });
+      });
+
+      it('renders partial ranking cards in grid when some have data and collapses empty ones', async () => {
+        await setup('C-1');
+
+        // Only levers has data
+        topLeversMock.list.set([{ lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 3 }]);
+        topPartnersMock.list.set([]);
+        topMainContactsMock.list.set([]);
+        topContributorsMock.list.set([]);
+
+        fixture.detectChanges();
+
+        expect(component.hasVisibleRankingCards()).toBe(true);
+        expect(component.partnersEmpty()).toBe(true);
+        expect(component.leversEmpty()).toBe(false);
+        expect(component.mainContactPersonsEmpty()).toBe(true);
+        expect(component.contributorsEmpty()).toBe(true);
+
+        // Partners card absent from grid
+        expect(fixture.nativeElement.querySelector('#partners-card')).toBeNull();
+
+        // Collapsed items in no-data-group
+        const widgets = component.collapsedEmptyWidgets();
+        expect(widgets.some(w => w.name === 'Top partner institutions')).toBe(true);
+        expect(widgets.some(w => w.name === 'Top primary levers')).toBe(false);
+        expect(widgets.some(w => w.name === 'Top main contact persons')).toBe(true);
+        expect(widgets.some(w => w.name === 'Top contributing projects')).toBe(true);
+      });
+
+      it('renders nothing in no-data-group when all widgets have data', async () => {
+        await setup('C-1', {
+          summary: {
+            total: 10,
+            by_indicator_year: [],
+            by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+            by_year: [{ year: 2024, count: 5 }, { year: 2025, count: 5 }],
+            partner_institutions: 2
+          }
+        });
+
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 3 }]);
+        topLeversMock.list.set([{ lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 3 }]);
+        topMainContactsMock.list.set([{ contact_person_name: 'Jane Doe', count: 2 }]);
+        topContributorsMock.list.set([{ contract_id: 'C-2', count: 1 }]);
+        geoScopeMock.topCountries.set([{ country_name: 'Colombia', count: 2 } as any]);
+
+        fixture.detectChanges();
+
+        expect(component.collapsedEmptyWidgets().length).toBe(0);
+
+        const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group section');
+        expect(noDataGroup).toBeNull();
+      });
+    });
+  });
 });
+
 

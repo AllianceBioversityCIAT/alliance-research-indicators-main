@@ -233,3 +233,79 @@
 - **Notes:** All acceptance criteria satisfied.
 
 ---
+
+## Task: T-05 — Empty-collapse rule + `no-data-group` component
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.ts` (created)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.html` (created)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.spec.ts` (created)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Created `NoDataGroupComponent` and wired empty-collapse logic across ranking cards, geographic scope, results over time (preserving single-year trend in place), results by status, and bilateral SP alignment.
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.spec.ts src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 122 passed, 122 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** FAIL
+- **Summary:** The implementation violates R-HL-004 which mandates empty-collapse for "Results by indicator" when total results = 0. "Results by indicator" was omitted from `collapsedEmptyWidgets` and was not wrapped in an `@if` block to collapse when empty.
+- **Issues Found:**
+  1. **Discovered Issue:** "Results by indicator" empty collapse omitted.
+     - **Violated Rule:** R-HL-004
+     - **Remediation Suggestion:** Add `indicatorsEmpty` computed signal, include in `collapsedEmptyWidgets`, and wrap `<section aria-labelledby="results-by-indicator-title">` in `@if (!indicatorsEmpty())`.
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** RETRY (Attempt 2)
+- **Notes:** Dispatched implementer to wire `indicatorsEmpty` and update test assertions.
+
+---
+
+### Attempt 2
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Added `indicatorsEmpty` computed, mapped "Results by indicator" in `collapsedEmptyWidgets`, wrapped indicator section with `@if (!indicatorsEmpty())`, and added test coverage for indicator collapse transitions.
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/no-data-group/no-data-group.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 123 passed, 123 total
+  ```
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** `indicatorsEmpty` computed signal is properly defined and integrated into `collapsedEmptyWidgets`, ensuring that the "Results by indicator" section is tracked as an empty widget and hidden via `@if (!indicatorsEmpty())`. `no-data-group` component adheres to Angular standalone best practices.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-05)
+- **Notes:** All R-HL-004 requirements and acceptance checks verified.
+
+---

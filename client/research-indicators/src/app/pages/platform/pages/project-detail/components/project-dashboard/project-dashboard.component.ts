@@ -35,6 +35,7 @@ import { ResultsCenterService } from '../../../results-center/results-center.ser
 import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results-summary.interface';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
+import { NoDataGroupComponent, NoDataGroupItem } from '../no-data-group/no-data-group.component';
 import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
@@ -95,6 +96,7 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     DatePipe,
     ResultsTrendCardComponent,
     SpAlignmentGraphComponent,
+    NoDataGroupComponent,
     VizChartComponent
   ],
   providers: [
@@ -328,6 +330,10 @@ export class ProjectDashboardComponent {
   readonly indicatorsWithResults = computed(() => this.indicatorSummaries().filter(indicator => indicator.value > 0));
 
   readonly totalProjectResults = computed(() => this.indicatorSummaries().reduce((total, indicator) => total + indicator.value, 0));
+
+  readonly indicatorsEmpty = computed(
+    () => !this.getProjectDetailService.loading() && !this.getProjectDetailService.loadError() && this.totalProjectResults() === 0
+  );
 
   // Heatmap matrix computations (R-DA-004)
   readonly heatmapYears = computed<(number | null)[]>(() => {
@@ -602,7 +608,7 @@ export class ProjectDashboardComponent {
   readonly topMainContactPersons = inject(GetTopMainContactPersonsService);
   readonly topPartners = inject(GetTopPartnersService);
   readonly topPrimaryLevers = inject(GetTopPrimaryLeversService);
-  private readonly geoScope = inject(GetGeoScopeService);
+  readonly geoScope = inject(GetGeoScopeService);
 
   readonly contributorItems = computed(() =>
     this.topContributors
@@ -663,6 +669,120 @@ export class ProjectDashboardComponent {
   readonly leversEmpty = computed(
     () => !this.topPrimaryLevers.loading() && !this.topPrimaryLevers.loadError() && this.topPrimaryLevers.list().length === 0
   );
+
+  readonly geoScopeEmpty = computed(() => {
+    if (this.geoScope.loading() || this.geoScope.loadError()) {
+      return false;
+    }
+
+    const summary = this.geoScope.summary();
+    const summaryTotal =
+      Number(summary.global ?? 0) +
+      Number(summary.regional ?? 0) +
+      Number(summary.countries ?? 0) +
+      Number(summary.sub_national ?? 0) +
+      Number(summary.yet_to_be_determined ?? 0);
+
+    return summaryTotal === 0 && this.geoScope.topRegionsList().length === 0 && this.geoScope.topCountries().length === 0;
+  });
+
+  readonly trendEmpty = computed(() => {
+    if (this.contractResultsSummary.loading() || this.contractResultsSummary.loadError()) {
+      return false;
+    }
+    const raw = this.contractResultsSummary.list()?.by_year ?? [];
+    const valid = raw.filter(b => b.year !== null && b.year !== undefined && !isNaN(Number(b.year)));
+    return valid.length === 0;
+  });
+
+  readonly spAlignmentEmpty = computed(
+    () =>
+      !this.contractSpAlignment.loading() &&
+      !this.contractSpAlignment.loadError() &&
+      (this.contractSpAlignment.list()?.sps ?? []).length === 0
+  );
+
+  readonly hasVisibleRankingCards = computed(
+    () => !this.partnersEmpty() || !this.leversEmpty() || !this.mainContactPersonsEmpty() || !this.contributorsEmpty()
+  );
+
+  readonly collapsedEmptyWidgets = computed<NoDataGroupItem[]>(() => {
+    const items: NoDataGroupItem[] = [];
+
+    if (this.trendEmpty()) {
+      items.push({
+        name: 'Results over time',
+        reason: 'No yearly result trends have been recorded yet.',
+        iconClass: 'pi pi-chart-line'
+      });
+    }
+
+    if (this.indicatorsEmpty()) {
+      items.push({
+        name: 'Results by indicator',
+        reason: 'No results were found for any indicator on this project.',
+        iconClass: 'pi pi-chart-pie'
+      });
+    }
+
+    if (this.statusChartEmpty()) {
+      items.push({
+        name: 'Results by status',
+        reason: 'No result statuses were found for this project.',
+        iconClass: 'pi pi-chart-bar'
+      });
+    }
+
+    if (this.geoScopeEmpty()) {
+      items.push({
+        name: 'Top geographic scope',
+        reason: 'No geographic scope data has been reported for this project yet.',
+        iconClass: 'pi pi-globe'
+      });
+    }
+
+    if (this.partnersEmpty()) {
+      items.push({
+        name: 'Top partner institutions',
+        reason: 'No partner institutions are linked to results on this project yet.',
+        iconClass: 'pi pi-building'
+      });
+    }
+
+    if (this.leversEmpty()) {
+      items.push({
+        name: 'Top primary levers',
+        reason: 'No primary levers are linked to results on this project yet.',
+        iconClass: 'pi pi-sliders-h'
+      });
+    }
+
+    if (this.mainContactPersonsEmpty()) {
+      items.push({
+        name: 'Top main contact persons',
+        reason: 'No main contact persons are linked to results on this project yet.',
+        iconClass: 'pi pi-users'
+      });
+    }
+
+    if (this.contributorsEmpty()) {
+      items.push({
+        name: 'Top contributing projects',
+        reason: 'No other projects contribute to this one yet.',
+        iconClass: 'pi pi-briefcase'
+      });
+    }
+
+    if (this.isBilateral() && this.spAlignmentEmpty()) {
+      items.push({
+        name: 'Strategic Plan alignment',
+        reason: 'No Strategic Plan alignments have been mapped yet.',
+        iconClass: 'pi pi-sitemap'
+      });
+    }
+
+    return items;
+  });
 
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;
 
