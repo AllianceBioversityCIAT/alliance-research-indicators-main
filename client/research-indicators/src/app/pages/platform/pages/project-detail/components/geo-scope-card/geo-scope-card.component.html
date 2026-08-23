@@ -5,7 +5,7 @@
   emptyMessage="No geographic scope data was found for this project." (retry)="service.update()">
   <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(320px,1.1fr)_minmax(0,0.9fr)]">
     <div class="flex min-w-0">
-      <app-geo-scope-map [countries]="service.topCountries()"></app-geo-scope-map>
+      <app-geo-scope-map [countries]="topCountriesList()"></app-geo-scope-map>
     </div>
 
     <div class="flex min-w-0 flex-col gap-4 px-6">

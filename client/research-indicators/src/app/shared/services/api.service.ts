@@ -114,16 +114,7 @@ import { InteractionFeedbackPayload } from '@shared/interfaces/feedback-interact
 import { ImpactArea } from '@shared/interfaces/impact-area.interface';
 import { LinkResultsResponse } from '@shared/interfaces/link-results.interface';
 import { LatestResult } from '@shared/interfaces/latest-result.interface';
-import {
-  ContractStaffReport,
-  GeoScopeReport,
-  TopContributorsContractReport,
-  TopMainContactPersonsReport,
-  TopPartnersReport,
-  TopPrimaryLeversReport
-} from '@shared/interfaces/project-dashboard.interface';
-import { ContractResultsSummary } from '@shared/interfaces/contract-results-summary.interface';
-import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
+import { ContractStaffReport } from '@shared/interfaces/project-dashboard.interface';
 import { ContractDashboardReport } from '@shared/interfaces/contract-dashboard.interface';
 
 @Injectable({
@@ -899,43 +890,8 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  GET_TopContributorsContracts = (contractId: string, limit = 5): Promise<MainResponse<TopContributorsContractReport>> => {
-    const url = () => `agresso/contracts/reports/top-contributors-contracts?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_TopPartners = (contractId: string, limit = 5): Promise<MainResponse<TopPartnersReport>> => {
-    const url = () => `agresso/contracts/reports/top-partners?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_TopMainContactPersons = (contractId: string, limit = 5): Promise<MainResponse<TopMainContactPersonsReport>> => {
-    const url = () => `agresso/contracts/reports/top-main-contact-persons?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_TopPrimaryLevers = (contractId: string, limit = 5): Promise<MainResponse<TopPrimaryLeversReport>> => {
-    const url = () => `agresso/contracts/reports/top-primary-levers?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
-    return this.TP.get(url(), {});
-  };
-
   GET_ContractStaff = (contractId: string): Promise<MainResponse<ContractStaffReport>> => {
     const url = () => `agresso/contracts/reports/contract-staff?contract-id=${encodeURIComponent(contractId)}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_GeoScope = (contractId: string, limit = 5): Promise<MainResponse<GeoScopeReport>> => {
-    const url = () => `agresso/contracts/reports/geo-scope?contract-id=${encodeURIComponent(contractId)}&limit=${limit}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_ContractResultsSummary = (contractId: string): Promise<MainResponse<ContractResultsSummary>> => {
-    const url = () => `agresso/contracts/reports/results-summary?contract-id=${encodeURIComponent(contractId)}`;
-    return this.TP.get(url(), {});
-  };
-
-  GET_ContractSpAlignment = (contractId: string): Promise<MainResponse<ContractSpAlignmentReport>> => {
-    const url = () => `agresso/contracts/reports/sp-alignment?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
 

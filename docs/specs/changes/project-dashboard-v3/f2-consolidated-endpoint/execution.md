@@ -166,3 +166,41 @@
 - **Notes:** All acceptance criteria for T-04 verified.
 
 ---
+
+## Task: T-05 — Deprecate & Retire Obsolete Endpoints & Services
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `nestjs-expert`, `angular-developer`, `tdd`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts` (modified)
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts` (modified)
+  - `client/research-indicators/src/app/shared/services/api.service.ts` (modified)
+  - `client/research-indicators/src/app/shared/services/api.service.spec.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.{ts,html,spec.ts}` (modified)
+  - Deleted 14 legacy client service files and test specs (`get-contract-results-summary`, `get-top-partners`, `get-top-primary-levers`, `get-top-main-contact-persons`, `get-top-contributors-contracts`, `get-geo-scope`, `get-contract-sp-alignment`).
+- **Summary:** Removed the 7 legacy report endpoints from `AgressoContractController` while preserving `reports/dashboard` and `reports/contract-staff`. Removed 7 legacy client methods from `ApiService`. Deleted 7 obsolete client service files. Migrated `GeoScopeCardComponent` to use `GetContractDashboardService`. Verified 0 remaining references to obsolete service names across the client package.
+- **Verification Command:**
+  - Server: `npm test -- agresso-contract.controller.spec.ts`
+  - Client: `npx jest src/app/shared/services/api.service.spec.ts src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  - Server: `PASS src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts (21 passed)`
+  - Client: `PASS (3 test suites, 310 passed)`
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Complete removal of obsolete report endpoints from server controller and legacy services from client. GeoScopeCardComponent cleanly migrated. Grep confirms 0 obsolete service matches. Tests and lint pass.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-05)
+- **Notes:** All acceptance criteria for T-05 verified.
+
+---

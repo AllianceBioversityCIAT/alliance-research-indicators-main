@@ -110,7 +110,7 @@ class ResultsCenterTableStubComponent {
 describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
-  let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock; GET_ContractResultsSummary: jest.Mock };
+  let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let contractDashboardMock: {
     data: ReturnType<typeof signal<ContractDashboardReport | null>>;
@@ -525,8 +525,7 @@ describe('ProjectDashboardComponent', () => {
             { result_status: { result_status_id: 'invalid' } }
           ]
         }
-      }),
-      GET_ContractResultsSummary: jest.fn()
+      })
     };
 
     await TestBed.configureTestingModule({

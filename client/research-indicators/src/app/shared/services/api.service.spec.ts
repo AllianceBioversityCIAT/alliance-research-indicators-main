@@ -1356,59 +1356,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/TEST123/results/count', {});
     });
 
-    it('should call GET_TopContributorsContracts', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
-      service.GET_TopContributorsContracts('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-contributors-contracts?contract-id=A100&limit=5',
-        {}
-      );
-    });
 
-    it('should call GET_TopPartners', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
-      service.GET_TopPartners('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A100&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_TopMainContactPersons', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
-      service.GET_TopMainContactPersons('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_TopMainContactPersons with the default limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
-      service.GET_TopMainContactPersons('A100');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-main-contact-persons?contract-id=A100&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_TopPrimaryLevers', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
-      service.GET_TopPrimaryLevers('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A100&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_GeoScope', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_GeoScope('A100', 5);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/geo-scope?contract-id=A100&limit=5',
-        {}
-      );
-    });
 
     it('should call GET_ResultsByContractId', () => {
       const contractId = 'TEST123';
@@ -2101,83 +2049,11 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('results/general-report/all', {});
     });
 
-    it('should call GET_TopContributorsContracts with encoded contract id and default limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_TopContributorsContracts('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-contributors-contracts?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_TopPartners with encoded contract id and custom limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_TopPartners('A 100/1', 8);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=8',
-        {}
-      );
-    });
-
-    it('should call GET_TopPartners with the default limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_TopPartners('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-partners?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_TopPrimaryLevers with encoded contract id and custom limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_TopPrimaryLevers('A 100/1', 4);
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=4',
-        {}
-      );
-    });
-
-    it('should call GET_TopPrimaryLevers with the default limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_TopPrimaryLevers('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/top-primary-levers?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
-    });
-
     it('should call GET_ContractStaff with encoded contract id', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
       service.GET_ContractStaff('A 100/1');
       expect(mockToPromiseService.get).toHaveBeenCalledWith(
         'agresso/contracts/reports/contract-staff?contract-id=A%20100%2F1',
-        {}
-      );
-    });
-
-    it('should call GET_GeoScope with encoded contract id and default limit', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_GeoScope('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/geo-scope?contract-id=A%20100%2F1&limit=5',
-        {}
-      );
-    });
-
-    it('should call GET_ContractResultsSummary with encoded contract id', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_ContractResultsSummary('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/results-summary?contract-id=A%20100%2F1',
-        {}
-      );
-    });
-
-    it('should call GET_ContractSpAlignment with encoded contract id', () => {
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-      service.GET_ContractSpAlignment('A 100/1');
-      expect(mockToPromiseService.get).toHaveBeenCalledWith(
-        'agresso/contracts/reports/sp-alignment?contract-id=A%20100%2F1',
         {}
       );
     });

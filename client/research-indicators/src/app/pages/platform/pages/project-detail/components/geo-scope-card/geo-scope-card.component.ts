@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { GeoScopeMapComponent } from '../geo-scope-map/geo-scope-map.component';
-import { GetGeoScopeService } from '@services/get-geo-scope.service';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import {
   GeoScopeCountrySummary,
   GeoScopeMetric,
@@ -19,14 +19,20 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GeoScopeCardComponent {
-  readonly service = inject(GetGeoScopeService);
+  readonly service = inject(GetContractDashboardService);
+
+  readonly loading = computed(() => this.service.loading());
+  readonly loadError = computed(() => this.service.loadError());
+  readonly summary = computed(() => this.service.geoScope()?.geo_scope_summary ?? {});
+  readonly topRegionsList = computed(() => this.service.geoScope()?.top_regions ?? []);
+  readonly topCountriesList = computed(() => this.service.geoScope()?.top_countries ?? []);
 
   readonly isEmpty = computed(() => {
-    if (this.service.loading() || this.service.loadError()) {
+    if (this.loading() || this.loadError()) {
       return false;
     }
 
-    const summary = this.service.summary();
+    const summary = this.summary();
     const summaryTotal =
       Number(summary.global ?? 0) +
       Number(summary.regional ?? 0) +
@@ -34,11 +40,11 @@ export class GeoScopeCardComponent {
       Number(summary.sub_national ?? 0) +
       Number(summary.yet_to_be_determined ?? 0);
 
-    return summaryTotal === 0 && this.service.topRegionsList().length === 0 && this.service.topCountries().length === 0;
+    return summaryTotal === 0 && this.topRegionsList().length === 0 && this.topCountriesList().length === 0;
   });
 
   readonly summaryMetrics = computed<GeoScopeMetric[]>(() => {
-    const summary = this.service.summary();
+    const summary = this.summary();
     if (!Object.keys(summary).length) {
       return [];
     }
@@ -55,7 +61,7 @@ export class GeoScopeCardComponent {
   readonly visibleSummaryMetrics = computed(() => this.summaryMetrics().filter(metric => metric.value > 0));
 
   readonly topCountries = computed<GeoScopeCountrySummary[]>(() =>
-    [...this.service.topCountries()]
+    [...this.topCountriesList()]
       .sort((first, second) => Number(second.count ?? 0) - Number(first.count ?? 0))
       .map(country => ({
         id: country.iso_alpha_2 ?? country.country_name,
@@ -82,7 +88,7 @@ export class GeoScopeCardComponent {
   );
 
   readonly topRegions = computed(() =>
-    this.service.topRegionsList().map((item, index) => ({
+    this.topRegionsList().map((item, index) => ({
       id: item.region_name ?? String(index),
       label: item.region_name ?? '—',
       count: Number(item.results_count ?? item.count ?? 0)

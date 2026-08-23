@@ -1,7 +1,7 @@
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { GetGeoScopeService } from '@services/get-geo-scope.service';
-import { GeoScopeCountry } from '@interfaces/geo-scope.interface';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
+import { GeoScopeCountry, GeoScopeResponse } from '@interfaces/geo-scope.interface';
 import { GeoScopeSummary, ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
 import { GeoScopeCardComponent } from './geo-scope-card.component';
 
@@ -38,10 +38,10 @@ class MockGeoScopeMapComponent {
 describe('GeoScopeCardComponent', () => {
   let component: GeoScopeCardComponent;
   let fixture: ComponentFixture<GeoScopeCardComponent>;
-  let service: ReturnType<typeof createGeoScopeServiceMock>;
+  let service: ReturnType<typeof createContractDashboardServiceMock>;
 
   beforeEach(async () => {
-    service = createGeoScopeServiceMock();
+    service = createContractDashboardServiceMock();
 
     await TestBed.configureTestingModule({
       imports: [GeoScopeCardComponent]
@@ -49,7 +49,7 @@ describe('GeoScopeCardComponent', () => {
       .overrideComponent(GeoScopeCardComponent, {
         set: {
           imports: [MockProjectDashboardCardComponent, MockGeoScopeMapComponent],
-          providers: [{ provide: GetGeoScopeService, useValue: service }]
+          providers: [{ provide: GetContractDashboardService, useValue: service }]
         }
       })
       .compileComponents();
@@ -69,20 +69,20 @@ describe('GeoScopeCardComponent', () => {
     expect(component.isEmpty()).toBe(false);
 
     service.loadError.set(false);
-    service.summary.set({ countries: 1 });
+    service.geoScopeSummary.set({ countries: 1 });
     expect(component.isEmpty()).toBe(false);
 
-    service.summary.set({});
-    service.topRegionsList.set([{ region_name: 'Latin America', count: 1 }]);
+    service.geoScopeSummary.set({});
+    service.topRegions.set([{ region_name: 'Latin America', count: 1 }]);
     expect(component.isEmpty()).toBe(false);
 
-    service.topRegionsList.set([]);
+    service.topRegions.set([]);
     service.topCountries.set([{ iso_alpha_2: 'CO', country_name: 'Colombia', count: 1 }]);
     expect(component.isEmpty()).toBe(false);
   });
 
   it('should build visible summary metrics from non-zero values', () => {
-    service.summary.set({
+    service.geoScopeSummary.set({
       global: 0,
       regional: 2,
       countries: 3,
@@ -103,7 +103,7 @@ describe('GeoScopeCardComponent', () => {
       'yet_to_be_determined'
     ]);
 
-    service.summary.set({});
+    service.geoScopeSummary.set({});
     expect(component.summaryMetrics()).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe('GeoScopeCardComponent', () => {
   });
 
   it('should support country and metric fallback values', () => {
-    service.summary.set({
+    service.geoScopeSummary.set({
       global: undefined,
       regional: undefined,
       countries: undefined,
@@ -238,7 +238,7 @@ describe('GeoScopeCardComponent', () => {
   });
 
   it('should map top regions for list rendering', () => {
-    service.topRegionsList.set([{ region_name: 'Africa', results_count: 3 }, { count: 1 }, {}]);
+    service.topRegions.set([{ region_name: 'Africa', results_count: 3 }, { count: 1 }, {}]);
 
     expect(component.topRegions()).toEqual([
       { id: 'Africa', label: 'Africa', count: 3 },
@@ -249,7 +249,7 @@ describe('GeoScopeCardComponent', () => {
 
   it('should not report empty for global/regional only project (R-GEO-006 AC.4 fixture)', () => {
     service.topCountries.set([]);
-    service.summary.set({ global: 7, regional: 3 });
+    service.geoScopeSummary.set({ global: 7, regional: 3 });
 
     expect(component.isEmpty()).toBe(false);
   });
@@ -265,13 +265,27 @@ describe('GeoScopeCardComponent', () => {
   });
 });
 
-function createGeoScopeServiceMock() {
+function createContractDashboardServiceMock() {
+  const geoScopeSummary = signal<Partial<GeoScopeSummary>>({});
+  const topRegions = signal<ProjectDashboardRankedItem[]>([]);
+  const topCountries = signal<GeoScopeCountry[]>([]);
+  const loading = signal(false);
+  const loadError = signal(false);
+  const geoScope = computed<GeoScopeResponse | null>(() => ({
+    contract_id: 'A100',
+    limit: 5,
+    geo_scope_summary: geoScopeSummary(),
+    top_regions: topRegions(),
+    top_countries: topCountries()
+  }));
+
   return {
-    summary: signal<Partial<GeoScopeSummary>>({}),
-    topRegionsList: signal<ProjectDashboardRankedItem[]>([]),
-    topCountries: signal<GeoScopeCountry[]>([]),
-    loading: signal(false),
-    loadError: signal(false),
+    geoScopeSummary,
+    topRegions,
+    topCountries,
+    geoScope,
+    loading,
+    loadError,
     update: jest.fn()
   };
 }

@@ -104,9 +104,9 @@ graph TD
   - Delete 7 obsolete client service files (`get-contract-results-summary`, `get-top-partners`, `get-top-primary-levers`, `get-top-main-contact-persons`, `get-top-contributors-contracts`, `get-geo-scope`, `get-contract-sp-alignment` + specs).
 - **Description:** Remove legacy report endpoints in `AgressoContractController` and legacy client services, confirming zero remaining references across the codebase.
 - **Acceptance / done check:**
-  - [ ] Grep for obsolete service names across `client/research-indicators/src` returns 0 matches.
-  - [ ] Server and client builds and test suites pass cleanly.
-- **Dependencies:** T-04 · **Effort:** S · **Status:** todo
+  - [x] Grep for obsolete service names across `client/research-indicators/src` returns 0 matches.
+  - [x] Server and client builds and test suites pass cleanly.
+- **Dependencies:** T-04 · **Effort:** S · **Status:** done
 
 ---
 
