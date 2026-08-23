@@ -1894,7 +1894,7 @@ describe('ProjectDashboardComponent', () => {
   });
 
   describe('T-12 dashboard integration and entry stagger (R-DA-003, R-DA-005, R-DA-007 AC.2)', () => {
-    it('should enforce DOM rendering order: KPI strip -> context strip -> analytics grid -> pending table -> AI block', async () => {
+    it('should enforce DOM rendering order: Hero (KPI + Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI (R-HL-003, design §6)', async () => {
       rolesServiceMock.isAdmin.mockReturnValue(true);
       await setup('C-1', {
         projectData: {
@@ -1903,27 +1903,62 @@ describe('ProjectDashboardComponent', () => {
           indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
         }
       });
+      component.executiveOverviewParagraphs.set(['Summary paragraph.']);
+      component.executiveOverviewGeneratedAt.set('2026-08-23T12:00:00.000Z');
       component.groundedDocuments.set([{ fileName: 'doc.pdf', fileKey: 'k/doc.pdf' }]);
       fixture.detectChanges();
 
       const root = fixture.nativeElement as HTMLElement;
       const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]');
       const contextStrip = root.querySelector('[aria-label="Project context summary"]');
-      const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
+      const caveat = root.querySelector('button[aria-controls="dashboard-caveat-details"]')?.closest('div');
+      const executiveOverview = root.querySelector('section[aria-labelledby="executive-overview-title"]');
+      const trendCard = root.querySelector('app-results-trend-card');
+      const statusSection = root.querySelector('section[aria-labelledby="results-by-status-title"]');
+      const indicatorSection = root.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      const geoCard = root.querySelector('app-geo-scope-card');
+      const partnersCard = root.querySelector('#partners-card');
+      const spGraph = root.querySelector('app-sp-alignment-graph');
       const pendingSection = root.querySelector('#pending-revision-section');
       const aiSection = root.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
 
       expect(kpiStrip).toBeTruthy();
       expect(contextStrip).toBeTruthy();
-      expect(analyticsGrid).toBeTruthy();
+      expect(caveat).toBeTruthy();
+      expect(executiveOverview).toBeTruthy();
+      expect(trendCard).toBeTruthy();
+      expect(statusSection).toBeTruthy();
+      expect(indicatorSection).toBeTruthy();
+      expect(geoCard).toBeTruthy();
+      expect(partnersCard).toBeTruthy();
+      expect(spGraph).toBeTruthy();
       expect(pendingSection).toBeTruthy();
       expect(aiSection).toBeTruthy();
 
-      // Verify DOM document order
+      // Verify DOM document order:
+      // Hero (KPI -> Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI
       expect(kpiStrip!.compareDocumentPosition(contextStrip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(contextStrip!.compareDocumentPosition(analyticsGrid!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(analyticsGrid!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(contextStrip!.compareDocumentPosition(caveat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(caveat!.compareDocumentPosition(executiveOverview!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(executiveOverview!.compareDocumentPosition(trendCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(trendCard!.compareDocumentPosition(indicatorSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(statusSection!.compareDocumentPosition(indicatorSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(indicatorSection!.compareDocumentPosition(geoCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(geoCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(partnersCard!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(spGraph!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(pendingSection!.compareDocumentPosition(aiSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      // Assert trend & status sections precede ranking cards in DOM
+      expect(trendCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(statusSection!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+      // Assert geo section is marked full-width class
+      expect(geoCard!.classList.contains('w-full')).toBe(true);
+
+      // Assert no element with gap-16 class exists in dashboard template
+      const elementsWithGap16 = root.querySelectorAll('.gap-16, [class*="gap-16"]');
+      expect(elementsWithGap16.length).toBe(0);
     });
 
     it('should isolate SP alignment error so sibling regions continue rendering data (R-PD-007, R-DA-003)', async () => {
@@ -2073,23 +2108,23 @@ describe('ProjectDashboardComponent', () => {
       });
     });
 
-    describe('DOM document order (R-AIP-001, D-AIP-2, KZ-017)', () => {
-      it('should render top card between context strip and analytics grid (KZ-017 declared limit: proves DOM order, not visual layout)', async () => {
+    describe('DOM document order (R-AIP-001, D-AIP-2, KZ-017, R-HL-003)', () => {
+      it('should render top card between caveat and trend/status row (KZ-017 declared limit: proves DOM order, not visual layout)', async () => {
         await setup('C-1', { isAdmin: false });
         component.executiveOverviewParagraphs.set(['Executive overview summary paragraph.']);
         fixture.detectChanges();
 
         const root = fixture.nativeElement as HTMLElement;
-        const contextStrip = root.querySelector('[aria-label="Project context summary"]');
+        const caveat = root.querySelector('button[aria-controls="dashboard-caveat-details"]')?.closest('div');
         const topCard = root.querySelector('section[aria-labelledby="executive-overview-title"]');
-        const analyticsGrid = root.querySelector('.grid.grid-cols-1.gap-5.lg\\:grid-cols-\\[3fr_1fr\\]');
+        const trendCard = root.querySelector('app-results-trend-card');
 
-        expect(contextStrip).toBeTruthy();
+        expect(caveat).toBeTruthy();
         expect(topCard).toBeTruthy();
-        expect(analyticsGrid).toBeTruthy();
+        expect(trendCard).toBeTruthy();
 
-        expect(contextStrip!.compareDocumentPosition(topCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(topCard!.compareDocumentPosition(analyticsGrid!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(caveat!.compareDocumentPosition(topCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(topCard!.compareDocumentPosition(trendCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       });
     });
 

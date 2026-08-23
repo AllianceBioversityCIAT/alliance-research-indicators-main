@@ -83,11 +83,11 @@ graph TD
 - **Files touched (intended):** `project-dashboard.component.html`, `geo-scope-card.component.html` (+specs).
 - **Description:** Reorder sections per design §6; apply the `gap-5`/`p-5`/`gap-4` scale; geo card `gap-16` → `gap-6`; caveat to single line with existing Learn-more expansion; no DOM for the F3 slot (comment only).
 - **Acceptance / done check:**
-  - [ ] Spec: DOM order assertion — trend & status sections precede the first ranking card; geo section marked full-width class.
-  - [ ] Spec: no element with a `gap-16` class remains in the two touched templates (**failing input:** leave one).
-  - [ ] Presence caveat: class assertions prove classes, not geometry — overflow/no-horizontal-scroll at 1280/768px is T-09 HITL's check (declared gap per requirements defect table).
-  - [ ] `npm run build` green (strictTemplates over reordered template).
-- **Dependencies:** T-02 · **Effort:** M · **Status:** todo
+  - [x] Spec: DOM order assertion — trend & status sections precede the first ranking card; geo section marked full-width class.
+  - [x] Spec: no element with a `gap-16` class remains in the two touched templates (**failing input:** leave one).
+  - [x] Presence caveat: class assertions prove classes, not geometry — overflow/no-horizontal-scroll at 1280/768px is T-09 HITL's check (declared gap per requirements defect table).
+  - [x] `npm run build` green (strictTemplates over reordered template).
+- **Dependencies:** T-02 · **Effort:** M · **Status:** done
 
 ### T-05 — Empty-collapse rule + `no-data-group` component
 

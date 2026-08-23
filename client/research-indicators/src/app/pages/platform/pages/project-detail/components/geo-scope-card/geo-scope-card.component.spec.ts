@@ -253,6 +253,16 @@ describe('GeoScopeCardComponent', () => {
 
     expect(component.isEmpty()).toBe(false);
   });
+
+  it('should normalize grid spacing to gap-6 and have no gap-16 elements (R-HL-008)', () => {
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const gap16Elements = root.querySelectorAll('.gap-16, [class*="gap-16"]');
+    expect(gap16Elements.length).toBe(0);
+
+    const gap6Grid = root.querySelector('.grid.min-w-0.grid-cols-1.gap-6.lg\\:grid-cols-3');
+    expect(gap6Grid).toBeTruthy();
+  });
 });
 
 function createGeoScopeServiceMock() {

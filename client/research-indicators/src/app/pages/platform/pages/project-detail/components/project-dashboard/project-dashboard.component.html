@@ -1,39 +1,4 @@
-<section class="block flex w-full flex-col gap-6 p-1">
-  <!-- Compact caveat banner with Learn More expansion (D-PD-8) -->
-  <div class="flex flex-col gap-2 rounded-lg border-l-4 border-l-[var(--ac-primary-blue-400)] bg-[var(--ac-grey-100)] p-3 text-left">
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-info-circle text-[16px] text-[var(--ac-primary-blue-400)]" aria-hidden="true"></i>
-        <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug text-[var(--ac-grey-800)]">
-          Result analytics below summarize official indicator records. AI features use grounding documents and may contain inaccuracies.
-        </p>
-      </div>
-      <button type="button"
-        class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
-        (click)="isCaveatExpanded.set(!isCaveatExpanded())"
-        [attr.aria-expanded]="isCaveatExpanded()"
-        aria-controls="dashboard-caveat-details">
-        {{ isCaveatExpanded() ? 'Show less' : 'Learn more' }}
-      </button>
-    </div>
-    @if (isCaveatExpanded()) {
-    <div id="dashboard-caveat-details" class="border-t border-[var(--ac-grey-200)] pt-2 mt-1">
-      <p class="m-0 font-['Barlow'] text-[12px] leading-relaxed text-[var(--ac-grey-700)]">
-        The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
-        metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
-        enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
-        depending on the source platform. We are actively working to make information from these additional systems
-        available with the same level of detail and consistency.
-      </p>
-    </div>
-    }
-  </div>
-
-  <div class="flex items-center gap-2.5">
-    <i class="pi pi-chart-bar !text-[18px] text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
-    <h2 class="m-0 font-['Barlow'] text-[16px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Result analytics</h2>
-  </div>
-
+<section class="flex w-full flex-col gap-5 p-1">
   <!-- KPI summary strip (R-PD-002, R-HL-002) -->
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators" [style.animation-delay.ms]="staggerMs.kpi">
     <!-- Tile 1: Total results -->
@@ -371,6 +336,36 @@
   </section>
   }
 
+  <!-- Compact caveat banner with Learn More expansion (D-PD-8, D-F1-7) -->
+  <div class="flex flex-col gap-2 rounded-lg border-l-4 border-l-[var(--ac-primary-blue-400)] bg-[var(--ac-grey-100)] p-3 text-left">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <i class="pi pi-info-circle text-[16px] text-[var(--ac-primary-blue-400)]" aria-hidden="true"></i>
+        <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug text-[var(--ac-grey-800)]">
+          Result analytics below summarize official indicator records. AI features use grounding documents and may contain inaccuracies.
+        </p>
+      </div>
+      <button type="button"
+        class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
+        (click)="isCaveatExpanded.set(!isCaveatExpanded())"
+        [attr.aria-expanded]="isCaveatExpanded()"
+        aria-controls="dashboard-caveat-details">
+        {{ isCaveatExpanded() ? 'Show less' : 'Learn more' }}
+      </button>
+    </div>
+    @if (isCaveatExpanded()) {
+    <div id="dashboard-caveat-details" class="border-t border-[var(--ac-grey-200)] pt-2 mt-1">
+      <p class="m-0 font-['Barlow'] text-[12px] leading-relaxed text-[var(--ac-grey-700)]">
+        The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
+        metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
+        enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
+        depending on the source platform. We are actively working to make information from these additional systems
+        available with the same level of detail and consistency.
+      </p>
+    </div>
+    }
+  </div>
+
   <!-- Top Executive Overview prominent card (R-AIP-001, D-AIP-1, D-AIP-2) -->
   @if (hasExecutiveOverviewData()) {
   <section class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
@@ -440,338 +435,342 @@
   </section>
   }
 
-  <!-- Geo scope -->
-  <div class="grid grid-cols-1 gap-5 lg:grid-cols-[3fr_1fr] lg:items-start">
-    <div class="flex min-w-0 flex-col gap-5">
+  <!-- Trend & Status row (R-HL-003, design §6) -->
+  <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+    <app-results-trend-card
+      [style.animation-delay.ms]="staggerMs.trend"
+      [buckets]="contractResultsSummary.list()?.by_year ?? []"
+      [loading]="contractResultsSummary.loading()"
+      [error]="contractResultsSummary.loadError()"
+      (retry)="contractResultsSummary.update()">
+    </app-results-trend-card>
 
-      <!-- Results by indicator -->
-      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+    <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+      aria-labelledby="results-by-status-title"
+      [style.animation-delay.ms]="staggerMs.indicatorStatus">
+      <header class="flex flex-col gap-1">
+        <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
+        <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
+          this project.</span>
+      </header>
 
-        <div id="partners-card" class="flex flex-1">
-          <app-project-dashboard-card title="Top partner institution"
-            description="Partner institutions most frequently linked to results on this primary project."
-            class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
-            [error]="topPartners.loadError()" [empty]="partnersEmpty()"
-            errorMessage="We could not load top partner institutions. Please try again."
-            emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
-            layout="rows-partners" (retry)="topPartners.update()">
-          </app-project-dashboard-card>
-        </div>
-
-        <div class="flex flex-1">
-          <app-project-dashboard-card title="Top primary levers"
-            description="Primary levers most frequently linked to results on this project." class="h-full w-full"
-            iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
-            [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
-            errorMessage="We could not load top primary levers. Please try again."
-            emptyMessage="No primary levers were found for this project." [items]="leverItems()"
-            layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
-          </app-project-dashboard-card>
-        </div>
-
-        <div class="flex flex-1">
-          <app-project-dashboard-card title="Top main contact person"
-            description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
-            iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
-            [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
-            errorMessage="We could not load main contact persons. Please try again."
-            emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
-            layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
-          </app-project-dashboard-card>
-        </div>
-
-        <div class="flex lg:flex-1 [&>*]:w-full">
-          <app-project-dashboard-card title="Top contributing projects"
-            description="Top projects contributing to results where this project is the primary project."
-            class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
-            [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
-            errorMessage="We could not load contributing projects. Please try again."
-            emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
-            [itemHeightPx]="43" (retry)="topContributors.update()">
-          </app-project-dashboard-card>
-        </div>
+      @if (statusChartLoading()) {
+      <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by status">
+        <p-skeleton width="100%" height="20px" borderRadius="4px" />
+        <p-skeleton width="100%" height="14px" borderRadius="4px" />
+        <p-skeleton width="100%" height="14px" borderRadius="4px" />
+        <p-skeleton width="80%" height="14px" borderRadius="4px" />
       </div>
-
-      <app-geo-scope-card class="w-full"></app-geo-scope-card>
-    </div>
-    <div class="flex min-w-0 flex-col gap-5">
-      <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-        aria-labelledby="results-by-indicator-title"
-        [style.animation-delay.ms]="staggerMs.indicatorStatus">
-        <header class="flex flex-wrap items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
-            <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results linked to each indicator
-              on this project.</span>
-          </div>
-
-          @if (!getProjectDetailService.loading() && !getProjectDetailService.loadError() && totalProjectResults() > 0) {
-          <div class="flex items-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-0.5" role="group" aria-label="Indicator view mode">
-            <button type="button"
-              class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-              [class.bg-[var(--ac-white-1)]]="indicatorView() === 'bars'"
-              [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'bars'"
-              [class.shadow-xs]="indicatorView() === 'bars'"
-              [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'bars'"
-              [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'bars'"
-              [attr.aria-pressed]="indicatorView() === 'bars'"
-              (click)="setIndicatorView('bars')">
-              Bars
-            </button>
-            <button type="button"
-              class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-              [class.bg-[var(--ac-white-1)]]="indicatorView() === 'heatmap'"
-              [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'heatmap'"
-              [class.shadow-xs]="indicatorView() === 'heatmap'"
-              [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'heatmap'"
-              [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'heatmap'"
-              [attr.aria-pressed]="indicatorView() === 'heatmap'"
-              (click)="setIndicatorView('heatmap')">
-              Heatmap
-            </button>
-          </div>
-          }
-        </header>
-
-        @if (getProjectDetailService.loading()) {
-        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by indicator">
-          <p-skeleton width="100%" height="20px" borderRadius="4px" />
-          <p-skeleton width="100%" height="14px" borderRadius="4px" />
-          <p-skeleton width="100%" height="14px" borderRadius="4px" />
-          <p-skeleton width="80%" height="14px" borderRadius="4px" />
-        </div>
-        } @else if (getProjectDetailService.loadError()) {
-        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
-          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
-          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load results by indicator. Please try again.</p>
-          <button pButton type="button" severity="secondary" size="small"
-            class="!min-h-[44px] !min-w-[44px]"
-            aria-label="Retry loading results by indicator"
-            (click)="retryIndicatorBreakdown()">Try again</button>
-        </div>
-        } @else if (totalProjectResults() === 0) {
-        <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
-          <i class="pi pi-chart-pie text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No results were found for any indicator
-            on this project.</p>
-        </div>
-        } @else {
-        @if (!useCrossfadeFallback()) {
-        <!-- Engine-native morph mode (R-DA-007): single viz-chart instance morphs via universalTransition -->
-        <div class="flex flex-col gap-3">
-          <app-viz-chart
-            [options]="activeIndicatorChartOptions()"
-            [tableModel]="indicatorHeatmapTableModel()"
-            chartTitle="Results by indicator"
-            height="320px"
-            (chartClick)="onIndicatorHeatmapClick($event)">
-          </app-viz-chart>
-
-          @if (indicatorView() === 'heatmap') {
-          <!-- Ramp Legend (WCAG 1.4.1) -->
-          <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
-            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
-            <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
+      } @else if (statusChartError()) {
+      <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+        <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load the status
+          breakdown. Please try again.</p>
+        <button pButton type="button" severity="secondary" size="small"
+          class="!min-h-[44px] !min-w-[44px]"
+          aria-label="Retry loading results by status"
+          (click)="contractResultsSummary.update()">Try again</button>
+      </div>
+      } @else if (statusChartEmpty()) {
+      <div class="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
+        <i class="pi pi-chart-bar text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No result statuses were found
+          for this project.</p>
+      </div>
+      } @else {
+      <div class="flex flex-col gap-4">
+        <figure class="m-0 flex w-full flex-col gap-2" role="img" [attr.aria-label]="statusAriaLabel()">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
+            Composition
+          </span>
+          <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
+            @for (bucket of statusBuckets(); track $index) {
+            <div class="h-full min-w-[2px] transition-[width] duration-300 ease-in-out"
+              [style.width.%]="statusSharePercent(bucket.count)"
+              [style.background-color]="statusColor(bucket.status_id)"
+              [attr.data-status-id]="bucket.status_id"
+              [attr.data-status-token]="statusTokenName(bucket.status_id)"
+              aria-hidden="true">
             </div>
-            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
+            }
           </div>
-          }
-        </div>
-        } @else {
-        <!-- Crossfade fallback mode (proposal §12 / design §6 escape valve) -->
-        @if (indicatorView() === 'bars') {
-        <div class="flex flex-col gap-4" [@fadeView]>
-          <div class="flex items-end justify-between gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
-            <div class="flex flex-col gap-0.5">
-              <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Total
-                results</span>
-              <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{
-                totalProjectResults() }}</strong>
-            </div>
-            <span class="pb-0.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">{{ indicatorsWithResults().length }}
-              indicators</span>
-          </div>
+        </figure>
 
-          <div class="flex flex-col gap-2">
-            <span
-              class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Distribution</span>
-            <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[var(--ac-grey-200)]"
-              [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
-              @for (indicator of indicatorsWithResults(); track indicator.id) {
-              <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
-                [style.width.%]="indicatorSharePercent(indicator.value)" [style.background-color]="indicator.color"
-                [title]="indicator.label + ': ' + indicator.value + ' results'"></div>
-              }
-            </figure>
-          </div>
-
-          <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[var(--ac-grey-200)] p-0">
-            @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
-            <li class="py-3 first:pt-0 last:pb-0">
-              <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-                <span
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ac-grey-100)] font-['Barlow'] text-[12px] font-bold tabular-nums text-[var(--ac-primary-blue-300)]">{{
-                  rank + 1 }}</span>
+        <table class="m-0 w-full border-collapse text-left">
+          <caption class="sr-only">Results by status — count and percentage per workflow status</caption>
+          <thead class="sr-only">
+            <tr>
+              <th scope="col">Status</th>
+              <th scope="col">Results</th>
+              <th scope="col">Share</th>
+            </tr>
+          </thead>
+          <tbody class="m-0 flex list-none flex-col gap-3 p-0">
+            @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
+            <tr class="grid w-full items-center gap-2.5 text-left text-inherit"
+              style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
+              <td class="min-w-0">
                 <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
                   [routerLink]="['/project-detail', contractId()]"
-                  [queryParams]="{ indicatorTab: indicator.id }"
-                  [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results, ' + indicatorSharePercent(indicator.value) + '% — view filtered results'">
-                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
-                  <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[var(--ac-primary-blue-600)] line-clamp-2"
-                    [title]="indicator.label">{{ indicator.label }}</span>
+                  [queryParams]="statusRowQueryParams(bucket)"
+                  [attr.aria-label]="statusRowAriaLabel(bucket)">
+                  <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                    [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                  <span class="min-w-0 truncate font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[var(--ac-grey-800)]">{{ bucket.name }}</span>
                 </a>
-                <span class="shrink-0 text-right">
-                  <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[var(--ac-primary-blue-600)]">{{
-                    indicator.value }}</strong>
-                  <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{
-                    indicatorSharePercent(indicator.value) }}%</span>
+              </td>
+              <td class="min-w-0 w-full overflow-hidden">
+                <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
+                  [style.width.%]="statusSharePercent(bucket.count)" [style.min-width.px]="bucket.count > 0 ? 32 : 0">
+                  <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                    [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                  <strong class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{ bucket.count }}</strong>
+                  <span class="shrink-0 font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{ statusSharePercent(bucket.count) }}%</span>
                 </span>
-              </div>
-            </li>
+              </td>
+            </tr>
             }
-          </ul>
-        </div>
-        } @else {
-        <div class="flex flex-col gap-3" [@fadeView]>
-          <app-viz-chart
-            [options]="indicatorHeatmapOptions()"
-            [tableModel]="indicatorHeatmapTableModel()"
-            chartTitle="Results by indicator and year matrix heatmap"
-            height="320px"
-            (chartClick)="onIndicatorHeatmapClick($event)">
-          </app-viz-chart>
+          </tbody>
+        </table>
+      </div>
+      }
+    </section>
+  </div>
 
-          <!-- Ramp Legend (WCAG 1.4.1) -->
-          <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
-            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
-            <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
-              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
-            </div>
-            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
-          </div>
-        </div>
-        }
-        }
-        }
-      </section>
-      <section class="flex min-h-0 flex-1 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-        aria-labelledby="results-by-status-title"
-        [style.animation-delay.ms]="staggerMs.indicatorStatus">
-        <header class="flex flex-col gap-1">
-          <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
-          <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
-            this project.</span>
-        </header>
+  <!-- Results by indicator section (R-HL-003, design §6) -->
+  <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+    aria-labelledby="results-by-indicator-title"
+    [style.animation-delay.ms]="staggerMs.indicatorStatus">
+    <header class="flex flex-wrap items-start justify-between gap-3">
+      <div class="flex flex-col gap-1">
+        <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
+        <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results linked to each indicator
+          on this project.</span>
+      </div>
 
-        @if (statusChartLoading()) {
-        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by status">
-          <p-skeleton width="100%" height="20px" borderRadius="4px" />
-          <p-skeleton width="100%" height="14px" borderRadius="4px" />
-          <p-skeleton width="100%" height="14px" borderRadius="4px" />
-          <p-skeleton width="80%" height="14px" borderRadius="4px" />
-        </div>
-        } @else if (statusChartError()) {
-        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
-          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
-          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load the status
-            breakdown. Please try again.</p>
-          <button pButton type="button" severity="secondary" size="small"
-            class="!min-h-[44px] !min-w-[44px]"
-            aria-label="Retry loading results by status"
-            (click)="contractResultsSummary.update()">Try again</button>
-        </div>
-        } @else if (statusChartEmpty()) {
-        <div class="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-          <i class="pi pi-chart-bar text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No result statuses were found
-            for this project.</p>
-        </div>
-        } @else {
-        <div class="flex flex-col gap-4">
-          <figure class="m-0 flex w-full flex-col gap-2" role="img" [attr.aria-label]="statusAriaLabel()">
-            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
-              Composition
-            </span>
-            <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
-              @for (bucket of statusBuckets(); track $index) {
-              <div class="h-full min-w-[2px] transition-[width] duration-300 ease-in-out"
-                [style.width.%]="statusSharePercent(bucket.count)"
-                [style.background-color]="statusColor(bucket.status_id)"
-                [attr.data-status-id]="bucket.status_id"
-                [attr.data-status-token]="statusTokenName(bucket.status_id)"
-                aria-hidden="true">
-              </div>
-              }
-            </div>
-          </figure>
+      @if (!getProjectDetailService.loading() && !getProjectDetailService.loadError() && totalProjectResults() > 0) {
+      <div class="flex items-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-0.5" role="group" aria-label="Indicator view mode">
+        <button type="button"
+          class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+          [class.bg-[var(--ac-white-1)]]="indicatorView() === 'bars'"
+          [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'bars'"
+          [class.shadow-xs]="indicatorView() === 'bars'"
+          [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'bars'"
+          [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'bars'"
+          [attr.aria-pressed]="indicatorView() === 'bars'"
+          (click)="setIndicatorView('bars')">
+          Bars
+        </button>
+        <button type="button"
+          class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+          [class.bg-[var(--ac-white-1)]]="indicatorView() === 'heatmap'"
+          [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'heatmap'"
+          [class.shadow-xs]="indicatorView() === 'heatmap'"
+          [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'heatmap'"
+          [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'heatmap'"
+          [attr.aria-pressed]="indicatorView() === 'heatmap'"
+          (click)="setIndicatorView('heatmap')">
+          Heatmap
+        </button>
+      </div>
+      }
+    </header>
 
-          <table class="m-0 w-full border-collapse text-left">
-            <caption class="sr-only">Results by status — count and percentage per workflow status</caption>
-            <thead class="sr-only">
-              <tr>
-                <th scope="col">Status</th>
-                <th scope="col">Results</th>
-                <th scope="col">Share</th>
-              </tr>
-            </thead>
-            <tbody class="m-0 flex list-none flex-col gap-3 p-0">
-              @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
-              <tr class="grid w-full items-center gap-2.5 text-left text-inherit"
-                style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
-                <td class="min-w-0">
-                  <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-                    [routerLink]="['/project-detail', contractId()]"
-                    [queryParams]="statusRowQueryParams(bucket)"
-                    [attr.aria-label]="statusRowAriaLabel(bucket)">
-                    <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
-                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
-                    <span class="min-w-0 truncate font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[var(--ac-grey-800)]">{{ bucket.name }}</span>
-                  </a>
-                </td>
-                <td class="min-w-0 w-full overflow-hidden">
-                  <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
-                    [style.width.%]="statusSharePercent(bucket.count)" [style.min-width.px]="bucket.count > 0 ? 32 : 0">
-                    <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
-                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
-                    <strong class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{ bucket.count }}</strong>
-                    <span class="shrink-0 font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{ statusSharePercent(bucket.count) }}%</span>
-                  </span>
-                </td>
-              </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        }
-      </section>
-      <app-results-trend-card
-        [style.animation-delay.ms]="staggerMs.trend"
-        [buckets]="contractResultsSummary.list()?.by_year ?? []"
-        [loading]="contractResultsSummary.loading()"
-        [error]="contractResultsSummary.loadError()"
-        (retry)="contractResultsSummary.update()">
-      </app-results-trend-card>
+    @if (getProjectDetailService.loading()) {
+    <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by indicator">
+      <p-skeleton width="100%" height="20px" borderRadius="4px" />
+      <p-skeleton width="100%" height="14px" borderRadius="4px" />
+      <p-skeleton width="100%" height="14px" borderRadius="4px" />
+      <p-skeleton width="80%" height="14px" borderRadius="4px" />
+    </div>
+    } @else if (getProjectDetailService.loadError()) {
+    <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+      <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+      <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load results by indicator. Please try again.</p>
+      <button pButton type="button" severity="secondary" size="small"
+        class="!min-h-[44px] !min-w-[44px]"
+        aria-label="Retry loading results by indicator"
+        (click)="retryIndicatorBreakdown()">Try again</button>
+    </div>
+    } @else if (totalProjectResults() === 0) {
+    <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
+      <i class="pi pi-chart-pie text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+      <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No results were found for any indicator
+        on this project.</p>
+    </div>
+    } @else {
+    @if (!useCrossfadeFallback()) {
+    <!-- Engine-native morph mode (R-DA-007): single viz-chart instance morphs via universalTransition -->
+    <div class="flex flex-col gap-3">
+      <app-viz-chart
+        [options]="activeIndicatorChartOptions()"
+        [tableModel]="indicatorHeatmapTableModel()"
+        chartTitle="Results by indicator"
+        height="320px"
+        (chartClick)="onIndicatorHeatmapClick($event)">
+      </app-viz-chart>
 
-      @if (isBilateral()) {
-      <app-sp-alignment-graph
-        [style.animation-delay.ms]="staggerMs.spGraph"
-        [report]="contractSpAlignment.list()"
-        [loading]="contractSpAlignment.loading()"
-        [error]="contractSpAlignment.loadError()"
-        (retry)="contractSpAlignment.update()">
-      </app-sp-alignment-graph>
+      @if (indicatorView() === 'heatmap') {
+      <!-- Ramp Legend (WCAG 1.4.1) -->
+      <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
+        <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
+        <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
+        </div>
+        <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
+      </div>
       }
     </div>
+    } @else {
+    <!-- Crossfade fallback mode (proposal §12 / design §6 escape valve) -->
+    @if (indicatorView() === 'bars') {
+    <div class="flex flex-col gap-4" [@fadeView]>
+      <div class="flex items-end justify-between gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
+        <div class="flex flex-col gap-0.5">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Total
+            results</span>
+          <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{
+            totalProjectResults() }}</strong>
+        </div>
+        <span class="pb-0.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">{{ indicatorsWithResults().length }}
+          indicators</span>
+      </div>
+
+      <div class="flex flex-col gap-2">
+        <span
+          class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Distribution</span>
+        <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[var(--ac-grey-200)]"
+          [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
+          @for (indicator of indicatorsWithResults(); track indicator.id) {
+          <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
+            [style.width.%]="indicatorSharePercent(indicator.value)" [style.background-color]="indicator.color"
+            [title]="indicator.label + ': ' + indicator.value + ' results'"></div>
+          }
+        </figure>
+      </div>
+
+      <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[var(--ac-grey-200)] p-0">
+        @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
+        <li class="py-3 first:pt-0 last:pb-0">
+          <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+            <span
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ac-grey-100)] font-['Barlow'] text-[12px] font-bold tabular-nums text-[var(--ac-primary-blue-300)]">{{
+              rank + 1 }}</span>
+            <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+              [routerLink]="['/project-detail', contractId()]"
+              [queryParams]="{ indicatorTab: indicator.id }"
+              [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results, ' + indicatorSharePercent(indicator.value) + '% — view filtered results'">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
+              <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[var(--ac-primary-blue-600)] line-clamp-2"
+                [title]="indicator.label">{{ indicator.label }}</span>
+            </a>
+            <span class="shrink-0 text-right">
+              <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[var(--ac-primary-blue-600)]">{{
+                indicator.value }}</strong>
+              <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{
+                indicatorSharePercent(indicator.value) }}%</span>
+            </span>
+          </div>
+        </li>
+        }
+      </ul>
+    </div>
+    } @else {
+    <div class="flex flex-col gap-3" [@fadeView]>
+      <app-viz-chart
+        [options]="indicatorHeatmapOptions()"
+        [tableModel]="indicatorHeatmapTableModel()"
+        chartTitle="Results by indicator and year matrix heatmap"
+        height="320px"
+        (chartClick)="onIndicatorHeatmapClick($event)">
+      </app-viz-chart>
+
+      <!-- Ramp Legend (WCAG 1.4.1) -->
+      <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
+        <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
+        <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
+          <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
+        </div>
+        <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
+      </div>
+    </div>
+    }
+    }
+    }
+
+    <!-- Reserved slot for F3 Indicator Deep Dive -->
+  </section>
+
+  <!-- Geographic scope -->
+  <app-geo-scope-card class="w-full"></app-geo-scope-card>
+
+  <!-- Rankings & SP alignment row (R-HL-003, design §6) -->
+  <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div id="partners-card" class="flex flex-1">
+        <app-project-dashboard-card title="Top partner institution"
+          description="Partner institutions most frequently linked to results on this primary project."
+          class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
+          [error]="topPartners.loadError()" [empty]="partnersEmpty()"
+          errorMessage="We could not load top partner institutions. Please try again."
+          emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
+          layout="rows-partners" (retry)="topPartners.update()">
+        </app-project-dashboard-card>
+      </div>
+
+      <div class="flex flex-1">
+        <app-project-dashboard-card title="Top primary levers"
+          description="Primary levers most frequently linked to results on this project." class="h-full w-full"
+          iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
+          [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
+          errorMessage="We could not load top primary levers. Please try again."
+          emptyMessage="No primary levers were found for this project." [items]="leverItems()"
+          layout="rows-stacked-lever" (retry)="topPrimaryLevers.update()">
+        </app-project-dashboard-card>
+      </div>
+
+      <div class="flex flex-1">
+        <app-project-dashboard-card title="Top main contact person"
+          description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
+          iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
+          [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
+          errorMessage="We could not load main contact persons. Please try again."
+          emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
+          layout="rows-stacked-lever" [itemHeightPx]="43" (retry)="topMainContactPersons.update()">
+        </app-project-dashboard-card>
+      </div>
+
+      <div class="flex lg:flex-1 [&>*]:w-full">
+        <app-project-dashboard-card title="Top contributing projects"
+          description="Top projects contributing to results where this project is the primary project."
+          class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
+          [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
+          errorMessage="We could not load contributing projects. Please try again."
+          emptyMessage="No contributor projects were found." [items]="contributorItems()" layout="rows-stacked-lever"
+          [itemHeightPx]="43" (retry)="topContributors.update()">
+        </app-project-dashboard-card>
+      </div>
+    </div>
+
+    @if (isBilateral()) {
+    <app-sp-alignment-graph
+      [style.animation-delay.ms]="staggerMs.spGraph"
+      [report]="contractSpAlignment.list()"
+      [loading]="contractSpAlignment.loading()"
+      [error]="contractSpAlignment.loadError()"
+      (retry)="contractSpAlignment.update()">
+    </app-sp-alignment-graph>
+    }
   </div>
+
   <!-- Pending revision results -->
   <section
     id="pending-revision-section"

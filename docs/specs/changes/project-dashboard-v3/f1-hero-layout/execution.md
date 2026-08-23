@@ -162,3 +162,74 @@
 - **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
 
 ---
+
+## Task: T-04 — Section reorder, spacing normalization, caveat compression
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts` (modified)
+- **Summary:** Reordered dashboard sections per Design §6 (Hero -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI). Normalised spacing (`gap-5` across dashboard, `gap-6` in geo-scope card).
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 120 passed, 120 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** FAIL
+- **Summary:** Implementation successfully modifies templates, but test diff snippet for `project-dashboard.component.spec.ts` was truncated in prompt payload.
+- **Issues Found:**
+  1. **Discovered Issue:** Spec diff in `project-dashboard.component.spec.ts` truncated.
+     - **Violated Rule:** `tasks.md` §3 (T-04 Acceptance Criteria)
+     - **Remediation Suggestion:** Supply complete diff of `project-dashboard.component.spec.ts`.
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** RETRY (Attempt 2)
+- **Notes:** Supplied complete diff for Attempt 2 review.
+
+---
+
+### Attempt 2
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `high`
+
+#### Implementer Report
+- **Files Changed:** Same as Attempt 1.
+- **Summary:** Complete diff provided verifying DOM order assertions (Hero -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI), trend & status preceding ranking cards, full-width geo-scope card, and zero `gap-16` classes.
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/geo-scope-card/geo-scope-card.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 120 passed, 120 total
+  ```
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** DOM structure in `project-dashboard.component.html` matches Design §6. Caveat banner compressed and placed below context strip (D-F1-7). Spacing normalization (`gap-16` to `gap-6`) applied in `geo-scope-card.component.html`. DOM order assertions in `project-dashboard.component.spec.ts` and `geo-scope-card.component.spec.ts` pass cleanly.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-04)
+- **Notes:** All acceptance criteria satisfied.
+
+---
