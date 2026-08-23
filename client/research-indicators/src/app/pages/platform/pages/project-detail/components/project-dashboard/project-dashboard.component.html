@@ -62,7 +62,7 @@
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
         Pending revision
       </span>
-      @if (contractResultsSummary.loading()) {
+      @if (contractDashboard.loading()) {
       <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading pending revision count">
         <p-skeleton width="60px" height="32px" borderRadius="4px" />
         <p-skeleton width="110px" height="14px" borderRadius="4px" />
@@ -82,17 +82,17 @@
     <!-- Tile 4: Partner institutions -->
     <button type="button"
       class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-      [class.hover:border-[var(--ac-primary-blue-400)]]="!contractResultsSummary.loading()"
-      [class.hover:shadow-sm]="!contractResultsSummary.loading()"
-      [class.cursor-pointer]="!contractResultsSummary.loading()"
-      [class.cursor-default]="contractResultsSummary.loading()"
-      [attr.disabled]="contractResultsSummary.loading() ? true : null"
-      [attr.aria-label]="contractResultsSummary.loading() ? 'Loading partner institutions count' : 'Partner institutions: ' + partnerInstitutionsCount() + ' linked to results — scroll to top partner institutions'"
+      [class.hover:border-[var(--ac-primary-blue-400)]]="!contractDashboard.loading()"
+      [class.hover:shadow-sm]="!contractDashboard.loading()"
+      [class.cursor-pointer]="!contractDashboard.loading()"
+      [class.cursor-default]="contractDashboard.loading()"
+      [attr.disabled]="contractDashboard.loading() ? true : null"
+      [attr.aria-label]="contractDashboard.loading() ? 'Loading partner institutions count' : 'Partner institutions: ' + partnerInstitutionsCount() + ' linked to results — scroll to top partner institutions'"
       (click)="scrollToPartners($event)">
       <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
         Partner institutions
       </span>
-      @if (contractResultsSummary.loading()) {
+      @if (contractDashboard.loading()) {
       <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading partner institutions count">
         <p-skeleton width="60px" height="32px" borderRadius="4px" />
         <p-skeleton width="110px" height="14px" borderRadius="4px" />
@@ -372,11 +372,11 @@
     @if (!trendEmpty()) {
     <app-results-trend-card
       [style.animation-delay.ms]="staggerMs.trend"
-      [buckets]="contractResultsSummary.list()?.by_year ?? []"
-      [loading]="contractResultsSummary.loading()"
-      [error]="contractResultsSummary.loadError()"
+      [buckets]="contractDashboard.summary()?.by_year ?? []"
+      [loading]="contractDashboard.loading()"
+      [error]="contractDashboard.loadError()"
       (chartClick)="onTrendChartClick($event)"
-      (retry)="contractResultsSummary.update()">
+      (retry)="contractDashboard.update()">
     </app-results-trend-card>
     }
 
@@ -405,7 +405,7 @@
         <button pButton type="button" severity="secondary" size="small"
           class="!min-h-[44px] !min-w-[44px]"
           aria-label="Retry loading results by status"
-          (click)="contractResultsSummary.update()">Try again</button>
+          (click)="contractDashboard.update()">Try again</button>
       </div>
       } @else {
       <div class="flex flex-col gap-4">
@@ -673,12 +673,12 @@
       <div id="partners-card" class="flex flex-1">
         <app-project-dashboard-card title="Top partner institution"
           description="Partner institutions most frequently linked to results on this primary project."
-          class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="topPartners.loading()"
-          [error]="topPartners.loadError()" [empty]="partnersEmpty()"
+          class="h-full w-full" iconClass="pi pi-building" [compact]="true" [loading]="contractDashboard.loading()"
+          [error]="contractDashboard.loadError()" [empty]="partnersEmpty()"
           errorMessage="We could not load top partner institutions. Please try again."
           emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
           [options]="partnerChartOptions()" [tableModel]="partnerTableModel()"
-          layout="viz-bar" (retry)="topPartners.update()">
+          layout="viz-bar" (retry)="contractDashboard.update()">
         </app-project-dashboard-card>
       </div>
       }
@@ -687,12 +687,12 @@
       <div class="flex flex-1">
         <app-project-dashboard-card title="Top primary levers"
           description="Primary levers most frequently linked to results on this project." class="h-full w-full"
-          iconClass="pi pi-sliders-h" [compact]="true" [loading]="topPrimaryLevers.loading()"
-          [error]="topPrimaryLevers.loadError()" [empty]="leversEmpty()"
+          iconClass="pi pi-sliders-h" [compact]="true" [loading]="contractDashboard.loading()"
+          [error]="contractDashboard.loadError()" [empty]="leversEmpty()"
           errorMessage="We could not load top primary levers. Please try again."
           emptyMessage="No primary levers were found for this project." [items]="leverItems()"
           [options]="leverChartOptions()" [tableModel]="leverTableModel()"
-          layout="viz-bar" (chartClick)="onLeverChartClick($event)" (retry)="topPrimaryLevers.update()">
+          layout="viz-bar" (chartClick)="onLeverChartClick($event)" (retry)="contractDashboard.update()">
         </app-project-dashboard-card>
       </div>
       }
@@ -701,12 +701,12 @@
       <div class="flex flex-1">
         <app-project-dashboard-card title="Top main contact person"
           description="Main contact persons most frequently linked to results on this project." class="h-full w-full"
-          iconClass="pi pi-users" [compact]="true" [loading]="topMainContactPersons.loading()"
-          [error]="topMainContactPersons.loadError()" [empty]="mainContactPersonsEmpty()"
+          iconClass="pi pi-users" [compact]="true" [loading]="contractDashboard.loading()"
+          [error]="contractDashboard.loadError()" [empty]="mainContactPersonsEmpty()"
           errorMessage="We could not load main contact persons. Please try again."
           emptyMessage="No main contact persons were found for this project." [items]="mainContactPersonItems()"
           [options]="mainContactChartOptions()" [tableModel]="mainContactTableModel()"
-          layout="viz-bar" (retry)="topMainContactPersons.update()">
+          layout="viz-bar" (retry)="contractDashboard.update()">
         </app-project-dashboard-card>
       </div>
       }
@@ -715,12 +715,12 @@
       <div class="flex lg:flex-1 [&>*]:w-full">
         <app-project-dashboard-card title="Top contributing projects"
           description="Top projects contributing to results where this project is the primary project."
-          class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="topContributors.loading()"
-          [error]="topContributors.loadError()" [empty]="contributorsEmpty()"
+          class="h-full w-full" iconClass="pi pi-briefcase" [compact]="true" [loading]="contractDashboard.loading()"
+          [error]="contractDashboard.loadError()" [empty]="contributorsEmpty()"
           errorMessage="We could not load contributing projects. Please try again."
           emptyMessage="No contributor projects were found." [items]="contributorItems()"
           [options]="contributorChartOptions()" [tableModel]="contributorTableModel()"
-          layout="viz-bar" (chartClick)="onContributorChartClick($event)" (retry)="topContributors.update()">
+          layout="viz-bar" (chartClick)="onContributorChartClick($event)" (retry)="contractDashboard.update()">
         </app-project-dashboard-card>
       </div>
       }
@@ -730,10 +730,10 @@
     @if (isBilateral() && !spAlignmentEmpty()) {
     <app-sp-alignment-graph
       [style.animation-delay.ms]="staggerMs.spGraph"
-      [report]="contractSpAlignment.list()"
-      [loading]="contractSpAlignment.loading()"
-      [error]="contractSpAlignment.loadError()"
-      (retry)="contractSpAlignment.update()">
+      [report]="contractDashboard.spAlignment()"
+      [loading]="contractDashboard.loading()"
+      [error]="contractDashboard.loadError()"
+      (retry)="contractDashboard.update()">
     </app-sp-alignment-graph>
     }
   </div>

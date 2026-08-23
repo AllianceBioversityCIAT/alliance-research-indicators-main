@@ -87,11 +87,11 @@ graph TD
   - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html`
 - **Description:** Migrate `ProjectDashboardComponent` to inject `GetContractDashboardService` instead of the 7 separate services. Rewire computed signals (`partnerItems`, `leverItems`, `contributorItems`, `mainContactPersonItems`, `statusBuckets`, `geoScopeEmpty`, `trendEmpty`, `collapsedEmptyWidgets`, `retryDashboard`). Ensure all F1 interactive features, tooltips, drill-through query parameters (`leverTab`, `contractTab`, `yearTab`, `indicatorTab`, `statusTab`), and empty collapse work identically.
 - **Acceptance / done check:**
-  - [ ] Spec: component triggers single dashboard service load on `contractId` signal change.
-  - [ ] Spec: empty collapse into `no-data-group` continues to work properly for empty sections.
-  - [ ] Spec: all drill-through clicks (levers, contributors, trend, indicators) navigate with correct query parameters.
-  - [ ] `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false` passes.
-- **Dependencies:** T-03 · **Effort:** L · **Status:** todo
+  - [x] Spec: component triggers single dashboard service load on `contractId` signal change.
+  - [x] Spec: empty collapse into `no-data-group` continues to work properly for empty sections.
+  - [x] Spec: all drill-through clicks (levers, contributors, trend, indicators) navigate with correct query parameters.
+  - [x] `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false` passes.
+- **Dependencies:** T-03 · **Effort:** L · **Status:** done
 
 ---
 

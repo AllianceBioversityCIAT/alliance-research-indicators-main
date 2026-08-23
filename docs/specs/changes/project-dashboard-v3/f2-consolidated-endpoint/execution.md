@@ -130,3 +130,39 @@
 - **Notes:** All acceptance criteria for T-03 verified.
 
 ---
+
+## Task: T-04 — Client Dashboard Component Migration
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`, `tdd`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Migrated `ProjectDashboardComponent` to consume `GetContractDashboardService` (`contractDashboard`) exclusively, replacing 7 legacy service injections. Simplified effect initialization to a single `contractDashboard.load(contractId)` call. Rewired all widget computeds, templates, and retry buttons to `contractDashboard.update()`. Preserved 100% of F1 interactive features, empty-collapse (`no-data-group`), and drill-through navigation.
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 1 passed, 1 total
+  Tests:       91 passed, 91 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Verified migration of `ProjectDashboardComponent` to `GetContractDashboardService`. Removed 7 legacy service calls. UI bindings, empty-collapse rules, and drill-through navigation work as expected per F1 contracts. Tests pass and ESLint reports 0 errors.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-04)
+- **Notes:** All acceptance criteria for T-04 verified.
+
+---

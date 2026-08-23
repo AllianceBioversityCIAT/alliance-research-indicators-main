@@ -1,17 +1,12 @@
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { Component, computed, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
-import { GetContractResultsSummaryService } from '@shared/services/get-contract-results-summary.service';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
-import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
-import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
-import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-persons.service';
-import { GetTopPartnersService } from '@services/get-top-partners.service';
-import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
 import { DocumentOverviewService } from '@shared/services/document-overview.service';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -22,12 +17,13 @@ import { ProjectDashboardCardComponent } from '../project-dashboard-card/project
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
-import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
-import { ContractSpAlignmentReport } from '@shared/interfaces/contract-sp-alignment.interface';
+import { ContractSpAlignmentReport, ContractSpAlignment } from '@shared/interfaces/contract-sp-alignment.interface';
+import { ContractDashboardReport, ContractDashboardTops } from '@shared/interfaces/contract-dashboard.interface';
+import { GeoScopeResponse } from '@interfaces/geo-scope.interface';
+import { ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
 import { DarkModeService } from '@shared/services/dark-mode.service';
-import { Router } from '@angular/router';
 import { VizChartComponent } from '@shared/components/viz-chart/viz-chart.component';
 
 @Component({
@@ -116,33 +112,29 @@ describe('ProjectDashboardComponent', () => {
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock; GET_ContractResultsSummary: jest.Mock };
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
-  let contractResultsSummaryMock: {
-    list: ReturnType<typeof signal<ContractResultsSummary | null>>;
+  let contractDashboardMock: {
+    data: ReturnType<typeof signal<ContractDashboardReport | null>>;
     loading: ReturnType<typeof signal<boolean>>;
     loadError: ReturnType<typeof signal<boolean>>;
-    main: jest.Mock;
+    loadedContractId: ReturnType<typeof signal<string | null>>;
+    summary: ReturnType<typeof computed<ContractResultsSummary | null>>;
+    tops: ReturnType<typeof computed<ContractDashboardTops | null>>;
+    topPartners: ReturnType<typeof computed<ProjectDashboardRankedItem[]>>;
+    topPrimaryLevers: ReturnType<typeof computed<ProjectDashboardRankedItem[]>>;
+    topMainContactPersons: ReturnType<typeof computed<ProjectDashboardRankedItem[]>>;
+    topContributors: ReturnType<typeof computed<ProjectDashboardRankedItem[]>>;
+    geoScope: ReturnType<typeof computed<GeoScopeResponse | null>>;
+    spAlignment: ReturnType<typeof computed<ContractSpAlignment | null>>;
+    load: jest.Mock;
     update: jest.Mock;
   };
-  let topContributorsMock: ReturnType<typeof createRankedServiceMock>;
-  let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
-  let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
-  let topLeversMock: ReturnType<typeof createRankedServiceMock>;
-  let geoScopeMock: {
-    summary: ReturnType<typeof signal<any>>;
-    topRegionsList: ReturnType<typeof signal<any[]>>;
-    topCountries: ReturnType<typeof signal<any[]>>;
-    loading: ReturnType<typeof signal<boolean>>;
-    loadError: ReturnType<typeof signal<boolean>>;
-    main: jest.Mock;
-    update: jest.Mock;
-  };
-  let contractSpAlignmentMock: {
-    list: ReturnType<typeof signal<ContractSpAlignmentReport | null>>;
-    loading: ReturnType<typeof signal<boolean>>;
-    loadError: ReturnType<typeof signal<boolean>>;
-    main: jest.Mock;
-    update: jest.Mock;
-  };
+  let contractResultsSummaryMock: any;
+  let topContributorsMock: any;
+  let topMainContactsMock: any;
+  let topPartnersMock: any;
+  let topLeversMock: any;
+  let geoScopeMock: any;
+  let contractSpAlignmentMock: any;
   let resultsCenterServiceMock: { initializeProjectDashboardResultsTable: jest.Mock };
   let fileManagerServiceMock: { uploadFile: jest.Mock };
   let documentOverviewServiceMock: {
@@ -164,14 +156,141 @@ describe('ProjectDashboardComponent', () => {
     return input;
   }
 
-  function createRankedServiceMock() {
+  function createContractDashboardServiceMock(options?: {
+    data?: ContractDashboardReport | null;
+    loading?: boolean;
+    loadError?: boolean;
+  }) {
+    const data = signal<ContractDashboardReport | null>(options?.data ?? null);
+    const loading = signal<boolean>(options?.loading ?? false);
+    const loadError = signal<boolean>(options?.loadError ?? false);
+    const loadedContractId = signal<string | null>(null);
+
+    const summary = computed(() => data()?.summary ?? null);
+    const tops = computed(() => data()?.tops ?? null);
+    const topPartners = computed(() => tops()?.partners ?? []);
+    const topPrimaryLevers = computed(() => tops()?.primary_levers ?? []);
+    const topMainContactPersons = computed(() => tops()?.main_contacts ?? []);
+    const topContributors = computed(() => tops()?.contributors ?? []);
+    const geoScope = computed(() => data()?.geo_scope ?? null);
+    const spAlignment = computed(() => data()?.sp_alignment ?? null);
+
+    const load = jest.fn().mockImplementation(async (contractId: string) => {
+      loadedContractId.set(contractId);
+    });
+    const update = jest.fn().mockImplementation(async () => {});
+
     return {
-      list: signal<any[]>([]),
-      loading: signal(false),
-      loadError: signal(false),
-      main: jest.fn(),
-      update: jest.fn()
+      data,
+      loading,
+      loadError,
+      loadedContractId,
+      summary,
+      tops,
+      topPartners,
+      topPrimaryLevers,
+      topMainContactPersons,
+      topContributors,
+      geoScope,
+      spAlignment,
+      load,
+      update
     };
+  }
+
+  function setPartners(partners: any[]) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
+    contractDashboardMock.data.set({
+      ...current,
+      tops: { ...currentTops, partners }
+    });
+  }
+
+  function setLevers(primary_levers: any[]) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
+    contractDashboardMock.data.set({
+      ...current,
+      tops: { ...currentTops, primary_levers }
+    });
+  }
+
+  function setContacts(main_contacts: any[]) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
+    contractDashboardMock.data.set({
+      ...current,
+      tops: { ...currentTops, main_contacts }
+    });
+  }
+
+  function setContributors(contributors: any[]) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
+    contractDashboardMock.data.set({
+      ...current,
+      tops: { ...currentTops, contributors }
+    });
+  }
+
+  function setSummary(summary: ContractResultsSummary | null) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    contractDashboardMock.data.set({
+      ...current,
+      summary
+    });
+  }
+
+  function setGeoScope(geo_scope: any | null) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    contractDashboardMock.data.set({
+      ...current,
+      geo_scope
+    });
+  }
+
+  function setSpAlignment(sp_alignment: any | null) {
+    const current = contractDashboardMock.data() ?? {
+      summary: null,
+      tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
+      geo_scope: null,
+      sp_alignment: null
+    };
+    contractDashboardMock.data.set({
+      ...current,
+      sp_alignment
+    });
   }
 
   async function setup(
@@ -183,31 +302,145 @@ describe('ProjectDashboardComponent', () => {
       projectData?: GetProjectDetail | null;
       projectLoading?: boolean;
       projectError?: boolean;
+      dashboardData?: ContractDashboardReport | null;
       summary?: ContractResultsSummary | null;
+      tops?: ContractDashboardTops | null;
+      geoScope?: GeoScopeResponse | null;
+      spAlignment?: ContractSpAlignment | null;
+      dashboardLoading?: boolean;
+      dashboardError?: boolean;
       summaryLoading?: boolean;
       summaryError?: boolean;
     }
   ) {
-    topContributorsMock = createRankedServiceMock();
-    topMainContactsMock = createRankedServiceMock();
-    topPartnersMock = createRankedServiceMock();
-    topLeversMock = createRankedServiceMock();
+    let initialDashboardData: ContractDashboardReport | null = null;
+    if (options?.dashboardData !== undefined) {
+      initialDashboardData = options.dashboardData;
+    } else if (
+      options?.summary !== undefined ||
+      options?.tops !== undefined ||
+      options?.geoScope !== undefined ||
+      options?.spAlignment !== undefined
+    ) {
+      initialDashboardData = {
+        summary: options?.summary ?? null,
+        tops: options?.tops ?? {
+          partners: [],
+          primary_levers: [],
+          main_contacts: [],
+          contributors: []
+        },
+        geo_scope: options?.geoScope ?? null,
+        sp_alignment: options?.spAlignment ?? null
+      };
+    }
+
+    contractDashboardMock = createContractDashboardServiceMock({
+      data: initialDashboardData,
+      loading: options?.dashboardLoading ?? options?.summaryLoading ?? false,
+      loadError: options?.dashboardError ?? options?.summaryError ?? false
+    });
+
+    topPartnersMock = {
+      list: { set: setPartners },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
+      main: jest.fn(),
+      update: contractDashboardMock.update
+    };
+
+    topLeversMock = {
+      list: { set: setLevers },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
+      main: jest.fn(),
+      update: contractDashboardMock.update
+    };
+
+    topMainContactsMock = {
+      list: { set: setContacts },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
+      main: jest.fn(),
+      update: contractDashboardMock.update
+    };
+
+    topContributorsMock = {
+      list: { set: setContributors },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
+      main: jest.fn(),
+      update: contractDashboardMock.update
+    };
+
+    contractResultsSummaryMock = {
+      list: { set: setSummary },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
+      main: jest.fn(),
+      update: contractDashboardMock.update
+    };
+
     geoScopeMock = {
-      summary: signal({}),
-      topRegionsList: signal([]),
-      topCountries: signal([]),
-      loading: signal(false),
-      loadError: signal(false),
+      summary: {
+        set: (summary: any) => {
+          const currentGeo = contractDashboardMock.data()?.geo_scope ?? {
+            contract_id: 'C-1',
+            limit: 10,
+            geo_scope_summary: {},
+            top_regions: [],
+            top_countries: []
+          };
+          setGeoScope({
+            ...currentGeo,
+            geo_scope_summary: summary
+          });
+        }
+      },
+      topRegionsList: {
+        set: (top_regions: any[]) => {
+          const currentGeo = contractDashboardMock.data()?.geo_scope ?? {
+            contract_id: 'C-1',
+            limit: 10,
+            geo_scope_summary: {},
+            top_regions: [],
+            top_countries: []
+          };
+          setGeoScope({
+            ...currentGeo,
+            top_regions
+          });
+        }
+      },
+      topCountries: {
+        set: (top_countries: any[]) => {
+          const currentGeo = contractDashboardMock.data()?.geo_scope ?? {
+            contract_id: 'C-1',
+            limit: 10,
+            geo_scope_summary: {},
+            top_regions: [],
+            top_countries: []
+          };
+          setGeoScope({
+            ...currentGeo,
+            top_countries
+          });
+        }
+      },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
       main: jest.fn(),
-      update: jest.fn()
+      update: contractDashboardMock.update
     };
+
     contractSpAlignmentMock = {
-      list: signal<ContractSpAlignmentReport | null>(null),
-      loading: signal(false),
-      loadError: signal(false),
+      list: { set: setSpAlignment },
+      loading: contractDashboardMock.loading,
+      loadError: contractDashboardMock.loadError,
       main: jest.fn(),
-      update: jest.fn()
+      update: contractDashboardMock.update
     };
+
     resultsCenterServiceMock = { initializeProjectDashboardResultsTable: jest.fn() };
     fileManagerServiceMock = {
       uploadFile: jest.fn().mockResolvedValue({ data: { filename: 'stored-file.pdf' } })
@@ -296,14 +529,6 @@ describe('ProjectDashboardComponent', () => {
       GET_ContractResultsSummary: jest.fn()
     };
 
-    contractResultsSummaryMock = {
-      list: signal<ContractResultsSummary | null>(options?.summary === undefined ? null : options.summary),
-      loading: signal(options?.summaryLoading ?? false),
-      loadError: signal(options?.summaryError ?? false),
-      main: jest.fn(),
-      update: jest.fn()
-    };
-
     await TestBed.configureTestingModule({
       imports: [ProjectDashboardComponent],
       providers: [
@@ -313,6 +538,7 @@ describe('ProjectDashboardComponent', () => {
         { provide: ActivatedRoute, useValue: { parent: { snapshot: { paramMap: convertToParamMap(contractId ? { id: contractId } : {}) } } } },
         { provide: ApiService, useValue: apiMock },
         { provide: GetProjectDetailService, useValue: getProjectDetailServiceMock },
+        { provide: GetContractDashboardService, useValue: contractDashboardMock },
         {
           provide: ProjectUtilsService,
           useValue: {
@@ -341,28 +567,10 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent, VizChartComponent],
-          providers: [
-            GetTopContributorsContractsService,
-            GetTopMainContactPersonsService,
-            GetTopPartnersService,
-            GetTopPrimaryLeversService,
-            GetGeoScopeService,
-            GetContractResultsSummaryService,
-            GetContractSpAlignmentService
-          ]
+          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent, VizChartComponent]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent, VizChartStubComponent],
-          providers: [
-            { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
-            { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
-            { provide: GetTopPartnersService, useValue: topPartnersMock },
-            { provide: GetTopPrimaryLeversService, useValue: topLeversMock },
-            { provide: GetGeoScopeService, useValue: geoScopeMock },
-            { provide: GetContractResultsSummaryService, useValue: contractResultsSummaryMock },
-            { provide: GetContractSpAlignmentService, useValue: contractSpAlignmentMock }
-          ]
+          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent, VizChartStubComponent]
         }
       })
       .compileComponents();
@@ -384,12 +592,7 @@ describe('ProjectDashboardComponent', () => {
     expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
     expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
     expect(apiMock.GET_Results).not.toHaveBeenCalled();
-    expect(contractResultsSummaryMock.main).toHaveBeenCalledWith('C-1');
-    expect(topContributorsMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topMainContactsMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topPartnersMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(topLeversMock.main).toHaveBeenCalledWith('C-1', 4);
-    expect(geoScopeMock.main).toHaveBeenCalledWith('C-1');
+    expect(contractDashboardMock.load).toHaveBeenCalledWith('C-1');
     expect(resultsCenterServiceMock.initializeProjectDashboardResultsTable).toHaveBeenCalledWith('C-1');
   });
 
@@ -475,13 +678,17 @@ describe('ProjectDashboardComponent', () => {
     expect(component.partnersEmpty()).toBe(true);
     expect(component.leversEmpty()).toBe(true);
 
-    topContributorsMock.loading.set(true);
-    topMainContactsMock.loadError.set(true);
-    topPartnersMock.list.set([{}]);
-    topLeversMock.list.set([{}]);
-
+    contractDashboardMock.loading.set(true);
     expect(component.contributorsEmpty()).toBe(false);
+
+    contractDashboardMock.loading.set(false);
+    contractDashboardMock.loadError.set(true);
     expect(component.mainContactPersonsEmpty()).toBe(false);
+
+    contractDashboardMock.loadError.set(false);
+    setPartners([{}]);
+    setLevers([{}]);
+
     expect(component.partnersEmpty()).toBe(false);
     expect(component.leversEmpty()).toBe(false);
   });
@@ -1053,27 +1260,25 @@ describe('ProjectDashboardComponent', () => {
         }
       });
 
-      // Simulate topPartners failure
-      topPartnersMock.loadError.set(true);
-      topPartnersMock.loading.set(false);
+      // Simulate getProjectDetailService failure
+      getProjectDetailServiceMock.loadError.set(true);
+      getProjectDetailServiceMock.loading.set(false);
 
-      // Simulate topPrimaryLevers success
-      topLeversMock.list.set([
+      // Contract dashboard service succeeded with data
+      setLevers([
         { lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 4 }
       ]);
-      topLeversMock.loading.set(false);
-      topLeversMock.loadError.set(false);
+      contractDashboardMock.loading.set(false);
+      contractDashboardMock.loadError.set(false);
 
       fixture.detectChanges();
 
-      // topPartners is in error
-      expect(topPartnersMock.loadError()).toBe(true);
+      // getProjectDetailService is in error
+      expect(getProjectDetailServiceMock.loadError()).toBe(true);
 
-      // Indicators card still displays data
+      // Indicators card displays error retry
       const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
-      expect(indicatorSection.textContent).toContain('Results by indicator');
-      expect(indicatorSection.textContent).toContain('5');
-      expect(indicatorSection.textContent).toContain('Publications');
+      expect(indicatorSection.textContent).toContain('We could not load results by indicator');
 
       // Status region still displays data
       const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
@@ -1630,8 +1835,8 @@ describe('ProjectDashboardComponent', () => {
       });
 
       // Simulate SP alignment service error
-      (component.contractSpAlignment as any).loadError.set(true);
-      (component.contractSpAlignment as any).loading.set(false);
+      contractDashboardMock.loadError.set(true);
+      contractDashboardMock.loading.set(false);
       fixture.detectChanges();
 
       // SP alignment graph displays its error state
