@@ -55,10 +55,10 @@ graph TD
   - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts` (+spec)
 - **Description:** Expose `getContractDashboard` in `AgressoContractService` and route `@Get('reports/dashboard')` in `AgressoContractController` with `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiQuery({ name: 'contract-id' })`, and response envelope formatting.
 - **Acceptance / done check:**
-  - [ ] Spec: controller endpoint validates `contract-id` query param and returns `ResponseUtils.format({ data, description, errors })`.
-  - [ ] Spec: missing `contract-id` returns validation error.
-  - [ ] `npm test -- agresso-contract.controller.spec.ts agresso-contract.service.spec.ts` passes.
-- **Dependencies:** T-01 · **Effort:** S · **Status:** todo
+  - [x] Spec: controller endpoint validates `contract-id` query param and returns `ResponseUtils.format({ data, description, errors })`.
+  - [x] Spec: missing `contract-id` returns validation error.
+  - [x] `npm test -- agresso-contract.controller.spec.ts agresso-contract.service.spec.ts` passes.
+- **Dependencies:** T-01 · **Effort:** S · **Status:** done
 
 ---
 

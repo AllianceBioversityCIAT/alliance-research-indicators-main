@@ -19,6 +19,7 @@ jest.mock('../../shared/utils/response.utils', () => ({
       description: params.description,
       status: params.status,
       data: params.data,
+      ...(params.errors !== undefined ? { errors: params.errors } : {}),
     })),
   },
 }));
@@ -43,6 +44,7 @@ describe('AgressoContractController', () => {
     getResultsSummaryReport: jest.fn(),
     getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
+    getContractDashboard: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -66,6 +68,142 @@ describe('AgressoContractController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('getContractDashboard', () => {
+    it('should return consolidated contract dashboard report with data and errors', async () => {
+      const mockData = {
+        summary: {
+          total: 10,
+          by_status: [],
+          by_year: [],
+          by_indicator_year: [],
+          partner_institutions: 5,
+        },
+        tops: {
+          partners: [],
+          primary_levers: [],
+          main_contacts: [],
+          contributors: [],
+        },
+        geo_scope: {
+          global: 1,
+          regional: 2,
+          countries: 3,
+          sub_national: 0,
+          yet_to_be_determined: 0,
+          top_regions: [],
+          top_countries: [],
+        },
+        sp_alignment: {
+          sps: [],
+          results_with_alignment: 1,
+          results_without_alignment: 0,
+        },
+      };
+      const mockResult = {
+        data: mockData,
+        errors: [],
+      };
+
+      mockAgressoContractService.getContractDashboard.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getContractDashboard('A100');
+
+      expect(
+        mockAgressoContractService.getContractDashboard,
+      ).toHaveBeenCalledWith('A100');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract dashboard report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+      expect(result).toEqual({
+        description: 'Contract dashboard report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+    });
+
+    it('should return partial failure errors when a section query fails', async () => {
+      const mockData = {
+        summary: null,
+        tops: null,
+        geo_scope: null,
+        sp_alignment: null,
+      };
+      const mockResult = {
+        data: mockData,
+        errors: ['geo_scope: query timeout'],
+      };
+
+      mockAgressoContractService.getContractDashboard.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getContractDashboard('A100');
+
+      expect(
+        mockAgressoContractService.getContractDashboard,
+      ).toHaveBeenCalledWith('A100');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract dashboard report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: ['geo_scope: query timeout'],
+      });
+      expect(result).toEqual({
+        description: 'Contract dashboard report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: ['geo_scope: query timeout'],
+      });
+    });
+
+    it('should throw BadRequestException when contract-id is empty or missing', async () => {
+      await expect(controller.getContractDashboard('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        controller.getContractDashboard(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockAgressoContractService.getContractDashboard,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should declare Swagger operation, query parameter, and response metadata', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getContractDashboard,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getContractDashboard,
+      );
+      const response = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        controller.getContractDashboard,
+      );
+
+      expect(operation).toMatchObject({
+        summary: 'Get consolidated contract dashboard analytics report',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'contract-id',
+            required: true,
+          }),
+        ]),
+      );
+      expect(response).toBeDefined();
+    });
   });
 
   describe('getTopPrimaryLeversReport', () => {

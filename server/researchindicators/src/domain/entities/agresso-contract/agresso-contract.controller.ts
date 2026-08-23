@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -19,6 +20,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiQuery,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiContractReportQueries } from './decorators/api-contract-report-queries.decorator';
@@ -36,6 +38,7 @@ import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
+import { ContractDashboardReportDto } from './dto/contract-dashboard-report.dto';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -129,6 +132,34 @@ export class AgressoContractController {
           data: response,
         }),
       );
+  }
+
+  @Get('reports/dashboard')
+  @ApiOperation({
+    summary: 'Get consolidated contract dashboard analytics report',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    description: 'Contract ID',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ContractDashboardReportDto,
+    description: 'Consolidated contract dashboard analytics report',
+  })
+  async getContractDashboard(@Query('contract-id') contractId: string) {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract-id query parameter is required');
+    }
+    const { data, errors } =
+      await this.agressoContractService.getContractDashboard(contractId);
+    return ResponseUtils.format({
+      data,
+      description: 'Contract dashboard report retrieved successfully',
+      status: HttpStatus.OK,
+      errors,
+    });
   }
 
   @Get('reports/top-primary-levers')

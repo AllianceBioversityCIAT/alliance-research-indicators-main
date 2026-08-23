@@ -51,3 +51,41 @@
 - **Notes:** All acceptance criteria for T-01 verified.
 
 ---
+
+## Task: T-02 — Backend Controller & Service Endpoint
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `nestjs-expert`, `api-design-principles`, `tdd`
+- **Effort Dial:** `medium`
+
+#### Implementer Report
+- **Files Changed:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.ts` (modified)
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.spec.ts` (modified)
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts` (modified)
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts` (modified)
+- **Summary:** Added `getContractDashboard(contractId)` method in `AgressoContractService` delegating to repository. Exposed `GET /reports/dashboard` endpoint in `AgressoContractController` decorated with Swagger metadata (`@ApiOperation`, `@ApiQuery`, `@ApiResponse`). Implemented parameter validation and response envelope formatting using `ResponseUtils.format`. Added unit tests for service and controller.
+- **Verification Command:** `npm test -- agresso-contract.controller.spec.ts agresso-contract.service.spec.ts`
+- **Verification Evidence:**
+  ```text
+  PASS src/domain/entities/agresso-contract/agresso-contract.service.spec.ts (11.946 s)
+  PASS src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts (12.543 s)
+  Test Suites: 2 passed, 2 total
+  Tests:       60 passed, 60 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Service and controller layers accurately implement `GET /reports/dashboard`. Standard Swagger annotations and parameter validation with `BadRequestException` are in place. Composite response maps data and errors cleanly to `ResponseUtils.format`. Tests pass and linter reports 0 errors.
+- **Issues Found:** none
+- **Advisory:** none
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-02)
+- **Notes:** All acceptance criteria for T-02 verified.
+
+---

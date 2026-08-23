@@ -176,6 +176,10 @@ export class AgressoContractService {
     return isBilateralFunding && !hasActivePooledFundingContract;
   }
 
+  async getContractDashboard(contractId: string) {
+    return this._agressoContractRepository.getContractDashboard(contractId);
+  }
+
   async getGeoScopeReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
   }

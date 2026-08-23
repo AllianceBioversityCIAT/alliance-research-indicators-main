@@ -48,6 +48,7 @@ describe('AgressoContractService', () => {
     getResultsSummaryReport: jest.fn(),
     getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
+    getContractDashboard: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -659,6 +660,42 @@ describe('AgressoContractService', () => {
 
       expect(repository.getFundingTypes).toHaveBeenCalled();
       expect(result).toEqual(expectedFundingTypes);
+    });
+  });
+
+  describe('getContractDashboard', () => {
+    it('should delegate consolidated contract dashboard retrieval to repository', async () => {
+      const mockResult = {
+        data: {
+          summary: null,
+          tops: {
+            partners: null,
+            primary_levers: null,
+            main_contacts: null,
+            contributors: null,
+          },
+          geo_scope: null,
+          sp_alignment: null,
+        },
+        errors: [],
+      };
+      mockRepository.getContractDashboard.mockResolvedValue(mockResult);
+
+      const result = await service.getContractDashboard('A100');
+
+      expect(repository.getContractDashboard).toHaveBeenCalledWith('A100');
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should propagate errors from repository', async () => {
+      mockRepository.getContractDashboard.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(service.getContractDashboard('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.getContractDashboard).toHaveBeenCalledWith('');
     });
   });
 });
