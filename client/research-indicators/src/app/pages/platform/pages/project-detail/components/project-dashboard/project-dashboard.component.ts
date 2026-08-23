@@ -654,6 +654,88 @@ export class ProjectDashboardComponent {
 
   readonly partnersEmpty = computed(() => !this.topPartners.loading() && !this.topPartners.loadError() && this.topPartners.list().length === 0);
 
+  readonly partnerTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.partnerItems();
+    if (items.length === 0) return null;
+    return {
+      caption: 'Top partner institutions',
+      headers: ['Partner institution', 'Results'],
+      rows: items.map(item => [item.label, item.count])
+    };
+  });
+
+  readonly partnerChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.partnerItems();
+    if (items.length === 0) return null;
+
+    return {
+      grid: {
+        top: 8,
+        bottom: 8,
+        left: 8,
+        right: 28,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: unknown) => {
+          const p = extractTooltipParam(params);
+          const idx = p.dataIndex ?? 0;
+          const item = items[idx];
+          const name = item?.label ?? p.name ?? '';
+          const count = item?.count ?? p.value ?? 0;
+          return `<strong>${escapeHtml(name)}</strong><br/>Results: ${count}`;
+        }
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        },
+        splitLine: {
+          lineStyle: { color: 'var(--ac-grey-200)' }
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: items.map(item => item.label),
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 120,
+          overflow: 'truncate'
+        }
+      },
+      series: [
+        {
+          type: 'bar',
+          name: 'Top partner institutions',
+          cursor: 'default',
+          data: items.map((item, index) => ({
+            value: item.count,
+            itemStyle: {
+              color: projectDashboardBarColor(index, items.length),
+              borderRadius: [0, 4, 4, 0]
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          }
+        }
+      ]
+    };
+  });
+
   readonly leverItems = computed(() =>
     this.topPrimaryLevers
       .list()
@@ -661,7 +743,11 @@ export class ProjectDashboardComponent {
         id: String(item.lever_id),
         label: formatLeverDisplayLabel(item.short_name, item.full_name),
         count: item.count,
-        iconUrl: item.icon || undefined
+        iconUrl: item.icon
+          ? (item.icon.startsWith('http')
+              ? item.icon
+              : `${environment.s3Folder}${item.icon.startsWith('/') ? item.icon.slice(1) : item.icon}`)
+          : undefined
       }))
       .sort((first, second) => second.count - first.count)
   );
@@ -669,6 +755,259 @@ export class ProjectDashboardComponent {
   readonly leversEmpty = computed(
     () => !this.topPrimaryLevers.loading() && !this.topPrimaryLevers.loadError() && this.topPrimaryLevers.list().length === 0
   );
+
+  readonly leverTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.leverItems();
+    if (items.length === 0) return null;
+    return {
+      caption: 'Top primary levers',
+      headers: ['Primary lever', 'Results'],
+      rows: items.map(item => [item.label, item.count])
+    };
+  });
+
+  readonly leverChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.leverItems();
+    if (items.length === 0) return null;
+
+    return {
+      grid: {
+        top: 8,
+        bottom: 8,
+        left: 8,
+        right: 28,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: unknown) => {
+          const p = extractTooltipParam(params);
+          const idx = p.dataIndex ?? 0;
+          const item = items[idx];
+          const name = item?.label ?? p.name ?? '';
+          const count = item?.count ?? p.value ?? 0;
+          const iconHtml = item?.iconUrl
+            ? `<img src="${item.iconUrl}" alt="" style="width: 18px; height: 18px; border-radius: 50%; vertical-align: middle; margin-right: 6px;" />`
+            : '';
+          return `<div style="display: flex; align-items: center; gap: 6px;">${iconHtml}<strong>${escapeHtml(name)}</strong></div><div>Results: ${count}</div>`;
+        }
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        },
+        splitLine: {
+          lineStyle: { color: 'var(--ac-grey-200)' }
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: items.map(item => item.label),
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 120,
+          overflow: 'truncate'
+        }
+      },
+      series: [
+        {
+          type: 'bar',
+          name: 'Top primary levers',
+          cursor: 'pointer',
+          data: items.map((item, index) => ({
+            value: item.count,
+            leverId: item.id,
+            itemStyle: {
+              color: projectDashboardBarColor(index, items.length),
+              borderRadius: [0, 4, 4, 0]
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          }
+        }
+      ]
+    };
+  });
+
+  readonly mainContactTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.mainContactPersonItems();
+    if (items.length === 0) return null;
+    return {
+      caption: 'Top main contact persons',
+      headers: ['Main contact person', 'Email', 'Results'],
+      rows: items.map(item => [item.label, item.description ?? '—', item.count])
+    };
+  });
+
+  readonly mainContactChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.mainContactPersonItems();
+    if (items.length === 0) return null;
+
+    return {
+      grid: {
+        top: 8,
+        bottom: 8,
+        left: 8,
+        right: 28,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: unknown) => {
+          const p = extractTooltipParam(params);
+          const idx = p.dataIndex ?? 0;
+          const item = items[idx];
+          const name = item?.label ?? p.name ?? '';
+          const count = item?.count ?? p.value ?? 0;
+          const email = item?.description;
+          const emailHtml = email ? `<br/><span style="color: var(--ac-grey-600); font-size: 12px;">${escapeHtml(email)}</span>` : '';
+          return `<strong>${escapeHtml(name)}</strong>${emailHtml}<br/>Results: ${count}`;
+        }
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        },
+        splitLine: {
+          lineStyle: { color: 'var(--ac-grey-200)' }
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: items.map(item => item.label),
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 120,
+          overflow: 'truncate'
+        }
+      },
+      series: [
+        {
+          type: 'bar',
+          name: 'Top main contact persons',
+          cursor: 'default',
+          data: items.map((item, index) => ({
+            value: item.count,
+            itemStyle: {
+              color: projectDashboardBarColor(index, items.length),
+              borderRadius: [0, 4, 4, 0]
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          }
+        }
+      ]
+    };
+  });
+
+  readonly contributorTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.contributorItems();
+    if (items.length === 0) return null;
+    return {
+      caption: 'Top contributing projects',
+      headers: ['Contributing project', 'Results'],
+      rows: items.map(item => [item.label, item.count])
+    };
+  });
+
+  readonly contributorChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.contributorItems();
+    if (items.length === 0) return null;
+
+    return {
+      grid: {
+        top: 8,
+        bottom: 8,
+        left: 8,
+        right: 28,
+        containLabel: true
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: unknown) => {
+          const p = extractTooltipParam(params);
+          const idx = p.dataIndex ?? 0;
+          const item = items[idx];
+          const name = item?.label ?? p.name ?? '';
+          const count = item?.count ?? p.value ?? 0;
+          return `<strong>${escapeHtml(name)}</strong><br/>Results: ${count}`;
+        }
+      },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow'
+        },
+        splitLine: {
+          lineStyle: { color: 'var(--ac-grey-200)' }
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: items.map(item => item.label),
+        inverse: true,
+        axisTick: { show: false },
+        axisLine: {
+          lineStyle: { color: 'var(--ac-grey-300)' }
+        },
+        axisLabel: {
+          color: 'var(--ac-grey-700)',
+          fontFamily: 'Barlow',
+          width: 120,
+          overflow: 'truncate'
+        }
+      },
+      series: [
+        {
+          type: 'bar',
+          name: 'Top contributing projects',
+          cursor: 'pointer',
+          data: items.map((item, index) => ({
+            value: item.count,
+            contractCode: item.id,
+            itemStyle: {
+              color: projectDashboardBarColor(index, items.length),
+              borderRadius: [0, 4, 4, 0]
+            }
+          })),
+          label: {
+            show: true,
+            position: 'right',
+            color: 'var(--ac-grey-800)',
+            fontFamily: 'Barlow'
+          }
+        }
+      ]
+    };
+  });
 
   readonly geoScopeEmpty = computed(() => {
     if (this.geoScope.loading() || this.geoScope.loadError()) {
@@ -826,6 +1165,42 @@ export class ProjectDashboardComponent {
         queryParams: { indicatorTab: indicator.id }
       });
     }
+  }
+
+  onLeverChartClick(event: ECElementEvent): void {
+    const data = event.data as { leverId?: string } | undefined;
+    const index = typeof event.dataIndex === 'number' ? event.dataIndex : undefined;
+    const item = index !== undefined ? this.leverItems()[index] : undefined;
+    const leverId = data?.leverId ?? item?.id;
+    const contractId = this.contractId();
+    if (contractId && leverId !== undefined && leverId !== null && leverId !== '') {
+      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+        queryParams: { leverTab: leverId }
+      });
+    }
+  }
+
+  onContributorChartClick(event: ECElementEvent): void {
+    const data = event.data as { contractCode?: string } | undefined;
+    const index = typeof event.dataIndex === 'number' ? event.dataIndex : undefined;
+    const item = index !== undefined ? this.contributorItems()[index] : undefined;
+    const contractCode = data?.contractCode ?? item?.id;
+    const contractId = this.contractId();
+    if (contractId && contractCode !== undefined && contractCode !== null && contractCode !== '') {
+      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+        queryParams: { contractTab: contractCode }
+      });
+    }
+  }
+
+  onPartnerChartClick(event?: ECElementEvent): void {
+    void event;
+    // Partner bars do not navigate in F1 (R-HL-005 accepted gap)
+  }
+
+  onMainContactChartClick(event?: ECElementEvent): void {
+    void event;
+    // Contact bars do not navigate in F1 (R-HL-005 accepted gap)
   }
 
   private async syncProjectFromSharedService(contractId: string): Promise<void> {
@@ -1262,5 +1637,22 @@ function formatCodeLabel(code: string | undefined, label: string | undefined): s
   }
   return cleanLabel || cleanCode || '—';
 }
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function extractTooltipParam(params: unknown): { dataIndex?: number; name?: string; value?: number } {
+  if (Array.isArray(params)) {
+    return (params[0] ?? {}) as { dataIndex?: number; name?: string; value?: number };
+  }
+  return (params ?? {}) as { dataIndex?: number; name?: string; value?: number };
+}
+
 
 

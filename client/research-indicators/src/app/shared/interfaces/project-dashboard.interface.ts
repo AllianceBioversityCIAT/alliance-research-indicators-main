@@ -1,6 +1,6 @@
 import type { GeoScopeCountry } from '@interfaces/geo-scope.interface';
 
-export type ProjectDashboardChartLayout = 'columns' | 'rows' | 'rows-partners' | 'rows-stacked' | 'rows-stacked-lever';
+export type ProjectDashboardChartLayout = 'columns' | 'rows' | 'rows-partners' | 'rows-stacked' | 'rows-stacked-lever' | 'viz-bar';
 
 export interface ProjectDashboardRankedListItem {
   id: string;

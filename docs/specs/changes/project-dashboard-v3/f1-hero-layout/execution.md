@@ -309,3 +309,44 @@
 - **Notes:** All R-HL-004 requirements and acceptance checks verified.
 
 ---
+
+## Task: T-06 — Ranking cards on viz-chart with lever/contract drill-through
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer Model:** Gemini Pro (T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `high`
+
+#### Implementer Report
+- **Files Changed:**
+  - `client/research-indicators/src/app/shared/interfaces/project-dashboard.interface.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard-card/project-dashboard-card.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard-card/project-dashboard-card.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard-card/project-dashboard-card.component.spec.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.ts` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` (modified)
+  - `client/research-indicators/src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts` (modified)
+- **Summary:** Added `viz-bar` layout to `project-dashboard-card` delegating to `VizChartComponent`. Switched 4 ranking cards (partners, levers, contacts, contributors) to `viz-bar` horizontal charts with rank colors, category `yAxis`, value `xAxis`, and rich HTML tooltips (lever icons, contact emails). Implemented drill-through for lever (`leverTab`) and contributing contract (`contractTab`), while maintaining no navigation for partner and contact bars. Supplied accessible `tableModel` to all cards (R-HL-009).
+- **Verification Command:** `npx jest src/app/pages/platform/pages/project-detail/components/project-dashboard-card/project-dashboard-card.component.spec.ts src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts --coverage=false`
+- **Verification Evidence:**
+  ```text
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard-card/project-dashboard-card.component.spec.ts
+  PASS src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.spec.ts
+  Test Suites: 2 passed, 2 total
+  Tests: 133 passed, 133 total
+  ```
+- **Not Done / Assumptions:** none
+
+#### Reviewer Verdict
+- **Status:** PASS
+- **Summary:** Ranking cards successfully migrated to `viz-bar` layout via `<app-viz-chart>`. Lever click navigates with `leverTab`, contributor click with `contractTab`. Partner and contact bars emit no navigation (R-HL-005). `tableModel` provided to every viz-chart instance for a11y (R-HL-009).
+- **Issues Found:** none
+- **Advisory:** Clean up redundant `[empty]` bindings in templates where `@if` already gates visibility.
+
+#### Leader Adjudication
+- **Decision:** ACCEPTED (→ finalize T-06)
+- **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
+
+---

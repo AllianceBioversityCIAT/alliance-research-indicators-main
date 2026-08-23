@@ -1,11 +1,30 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ProjectDashboardCardComponent } from './project-dashboard-card.component';
 
+const mockChartInstance = {
+  setOption: jest.fn(),
+  resize: jest.fn(),
+  dispose: jest.fn(),
+  isDisposed: jest.fn().mockReturnValue(false),
+  clear: jest.fn(),
+  on: jest.fn()
+};
+
+jest.mock('echarts/core', () => ({
+  use: jest.fn(),
+  init: jest.fn(() => mockChartInstance),
+  registerMap: jest.fn(),
+  getMap: jest.fn()
+}));
+
 describe('ProjectDashboardCardComponent', () => {
   let component: ProjectDashboardCardComponent;
   let fixture: ComponentFixture<ProjectDashboardCardComponent>;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    mockChartInstance.isDisposed.mockReturnValue(false);
+
     await TestBed.configureTestingModule({
       imports: [ProjectDashboardCardComponent]
     }).compileComponents();
@@ -135,5 +154,35 @@ describe('ProjectDashboardCardComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('No partner institutions were found for this project.');
     expect(fixture.nativeElement.textContent).not.toContain('We could not load');
     expect(fixture.nativeElement.querySelector('.pi-building')).toBeTruthy();
+  });
+
+  it('should render app-viz-chart when layout is viz-bar and forward inputs/outputs', () => {
+    const mockOptions: any = {
+      xAxis: { type: 'value' },
+      yAxis: { type: 'category', data: ['Partner A'] },
+      series: [{ type: 'bar', data: [10] }]
+    };
+    const mockTableModel = {
+      caption: 'Top partner institutions',
+      headers: ['Partner institution', 'Results'],
+      rows: [['Partner A', 10]]
+    };
+
+    fixture.componentRef.setInput('title', 'Top partner institutions');
+    fixture.componentRef.setInput('layout', 'viz-bar');
+    fixture.componentRef.setInput('options', mockOptions);
+    fixture.componentRef.setInput('tableModel', mockTableModel);
+    fixture.componentRef.setInput('chartHeight', '220px');
+    fixture.detectChanges();
+
+    const vizChartEl = fixture.nativeElement.querySelector('app-viz-chart');
+    expect(vizChartEl).toBeTruthy();
+
+    const chartClickSpy = jest.fn();
+    component.chartClick.subscribe(chartClickSpy);
+
+    const mockEvent = { componentType: 'series', dataIndex: 0, data: { value: 10 } } as any;
+    component.chartClick.emit(mockEvent);
+    expect(chartClickSpy).toHaveBeenCalledWith(mockEvent);
   });
 });

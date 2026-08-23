@@ -107,12 +107,12 @@ graph TD
 - **Files touched (intended):** `project-dashboard-card.component.{html,ts}` (+spec), `project-dashboard.component.{html,ts}` (+spec).
 - **Description:** New `viz-bar` layout path in `project-dashboard-card` delegating to `app-viz-chart` (horizontal bars, tableModel, chartClick output); partners/levers/contacts/contributors switch to it; lever click → `leverTab`, contributor click → `contractTab` (via T-01); partner/contact bars have no click handler; HTML tooltips carry full label + count + contact e-mail / lever icon.
 - **Acceptance / done check:**
-  - [ ] Spec: lever chartClick event navigates with `leverTab` = clicked lever id (transition-arranged); contributor → `contractTab`.
-  - [ ] Spec: partner and contact configurations emit no navigation on chartClick (**named failing input:** wire the shared handler to all four cards indiscriminately → this spec must fail).
-  - [ ] Spec: every viz-bar instance receives a non-empty `tableModel` (R-HL-009 non-visual path).
-  - [ ] Old bespoke bar markup for the four cards removed; `npx eslint <files>` green.
-  - [ ] Presence caveat: tooltip content asserted as options/formatter output, not rendered pixels — hover rendering is T-09 HITL.
-- **Dependencies:** T-01 · **Effort:** L · **Status:** todo
+  - [x] Spec: lever chartClick event navigates with `leverTab` = clicked lever id (transition-arranged); contributor → `contractTab`.
+  - [x] Spec: partner and contact configurations emit no navigation on chartClick (**named failing input:** wire the shared handler to all four cards indiscriminately → this spec must fail).
+  - [x] Spec: every viz-bar instance receives a non-empty `tableModel` (R-HL-009 non-visual path).
+  - [x] Old bespoke bar markup for the four cards removed; `npx eslint <files>` green.
+  - [x] Presence caveat: tooltip content asserted as options/formatter output, not rendered pixels — hover rendering is T-09 HITL.
+- **Dependencies:** T-01 · **Effort:** L · **Status:** done
 
 ### T-07 — Trend and status interactivity
 

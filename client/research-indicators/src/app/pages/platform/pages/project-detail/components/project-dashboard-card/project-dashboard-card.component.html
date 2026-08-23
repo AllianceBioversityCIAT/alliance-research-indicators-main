@@ -34,7 +34,7 @@
       <i [class]="iconClass() + ' text-[28px] text-[var(--ac-light-blue-300)]'" aria-hidden="true"></i>
       <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">{{ emptyMessage() }}</p>
     </div>
-    } @else if (items().length) {
+    } @else if (items().length || layout() === 'viz-bar') {
     <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-visible">
       <ng-container *ngTemplateOutlet="rankedList"></ng-container>
     </div>
@@ -48,7 +48,15 @@
 }
 
 <ng-template #rankedList>
-  @if (layout() === 'columns') {
+  @if (layout() === 'viz-bar') {
+  <app-viz-chart
+    [options]="options()"
+    [tableModel]="tableModel()"
+    [chartTitle]="chartTitle() || title()"
+    [height]="chartHeight()"
+    (chartClick)="chartClick.emit($event)">
+  </app-viz-chart>
+  } @else if (layout() === 'columns') {
   <ul
     class="m-0 grid w-full max-w-full list-none box-border items-end gap-1.5 overflow-hidden rounded-[10px] bg-[var(--ac-grey-100)] px-2 pb-2.5 pt-3 p-0"
     [style.min-height.px]="largeColumns() ? 200 : 140" [class.justify-center]="items().length <= 3"

@@ -1,4 +1,4 @@
-import { Component, Input, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -77,10 +77,17 @@ class ProjectDashboardCardStubComponent {
   @Input() error = false;
   @Input() empty = false;
   @Input() emptyMessage = '';
+  @Input() errorMessage = '';
   @Input() items: unknown[] = [];
   @Input() layout = '';
   @Input() itemHeightPx: number | null = null;
   @Input() iconClass = '';
+  @Input() options: unknown = null;
+  @Input() tableModel: unknown = null;
+  @Input() chartTitle = '';
+  @Input() chartHeight = '';
+  @Output() chartClick = new EventEmitter<unknown>();
+  @Output() retry = new EventEmitter<void>();
 }
 
 @Component({
@@ -3050,6 +3057,215 @@ describe('ProjectDashboardComponent', () => {
 
         const noDataGroup = fixture.nativeElement.querySelector('app-no-data-group section');
         expect(noDataGroup).toBeNull();
+      });
+    });
+
+    describe('Ranking cards on viz-bar with drill-through (T-06 / R-HL-005 / R-HL-009)', () => {
+      it('navigates to project-results with leverTab on lever chartClick (transition-arranged)', async () => {
+        await setup('C-TEST');
+
+        topLeversMock.list.set([
+          { lever_id: 12, short_name: 'LEV1', full_name: 'Lever 1', count: 7, icon: 'icons/lever1.svg' },
+          { lever_id: 34, short_name: 'LEV2', full_name: 'Lever 2', count: 3 }
+        ]);
+        fixture.detectChanges();
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        // KZ-015: initial state — no navigation has occurred
+        expect(navSpy).not.toHaveBeenCalled();
+
+        // Act: click on the first lever bar (index 0)
+        component.onLeverChartClick({
+          componentType: 'series',
+          dataIndex: 0,
+          data: { value: 7, leverId: '12' }
+        } as any);
+
+        // Assert: navigated with leverTab = '12'
+        expect(navSpy).toHaveBeenCalledTimes(1);
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+          queryParams: { leverTab: '12' }
+        });
+      });
+
+      it('navigates to project-results with contractTab on contributor chartClick (transition-arranged)', async () => {
+        await setup('C-TEST');
+
+        topContributorsMock.list.set([
+          { contract_code: 'CONT-99', contract_description: 'Contributing Proj', results_count: 5 },
+          { contract_id: 'CONT-88', project_name: 'Second Contributor', count: 2 }
+        ]);
+        fixture.detectChanges();
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        // KZ-015: initial state
+        expect(navSpy).not.toHaveBeenCalled();
+
+        // Act: click on the first contributor bar
+        component.onContributorChartClick({
+          componentType: 'series',
+          dataIndex: 0,
+          data: { value: 5, contractCode: 'CONT-99' }
+        } as any);
+
+        // Assert: navigated with contractTab = 'CONT-99'
+        expect(navSpy).toHaveBeenCalledTimes(1);
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+          queryParams: { contractTab: 'CONT-99' }
+        });
+      });
+
+      it('does NOT navigate on partner or contact chartClick (named failing input check)', async () => {
+        await setup('C-TEST');
+
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'Partner Org', count: 4 }]);
+        topMainContactsMock.list.set([{ contact_person_name: 'Jane Contact', email: 'jane@example.com', count: 3 }]);
+        fixture.detectChanges();
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        // Act on partner
+        component.onPartnerChartClick({ componentType: 'series', dataIndex: 0 } as any);
+        expect(navSpy).not.toHaveBeenCalled();
+
+        // Act on contact
+        component.onMainContactChartClick({ componentType: 'series', dataIndex: 0 } as any);
+        expect(navSpy).not.toHaveBeenCalled();
+      });
+
+      it('provides a non-empty tableModel on every viz-bar ranking card with data (R-HL-009 non-visual path)', async () => {
+        await setup('C-TEST');
+
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 5 }]);
+        topLeversMock.list.set([{ lever_id: 10, short_name: 'L1', full_name: 'Lever One', count: 4 }]);
+        topMainContactsMock.list.set([{ contact_person_name: 'John Doe', email: 'john@example.com', count: 3 }]);
+        topContributorsMock.list.set([{ contract_code: 'P-1', contract_description: 'Proj One', results_count: 2 }]);
+        fixture.detectChanges();
+
+        // Partner table model
+        const partnerTable = component.partnerTableModel();
+        expect(partnerTable).not.toBeNull();
+        expect(partnerTable?.caption).toBe('Top partner institutions');
+        expect(partnerTable?.headers).toEqual(['Partner institution', 'Results']);
+        expect(partnerTable?.rows).toEqual([['CIAT', 5]]);
+
+        // Lever table model
+        const leverTable = component.leverTableModel();
+        expect(leverTable).not.toBeNull();
+        expect(leverTable?.caption).toBe('Top primary levers');
+        expect(leverTable?.headers).toEqual(['Primary lever', 'Results']);
+        expect(leverTable?.rows).toEqual([['LEVER ONE', 4]]);
+
+        // Contact table model
+        const contactTable = component.mainContactTableModel();
+        expect(contactTable).not.toBeNull();
+        expect(contactTable?.caption).toBe('Top main contact persons');
+        expect(contactTable?.headers).toEqual(['Main contact person', 'Email', 'Results']);
+        expect(contactTable?.rows).toEqual([['John Doe', 'john@example.com', 3]]);
+
+        // Contributor table model
+        const contributorTable = component.contributorTableModel();
+        expect(contributorTable).not.toBeNull();
+        expect(contributorTable?.caption).toBe('Top contributing projects');
+        expect(contributorTable?.headers).toEqual(['Contributing project', 'Results']);
+        expect(contributorTable?.rows).toEqual([['P-1 - Proj One', 2]]);
+      });
+
+      it('returns null tableModel and options when datasets are empty', async () => {
+        await setup('C-TEST');
+
+        topPartnersMock.list.set([]);
+        topLeversMock.list.set([]);
+        topMainContactsMock.list.set([]);
+        topContributorsMock.list.set([]);
+        fixture.detectChanges();
+
+        expect(component.partnerTableModel()).toBeNull();
+        expect(component.partnerChartOptions()).toBeNull();
+        expect(component.leverTableModel()).toBeNull();
+        expect(component.leverChartOptions()).toBeNull();
+        expect(component.mainContactTableModel()).toBeNull();
+        expect(component.mainContactChartOptions()).toBeNull();
+        expect(component.contributorTableModel()).toBeNull();
+        expect(component.contributorChartOptions()).toBeNull();
+      });
+
+      it('produces rich HTML tooltips with lever icon, contact email, and correct labels', async () => {
+        await setup('C-TEST');
+
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'Bioversity', count: 8 }]);
+        topLeversMock.list.set([
+          { lever_id: 7, short_name: 'L7', full_name: 'Crops: Biodiversity', count: 6, icon: 'levers/crops.svg' }
+        ]);
+        topMainContactsMock.list.set([
+          { first_name: 'Alice', last_name: 'Smith', email: 'alice@cgiar.org', count: 4 }
+        ]);
+        topContributorsMock.list.set([
+          { contract_code: 'CTR-01', contract_description: 'Agroecology Project', results_count: 3 }
+        ]);
+        fixture.detectChanges();
+
+        // Partner tooltip formatter
+        const partnerOptions = component.partnerChartOptions();
+        const partnerFormatter = (partnerOptions?.tooltip as any)?.formatter;
+        expect(typeof partnerFormatter).toBe('function');
+        const partnerHtml = partnerFormatter({ dataIndex: 0 });
+        expect(partnerHtml).toContain('Bioversity');
+        expect(partnerHtml).toContain('Results: 8');
+
+        // Lever tooltip formatter (includes iconUrl in img tag)
+        const leverOptions = component.leverChartOptions();
+        const leverFormatter = (leverOptions?.tooltip as any)?.formatter;
+        expect(typeof leverFormatter).toBe('function');
+        const leverHtml = leverFormatter({ dataIndex: 0 });
+        expect(leverHtml).toContain('CROPS - BIODIVERSITY');
+        expect(leverHtml).toContain('Results: 6');
+        expect(leverHtml).toContain('<img src=');
+        expect(leverHtml).toContain('levers/crops.svg');
+
+        // Contact tooltip formatter (includes email)
+        const contactOptions = component.mainContactChartOptions();
+        const contactFormatter = (contactOptions?.tooltip as any)?.formatter;
+        expect(typeof contactFormatter).toBe('function');
+        const contactHtml = contactFormatter({ dataIndex: 0 });
+        expect(contactHtml).toContain('Alice Smith');
+        expect(contactHtml).toContain('alice@cgiar.org');
+        expect(contactHtml).toContain('Results: 4');
+
+        // Contributor tooltip formatter
+        const contributorOptions = component.contributorChartOptions();
+        const contributorFormatter = (contributorOptions?.tooltip as any)?.formatter;
+        expect(typeof contributorFormatter).toBe('function');
+        const contributorHtml = contributorFormatter({ dataIndex: 0 });
+        expect(contributorHtml).toContain('CTR-01 - Agroecology Project');
+        expect(contributorHtml).toContain('Results: 3');
+      });
+
+      it('configures proper series cursor (pointer for drillable, default for non-drillable)', async () => {
+        await setup('C-TEST');
+
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 2 }]);
+        topLeversMock.list.set([{ lever_id: 1, short_name: 'L1', full_name: 'Lever 1', count: 2 }]);
+        topMainContactsMock.list.set([{ contact_person_name: 'Jane', count: 2 }]);
+        topContributorsMock.list.set([{ contract_code: 'P-1', contract_description: 'P1', results_count: 2 }]);
+        fixture.detectChanges();
+
+        const partnerSeries = (component.partnerChartOptions()?.series as any[])[0];
+        expect(partnerSeries.cursor).toBe('default');
+
+        const contactSeries = (component.mainContactChartOptions()?.series as any[])[0];
+        expect(contactSeries.cursor).toBe('default');
+
+        const leverSeries = (component.leverChartOptions()?.series as any[])[0];
+        expect(leverSeries.cursor).toBe('pointer');
+
+        const contributorSeries = (component.contributorChartOptions()?.series as any[])[0];
+        expect(contributorSeries.cursor).toBe('pointer');
       });
     });
   });

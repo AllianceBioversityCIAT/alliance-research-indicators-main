@@ -9,11 +9,13 @@ import {
   ProjectDashboardChartLayout,
   ProjectDashboardRankedListItem
 } from '@interfaces/project-dashboard.interface';
+import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+import type { ECElementEvent } from 'echarts/core';
 
 @Component({
   selector: 'app-project-dashboard-card',
   standalone: true,
-  imports: [NgTemplateOutlet, ButtonModule, SkeletonModule, TooltipModule, TruncatedTextTooltipDirective],
+  imports: [NgTemplateOutlet, ButtonModule, SkeletonModule, TooltipModule, TruncatedTextTooltipDirective, VizChartComponent],
   templateUrl: './project-dashboard-card.component.html',
   host: {
     class: 'block h-full',
@@ -43,7 +45,12 @@ export class ProjectDashboardCardComponent {
   readonly errorMessage = input('We could not load this data. Please try again.');
   readonly emptyMessage = input('No data available for this project yet.');
   readonly iconClass = input('pi pi-chart-bar');
+  readonly options = input<EChartsOption | null>(null);
+  readonly tableModel = input<VizChartTableModel | null>(null);
+  readonly chartTitle = input<string>('');
+  readonly chartHeight = input<string>('200px');
   readonly retry = output<void>();
+  readonly chartClick = output<ECElementEvent>();
 
   readonly maxCount = computed(() => {
     const items = this.items();
