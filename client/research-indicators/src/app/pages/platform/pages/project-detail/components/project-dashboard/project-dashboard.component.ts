@@ -7,12 +7,7 @@ import { PopoverModule } from 'primeng/popover';
 import { SkeletonModule } from 'primeng/skeleton';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
-import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
-import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-persons.service';
-import { GetTopPartnersService } from '@services/get-top-partners.service';
-import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
-import { GetGeoScopeService } from '@services/get-geo-scope.service';
-import { GetContractResultsSummaryService } from '@services/get-contract-results-summary.service';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { environment } from '@envs/environment';
 import { GetProjectDetail, GetProjectDetailIndicator } from '@shared/interfaces/get-project-detail.interface';
@@ -25,7 +20,6 @@ import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
 import { NoDataGroupComponent, NoDataGroupItem } from '../no-data-group/no-data-group.component';
-import { GetContractSpAlignmentService } from '@services/get-contract-sp-alignment.service';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
@@ -83,15 +77,6 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     NoDataGroupComponent,
     VizChartComponent
   ],
-  providers: [
-    GetTopContributorsContractsService,
-    GetTopMainContactPersonsService,
-    GetTopPartnersService,
-    GetTopPrimaryLeversService,
-    GetGeoScopeService,
-    GetContractResultsSummaryService,
-    GetContractSpAlignmentService
-  ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [
@@ -110,8 +95,7 @@ export class ProjectDashboardComponent {
   private readonly resultsCenterService = inject(ResultsCenterService);
   private readonly darkModeService = inject(DarkModeService);
   readonly getProjectDetailService = inject(GetProjectDetailService);
-  readonly contractResultsSummary = inject(GetContractResultsSummaryService);
-  readonly contractSpAlignment = inject(GetContractSpAlignmentService);
+  readonly contractDashboard = inject(GetContractDashboardService);
 
   readonly tokens = chartTokens(this.darkModeService.darkMode());
 
@@ -289,7 +273,7 @@ export class ProjectDashboardComponent {
 
   // Heatmap matrix computations (R-DA-004)
   readonly heatmapYears = computed<(number | null)[]>(() => {
-    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+    const byIndYear = this.contractDashboard.summary()?.by_indicator_year ?? [];
     const rawYears = Array.from(new Set(byIndYear.map(item => item.year)));
     const numericYears = rawYears
       .filter((y): y is number => y !== null && y !== undefined && !isNaN(Number(y)))
@@ -301,7 +285,7 @@ export class ProjectDashboardComponent {
   readonly heatmapMatrixData = computed(() => {
     const indicators = this.indicatorsWithResults();
     const years = this.heatmapYears();
-    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+    const byIndYear = this.contractDashboard.summary()?.by_indicator_year ?? [];
 
     const map = new Map<string, number>();
     for (const item of byIndYear) {
@@ -334,7 +318,7 @@ export class ProjectDashboardComponent {
 
   readonly indicatorHeatmapTableModel = computed<VizChartTableModel>(() => {
     const { indicators, years } = this.heatmapMatrixData();
-    const byIndYear = this.contractResultsSummary.list()?.by_indicator_year ?? [];
+    const byIndYear = this.contractDashboard.summary()?.by_indicator_year ?? [];
     const map = new Map<string, number>();
     for (const item of byIndYear) {
       const key = `${item.indicator_id}_${item.year ?? 'null'}`;
@@ -541,32 +525,26 @@ export class ProjectDashboardComponent {
   readonly indicatorsCoveredCount = computed(() => this.indicatorsWithResults().length);
   readonly indicatorsTotalCount = computed(() => this.indicatorSummaries().length);
   readonly pendingRevisionCount = computed(() => {
-    const byStatus = this.contractResultsSummary.list()?.by_status ?? [];
+    const byStatus = this.contractDashboard.summary()?.by_status ?? [];
     const pending = byStatus.find(s => Number(s.status_id) === 5 || s.name?.toLowerCase().includes('pending'));
     return pending?.count ?? 0;
   });
-  readonly partnerInstitutionsCount = computed(() => this.contractResultsSummary.list()?.partner_institutions ?? 0);
+  readonly partnerInstitutionsCount = computed(() => this.contractDashboard.summary()?.partner_institutions ?? 0);
 
   // Status region (R-PD-003): fed exclusively by the aggregate (R-PD-001 via
-  // GetContractResultsSummaryService — T-05). The bulk `GET results` fetch,
+  // GetContractDashboardService — T-04). The bulk `GET results` fetch,
   // `buildStatusChartItems`, and the hardcoded fallback are removed (D-PD-2/D-PD-3).
-  readonly statusBuckets = computed<ContractResultsSummaryStatusBucket[]>(() => this.contractResultsSummary.list()?.by_status ?? []);
-  readonly statusTotal = computed(() => this.contractResultsSummary.list()?.total ?? 0);
-  readonly statusChartLoading = computed(() => this.contractResultsSummary.loading());
-  readonly statusChartError = computed(() => this.contractResultsSummary.loadError());
+  readonly statusBuckets = computed<ContractResultsSummaryStatusBucket[]>(() => this.contractDashboard.summary()?.by_status ?? []);
+  readonly statusTotal = computed(() => this.contractDashboard.summary()?.total ?? 0);
+  readonly statusChartLoading = computed(() => this.contractDashboard.loading());
+  readonly statusChartError = computed(() => this.contractDashboard.loadError());
   readonly statusChartEmpty = computed(
-    () => !this.contractResultsSummary.loading() && !this.contractResultsSummary.loadError() && this.statusBuckets().length === 0
+    () => !this.contractDashboard.loading() && !this.contractDashboard.loadError() && this.statusBuckets().length === 0
   );
 
-  readonly topContributors = inject(GetTopContributorsContractsService);
-  readonly topMainContactPersons = inject(GetTopMainContactPersonsService);
-  readonly topPartners = inject(GetTopPartnersService);
-  readonly topPrimaryLevers = inject(GetTopPrimaryLeversService);
-  readonly geoScope = inject(GetGeoScopeService);
-
   readonly contributorItems = computed(() =>
-    this.topContributors
-      .list()
+    this.contractDashboard
+      .topContributors()
       .map((item, index) => ({
         id: item.contract_code ?? item.contract_id ?? String(index),
         label: formatContributorLabel(item),
@@ -576,12 +554,12 @@ export class ProjectDashboardComponent {
   );
 
   readonly contributorsEmpty = computed(
-    () => !this.topContributors.loading() && !this.topContributors.loadError() && this.topContributors.list().length === 0
+    () => !this.contractDashboard.loading() && !this.contractDashboard.loadError() && this.contractDashboard.topContributors().length === 0
   );
 
   readonly mainContactPersonItems = computed(() =>
-    this.topMainContactPersons
-      .list()
+    this.contractDashboard
+      .topMainContactPersons()
       .map((item, index) => ({
         id: formatMainContactPersonName(item) ?? String(index),
         label: formatMainContactPersonName(item) ?? '—',
@@ -593,20 +571,20 @@ export class ProjectDashboardComponent {
 
   readonly mainContactPersonsEmpty = computed(
     () =>
-      !this.topMainContactPersons.loading() &&
-      !this.topMainContactPersons.loadError() &&
-      this.topMainContactPersons.list().length === 0
+      !this.contractDashboard.loading() &&
+      !this.contractDashboard.loadError() &&
+      this.contractDashboard.topMainContactPersons().length === 0
   );
 
   readonly partnerItems = computed(() =>
-    this.topPartners.list().map((item, index) => ({
+    this.contractDashboard.topPartners().map((item, index) => ({
       id: getPartnerItemId(item, index),
       label: formatPartnerLabel(item),
       count: Number(item.results_count ?? item.count ?? 0)
     }))
   );
 
-  readonly partnersEmpty = computed(() => !this.topPartners.loading() && !this.topPartners.loadError() && this.topPartners.list().length === 0);
+  readonly partnersEmpty = computed(() => !this.contractDashboard.loading() && !this.contractDashboard.loadError() && this.contractDashboard.topPartners().length === 0);
 
   readonly partnerTableModel = computed<VizChartTableModel | null>(() => {
     const items = this.partnerItems();
@@ -691,12 +669,12 @@ export class ProjectDashboardComponent {
   });
 
   readonly leverItems = computed(() =>
-    this.topPrimaryLevers
-      .list()
+    this.contractDashboard
+      .topPrimaryLevers()
       .map(item => ({
         id: String(item.lever_id),
-        label: formatLeverDisplayLabel(item.short_name, item.full_name),
-        count: item.count,
+        label: formatLeverDisplayLabel(item.short_name ?? '', item.full_name ?? ''),
+        count: Number(item.count ?? item.results_count ?? 0),
         iconUrl: item.icon
           ? (item.icon.startsWith('http')
               ? item.icon
@@ -707,7 +685,7 @@ export class ProjectDashboardComponent {
   );
 
   readonly leversEmpty = computed(
-    () => !this.topPrimaryLevers.loading() && !this.topPrimaryLevers.loadError() && this.topPrimaryLevers.list().length === 0
+    () => !this.contractDashboard.loading() && !this.contractDashboard.loadError() && this.contractDashboard.topPrimaryLevers().length === 0
   );
 
   readonly leverTableModel = computed<VizChartTableModel | null>(() => {
@@ -964,11 +942,16 @@ export class ProjectDashboardComponent {
   });
 
   readonly geoScopeEmpty = computed(() => {
-    if (this.geoScope.loading() || this.geoScope.loadError()) {
+    if (this.contractDashboard.loading() || this.contractDashboard.loadError()) {
       return false;
     }
 
-    const summary = this.geoScope.summary();
+    const geo = this.contractDashboard.geoScope();
+    if (!geo) {
+      return true;
+    }
+
+    const summary = geo.geo_scope_summary ?? {};
     const summaryTotal =
       Number(summary.global ?? 0) +
       Number(summary.regional ?? 0) +
@@ -976,23 +959,23 @@ export class ProjectDashboardComponent {
       Number(summary.sub_national ?? 0) +
       Number(summary.yet_to_be_determined ?? 0);
 
-    return summaryTotal === 0 && this.geoScope.topRegionsList().length === 0 && this.geoScope.topCountries().length === 0;
+    return summaryTotal === 0 && (geo.top_regions ?? []).length === 0 && (geo.top_countries ?? []).length === 0;
   });
 
   readonly trendEmpty = computed(() => {
-    if (this.contractResultsSummary.loading() || this.contractResultsSummary.loadError()) {
+    if (this.contractDashboard.loading() || this.contractDashboard.loadError()) {
       return false;
     }
-    const raw = this.contractResultsSummary.list()?.by_year ?? [];
+    const raw = this.contractDashboard.summary()?.by_year ?? [];
     const valid = raw.filter(b => b.year !== null && b.year !== undefined && !isNaN(Number(b.year)));
     return valid.length === 0;
   });
 
   readonly spAlignmentEmpty = computed(
     () =>
-      !this.contractSpAlignment.loading() &&
-      !this.contractSpAlignment.loadError() &&
-      (this.contractSpAlignment.list()?.sps ?? []).length === 0
+      !this.contractDashboard.loading() &&
+      !this.contractDashboard.loadError() &&
+      (this.contractDashboard.spAlignment()?.sps ?? []).length === 0
   );
 
   readonly hasVisibleRankingCards = computed(
@@ -1086,21 +1069,8 @@ export class ProjectDashboardComponent {
       const contractId = this.contractId();
       if (contractId) {
         void this.syncProjectFromSharedService(contractId);
-        this.contractResultsSummary.main(contractId);
-        this.topContributors.main(contractId, 4);
-        this.topMainContactPersons.main(contractId, 4);
-        this.topPartners.main(contractId, 4);
-        this.topPrimaryLevers.main(contractId, 4);
-        this.geoScope.main(contractId);
+        void this.contractDashboard.load(contractId);
         this.resultsCenterService.initializeProjectDashboardResultsTable(contractId);
-      }
-    });
-
-    effect(() => {
-      const contractId = this.contractId();
-      const isBilateral = this.isBilateral();
-      if (contractId && isBilateral) {
-        this.contractSpAlignment.main(contractId);
       }
     });
   }
@@ -1181,7 +1151,7 @@ export class ProjectDashboardComponent {
     if (event.componentType !== 'series') {
       return;
     }
-    const yearStr = event.name ?? (typeof event.dataIndex === 'number' ? this.contractResultsSummary.list()?.by_year?.[event.dataIndex]?.year : undefined);
+    const yearStr = event.name ?? (typeof event.dataIndex === 'number' ? this.contractDashboard.summary()?.by_year?.[event.dataIndex]?.year : undefined);
     const year = yearStr !== undefined && yearStr !== null && yearStr !== '' ? Number(yearStr) : undefined;
     const contractId = this.contractId();
     if (contractId && year !== undefined && !isNaN(year)) {
@@ -1324,7 +1294,7 @@ export class ProjectDashboardComponent {
   }
 
   scrollToPartners(event?: Event): void {
-    if (this.contractResultsSummary.loading()) {
+    if (this.contractDashboard.loading()) {
       return;
     }
     if (event) {
