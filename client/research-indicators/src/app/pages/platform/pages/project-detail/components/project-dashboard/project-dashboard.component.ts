@@ -164,15 +164,7 @@ export class ProjectDashboardComponent {
   readonly hasExecutiveOverviewExpandableContent = computed(
     () => this.executiveOverviewParagraphs().length > 1 || this.overviewSourceDocuments().length > 0
   );
-  readonly showGroundingSection = computed(() => {
-    return (
-      this.canAccessGroundingSetup() &&
-      (this.hasGroundedDocuments() ||
-        this.executiveOverviewLoading() ||
-        this.executiveOverviewError() ||
-        this.hasExecutiveOverviewData())
-    );
-  });
+  readonly showGroundingSection = computed(() => this.canAccessGroundingSetup());
 
   readonly indicatorSummaries = computed(() => {
     const indicators = this.projectUtils.sortIndicators([...(this.project()?.indicators ?? [])]);

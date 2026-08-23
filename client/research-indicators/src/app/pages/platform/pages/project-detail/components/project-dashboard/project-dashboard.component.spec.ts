@@ -1863,15 +1863,9 @@ describe('ProjectDashboardComponent', () => {
         expect(topCard.textContent).toContain('First summary paragraph.');
       });
 
-      it('Cell 3: admin + no summary + docs present -> card ABSENT, bottom AI section PRESENT with setup only (KZ-015)', async () => {
+      it('Cell 3: admin + no summary -> card ABSENT, bottom AI section PRESENT with setup only (KZ-015)', async () => {
         await setup('C-1', { isAdmin: true, emptyOverview: true });
         component.groundedDocuments.set([]);
-        fixture.detectChanges();
-
-        expect(fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]')).toBeNull();
-        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).toBeNull();
-
-        component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'k/contract.pdf' }]);
         fixture.detectChanges();
 
         expect(component.hasExecutiveOverviewData()).toBe(false);
@@ -1885,6 +1879,12 @@ describe('ProjectDashboardComponent', () => {
         expect(bottomSection.textContent).toContain('AI Grounding & Setup');
         expect(bottomSection.querySelector('#grounding-file-input')).toBeTruthy();
         expect(bottomSection.textContent).not.toContain('Grounded AI Summary');
+
+        // Add a document and verify persistence
+        component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'k/contract.pdf' }]);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).not.toBeNull();
       });
 
       it('Cell 4: admin + summary exists -> card PRESENT, bottom AI section PRESENT (setup only) (KZ-015)', async () => {
