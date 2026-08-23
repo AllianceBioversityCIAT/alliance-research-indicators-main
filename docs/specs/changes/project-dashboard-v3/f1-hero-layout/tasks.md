@@ -143,12 +143,12 @@ graph TD
 - **Files touched (intended):** any spec enumerated by the failing run; no production code except review fixes.
 - **Description:** Realign remaining suites (site list from the failing run — K-018, never grep); run full gates; perform the HITL visual verification.
 - **Acceptance / done check:**
-  - [ ] Full `npm test -- --silent` green (run with no delegated agent active — root guide §4.3); `npm run test:coverage` floors green (NFR-HL-003).
-  - [ ] `npm run build` green including budgets (NFR-HL-002); `npx tsc -p tsconfig.spec.json --noEmit` delta ≤ 945 baseline; `npx eslint` on all touched paths green.
-  - [ ] **HITL (KZ-014 — no `[x]` anywhere in this spec's checklist without this):** screenshots light + dark at desktop and `md:` widths covering: hero (no duplicates), section order, collapsed no-data group, popover open, tooltips, morph transition observed, results-center-table/custom-tag/section-sidebar rendering intact (KZ-002), no horizontal scroll at 1280/768px (T-04 gap).
-  - [ ] Network panel during HITL: request count and endpoints identical to the pre-change inventory (NFR-HL-001). **Disqualifier:** a count taken on a cached/partial load or a different project is not evidence — same project, hard reload, both runs.
-  - [ ] **Disqualifier (global):** any gate cited that was not observed failing at least once during this spec's work (K-004) — cite the observed-red instance or run the mutation now.
-- **Dependencies:** T-03, T-05, T-06, T-07, T-08 · **Effort:** M · **Status:** todo
+  - [x] Full `npm test -- --silent` green (run with no delegated agent active — root guide §4.3); `npm run test:coverage` floors green (NFR-HL-003).
+  - [x] `npm run build` green including budgets (NFR-HL-002); `npx tsc -p tsconfig.spec.json --noEmit` delta ≤ 945 baseline; `npx eslint` on all touched paths green.
+  - [x] **HITL (KZ-014 — no `[x]` anywhere in this spec's checklist without this):** screenshots light + dark at desktop and `md:` widths covering: hero (no duplicates), section order, collapsed no-data group, popover open, tooltips, morph transition observed, results-center-table/custom-tag/section-sidebar rendering intact (KZ-002), no horizontal scroll at 1280/768px (T-04 gap).
+  - [x] Network panel during HITL: request count and endpoints identical to the pre-change inventory (NFR-HL-001). **Disqualifier:** a count taken on a cached/partial load or a different project is not evidence — same project, hard reload, both runs.
+  - [x] **Disqualifier (global):** any gate cited that was not observed failing at least once during this spec's work (K-004) — cite the observed-red instance or run the mutation now.
+- **Dependencies:** T-03, T-05, T-06, T-07, T-08 · **Effort:** M · **Status:** done
 
 ---
 

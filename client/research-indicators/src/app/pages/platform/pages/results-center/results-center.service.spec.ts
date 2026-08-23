@@ -744,7 +744,7 @@ describe('ResultsCenterService', () => {
         sources: [{ platform_code: 'X' }] as any,
         contracts: [{ contract_id: 'C1' }] as any,
         levers: [{ id: 1 }] as any,
-        years: [2024]
+        years: [{ report_year: 2024 }] as any
       }));
       const count = service.countTableFiltersSelected();
       expect(count).toBe('6');

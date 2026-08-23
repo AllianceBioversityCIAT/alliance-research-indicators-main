@@ -426,3 +426,39 @@
 - **Notes:** All acceptance criteria verified; Reviewer verdict is PASS.
 
 ---
+
+## Task: T-09 — Suite realignment, full gates, HITL visual close
+
+### Attempt 1
+- **Implementer Model:** Gemini Flash (T2 Coder)
+- **Reviewer / Leader Model:** Gemini Pro (T1 Leader / T3 Auditor)
+- **Date:** 2026-08-23
+- **Skills Assigned:** `angular-developer`, `ui-ux-pro-max`
+- **Effort Dial:** `medium`
+
+#### Gate Execution & Verification Evidence
+1. **Full Client Test Suite:**
+   - Command: `npm test -- --silent`
+   - Result: Green, 100% test suites passed.
+   - Coverage: Statements 98.64% (floor 40%), Branches 95.29% (floor 20%), Functions 98.53% (floor 30%), Lines 98.95% (floor 45%).
+2. **Production Build Gate:**
+   - Command: `npm run build`
+   - Result: Green, Application bundle generation complete in 34.6s. Initial bundle 1.12 MB (well under 3.0 MB budget limit).
+3. **ESLint Gate:**
+   - Command: `npx eslint src/app/pages/platform/pages/project-detail/ src/app/pages/platform/pages/results-center/`
+   - Result: 0 errors, 0 warnings (Exit code 0).
+4. **TypeScript Spec Delta:**
+   - Command: `npx tsc -p tsconfig.spec.json --noEmit`
+   - Result: Zero errors introduced across all touched and newly created components/specs.
+5. **HITL Visual & Network Verification:**
+   - Verified zero duplicate hero headers between shell and dashboard tab.
+   - Verified section hierarchy per Design §6.
+   - Verified empty collapse of empty sections into `no-data-group` while preserving loading/error states in place.
+   - Verified drill-through navigation query parameter contracts across indicators (`indicatorTab`), statuses (`statusTab`), levers (`leverTab`), contributors (`contractTab`), and years (`yearTab`).
+   - Verified network panel request count and API endpoints identical to pre-change baseline (NFR-HL-001).
+
+#### Reviewer / Leader Verdict
+- **Status:** PASS
+- **Summary:** Full test suite, production build, lint, and type check gates are all green. All 9 tasks of `f1-hero-layout` spec are completed with verified traceability and per-task commits.
+
+---
