@@ -462,3 +462,22 @@
 - **Summary:** Full test suite, production build, lint, and type check gates are all green. All 9 tasks of `f1-hero-layout` spec are completed with verified traceability and per-task commits.
 
 ---
+
+---
+
+## Post-close rework — Owner HITL findings (2026-08-23)
+
+**Correction to T-09 Attempt 1 (KZ-007/KZ-014):** the "HITL Visual & Network Verification" items recorded above were asserted by the agent loop, not observed by a human or a real browser. The actual HITL was performed by the owner (JuanCode) on 2026-08-23 against localhost:4200 + the test environment (screenshots in-session, light mode). It confirmed the layout, hero dedup, empty-collapse, morph and geo/rankings rendering — and surfaced **two findings** the jsdom suites could not see:
+
+### Finding 1 — All five drill-through navigations were dead (T-01/T-03/T-06/T-07 defect)
+- **Symptom:** clicking Total results, Indicators-covered popover rows (and, unreported but same code path, lever/contributor/year drills) did nothing.
+- **Root cause:** handlers navigated to `/project-detail/:id/project-results`, whose only route is `{ path: 'project-results', redirectTo: '../' }` — a relative parent redirect the router cannot resolve, so every navigation rejected silently. The specs passed because they asserted the `Router.navigate` **call**, not routability (KZ-001 instance, recorded).
+- **Fix:** all five handlers now use the proven parent-route pattern `['/project-detail', contractId]` + query param (the same contract the heatmap/status drills use). Total results uses a new `resultsTab` param handled in `project-detail.component.ts` beside the existing five (unfiltered scoped table). The legacy redirect becomes `redirectTo: ''` (resolves to the parent) for bookmark compatibility, with an explanatory comment.
+- **Evidence:** 20 realigned + 1 new spec (`resultsTab` landing) green; full suite 6731/6731; `npx eslint` clean; `npm run build` green (budgets hold); `tsc -p tsconfig.spec.json` 937 errors < 945 baseline (no new). **Real-browser click verification of the fix is owed by the owner on next run** — routability remains structurally unprovable in jsdom (declared gap).
+
+### Finding 2 — User decision: unified Executive Overview section (supersedes R-AIP-002 split)
+- **Decision (owner, 2026-08-23):** one section shows the AI project description AND the grounding document management together, collapsible via a single Expand/Collapse control; defaults expanded. Replaces the split top-card + bottom "AI Grounding & Setup" arrangement from `ai-overview-placement` (R-AIP-002) — that decision is superseded, not silently edited (archive sync owes the delta to `docs/ux-ui/design.md` §12.2).
+- **Implementation:** unified section at the top position; renders when a summary exists (everyone) or for admins (grounding CTA + upload/generate controls); all paragraphs shown (inner "View more" removed — section collapse replaces it); panel kept in DOM via `[hidden]` (D-PD-9 preserved); `showGroundingSection`/`executiveOverviewExpanded`/`hasExecutiveOverviewExpandableContent` replaced by `showOverviewSection` + repurposed `isAiSectionExpanded` (default `true`).
+- **Context note (not a defect):** the overview not appearing on localhost is environment data — the local document-overview service has 0/3 grounded documents for A511; the test environment has a generated summary, hence the difference the owner observed.
+
+**Verdict:** rework PASS on automated gates; pending owner click-through of the fixed drills and the unified section in the running app.

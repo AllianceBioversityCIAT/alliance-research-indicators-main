@@ -149,9 +149,10 @@ export class ProjectDashboardComponent {
   readonly executiveOverviewParagraphs = signal<string[]>([]);
   readonly executiveOverviewLoading = signal(false);
   readonly executiveOverviewError = signal(false);
-  readonly executiveOverviewExpanded = signal(false);
   readonly isCaveatExpanded = signal(false);
-  readonly isAiSectionExpanded = signal(false);
+  // Unified Executive Overview section collapse (user decision 2026-08-23):
+  // defaults expanded so the grounded description is visible on load.
+  readonly isAiSectionExpanded = signal(true);
 
   readonly contractId = computed(() => this.route.parent?.snapshot.paramMap.get('id') ?? '');
   readonly project = signal<GetProjectDetail | null>(null);
@@ -307,10 +308,9 @@ export class ProjectDashboardComponent {
   readonly hasGroundedDocuments = computed(() => this.groundedDocuments().length > 0);
   readonly canAccessGroundingSetup = computed(() => this.rolesService.isAdmin());
   readonly hasExecutiveOverviewData = computed(() => this.executiveOverviewParagraphs().length > 0);
-  readonly hasExecutiveOverviewExpandableContent = computed(
-    () => this.executiveOverviewParagraphs().length > 1 || this.overviewSourceDocuments().length > 0
-  );
-  readonly showGroundingSection = computed(() => this.canAccessGroundingSetup());
+  // Unified section renders for everyone once a summary exists, and for admins
+  // even without one (they see the grounding CTA). Supersedes R-AIP-002 split.
+  readonly showOverviewSection = computed(() => this.hasExecutiveOverviewData() || this.canAccessGroundingSetup());
 
   readonly indicatorSummaries = computed(() => {
     const indicators = this.projectUtils.sortIndicators([...(this.project()?.indicators ?? [])]);
@@ -1235,7 +1235,7 @@ export class ProjectDashboardComponent {
     const year = yearStr !== undefined && yearStr !== null && yearStr !== '' ? Number(yearStr) : undefined;
     const contractId = this.contractId();
     if (contractId && year !== undefined && !isNaN(year)) {
-      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+      void this.router.navigate(['/project-detail', contractId], {
         queryParams: { yearTab: year }
       });
     }
@@ -1248,7 +1248,7 @@ export class ProjectDashboardComponent {
     const leverId = data?.leverId ?? item?.id;
     const contractId = this.contractId();
     if (contractId && leverId !== undefined && leverId !== null && leverId !== '') {
-      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+      void this.router.navigate(['/project-detail', contractId], {
         queryParams: { leverTab: leverId }
       });
     }
@@ -1261,7 +1261,7 @@ export class ProjectDashboardComponent {
     const contractCode = data?.contractCode ?? item?.id;
     const contractId = this.contractId();
     if (contractId && contractCode !== undefined && contractCode !== null && contractCode !== '') {
-      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+      void this.router.navigate(['/project-detail', contractId], {
         queryParams: { contractTab: contractCode }
       });
     }
@@ -1353,7 +1353,9 @@ export class ProjectDashboardComponent {
     }
     const contractId = this.contractId();
     if (contractId) {
-      void this.router.navigate(['/project-detail', contractId, 'project-results']);
+      void this.router.navigate(['/project-detail', contractId], {
+        queryParams: { resultsTab: 1 }
+      });
     }
   }
 
@@ -1365,7 +1367,7 @@ export class ProjectDashboardComponent {
     const contractId = this.contractId();
     const targetId = indicator.indicatorId ?? indicator.id;
     if (contractId && targetId !== null && targetId !== undefined) {
-      void this.router.navigate(['/project-detail', contractId, 'project-results'], {
+      void this.router.navigate(['/project-detail', contractId], {
         queryParams: { indicatorTab: targetId }
       });
     }

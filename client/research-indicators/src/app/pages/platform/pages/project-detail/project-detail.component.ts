@@ -80,7 +80,8 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
       this.activatedRoute.snapshot.queryParamMap?.has('indicatorTab') ||
       this.activatedRoute.snapshot.queryParamMap?.has('leverTab') ||
       this.activatedRoute.snapshot.queryParamMap?.has('contractTab') ||
-      this.activatedRoute.snapshot.queryParamMap?.has('yearTab');
+      this.activatedRoute.snapshot.queryParamMap?.has('yearTab') ||
+      this.activatedRoute.snapshot.queryParamMap?.has('resultsTab');
 
     if (!hasDrillParams && this.lastSegment() === 'project-results' && this.activateProjectResultsState()) {
       void this.resultsCenterService.main();
@@ -105,8 +106,9 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
         const hasLeverTab = params.has('leverTab');
         const hasContractTab = params.has('contractTab');
         const hasYearTab = params.has('yearTab');
+        const hasResultsTab = params.has('resultsTab');
 
-        if (!hasStatusTab && !hasIndicatorTab && !hasLeverTab && !hasContractTab && !hasYearTab) {
+        if (!hasStatusTab && !hasIndicatorTab && !hasLeverTab && !hasContractTab && !hasYearTab && !hasResultsTab) {
           return;
         }
 

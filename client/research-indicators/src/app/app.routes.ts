@@ -193,8 +193,12 @@ export const routes: Routes = [
         },
         children: [
           {
+            // Legacy segment kept for bookmark compatibility. A relative
+            // `redirectTo: '../'` is not resolvable by the router (navigations
+            // to it reject silently) — an empty relative redirect resolves to
+            // the parent `/project-detail/:id`, which owns the results tab.
             path: 'project-results',
-            redirectTo: '../',
+            redirectTo: '',
             pathMatch: 'full'
           },
           {

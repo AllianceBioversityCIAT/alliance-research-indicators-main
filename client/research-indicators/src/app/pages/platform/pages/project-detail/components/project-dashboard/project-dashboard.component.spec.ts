@@ -684,7 +684,7 @@ describe('ProjectDashboardComponent', () => {
       ]);
       expect(component.executiveOverviewGeneratedAt()).toBe('2026-07-09T20:10:56.921192+00:00');
       expect(component.hasExecutiveOverviewData()).toBe(true);
-      expect(component.showGroundingSection()).toBe(true);
+      expect(component.showOverviewSection()).toBe(true);
     });
 
     it('should load executive overview summary for non-admin users when data exists', async () => {
@@ -697,7 +697,8 @@ describe('ProjectDashboardComponent', () => {
         'Second stored paragraph.'
       ]);
       expect(component.hasExecutiveOverviewData()).toBe(true);
-      expect(component.showGroundingSection()).toBe(false);
+      // Unified section (user decision 2026-08-23): visible to non-admins once a summary exists
+      expect(component.showOverviewSection()).toBe(true);
     });
 
     it('should hide executive overview for non-admin users when no data exists', async () => {
@@ -705,7 +706,7 @@ describe('ProjectDashboardComponent', () => {
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
       expect(component.hasExecutiveOverviewData()).toBe(false);
-      expect(component.showGroundingSection()).toBe(false);
+      expect(component.showOverviewSection()).toBe(false);
     });
 
     it('should block grounding upload actions for non-admin users', async () => {
@@ -792,7 +793,7 @@ describe('ProjectDashboardComponent', () => {
         })
       );
 
-      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
       expect(bottomSection).toBeTruthy();
       const errorAlert = bottomSection.querySelector('[role="alert"]');
       expect(errorAlert).toBeTruthy();
@@ -805,7 +806,7 @@ describe('ProjectDashboardComponent', () => {
       component.executiveOverviewError.set(true);
       fixture.detectChanges();
 
-      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+      const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
       expect(bottomSection.querySelector('[role="alert"]')).toBeTruthy();
 
       // Trigger new upload
@@ -1336,7 +1337,9 @@ describe('ProjectDashboardComponent', () => {
       totalResultsBtn.click();
       fixture.detectChanges();
 
-      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1', 'project-results']);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { resultsTab: 1 }
+      });
     });
 
     it('should not navigate to project-results when Total results tile is clicked while loading (R-HL-002)', async () => {
@@ -1393,7 +1396,7 @@ describe('ProjectDashboardComponent', () => {
       publicationBtn.click();
       fixture.detectChanges();
 
-      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1', 'project-results'], {
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
         queryParams: { indicatorTab: 1 }
       });
     });
@@ -1652,7 +1655,7 @@ describe('ProjectDashboardComponent', () => {
         fixture.detectChanges();
 
         const kpiRegion = fixture.nativeElement.querySelector('[role="region"][aria-label="Key performance indicators"]');
-        const aiSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+        const aiSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
 
         expect(kpiRegion).toBeTruthy();
         expect(aiSection).toBeTruthy();
@@ -1673,7 +1676,7 @@ describe('ProjectDashboardComponent', () => {
         expect(fileInput.tagName.toLowerCase()).toBe('input');
 
         // Verify container is hidden but still in DOM
-        const collapsibleContainer = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"] div[hidden]');
+        const collapsibleContainer = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"] div[hidden]');
         expect(collapsibleContainer).toBeTruthy();
         expect(collapsibleContainer.hidden).toBe(true);
       });
@@ -1685,7 +1688,7 @@ describe('ProjectDashboardComponent', () => {
         component.executiveOverviewLoading.set(true);
         fixture.detectChanges();
 
-        const headerStatus = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"] header [role="status"]');
+        const headerStatus = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"] header [role="status"]');
         expect(headerStatus).toBeTruthy();
         expect(headerStatus.textContent).toContain('Generating summary…');
       });
@@ -2097,7 +2100,7 @@ describe('ProjectDashboardComponent', () => {
   });
 
   describe('T-12 dashboard integration and entry stagger (R-DA-003, R-DA-005, R-DA-007 AC.2)', () => {
-    it('should enforce DOM rendering order: Hero (KPI + Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> AI (R-HL-003, design §6)', async () => {
+    it('should enforce DOM rendering order: Hero (KPI + Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> No data (R-HL-003, design §6)', async () => {
       rolesServiceMock.isAdmin.mockReturnValue(true);
       await setup('C-1', {
         projectData: {
@@ -2138,7 +2141,6 @@ describe('ProjectDashboardComponent', () => {
       const spGraph = root.querySelector('app-sp-alignment-graph');
       const pendingSection = root.querySelector('#pending-revision-section');
       const noDataGroup = root.querySelector('app-no-data-group');
-      const aiSection = root.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
 
       expect(kpiStrip).toBeTruthy();
       expect(contextStrip).toBeTruthy();
@@ -2152,7 +2154,6 @@ describe('ProjectDashboardComponent', () => {
       expect(spGraph).toBeTruthy();
       expect(pendingSection).toBeTruthy();
       expect(noDataGroup).toBeTruthy();
-      expect(aiSection).toBeTruthy();
 
       // Verify DOM document order:
       // Hero (KPI -> Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> No data yet -> AI
@@ -2167,7 +2168,6 @@ describe('ProjectDashboardComponent', () => {
       expect(partnersCard!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(spGraph!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(pendingSection!.compareDocumentPosition(noDataGroup!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(noDataGroup!.compareDocumentPosition(aiSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
       // Assert trend & status sections precede ranking cards in DOM
       expect(trendCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -2268,37 +2268,33 @@ describe('ProjectDashboardComponent', () => {
 
         expect(component.canAccessGroundingSetup()).toBe(false);
         expect(component.hasExecutiveOverviewData()).toBe(false);
-        expect(component.showGroundingSection()).toBe(false);
+        expect(component.showOverviewSection()).toBe(false);
 
-        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
-        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+        const unifiedSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
 
-        expect(topCard).toBeNull();
-        expect(bottomSection).toBeNull();
+        expect(unifiedSection).toBeNull();
         expect(fixture.nativeElement.textContent).not.toContain('Executive Overview');
-        expect(fixture.nativeElement.textContent).not.toContain('AI Grounding');
       });
 
       it('Cell 2: non-admin + summary exists -> card PRESENT, bottom AI section ABSENT (KZ-015 transition)', async () => {
         await setup('C-1', { isAdmin: false, emptyOverview: true });
         expect(fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]')).toBeNull();
-        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).toBeNull();
 
         component.executiveOverviewParagraphs.set(['First summary paragraph.', 'Second summary paragraph.']);
         component.executiveOverviewGeneratedAt.set('2026-08-22T14:30:00.000Z');
         fixture.detectChanges();
 
         expect(component.hasExecutiveOverviewData()).toBe(true);
-        expect(component.showGroundingSection()).toBe(false);
+        expect(component.showOverviewSection()).toBe(true);
 
         const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
-        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
 
         expect(topCard).not.toBeNull();
-        expect(bottomSection).toBeNull();
         expect(topCard.textContent).toContain('Executive Overview');
         expect(topCard.textContent).toContain('Grounded AI Summary');
         expect(topCard.textContent).toContain('First summary paragraph.');
+        // Non-admin never sees grounding controls inside the unified section
+        expect(topCard.querySelector('#grounding-file-input')).toBeNull();
       });
 
       it('Cell 3: admin + no summary -> card ABSENT, bottom AI section PRESENT with setup only (KZ-015)', async () => {
@@ -2307,22 +2303,20 @@ describe('ProjectDashboardComponent', () => {
         fixture.detectChanges();
 
         expect(component.hasExecutiveOverviewData()).toBe(false);
-        expect(component.showGroundingSection()).toBe(true);
+        expect(component.showOverviewSection()).toBe(true);
 
-        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
-        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+        const unifiedSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
 
-        expect(topCard).toBeNull();
-        expect(bottomSection).not.toBeNull();
-        expect(bottomSection.textContent).toContain('AI Grounding & Setup');
-        expect(bottomSection.querySelector('#grounding-file-input')).toBeTruthy();
-        expect(bottomSection.textContent).not.toContain('Grounded AI Summary');
+        expect(unifiedSection).not.toBeNull();
+        expect(unifiedSection.textContent).toContain('No executive overview has been generated for this project yet.');
+        expect(unifiedSection.querySelector('#grounding-file-input')).toBeTruthy();
+        expect(unifiedSection.textContent).not.toContain('Grounded AI Summary');
 
         // Add a document and verify persistence
         component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'k/contract.pdf' }]);
         fixture.detectChanges();
 
-        expect(fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]')).not.toBeNull();
       });
 
       it('Cell 4: admin + summary exists -> card PRESENT, bottom AI section PRESENT (setup only) (KZ-015)', async () => {
@@ -2336,15 +2330,16 @@ describe('ProjectDashboardComponent', () => {
         fixture.detectChanges();
 
         expect(component.hasExecutiveOverviewData()).toBe(true);
-        expect(component.showGroundingSection()).toBe(true);
+        expect(component.showOverviewSection()).toBe(true);
 
-        const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
-        const bottomSection = fixture.nativeElement.querySelector('section[aria-labelledby="ai-grounding-section-title"]');
+        const unifiedSection = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
 
-        expect(topCard).not.toBeNull();
-        expect(bottomSection).not.toBeNull();
-        expect(topCard.textContent).toContain('Executive Overview');
-        expect(bottomSection.textContent).toContain('AI Grounding & Setup');
+        expect(unifiedSection).not.toBeNull();
+        expect(unifiedSection.textContent).toContain('Executive Overview');
+        expect(unifiedSection.textContent).toContain('Admin summary paragraph.');
+        expect(unifiedSection.textContent).toContain('Grounded AI Summary');
+        // One section carries BOTH the summary and the grounding controls (user decision 2026-08-23)
+        expect(unifiedSection.querySelector('#grounding-file-input')).toBeTruthy();
       });
     });
 
@@ -2378,7 +2373,7 @@ describe('ProjectDashboardComponent', () => {
     });
 
     describe('View more expansion and provenance sources (R-AIP-001, D-AIP-3, D-AIP-4)', () => {
-      it('should collapse to 1 paragraph by default and expand remaining paragraphs + sources on View more click', async () => {
+      it('shows all paragraphs and sources by default, and Collapse hides the panel via [hidden] (D-PD-9, user decision 2026-08-23)', async () => {
         await setup('C-1', { isAdmin: false });
         component.executiveOverviewParagraphs.set([
           'First overview paragraph.',
@@ -2390,48 +2385,35 @@ describe('ProjectDashboardComponent', () => {
           { fileName: 'Scope_of_Work.docx', fileKey: 'k/sow.docx' }
         ]);
         component.executiveOverviewGeneratedAt.set('2026-08-22T12:00:00.000Z');
-        component.executiveOverviewExpanded.set(false);
         fixture.detectChanges();
 
         const topCard = fixture.nativeElement.querySelector('section[aria-labelledby="executive-overview-title"]');
         expect(topCard).toBeTruthy();
 
-        const toggleBtn = topCard.querySelector('button[aria-controls="executive-overview-details"]') as HTMLButtonElement;
+        const toggleBtn = topCard.querySelector('button[aria-controls="executive-overview-panel"]') as HTMLButtonElement;
         expect(toggleBtn).toBeTruthy();
-        expect(toggleBtn.textContent?.trim()).toBe('View more');
-        expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
-
-        const collapsedParagraphs = topCard.querySelectorAll('p');
-        expect(collapsedParagraphs.length).toBe(1);
-        expect(collapsedParagraphs[0].textContent?.trim()).toBe('First overview paragraph.');
-        expect(topCard.querySelector('#executive-overview-details')).toBeNull();
-
-        toggleBtn.click();
-        fixture.detectChanges();
-
-        expect(component.executiveOverviewExpanded()).toBe(true);
-        expect(toggleBtn.textContent?.trim()).toBe('Show less');
+        expect(toggleBtn.textContent?.trim()).toBe('Collapse');
         expect(toggleBtn.getAttribute('aria-expanded')).toBe('true');
 
-        const expandedParagraphs = topCard.querySelectorAll('p');
-        expect(expandedParagraphs.length).toBe(3);
-        expect(expandedParagraphs[0].textContent?.trim()).toBe('First overview paragraph.');
-        expect(expandedParagraphs[1].textContent?.trim()).toBe('Second overview paragraph.');
-        expect(expandedParagraphs[2].textContent?.trim()).toBe('Third overview paragraph.');
-
-        const sourceSection = topCard.querySelector('#executive-overview-details');
-        expect(sourceSection).toBeTruthy();
-        expect(sourceSection.textContent).toContain('Generated from');
-        expect(sourceSection.textContent).toContain('Contract_2026.pdf');
-        expect(sourceSection.textContent).toContain('Scope_of_Work.docx');
+        const panel = topCard.querySelector('#executive-overview-panel') as HTMLElement;
+        expect(panel).toBeTruthy();
+        expect(panel.hidden).toBe(false);
+        expect(panel.querySelectorAll('p').length).toBe(3);
+        expect(panel.textContent).toContain('Generated from');
+        expect(panel.textContent).toContain('Contract_2026.pdf');
+        expect(panel.textContent).toContain('Scope_of_Work.docx');
 
         toggleBtn.click();
         fixture.detectChanges();
 
-        expect(component.executiveOverviewExpanded()).toBe(false);
-        expect(toggleBtn.textContent?.trim()).toBe('View more');
+        expect(component.isAiSectionExpanded()).toBe(false);
+        expect(toggleBtn.textContent?.trim()).toBe('Expand');
         expect(toggleBtn.getAttribute('aria-expanded')).toBe('false');
-        expect(topCard.querySelectorAll('p').length).toBe(1);
+
+        // Panel stays in the DOM (D-PD-9: [hidden], never @if) but is not shown
+        const hiddenPanel = topCard.querySelector('#executive-overview-panel') as HTMLElement;
+        expect(hiddenPanel).toBeTruthy();
+        expect(hiddenPanel.hidden).toBe(true);
       });
     });
 
@@ -2446,7 +2428,7 @@ describe('ProjectDashboardComponent', () => {
 
         expect(component.hasExecutiveOverviewData()).toBe(true);
         expect(component.hasGroundedDocuments()).toBe(false);
-        expect(component.showGroundingSection()).toBe(true);
+        expect(component.showOverviewSection()).toBe(true);
       });
     });
   });
@@ -3240,7 +3222,7 @@ describe('ProjectDashboardComponent', () => {
 
         // Assert: navigated with leverTab = '12'
         expect(navSpy).toHaveBeenCalledTimes(1);
-        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST'], {
           queryParams: { leverTab: '12' }
         });
       });
@@ -3269,7 +3251,7 @@ describe('ProjectDashboardComponent', () => {
 
         // Assert: navigated with contractTab = 'CONT-99'
         expect(navSpy).toHaveBeenCalledTimes(1);
-        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST'], {
           queryParams: { contractTab: 'CONT-99' }
         });
       });
@@ -3458,7 +3440,7 @@ describe('ProjectDashboardComponent', () => {
 
         // Assert: navigated with yearTab = 2024
         expect(navSpy).toHaveBeenCalledTimes(1);
-        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST', 'project-results'], {
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-TEST'], {
           queryParams: { yearTab: 2024 }
         });
       });

@@ -366,51 +366,72 @@
     }
   </div>
 
-  <!-- Top Executive Overview prominent card (R-AIP-001, D-AIP-1, D-AIP-2) -->
-  @if (hasExecutiveOverviewData()) {
-  <section class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  <!-- Unified Executive Overview: grounded AI description + document grounding setup in ONE
+       collapsible section (user decision 2026-08-23 — supersedes R-AIP-002's split placement;
+       collapsible panel preserved in DOM with [hidden], NEVER @if (D-PD-9)) -->
+  @if (showOverviewSection()) {
+  <section class="flex flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
     aria-labelledby="executive-overview-title"
     [style.animation-delay.ms]="staggerMs.executiveOverview">
-    <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex min-w-0 flex-col gap-1">
-        <div class="flex items-center gap-2">
-          <h2 id="executive-overview-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
-            Executive Overview
-          </h2>
+    <header class="flex flex-wrap items-start justify-between gap-4">
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--ac-grey-100)] text-[var(--ac-primary-blue-600)]">
+          <i class="pi pi-sparkles text-[16px]" aria-hidden="true"></i>
         </div>
-        @if (executiveOverviewGeneratedAt()) {
-        <span class="block font-['Barlow'] text-[13px] font-normal leading-snug text-[var(--ac-grey-700)]">
-          Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
-        </span>
-        }
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <h2 id="executive-overview-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
+              Executive Overview
+            </h2>
+            @if (hasExecutiveOverviewData()) {
+            <span
+              class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ac-grey-100)] px-3 py-1 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[var(--ac-light-blue-300)]">
+              <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
+              Grounded AI Summary
+            </span>
+            }
+            @if (canAccessGroundingSetup()) {
+            <span class="rounded-full bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Space_Grotesk'] text-[11px] font-semibold"
+              [style.color]="groundedDocumentsCountColor()">
+              {{ groundedDocuments().length }}/{{ maxGroundingDocs }} documents
+            </span>
+            }
+          </div>
+          @if (executiveOverviewGeneratedAt()) {
+          <span class="block font-['Barlow'] text-[13px] font-normal leading-snug text-[var(--ac-grey-700)]">
+            Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+          </span>
+          } @else {
+          <p class="m-0 font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+            Upload project documents to ground AI executive summary generation.
+          </p>
+          }
+        </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <span
-          class="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Space_Grotesk'] text-[11px] font-bold uppercase tracking-wide text-[var(--ac-light-blue-300)]">
-          <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
-          Grounded AI Summary
+      <div class="flex items-center gap-3">
+        @if (!isAiSectionExpanded() && executiveOverviewLoading()) {
+        <span class="flex items-center gap-2 font-['Barlow'] text-[12px] font-medium text-[var(--ac-primary-blue-400)]" role="status">
+          <i class="pi pi-spin pi-spinner text-[14px]" aria-hidden="true"></i>
+          Generating summary…
         </span>
-        @if (hasExecutiveOverviewExpandableContent()) {
-        <button type="button"
-          class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
-          (click)="executiveOverviewExpanded.set(!executiveOverviewExpanded())"
-          [attr.aria-expanded]="executiveOverviewExpanded()"
-          aria-controls="executive-overview-details">
-          {{ executiveOverviewExpanded() ? 'Show less' : 'View more' }}
-        </button>
         }
+        <button pButton type="button" severity="secondary" size="small"
+          class="!min-h-[44px] !min-w-[44px]"
+          (click)="isAiSectionExpanded.set(!isAiSectionExpanded())"
+          [attr.aria-expanded]="isAiSectionExpanded()"
+          aria-controls="executive-overview-panel"
+          aria-label="Toggle Executive Overview panel">
+          {{ isAiSectionExpanded() ? 'Collapse' : 'Expand' }}
+        </button>
       </div>
     </header>
 
-    <div class="flex flex-col gap-4">
-      @if (executiveOverviewParagraphs().length > 0) {
-      <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ executiveOverviewParagraphs()[0] }}</p>
-      }
-
-      @if (executiveOverviewExpanded()) {
-      <div id="executive-overview-details" class="flex flex-col gap-4">
-        @for (paragraph of executiveOverviewParagraphs().slice(1); track paragraph) {
+    <!-- Collapsible panel preserved in DOM with [hidden] (NEVER @if) (D-PD-9) -->
+    <div id="executive-overview-panel" [hidden]="!isAiSectionExpanded()" class="flex flex-col gap-5 pt-5 mt-4 border-t border-[var(--ac-grey-200)]">
+      @if (hasExecutiveOverviewData()) {
+      <div class="flex flex-col gap-4">
+        @for (paragraph of executiveOverviewParagraphs(); track paragraph) {
         <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]">{{ paragraph }}</p>
         }
 
@@ -428,6 +449,95 @@
             }
           </ul>
         </div>
+        }
+      </div>
+      } @else {
+      <p class="m-0 font-['Barlow'] text-[13.5px] leading-snug text-[var(--ac-grey-700)]">
+        No executive overview has been generated for this project yet.
+      </p>
+      }
+
+      @if (canAccessGroundingSetup()) {
+      <div class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-6 py-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="mb-2 flex items-center gap-2.5">
+              <i class="pi pi-file !text-[18px] text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+              <h3 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Grounding &amp; Setup</h3>
+            </div>
+            <p class="m-0 max-w-4xl font-['Barlow'] text-[14px] font-normal leading-4.5 text-[var(--ac-grey-700)]">
+              Upload project foundational documents (Contract, Scope of Work, Theory of Change) to prime the AI. The system
+              will use these documents to better understand goals and context for generating insights and reports.
+            </p>
+          </div>
+
+          <div class="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
+            <button pButton type="button"
+              class="!h-9 !min-w-[8.75rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-[var(--ac-light-blue-400)] !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-white"
+              [class.!justify-center]="uploadingGroundingDoc()"
+              [disabled]="!canUploadMoreGroundingDocs() || uploadingGroundingDoc()" [loading]="uploadingGroundingDoc()"
+              [attr.aria-label]="uploadingGroundingDoc() ? 'Uploading documents' : 'Upload Docs'"
+              (click)="triggerGroundingUpload(groundingFileInput)">
+              @if (!uploadingGroundingDoc()) {
+              <i class="pi pi-file-plus mr-1 !text-[14px]" aria-hidden="true"></i>
+              Upload Docs
+              }
+            </button>
+
+            @if (hasGroundedDocuments()) {
+            <button pButton type="button"
+              class="!h-9 !min-w-[7.25rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-transparent !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-[var(--ac-light-blue-400)] hover:!bg-[var(--ac-grey-100)]"
+              [class.!justify-center]="executiveOverviewLoading()"
+              [disabled]="!canGenerateExecutiveOverview()" [loading]="executiveOverviewLoading()"
+              [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Generate'"
+              (click)="generateExecutiveOverview()">
+              @if (!executiveOverviewLoading()) {
+              <i class="pi pi-sparkles mr-1 !text-[14px]" aria-hidden="true"></i>
+              Generate
+              }
+            </button>
+            }
+
+            <label class="sr-only" for="grounding-file-input">Upload foundational project documents</label>
+            <input #groundingFileInput id="grounding-file-input" type="file" class="hidden"
+              [accept]="groundingAcceptedFormats.join(',')" multiple (change)="onGroundingFilesSelected($event)" />
+          </div>
+        </div>
+
+        @if (executiveOverviewError()) {
+        <div class="flex items-center gap-2 rounded-lg border border-[var(--ac-red-1)] bg-[var(--ac-white-1)] px-4 py-3 text-[var(--ac-red-1)] shadow-xs" role="alert">
+          <i class="pi pi-exclamation-triangle text-[16px] shrink-0" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug">
+            Unable to generate the executive overview. Please try again.
+          </p>
+        </div>
+        }
+
+        @if (hasGroundedDocuments()) {
+        <span
+          class="font-['Barlow'] text-[12px] font-medium leading-none"
+          [attr.aria-label]="'Documents uploaded: ' + groundedDocuments().length + ' of ' + maxGroundingDocs">
+          <span class="text-[var(--ac-grey-600)]">Documents uploaded: </span>
+          <span [style.color]="groundedDocumentsCountColor()">{{ groundedDocuments().length }}/{{ maxGroundingDocs }}</span>
+        </span>
+
+        <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
+          @for (document of groundedDocuments(); track document.fileKey) {
+          <li
+            class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] px-3 py-2.5">
+            <span class="flex min-w-0 flex-1 items-center gap-2">
+              <i class="pi pi-file !text-[14px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                document.fileName }}</span>
+            </span>
+            <button type="button"
+              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-[var(--ac-red-1)] transition-colors hover:bg-[var(--ac-grey-100)]"
+              [attr.aria-label]="'Remove ' + document.fileName" (click)="removeGroundingDocument(document.fileKey)">
+              <i class="pi pi-times !text-[14px]" aria-hidden="true"></i>
+            </button>
+          </li>
+          }
+        </ul>
         }
       </div>
       }
@@ -826,135 +936,4 @@
   <!-- Collapsed empty widgets group (R-HL-004, D-F1-3) -->
   <app-no-data-group [items]="collapsedEmptyWidgets()"></app-no-data-group>
 
-  <!-- AI Grounding & Setup section relocated below analytics (R-PD-008, D-PD-8, D-PD-9, R-AIP-002) -->
-  @if (showGroundingSection()) {
-  <section class="flex flex-col rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-    aria-labelledby="ai-grounding-section-title">
-    <header class="flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--ac-grey-100)] text-[var(--ac-primary-blue-600)]">
-          <i class="pi pi-sparkles text-[16px]" aria-hidden="true"></i>
-        </div>
-        <div class="flex flex-col gap-0.5">
-          <div class="flex items-center gap-2">
-            <h2 id="ai-grounding-section-title" class="m-0 font-['Barlow'] text-[16px] font-semibold text-[var(--ac-primary-blue-600)]">
-              AI Grounding &amp; Setup
-            </h2>
-            <span class="rounded-full bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Space_Grotesk'] text-[11px] font-semibold"
-              [style.color]="groundedDocumentsCountColor()">
-              {{ groundedDocuments().length }}/{{ maxGroundingDocs }} documents
-            </span>
-          </div>
-          <p class="m-0 font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
-            Upload project documents to ground AI executive summary generation.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        @if (!isAiSectionExpanded() && executiveOverviewLoading()) {
-        <span class="flex items-center gap-2 font-['Barlow'] text-[12px] font-medium text-[var(--ac-primary-blue-400)]" role="status">
-          <i class="pi pi-spin pi-spinner text-[14px]" aria-hidden="true"></i>
-          Generating summary…
-        </span>
-        }
-        <button pButton type="button" severity="secondary" size="small"
-          class="!min-h-[44px] !min-w-[44px]"
-          (click)="isAiSectionExpanded.set(!isAiSectionExpanded())"
-          [attr.aria-expanded]="isAiSectionExpanded()"
-          aria-label="Toggle AI Grounding and Setup panel">
-          {{ isAiSectionExpanded() ? 'Collapse' : 'Expand' }}
-        </button>
-      </div>
-    </header>
-
-    <!-- Collapsible panel preserved in DOM with [hidden] (NEVER @if) (D-PD-9) -->
-    <div [hidden]="!isAiSectionExpanded()" class="flex flex-col gap-6 pt-5 mt-4 border-t border-[var(--ac-grey-200)]">
-      @if (canAccessGroundingSetup()) {
-      <div class="flex flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-6 py-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="min-w-0 flex-1">
-            <div class="mb-2 flex items-center gap-2.5">
-              <i class="pi pi-file !text-[18px] text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
-              <h3 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Grounding &amp; Setup</h3>
-            </div>
-            <p class="m-0 max-w-4xl font-['Barlow'] text-[14px] font-normal leading-4.5 text-[var(--ac-grey-700)]">
-              Upload project foundational documents (Contract, Scope of Work, Theory of Change) to prime the AI. The system
-              will use these documents to better understand goals and context for generating insights and reports.
-            </p>
-          </div>
-
-          <div class="flex shrink-0 flex-wrap items-center gap-3 lg:justify-end">
-            <button pButton type="button"
-              class="!h-9 !min-w-[8.75rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-[var(--ac-light-blue-400)] !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-white"
-              [class.!justify-center]="uploadingGroundingDoc()"
-              [disabled]="!canUploadMoreGroundingDocs() || uploadingGroundingDoc()" [loading]="uploadingGroundingDoc()"
-              [attr.aria-label]="uploadingGroundingDoc() ? 'Uploading documents' : 'Upload Docs'"
-              (click)="triggerGroundingUpload(groundingFileInput)">
-              @if (!uploadingGroundingDoc()) {
-              <i class="pi pi-file-plus mr-1 !text-[14px]" aria-hidden="true"></i>
-              Upload Docs
-              }
-            </button>
-
-            @if (hasGroundedDocuments()) {
-            <button pButton type="button"
-              class="!h-9 !min-w-[7.25rem] !rounded-lg !border-[var(--ac-light-blue-400)] !bg-transparent !px-4 !font-['Barlow'] !text-[13px] !font-semibold !text-[var(--ac-light-blue-400)] hover:!bg-[var(--ac-grey-100)]"
-              [class.!justify-center]="executiveOverviewLoading()"
-              [disabled]="!canGenerateExecutiveOverview()" [loading]="executiveOverviewLoading()"
-              [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Generate'"
-              (click)="generateExecutiveOverview()">
-              @if (!executiveOverviewLoading()) {
-              <i class="pi pi-sparkles mr-1 !text-[14px]" aria-hidden="true"></i>
-              Generate
-              }
-            </button>
-            }
-
-            <label class="sr-only" for="grounding-file-input">Upload foundational project documents</label>
-            <input #groundingFileInput id="grounding-file-input" type="file" class="hidden"
-              [accept]="groundingAcceptedFormats.join(',')" multiple (change)="onGroundingFilesSelected($event)" />
-          </div>
-        </div>
-
-        @if (executiveOverviewError()) {
-        <div class="flex items-center gap-2 rounded-lg border border-[var(--ac-red-1)] bg-[var(--ac-white-1)] px-4 py-3 text-[var(--ac-red-1)] shadow-xs" role="alert">
-          <i class="pi pi-exclamation-triangle text-[16px] shrink-0" aria-hidden="true"></i>
-          <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug">
-            Unable to generate the executive overview. Please try again.
-          </p>
-        </div>
-        }
-
-        @if (hasGroundedDocuments()) {
-        <span
-          class="font-['Barlow'] text-[12px] font-medium leading-none"
-          [attr.aria-label]="'Documents uploaded: ' + groundedDocuments().length + ' of ' + maxGroundingDocs">
-          <span class="text-[var(--ac-grey-600)]">Documents uploaded: </span>
-          <span [style.color]="groundedDocumentsCountColor()">{{ groundedDocuments().length }}/{{ maxGroundingDocs }}</span>
-        </span>
-
-        <ul class="m-0 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 xl:grid-cols-3">
-          @for (document of groundedDocuments(); track document.fileKey) {
-          <li
-            class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] px-3 py-2.5">
-            <span class="flex min-w-0 flex-1 items-center gap-2">
-              <i class="pi pi-file !text-[14px] shrink-0 text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-              <span class="truncate font-['Barlow'] text-[13px] font-medium text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
-                document.fileName }}</span>
-            </span>
-            <button type="button"
-              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-[var(--ac-red-1)] transition-colors hover:bg-[var(--ac-grey-100)]"
-              [attr.aria-label]="'Remove ' + document.fileName" (click)="removeGroundingDocument(document.fileKey)">
-              <i class="pi pi-times !text-[14px]" aria-hidden="true"></i>
-            </button>
-          </li>
-          }
-        </ul>
-        }
-      </div>
-      }
-    </div>
-  </section>
-  }
 </section>

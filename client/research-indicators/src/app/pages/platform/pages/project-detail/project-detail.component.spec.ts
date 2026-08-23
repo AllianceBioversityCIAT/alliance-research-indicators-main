@@ -674,6 +674,29 @@ describe('ProjectDetailComponent', () => {
       });
     });
 
+    it('should handle resultsTab (unfiltered results view) and strip params', () => {
+      component.ngOnInit();
+      router.navigate.mockClear();
+      resultsCenterService.initializeScopedResultsTable.mockClear();
+
+      queryParamMapSubject.next(convertToParamMap({ resultsTab: '1' }));
+
+      expect(component.lastSegment()).toBe('project-results');
+      expect(resultsCenterService.initializeScopedResultsTable).toHaveBeenCalledWith({
+        contractId: 'mock-id',
+        statusId: undefined,
+        indicatorId: undefined,
+        leverId: undefined,
+        contractCode: undefined,
+        year: undefined
+      });
+      expect(router.navigate).toHaveBeenCalledWith([], {
+        relativeTo: activatedRoute,
+        queryParams: {},
+        replaceUrl: true
+      });
+    });
+
     it('should handle contractTab drill-through and strip params', () => {
       component.ngOnInit();
       router.navigate.mockClear();

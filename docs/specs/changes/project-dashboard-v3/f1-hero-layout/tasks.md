@@ -2,7 +2,7 @@
 
 - **Module:** client / project-detail (STAR)
 - **Spec id:** 2026-08-project-dashboard-v3-f1
-- **Status:** not-started
+- **Status:** completed
 - **Owner:** JuanCode
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -180,7 +180,8 @@ Branch: `bilateral-visual-improvements` (current). Commits `<type>(project-dashb
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
 | RB-1 | 2026-08-23 | Popover a11y fails review | D-F1-5 fallback: inline disclosure | JuanCode | open |
-| RB-2 | 2026-08-23 | Suite realignment larger than budget | Budget tripwire → escalate per execute protocol | JuanCode | open |
+| RB-2 | 2026-08-23 | Suite realignment larger than budget | Budget tripwire → escalate per execute protocol | JuanCode | closed |
+| RB-3 | 2026-08-23 | All 5 drill navigations dead in real browser (unroutable `project-results` segment); jsdom specs blind to routability | Fixed via D-F1-8; routability stays a declared HITL-only check | JuanCode | closed (owner click-through owed) |
 
 ## 8. Done definition
 
