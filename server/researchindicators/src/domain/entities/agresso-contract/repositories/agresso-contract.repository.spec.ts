@@ -1860,4 +1860,289 @@ describe('AgressoContractRepository', () => {
       });
     });
   });
+
+  describe('getContractDashboard', () => {
+    const mockSummary = {
+      total: 10,
+      by_status: [{ status_id: 1, name: 'Completed', count: 10 }],
+      by_year: [{ year: 2024, count: 10 }],
+      partner_institutions: 5,
+      by_indicator_year: [{ indicator_id: 1, year: 2024, count: 10 }],
+    };
+
+    const mockPartners = {
+      contract_id: 'C-100',
+      limit: 5,
+      top_partners: [
+        {
+          institution_id: 1,
+          institution_name: 'Partner 1',
+          acronym: 'P1',
+          count: 4,
+        },
+      ],
+    };
+
+    const mockLevers = {
+      contract_id: 'C-100',
+      limit: 5,
+      top_primary_levers: [
+        {
+          lever_id: 1,
+          short_name: 'Lever 1',
+          full_name: 'Full Lever 1',
+          icon: null,
+          count: 8,
+        },
+      ],
+    };
+
+    const mockContacts = {
+      contract_id: 'C-100',
+      limit: 5,
+      top_main_contact_persons: [
+        {
+          user_id: 'U1',
+          first_name: 'Jane',
+          last_name: 'Doe',
+          email: 'jane@cgiar.org',
+          count: 6,
+        },
+      ],
+    };
+
+    const mockContributors = {
+      contract_id: 'C-100',
+      limit: 5,
+      top_contributors: [
+        {
+          contract_id: 'C-200',
+          contract_description: 'Contributor desc',
+          project_name: 'Contributor proj',
+          count: 3,
+        },
+      ],
+    };
+
+    const mockGeoScope = {
+      contract_id: 'C-100',
+      limit: 5,
+      geo_scope_summary: {
+        global: 1,
+        regional: 2,
+        countries: 3,
+        sub_national: 4,
+        yet_to_be_determined: 0,
+      },
+      top_regions: [{ region_id: 1, region_name: 'Africa', count: 2 }],
+      top_countries: [
+        {
+          iso_alpha_2: 'KE',
+          country_name: 'Kenya',
+          count: 3,
+          top_sub_nationals: [],
+        },
+      ],
+    };
+
+    const mockSpAlignment = {
+      sps: [
+        {
+          sp_code: 'SP-01',
+          name: 'Science Program 1',
+          category: 'Science programs',
+          icon_key: 'SP-01',
+          links: [
+            {
+              result_official_code: '100',
+              result_title: 'Result Title 100',
+              role: 'PRIMARY' as const,
+            },
+          ],
+        },
+      ],
+      results_with_alignment: 1,
+      results_without_alignment: 0,
+    };
+
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getContractDashboard('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getContractDashboard(null as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getContractDashboard(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should execute all 7 subqueries in parallel and return fully-populated composite object for bilateral contracts', async () => {
+      jest
+        .spyOn(repository, 'getResultsSummaryReport')
+        .mockResolvedValue(mockSummary as any);
+      jest
+        .spyOn(repository, 'getTopPartnersReport')
+        .mockResolvedValue(mockPartners as any);
+      jest
+        .spyOn(repository, 'getTopPrimaryLeversReport')
+        .mockResolvedValue(mockLevers as any);
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue(mockContacts as any);
+      jest
+        .spyOn(repository, 'getTopContributorsReport')
+        .mockResolvedValue(mockContributors as any);
+      jest
+        .spyOn(repository, 'getGeoScopeReport')
+        .mockResolvedValue(mockGeoScope as any);
+      jest
+        .spyOn(repository, 'getSpAlignmentReport')
+        .mockResolvedValue(mockSpAlignment as any);
+
+      const result = await repository.getContractDashboard('C-100');
+
+      expect(repository.getResultsSummaryReport).toHaveBeenCalledWith('C-100');
+      expect(repository.getTopPartnersReport).toHaveBeenCalledWith('C-100');
+      expect(repository.getTopPrimaryLeversReport).toHaveBeenCalledWith(
+        'C-100',
+      );
+      expect(repository.getTopMainContactPersonsReport).toHaveBeenCalledWith(
+        'C-100',
+      );
+      expect(repository.getTopContributorsReport).toHaveBeenCalledWith('C-100');
+      expect(repository.getGeoScopeReport).toHaveBeenCalledWith('C-100');
+      expect(repository.getSpAlignmentReport).toHaveBeenCalledWith('C-100');
+
+      expect(result.errors).toEqual([]);
+      expect(result.data).toEqual({
+        summary: mockSummary,
+        tops: {
+          partners: mockPartners.top_partners,
+          primary_levers: mockLevers.top_primary_levers,
+          main_contacts: mockContacts.top_main_contact_persons,
+          contributors: mockContributors.top_contributors,
+        },
+        geo_scope: mockGeoScope,
+        sp_alignment: mockSpAlignment,
+      });
+    });
+
+    it('should isolate a single subquery failure (e.g. getGeoScopeReport) and record error without failing the dashboard', async () => {
+      jest
+        .spyOn(repository, 'getResultsSummaryReport')
+        .mockResolvedValue(mockSummary as any);
+      jest
+        .spyOn(repository, 'getTopPartnersReport')
+        .mockResolvedValue(mockPartners as any);
+      jest
+        .spyOn(repository, 'getTopPrimaryLeversReport')
+        .mockResolvedValue(mockLevers as any);
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue(mockContacts as any);
+      jest
+        .spyOn(repository, 'getTopContributorsReport')
+        .mockResolvedValue(mockContributors as any);
+      jest
+        .spyOn(repository, 'getGeoScopeReport')
+        .mockRejectedValue(new Error('Geo query timeout'));
+      jest
+        .spyOn(repository, 'getSpAlignmentReport')
+        .mockResolvedValue(mockSpAlignment as any);
+
+      const result = await repository.getContractDashboard('C-100');
+
+      expect(result.data.geo_scope).toBeNull();
+      expect(result.data.summary).toEqual(mockSummary);
+      expect(result.data.tops?.partners).toEqual(mockPartners.top_partners);
+      expect(result.data.tops?.primary_levers).toEqual(
+        mockLevers.top_primary_levers,
+      );
+      expect(result.data.tops?.main_contacts).toEqual(
+        mockContacts.top_main_contact_persons,
+      );
+      expect(result.data.tops?.contributors).toEqual(
+        mockContributors.top_contributors,
+      );
+      expect(result.data.sp_alignment).toEqual(mockSpAlignment);
+      expect(result.errors).toEqual(['geo_scope: Geo query timeout']);
+    });
+
+    it('should isolate multiple subquery failures and populate errors array with each failure descriptor', async () => {
+      jest
+        .spyOn(repository, 'getResultsSummaryReport')
+        .mockRejectedValue(new Error('Summary syntax error'));
+      jest
+        .spyOn(repository, 'getTopPartnersReport')
+        .mockRejectedValue(new Error('Partners DB lock'));
+      jest
+        .spyOn(repository, 'getTopPrimaryLeversReport')
+        .mockResolvedValue(mockLevers as any);
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue(mockContacts as any);
+      jest
+        .spyOn(repository, 'getTopContributorsReport')
+        .mockResolvedValue(mockContributors as any);
+      jest
+        .spyOn(repository, 'getGeoScopeReport')
+        .mockResolvedValue(mockGeoScope as any);
+      jest
+        .spyOn(repository, 'getSpAlignmentReport')
+        .mockResolvedValue(mockSpAlignment as any);
+
+      const result = await repository.getContractDashboard('C-100');
+
+      expect(result.data.summary).toBeNull();
+      expect(result.data.tops?.partners).toBeNull();
+      expect(result.data.tops?.primary_levers).toEqual(
+        mockLevers.top_primary_levers,
+      );
+      expect(result.data.tops?.main_contacts).toEqual(
+        mockContacts.top_main_contact_persons,
+      );
+      expect(result.data.tops?.contributors).toEqual(
+        mockContributors.top_contributors,
+      );
+      expect(result.data.geo_scope).toEqual(mockGeoScope);
+      expect(result.data.sp_alignment).toEqual(mockSpAlignment);
+      expect(result.errors).toEqual([
+        'summary: Summary syntax error',
+        'partners: Partners DB lock',
+      ]);
+    });
+
+    it('should return sp_alignment: null without error for non-bilateral contract when spAlignmentReport resolves to null', async () => {
+      jest
+        .spyOn(repository, 'getResultsSummaryReport')
+        .mockResolvedValue(mockSummary as any);
+      jest
+        .spyOn(repository, 'getTopPartnersReport')
+        .mockResolvedValue(mockPartners as any);
+      jest
+        .spyOn(repository, 'getTopPrimaryLeversReport')
+        .mockResolvedValue(mockLevers as any);
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue(mockContacts as any);
+      jest
+        .spyOn(repository, 'getTopContributorsReport')
+        .mockResolvedValue(mockContributors as any);
+      jest
+        .spyOn(repository, 'getGeoScopeReport')
+        .mockResolvedValue(mockGeoScope as any);
+      jest
+        .spyOn(repository, 'getSpAlignmentReport')
+        .mockResolvedValue(null as any);
+
+      const result = await repository.getContractDashboard('C-POOL');
+
+      expect(result.data.sp_alignment).toBeNull();
+      expect(result.errors).toEqual([]);
+      expect(result.data.summary).toEqual(mockSummary);
+      expect(result.data.tops?.partners).toEqual(mockPartners.top_partners);
+      expect(result.data.geo_scope).toEqual(mockGeoScope);
+    });
+  });
 });

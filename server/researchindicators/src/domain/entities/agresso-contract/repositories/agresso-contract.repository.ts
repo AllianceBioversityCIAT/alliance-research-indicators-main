@@ -63,6 +63,7 @@ import {
   ContractSpAlignmentReportDto,
   ContractSpAlignmentSpDto,
 } from '../dto/contract-sp-alignment-report.dto';
+import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto';
 
 @Injectable()
 export class AgressoContractRepository
@@ -1345,6 +1346,105 @@ export class AgressoContractRepository
       sps: Array.from(spsMap.values()),
       results_with_alignment: resultsWithAlignment,
       results_without_alignment: resultsWithoutAlignment,
+    };
+  }
+
+  async getContractDashboard(
+    contractId: string,
+  ): Promise<{ data: ContractDashboardReportDto; errors: string[] }> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const [
+      summaryResult,
+      partnersResult,
+      leversResult,
+      contactsResult,
+      contributorsResult,
+      geoScopeResult,
+      spAlignmentResult,
+    ] = await Promise.allSettled([
+      this.getResultsSummaryReport(contractId),
+      this.getTopPartnersReport(contractId),
+      this.getTopPrimaryLeversReport(contractId),
+      this.getTopMainContactPersonsReport(contractId),
+      this.getTopContributorsReport(contractId),
+      this.getGeoScopeReport(contractId),
+      this.getSpAlignmentReport(contractId),
+    ]);
+
+    const errors: string[] = [];
+
+    const summary =
+      summaryResult.status === 'fulfilled'
+        ? summaryResult.value
+        : (errors.push(
+            `summary: ${summaryResult.reason?.message ?? summaryResult.reason}`,
+          ),
+          null);
+
+    const partners =
+      partnersResult.status === 'fulfilled'
+        ? (partnersResult.value?.top_partners ?? null)
+        : (errors.push(
+            `partners: ${partnersResult.reason?.message ?? partnersResult.reason}`,
+          ),
+          null);
+
+    const primary_levers =
+      leversResult.status === 'fulfilled'
+        ? (leversResult.value?.top_primary_levers ?? null)
+        : (errors.push(
+            `primary_levers: ${leversResult.reason?.message ?? leversResult.reason}`,
+          ),
+          null);
+
+    const main_contacts =
+      contactsResult.status === 'fulfilled'
+        ? (contactsResult.value?.top_main_contact_persons ?? null)
+        : (errors.push(
+            `main_contacts: ${contactsResult.reason?.message ?? contactsResult.reason}`,
+          ),
+          null);
+
+    const contributors =
+      contributorsResult.status === 'fulfilled'
+        ? (contributorsResult.value?.top_contributors ?? null)
+        : (errors.push(
+            `contributors: ${contributorsResult.reason?.message ?? contributorsResult.reason}`,
+          ),
+          null);
+
+    const geo_scope =
+      geoScopeResult.status === 'fulfilled'
+        ? geoScopeResult.value
+        : (errors.push(
+            `geo_scope: ${geoScopeResult.reason?.message ?? geoScopeResult.reason}`,
+          ),
+          null);
+
+    const sp_alignment =
+      spAlignmentResult.status === 'fulfilled'
+        ? (spAlignmentResult.value ?? null)
+        : (errors.push(
+            `sp_alignment: ${spAlignmentResult.reason?.message ?? spAlignmentResult.reason}`,
+          ),
+          null);
+
+    return {
+      data: {
+        summary,
+        tops: {
+          partners,
+          primary_levers,
+          main_contacts,
+          contributors,
+        },
+        geo_scope,
+        sp_alignment,
+      },
+      errors,
     };
   }
 
