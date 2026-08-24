@@ -5,7 +5,7 @@
 - **Status:** draft
 - **Owner:** JuanCode
 - **Linked requirements:** ./requirements.md
-- **Visual reference:** none new — the six cards reuse the card/tile/notice idioms approved in F1 and F3 (`../f3-indicator-deep-dive/mockup/deep-dive-panel.html`); only the treemap is a new form, token-themed via `--ac-viz-*`
+- **Visual reference:** none new — the six cards reuse the card/tile/notice idioms approved in F1 and F3 (`docs/specs/archive/2026-08-24-changes--project-dashboard-v3--f3-indicator-deep-dive/mockup/deep-dive-panel.html`); only the treemap is a new form, token-themed via `--ac-viz-*`
 - **Last updated:** 2026-08-23
 
 ---

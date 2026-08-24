@@ -1,6 +1,6 @@
 # Kaizen Entry — changes/project-dashboard-v3/f3-indicator-deep-dive
 
-> **Pre-archive entry (opened mid-execution, 2026-08-23).** `/akili-archive` updates this file in place (exact-name re-run detection); it does not create a second one.
+> Updated in place at archive (2026-08-24); originally opened mid-execution 2026-08-23.
 
 ## Document Control
 
@@ -9,7 +9,7 @@
 | Spec Path | `changes/project-dashboard-v3/f3-indicator-deep-dive` |
 | Date | 2026-08-23 |
 | Branch | bilateral-visual-improvements |
-| Archive Run | 0 (in execution) |
+| Archive Run | 1 |
 | Approval Mode | gated |
 | Branch Context | **spec branch** — one standardization applied early by explicit owner mandate (see P1); digest untouched |
 
@@ -19,7 +19,11 @@
 |---|---|---|
 | In-flight spec corrections | **1** — T-05 bootstrap scope (supertest e2e → in-process HTTP-path integration spec) | tasks.md T-05 amendment; design §10 |
 | Observed cost of the defect | 26 min hang on `npm run test:e2e` (full `AppModule` vs remote dev infra); shared dev DB touched by a test | owner report 2026-08-23 |
-| (other signals) | filled at archive | — |
+| Reviewer FAIL rework attempts | 1 loop (T-08: 2 attempts — inert retry + empty-during-load, both real) | execution.md T-08 |
+| HALTs / FATAL_FAILs / Pivots | 0 | execution.md |
+| Runtime incidents | 3 quota exhaustions across 2 Leaders + 2 Implementer spawns; zero lost work (audit-trail handoff) | execution.md |
+| Validation | owner HITL light-mode approved; latency inconclusive/pending; dark-mode not evidenced (carried) | archive-summary §8/§9 |
+| Budget | 10/10 tasks · rounds within (1 loop + 1 addendum) | design §13 vs execution.md |
 
 ## Lessons
 
@@ -31,6 +35,11 @@
 ## Noted, not a lesson
 
 - The correction was applied while another session executed the spec (owner-coordinated); the Correction Closure sweep covered requirements/design/tasks/graph in the same commit set (`98df5e96`, `d66a6233`).
+
+## Noted, not a lesson (archive additions)
+
+- T-08's attempt-1 retry spec asserted the call, not the fetch — the Reviewer's presence≠behavior contract caught it in-loop (the system working; KZ-001's rule, no new ID).
+- The cross-host Leader handoff succeeded because execution.md carried complete state — evidence-before-checkbox paying out; no rule change needed.
 
 ## Pending Items
 
@@ -52,4 +61,14 @@
 | Target | `docs/specs/general-setup/task.md` §5 Testing expectations (and AKILI upstream template) |
 | Edit | Add: *A task that mandates an e2e/integration test MUST state its bootstrap scope — modules mounted, providers overridden, resources it may not touch (DB, network). "e2e" without scope is read as the repo's nearest example, whatever that boots.* |
 | Severity | High |
+| Status | pending |
+
+### P3
+
+| Field | Value |
+|---|---|
+| Kind | guide-sync |
+| Target | `docs/ux-ui/design.md` §8.1 (component inventory) + §12.2 (decision record) + `docs/trd/trd.md` (API contracts) |
+| Edit | Register `app-indicator-deep-dive` (lazy tabbed panel, tri-state, IntersectionObserver-gated fetch) and the viz-chart Pie/Funnel/Radar registrations in §8.1; §12.2 entry for the F3 ship (archive path `docs/specs/archive/2026-08-24-changes--project-dashboard-v3--f3-indicator-deep-dive`); TRD API delta: `GET /api/v1/agresso/contracts/reports/indicator-details` (nullable sections, `{total_results, n}`, partial-failure envelope). |
+| Severity | Medium |
 | Status | pending |
