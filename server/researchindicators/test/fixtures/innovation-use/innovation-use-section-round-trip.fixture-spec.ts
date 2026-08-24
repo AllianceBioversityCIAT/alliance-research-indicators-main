@@ -1015,6 +1015,216 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
   });
 
   // -----------------------------------------------------------------------
+  // R-IUJ-001 — stale justification on level drop
+  // (`docs/specs/bugfix/innovation-use-stale-justification`). Same resultId
+  // as Hole 1: catalog id 7 + sentinel explanation, actor A count left at
+  // 241 by the DD-14 `it` above. Each case restores that precondition.
+  // Do not rewrite the Hole 1 `it`s (F4 / `''` / `'   '`).
+  // -----------------------------------------------------------------------
+
+  it('F1 / R-IUJ-001 AC.1 — STAR shape: PATCH catalog id 3 (level 2) still sending the stored justification; raw SELECT of the explanation is NULL', async () => {
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const [actorBefore] = await dataSource.query(
+      `SELECT actors_count FROM result_actors WHERE result_actors_id = ? AND is_active = 1`,
+      [actorAId],
+    );
+    const [orgBefore] = await dataSource.query(
+      `SELECT organization_count FROM result_institution_types WHERE result_institution_type_id = ? AND is_active = 1`,
+      [organizationId],
+    );
+    const [quantBefore] = await dataSource.query(
+      `SELECT quantification_number FROM result_quantifications WHERE result_id = ? AND is_active = 1 AND unit = ?`,
+      [resultId, 'sentinel-unit-F-A'],
+    );
+    const actorSentinel = Number(actorBefore.actors_count);
+    const orgSentinel = Number(orgBefore.organization_count);
+    const quantSentinel = Number(quantBefore.quantification_number);
+
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_id: 3,
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+      actors: [
+        {
+          result_actors_id: actorAId,
+          actor_type_id: actorTypeCodeA,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: actorSentinel,
+        },
+        {
+          result_actors_id: actorCId,
+          actor_type_id: actorTypeCodeC,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: 99,
+        },
+      ],
+      organizations: [
+        {
+          result_institution_type_id: organizationId,
+          institution_type_id: institutionTypeCode,
+          organization_count: orgSentinel,
+        },
+      ],
+      quantifications: [
+        {
+          quantification_number: quantSentinel,
+          unit: 'sentinel-unit-F-A',
+          description: 'sentinel-description-F-A',
+        },
+      ],
+    });
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+    expect(Number(after.innovation_use_level_id)).toBe(3);
+    expect(result.innovation_use_level_explanation).toBeNull();
+    expect(result.innovation_use_level_id).toBe(3);
+
+    const [actorAfter] = await dataSource.query(
+      `SELECT actors_count FROM result_actors WHERE result_actors_id = ? AND is_active = 1`,
+      [actorAId],
+    );
+    const [orgAfter] = await dataSource.query(
+      `SELECT organization_count FROM result_institution_types WHERE result_institution_type_id = ? AND is_active = 1`,
+      [organizationId],
+    );
+    const [quantAfter] = await dataSource.query(
+      `SELECT quantification_number FROM result_quantifications WHERE result_id = ? AND is_active = 1 AND unit = ?`,
+      [resultId, 'sentinel-unit-F-A'],
+    );
+    expect(Number(actorAfter.actors_count)).toBe(actorSentinel);
+    expect(Number(orgAfter.organization_count)).toBe(orgSentinel);
+    expect(Number(quantAfter.quantification_number)).toBe(quantSentinel);
+
+    await harness.service.update(resultId, {
+      innovation_use_level_id: innovationUseLevelId,
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
+  });
+
+  it('F2 / R-IUJ-001 AC.2 — omitted-key shape: PATCH catalog id 3 with no explanation key; raw SELECT of the explanation is NULL', async () => {
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_id: 3,
+    } as CreateResultInnovationUseDto);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+    expect(Number(after.innovation_use_level_id)).toBe(3);
+    expect(result.innovation_use_level_explanation).toBeNull();
+
+    await harness.service.update(resultId, {
+      innovation_use_level_id: innovationUseLevelId,
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
+  });
+
+  it('F3 / R-IUJ-001 AC.3 — D-1 trap: PATCH catalog id 6 (level 5, not "still requires a justification"); raw SELECT of the explanation is NULL', async () => {
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_id: 6,
+    } as CreateResultInnovationUseDto);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+    expect(Number(after.innovation_use_level_id)).toBe(6);
+    expect(result.innovation_use_level_explanation).toBeNull();
+
+    await harness.service.update(resultId, {
+      innovation_use_level_id: innovationUseLevelId,
+      innovation_use_level_explanation: innovationUseLevelExplanation,
+    } as unknown as CreateResultInnovationUseDto);
+  });
+
+  it('R-IUJ-001 AC.4 present-null: PATCH innovation_use_level_id null; raw SELECT of the explanation is NULL', async () => {
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(Number(before.innovation_use_level_id)).toBe(innovationUseLevelId);
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const result = await harness.service.update(resultId, {
+      innovation_use_level_id: null,
+    } as unknown as CreateResultInnovationUseDto);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+    expect(after.innovation_use_level_id).toBeNull();
+    expect(result.innovation_use_level_explanation).toBeNull();
+  });
+
+  it('R-IUJ-001 AC.4 no stored level: leftover explanation with NULL level id, PATCH omitting the explanation key; raw SELECT is NULL', async () => {
+    await dataSource.query(
+      `UPDATE result_innovation_use SET innovation_use_level_id = NULL, innovation_use_level_explanation = ? WHERE result_id = ?`,
+      [innovationUseLevelExplanation, resultId],
+    );
+    const [before] = await dataSource.query(
+      `SELECT innovation_use_level_id, innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(before.innovation_use_level_id).toBeNull();
+    expect(before.innovation_use_level_explanation).toBe(
+      innovationUseLevelExplanation,
+    );
+
+    const result = await harness.service.update(resultId, {
+      // explanation omitted; stored level is already NULL.
+      quantifications: [
+        {
+          quantification_number: 55,
+          unit: 'sentinel-unit-F-A',
+          description: 'sentinel-description-F-A',
+        },
+      ],
+    } as CreateResultInnovationUseDto);
+
+    const [after] = await dataSource.query(
+      `SELECT innovation_use_level_explanation FROM result_innovation_use WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(after.innovation_use_level_explanation).toBeNull();
+    expect(result.innovation_use_level_explanation).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
   // Hole 2 — T-08 advisory B-4: `create()` honors a PASSED transaction
   // manager (see this file's header comment for the full rationale).
   // -----------------------------------------------------------------------

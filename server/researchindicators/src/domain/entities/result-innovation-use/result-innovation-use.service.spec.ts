@@ -849,6 +849,126 @@ describe('ResultInnovationUseService', () => {
     });
   });
 
+  describe('update — clear justification when effective catalog level is < 6 or absent (R-IUJ-001; not Bug-Mode evidence, DD-6)', () => {
+    const resultId = 42;
+
+    it('writes explanation null when the resolved catalog level is 2, ignoring a present DTO string', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'stale justification',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 3,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 2 },
+        });
+      levelFindOne.mockResolvedValueOnce({ id: 3, level: 2 });
+
+      await service.update(resultId, {
+        innovation_use_level_id: 3,
+        innovation_use_level_explanation: 'stale justification',
+      } as CreateResultInnovationUseDto);
+
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          innovation_use_level_id: 3,
+          innovation_use_level_explanation: null,
+        }),
+      );
+    });
+
+    it('writes explanation null when the resolved catalog level is 5 (catalog id 6 — family D-1)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'stale justification',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 6,
+          innovation_use_level_explanation: null,
+          innovation_use_level: { level: 5 },
+        });
+      levelFindOne.mockResolvedValueOnce({ id: 6, level: 5 });
+
+      await service.update(resultId, {
+        innovation_use_level_id: 6,
+        innovation_use_level_explanation: 'stale justification',
+      } as CreateResultInnovationUseDto);
+
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          innovation_use_level_id: 6,
+          innovation_use_level_explanation: null,
+        }),
+      );
+    });
+
+    it('passes the DTO explanation through when the resolved catalog level is 6', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'kept',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'kept',
+          innovation_use_level: { level: 6 },
+        });
+      levelFindOne.mockResolvedValueOnce({ id: 7, level: 6 });
+
+      await service.update(resultId, {
+        innovation_use_level_id: 7,
+        innovation_use_level_explanation: 'kept',
+      } as CreateResultInnovationUseDto);
+
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({
+          innovation_use_level_id: 7,
+          innovation_use_level_explanation: 'kept',
+        }),
+      );
+    });
+
+    it('writes explanation null when there is no effective catalog level', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          is_active: true,
+          innovation_use_level_id: null,
+          innovation_use_level_explanation: 'leftover',
+        })
+        .mockResolvedValueOnce({
+          result_id: resultId,
+          innovation_use_level_id: null,
+          innovation_use_level_explanation: null,
+          innovation_use_level: null,
+        });
+
+      await service.update(resultId, {
+        innovation_use_level_explanation: 'leftover',
+      } as CreateResultInnovationUseDto);
+
+      expect(levelFindOne).not.toHaveBeenCalled();
+      expect(managerUpdate).toHaveBeenCalledWith(
+        resultId,
+        expect.objectContaining({ innovation_use_level_explanation: null }),
+      );
+    });
+  });
+
   describe('update — full write transaction (design.md §5.1, R-IUA-003)', () => {
     const resultId = 42;
 
