@@ -180,6 +180,12 @@ export class AgressoContractService {
     return this._agressoContractRepository.getContractDashboard(contractId);
   }
 
+  async getIndicatorDetailsReport(contractId: string) {
+    return this._agressoContractRepository.getIndicatorDetailsReport(
+      contractId,
+    );
+  }
+
   async getGeoScopeReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
   }

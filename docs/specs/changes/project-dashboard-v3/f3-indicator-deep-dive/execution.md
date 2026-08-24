@@ -92,3 +92,24 @@
 - **Reviewer Verdict:**
   - `STATUS: PASS`
   - Summary: The remediation has been correctly applied to `getInnovationUseDetailsReport`. The aggregation logic now correctly utilizes `COALESCE(SUM(ra.column), 0)` to calculate exact population quantities rather than counting boolean presences, satisfying R-DD-002 rows 2, 4, 6. The `agresso-contract.repository.spec.ts` test suite accurately reflects this behavioral change with realistic mocked summations, successfully verifying the logic.
+
+### Task T-04 — Composition method + service + controller + Swagger
+
+- **Status:** PASS (Attempt 1)
+- **Implementer:** custom-implementer (flash)
+- **Reviewer:** custom-reviewer (pro)
+- **Files touched:**
+  - `server/researchindicators/src/domain/entities/agresso-contract/dto/contract-indicator-details-report.dto.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.service.spec.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.ts`
+  - `server/researchindicators/src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts`
+- **Verification Evidence:**
+  - Unit tests: `jest src/domain/entities/agresso-contract/repositories/agresso-contract.repository.spec.ts src/domain/entities/agresso-contract/agresso-contract.service.spec.ts src/domain/entities/agresso-contract/agresso-contract.controller.spec.ts --silent` (171/171 passed)
+  - Linter: `npx eslint` across touched files (0 errors, 0 warnings)
+  - Full server test suite: 338 suites passed, 2480 tests passed
+- **Reviewer Verdict:**
+  - `STATUS: PASS`
+  - Summary: The implementation for Task T-04 correctly fulfills the specified requirements, including the complete tri-state error handling semantics (D-F3-7) and the proper Swagger annotations, validation, and response formatting in the controller. The use of `Promise.allSettled` along with a precise conditional population safely isolates individual section failures while cleanly omitting zero-result indicators.

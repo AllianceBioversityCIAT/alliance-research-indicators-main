@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { AgressoContractRepository } from './agresso-contract.repository';
@@ -3480,6 +3484,296 @@ describe('AgressoContractRepository', () => {
         organization_types: [],
         quantifications: [],
       });
+    });
+  });
+
+  describe('getIndicatorDetailsReport', () => {
+    const mockCapacitySharing: any = {
+      meta: { total_results: 4, n: 3 },
+      total_trainees: 50,
+      gender_split: [{ gender: 'female', count: 30 }],
+      session_lengths: [{ id: 1, name: 'Short-term', count: 3 }],
+      delivery_modalities: [{ id: 1, name: 'In person', count: 3 }],
+      session_types: [{ id: 1, name: 'Group', count: 3 }],
+    };
+
+    const mockInnovationDev: any = {
+      meta: { total_results: 2, n: 2 },
+      readiness_levels: [{ id: 1, name: 'Level 1', level: 1, count: 2 }],
+      innovation_types: [{ id: 1, name: 'Technological', count: 2 }],
+      innovation_natures: [{ id: 1, name: 'Product', count: 2 }],
+      anticipated_users: [{ id: 1, name: 'Farmers', count: 2 }],
+      scalability_profile: [
+        {
+          key: 'is_cheaper_than_alternatives',
+          name: 'Cheaper than alternatives',
+          true_count: 2,
+          answered_count: 2,
+        },
+      ],
+    };
+
+    const mockKnowledgeProduct: any = {
+      meta: { total_results: 5, n: 4 },
+      open_access_split: [{ name: 'Open Access', count: 3 }],
+      access_status: [{ name: 'Published', count: 4 }],
+      types: [{ id: 1, name: 'Journal Article', count: 4 }],
+      publications_by_year: [{ year: 2025, count: 4 }],
+    };
+
+    const mockPolicyChange: any = {
+      meta: { total_results: 3, n: 3 },
+      stage_funnel: [{ id: 1, name: 'Stage 1', order: 1, count: 3 }],
+      policy_types: [{ id: 1, name: 'Policy', count: 3 }],
+      implicated_institutions_count: 2,
+    };
+
+    const mockOicr: any = {
+      meta: { total_results: 1, n: 1 },
+      maturity_levels: [{ id: 1, name: 'Mature', count: 1 }],
+      external_use_split: [{ name: 'External use', count: 1 }],
+    };
+
+    const mockInnovationUse: any = {
+      meta: { total_results: 6, n: 4 },
+      gender_youth_reach: {
+        overall: {
+          women_youth: 10,
+          women_not_youth: 20,
+          men_youth: 15,
+          men_not_youth: 25,
+          total: 70,
+        },
+        by_actor_type: [],
+      },
+      organization_types: [{ id: 1, name: 'Government', count: 2 }],
+      quantifications: [{ unit: 'Hectares', total: 100, count: 2 }],
+    };
+
+    const mockVelocity: any = [
+      { month: '2025-01', count: 2 },
+      { month: '2025-02', count: 3 },
+    ];
+
+    it('should throw BadRequestException if contractId is empty, null, or undefined', async () => {
+      await expect(repository.getIndicatorDetailsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getIndicatorDetailsReport(null as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getIndicatorDetailsReport(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should compose report for mixed indicators contract (present returned, zero-result omitted)', async () => {
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({
+        1: 4,
+        2: 2,
+        3: 5,
+        4: 3,
+      });
+
+      const getCapSharingSpy = jest
+        .spyOn(repository, 'getCapacitySharingDetailsReport')
+        .mockResolvedValue(mockCapacitySharing);
+      const getInnovDevSpy = jest
+        .spyOn(repository, 'getInnovationDevDetailsReport')
+        .mockResolvedValue(mockInnovationDev);
+      const getKpSpy = jest
+        .spyOn(repository, 'getKnowledgeProductDetailsReport')
+        .mockResolvedValue(mockKnowledgeProduct);
+      const getPolicySpy = jest
+        .spyOn(repository, 'getPolicyChangeDetailsReport')
+        .mockResolvedValue(mockPolicyChange);
+      const getOicrSpy = jest
+        .spyOn(repository, 'getOicrDetailsReport')
+        .mockResolvedValue(mockOicr);
+      const getInnovUseSpy = jest
+        .spyOn(repository, 'getInnovationUseDetailsReport')
+        .mockResolvedValue(mockInnovationUse);
+      const getVelocitySpy = jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockResolvedValue(mockVelocity);
+
+      const result = await repository.getIndicatorDetailsReport('A511');
+
+      // Present sections
+      expect(result.data.capacity_sharing).toEqual(mockCapacitySharing);
+      expect(result.data.innovation_dev).toEqual(mockInnovationDev);
+      expect(result.data.knowledge_product).toEqual(mockKnowledgeProduct);
+      expect(result.data.policy_change).toEqual(mockPolicyChange);
+      expect(result.data.reporting_velocity).toEqual(mockVelocity);
+
+      // Tri-state assertion: Zero-result indicators must be omitted (undefined), NOT null
+      expect(result.data.oicr).toBeUndefined();
+      expect('oicr' in result.data).toBe(false);
+      expect(result.data.innovation_use).toBeUndefined();
+      expect('innovation_use' in result.data).toBe(false);
+
+      // No errors
+      expect(result.errors).toEqual([]);
+
+      // Spies called only for indicators with count > 0
+      expect(getCapSharingSpy).toHaveBeenCalledWith('A511', 4);
+      expect(getInnovDevSpy).toHaveBeenCalledWith('A511', 2);
+      expect(getKpSpy).toHaveBeenCalledWith('A511', 5);
+      expect(getPolicySpy).toHaveBeenCalledWith('A511', 3);
+      expect(getOicrSpy).not.toHaveBeenCalled();
+      expect(getInnovUseSpy).not.toHaveBeenCalled();
+      expect(getVelocitySpy).toHaveBeenCalledWith('A511');
+    });
+
+    it('should handle partial failure by setting failed section to null, logging error, and returning errors array', async () => {
+      const loggerSpy = jest
+        .spyOn(repository['logger'], '_error')
+        .mockImplementation();
+
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({
+        1: 3,
+        2: 2,
+      });
+
+      jest
+        .spyOn(repository, 'getCapacitySharingDetailsReport')
+        .mockResolvedValue(mockCapacitySharing);
+      jest
+        .spyOn(repository, 'getInnovationDevDetailsReport')
+        .mockRejectedValue(
+          new Error('Connection timeout in innovation dev query'),
+        );
+      jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockResolvedValue(mockVelocity);
+
+      const result = await repository.getIndicatorDetailsReport('A511');
+
+      expect(result.data.capacity_sharing).toEqual(mockCapacitySharing);
+      expect(result.data.innovation_dev).toBeNull();
+      expect(result.data.reporting_velocity).toEqual(mockVelocity);
+      expect(result.data.knowledge_product).toBeUndefined();
+      expect(result.errors).toEqual([
+        'innovation_dev: Connection timeout in innovation dev query',
+      ]);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to get innovation dev details for contract A511',
+        ),
+      );
+    });
+
+    it('should handle partial failure when reporting velocity fails', async () => {
+      const loggerSpy = jest
+        .spyOn(repository['logger'], '_error')
+        .mockImplementation();
+
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({
+        1: 3,
+      });
+
+      jest
+        .spyOn(repository, 'getCapacitySharingDetailsReport')
+        .mockResolvedValue(mockCapacitySharing);
+      jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockRejectedValue(new Error('Velocity DB error'));
+
+      const result = await repository.getIndicatorDetailsReport('A511');
+
+      expect(result.data.capacity_sharing).toEqual(mockCapacitySharing);
+      expect(result.data.reporting_velocity).toBeNull();
+      expect(result.errors).toEqual(['reporting_velocity: Velocity DB error']);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to get reporting velocity for contract A511',
+        ),
+      );
+    });
+
+    it('should throw InternalServerErrorException when all attempted queries fail', async () => {
+      jest.spyOn(repository['logger'], '_error').mockImplementation();
+
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({
+        1: 2,
+        3: 4,
+      });
+
+      jest
+        .spyOn(repository, 'getCapacitySharingDetailsReport')
+        .mockRejectedValue(new Error('Capacity error'));
+      jest
+        .spyOn(repository, 'getKnowledgeProductDetailsReport')
+        .mockRejectedValue(new Error('KP error'));
+      jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockRejectedValue(new Error('Velocity error'));
+
+      await expect(
+        repository.getIndicatorDetailsReport('A511'),
+      ).rejects.toThrow(InternalServerErrorException);
+    });
+
+    it('should return empty velocity and omit all sections for a contract with zero results across all indicators', async () => {
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({});
+      jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockResolvedValue([]);
+
+      const result = await repository.getIndicatorDetailsReport('A511');
+
+      expect(result.data.reporting_velocity).toEqual([]);
+      expect(result.data.capacity_sharing).toBeUndefined();
+      expect(result.data.innovation_dev).toBeUndefined();
+      expect(result.data.knowledge_product).toBeUndefined();
+      expect(result.data.policy_change).toBeUndefined();
+      expect(result.data.oicr).toBeUndefined();
+      expect(result.data.innovation_use).toBeUndefined();
+      expect(result.errors).toEqual([]);
+    });
+
+    it('should populate all 6 sections when all indicators have results and succeed', async () => {
+      jest.spyOn(repository, 'getIndicatorTotalResults').mockResolvedValue({
+        1: 4,
+        2: 2,
+        3: 5,
+        4: 3,
+        5: 1,
+        6: 6,
+      });
+
+      jest
+        .spyOn(repository, 'getCapacitySharingDetailsReport')
+        .mockResolvedValue(mockCapacitySharing);
+      jest
+        .spyOn(repository, 'getInnovationDevDetailsReport')
+        .mockResolvedValue(mockInnovationDev);
+      jest
+        .spyOn(repository, 'getKnowledgeProductDetailsReport')
+        .mockResolvedValue(mockKnowledgeProduct);
+      jest
+        .spyOn(repository, 'getPolicyChangeDetailsReport')
+        .mockResolvedValue(mockPolicyChange);
+      jest
+        .spyOn(repository, 'getOicrDetailsReport')
+        .mockResolvedValue(mockOicr);
+      jest
+        .spyOn(repository, 'getInnovationUseDetailsReport')
+        .mockResolvedValue(mockInnovationUse);
+      jest
+        .spyOn(repository, 'getReportingVelocityReport')
+        .mockResolvedValue(mockVelocity);
+
+      const result = await repository.getIndicatorDetailsReport('A511');
+
+      expect(result.data.capacity_sharing).toEqual(mockCapacitySharing);
+      expect(result.data.innovation_dev).toEqual(mockInnovationDev);
+      expect(result.data.knowledge_product).toEqual(mockKnowledgeProduct);
+      expect(result.data.policy_change).toEqual(mockPolicyChange);
+      expect(result.data.oicr).toEqual(mockOicr);
+      expect(result.data.innovation_use).toEqual(mockInnovationUse);
+      expect(result.data.reporting_velocity).toEqual(mockVelocity);
+      expect(result.errors).toEqual([]);
     });
   });
 });

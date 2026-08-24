@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, FindOptionsWhere, In, Repository } from 'typeorm';
@@ -14,6 +15,7 @@ import { formatPersonName } from '../../../shared/utils/name-format.util';
 import { StringKeys } from '../../../shared/global-dto/types-global';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { Indicator } from '../../indicators/entities/indicator.entity';
+import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { MappedContractsDto } from '../dto/mapper-agresso-contract.dto';
 import {
   escapeLikeString,
@@ -67,6 +69,7 @@ import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto
 import {
   CapacitySharingDetailsDto,
   CapacitySharingGenderSplitDto,
+  ContractIndicatorDetailsReportDto,
   InnovationDevDetailsDto,
   InnovationDevScalabilityProfileDto,
   InnovationUseDetailsDto,
@@ -75,12 +78,17 @@ import {
   PolicyChangeDetailsDto,
   ReportingVelocityItemDto,
 } from '../dto/contract-indicator-details-report.dto';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 @Injectable()
 export class AgressoContractRepository
   extends Repository<AgressoContract>
   implements ElasticFindEntity<AgressoContractOpensearchDto>
 {
+  private readonly logger = new LoggerUtil({
+    name: AgressoContractRepository.name,
+  });
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly currentUser: CurrentUserUtil,
@@ -1457,6 +1465,179 @@ export class AgressoContractRepository
         geo_scope,
         sp_alignment,
       },
+      errors,
+    };
+  }
+
+  async getIndicatorDetailsReport(
+    contractId: string,
+  ): Promise<{ data: ContractIndicatorDetailsReportDto; errors: string[] }> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const indicatorTotals = await this.getIndicatorTotalResults(contractId);
+
+    const totalCapacity =
+      indicatorTotals[IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT] ?? 0;
+    const totalInnovDev = indicatorTotals[IndicatorsEnum.INNOVATION_DEV] ?? 0;
+    const totalKp = indicatorTotals[IndicatorsEnum.KNOWLEDGE_PRODUCT] ?? 0;
+    const totalPolicy = indicatorTotals[IndicatorsEnum.POLICY_CHANGE] ?? 0;
+    const totalOicr = indicatorTotals[IndicatorsEnum.OICR] ?? 0;
+    const totalInnovUse = indicatorTotals[IndicatorsEnum.INNOVATION_USE] ?? 0;
+
+    const [
+      capacityResult,
+      innovDevResult,
+      kpResult,
+      policyResult,
+      oicrResult,
+      innovUseResult,
+      velocityResult,
+    ] = await Promise.allSettled([
+      totalCapacity > 0
+        ? this.getCapacitySharingDetailsReport(contractId, totalCapacity)
+        : Promise.resolve(undefined),
+      totalInnovDev > 0
+        ? this.getInnovationDevDetailsReport(contractId, totalInnovDev)
+        : Promise.resolve(undefined),
+      totalKp > 0
+        ? this.getKnowledgeProductDetailsReport(contractId, totalKp)
+        : Promise.resolve(undefined),
+      totalPolicy > 0
+        ? this.getPolicyChangeDetailsReport(contractId, totalPolicy)
+        : Promise.resolve(undefined),
+      totalOicr > 0
+        ? this.getOicrDetailsReport(contractId, totalOicr)
+        : Promise.resolve(undefined),
+      totalInnovUse > 0
+        ? this.getInnovationUseDetailsReport(contractId, totalInnovUse)
+        : Promise.resolve(undefined),
+      this.getReportingVelocityReport(contractId),
+    ]);
+
+    const errors: string[] = [];
+    const data: ContractIndicatorDetailsReportDto = {};
+
+    let attemptedCount = 1;
+    let rejectedCount = 0;
+
+    if (totalCapacity > 0) {
+      attemptedCount++;
+      if (capacityResult.status === 'fulfilled') {
+        data.capacity_sharing =
+          capacityResult.value as CapacitySharingDetailsDto;
+      } else {
+        rejectedCount++;
+        const err =
+          capacityResult.reason?.message ?? String(capacityResult.reason);
+        errors.push(`capacity_sharing: ${err}`);
+        this.logger._error(
+          `Failed to get capacity sharing details for contract ${contractId}: ${err}`,
+        );
+        data.capacity_sharing = null;
+      }
+    }
+
+    if (totalInnovDev > 0) {
+      attemptedCount++;
+      if (innovDevResult.status === 'fulfilled') {
+        data.innovation_dev = innovDevResult.value as InnovationDevDetailsDto;
+      } else {
+        rejectedCount++;
+        const err =
+          innovDevResult.reason?.message ?? String(innovDevResult.reason);
+        errors.push(`innovation_dev: ${err}`);
+        this.logger._error(
+          `Failed to get innovation dev details for contract ${contractId}: ${err}`,
+        );
+        data.innovation_dev = null;
+      }
+    }
+
+    if (totalKp > 0) {
+      attemptedCount++;
+      if (kpResult.status === 'fulfilled') {
+        data.knowledge_product = kpResult.value as KnowledgeProductDetailsDto;
+      } else {
+        rejectedCount++;
+        const err = kpResult.reason?.message ?? String(kpResult.reason);
+        errors.push(`knowledge_product: ${err}`);
+        this.logger._error(
+          `Failed to get knowledge product details for contract ${contractId}: ${err}`,
+        );
+        data.knowledge_product = null;
+      }
+    }
+
+    if (totalPolicy > 0) {
+      attemptedCount++;
+      if (policyResult.status === 'fulfilled') {
+        data.policy_change = policyResult.value as PolicyChangeDetailsDto;
+      } else {
+        rejectedCount++;
+        const err = policyResult.reason?.message ?? String(policyResult.reason);
+        errors.push(`policy_change: ${err}`);
+        this.logger._error(
+          `Failed to get policy change details for contract ${contractId}: ${err}`,
+        );
+        data.policy_change = null;
+      }
+    }
+
+    if (totalOicr > 0) {
+      attemptedCount++;
+      if (oicrResult.status === 'fulfilled') {
+        data.oicr = oicrResult.value as OicrDetailsDto;
+      } else {
+        rejectedCount++;
+        const err = oicrResult.reason?.message ?? String(oicrResult.reason);
+        errors.push(`oicr: ${err}`);
+        this.logger._error(
+          `Failed to get OICR details for contract ${contractId}: ${err}`,
+        );
+        data.oicr = null;
+      }
+    }
+
+    if (totalInnovUse > 0) {
+      attemptedCount++;
+      if (innovUseResult.status === 'fulfilled') {
+        data.innovation_use = innovUseResult.value as InnovationUseDetailsDto;
+      } else {
+        rejectedCount++;
+        const err =
+          innovUseResult.reason?.message ?? String(innovUseResult.reason);
+        errors.push(`innovation_use: ${err}`);
+        this.logger._error(
+          `Failed to get innovation use details for contract ${contractId}: ${err}`,
+        );
+        data.innovation_use = null;
+      }
+    }
+
+    if (velocityResult.status === 'fulfilled') {
+      data.reporting_velocity =
+        velocityResult.value as ReportingVelocityItemDto[];
+    } else {
+      rejectedCount++;
+      const err =
+        velocityResult.reason?.message ?? String(velocityResult.reason);
+      errors.push(`reporting_velocity: ${err}`);
+      this.logger._error(
+        `Failed to get reporting velocity for contract ${contractId}: ${err}`,
+      );
+      data.reporting_velocity = null;
+    }
+
+    if (attemptedCount > 0 && rejectedCount === attemptedCount) {
+      throw new InternalServerErrorException(
+        'All indicator detail queries failed',
+      );
+    }
+
+    return {
+      data,
       errors,
     };
   }

@@ -39,6 +39,7 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ContractDashboardReportDto } from './dto/contract-dashboard-report.dto';
+import { ContractIndicatorDetailsReportDto } from './dto/contract-indicator-details-report.dto';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -157,6 +158,35 @@ export class AgressoContractController {
     return ResponseUtils.format({
       data,
       description: 'Contract dashboard report retrieved successfully',
+      status: HttpStatus.OK,
+      errors,
+    });
+  }
+
+  @Get('reports/indicator-details')
+  @ApiOperation({
+    summary:
+      'Get per-indicator-type aggregates and reporting velocity for a contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    description: 'Contract ID',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ContractIndicatorDetailsReportDto,
+    description: 'Contract indicator details report retrieved successfully',
+  })
+  async getIndicatorDetailsReport(@Query('contract-id') contractId: string) {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract-id query parameter is required');
+    }
+    const { data, errors } =
+      await this.agressoContractService.getIndicatorDetailsReport(contractId);
+    return ResponseUtils.format({
+      data,
+      description: 'Contract indicator details report retrieved successfully',
       status: HttpStatus.OK,
       errors,
     });

@@ -49,6 +49,7 @@ describe('AgressoContractService', () => {
     getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
     getContractDashboard: jest.fn(),
+    getIndicatorDetailsReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -696,6 +697,35 @@ describe('AgressoContractService', () => {
         BadRequestException,
       );
       expect(repository.getContractDashboard).toHaveBeenCalledWith('');
+    });
+  });
+
+  describe('getIndicatorDetailsReport', () => {
+    it('should delegate indicator details report retrieval to repository', async () => {
+      const mockResult = {
+        data: {
+          capacity_sharing: null,
+          reporting_velocity: [],
+        },
+        errors: [],
+      };
+      mockRepository.getIndicatorDetailsReport.mockResolvedValue(mockResult);
+
+      const result = await service.getIndicatorDetailsReport('A100');
+
+      expect(repository.getIndicatorDetailsReport).toHaveBeenCalledWith('A100');
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should propagate errors from repository', async () => {
+      mockRepository.getIndicatorDetailsReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(service.getIndicatorDetailsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.getIndicatorDetailsReport).toHaveBeenCalledWith('');
     });
   });
 });

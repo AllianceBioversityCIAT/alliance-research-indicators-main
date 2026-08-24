@@ -45,6 +45,7 @@ describe('AgressoContractController', () => {
     getSpAlignmentReport: jest.fn(),
     getFundingTypes: jest.fn(),
     getContractDashboard: jest.fn(),
+    getIndicatorDetailsReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -192,6 +193,129 @@ describe('AgressoContractController', () => {
 
       expect(operation).toMatchObject({
         summary: 'Get consolidated contract dashboard analytics report',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'contract-id',
+            required: true,
+          }),
+        ]),
+      );
+      expect(response).toBeDefined();
+    });
+  });
+
+  describe('getIndicatorDetailsReport', () => {
+    it('should return contract indicator details report with data and errors', async () => {
+      const mockData = {
+        capacity_sharing: {
+          meta: { total_results: 4, n: 3 },
+          total_trainees: 50,
+          gender_split: [{ gender: 'female', count: 30 }],
+          session_lengths: [{ id: 1, name: 'Short-term', count: 3 }],
+          delivery_modalities: [{ id: 1, name: 'In person', count: 3 }],
+          session_types: [{ id: 1, name: 'Group', count: 3 }],
+        },
+        reporting_velocity: [
+          { month: '2025-01', count: 2 },
+          { month: '2025-02', count: 3 },
+        ],
+      };
+      const mockResult = {
+        data: mockData,
+        errors: [],
+      };
+
+      mockAgressoContractService.getIndicatorDetailsReport.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getIndicatorDetailsReport('A511');
+
+      expect(
+        mockAgressoContractService.getIndicatorDetailsReport,
+      ).toHaveBeenCalledWith('A511');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract indicator details report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+      expect(result).toEqual({
+        description: 'Contract indicator details report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+    });
+
+    it('should return partial failure errors when a section query fails', async () => {
+      const mockData = {
+        capacity_sharing: null,
+        reporting_velocity: [],
+      };
+      const mockResult = {
+        data: mockData,
+        errors: ['capacity_sharing: query timeout'],
+      };
+
+      mockAgressoContractService.getIndicatorDetailsReport.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getIndicatorDetailsReport('A511');
+
+      expect(
+        mockAgressoContractService.getIndicatorDetailsReport,
+      ).toHaveBeenCalledWith('A511');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract indicator details report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: ['capacity_sharing: query timeout'],
+      });
+      expect(result).toEqual({
+        description: 'Contract indicator details report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: ['capacity_sharing: query timeout'],
+      });
+    });
+
+    it('should throw BadRequestException when contract-id is empty or missing', async () => {
+      await expect(controller.getIndicatorDetailsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        controller.getIndicatorDetailsReport(null as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        controller.getIndicatorDetailsReport(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockAgressoContractService.getIndicatorDetailsReport,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should declare Swagger operation, query parameter, and response metadata', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getIndicatorDetailsReport,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getIndicatorDetailsReport,
+      );
+      const response = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        controller.getIndicatorDetailsReport,
+      );
+
+      expect(operation).toMatchObject({
+        summary:
+          'Get per-indicator-type aggregates and reporting velocity for a contract',
       });
       expect(parameters).toEqual(
         expect.arrayContaining([

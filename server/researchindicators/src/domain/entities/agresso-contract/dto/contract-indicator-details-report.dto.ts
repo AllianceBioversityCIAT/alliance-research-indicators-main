@@ -686,3 +686,32 @@ export class ContractIndicatorDetailsReportDto {
   })
   reporting_velocity?: ReportingVelocityItemDto[] | null;
 }
+
+export class ContractIndicatorDetailsResponseDto {
+  @ApiProperty({
+    type: ContractIndicatorDetailsReportDto,
+    description: 'Contract indicator details report data',
+  })
+  data!: ContractIndicatorDetailsReportDto;
+
+  @ApiProperty({
+    description: 'Response description',
+    example: 'Contract indicator details report retrieved successfully',
+  })
+  description!: string;
+
+  @ApiProperty({
+    type: Number,
+    description: 'HTTP status code',
+    example: 200,
+  })
+  status!: number;
+
+  @ApiProperty({
+    type: [String],
+    required: false,
+    description: 'List of partial failure errors, if any',
+    example: ['capacity_sharing: query timeout'],
+  })
+  errors?: string[];
+}

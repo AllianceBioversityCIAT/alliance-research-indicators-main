@@ -71,9 +71,9 @@ graph TD
 - **Files:** repository composition, `agresso-contract.service.ts`, `agresso-contract.controller.ts` (+specs).
 - **Description:** `getIndicatorDetailsReport` composing the seven queries via `Promise.allSettled` (F2 as-built idiom): zero-result indicator → key **omitted**; failure → `null` + envelope error + `LoggerUtil.error`; all-fail → throw. Controller handler + full Swagger + 400 validation.
 - **Acceptance / done check:**
-  - [ ] Unit specs: omission vs null vs populated tri-state (**failing input:** emit `null` for a zero-result indicator → tri-state spec fails); section methods unmodified by composition (diff-scoped).
-  - [ ] Server suite + eslint green.
-- **Deps:** T-02, T-03 · **Effort:** M · **Status:** todo
+  - [x] Unit specs: omission vs null vs populated tri-state (**failing input:** emit `null` for a zero-result indicator → tri-state spec fails); section methods unmodified by composition (diff-scoped).
+  - [x] Server suite + eslint green.
+- **Deps:** T-02, T-03 · **Effort:** M · **Status:** done
 
 ### T-05 — Supertest e2e + dev ground-truth check
 
