@@ -77,9 +77,9 @@ graph TD
 - **Files:** `test/agresso-contract-insights.integration-spec.ts` (NEW — `npm run test:integration`; template `test/bilateral-primary-contributing-sp.integration-spec.ts`); evidence in `execution.md`.
 - **Description:** `TestingModule` with only controller + service + global `ResponseInterceptor`/`GlobalExceptions`, repository `overrideProvider`-mocked, supertest on `app.getHttpServer()`. Cases: all-present, one-null + errors entry, all-fail 500, 400. **MUST NOT** import `AppModule`, open a `DataSource`, or reach the network (K-021). Then ground-truth on dev: `reach` four sums and `keywords` top-3 for A511 vs hand-run SQL, back-to-back.
 - **Acceptance / done check:**
-  - [ ] `npm run test:integration` green, wall-clock < 60 s (**failing input:** rethrow-on-first-rejection → the one-null case 500s; **disqualifier:** any DB connection opened or timeout exceeded).
-  - [ ] Ground-truth recorded with SQL + both value sets; **disqualifier:** captures not back-to-back or different contracts.
-- **Deps:** T-04 · **Effort:** M · **Status:** todo
+  - [x] `npm run test:integration` green, wall-clock < 60 s (**failing input:** rethrow-on-first-rejection → the one-null case 500s; **disqualifier:** any DB connection opened or timeout exceeded). *(7.8 s; KZ-017 note: red is assertion-level, composition half owned by T-04 — see execution.md. Template note: the bilateral template named above wires a REAL DataSource — F3's `agresso-contract-indicator-details.integration-spec.ts` is the K-021-conformant template used.)*
+  - [x] Ground-truth recorded with SQL + both value sets; **disqualifier:** captures not back-to-back or different contracts. *(A511 primary + A1048 labeled arithmetic supplement; semantics finding recorded — see execution.md T-05.)*
+- **Deps:** T-04 · **Effort:** M · **Status:** done
 
 ### T-06 — Register `TreemapChart` in viz-chart
 
