@@ -51,9 +51,9 @@ graph TD
 - **Files:** repository (+spec).
 - **Description:** Joined, label-resolved aggregates: trainees totals + gender + length/modality/type mixes; open-access/access-status/type + publications-by-year; maturity distribution + external-use split. Each returns rows only from contributing results (`n`).
 - **Acceptance / done check:**
-  - [ ] SQL specs assert generated SQL + params (KZ-001) with fixtures: multi-row satellite, **result without satellite row** (must not contribute zeros — the named failing input: a LEFT-JOIN-with-COALESCE-0 mutation must redden the sums spec).
-  - [ ] Label fields resolved (lookup join asserted; **failing input:** drop a join → label NULL → spec fails).
-- **Deps:** T-01 · **Effort:** L · **Status:** todo
+  - [x] SQL specs assert generated SQL + params (KZ-001) with fixtures: multi-row satellite, **result without satellite row** (must not contribute zeros — the named failing input: a LEFT-JOIN-with-COALESCE-0 mutation must redden the sums spec).
+  - [x] Label fields resolved (lookup join asserted; **failing input:** drop a join → label NULL → spec fails).
+- **Deps:** T-01 · **Effort:** L · **Status:** done
 
 ### T-03 — Section queries: innovation_dev, policy_change, innovation_use
 

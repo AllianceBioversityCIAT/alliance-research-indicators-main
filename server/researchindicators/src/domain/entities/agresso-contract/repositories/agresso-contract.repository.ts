@@ -64,7 +64,13 @@ import {
   ContractSpAlignmentSpDto,
 } from '../dto/contract-sp-alignment-report.dto';
 import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto';
-import { ReportingVelocityItemDto } from '../dto/contract-indicator-details-report.dto';
+import {
+  CapacitySharingDetailsDto,
+  CapacitySharingGenderSplitDto,
+  KnowledgeProductDetailsDto,
+  OicrDetailsDto,
+  ReportingVelocityItemDto,
+} from '../dto/contract-indicator-details-report.dto';
 
 @Injectable()
 export class AgressoContractRepository
@@ -1516,6 +1522,388 @@ export class AgressoContractRepository
       month: String(row.month),
       count: Number(row.count ?? 0),
     }));
+  }
+
+  async getCapacitySharingDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<CapacitySharingDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const summaryQuery = `
+      SELECT
+        COUNT(DISTINCT rcs.result_id) AS n,
+        COALESCE(SUM(rcs.session_participants_total), 0) AS total_trainees,
+        COALESCE(SUM(rcs.session_participants_female), 0) AS female_count,
+        COALESCE(SUM(rcs.session_participants_male), 0) AS male_count,
+        COALESCE(SUM(rcs.session_participants_non_binary), 0) AS non_binary_count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_capacity_sharing rcs
+        ON rcs.result_id = cr.result_id
+        AND rcs.is_active = TRUE
+    `;
+
+    const sessionLengthsQuery = `
+      SELECT
+        sl.session_length_id AS id,
+        sl.name AS name,
+        COUNT(DISTINCT rcs.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_capacity_sharing rcs
+        ON rcs.result_id = cr.result_id
+        AND rcs.is_active = TRUE
+      INNER JOIN session_lengths sl
+        ON sl.session_length_id = rcs.session_length_id
+        AND sl.is_active = TRUE
+      GROUP BY sl.session_length_id, sl.name
+      ORDER BY count DESC, sl.name ASC
+    `;
+
+    const deliveryModalitiesQuery = `
+      SELECT
+        dm.delivery_modality_id AS id,
+        dm.name AS name,
+        COUNT(DISTINCT rcs.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_capacity_sharing rcs
+        ON rcs.result_id = cr.result_id
+        AND rcs.is_active = TRUE
+      INNER JOIN delivery_modalities dm
+        ON dm.delivery_modality_id = rcs.delivery_modality_id
+        AND dm.is_active = TRUE
+      GROUP BY dm.delivery_modality_id, dm.name
+      ORDER BY count DESC, dm.name ASC
+    `;
+
+    const sessionTypesQuery = `
+      SELECT
+        st.session_type_id AS id,
+        st.name AS name,
+        COUNT(DISTINCT rcs.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_capacity_sharing rcs
+        ON rcs.result_id = cr.result_id
+        AND rcs.is_active = TRUE
+      INNER JOIN session_types st
+        ON st.session_type_id = rcs.session_type_id
+        AND st.is_active = TRUE
+      GROUP BY st.session_type_id, st.name
+      ORDER BY count DESC, st.name ASC
+    `;
+
+    const [
+      summaryRows,
+      sessionLengthRows,
+      deliveryModalityRows,
+      sessionTypeRows,
+    ] = await Promise.all([
+      this.query(summaryQuery, [contractId]),
+      this.query(sessionLengthsQuery, [contractId]),
+      this.query(deliveryModalitiesQuery, [contractId]),
+      this.query(sessionTypesQuery, [contractId]),
+    ]);
+
+    const summaryRow = (summaryRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(summaryRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        total_trainees: 0,
+        gender_split: [],
+        session_lengths: [],
+        delivery_modalities: [],
+        session_types: [],
+      };
+    }
+
+    const gender_split: CapacitySharingGenderSplitDto[] = [
+      { gender: 'female', count: Number(summaryRow.female_count ?? 0) },
+      { gender: 'male', count: Number(summaryRow.male_count ?? 0) },
+      { gender: 'non_binary', count: Number(summaryRow.non_binary_count ?? 0) },
+    ];
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      total_trainees: Number(summaryRow.total_trainees ?? 0),
+      gender_split,
+      session_lengths: (
+        sessionLengthRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      delivery_modalities: (
+        deliveryModalityRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      session_types: (sessionTypeRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+          name: String(row.name),
+          count: Number(row.count ?? 0),
+        }),
+      ),
+    };
+  }
+
+  async getKnowledgeProductDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<KnowledgeProductDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rkp.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_knowledge_products rkp
+        ON rkp.result_id = cr.result_id
+        AND rkp.is_active = TRUE
+    `;
+
+    const openAccessQuery = `
+      SELECT
+        CASE
+          WHEN rkp.open_access = TRUE THEN 'Open access'
+          WHEN rkp.open_access = FALSE THEN 'Restricted'
+          ELSE 'Unknown'
+        END AS name,
+        COUNT(DISTINCT rkp.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_knowledge_products rkp
+        ON rkp.result_id = cr.result_id
+        AND rkp.is_active = TRUE
+      GROUP BY
+        CASE
+          WHEN rkp.open_access = TRUE THEN 'Open access'
+          WHEN rkp.open_access = FALSE THEN 'Restricted'
+          ELSE 'Unknown'
+        END
+      ORDER BY count DESC, name ASC
+    `;
+
+    const accessStatusQuery = `
+      SELECT
+        COALESCE(NULLIF(TRIM(rkp.access_status), ''), 'Unknown') AS name,
+        COUNT(DISTINCT rkp.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_knowledge_products rkp
+        ON rkp.result_id = cr.result_id
+        AND rkp.is_active = TRUE
+      GROUP BY COALESCE(NULLIF(TRIM(rkp.access_status), ''), 'Unknown')
+      ORDER BY count DESC, name ASC
+    `;
+
+    const typesQuery = `
+      SELECT
+        NULL AS id,
+        COALESCE(NULLIF(TRIM(rkp.type), ''), 'Unknown') AS name,
+        COUNT(DISTINCT rkp.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_knowledge_products rkp
+        ON rkp.result_id = cr.result_id
+        AND rkp.is_active = TRUE
+      GROUP BY COALESCE(NULLIF(TRIM(rkp.type), ''), 'Unknown')
+      ORDER BY count DESC, name ASC
+    `;
+
+    const publicationsByYearQuery = `
+      SELECT
+        CASE
+          WHEN rkp.publication_date IS NOT NULL
+            AND TRIM(rkp.publication_date) != ''
+            AND CAST(SUBSTRING(TRIM(rkp.publication_date), 1, 4) AS UNSIGNED) > 0
+          THEN CAST(SUBSTRING(TRIM(rkp.publication_date), 1, 4) AS UNSIGNED)
+          ELSE NULL
+        END AS year,
+        COUNT(DISTINCT rkp.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_knowledge_products rkp
+        ON rkp.result_id = cr.result_id
+        AND rkp.is_active = TRUE
+      GROUP BY year
+      ORDER BY year ASC
+    `;
+
+    const [
+      countRows,
+      openAccessRows,
+      accessStatusRows,
+      typesRows,
+      publicationsByYearRows,
+    ] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(openAccessQuery, [contractId]),
+      this.query(accessStatusQuery, [contractId]),
+      this.query(typesQuery, [contractId]),
+      this.query(publicationsByYearQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        open_access_split: [],
+        access_status: [],
+        types: [],
+        publications_by_year: [],
+      };
+    }
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      open_access_split: (openAccessRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          name: String(row.name),
+          count: Number(row.count ?? 0),
+        }),
+      ),
+      access_status: (accessStatusRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          name: String(row.name),
+          count: Number(row.count ?? 0),
+        }),
+      ),
+      types: (typesRows as Array<Record<string, unknown>>).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      publications_by_year: (
+        publicationsByYearRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        year:
+          row.year !== null && row.year !== undefined ? Number(row.year) : null,
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  async getOicrDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<OicrDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT ro.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_oicrs ro
+        ON ro.result_id = cr.result_id
+        AND ro.is_active = TRUE
+    `;
+
+    const maturityLevelsQuery = `
+      SELECT
+        ml.id AS id,
+        ml.name AS name,
+        COUNT(DISTINCT ro.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_oicrs ro
+        ON ro.result_id = cr.result_id
+        AND ro.is_active = TRUE
+      INNER JOIN maturity_levels ml
+        ON ml.id = ro.maturity_level_id
+        AND ml.is_active = TRUE
+      GROUP BY ml.id, ml.name
+      ORDER BY count DESC, ml.name ASC
+    `;
+
+    const externalUseQuery = `
+      SELECT
+        CASE
+          WHEN ro.for_external_use = TRUE THEN 'External use'
+          WHEN ro.for_external_use = FALSE THEN 'Internal'
+          ELSE 'Not specified'
+        END AS name,
+        COUNT(DISTINCT ro.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_oicrs ro
+        ON ro.result_id = cr.result_id
+        AND ro.is_active = TRUE
+      GROUP BY
+        CASE
+          WHEN ro.for_external_use = TRUE THEN 'External use'
+          WHEN ro.for_external_use = FALSE THEN 'Internal'
+          ELSE 'Not specified'
+        END
+      ORDER BY count DESC, name ASC
+    `;
+
+    const [countRows, maturityRows, externalUseRows] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(maturityLevelsQuery, [contractId]),
+      this.query(externalUseQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        maturity_levels: [],
+        external_use_split: [],
+      };
+    }
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      maturity_levels: (maturityRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+          name: String(row.name),
+          count: Number(row.count ?? 0),
+        }),
+      ),
+      external_use_split: (
+        externalUseRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+    };
   }
 
   async getFundingTypes() {

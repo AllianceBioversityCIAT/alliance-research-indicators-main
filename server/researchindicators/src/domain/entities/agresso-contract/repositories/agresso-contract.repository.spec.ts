@@ -2261,4 +2261,496 @@ describe('AgressoContractRepository', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('getCapacitySharingDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getCapacitySharingDetailsReport('', 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getCapacitySharingDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getCapacitySharingDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query capacity sharing details and return correctly populated DTO (asserts generated SQL + params + lookup joins)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '3',
+            total_trainees: '150',
+            female_count: '80',
+            male_count: '60',
+            non_binary_count: '10',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Short-term', count: '2' },
+          { id: 2, name: 'Long-term', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'In person', count: '2' },
+          { id: 2, name: 'Virtual', count: '1' },
+        ])
+        .mockResolvedValueOnce([{ id: 1, name: 'Group', count: '3' }]);
+
+      const result = await repository.getCapacitySharingDetailsReport(
+        'A1676',
+        5,
+      );
+
+      expect(repository.query).toHaveBeenCalledTimes(4);
+
+      const [summarySql, summaryParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [sessionLengthsSql, sessionLengthsParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[1];
+      const [deliveryModalitiesSql, deliveryModalitiesParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[2];
+      const [sessionTypesSql, sessionTypesParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[3];
+
+      // Summary query assertions (KZ-001)
+      expect(summarySql).toContain('SELECT DISTINCT r.result_id');
+      expect(summarySql).toContain('FROM results r');
+      expect(summarySql).toContain('INNER JOIN result_contracts rc');
+      expect(summarySql).toContain('rc.contract_id = ?');
+      expect(summarySql).toContain('rc.is_primary = TRUE');
+      expect(summarySql).toContain('rc.is_active = TRUE');
+      expect(summarySql).toContain('r.is_active = TRUE');
+      expect(summarySql).toContain('r.is_snapshot = FALSE');
+      expect(summarySql).toContain('INNER JOIN result_capacity_sharing rcs');
+      expect(summarySql).toContain('rcs.result_id = cr.result_id');
+      expect(summarySql).toContain('rcs.is_active = TRUE');
+      expect(summarySql).toContain('COUNT(DISTINCT rcs.result_id) AS n');
+      expect(summarySql).toContain(
+        'COALESCE(SUM(rcs.session_participants_total), 0) AS total_trainees',
+      );
+      expect(summarySql).toContain(
+        'COALESCE(SUM(rcs.session_participants_female), 0) AS female_count',
+      );
+      expect(summarySql).toContain(
+        'COALESCE(SUM(rcs.session_participants_male), 0) AS male_count',
+      );
+      expect(summarySql).toContain(
+        'COALESCE(SUM(rcs.session_participants_non_binary), 0) AS non_binary_count',
+      );
+      expect(summaryParams).toEqual(['A1676']);
+
+      // Session lengths lookup join assertions
+      expect(sessionLengthsSql).toContain('INNER JOIN session_lengths sl');
+      expect(sessionLengthsSql).toContain(
+        'sl.session_length_id = rcs.session_length_id',
+      );
+      expect(sessionLengthsSql).toContain('sl.is_active = TRUE');
+      expect(sessionLengthsSql).toContain('sl.name AS name');
+      expect(sessionLengthsSql).toContain(
+        'GROUP BY sl.session_length_id, sl.name',
+      );
+      expect(sessionLengthsSql).toContain('ORDER BY count DESC, sl.name ASC');
+      expect(sessionLengthsParams).toEqual(['A1676']);
+
+      // Delivery modalities lookup join assertions
+      expect(deliveryModalitiesSql).toContain(
+        'INNER JOIN delivery_modalities dm',
+      );
+      expect(deliveryModalitiesSql).toContain(
+        'dm.delivery_modality_id = rcs.delivery_modality_id',
+      );
+      expect(deliveryModalitiesSql).toContain('dm.is_active = TRUE');
+      expect(deliveryModalitiesSql).toContain('dm.name AS name');
+      expect(deliveryModalitiesSql).toContain(
+        'GROUP BY dm.delivery_modality_id, dm.name',
+      );
+      expect(deliveryModalitiesSql).toContain(
+        'ORDER BY count DESC, dm.name ASC',
+      );
+      expect(deliveryModalitiesParams).toEqual(['A1676']);
+
+      // Session types lookup join assertions
+      expect(sessionTypesSql).toContain('INNER JOIN session_types st');
+      expect(sessionTypesSql).toContain(
+        'st.session_type_id = rcs.session_type_id',
+      );
+      expect(sessionTypesSql).toContain('st.is_active = TRUE');
+      expect(sessionTypesSql).toContain('st.name AS name');
+      expect(sessionTypesSql).toContain('GROUP BY st.session_type_id, st.name');
+      expect(sessionTypesSql).toContain('ORDER BY count DESC, st.name ASC');
+      expect(sessionTypesParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 5,
+          n: 3,
+        },
+        total_trainees: 150,
+        gender_split: [
+          { gender: 'female', count: 80 },
+          { gender: 'male', count: 60 },
+          { gender: 'non_binary', count: 10 },
+        ],
+        session_lengths: [
+          { id: 1, name: 'Short-term', count: 2 },
+          { id: 2, name: 'Long-term', count: 1 },
+        ],
+        delivery_modalities: [
+          { id: 1, name: 'In person', count: 2 },
+          { id: 2, name: 'Virtual', count: 1 },
+        ],
+        session_types: [{ id: 1, name: 'Group', count: 3 }],
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults (absent != 0 semantics)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '2',
+            total_trainees: '45',
+            female_count: '25',
+            male_count: '20',
+            non_binary_count: '0',
+          },
+        ])
+        .mockResolvedValueOnce([{ id: 1, name: 'Short-term', count: '2' }])
+        .mockResolvedValueOnce([{ id: 1, name: 'In person', count: '2' }])
+        .mockResolvedValueOnce([{ id: 1, name: 'Individual', count: '2' }]);
+
+      const result = await repository.getCapacitySharingDetailsReport(
+        'A1676',
+        10,
+      );
+
+      expect(result.meta).toEqual({
+        total_results: 10,
+        n: 2,
+      });
+      expect(result.total_trainees).toBe(45);
+      expect(result.gender_split).toEqual([
+        { gender: 'female', count: 25 },
+        { gender: 'male', count: 20 },
+        { gender: 'non_binary', count: 0 },
+      ]);
+    });
+
+    it('should return zeroes and empty arrays when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '0',
+            total_trainees: '0',
+            female_count: '0',
+            male_count: '0',
+            non_binary_count: '0',
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getCapacitySharingDetailsReport(
+        'A1676',
+        4,
+      );
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 4,
+          n: 0,
+        },
+        total_trainees: 0,
+        gender_split: [],
+        session_lengths: [],
+        delivery_modalities: [],
+        session_types: [],
+      });
+    });
+  });
+
+  describe('getKnowledgeProductDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getKnowledgeProductDetailsReport('', 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getKnowledgeProductDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getKnowledgeProductDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query knowledge product details and return correctly populated DTO (asserts generated SQL + params)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '4' }])
+        .mockResolvedValueOnce([
+          { name: 'Open access', count: '3' },
+          { name: 'Restricted', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { name: 'Peer Reviewed Journal Article', count: '4' },
+        ])
+        .mockResolvedValueOnce([
+          { id: null, name: 'Journal Article', count: '4' },
+        ])
+        .mockResolvedValueOnce([
+          { year: 2024, count: '3' },
+          { year: 2025, count: '1' },
+        ]);
+
+      const result = await repository.getKnowledgeProductDetailsReport(
+        'A1676',
+        6,
+      );
+
+      expect(repository.query).toHaveBeenCalledTimes(5);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [openAccessSql, openAccessParams] = (repository.query as jest.Mock)
+        .mock.calls[1];
+      const [accessStatusSql, accessStatusParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[2];
+      const [typesSql, typesParams] = (repository.query as jest.Mock).mock
+        .calls[3];
+      const [pubYearSql, pubYearParams] = (repository.query as jest.Mock).mock
+        .calls[4];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_knowledge_products rkp');
+      expect(countSql).toContain('rkp.result_id = cr.result_id');
+      expect(countSql).toContain('rkp.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rkp.result_id) AS n');
+      expect(countParams).toEqual(['A1676']);
+
+      // Open access query assertions
+      expect(openAccessSql).toContain(
+        "WHEN rkp.open_access = TRUE THEN 'Open access'",
+      );
+      expect(openAccessSql).toContain(
+        "WHEN rkp.open_access = FALSE THEN 'Restricted'",
+      );
+      expect(openAccessSql).toContain("ELSE 'Unknown'");
+      expect(openAccessSql).toContain('ORDER BY count DESC, name ASC');
+      expect(openAccessParams).toEqual(['A1676']);
+
+      // Access status query assertions
+      expect(accessStatusSql).toContain(
+        "COALESCE(NULLIF(TRIM(rkp.access_status), ''), 'Unknown')",
+      );
+      expect(accessStatusSql).toContain('ORDER BY count DESC, name ASC');
+      expect(accessStatusParams).toEqual(['A1676']);
+
+      // Types query assertions
+      expect(typesSql).toContain(
+        "COALESCE(NULLIF(TRIM(rkp.type), ''), 'Unknown')",
+      );
+      expect(typesSql).toContain('ORDER BY count DESC, name ASC');
+      expect(typesParams).toEqual(['A1676']);
+
+      // Publications by year assertions
+      expect(pubYearSql).toContain(
+        'CAST(SUBSTRING(TRIM(rkp.publication_date), 1, 4) AS UNSIGNED)',
+      );
+      expect(pubYearSql).toContain('ORDER BY year ASC');
+      expect(pubYearParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 6,
+          n: 4,
+        },
+        open_access_split: [
+          { name: 'Open access', count: 3 },
+          { name: 'Restricted', count: 1 },
+        ],
+        access_status: [{ name: 'Peer Reviewed Journal Article', count: 4 }],
+        types: [{ id: null, name: 'Journal Article', count: 4 }],
+        publications_by_year: [
+          { year: 2024, count: 3 },
+          { year: 2025, count: 1 },
+        ],
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([{ name: 'Open access', count: '3' }])
+        .mockResolvedValueOnce([{ name: 'Published', count: '3' }])
+        .mockResolvedValueOnce([{ id: null, name: 'Book Chapter', count: '3' }])
+        .mockResolvedValueOnce([{ year: 2023, count: '3' }]);
+
+      const result = await repository.getKnowledgeProductDetailsReport(
+        'A1676',
+        8,
+      );
+
+      expect(result.meta).toEqual({
+        total_results: 8,
+        n: 3,
+      });
+      expect(result.open_access_split).toEqual([
+        { name: 'Open access', count: 3 },
+      ]);
+    });
+
+    it('should return empty arrays when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getKnowledgeProductDetailsReport(
+        'A1676',
+        3,
+      );
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 3,
+          n: 0,
+        },
+        open_access_split: [],
+        access_status: [],
+        types: [],
+        publications_by_year: [],
+      });
+    });
+  });
+
+  describe('getOicrDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getOicrDetailsReport('', 5)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getOicrDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getOicrDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query OICR details and return correctly populated DTO (asserts generated SQL + params + lookup joins)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Level 1 - Discovery', count: '1' },
+          { id: 2, name: 'Level 2 - Piloting', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { name: 'External use', count: '1' },
+          { name: 'Internal', count: '1' },
+        ]);
+
+      const result = await repository.getOicrDetailsReport('A1676', 4);
+
+      expect(repository.query).toHaveBeenCalledTimes(3);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [maturityLevelsSql, maturityLevelsParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[1];
+      const [externalUseSql, externalUseParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[2];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_oicrs ro');
+      expect(countSql).toContain('ro.result_id = cr.result_id');
+      expect(countSql).toContain('ro.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT ro.result_id) AS n');
+      expect(countParams).toEqual(['A1676']);
+
+      // Maturity levels lookup join assertions
+      expect(maturityLevelsSql).toContain('INNER JOIN maturity_levels ml');
+      expect(maturityLevelsSql).toContain('ml.id = ro.maturity_level_id');
+      expect(maturityLevelsSql).toContain('ml.is_active = TRUE');
+      expect(maturityLevelsSql).toContain('ml.name AS name');
+      expect(maturityLevelsSql).toContain('GROUP BY ml.id, ml.name');
+      expect(maturityLevelsSql).toContain('ORDER BY count DESC, ml.name ASC');
+      expect(maturityLevelsParams).toEqual(['A1676']);
+
+      // External use query assertions
+      expect(externalUseSql).toContain(
+        "WHEN ro.for_external_use = TRUE THEN 'External use'",
+      );
+      expect(externalUseSql).toContain(
+        "WHEN ro.for_external_use = FALSE THEN 'Internal'",
+      );
+      expect(externalUseSql).toContain("ELSE 'Not specified'");
+      expect(externalUseSql).toContain('ORDER BY count DESC, name ASC');
+      expect(externalUseParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 4,
+          n: 2,
+        },
+        maturity_levels: [
+          { id: 1, name: 'Level 1 - Discovery', count: 1 },
+          { id: 2, name: 'Level 2 - Piloting', count: 1 },
+        ],
+        external_use_split: [
+          { name: 'External use', count: 1 },
+          { name: 'Internal', count: 1 },
+        ],
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { id: 3, name: 'Level 3 - Scaling', count: '2' },
+        ])
+        .mockResolvedValueOnce([{ name: 'External use', count: '2' }]);
+
+      const result = await repository.getOicrDetailsReport('A1676', 5);
+
+      expect(result.meta).toEqual({
+        total_results: 5,
+        n: 2,
+      });
+      expect(result.maturity_levels).toEqual([
+        { id: 3, name: 'Level 3 - Scaling', count: 2 },
+      ]);
+      expect(result.external_use_split).toEqual([
+        { name: 'External use', count: 2 },
+      ]);
+    });
+
+    it('should return empty arrays when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getOicrDetailsReport('A1676', 2);
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 2,
+          n: 0,
+        },
+        maturity_levels: [],
+        external_use_split: [],
+      });
+    });
+  });
 });
