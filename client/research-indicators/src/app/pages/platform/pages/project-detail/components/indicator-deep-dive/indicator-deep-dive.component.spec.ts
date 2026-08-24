@@ -436,7 +436,7 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
         { flag: 'is_simpler_to_use', label: 'Simpler', true_count: 3, answered_count: 4 },
         { flag: 'does_perform_better', label: 'Performs', true_count: 4, answered_count: 6 },
         { flag: 'is_desirable_to_users', label: 'Desirable', true_count: 1, answered_count: 3 },
-        { flag: 'has_commercial_viability', label: 'Commercial', true_count: 0, answered_count: 2 },
+        { flag: 'has_commercial_viability', label: 'Commercial', true_count: 0, answered_count: 0 },
         { flag: 'has_suitable_enabling_environment', label: 'Enabling', true_count: 5, answered_count: 6 },
         { flag: 'has_evidence_of_uptake', label: 'Uptake', true_count: 2, answered_count: 4 }
       ]
@@ -477,7 +477,7 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
         loadWithData({ innovation_dev: INNOVATION_DEV_FIXTURE });
 
         const options = component.innovationScalabilityRadarOptions() as unknown as {
-          series: [{ data: [{ value: number[] }] }];
+          series: [{ data: [{ value: (number | null)[] }] }];
         };
         expect(options).not.toBeNull();
         const values = options.series[0].data[0].value;
@@ -487,6 +487,9 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
         // fixture where n === every answered_count cannot tell them apart).
         expect(values[1]).toBe(75);
         expect(values[1]).not.toBe(50);
+        // index 4 = has_commercial_viability: 0 answered -> a GAP (null), never
+        // a false 0 (failing input: the old ': 0' fallback turns this red).
+        expect(values[4]).toBeNull();
       }
     );
 
@@ -498,6 +501,7 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
       const table = component.innovationScalabilityTableModel();
       expect(table).not.toBeNull();
       expect(table?.rows).toContainEqual(['Simpler', 3, 4]);
+      expect(table?.rows).toContainEqual(['Commercial', 0, 0]);
       expect(table?.rows.length).toBe(7);
     });
 

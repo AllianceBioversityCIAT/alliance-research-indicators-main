@@ -314,7 +314,7 @@ export class IndicatorDeepDiveComponent implements AfterViewInit, OnDestroy {
     };
   }
 
-  private radarOptions(axes: { name: string; max: number }[], values: number[], seriesName: string): EChartsOption | null {
+  private radarOptions(axes: { name: string; max: number }[], values: (number | null)[], seriesName: string): EChartsOption | null {
     if (!axes || axes.length === 0) {
       return null;
     }
@@ -424,7 +424,10 @@ export class IndicatorDeepDiveComponent implements AfterViewInit, OnDestroy {
     const profile = this.getIndicatorDetailsService.innovationDev()?.scalability_profile ?? [];
     if (profile.length === 0) return null;
     const axes = profile.map(p => ({ name: this.scalabilityLabel(p), max: 100 }));
-    const values = profile.map(p => (p.answered_count > 0 ? Math.round((p.true_count / p.answered_count) * 100) : 0));
+    // answered_count === 0 renders as a GAP (null), never a false 0 — on the
+    // chart, 0 is pixel-identical to "every answer was false" (T-09 Reviewer
+    // advisory, adopted pre-HITL); the accessible table still shows 0/0.
+    const values = profile.map(p => (p.answered_count > 0 ? Math.round((p.true_count / p.answered_count) * 100) : null));
     return this.radarOptions(axes, values, 'Scalability profile (% true of answered)');
   });
   readonly innovationScalabilityTableModel = computed<VizChartTableModel | null>(() => {
