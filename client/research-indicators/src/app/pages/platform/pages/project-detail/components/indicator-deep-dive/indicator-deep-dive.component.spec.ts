@@ -2,7 +2,34 @@ import { WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { IndicatorDeepDiveComponent, IndicatorDeepDiveTab } from './indicator-deep-dive.component';
 import { GetIndicatorDetailsService } from '@shared/services/get-indicator-details.service';
-import { CapacitySharingDetails, ContractIndicatorDetailsReport } from '@shared/interfaces/contract-indicator-details.interface';
+import { DarkModeService } from '@shared/services/dark-mode.service';
+import {
+  CapacitySharingDetails,
+  ContractIndicatorDetailsReport,
+  InnovationDevDetails,
+  InnovationUseDetails,
+  PolicyChangeDetails
+} from '@shared/interfaces/contract-indicator-details.interface';
+
+// viz-chart initializes real ECharts SVG rendering in ngAfterViewInit; mocked
+// at the module boundary (same pattern as results-trend-card.component.spec.ts)
+// so these component specs stay fast/deterministic and never depend on a real
+// canvas/SVG engine inside jsdom.
+const mockChartInstance = {
+  setOption: jest.fn(),
+  resize: jest.fn(),
+  dispose: jest.fn(),
+  isDisposed: jest.fn().mockReturnValue(false),
+  clear: jest.fn(),
+  on: jest.fn()
+};
+
+jest.mock('echarts/core', () => ({
+  use: jest.fn(),
+  init: jest.fn(() => mockChartInstance),
+  registerMap: jest.fn(),
+  getMap: jest.fn()
+}));
 
 interface IndicatorDetailsServiceMock {
   data: WritableSignal<ContractIndicatorDetailsReport | null>;
@@ -12,6 +39,16 @@ interface IndicatorDetailsServiceMock {
   sectionFailed: jest.Mock;
   load: jest.Mock;
   update: jest.Mock;
+  // T-09: mirrors GetIndicatorDetailsService's real per-section computed
+  // accessors (plain functions here, not signals — sufficient since the
+  // builders under test only ever call them, never subscribe to identity).
+  capacitySharing: () => ContractIndicatorDetailsReport['capacity_sharing'];
+  innovationDev: () => ContractIndicatorDetailsReport['innovation_dev'];
+  knowledgeProduct: () => ContractIndicatorDetailsReport['knowledge_product'];
+  policyChange: () => ContractIndicatorDetailsReport['policy_change'];
+  oicr: () => ContractIndicatorDetailsReport['oicr'];
+  innovationUse: () => ContractIndicatorDetailsReport['innovation_use'];
+  reportingVelocity: () => ContractIndicatorDetailsReport['reporting_velocity'];
 }
 
 // Live nested fixture matching the DTO shape (KZ-001) — never a primitive stand-in.
@@ -54,7 +91,14 @@ function createServiceMock(): IndicatorDetailsServiceMock {
     update: jest.fn(() => {
       loadingSignal.set(true);
       return Promise.resolve();
-    })
+    }),
+    capacitySharing: () => dataSignal()?.capacity_sharing ?? null,
+    innovationDev: () => dataSignal()?.innovation_dev ?? null,
+    knowledgeProduct: () => dataSignal()?.knowledge_product ?? null,
+    policyChange: () => dataSignal()?.policy_change ?? null,
+    oicr: () => dataSignal()?.oicr ?? null,
+    innovationUse: () => dataSignal()?.innovation_use ?? null,
+    reportingVelocity: () => dataSignal()?.reporting_velocity ?? null
   };
 }
 
@@ -76,11 +120,13 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
       disconnect(): void {}
     };
 
+    jest.clearAllMocks();
+    mockChartInstance.isDisposed.mockReturnValue(false);
     serviceMock = createServiceMock();
 
     await TestBed.configureTestingModule({
       imports: [IndicatorDeepDiveComponent],
-      providers: [{ provide: GetIndicatorDetailsService, useValue: serviceMock }]
+      providers: [{ provide: GetIndicatorDetailsService, useValue: serviceMock }, DarkModeService]
     }).compileComponents();
 
     fixture = TestBed.createComponent(IndicatorDeepDiveComponent);
@@ -359,6 +405,157 @@ describe('IndicatorDeepDiveComponent (R-DD-003, R-DD-005, D-F3-2/5/7)', () => {
       fixture.componentRef.setInput('loading', false);
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).toContain('No indicators with results to show a deep-dive for.');
+    });
+  });
+
+  describe('Chart option builders (T-09, R-DD-004, D-F3-3/6)', () => {
+    // Mirrors the 'Tri-state per tab' describe's `completeLoad` helper:
+    // intersect/focus first (hasIntersected → true), then resolve the load.
+    function loadWithData(data: ContractIndicatorDetailsReport): void {
+      const section: HTMLElement = fixture.nativeElement.querySelector('section');
+      section.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      serviceMock.loading.set(false);
+      serviceMock.data.set(data);
+      fixture.detectChanges();
+    }
+
+    // Live nested fixture (KZ-001): meta.n = 6 (rows with satellite data), but
+    // `is_simpler_to_use` was only answered by 4 of those 6 rows — the
+    // "unanswered flags" case R-DD-004's scenario and D-F3-3 exist for.
+    const INNOVATION_DEV_FIXTURE: InnovationDevDetails = {
+      meta: { total_results: 6, n: 6 },
+      readiness_levels: [
+        { level: 3, name: 'IRL 3', count: 1 },
+        { level: 1, name: 'IRL 1', count: 2 }
+      ],
+      innovation_types: [{ name: 'Product', count: 3 }],
+      innovation_natures: [{ name: 'New', count: 2 }],
+      anticipated_users: [{ name: 'Farmers', count: 1 }],
+      scalability_profile: [
+        { flag: 'is_cheaper_than_alternatives', label: 'Cheaper', true_count: 2, answered_count: 5 },
+        { flag: 'is_simpler_to_use', label: 'Simpler', true_count: 3, answered_count: 4 },
+        { flag: 'does_perform_better', label: 'Performs', true_count: 4, answered_count: 6 },
+        { flag: 'is_desirable_to_users', label: 'Desirable', true_count: 1, answered_count: 3 },
+        { flag: 'has_commercial_viability', label: 'Commercial', true_count: 0, answered_count: 2 },
+        { flag: 'has_suitable_enabling_environment', label: 'Enabling', true_count: 5, answered_count: 6 },
+        { flag: 'has_evidence_of_uptake', label: 'Uptake', true_count: 2, answered_count: 4 }
+      ]
+    };
+
+    const POLICY_FIXTURE: PolicyChangeDetails = {
+      meta: { total_results: 3, n: 3 },
+      // Deliberately not monotonic by count — a naive re-sort (e.g. by count
+      // descending) would reorder these; the server owns funnel order.
+      stage_funnel: [
+        { name: 'Adopted', count: 1 },
+        { name: 'Piloted', count: 5 },
+        { name: 'Proposed', count: 3 }
+      ],
+      policy_types: [{ name: 'Regulation', count: 2 }],
+      implicated_institutions_count: 4
+    };
+
+    const INNOVATION_USE_FIXTURE: InnovationUseDetails = {
+      meta: { total_results: 4, n: 4 },
+      gender_youth_reach: {
+        overall: { women_youth: 10, women_not_youth: 5, men_youth: 8, men_not_youth: 3 },
+        by_actor_type: [{ actor_type_name: 'Farmers', women_youth: 6, women_not_youth: 2, men_youth: 4, men_not_youth: 1 }]
+      },
+      organization_types: [{ name: 'Public', count: 2 }],
+      quantifications: [
+        { unit: 'hectares', total: 120, count: 3 },
+        { unit: 'people', total: 450, count: 4 }
+      ]
+    };
+
+    it(
+      'radar values derive from answered_count, not meta.n — R-DD-004 scenario / D-F3-3 ' +
+        '(failing input: dividing by meta.n instead of answered_count gives 50 instead of 75 for this fixture)',
+      () => {
+        setInputs();
+        fixture.detectChanges();
+        loadWithData({ innovation_dev: INNOVATION_DEV_FIXTURE });
+
+        const options = component.innovationScalabilityRadarOptions() as unknown as {
+          series: [{ data: [{ value: number[] }] }];
+        };
+        expect(options).not.toBeNull();
+        const values = options.series[0].data[0].value;
+        // index 1 = is_simpler_to_use: true_count 3, answered_count 4 → 75%.
+        // Dividing by meta.n (6) instead would yield 50 — the two must differ
+        // for this fixture to discriminate (disqualifier: an all-answered
+        // fixture where n === every answered_count cannot tell them apart).
+        expect(values[1]).toBe(75);
+        expect(values[1]).not.toBe(50);
+      }
+    );
+
+    it('exposes the same true/answered numbers in the radar chart accessible table (R-DD-004 scenario)', () => {
+      setInputs();
+      fixture.detectChanges();
+      loadWithData({ innovation_dev: INNOVATION_DEV_FIXTURE });
+
+      const table = component.innovationScalabilityTableModel();
+      expect(table).not.toBeNull();
+      expect(table?.rows).toContainEqual(['Simpler', 3, 4]);
+      expect(table?.rows.length).toBe(7);
+    });
+
+    it('funnel data is rendered in the order delivered by the server, never re-sorted (design R-1)', () => {
+      setInputs();
+      fixture.detectChanges();
+      loadWithData({ policy_change: POLICY_FIXTURE });
+
+      const options = component.policyStageFunnelChartOptions() as unknown as {
+        series: [{ sort: string; data: { name: string }[] }];
+      };
+      expect(options).not.toBeNull();
+      expect(options.series[0].sort).toBe('none');
+      expect(options.series[0].data.map(d => d.name)).toEqual(['Adopted', 'Piloted', 'Proposed']);
+    });
+
+    it('every rendered viz-chart in the active (capacity sharing) tab receives a non-empty tableModel', () => {
+      setInputs();
+      fixture.detectChanges();
+      loadWithData({ capacity_sharing: CAPACITY_SHARING_SPARSE });
+
+      const vizCharts = fixture.nativeElement.querySelectorAll('app-viz-chart');
+      expect(vizCharts.length).toBeGreaterThan(0);
+      expect(component.capacityGenderTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.capacitySessionLengthTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.capacityModalityTableModel()?.rows.length).toBeGreaterThan(0);
+    });
+
+    it('quantifications render as a plain accessible table, never through viz-chart (D-F3-6)', () => {
+      setInputs({ indicators: [{ id: 6, indicatorId: 6, label: 'Innovation Use', value: 4, color: 'var(--ac-green-1)' }] });
+      fixture.detectChanges();
+      loadWithData({ innovation_use: INNOVATION_USE_FIXTURE });
+
+      const table = component.innovationUseQuantificationsTableModel();
+      expect(table?.rows).toEqual([
+        ['hectares', 120, 3],
+        ['people', 450, 4]
+      ]);
+      // Not `querySelector('table')` alone — viz-chart also renders its own
+      // sr-only accessible `<table>` per chart instance; scope to the
+      // plain-table wrapper this D-F3-6 markup owns.
+      const renderedTable: HTMLTableElement = fixture.nativeElement.querySelector('[data-slot="quantifications-table"] table');
+      expect(renderedTable).not.toBeNull();
+      expect(renderedTable.textContent).toContain('hectares');
+      // The stacked-bar reach chart is a viz-chart; the quantifications table
+      // is not — assert the table exists independently of chart count.
+      expect(fixture.nativeElement.querySelectorAll('app-viz-chart').length).toBeGreaterThan(0);
+    });
+
+    it('the innovation-use stacked bars are stacked (not grouped) across the same `stack` id', () => {
+      setInputs({ indicators: [{ id: 6, indicatorId: 6, label: 'Innovation Use', value: 4, color: 'var(--ac-green-1)' }] });
+      fixture.detectChanges();
+      loadWithData({ innovation_use: INNOVATION_USE_FIXTURE });
+
+      const options = component.innovationUseGenderYouthChartOptions() as unknown as { series: { stack: string }[] };
+      expect(options).not.toBeNull();
+      const stackIds = options.series.map(s => s.stack);
+      expect(new Set(stackIds).size).toBe(1);
     });
   });
 });

@@ -129,10 +129,10 @@ graph TD
 - **Files:** deep-dive component templates/builders (+spec).
 - **Description:** Options builders per section (donuts, histogram, radar from `{true_count, answered_count}`, funnel, stacked bars, publications-by-year, velocity line) — each viz-chart with tableModel + accessible name; quantifications as a table; `--ac-viz-*` tokens only.
 - **Acceptance / done check:**
-  - [ ] Builder specs: radar values derive from `answered_count` (**failing input:** divide by `n` instead → a fixture with unanswered flags fails); funnel data ordered as delivered; every chart instance receives a non-empty tableModel.
-  - [ ] `npx eslint` + targeted jest green; hex-literal grep over the new component files returns zero hits.
-  - [ ] Presence caveat: options objects are not rendered charts → T-10 HITL owns visuals.
-- **Deps:** T-06, T-08 · **Effort:** L · **Status:** todo
+  - [x] Builder specs: radar values derive from `answered_count` (**failing input:** divide by `n` instead → a fixture with unanswered flags fails); funnel data ordered as delivered; every chart instance receives a non-empty tableModel.
+  - [x] `npx eslint` + targeted jest green; hex-literal grep over the new component files returns zero hits.
+  - [x] Presence caveat: options objects are not rendered charts → T-10 HITL owns visuals.
+- **Deps:** T-06, T-08 · **Effort:** L · **Status:** done
 
 ### T-10 — Full gates, latency, bundle delta, HITL close
 

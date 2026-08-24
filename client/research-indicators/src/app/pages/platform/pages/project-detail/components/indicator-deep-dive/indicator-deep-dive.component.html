@@ -15,8 +15,25 @@
     </span>
   </header>
 
-  <!-- Reserved for T-09's reporting velocity strip (R-DD-006, design workflow #4) -->
-  <div data-slot="velocity"></div>
+  <!-- Reporting velocity strip (R-DD-006, design workflow #4) — renders only
+       when the section has data; absent/failed velocity never blocks the tabs. -->
+  <div data-slot="velocity">
+    @if (velocityChartOptions(); as velocityOptions) {
+    <div class="flex items-center gap-4 rounded-[10px] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2.5">
+      <div class="min-w-[150px]">
+        <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Reporting activity</span>
+        <p class="m-0 font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">results created per month</p>
+      </div>
+      <div class="min-w-0 flex-1">
+        <app-viz-chart [options]="velocityOptions" [tableModel]="velocityTableModel()" chartTitle="Results created per month, last 24 months" height="44px" />
+      </div>
+      <div class="text-right">
+        <div class="font-['Space_Grotesk'] text-[20px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ velocityTotal() }}</div>
+        <div class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">last 24 mo</div>
+      </div>
+    </div>
+    }
+  </div>
 
   @if (tabs().length === 0) {
     @if (loading()) {
@@ -68,6 +85,120 @@
     [attr.aria-labelledby]="'deep-dive-tab-' + tab.id"
     class="flex flex-col gap-3"
     tabindex="0">
+    <!-- T-09 chart grid, shared by the 'sparse' and 'complete' cases below
+         (D-F3-7): options-builders per section (R-DD-004), grid minmax(240px,1fr)
+         per design §6. `tab` is captured from the enclosing `@if...as tab`. -->
+    <ng-template #chartsGrid>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
+        @switch (activeSectionKey()) {
+          @case ('capacity_sharing') {
+          <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3">
+            <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">People trained</span>
+            <span class="font-['Space_Grotesk'] text-[28px] font-bold leading-none text-[var(--ac-primary-blue-600)]">
+              {{ getIndicatorDetailsService.capacitySharing()?.total_trainees ?? 0 }}
+            </span>
+          </div>
+          @if (capacityGenderChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="capacityGenderTableModel()" chartTitle="Gender split of trainees" height="220px" />
+          }
+          @if (capacitySessionLengthChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="capacitySessionLengthTableModel()" chartTitle="Session length mix" height="180px" />
+          }
+          @if (capacityModalityChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="capacityModalityTableModel()" chartTitle="Delivery modality mix" height="180px" />
+          }
+          @if (capacitySessionTypeChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="capacitySessionTypeTableModel()" chartTitle="Session type mix" height="180px" />
+          }
+          }
+          @case ('innovation_dev') {
+          @if (innovationReadinessChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationReadinessTableModel()" chartTitle="Readiness levels (IRL)" height="220px" />
+          }
+          @if (innovationScalabilityRadarOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationScalabilityTableModel()" chartTitle="Scalability profile, true vs answered per factor" height="220px" />
+          }
+          @if (innovationTypeChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationTypeTableModel()" chartTitle="Innovation type mix" height="180px" />
+          }
+          @if (innovationNatureChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationNatureTableModel()" chartTitle="Innovation nature mix" height="180px" />
+          }
+          @if (innovationUsersChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationUsersTableModel()" chartTitle="Anticipated users mix" height="180px" />
+          }
+          }
+          @case ('knowledge_product') {
+          @if (knowledgeOpenAccessChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="knowledgeOpenAccessTableModel()" chartTitle="Open-access split" height="220px" />
+          }
+          @if (knowledgeAccessStatusChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="knowledgeAccessStatusTableModel()" chartTitle="Access status mix" height="180px" />
+          }
+          @if (knowledgeTypeChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="knowledgeTypeTableModel()" chartTitle="Knowledge product type mix" height="180px" />
+          }
+          @if (knowledgePublicationsByYearChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="knowledgePublicationsByYearTableModel()" chartTitle="Publications by year" height="220px" />
+          }
+          }
+          @case ('policy_change') {
+          <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3">
+            <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Implicated institutions</span>
+            <span class="font-['Space_Grotesk'] text-[28px] font-bold leading-none text-[var(--ac-primary-blue-600)]">
+              {{ getIndicatorDetailsService.policyChange()?.implicated_institutions_count ?? 0 }}
+            </span>
+          </div>
+          @if (policyStageFunnelChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="policyStageFunnelTableModel()" chartTitle="Policy stage funnel, ordered as delivered" height="220px" />
+          }
+          @if (policyTypeChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="policyTypeTableModel()" chartTitle="Policy type mix" height="180px" />
+          }
+          }
+          @case ('oicr') {
+          @if (oicrMaturityChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="oicrMaturityTableModel()" chartTitle="Maturity level distribution" height="220px" />
+          }
+          @if (oicrExternalUseChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="oicrExternalUseTableModel()" chartTitle="External-use split" height="220px" />
+          }
+          }
+          @case ('innovation_use') {
+          @if (innovationUseGenderYouthChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationUseGenderYouthTableModel()" chartTitle="Gender times youth reach" height="220px" />
+          }
+          @if (innovationUseOrgTypeChartOptions(); as opts) {
+          <app-viz-chart [options]="opts" [tableModel]="innovationUseOrgTypeTableModel()" chartTitle="Organization type mix" height="180px" />
+          }
+          @if (innovationUseQuantificationsTableModel(); as quantTable) {
+          <div data-slot="quantifications-table" class="flex flex-col gap-2 overflow-x-auto rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3">
+            <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Quantifications by unit</span>
+            <table class="w-full border-collapse text-left font-['Barlow'] text-[12.5px]">
+              <caption class="sr-only">{{ quantTable.caption }}</caption>
+              <thead>
+                <tr>
+                  @for (header of quantTable.headers; track header) {
+                  <th scope="col" class="border-b border-[var(--ac-grey-200)] py-1 pr-3 text-[var(--ac-grey-700)]">{{ header }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of quantTable.rows; track $index) {
+                <tr>
+                  @for (cell of row; track $index) {
+                  <td class="border-b border-[var(--ac-grey-100)] py-1 pr-3 text-[var(--ac-grey-800)]">{{ cell }}</td>
+                  }
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          }
+          }
+        }
+      </div>
+    </ng-template>
     @switch (activeTabState()) {
       @case ('skeleton') {
       <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" [attr.aria-label]="'Loading ' + tab.label + ' details'">
@@ -111,12 +242,14 @@
           Showing metadata from {{ activeSectionMeta()?.n }} of {{ activeSectionMeta()?.total_results }} {{ tab.label }} results — results imported from other platforms may not include it.
         </p>
       </div>
-      <!-- Reserved for T-09's chart grid builders (R-DD-004) -->
-      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId ?? tab.id"></div>
+      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId">
+        <ng-container *ngTemplateOutlet="chartsGrid" />
+      </div>
       }
       @case ('complete') {
-      <!-- Reserved for T-09's chart grid builders (R-DD-004) -->
-      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId ?? tab.id"></div>
+      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId">
+        <ng-container *ngTemplateOutlet="chartsGrid" />
+      </div>
       }
     }
   </div>

@@ -1,8 +1,16 @@
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, computed, inject, input, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { GetIndicatorDetailsService } from '@shared/services/get-indicator-details.service';
-import { ContractIndicatorDetailsReport, SectionMeta } from '@shared/interfaces/contract-indicator-details.interface';
+import { DarkModeService } from '@shared/services/dark-mode.service';
+import { chartTokens } from '@shared/utils/chart-tokens.util';
+import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+import {
+  ContractIndicatorDetailsReport,
+  SectionMeta,
+  InnovationDevScalabilityProfile
+} from '@shared/interfaces/contract-indicator-details.interface';
 
 // Minimal shape consumed from the F1 indicator summaries computed on
 // ProjectDashboardComponent (`indicatorsWithResults()`). Tabs are rendered in
@@ -44,13 +52,15 @@ export type DeepDiveTabState = 'skeleton' | 'error' | 'unavailable' | 'empty' | 
 @Component({
   selector: 'app-indicator-deep-dive',
   standalone: true,
-  imports: [ButtonModule, SkeletonModule],
+  imports: [ButtonModule, SkeletonModule, VizChartComponent, NgTemplateOutlet],
   templateUrl: './indicator-deep-dive.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class IndicatorDeepDiveComponent implements AfterViewInit, OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   readonly getIndicatorDetailsService = inject(GetIndicatorDetailsService);
+  private readonly darkModeService = inject(DarkModeService);
+  readonly tokens = chartTokens(this.darkModeService.darkMode());
 
   readonly contractId = input<string>('');
   readonly indicators = input<IndicatorDeepDiveTab[]>([]);
@@ -156,6 +166,569 @@ export class IndicatorDeepDiveComponent implements AfterViewInit, OnDestroy {
     const section = this.getIndicatorDetailsService.data()?.[key];
     return section?.meta ?? null;
   });
+
+  // ---------------------------------------------------------------------
+  // T-09 — per-tab chart grid option/table builders (R-DD-004, D-F3-3/6).
+  // Each builder pairs 1:1 with a table-model computed of the same prefix
+  // — a chart is only rendered (template `@if`) when both resolve non-null,
+  // so no viz-chart instance ever receives an empty tableModel.
+  // ---------------------------------------------------------------------
+
+  private paletteColors(count: number): string[] {
+    const t = this.tokens();
+    const resolved = [t.series1, t.series2, t.series3, t.series4, t.series5].filter(Boolean);
+    const fallback = [
+      'var(--ac-viz-series-1)',
+      'var(--ac-viz-series-2)',
+      'var(--ac-viz-series-3)',
+      'var(--ac-viz-series-4)',
+      'var(--ac-viz-series-5)'
+    ];
+    const palette = resolved.length === 5 ? resolved : fallback;
+    return Array.from({ length: count }, (_, i) => palette[i % palette.length]);
+  }
+
+  private namedCountTable(caption: string, items: { name: string; count: number }[]): VizChartTableModel {
+    return { caption, headers: ['Name', 'Count'], rows: items.map(i => [i.name, i.count]) };
+  }
+
+  private donutOptions(items: { name: string; count: number }[], seriesName: string): EChartsOption | null {
+    if (!items || items.length === 0 || items.every(i => i.count === 0)) {
+      return null;
+    }
+    const colors = this.paletteColors(items.length);
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+      legend: {
+        bottom: 0,
+        icon: 'circle',
+        textStyle: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', fontSize: 11 }
+      },
+      series: [
+        {
+          name: seriesName,
+          type: 'pie',
+          radius: ['45%', '70%'],
+          avoidLabelOverlap: true,
+          cursor: 'pointer',
+          itemStyle: { borderColor: 'var(--ac-white-1)', borderWidth: 2 },
+          label: { show: false },
+          labelLine: { show: false },
+          data: items.map((it, idx) => ({ name: it.name, value: it.count, itemStyle: { color: colors[idx] } }))
+        }
+      ]
+    };
+  }
+
+  private barOptions(items: { name: string; count: number }[], seriesName: string, color?: string): EChartsOption | null {
+    if (!items || items.length === 0) {
+      return null;
+    }
+    const labels = items.map(i => i.name).slice().reverse();
+    const values = items.map(i => i.count).slice().reverse();
+    const barColor = color || this.tokens().series1 || 'var(--ac-viz-series-1)';
+    return {
+      grid: { top: 8, bottom: 16, left: 8, right: 24, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-200)' } }
+      },
+      yAxis: {
+        type: 'category',
+        data: labels,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } },
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', width: 110, overflow: 'truncate' }
+      },
+      series: [
+        {
+          name: seriesName,
+          type: 'bar',
+          cursor: 'pointer',
+          data: values,
+          itemStyle: { color: barColor, borderRadius: [0, 4, 4, 0] },
+          label: { show: true, position: 'right', color: 'var(--ac-grey-800)', fontFamily: 'Barlow' }
+        }
+      ]
+    };
+  }
+
+  private verticalBarOptions(categories: string[], values: number[], seriesName: string, color?: string): EChartsOption | null {
+    if (!categories || categories.length === 0) {
+      return null;
+    }
+    const barColor = color || this.tokens().series2 || 'var(--ac-viz-series-2)';
+    return {
+      grid: { top: 16, bottom: 24, left: 8, right: 8, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } },
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' }
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-100)', type: 'dashed' } }
+      },
+      series: [
+        {
+          name: seriesName,
+          type: 'bar',
+          cursor: 'pointer',
+          data: values,
+          itemStyle: { color: barColor, borderRadius: [4, 4, 0, 0] }
+        }
+      ]
+    };
+  }
+
+  // Funnel data is rendered in the order it was delivered (`sort: 'none'`) —
+  // the server owns stage ordering (design R-1); the client must never re-sort.
+  private funnelOptions(items: { name: string; count: number }[], seriesName: string): EChartsOption | null {
+    if (!items || items.length === 0) {
+      return null;
+    }
+    const colors = this.paletteColors(items.length);
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+      series: [
+        {
+          name: seriesName,
+          type: 'funnel',
+          left: '6%',
+          right: '6%',
+          sort: 'none',
+          gap: 4,
+          label: { show: true, position: 'inside', color: 'var(--ac-white-1)', fontFamily: 'Barlow' },
+          itemStyle: { borderColor: 'var(--ac-white-1)', borderWidth: 1 },
+          data: items.map((it, idx) => ({ name: it.name, value: it.count, itemStyle: { color: colors[idx] } }))
+        }
+      ]
+    };
+  }
+
+  private radarOptions(axes: { name: string; max: number }[], values: number[], seriesName: string): EChartsOption | null {
+    if (!axes || axes.length === 0) {
+      return null;
+    }
+    const color = this.tokens().series1 || 'var(--ac-viz-series-1)';
+    return {
+      radar: {
+        indicator: axes,
+        axisName: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', fontSize: 10 },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-200)' } },
+        splitArea: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } }
+      },
+      tooltip: { trigger: 'item' },
+      series: [
+        {
+          name: seriesName,
+          type: 'radar',
+          data: [
+            {
+              value: values,
+              name: seriesName,
+              areaStyle: { color, opacity: 0.25 },
+              lineStyle: { color, width: 1.5 },
+              itemStyle: { color }
+            }
+          ]
+        }
+      ]
+    };
+  }
+
+  private scalabilityLabel(profile: InnovationDevScalabilityProfile): string {
+    return profile.label ?? profile.name ?? profile.flag ?? profile.key ?? 'Unanswered flag';
+  }
+
+  // --- capacity_sharing ---------------------------------------------------
+
+  readonly capacityGenderChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.gender_split ?? [];
+    return this.donutOptions(
+      items.map(i => ({ name: i.gender, count: i.count })),
+      'Gender split of trainees'
+    );
+  });
+  readonly capacityGenderTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.gender_split ?? [];
+    if (items.length === 0) return null;
+    return this.namedCountTable(
+      'Gender split of trainees',
+      items.map(i => ({ name: i.gender, count: i.count }))
+    );
+  });
+
+  readonly capacitySessionLengthChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.session_lengths ?? [];
+    return this.barOptions(items, 'Session length mix');
+  });
+  readonly capacitySessionLengthTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.session_lengths ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Session length mix', items);
+  });
+
+  readonly capacityModalityChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.delivery_modalities ?? [];
+    return this.barOptions(items, 'Delivery modality mix');
+  });
+  readonly capacityModalityTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.delivery_modalities ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Delivery modality mix', items);
+  });
+
+  readonly capacitySessionTypeChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.session_types ?? [];
+    return this.barOptions(items, 'Session type mix');
+  });
+  readonly capacitySessionTypeTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.capacitySharing()?.session_types ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Session type mix', items);
+  });
+
+  // --- innovation_dev ------------------------------------------------------
+
+  readonly innovationReadinessChartOptions = computed<EChartsOption | null>(() => {
+    const items = [...(this.getIndicatorDetailsService.innovationDev()?.readiness_levels ?? [])].sort((a, b) => a.level - b.level);
+    if (items.length === 0) return null;
+    return this.verticalBarOptions(
+      items.map(i => i.name),
+      items.map(i => i.count),
+      'Readiness levels (IRL)',
+      this.tokens().series2
+    );
+  });
+  readonly innovationReadinessTableModel = computed<VizChartTableModel | null>(() => {
+    const items = [...(this.getIndicatorDetailsService.innovationDev()?.readiness_levels ?? [])].sort((a, b) => a.level - b.level);
+    if (items.length === 0) return null;
+    return {
+      caption: 'Readiness levels (IRL), ordered by level',
+      headers: ['Level', 'Name', 'Count'],
+      rows: items.map(i => [i.level, i.name, i.count])
+    };
+  });
+
+  // R-DD-004 scenario: axis value derives from `answered_count` (the
+  // denominator basis), never `meta.n` — NULL/unanswered flags must not be
+  // treated as false, and must not be silently folded into the section's n.
+  readonly innovationScalabilityRadarOptions = computed<EChartsOption | null>(() => {
+    const profile = this.getIndicatorDetailsService.innovationDev()?.scalability_profile ?? [];
+    if (profile.length === 0) return null;
+    const axes = profile.map(p => ({ name: this.scalabilityLabel(p), max: 100 }));
+    const values = profile.map(p => (p.answered_count > 0 ? Math.round((p.true_count / p.answered_count) * 100) : 0));
+    return this.radarOptions(axes, values, 'Scalability profile (% true of answered)');
+  });
+  readonly innovationScalabilityTableModel = computed<VizChartTableModel | null>(() => {
+    const profile = this.getIndicatorDetailsService.innovationDev()?.scalability_profile ?? [];
+    if (profile.length === 0) return null;
+    return {
+      caption: 'Scalability profile — true vs answered per factor',
+      headers: ['Factor', 'True', 'Answered'],
+      rows: profile.map(p => [this.scalabilityLabel(p), p.true_count, p.answered_count])
+    };
+  });
+
+  readonly innovationTypeChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.innovation_types ?? [];
+    return this.barOptions(items, 'Innovation type mix');
+  });
+  readonly innovationTypeTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.innovation_types ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Innovation type mix', items);
+  });
+
+  readonly innovationNatureChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.innovation_natures ?? [];
+    return this.barOptions(items, 'Innovation nature mix');
+  });
+  readonly innovationNatureTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.innovation_natures ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Innovation nature mix', items);
+  });
+
+  readonly innovationUsersChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.anticipated_users ?? [];
+    return this.barOptions(items, 'Anticipated users mix');
+  });
+  readonly innovationUsersTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationDev()?.anticipated_users ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Anticipated users mix', items);
+  });
+
+  // --- knowledge_product ----------------------------------------------------
+
+  readonly knowledgeOpenAccessChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.open_access_split ?? [];
+    return this.donutOptions(items, 'Open-access split');
+  });
+  readonly knowledgeOpenAccessTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.open_access_split ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Open-access split', items);
+  });
+
+  readonly knowledgeAccessStatusChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.access_status ?? [];
+    return this.barOptions(items, 'Access status mix');
+  });
+  readonly knowledgeAccessStatusTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.access_status ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Access status mix', items);
+  });
+
+  readonly knowledgeTypeChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.types ?? [];
+    return this.barOptions(items, 'Knowledge product type mix');
+  });
+  readonly knowledgeTypeTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.types ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Knowledge product type mix', items);
+  });
+
+  readonly knowledgePublicationsByYearChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.publications_by_year ?? [];
+    if (items.length === 0) return null;
+    const sorted = [...items].sort((a, b) => {
+      if (a.year === null) return 1;
+      if (b.year === null) return -1;
+      return a.year - b.year;
+    });
+    return this.verticalBarOptions(
+      sorted.map(i => (i.year === null ? 'No year' : String(i.year))),
+      sorted.map(i => i.count),
+      'Publications by year',
+      this.tokens().series3
+    );
+  });
+  readonly knowledgePublicationsByYearTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.knowledgeProduct()?.publications_by_year ?? [];
+    if (items.length === 0) return null;
+    const sorted = [...items].sort((a, b) => {
+      if (a.year === null) return 1;
+      if (b.year === null) return -1;
+      return a.year - b.year;
+    });
+    return {
+      caption: 'Publications by year',
+      headers: ['Year', 'Count'],
+      rows: sorted.map(i => [i.year === null ? 'No year' : String(i.year), i.count])
+    };
+  });
+
+  // --- policy_change ----------------------------------------------------
+
+  readonly policyStageFunnelChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.policyChange()?.stage_funnel ?? [];
+    return this.funnelOptions(
+      items.map(i => ({ name: i.name ?? i.stage_name ?? 'Stage', count: i.count })),
+      'Policy stage funnel'
+    );
+  });
+  readonly policyStageFunnelTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.policyChange()?.stage_funnel ?? [];
+    if (items.length === 0) return null;
+    return this.namedCountTable(
+      'Policy stage funnel, ordered as delivered',
+      items.map(i => ({ name: i.name ?? i.stage_name ?? 'Stage', count: i.count }))
+    );
+  });
+
+  readonly policyTypeChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.policyChange()?.policy_types ?? [];
+    return this.barOptions(items, 'Policy type mix');
+  });
+  readonly policyTypeTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.policyChange()?.policy_types ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Policy type mix', items);
+  });
+
+  // --- oicr ----------------------------------------------------------------
+
+  readonly oicrMaturityChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.oicr()?.maturity_levels ?? [];
+    return this.donutOptions(
+      items.map(i => ({ name: i.name ?? i.level_name ?? 'Unspecified', count: i.count })),
+      'Maturity level distribution'
+    );
+  });
+  readonly oicrMaturityTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.oicr()?.maturity_levels ?? [];
+    if (items.length === 0) return null;
+    return this.namedCountTable(
+      'Maturity level distribution',
+      items.map(i => ({ name: i.name ?? i.level_name ?? 'Unspecified', count: i.count }))
+    );
+  });
+
+  readonly oicrExternalUseChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.oicr()?.external_use_split ?? [];
+    return this.donutOptions(
+      items.map(i => ({
+        name: i.name ?? (i.for_external_use === true ? 'External use' : i.for_external_use === false ? 'Internal use' : 'Unspecified'),
+        count: i.count
+      })),
+      'External-use split'
+    );
+  });
+  readonly oicrExternalUseTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.oicr()?.external_use_split ?? [];
+    if (items.length === 0) return null;
+    return this.namedCountTable(
+      'External-use split',
+      items.map(i => ({
+        name: i.name ?? (i.for_external_use === true ? 'External use' : i.for_external_use === false ? 'Internal use' : 'Unspecified'),
+        count: i.count
+      }))
+    );
+  });
+
+  // --- innovation_use --------------------------------------------------------
+
+  readonly innovationUseGenderYouthChartOptions = computed<EChartsOption | null>(() => {
+    const reach = this.getIndicatorDetailsService.innovationUse()?.gender_youth_reach ?? null;
+    if (!reach) return null;
+    const byActor = reach.by_actor_type ?? [];
+    const categories = byActor.length > 0 ? byActor.map(a => a.actor_type_name ?? a.actor_type ?? 'Unspecified') : ['Overall'];
+    const rows = byActor.length > 0 ? byActor : [reach.overall];
+    const colors = this.paletteColors(4);
+    return {
+      grid: { top: 16, bottom: 40, left: 8, right: 8, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { bottom: 0, textStyle: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', fontSize: 11 } },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } },
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' }
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-100)', type: 'dashed' } }
+      },
+      series: [
+        {
+          name: 'Women, youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.women_youth ?? 0),
+          itemStyle: { color: colors[0] }
+        },
+        {
+          name: 'Women, not youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.women_not_youth ?? 0),
+          itemStyle: { color: colors[1] }
+        },
+        {
+          name: 'Men, youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.men_youth ?? 0),
+          itemStyle: { color: colors[2] }
+        },
+        {
+          name: 'Men, not youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.men_not_youth ?? 0),
+          itemStyle: { color: colors[3] }
+        }
+      ]
+    };
+  });
+  readonly innovationUseGenderYouthTableModel = computed<VizChartTableModel | null>(() => {
+    const reach = this.getIndicatorDetailsService.innovationUse()?.gender_youth_reach ?? null;
+    if (!reach) return null;
+    const byActor = reach.by_actor_type ?? [];
+    const categories = byActor.length > 0 ? byActor.map(a => a.actor_type_name ?? a.actor_type ?? 'Unspecified') : ['Overall'];
+    const rows = byActor.length > 0 ? byActor : [reach.overall];
+    return {
+      caption: 'Gender × youth reach',
+      headers: ['Group', 'Women, youth', 'Women, not youth', 'Men, youth', 'Men, not youth'],
+      rows: rows.map((r, idx) => [categories[idx], r.women_youth ?? 0, r.women_not_youth ?? 0, r.men_youth ?? 0, r.men_not_youth ?? 0])
+    };
+  });
+
+  readonly innovationUseOrgTypeChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationUse()?.organization_types ?? [];
+    return this.barOptions(items, 'Organization type mix');
+  });
+  readonly innovationUseOrgTypeTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationUse()?.organization_types ?? [];
+    return items.length === 0 ? null : this.namedCountTable('Organization type mix', items);
+  });
+
+  // Quantifications render as a plain table, never a chart — units are
+  // heterogeneous (hectares, people, USD…) so one axis would misrepresent
+  // the data (D-F3-6).
+  readonly innovationUseQuantificationsTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.innovationUse()?.quantifications ?? [];
+    if (items.length === 0) return null;
+    return {
+      caption: 'Quantifications by unit',
+      headers: ['Unit', 'Total', 'Count'],
+      rows: items.map(i => [i.unit, i.total ?? i.total_number ?? 0, i.count])
+    };
+  });
+
+  // --- reporting_velocity (R-DD-006) ---------------------------------------
+
+  readonly velocityChartOptions = computed<EChartsOption | null>(() => {
+    const items = this.getIndicatorDetailsService.reportingVelocity() ?? [];
+    if (items.length === 0) return null;
+    const color = this.tokens().series1 || 'var(--ac-viz-series-1)';
+    return {
+      grid: { top: 4, bottom: 4, left: 4, right: 4 },
+      xAxis: { type: 'category', show: false, data: items.map(i => i.month) },
+      yAxis: { type: 'value', show: false, min: 0 },
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: unknown) => {
+          const item = Array.isArray(params) ? params[0] : (params as { name?: string; value?: unknown });
+          if (!item) return '';
+          return `${item.name}: <strong>${item.value}</strong> results`;
+        }
+      },
+      series: [
+        {
+          type: 'line',
+          data: items.map(i => i.count),
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 4,
+          itemStyle: { color },
+          lineStyle: { color, width: 2 },
+          areaStyle: { color, opacity: 0.08 }
+        }
+      ]
+    };
+  });
+  readonly velocityTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.getIndicatorDetailsService.reportingVelocity() ?? [];
+    if (items.length === 0) return null;
+    return {
+      caption: 'Reporting activity by month (last 24 months)',
+      headers: ['Month', 'Results created'],
+      rows: items.map(i => [i.month, i.count])
+    };
+  });
+  readonly velocityTotal = computed(() => (this.getIndicatorDetailsService.reportingVelocity() ?? []).reduce((sum, i) => sum + i.count, 0));
 
   ngAfterViewInit(): void {
     if (typeof IntersectionObserver === 'undefined') {
