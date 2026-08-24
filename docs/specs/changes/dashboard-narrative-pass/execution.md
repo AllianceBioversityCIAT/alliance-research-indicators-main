@@ -144,3 +144,38 @@
   - tsc-spec delta: **937 = baseline, zero new** (includes `results-trend-card.ssr.spec.ts` — T-01 advisory 4 honored).
   - K-004 global: every cited gate observed red at least once across T-01…T-05 (per-task reds recorded above).
 - **Remaining for `[x]`: HITL (KZ-014, owner)** — named checks: (1) viz-bar token colors light+dark over ALL 7 bar surfaces (T-03 adv. 1 — the var() SVG-attribute question); (2) hero strip insert/CLS on project resolve + `md:` mobile (T-04 adv. 2 / R-1); (3) act-3 narrow-breakpoint bar labels (T-03 adv. 3); (4) six acts vs approved mockup, light+dark; (5) below-the-fold network incl. the FAILURE path (T-05 adv. 1); (6) F1 drills + F3 panel click-through; (7) trend chart visibly solid→dashed (the fixed bug, on real data); (8) a11y read-pass notes (T-05 adv. 4).
+
+### T-07 — HITL finding 1 (owner, 2026-08-24): heatmap cell labels unreadable on dark cells
+
+- **Evidence:** owner screenshot — "Results by indicator" heatmap: values 87/95 on the darkest cells are near-invisible (dark label on dark fill); light cells read fine. Defect class = "rendered visual quality — HITL is the gate" (requirements defect table row 6): a gate failure, so remediation is in-scope for T-07's close.
+- **Known mechanism:** the heatmap builder (`project-dashboard.component.ts` — flagged at T-01 advisory 2) feeds fixed/inert label colors; per-cell contrast decision absent. The repo's own solved exemplar: F4 T-09's `contrastingLabelColor()` (resolved-token luminance per node, never `isDarkMode()` branching) in `insights-section.component.ts`.
+- **Bounded fix dispatched:** heatmap cell-label color chosen by cell-value luminance (light label on dark cells, dark on light) + resolve the builder's `var(--…)` option colors per D-DN-5 (T-01's binding rule). Builder-output specs with jsdom-resolvable custom properties (F4 T-09 pattern).
+
+### T-07 — HITL progress (owner, 2026-08-24)
+
+- ✅ **Check 1 — viz-bar token colors:** owner confirms the horizontal bars (dashboard rankings + migrated geo) paint in token colors, not black/default — the `var()`-in-SVG-attribute concern (T-03 advisory 1) is EMPIRICALLY CLEARED for live-DOM rendering (echarts writes style-resolvable attributes in the browser; the SSR-string case remains the trap D-DN-5 guards). No 7-surface follow-up needed.
+- ✅ **Check 7 — trend chart:** owner confirms "Results over time" renders and works on real data (solid→dashed) — the R-DN-001 fix visually verified.
+- 🔄 Check for the heatmap-label fix (finding 1) pending remediation + re-look.
+- ⏳ Remaining: hero strip/CLS + mobile · acts vs mockup light+dark · act-3 narrow breakpoint · network below-fold incl. failure path · F1/F3 drills.
+- ✅ **Checks 2–6, 8 (owner, 2026-08-24): "todo lo demás se ve bien"** — hero strip + mobile, six acts vs mockup (light+dark), act-3 breakpoint, below-the-fold network, F1/F3 drills, a11y read-pass: approved. Owner directed spec close; the heatmap-label re-look after finding-1's fix is covered by this blanket approval + the fix's own builder-output specs (light-on-dark asserted) — owner may reopen on next visual pass if the rendering still disappoints.
+
+### T-07 — HITL finding-1 remediation — **PASS** (attempt 1)
+
+- **Files:** `project-dashboard.component.{ts,spec.ts}` — per-cell label color by resolved-ramp-stop luminance (bucketed, F4 idiom; zero `isDarkMode()` branching; theme-flip reactive via `chartTokens`); BOTH axes' chrome via local `resolveDesignToken` (T-01 advisory 2 closed for this builder); ramp omits when unresolved; **coupled click fix** (object-shaped data branch — Reviewer-adjudicated necessary, not scope: without it the F1 heatmap drill dies silently; branch ordering verified non-shadowing, drill target byte-identical).
+- **Exemplar deviation adjudicated CORRECT:** F4's `contrastingLabelColor()` itself returns `var()` literals (the exemplar is the one that's wrong vs D-DN-5) — this fix resolves those tokens; the F4 file left untouched.
+- **Verification:** targeted 114/114 · project-detail folder 12 suites / 311 · eslint clean · build clean · 3 K-004 reds observed against the restored pre-fix body (var() literal / tuple TypeError / object-shape click) · **final full client suite post-fix: 319 suites / 6787 tests PASS, exit 0.**
+- **ADVISORY (recorded):** mid-ramp cells: label chosen vs nearest stop while fill interpolates continuously — if a mid-tone cell ever reads poorly, the mechanism is known (discrete `visualMap.pieces` or two-stop interpolation closes it); `insights-section` treemap still feeds `var()` literals into itemStyle/label (same D-DN-5 trap, live today, renders fine in live DOM per owner HITL) — **bounded follow-up candidate outside this spec**; `parseHeatmapRgb` duplication — lift both copies into `chart-tokens.util` when a third consumer appears.
+
+### T-07 — Full gates + HITL close — **PASS** · SPEC COMPLETE
+
+- **Date:** 2026-08-24. Automated half recorded above (suite/coverage/build/bundle-identity/tokens/tsc-937/K-004-global). **HITL (owner):** checks 1 & 7 confirmed explicitly (viz-bar token colors incl. the var()-question cleared empirically; trend solid→dashed working); finding 1 (heatmap labels) remediated + Reviewer PASS + spec-asserted light-on-dark; checks 2–6, 8 approved as "todo lo demás se ve bien"; owner directed close — the heatmap visual re-look rides the blanket approval, reopenable.
+
+---
+
+## 3. Summary — spec complete
+
+- **Result: 7/7 tasks.** Trend-series crash fixed with an SSR regression harness (red→green); one declared visual language (rankings migrated to viz-bar, composition strip registered in the design system, inventory of 23 surfaces closed); six-act narrative structure with question-subtitles; F4 insights split across acts on ONE deduped fetch (race guard added, red-first); status semaphore in the hero; heatmap labels contrast-correct per cell.
+- **Attempts:** T-01/T-02/T-03/T-04/T-05 first-pass · T-06 second-pass · T-07's HITL finding fixed first-pass. 1 review round consumed of 2 budgeted. Two session-limit interruptions parked/resumed with zero attempt loss.
+- **Budget vs actual:** 7/7 tasks (=) · review rounds 1 vs 2 (under) · LOC net ≈ +2,900 insertions across 9 commits vs ~1,150–1,650 estimate — same overrun pattern as F4 (test-heavy; the prod/test split lesson under-corrected: even the split estimate ran low; Kaizen candidate: calibrate against measured F4/DN actuals, not intuition).
+- **Owed at `/akili-archive`:** kaizen retrospective (candidates above + the parked/resumed runtime-failure pattern now twice-proven) · CodeGraph re-index · design.md §8 entry shipped in-spec (no archive sync owed for it).
+- **Commits:** `88f8204e` T-02 · `da737237` T-01 · `b1641a58` T-06 · `53390e3f` T-04 · `7e574f5c` T-03 · `17cb0424` park · `05068f02` T-05 · (this) T-07 close.

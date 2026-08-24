@@ -1546,6 +1546,97 @@ describe('ProjectDashboardComponent', () => {
       expect((options?.series as any[])[0].data.length).toBe(4);
     });
 
+    describe('Per-cell label contrast + D-DN-5 compliance (T-07 HITL fix — owner screenshot: values on the ' + 'darkest cells were near-invisible, dark label on dark fill)', () => {
+      const heatmapProjectData: GetProjectDetail = {
+        indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 4 } as any]
+      };
+      const heatmapSummary: ContractResultsSummary = {
+        total: 4,
+        by_status: [],
+        by_year: [{ year: 2022, count: 0 }, { year: 2023, count: 4 }],
+        by_indicator_year: [
+          { indicator_id: 1, year: 2022, count: 0 },
+          { indicator_id: 1, year: 2023, count: 4 }
+        ],
+        partner_institutions: 0
+      };
+
+      it(
+        'never emits an unresolved var(--…) string into the heatmap options — RED FIRST against the pre-fix ' +
+          'code (T-01 advisory 2: lines ~447/450 fed literal \'var(--ac-grey-300)\'/\'var(--ac-grey-700)\' ' +
+          'unconditionally, and the series/ramp fallbacks did too)',
+        async () => {
+          const RAMP_TOKEN_NAMES = ['--ac-viz-ramp-1', '--ac-viz-ramp-2', '--ac-viz-ramp-3', '--ac-viz-ramp-4', '--ac-viz-ramp-5'];
+          const OTHER_TOKEN_NAMES = ['--ac-grey-300', '--ac-grey-700', '--ac-grey-800', '--ac-grey-900', '--ac-white-1'];
+          const original = [...RAMP_TOKEN_NAMES, ...OTHER_TOKEN_NAMES].map(n => document.documentElement.style.getPropertyValue(n) || null);
+          const ramp = ['#ffffff', '#dddddd', '#999999', '#333333', '#000000'];
+          RAMP_TOKEN_NAMES.forEach((n, i) => document.documentElement.style.setProperty(n, ramp[i]));
+          document.documentElement.style.setProperty('--ac-grey-300', '#c9ced4');
+          document.documentElement.style.setProperty('--ac-grey-700', '#4a5560');
+          document.documentElement.style.setProperty('--ac-grey-800', '#2a2f36');
+          document.documentElement.style.setProperty('--ac-grey-900', '#111111');
+          document.documentElement.style.setProperty('--ac-white-1', '#ffffff');
+
+          try {
+            await setup('C-1', { projectData: heatmapProjectData, summary: heatmapSummary });
+
+            const options = component.indicatorHeatmapOptions();
+            expect(options).toBeTruthy();
+            expect(JSON.stringify(options)).not.toContain('var(--');
+          } finally {
+            [...RAMP_TOKEN_NAMES, ...OTHER_TOKEN_NAMES].forEach((n, i) => {
+              const value = original[i];
+              if (value) {
+                document.documentElement.style.setProperty(n, value);
+              } else {
+                document.documentElement.style.removeProperty(n);
+              }
+            });
+          }
+        }
+      );
+
+      it(
+        'pairs the darkest resolved ramp stop with a light label and the lightest resolved stop with a dark ' +
+          'label (failing input: a fixed single label color reddens one of these two — the darkest-cell case ' +
+          'is exactly the owner-reported bug)',
+        async () => {
+          const RAMP_TOKEN_NAMES = ['--ac-viz-ramp-1', '--ac-viz-ramp-2', '--ac-viz-ramp-3', '--ac-viz-ramp-4', '--ac-viz-ramp-5'];
+          const OTHER_TOKEN_NAMES = ['--ac-grey-900', '--ac-white-1'];
+          const original = [...RAMP_TOKEN_NAMES, ...OTHER_TOKEN_NAMES].map(n => document.documentElement.style.getPropertyValue(n) || null);
+          const ramp = ['#ffffff', '#dddddd', '#999999', '#333333', '#000000'];
+          RAMP_TOKEN_NAMES.forEach((n, i) => document.documentElement.style.setProperty(n, ramp[i]));
+          document.documentElement.style.setProperty('--ac-grey-900', '#111111');
+          document.documentElement.style.setProperty('--ac-white-1', '#ffffff');
+
+          try {
+            await setup('C-1', { projectData: heatmapProjectData, summary: heatmapSummary });
+
+            const options = component.indicatorHeatmapOptions() as unknown as {
+              series: { data: { value: [number, number, number]; label: { color?: string } }[] }[];
+            };
+            const cells = options.series[0].data;
+            // year 2022 (yearIndex 0) -> count 0 -> lightest bucket (ramp-1, #ffffff) -> dark label
+            const lightestCell = cells.find(c => c.value[2] === 0)!;
+            // year 2023 (yearIndex 1) -> count 4 = max -> deepest bucket (ramp-5, #000000) -> light label
+            const darkestCell = cells.find(c => c.value[2] === 4)!;
+
+            expect(lightestCell.label.color).toBe('#111111');
+            expect(darkestCell.label.color).toBe('#ffffff');
+          } finally {
+            [...RAMP_TOKEN_NAMES, ...OTHER_TOKEN_NAMES].forEach((n, i) => {
+              const value = original[i];
+              if (value) {
+                document.documentElement.style.setProperty(n, value);
+              } else {
+                document.documentElement.style.removeProperty(n);
+              }
+            });
+          }
+        }
+      );
+    });
+
     it('should render the ramp legend in DOM when heatmap view is active', async () => {
       await setup('C-1', {
         summary: summaryWithMatrix,
@@ -1586,6 +1677,38 @@ describe('ProjectDashboardComponent', () => {
         queryParams: { indicatorTab: 1 }
       });
     });
+
+    it(
+      'navigates correctly from the REAL echarts click shape now that heatmap cells are per-cell objects ' +
+        '(T-07 HITL fix — `{ value, label }`, not a bare tuple): a real heatmap click hands the handler the ' +
+        'data object, not an array, so `Array.isArray(event.data)` alone would miss it (failing input: without ' +
+        'the object-shape branch, this click resolves to no navigation at all since dataIndex/name fallbacks ' +
+        'do not apply to heatmap cells)',
+      async () => {
+        await setup('C-1', {
+          summary: summaryWithMatrix,
+          projectData: {
+            indicators: [
+              { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+              { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+            ]
+          }
+        });
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        const options = component.indicatorHeatmapOptions() as unknown as {
+          series: { data: { value: [number, number, number] } }[];
+        };
+        const realCell = options.series[0].data[0];
+        expect(Array.isArray(realCell)).toBe(false);
+
+        component.onIndicatorHeatmapClick({ data: realCell } as any);
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+          queryParams: { indicatorTab: 1 }
+        });
+      }
+    );
 
     it('mounts the F3 indicator deep-dive panel alongside Results by indicator and does not intercept its bar-click navigation (R-DD-005)', async () => {
       await setup('C-1', {

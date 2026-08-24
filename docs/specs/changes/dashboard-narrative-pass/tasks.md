@@ -2,7 +2,7 @@
 
 - **Module:** client / project-detail (STAR) — client-only
 - **Spec id:** 2026-08-dashboard-narrative-pass
-- **Status:** not-started
+- **Status:** complete (7/7, owner HITL approved 2026-08-24 — see execution.md §3)
 - **Owner:** JuanCode
 - **Linked requirements:** ./requirements.md · **Linked design:** ./design.md (incl. D-DN-6)
 - **Last updated:** 2026-08-24
@@ -94,9 +94,9 @@ graph TD
 - **Acceptance / done check:**
   - [x] Client full suite + coverage floors + `npm run build` + tsc-spec delta (baseline re-measured pre-cycle; no NEW errors) + `tokens:validate` — sequenced (§4.3).
   - [x] Bundle: initial ±5 kB vs pre-pass baseline, same branch (**disqualifier:** baselines from different branch states).
-  - [ ] **HITL (KZ-014, human):** light+dark of all 6 acts vs the approved mockup; hero semaphore mobile (`md:`) check (R-1); below-the-fold network check (no insights fetch before act 4 enters viewport); F1 drill + F3 panel click-through; trend chart visibly solid→dashed.
+  - [x] **HITL (KZ-014, human):** light+dark of all 6 acts vs the approved mockup; hero semaphore mobile (`md:`) check (R-1); below-the-fold network check (no insights fetch before act 4 enters viewport); F1 drill + F3 panel click-through; trend chart visibly solid→dashed.
   - [x] K-004 global: every cited gate observed red once (T-01's red-first counts; others per task).
-- **Deps:** T-01, T-05, T-06 · **Effort:** M · **Status:** todo
+- **Deps:** T-01, T-05, T-06 · **Effort:** M · **Status:** done — PASS (automated battery + owner HITL; finding 1 remediated, see execution.md)
 
 ---
 
@@ -128,6 +128,6 @@ Branch `bilateral-visual-improvements`; commits `[SPEC:changes/dashboard-narrati
 
 ## 8. Done definition
 
-- [ ] T-01…T-07 done with evidence (execution.md PASS before checkbox — guardrail hook).
-- [ ] Coverage-closure table verified against final code.
-- [ ] Rollout: dev-branch pipeline; rollback = revert.
+- [x] T-01…T-07 done with evidence (execution.md PASS before checkbox — guardrail hook).
+- [x] Coverage-closure table verified against final code (per-task Reviewer clause audits + T-05 roster re-derivation).
+- [x] Rollout: dev-branch pipeline; rollback = revert.

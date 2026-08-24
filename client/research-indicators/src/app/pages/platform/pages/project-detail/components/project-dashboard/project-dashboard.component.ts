@@ -390,20 +390,30 @@ export class ProjectDashboardComponent {
       return null;
     }
 
+    // T-07 HITL fix: `chartTokens()` already resolves these via
+    // `getComputedStyle` — a length !== 5 means resolution genuinely failed
+    // (jsdom, or the theme hasn't painted yet), and D-DN-5 bans feeding an
+    // unresolved `'var(--…)'` fallback string into echarts options (the
+    // confirmed SVG-presentation-attribute trap). `undefined` here lets
+    // echarts fall back to its OWN default visualMap gradient instead.
     const tokenRamp = this.tokens().ramp.filter(Boolean);
-    const rampColors =
-      tokenRamp.length === 5
-        ? tokenRamp
-        : [
-            'var(--ac-viz-ramp-1)',
-            'var(--ac-viz-ramp-2)',
-            'var(--ac-viz-ramp-3)',
-            'var(--ac-viz-ramp-4)',
-            'var(--ac-viz-ramp-5)'
-          ];
+    const rampColors = tokenRamp.length === 5 ? tokenRamp : undefined;
 
     const yearLabels = years.map(y => (y === null ? 'No year' : String(y)));
     const indicatorLabels = indicators.map(i => i.label);
+
+    // Per-cell label contrast (T-07 HITL fix — owner screenshot: values on
+    // the darkest cells were near-invisible, dark label on dark fill).
+    // Mirrors `insights-section.component.ts`'s `contrastingLabelColor()` /
+    // `parseRgb()` (F4 T-09 exemplar): bucket each cell's value onto the
+    // same 5 resolved ramp stops actually painted, then read THAT stop's
+    // real luminance — never `isDarkMode()` branching for the decision, so
+    // it self-corrects regardless of which theme inverts the ramp direction
+    // (`tokens:validate` already confirms it does, between themes).
+    const heatmapData = data.map(([xIdx, yIdx, count]) => ({
+      value: [xIdx, yIdx, count] as [number, number, number],
+      label: { color: this.heatmapCellLabelColor(count, max, rampColors) }
+    }));
 
     return {
       grid: {
@@ -416,8 +426,8 @@ export class ProjectDashboardComponent {
       tooltip: {
         position: 'top',
         formatter: (params: unknown) => {
-          const item = params as { data?: [number, number, number] };
-          const d = item?.data;
+          const item = params as { data?: { value?: [number, number, number] } };
+          const d = item?.data?.value;
           if (!d || !Array.isArray(d)) return '';
           const [xIdx, yIdx, count] = d;
           const yearLabel = yearLabels[xIdx] ?? '';
@@ -431,10 +441,10 @@ export class ProjectDashboardComponent {
         splitArea: { show: true },
         axisTick: { show: false },
         axisLine: {
-          lineStyle: { color: 'var(--ac-grey-300)' }
+          lineStyle: { color: this.resolveDesignToken('--ac-grey-300') }
         },
         axisLabel: {
-          color: 'var(--ac-grey-700)',
+          color: this.resolveDesignToken('--ac-grey-700'),
           fontFamily: 'Barlow'
         }
       },
@@ -444,10 +454,10 @@ export class ProjectDashboardComponent {
         splitArea: { show: true },
         axisTick: { show: false },
         axisLine: {
-          lineStyle: { color: 'var(--ac-grey-300)' }
+          lineStyle: { color: this.resolveDesignToken('--ac-grey-300') }
         },
         axisLabel: {
-          color: 'var(--ac-grey-700)',
+          color: this.resolveDesignToken('--ac-grey-700'),
           fontFamily: 'Barlow',
           width: 140,
           overflow: 'truncate'
@@ -459,9 +469,7 @@ export class ProjectDashboardComponent {
         calculable: false,
         orient: 'horizontal',
         show: false,
-        inRange: {
-          color: rampColors
-        }
+        inRange: rampColors ? { color: rampColors } : undefined
       },
       series: [
         {
@@ -469,14 +477,13 @@ export class ProjectDashboardComponent {
           name: 'Results by indicator and year',
           type: 'heatmap',
           cursor: 'pointer',
-          data,
+          data: heatmapData,
           universalTransition: {
             enabled: true,
             divideShape: 'clone'
           },
           label: {
             show: true,
-            color: 'var(--ac-grey-800)',
             fontFamily: 'Barlow'
           },
           emphasis: {
@@ -489,6 +496,68 @@ export class ProjectDashboardComponent {
       ]
     };
   });
+
+  // T-07 HITL fix — resolves a general (non `--ac-viz-*`) design token the
+  // same way `results-trend-card.component.ts` does for its axis chrome
+  // (D-DN-5): a resolved literal, or `undefined` so echarts falls back to
+  // its own default rather than receiving an unresolved `'var(--…)'` string.
+  private resolveDesignToken(name: string): string | undefined {
+    if (typeof document === 'undefined') return undefined;
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || undefined;
+  }
+
+  // Buckets a cell's value onto the same 5 resolved ramp stops the fill
+  // actually uses (discrete, deterministic — mirrors
+  // `insights-section.component.ts`'s `treemapRampBucket()`/`rampColors()`
+  // family), then reads that stop's ACTUAL luminance for the label color.
+  // No resolved ramp (jsdom, or theme not yet painted) -> `undefined`
+  // (echarts' own default), never a literal fallback string.
+  private heatmapCellLabelColor(value: number, max: number, rampColors: string[] | undefined): string | undefined {
+    if (!rampColors || rampColors.length !== 5) {
+      return this.resolveDesignToken('--ac-grey-800');
+    }
+    const bucket = max > 0 ? Math.min(4, Math.max(0, Math.round((Math.min(max, Math.max(0, value)) / max) * 4))) : 0;
+    return this.contrastingHeatmapLabelColor(rampColors[bucket]);
+  }
+
+  // Same WCAG-contrast decision as `insights-section.component.ts`'s
+  // `contrastingLabelColor()` (F4 T-09) — kept local to this component
+  // rather than shared, per T-07's bounded scope (this file only). Deviates
+  // from that exemplar in one deliberate way: the exemplar returns literal
+  // `'var(--ac-white-1)'`/`'var(--ac-grey-900)'` strings, which is itself an
+  // unresolved-var() leak into echarts options (D-DN-5) — out of scope to
+  // fix there, but not a pattern to copy into a builder this spec explicitly
+  // gates on "zero `var(--` in the emitted options". Both branches resolve
+  // through `resolveDesignToken` instead.
+  private contrastingHeatmapLabelColor(color: string): string | undefined {
+    const rgb = this.parseHeatmapRgb(color);
+    if (!rgb) {
+      return this.resolveDesignToken('--ac-grey-800');
+    }
+    const [r, g, b] = rgb;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.55 ? this.resolveDesignToken('--ac-grey-900') : this.resolveDesignToken('--ac-white-1');
+  }
+
+  private parseHeatmapRgb(color: string): [number, number, number] | null {
+    const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(color.trim());
+    if (hex) {
+      let value = hex[1];
+      if (value.length === 3) {
+        value = value
+          .split('')
+          .map(c => c + c)
+          .join('');
+      }
+      const num = parseInt(value, 16);
+      return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+    }
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color.trim());
+    if (rgb) {
+      return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    }
+    return null;
+  }
 
   readonly indicatorBarOptions = computed<EChartsOption | null>(() => {
     const indicators = this.indicatorsWithResults();
@@ -1170,6 +1239,17 @@ export class ProjectDashboardComponent {
 
     if (Array.isArray(event.data)) {
       const rawIndex = event.data[1];
+      const indicatorIndex = typeof rawIndex === 'number' ? rawIndex : Number(rawIndex);
+      if (Number.isFinite(indicatorIndex)) {
+        const indicator = this.indicatorsWithResults()[indicatorIndex];
+        targetId = indicator?.indicatorId ?? indicator?.id;
+      }
+    } else if (event.data && typeof event.data === 'object' && Array.isArray((event.data as { value?: unknown }).value)) {
+      // T-07 HITL fix: heatmap cells are now per-cell objects (`{ value: [x, y, count], label }`)
+      // — carries the per-cell label-contrast color — rather than a raw tuple, so echarts hands
+      // this branch the object, not the array. `value[1]` is still the indicator index, same
+      // position `heatmapMatrixData()` always used (`[yearIndex, indicatorIndex, count]`).
+      const rawIndex = (event.data as { value: unknown[] }).value[1];
       const indicatorIndex = typeof rawIndex === 'number' ? rawIndex : Number(rawIndex);
       if (Number.isFinite(indicatorIndex)) {
         const indicator = this.indicatorsWithResults()[indicatorIndex];
