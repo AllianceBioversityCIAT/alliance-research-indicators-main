@@ -32,6 +32,24 @@ export type InsightCardState = 'skeleton' | 'error' | 'empty' | 'sparse' | 'comp
 
 type InsightSectionKey = keyof ContractInsightsReport;
 
+// Per-card identity (T-05, D-DN-4, RB-2 — the ONE allowed structural change).
+// The dashboard narrative pass re-groups F4 cards across acts 4-6 while
+// keeping ONE component doing the fetch/state work: `visibleCards` lets a
+// mounted instance render only a NAMED SUBSET of its six cards, so multiple
+// instances (one per act) each project a different slice of the same
+// underlying `GetContractInsightsService` state. `data-card` attribute
+// values in the template are the source of truth for these keys.
+export type InsightCardKey = 'reach' | 'sdg-coverage' | 'evidence' | 'review-flow' | 'contributing-levers' | 'keywords';
+
+export const ALL_INSIGHT_CARD_KEYS: InsightCardKey[] = [
+  'reach',
+  'sdg-coverage',
+  'evidence',
+  'review-flow',
+  'contributing-levers',
+  'keywords'
+];
+
 @Component({
   selector: 'app-insights-section',
   standalone: true,
@@ -51,6 +69,28 @@ export class InsightsSectionComponent implements AfterViewInit, OnDestroy {
   // client-side comparison against this input + the lazy `sdg_coverage`
   // section (R-IN-003 SDG comparison scenario BUT-clause).
   readonly declaredSdgs = input<DeclaredSdg[]>([]);
+
+  // Which cards THIS instance renders (T-05, D-DN-4). Defaults to all six —
+  // a caller that never sets this input keeps the pre-T-05 single-instance
+  // behavior exactly (back-compat for `insights-section.component.spec.ts`,
+  // which never sets it).
+  readonly visibleCards = input<InsightCardKey[]>(ALL_INSIGHT_CARD_KEYS);
+  // Unique id root for this instance's heading/aria-labelledby (T-05) — when
+  // the dashboard mounts three instances (one per act) simultaneously, a
+  // shared hardcoded id would duplicate DOM ids and break aria-labelledby
+  // resolution. Defaults to the pre-T-05 id so a lone instance is unchanged.
+  readonly instanceId = input<string>('insights-section');
+  // Per-instance subtitle (T-05) — customized by the dashboard per act so a
+  // one/two-card instance doesn't claim to cover cards it doesn't render.
+  readonly description = input<string>(
+    'Portfolio-level reach, SDG coverage, evidence, review flow, contributing levers, and keywords across all indicators.'
+  );
+
+  private readonly visibleCardKeys = computed(() => new Set(this.visibleCards()));
+
+  isCardVisible(key: InsightCardKey): boolean {
+    return this.visibleCardKeys().has(key);
+  }
 
   private readonly hasIntersected = signal(false);
   private observer: IntersectionObserver | null = null;
@@ -587,6 +627,20 @@ export class InsightsSectionComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.hasIntersected.set(true);
+
+    // T-05/D-DN-4: acts 4-6 each mount their own instance, each with its own
+    // observer, over the SAME contract — "ONE fetch feeds all repositioned
+    // F4 cards". `GetContractInsightsService.load()` only dedupes AFTER a
+    // load has completed (`loadedContractId() === contractId && data()`), so
+    // it does not by itself cover two instances intersecting before the
+    // first request resolves (e.g. both acts already in the initial
+    // viewport). This closes that gap: if a load for this contract is
+    // already in flight or already loaded, this instance still marks itself
+    // observed (clearing its own skeleton once the shared signals resolve)
+    // without issuing a second request.
+    if (this.getContractInsightsService.loading() || this.getContractInsightsService.loadedContractId() === contractId) {
+      return;
+    }
     void this.getContractInsightsService.load(contractId);
   }
 }

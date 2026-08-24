@@ -1,684 +1,701 @@
 <section class="flex w-full flex-col gap-5 p-1">
-  <!-- KPI summary strip (R-PD-002, R-HL-002) -->
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators" [style.animation-delay.ms]="staggerMs.kpi">
-    <!-- Tile 1: Total results -->
-    <button type="button"
-      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-      [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
-      [class.hover:shadow-sm]="!getProjectDetailService.loading()"
-      [class.cursor-pointer]="!getProjectDetailService.loading()"
-      [class.cursor-default]="getProjectDetailService.loading()"
-      [attr.disabled]="getProjectDetailService.loading() ? true : null"
-      [attr.aria-label]="getProjectDetailService.loading() ? 'Loading total results' : 'Total results: ' + totalProjectResults() + ' across all indicator types — view project results'"
-      (click)="navigateToTotalResults()">
-      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-        Total results
-      </span>
-      @if (getProjectDetailService.loading()) {
-      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading total results">
-        <p-skeleton width="60px" height="32px" borderRadius="4px" />
-        <p-skeleton width="110px" height="14px" borderRadius="4px" />
-      </div>
-      } @else {
-      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
-        {{ totalProjectResults() }}
-      </strong>
-      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
-        across all indicator types
-      </span>
-      }
-    </button>
 
-    <!-- Tile 2: Indicators covered -->
-    <button type="button"
-      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-      [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
-      [class.hover:shadow-sm]="!getProjectDetailService.loading()"
-      [class.cursor-pointer]="!getProjectDetailService.loading()"
-      [class.cursor-default]="getProjectDetailService.loading()"
-      [attr.disabled]="getProjectDetailService.loading() ? true : null"
-      [attr.aria-label]="getProjectDetailService.loading() ? 'Loading indicators covered' : 'Indicators covered: ' + indicatorsCoveredCount() + ' of ' + indicatorsTotalCount() + ' indicator types — click to view breakdown'"
-      (click)="!getProjectDetailService.loading() && indicatorsOp.toggle($event)">
-      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-        Indicators covered
-      </span>
-      @if (getProjectDetailService.loading()) {
-      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading indicators covered">
-        <p-skeleton width="60px" height="32px" borderRadius="4px" />
-        <p-skeleton width="110px" height="14px" borderRadius="4px" />
-      </div>
-      } @else {
-      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
-        {{ indicatorsCoveredCount() }}
-      </strong>
-      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
-        of {{ indicatorsTotalCount() }} indicator types
-      </span>
-      }
-    </button>
+  <!-- ============================================================ -->
+  <!-- ACT 1 — Identity & health (R-DN-003, design §2.3/D-DN-3)      -->
+  <!-- Hero F1 (KPI strip + context chips + in-hero status semaphore, -->
+  <!-- T-04/D-DN-6 OQ-1-A) + the compact caveat banner.               -->
+  <!-- ============================================================ -->
+  <section aria-labelledby="act-1-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-1-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 1</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What is this project and how is it going?</span>
+    </h2>
 
-    <!-- Tile 3: Pending revision -->
-    <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
-      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-        Pending revision
-      </span>
-      @if (contractDashboard.loading()) {
-      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading pending revision count">
-        <p-skeleton width="60px" height="32px" borderRadius="4px" />
-        <p-skeleton width="110px" height="14px" borderRadius="4px" />
-      </div>
-      } @else {
-      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
-        {{ pendingRevisionCount() }}
-      </strong>
-      <a href="#pending-revision-section"
-        class="inline-flex items-center gap-1 font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-light-blue-400)] transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-        (click)="scrollToPendingRevision($event)">
-        Review queue &rarr;
-      </a>
-      }
-    </div>
-
-    <!-- Tile 4: Partner institutions -->
-    <button type="button"
-      class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-      [class.hover:border-[var(--ac-primary-blue-400)]]="!contractDashboard.loading()"
-      [class.hover:shadow-sm]="!contractDashboard.loading()"
-      [class.cursor-pointer]="!contractDashboard.loading()"
-      [class.cursor-default]="contractDashboard.loading()"
-      [attr.disabled]="contractDashboard.loading() ? true : null"
-      [attr.aria-label]="contractDashboard.loading() ? 'Loading partner institutions count' : 'Partner institutions: ' + partnerInstitutionsCount() + ' linked to results — scroll to top partner institutions'"
-      (click)="scrollToPartners($event)">
-      <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-        Partner institutions
-      </span>
-      @if (contractDashboard.loading()) {
-      <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading partner institutions count">
-        <p-skeleton width="60px" height="32px" borderRadius="4px" />
-        <p-skeleton width="110px" height="14px" borderRadius="4px" />
-      </div>
-      } @else {
-      <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
-        {{ partnerInstitutionsCount() }}
-      </strong>
-      <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
-        linked to results
-      </span>
-      }
-    </button>
-  </div>
-
-  <p-popover #indicatorsOp [style]="{ width: '340px' }" appendTo="body">
-    <div class="flex flex-col gap-2 p-1.5 text-sm" data-testid="indicators-covered-popover" role="region" aria-label="Covered indicators breakdown">
-      <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
-        <span class="font-semibold text-[13px] font-['Barlow'] text-[var(--ac-primary-blue-600)]">Covered Indicators</span>
-        <span class="font-['Barlow'] text-[12px] font-medium text-[var(--ac-grey-600)]">
-          {{ indicatorsCoveredCount() }} of {{ indicatorsTotalCount() }}
+    <!-- KPI summary strip (R-PD-002, R-HL-002) -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="region" aria-label="Key performance indicators" [style.animation-delay.ms]="staggerMs.kpi">
+      <!-- Tile 1: Total results -->
+      <button type="button"
+        class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+        [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
+        [class.hover:shadow-sm]="!getProjectDetailService.loading()"
+        [class.cursor-pointer]="!getProjectDetailService.loading()"
+        [class.cursor-default]="getProjectDetailService.loading()"
+        [attr.disabled]="getProjectDetailService.loading() ? true : null"
+        [attr.aria-label]="getProjectDetailService.loading() ? 'Loading total results' : 'Total results: ' + totalProjectResults() + ' across all indicator types — view project results'"
+        (click)="navigateToTotalResults()">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Total results
         </span>
-      </div>
-      @if (indicatorsWithResults().length === 0) {
-      <p class="m-0 py-2 text-center font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
-        No indicators with results
-      </p>
-      } @else {
-      <ul class="m-0 flex list-none flex-col gap-1 p-0" role="list">
-        @for (indicator of indicatorsWithResults(); track indicator.id) {
-        <li>
-          <button type="button"
-            class="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] cursor-pointer bg-transparent border-0"
-            [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'"
-            (click)="navigateToIndicatorResults(indicator, indicatorsOp)">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
-              <span class="min-w-0 font-['Barlow'] text-[13px] font-medium text-[var(--ac-grey-800)] truncate" [title]="indicator.label">
-                {{ indicator.label }}
-              </span>
-            </div>
-            <strong class="shrink-0 font-['Barlow'] text-[13px] font-bold tabular-nums text-[var(--ac-primary-blue-600)]">
-              {{ indicator.value }}
-            </strong>
-          </button>
-        </li>
+        @if (getProjectDetailService.loading()) {
+        <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading total results">
+          <p-skeleton width="60px" height="32px" borderRadius="4px" />
+          <p-skeleton width="110px" height="14px" borderRadius="4px" />
+        </div>
+        } @else {
+        <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ totalProjectResults() }}
+        </strong>
+        <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+          across all indicator types
+        </span>
         }
-      </ul>
-      }
-    </div>
-  </p-popover>
+      </button>
 
-  <!-- Hero context chips row (R-HL-001) -->
-  @if (getProjectDetailService.loading()) {
-  <div class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
-    role="status" aria-label="Loading project context" [style.animation-delay.ms]="staggerMs.contextStrip">
-    <div class="flex flex-wrap items-stretch gap-3">
-      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
-        <p-skeleton width="70px" height="12px" borderRadius="4px" />
-        <p-skeleton width="100px" height="18px" borderRadius="4px" />
+      <!-- Tile 2: Indicators covered -->
+      <button type="button"
+        class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+        [class.hover:border-[var(--ac-primary-blue-400)]]="!getProjectDetailService.loading()"
+        [class.hover:shadow-sm]="!getProjectDetailService.loading()"
+        [class.cursor-pointer]="!getProjectDetailService.loading()"
+        [class.cursor-default]="getProjectDetailService.loading()"
+        [attr.disabled]="getProjectDetailService.loading() ? true : null"
+        [attr.aria-label]="getProjectDetailService.loading() ? 'Loading indicators covered' : 'Indicators covered: ' + indicatorsCoveredCount() + ' of ' + indicatorsTotalCount() + ' indicator types — click to view breakdown'"
+        (click)="!getProjectDetailService.loading() && indicatorsOp.toggle($event)">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Indicators covered
+        </span>
+        @if (getProjectDetailService.loading()) {
+        <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading indicators covered">
+          <p-skeleton width="60px" height="32px" borderRadius="4px" />
+          <p-skeleton width="110px" height="14px" borderRadius="4px" />
+        </div>
+        } @else {
+        <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ indicatorsCoveredCount() }}
+        </strong>
+        <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+          of {{ indicatorsTotalCount() }} indicator types
+        </span>
+        }
+      </button>
+
+      <!-- Tile 3: Pending revision -->
+      <div class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Pending revision
+        </span>
+        @if (contractDashboard.loading()) {
+        <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading pending revision count">
+          <p-skeleton width="60px" height="32px" borderRadius="4px" />
+          <p-skeleton width="110px" height="14px" borderRadius="4px" />
+        </div>
+        } @else {
+        <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ pendingRevisionCount() }}
+        </strong>
+        <a href="#pending-revision-section"
+          class="inline-flex items-center gap-1 font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-light-blue-400)] transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+          (click)="scrollToPendingRevision($event)">
+          Review queue &rarr;
+        </a>
+        }
       </div>
-      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
-        <p-skeleton width="80px" height="12px" borderRadius="4px" />
-        <p-skeleton width="110px" height="18px" borderRadius="4px" />
+
+      <!-- Tile 4: Partner institutions -->
+      <button type="button"
+        class="flex flex-col gap-1.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4.5 shadow-xs text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+        [class.hover:border-[var(--ac-primary-blue-400)]]="!contractDashboard.loading()"
+        [class.hover:shadow-sm]="!contractDashboard.loading()"
+        [class.cursor-pointer]="!contractDashboard.loading()"
+        [class.cursor-default]="contractDashboard.loading()"
+        [attr.disabled]="contractDashboard.loading() ? true : null"
+        [attr.aria-label]="contractDashboard.loading() ? 'Loading partner institutions count' : 'Partner institutions: ' + partnerInstitutionsCount() + ' linked to results — scroll to top partner institutions'"
+        (click)="scrollToPartners($event)">
+        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+          Partner institutions
+        </span>
+        @if (contractDashboard.loading()) {
+        <div class="flex flex-col gap-2 py-1" role="status" aria-label="Loading partner institutions count">
+          <p-skeleton width="60px" height="32px" borderRadius="4px" />
+          <p-skeleton width="110px" height="14px" borderRadius="4px" />
+        </div>
+        } @else {
+        <strong class="font-['Space_Grotesk'] text-[32px] font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">
+          {{ partnerInstitutionsCount() }}
+        </strong>
+        <span class="font-['Barlow'] text-[12.5px] text-[var(--ac-grey-600)]">
+          linked to results
+        </span>
+        }
+      </button>
+    </div>
+
+    <p-popover #indicatorsOp [style]="{ width: '340px' }" appendTo="body">
+      <div class="flex flex-col gap-2 p-1.5 text-sm" data-testid="indicators-covered-popover" role="region" aria-label="Covered indicators breakdown">
+        <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
+          <span class="font-semibold text-[13px] font-['Barlow'] text-[var(--ac-primary-blue-600)]">Covered Indicators</span>
+          <span class="font-['Barlow'] text-[12px] font-medium text-[var(--ac-grey-600)]">
+            {{ indicatorsCoveredCount() }} of {{ indicatorsTotalCount() }}
+          </span>
+        </div>
+        @if (indicatorsWithResults().length === 0) {
+        <p class="m-0 py-2 text-center font-['Barlow'] text-[13px] text-[var(--ac-grey-700)]">
+          No indicators with results
+        </p>
+        } @else {
+        <ul class="m-0 flex list-none flex-col gap-1 p-0" role="list">
+          @for (indicator of indicatorsWithResults(); track indicator.id) {
+          <li>
+            <button type="button"
+              class="flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] cursor-pointer bg-transparent border-0"
+              [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'"
+              (click)="navigateToIndicatorResults(indicator, indicatorsOp)">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
+                <span class="min-w-0 font-['Barlow'] text-[13px] font-medium text-[var(--ac-grey-800)] truncate" [title]="indicator.label">
+                  {{ indicator.label }}
+                </span>
+              </div>
+              <strong class="shrink-0 font-['Barlow'] text-[13px] font-bold tabular-nums text-[var(--ac-primary-blue-600)]">
+                {{ indicator.value }}
+              </strong>
+            </button>
+          </li>
+          }
+        </ul>
+        }
       </div>
-      <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
-        <p-skeleton width="75px" height="12px" borderRadius="4px" />
-        <p-skeleton width="90px" height="18px" borderRadius="4px" />
-      </div>
-      <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2 gap-2">
-        <div class="flex items-center justify-between">
-          <p-skeleton width="60px" height="12px" borderRadius="4px" />
+    </p-popover>
+
+    <!-- Hero context chips row (R-HL-001) -->
+    @if (getProjectDetailService.loading()) {
+    <div class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
+      role="status" aria-label="Loading project context" [style.animation-delay.ms]="staggerMs.contextStrip">
+      <div class="flex flex-wrap items-stretch gap-3">
+        <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
           <p-skeleton width="70px" height="12px" borderRadius="4px" />
+          <p-skeleton width="100px" height="18px" borderRadius="4px" />
         </div>
-        <p-skeleton width="100%" height="8px" borderRadius="9999px" />
-        <div class="flex items-center justify-between">
+        <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
           <p-skeleton width="80px" height="12px" borderRadius="4px" />
-          <p-skeleton width="80px" height="12px" borderRadius="4px" />
+          <p-skeleton width="110px" height="18px" borderRadius="4px" />
+        </div>
+        <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2 gap-2">
+          <p-skeleton width="75px" height="12px" borderRadius="4px" />
+          <p-skeleton width="90px" height="18px" borderRadius="4px" />
+        </div>
+        <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2 gap-2">
+          <div class="flex items-center justify-between">
+            <p-skeleton width="60px" height="12px" borderRadius="4px" />
+            <p-skeleton width="70px" height="12px" borderRadius="4px" />
+          </div>
+          <p-skeleton width="100%" height="8px" borderRadius="9999px" />
+          <div class="flex items-center justify-between">
+            <p-skeleton width="80px" height="12px" borderRadius="4px" />
+            <p-skeleton width="80px" height="12px" borderRadius="4px" />
+          </div>
         </div>
       </div>
     </div>
-  </div>
-  } @else if (hasAnyContext() || !statusChartEmpty()) {
-  <section class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
-    role="region" aria-label="Project context summary" [style.animation-delay.ms]="staggerMs.contextStrip">
-    @if (hasPrimaryContext()) {
-    <div class="flex flex-wrap items-stretch gap-3">
-      @if (grantAmount()) {
-      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Total Budget
-        </span>
-        <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
-          {{ grantAmount() }}
-        </span>
-      </div>
-      }
-
-      @if (centerAmount()) {
-      <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Center Budget
-        </span>
-        <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
-          {{ centerAmount() }}
-        </span>
-      </div>
-      }
-
-      @if (fundingType()) {
-      <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Funding Type
-        </span>
-        <span class="font-['Barlow'] text-[14px] font-semibold text-[var(--ac-grey-800)]">
-          {{ fundingType() }}
-        </span>
-      </div>
-      }
-
-      @if (hasLever()) {
-      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Lever
-        </span>
-        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-300)]"
-          [title]="projectLeverName()">
-          {{ projectLeverName() }}
-        </span>
-      </div>
-      }
-
-      @if (donor()) {
-      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Foundress
-        </span>
-        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
-          [title]="donor()!">
-          {{ donor() }}
-        </span>
-      </div>
-      }
-
-      @if (hasDivision()) {
-      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Division
-        </span>
-        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
-          [title]="projectDivisionLabel()">
-          {{ projectDivisionLabel() }}
-        </span>
-      </div>
-      }
-
-      @if (hasUnit()) {
-      <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
-        <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Unit
-        </span>
-        <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
-          [title]="projectUnitLabel()">
-          {{ projectUnitLabel() }}
-        </span>
-      </div>
-      }
-
-      <!-- Timeline Tile -->
-      @if (timeline(); as tl) {
-      <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2">
-        <div class="mb-1.5 flex items-center justify-between gap-2">
+    } @else if (hasAnyContext() || !statusChartEmpty()) {
+    <section class="box-border flex w-full flex-col gap-3.5 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-4 shadow-xs"
+      role="region" [attr.aria-label]="hasAnyContext() ? 'Project context summary' : 'Results by status'" [style.animation-delay.ms]="staggerMs.contextStrip">
+      @if (hasPrimaryContext()) {
+      <div class="flex flex-wrap items-stretch gap-3">
+        @if (grantAmount()) {
+        <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
           <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-            Timeline
+            Total Budget
           </span>
-          <span class="font-['Barlow'] text-[12px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
-            {{ tl.elapsedPercent }}% elapsed
+          <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+            {{ grantAmount() }}
           </span>
         </div>
+        }
 
-        <!-- Progress bar -->
-        <div class="relative h-2 w-full overflow-hidden rounded-full bg-[var(--ac-grey-300)]"
-          role="progressbar"
-          [attr.aria-valuenow]="tl.elapsedPercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          [attr.aria-label]="tl.elapsedPercent + '% timeline elapsed'">
-          <div class="h-full rounded-full bg-[var(--ac-primary-blue-400)] transition-all duration-300 ease-out"
-            [style.width.%]="tl.elapsedPercent"></div>
+        @if (centerAmount()) {
+        <div class="flex min-w-[140px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Center Budget
+          </span>
+          <span class="font-['Barlow'] text-[14px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+            {{ centerAmount() }}
+          </span>
         </div>
+        }
 
-        <!-- Date labels -->
-        <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
-          <span>Start: {{ tl.startDate | date: 'dd/MM/yyyy' }}</span>
-          <span>End: {{ tl.endDate | date: 'dd/MM/yyyy' }}</span>
-          @if (tl.isExtended && tl.extensionDate) {
-          <span class="inline-flex items-center gap-1 font-medium text-[var(--ac-orange-1)]">
-            <i class="pi pi-clock text-[11px]" aria-hidden="true"></i>
-            <span>Extension: {{ tl.extensionDate | date: 'dd/MM/yyyy' }}</span>
+        @if (fundingType()) {
+        <div class="flex min-w-[120px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Funding Type
+          </span>
+          <span class="font-['Barlow'] text-[14px] font-semibold text-[var(--ac-grey-800)]">
+            {{ fundingType() }}
+          </span>
+        </div>
+        }
+
+        @if (hasLever()) {
+        <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Lever
+          </span>
+          <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-300)]"
+            [title]="projectLeverName()">
+            {{ projectLeverName() }}
+          </span>
+        </div>
+        }
+
+        @if (donor()) {
+        <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Foundress
+          </span>
+          <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+            [title]="donor()!">
+            {{ donor() }}
+          </span>
+        </div>
+        }
+
+        @if (hasDivision()) {
+        <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Division
+          </span>
+          <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+            [title]="projectDivisionLabel()">
+            {{ projectDivisionLabel() }}
+          </span>
+        </div>
+        }
+
+        @if (hasUnit()) {
+        <div class="flex min-w-[140px] max-w-[240px] flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Unit
+          </span>
+          <span class="truncate font-['Barlow'] text-[14px] font-semibold text-[var(--ac-primary-blue-600)]"
+            [title]="projectUnitLabel()">
+            {{ projectUnitLabel() }}
+          </span>
+        </div>
+        }
+
+        <!-- Timeline Tile -->
+        @if (timeline(); as tl) {
+        <div class="flex min-w-[280px] flex-1 flex-col justify-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3.5 py-2">
+          <div class="mb-1.5 flex items-center justify-between gap-2">
+            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+              Timeline
+            </span>
+            <span class="font-['Barlow'] text-[12px] font-semibold tabular-nums text-[var(--ac-primary-blue-600)]">
+              {{ tl.elapsedPercent }}% elapsed
+            </span>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="relative h-2 w-full overflow-hidden rounded-full bg-[var(--ac-grey-300)]"
+            role="progressbar"
+            [attr.aria-valuenow]="tl.elapsedPercent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            [attr.aria-label]="tl.elapsedPercent + '% timeline elapsed'">
+            <div class="h-full rounded-full bg-[var(--ac-primary-blue-400)] transition-all duration-300 ease-out"
+              [style.width.%]="tl.elapsedPercent"></div>
+          </div>
+
+          <!-- Date labels -->
+          <div class="mt-1.5 flex flex-wrap items-center justify-between gap-2 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
+            <span>Start: {{ tl.startDate | date: 'dd/MM/yyyy' }}</span>
+            <span>End: {{ tl.endDate | date: 'dd/MM/yyyy' }}</span>
+            @if (tl.isExtended && tl.extensionDate) {
+            <span class="inline-flex items-center gap-1 font-medium text-[var(--ac-orange-1)]">
+              <i class="pi pi-clock text-[11px]" aria-hidden="true"></i>
+              <span>Extension: {{ tl.extensionDate | date: 'dd/MM/yyyy' }}</span>
+            </span>
+            }
+          </div>
+        </div>
+        }
+      </div>
+      }
+
+      <!-- SDG & CGIAR Entities row if present -->
+      @if (hasSecondaryContext()) {
+      <div class="flex flex-wrap items-center gap-2"
+        [class.border-t]="hasPrimaryContext()"
+        [class.border-[var(--ac-grey-200)]]="hasPrimaryContext()"
+        [class.pt-3]="hasPrimaryContext()">
+        @if (sdgs().length > 0) {
+        <div class="flex flex-wrap items-center gap-1.5" aria-label="Sustainable Development Goals">
+          <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            SDGs:
+          </span>
+          @for (sdg of sdgs(); track sdg) {
+          <span class="inline-flex items-center rounded-md border border-[var(--ac-light-blue-200)] bg-[var(--ac-light-blue-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-light-blue-500)]">
+            {{ sdg }}
           </span>
           }
         </div>
-      </div>
-      }
-    </div>
-    }
-
-    <!-- SDG & CGIAR Entities row if present -->
-    @if (hasSecondaryContext()) {
-    <div class="flex flex-wrap items-center gap-2"
-      [class.border-t]="hasPrimaryContext()"
-      [class.border-[var(--ac-grey-200)]]="hasPrimaryContext()"
-      [class.pt-3]="hasPrimaryContext()">
-      @if (sdgs().length > 0) {
-      <div class="flex flex-wrap items-center gap-1.5" aria-label="Sustainable Development Goals">
-        <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          SDGs:
-        </span>
-        @for (sdg of sdgs(); track sdg) {
-        <span class="inline-flex items-center rounded-md border border-[var(--ac-light-blue-200)] bg-[var(--ac-light-blue-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-light-blue-500)]">
-          {{ sdg }}
-        </span>
         }
-      </div>
-      }
 
-      @if (cgiarEntities().length > 0) {
-      <div class="flex flex-wrap items-center gap-1.5" aria-label="CGIAR Entities">
-        <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
-          Entities:
-        </span>
-        @for (entity of cgiarEntities(); track entity.code ?? entity.name) {
-        <span class="inline-flex items-center rounded-md border border-[var(--ac-green-200)] bg-[var(--ac-green-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-green-700)]">
-          {{ entity.code || entity.name }}
-        </span>
-        }
-      </div>
-      }
-    </div>
-    }
-    @if (!statusChartEmpty()) {
-    <section class="flex flex-col gap-3"
-      [class.border-t]="hasAnyContext()"
-      [class.border-[var(--ac-grey-200)]]="hasAnyContext()"
-      [class.pt-3]="hasAnyContext()"
-      aria-labelledby="results-by-status-title"
-      [style.animation-delay.ms]="staggerMs.indicatorStatus">
-      <header class="flex flex-col gap-1">
-        <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
-        <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
-          this project.</span>
-      </header>
-
-      @if (statusChartLoading()) {
-      <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by status">
-        <p-skeleton width="100%" height="20px" borderRadius="4px" />
-        <p-skeleton width="100%" height="14px" borderRadius="4px" />
-        <p-skeleton width="100%" height="14px" borderRadius="4px" />
-        <p-skeleton width="80%" height="14px" borderRadius="4px" />
-      </div>
-      } @else if (statusChartError()) {
-      <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
-        <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
-        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load the status
-          breakdown. Please try again.</p>
-        <button pButton type="button" severity="secondary" size="small"
-          class="!min-h-[44px] !min-w-[44px]"
-          aria-label="Retry loading results by status"
-          (click)="contractDashboard.update()">Try again</button>
-      </div>
-      } @else {
-      <div class="flex flex-col gap-4">
-        <figure class="m-0 flex w-full flex-col gap-2" role="img" [attr.aria-label]="statusAriaLabel()">
-          <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
-            Composition
+        @if (cgiarEntities().length > 0) {
+        <div class="flex flex-wrap items-center gap-1.5" aria-label="CGIAR Entities">
+          <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">
+            Entities:
           </span>
-          <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
-            @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
-            <a class="block h-full min-w-[2px] transition-all duration-300 ease-in-out hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-              [style.width.%]="statusSharePercent(bucket.count)"
-              [style.background-color]="statusColor(bucket.status_id)"
-              [routerLink]="['/project-detail', contractId()]"
-              [queryParams]="statusRowQueryParams(bucket)"
-              [attr.aria-label]="statusRowAriaLabel(bucket)"
-              [attr.data-status-id]="bucket.status_id"
-              [attr.data-status-token]="statusTokenName(bucket.status_id)">
-            </a>
-            }
-          </div>
-        </figure>
-
-        <table class="m-0 w-full border-collapse text-left">
-          <caption class="sr-only">Results by status — count and percentage per workflow status</caption>
-          <thead class="sr-only">
-            <tr>
-              <th scope="col">Status</th>
-              <th scope="col">Results</th>
-              <th scope="col">Share</th>
-            </tr>
-          </thead>
-          <tbody class="m-0 flex list-none flex-col gap-3 p-0">
-            @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
-            <tr class="grid w-full items-center gap-2.5 text-left text-inherit"
-              style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
-              <td class="min-w-0">
-                <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-                  [routerLink]="['/project-detail', contractId()]"
-                  [queryParams]="statusRowQueryParams(bucket)"
-                  [attr.aria-label]="statusRowAriaLabel(bucket)">
-                  <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
-                    [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
-                  <span class="min-w-0 truncate font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[var(--ac-grey-800)]">{{ bucket.name }}</span>
-                </a>
-              </td>
-              <td class="min-w-0 w-full overflow-hidden">
-                <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
-                  [style.width.%]="statusSharePercent(bucket.count)" [style.min-width.px]="bucket.count > 0 ? 32 : 0">
-                  <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
-                    [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
-                  <strong class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{ bucket.count }}</strong>
-                  <span class="shrink-0 font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{ statusSharePercent(bucket.count) }}%</span>
-                </span>
-              </td>
-            </tr>
-            }
-          </tbody>
-        </table>
+          @for (entity of cgiarEntities(); track entity.code ?? entity.name) {
+          <span class="inline-flex items-center rounded-md border border-[var(--ac-green-200)] bg-[var(--ac-green-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-green-700)]">
+            {{ entity.code || entity.name }}
+          </span>
+          }
+        </div>
+        }
       </div>
+      }
+      @if (!statusChartEmpty()) {
+      <section class="flex flex-col gap-3"
+        [class.border-t]="hasAnyContext()"
+        [class.border-[var(--ac-grey-200)]]="hasAnyContext()"
+        [class.pt-3]="hasAnyContext()"
+        aria-labelledby="results-by-status-title"
+        [style.animation-delay.ms]="staggerMs.indicatorStatus">
+        <header class="flex flex-col gap-1">
+          <span id="results-by-status-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by status</span>
+          <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results by workflow status on
+            this project.</span>
+        </header>
+
+        @if (statusChartLoading()) {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by status">
+          <p-skeleton width="100%" height="20px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="80%" height="14px" borderRadius="4px" />
+        </div>
+        } @else if (statusChartError()) {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load the status
+            breakdown. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small"
+            class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading results by status"
+            (click)="contractDashboard.update()">Try again</button>
+        </div>
+        } @else {
+        <div class="flex flex-col gap-4">
+          <figure class="m-0 flex w-full flex-col gap-2" role="img" [attr.aria-label]="statusAriaLabel()">
+            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">
+              Composition
+            </span>
+            <div class="flex h-3 w-full overflow-hidden rounded-full bg-[var(--ac-grey-200)]" role="presentation">
+              @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
+              <a class="block h-full min-w-[2px] transition-all duration-300 ease-in-out hover:opacity-85 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                [style.width.%]="statusSharePercent(bucket.count)"
+                [style.background-color]="statusColor(bucket.status_id)"
+                [routerLink]="['/project-detail', contractId()]"
+                [queryParams]="statusRowQueryParams(bucket)"
+                [attr.aria-label]="statusRowAriaLabel(bucket)"
+                [attr.data-status-id]="bucket.status_id"
+                [attr.data-status-token]="statusTokenName(bucket.status_id)">
+              </a>
+              }
+            </div>
+          </figure>
+
+          <table class="m-0 w-full border-collapse text-left">
+            <caption class="sr-only">Results by status — count and percentage per workflow status</caption>
+            <thead class="sr-only">
+              <tr>
+                <th scope="col">Status</th>
+                <th scope="col">Results</th>
+                <th scope="col">Share</th>
+              </tr>
+            </thead>
+            <tbody class="m-0 flex list-none flex-col gap-3 p-0">
+              @for (bucket of statusBuckets(); track bucket.status_id ?? 'no-status') {
+              <tr class="grid w-full items-center gap-2.5 text-left text-inherit"
+                style="grid-template-columns: clamp(7.5rem, 38%, 12rem) minmax(0, 1fr)">
+                <td class="min-w-0">
+                  <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                    [routerLink]="['/project-detail', contractId()]"
+                    [queryParams]="statusRowQueryParams(bucket)"
+                    [attr.aria-label]="statusRowAriaLabel(bucket)">
+                    <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                    <span class="min-w-0 truncate font-['Barlow'] text-[12.5px] font-semibold capitalize leading-tight text-[var(--ac-grey-800)]">{{ bucket.name }}</span>
+                  </a>
+                </td>
+                <td class="min-w-0 w-full overflow-hidden">
+                  <span class="flex max-w-full items-center gap-2 transition-[width] duration-300 ease-in-out"
+                    [style.width.%]="statusSharePercent(bucket.count)" [style.min-width.px]="bucket.count > 0 ? 32 : 0">
+                    <span class="h-3 min-w-2 flex-1 rounded-full" [style.background-color]="statusColor(bucket.status_id)"
+                      [attr.data-status-token]="statusTokenName(bucket.status_id)" aria-hidden="true"></span>
+                    <strong class="shrink-0 font-['Barlow'] text-xs font-bold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{ bucket.count }}</strong>
+                    <span class="shrink-0 font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{ statusSharePercent(bucket.count) }}%</span>
+                  </span>
+                </td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        }
+      </section>
       }
     </section>
     }
+
+    <!-- Compact caveat banner with Learn More expansion (D-PD-8, D-F1-7) -->
+    <div class="flex flex-col gap-2 rounded-lg border-l-4 border-l-[var(--ac-primary-blue-400)] bg-[var(--ac-grey-100)] p-3 text-left">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-info-circle text-[16px] text-[var(--ac-primary-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug text-[var(--ac-grey-800)]">
+            Result analytics below summarize official indicator records. AI features use grounding documents and may contain inaccuracies.
+          </p>
+        </div>
+        <button type="button"
+          class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
+          (click)="isCaveatExpanded.set(!isCaveatExpanded())"
+          [attr.aria-expanded]="isCaveatExpanded()"
+          aria-controls="dashboard-caveat-details">
+          {{ isCaveatExpanded() ? 'Show less' : 'Learn more' }}
+        </button>
+      </div>
+      @if (isCaveatExpanded()) {
+      <div id="dashboard-caveat-details" class="border-t border-[var(--ac-grey-200)] pt-2 mt-1">
+        <p class="m-0 font-['Barlow'] text-[12px] leading-relaxed text-[var(--ac-grey-700)]">
+          The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
+          metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
+          enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
+          depending on the source platform. We are actively working to make information from these additional systems
+          available with the same level of detail and consistency.
+        </p>
+      </div>
+      }
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ACT 2 — Production (R-DN-003, design §2.3/D-DN-3)             -->
+  <!-- Results over time (R-DN-001 fix) + Results by indicator.      -->
+  <!-- ============================================================ -->
+  @if (!trendEmpty() || !indicatorsEmpty()) {
+  <section aria-labelledby="act-2-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-2-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 2</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">How much has been produced, and when?</span>
+    </h2>
+
+    <div class="grid grid-cols-1 gap-5" [class.lg:grid-cols-2]="!trendEmpty() && !indicatorsEmpty()" [class.lg:items-stretch]="!trendEmpty() && !indicatorsEmpty()">
+      @if (!trendEmpty()) {
+      <app-results-trend-card
+        [style.animation-delay.ms]="staggerMs.trend"
+        [buckets]="contractDashboard.summary()?.by_year ?? []"
+        [loading]="contractDashboard.loading()"
+        [error]="contractDashboard.loadError()"
+        (chartClick)="onTrendChartClick($event)"
+        (retry)="contractDashboard.update()">
+      </app-results-trend-card>
+      }
+
+      @if (!indicatorsEmpty()) {
+      <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+        aria-labelledby="results-by-indicator-title"
+        [style.animation-delay.ms]="staggerMs.indicatorStatus">
+        <header class="flex flex-wrap items-start justify-between gap-3">
+          <div class="flex flex-col gap-1">
+            <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
+            <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results linked to each indicator
+              on this project.</span>
+          </div>
+
+          @if (!getProjectDetailService.loading() && !getProjectDetailService.loadError() && totalProjectResults() > 0) {
+          <div class="flex items-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-0.5" role="group" aria-label="Indicator view mode">
+            <button type="button"
+              class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+              [class.bg-[var(--ac-white-1)]]="indicatorView() === 'bars'"
+              [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'bars'"
+              [class.shadow-xs]="indicatorView() === 'bars'"
+              [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'bars'"
+              [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'bars'"
+              [attr.aria-pressed]="indicatorView() === 'bars'"
+              (click)="setIndicatorView('bars')">
+              Bars
+            </button>
+            <button type="button"
+              class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+              [class.bg-[var(--ac-white-1)]]="indicatorView() === 'heatmap'"
+              [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'heatmap'"
+              [class.shadow-xs]="indicatorView() === 'heatmap'"
+              [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'heatmap'"
+              [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'heatmap'"
+              [attr.aria-pressed]="indicatorView() === 'heatmap'"
+              (click)="setIndicatorView('heatmap')">
+              Heatmap
+            </button>
+          </div>
+          }
+        </header>
+
+        @if (getProjectDetailService.loading()) {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by indicator">
+          <p-skeleton width="100%" height="20px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="14px" borderRadius="4px" />
+          <p-skeleton width="80%" height="14px" borderRadius="4px" />
+        </div>
+        } @else if (getProjectDetailService.loadError()) {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load results by indicator. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small"
+            class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading results by indicator"
+            (click)="retryIndicatorBreakdown()">Try again</button>
+        </div>
+        } @else if (totalProjectResults() === 0) {
+        <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
+          <i class="pi pi-chart-pie text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No results were found for any indicator
+            on this project.</p>
+        </div>
+        } @else {
+        @if (!useCrossfadeFallback()) {
+        <!-- Engine-native morph mode (R-DA-007): single viz-chart instance morphs via universalTransition -->
+        <div class="flex flex-col gap-3">
+          <app-viz-chart
+            [options]="activeIndicatorChartOptions()"
+            [tableModel]="indicatorHeatmapTableModel()"
+            chartTitle="Results by indicator"
+            height="320px"
+            (chartClick)="onIndicatorHeatmapClick($event)">
+          </app-viz-chart>
+
+          <ul class="sr-only" aria-label="Results by indicator drill-through links">
+            @for (indicator of indicatorsWithResults(); track indicator.id) {
+            <li>
+              <a [routerLink]="['/project-detail', contractId()]"
+                [queryParams]="{ indicatorTab: indicator.id }"
+                [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'">
+                {{ indicator.label }} ({{ indicator.value }} results)
+              </a>
+            </li>
+            }
+          </ul>
+
+          @if (indicatorView() === 'heatmap') {
+          <!-- Ramp Legend (WCAG 1.4.1) -->
+          <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
+            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
+            <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
+            </div>
+            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
+          </div>
+          }
+        </div>
+        } @else {
+        <!-- Crossfade fallback mode (proposal §12 / design §6 escape valve) -->
+        @if (indicatorView() === 'bars') {
+        <div class="flex flex-col gap-4" [@fadeView]>
+          <div class="flex items-end justify-between gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Total
+                results</span>
+              <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{
+                totalProjectResults() }}</strong>
+            </div>
+            <span class="pb-0.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">{{ indicatorsWithResults().length }}
+              indicators</span>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span
+              class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Distribution</span>
+            <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[var(--ac-grey-200)]"
+              [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
+              @for (indicator of indicatorsWithResults(); track indicator.id) {
+              <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
+                [style.width.%]="indicatorSharePercent(indicator.value)" [style.background-color]="indicator.color"
+                [title]="indicator.label + ': ' + indicator.value + ' results'"></div>
+              }
+            </figure>
+          </div>
+
+          <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[var(--ac-grey-200)] p-0">
+            @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
+            <li class="py-3 first:pt-0 last:pb-0">
+              <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ac-grey-100)] font-['Barlow'] text-[12px] font-bold tabular-nums text-[var(--ac-primary-blue-300)]">{{
+                  rank + 1 }}</span>
+                <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                  [routerLink]="['/project-detail', contractId()]"
+                  [queryParams]="{ indicatorTab: indicator.id }"
+                  [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results, ' + indicatorSharePercent(indicator.value) + '% — view filtered results'">
+                  <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
+                  <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[var(--ac-primary-blue-600)] line-clamp-2"
+                    [title]="indicator.label">{{ indicator.label }}</span>
+                </a>
+                <span class="shrink-0 text-right">
+                  <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[var(--ac-primary-blue-600)]">{{
+                    indicator.value }}</strong>
+                  <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{
+                    indicatorSharePercent(indicator.value) }}%</span>
+                </span>
+              </div>
+            </li>
+            }
+          </ul>
+        </div>
+        } @else {
+        <div class="flex flex-col gap-3" [@fadeView]>
+          <app-viz-chart
+            [options]="indicatorHeatmapOptions()"
+            [tableModel]="indicatorHeatmapTableModel()"
+            chartTitle="Results by indicator and year matrix heatmap"
+            height="320px"
+            (chartClick)="onIndicatorHeatmapClick($event)">
+          </app-viz-chart>
+
+          <!-- Ramp Legend (WCAG 1.4.1) -->
+          <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
+            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
+            <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
+              <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
+            </div>
+            <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
+          </div>
+        </div>
+        }
+        }
+        }
+      </section>
+      }
+    </div>
   </section>
   }
 
-  <!-- Compact caveat banner with Learn More expansion (D-PD-8, D-F1-7) -->
-  <div class="flex flex-col gap-2 rounded-lg border-l-4 border-l-[var(--ac-primary-blue-400)] bg-[var(--ac-grey-100)] p-3 text-left">
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-2">
-        <i class="pi pi-info-circle text-[16px] text-[var(--ac-primary-blue-400)]" aria-hidden="true"></i>
-        <p class="m-0 font-['Barlow'] text-[13px] font-medium leading-snug text-[var(--ac-grey-800)]">
-          Result analytics below summarize official indicator records. AI features use grounding documents and may contain inaccuracies.
-        </p>
-      </div>
-      <button type="button"
-        class="shrink-0 cursor-pointer bg-transparent border-0 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-light-blue-400)] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] rounded px-1.5 py-0.5"
-        (click)="isCaveatExpanded.set(!isCaveatExpanded())"
-        [attr.aria-expanded]="isCaveatExpanded()"
-        aria-controls="dashboard-caveat-details">
-        {{ isCaveatExpanded() ? 'Show less' : 'Learn more' }}
-      </button>
-    </div>
-    @if (isCaveatExpanded()) {
-    <div id="dashboard-caveat-details" class="border-t border-[var(--ac-grey-200)] pt-2 mt-1">
-      <p class="m-0 font-['Barlow'] text-[12px] leading-relaxed text-[var(--ac-grey-700)]">
-        The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on
-        metadata that is currently available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet
-        enriched with the same metadata, so the level of detail displayed in certain dashboard visualizations may vary
-        depending on the source platform. We are actively working to make information from these additional systems
-        available with the same level of detail and consistency.
-      </p>
-    </div>
-    }
-  </div>
+  <!-- ============================================================ -->
+  <!-- ACT 3 — Reach (R-DN-003, design §2.3/D-DN-3)                  -->
+  <!-- Geographic scope (map + top regions/countries) + partners +   -->
+  <!-- contacts + contributing projects (all "who" rankings).        -->
+  <!-- ============================================================ -->
+  @if (!geoScopeEmpty() || hasVisibleReachRankingCards()) {
+  <section aria-labelledby="act-3-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-3-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 3</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">Where, and with whom?</span>
+    </h2>
 
-  <!-- Trend & Results by indicator row (R-HL-003, design §6, D-DN-6 reversion challenge 1) -->
-  @if (!trendEmpty() || !indicatorsEmpty()) {
-  <div class="grid grid-cols-1 gap-5" [class.lg:grid-cols-2]="!trendEmpty() && !indicatorsEmpty()" [class.lg:items-stretch]="!trendEmpty() && !indicatorsEmpty()">
-    @if (!trendEmpty()) {
-    <app-results-trend-card
-      [style.animation-delay.ms]="staggerMs.trend"
-      [buckets]="contractDashboard.summary()?.by_year ?? []"
-      [loading]="contractDashboard.loading()"
-      [error]="contractDashboard.loadError()"
-      (chartClick)="onTrendChartClick($event)"
-      (retry)="contractDashboard.update()">
-    </app-results-trend-card>
+    @if (!geoScopeEmpty()) {
+    <app-geo-scope-card class="w-full"></app-geo-scope-card>
     }
 
-    @if (!indicatorsEmpty()) {
-    <section class="flex shrink-0 flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-      aria-labelledby="results-by-indicator-title"
-      [style.animation-delay.ms]="staggerMs.indicatorStatus">
-      <header class="flex flex-wrap items-start justify-between gap-3">
-        <div class="flex flex-col gap-1">
-          <span id="results-by-indicator-title" class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Results by indicator</span>
-          <span class="font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Number of results linked to each indicator
-            on this project.</span>
-        </div>
-
-        @if (!getProjectDetailService.loading() && !getProjectDetailService.loadError() && totalProjectResults() > 0) {
-        <div class="flex items-center rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] p-0.5" role="group" aria-label="Indicator view mode">
-          <button type="button"
-            class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-            [class.bg-[var(--ac-white-1)]]="indicatorView() === 'bars'"
-            [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'bars'"
-            [class.shadow-xs]="indicatorView() === 'bars'"
-            [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'bars'"
-            [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'bars'"
-            [attr.aria-pressed]="indicatorView() === 'bars'"
-            (click)="setIndicatorView('bars')">
-            Bars
-          </button>
-          <button type="button"
-            class="inline-flex min-h-[36px] items-center justify-center rounded-md px-2.5 py-1 font-['Barlow'] text-[12px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-            [class.bg-[var(--ac-white-1)]]="indicatorView() === 'heatmap'"
-            [class.text-[var(--ac-primary-blue-600)]]="indicatorView() === 'heatmap'"
-            [class.shadow-xs]="indicatorView() === 'heatmap'"
-            [class.text-[var(--ac-grey-600)]]="indicatorView() !== 'heatmap'"
-            [class.hover:text-[var(--ac-grey-800)]]="indicatorView() !== 'heatmap'"
-            [attr.aria-pressed]="indicatorView() === 'heatmap'"
-            (click)="setIndicatorView('heatmap')">
-            Heatmap
-          </button>
-        </div>
-        }
-      </header>
-
-      @if (getProjectDetailService.loading()) {
-      <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading results by indicator">
-        <p-skeleton width="100%" height="20px" borderRadius="4px" />
-        <p-skeleton width="100%" height="14px" borderRadius="4px" />
-        <p-skeleton width="100%" height="14px" borderRadius="4px" />
-        <p-skeleton width="80%" height="14px" borderRadius="4px" />
-      </div>
-      } @else if (getProjectDetailService.loadError()) {
-      <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
-        <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
-        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load results by indicator. Please try again.</p>
-        <button pButton type="button" severity="secondary" size="small"
-          class="!min-h-[44px] !min-w-[44px]"
-          aria-label="Retry loading results by indicator"
-          (click)="retryIndicatorBreakdown()">Try again</button>
-      </div>
-      } @else if (totalProjectResults() === 0) {
-      <div class="flex flex-col items-center justify-center gap-2 rounded-lg px-4 py-8 text-center">
-        <i class="pi pi-chart-pie text-[24px] text-[var(--ac-light-blue-300)]" aria-hidden="true"></i>
-        <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">No results were found for any indicator
-          on this project.</p>
-      </div>
-      } @else {
-      @if (!useCrossfadeFallback()) {
-      <!-- Engine-native morph mode (R-DA-007): single viz-chart instance morphs via universalTransition -->
-      <div class="flex flex-col gap-3">
-        <app-viz-chart
-          [options]="activeIndicatorChartOptions()"
-          [tableModel]="indicatorHeatmapTableModel()"
-          chartTitle="Results by indicator"
-          height="320px"
-          (chartClick)="onIndicatorHeatmapClick($event)">
-        </app-viz-chart>
-
-        <ul class="sr-only" aria-label="Results by indicator drill-through links">
-          @for (indicator of indicatorsWithResults(); track indicator.id) {
-          <li>
-            <a [routerLink]="['/project-detail', contractId()]"
-              [queryParams]="{ indicatorTab: indicator.id }"
-              [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results — view filtered results'">
-              {{ indicator.label }} ({{ indicator.value }} results)
-            </a>
-          </li>
-          }
-        </ul>
-
-        @if (indicatorView() === 'heatmap') {
-        <!-- Ramp Legend (WCAG 1.4.1) -->
-        <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
-          <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
-          <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
-          </div>
-          <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
-        </div>
-        }
-      </div>
-      } @else {
-      <!-- Crossfade fallback mode (proposal §12 / design §6 escape valve) -->
-      @if (indicatorView() === 'bars') {
-      <div class="flex flex-col gap-4" [@fadeView]>
-        <div class="flex items-end justify-between gap-3 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-4 py-3">
-          <div class="flex flex-col gap-0.5">
-            <span class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Total
-              results</span>
-            <strong class="font-['Barlow'] text-[28px] font-semibold leading-none tabular-nums text-[var(--ac-primary-blue-600)]">{{
-              totalProjectResults() }}</strong>
-          </div>
-          <span class="pb-0.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">{{ indicatorsWithResults().length }}
-            indicators</span>
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <span
-            class="font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wide text-[var(--ac-grey-600)]">Distribution</span>
-          <figure class="m-0 flex h-5 w-full overflow-hidden rounded-lg bg-[var(--ac-grey-200)]"
-            [attr.aria-label]="'Results distribution across ' + indicatorsWithResults().length + ' indicators'">
-            @for (indicator of indicatorsWithResults(); track indicator.id) {
-            <div class="h-full min-w-[3px] transition-[width] duration-300 ease-in-out"
-              [style.width.%]="indicatorSharePercent(indicator.value)" [style.background-color]="indicator.color"
-              [title]="indicator.label + ': ' + indicator.value + ' results'"></div>
-            }
-          </figure>
-        </div>
-
-        <ul class="m-0 flex list-none flex-col gap-0 divide-y divide-[var(--ac-grey-200)] p-0">
-          @for (indicator of indicatorsWithResults(); track indicator.id; let rank = $index) {
-          <li class="py-3 first:pt-0 last:pb-0">
-            <div class="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-              <span
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ac-grey-100)] font-['Barlow'] text-[12px] font-bold tabular-nums text-[var(--ac-primary-blue-300)]">{{
-                rank + 1 }}</span>
-              <a class="flex min-w-0 items-center gap-2 rounded-md px-1 py-0.5 transition-colors hover:bg-[var(--ac-grey-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
-                [routerLink]="['/project-detail', contractId()]"
-                [queryParams]="{ indicatorTab: indicator.id }"
-                [attr.aria-label]="indicator.label + ': ' + indicator.value + ' results, ' + indicatorSharePercent(indicator.value) + '% — view filtered results'">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" [style.background-color]="indicator.color" aria-hidden="true"></span>
-                <span class="min-w-0 font-['Barlow'] text-[12px] font-semibold leading-snug text-[var(--ac-primary-blue-600)] line-clamp-2"
-                  [title]="indicator.label">{{ indicator.label }}</span>
-              </a>
-              <span class="shrink-0 text-right">
-                <strong class="block font-['Barlow'] text-[14px] font-bold tabular-nums leading-none text-[var(--ac-primary-blue-600)]">{{
-                  indicator.value }}</strong>
-                <span class="mt-0.5 block font-['Barlow'] text-[11px] tabular-nums text-[var(--ac-grey-700)]">{{
-                  indicatorSharePercent(indicator.value) }}%</span>
-              </span>
-            </div>
-          </li>
-          }
-        </ul>
-      </div>
-      } @else {
-      <div class="flex flex-col gap-3" [@fadeView]>
-        <app-viz-chart
-          [options]="indicatorHeatmapOptions()"
-          [tableModel]="indicatorHeatmapTableModel()"
-          chartTitle="Results by indicator and year matrix heatmap"
-          height="320px"
-          (chartClick)="onIndicatorHeatmapClick($event)">
-        </app-viz-chart>
-
-        <!-- Ramp Legend (WCAG 1.4.1) -->
-        <div class="flex items-center justify-between gap-2 px-1 text-xs text-[var(--ac-grey-600)]" aria-label="Heatmap density scale">
-          <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMinCount() }} results</span>
-          <div class="flex h-2.5 flex-1 max-w-[160px] overflow-hidden rounded">
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-1)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-2)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-3)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-4)]"></span>
-            <span class="h-full flex-1 bg-[var(--ac-viz-ramp-5)]"></span>
-          </div>
-          <span class="font-['Barlow'] text-[11px] tabular-nums">{{ heatmapMaxCount() }} results</span>
-        </div>
-      </div>
-      }
-      }
-      }
-    </section>
-    }
-  </div>
-  }
-
-  <!-- F3 Indicator deep-dive panel (reserved F1 slot; mount only — R-DD-003/005).
-       Stays mounted through loading and load-error, hidden only when the
-       project genuinely has zero results — the component itself renders its
-       own skeleton (via [loading]) while F1's indicator summaries are still
-       loading, never the terminal "no indicators" notice during that window. -->
-  @if (!indicatorsEmpty()) {
-  <app-indicator-deep-dive
-    [contractId]="contractId()"
-    [indicators]="indicatorsWithResults()"
-    [loading]="getProjectDetailService.loading()" />
-  }
-
-  <!-- Geographic scope -->
-  @if (!geoScopeEmpty()) {
-  <app-geo-scope-card class="w-full"></app-geo-scope-card>
-  }
-
-  <!-- Rankings & SP alignment row (R-HL-003, design §6) -->
-  @if (hasVisibleRankingCards() || (isBilateral() && !spAlignmentEmpty())) {
-  <div class="grid grid-cols-1 gap-5"
-    [class.lg:grid-cols-2]="hasVisibleRankingCards() && (isBilateral() && !spAlignmentEmpty())"
-    [class.lg:items-start]="hasVisibleRankingCards() && (isBilateral() && !spAlignmentEmpty())">
-    @if (hasVisibleRankingCards()) {
+    @if (hasVisibleReachRankingCards()) {
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
       @if (!partnersEmpty()) {
       <div id="partners-card" class="flex flex-1">
@@ -690,20 +707,6 @@
           emptyMessage="No partner institutions were found for this project." [items]="partnerItems()"
           [options]="partnerChartOptions()" [tableModel]="partnerTableModel()"
           layout="viz-bar" (retry)="contractDashboard.update()">
-        </app-project-dashboard-card>
-      </div>
-      }
-
-      @if (!leversEmpty()) {
-      <div class="flex flex-1">
-        <app-project-dashboard-card title="Top primary levers"
-          description="Primary levers most frequently linked to results on this project." class="h-full w-full"
-          iconClass="pi pi-sliders-h" [compact]="true" [loading]="contractDashboard.loading()"
-          [error]="contractDashboard.loadError()" [empty]="leversEmpty()"
-          errorMessage="We could not load top primary levers. Please try again."
-          emptyMessage="No primary levers were found for this project." [items]="leverItems()"
-          [options]="leverChartOptions()" [tableModel]="leverTableModel()"
-          layout="viz-bar" (chartClick)="onLeverChartClick($event)" (retry)="contractDashboard.update()">
         </app-project-dashboard-card>
       </div>
       }
@@ -737,40 +740,126 @@
       }
     </div>
     }
-
-    @if (isBilateral() && !spAlignmentEmpty()) {
-    <app-sp-alignment-graph
-      [style.animation-delay.ms]="staggerMs.spGraph"
-      [report]="contractDashboard.spAlignment()"
-      [loading]="contractDashboard.loading()"
-      [error]="contractDashboard.loadError()"
-      (retry)="contractDashboard.update()">
-    </app-sp-alignment-graph>
-    }
-  </div>
+  </section>
   }
 
-  <!-- F4 Insights section (mount only — R-IN-003/004): after the F3 deep-dive
-       panel, before the pending-revision table (F1 order preserved
-       otherwise). Contract-declared SDGs come from the F1 hero's already-
-       loaded project data (`declaredSdgs()`) — no new fetch. -->
-  <app-insights-section
-    [contractId]="contractId()"
-    [declaredSdgs]="declaredSdgs()" />
+  <!-- ============================================================ -->
+  <!-- ACT 4 — Direction (R-DN-003, design §2.3/D-DN-3)              -->
+  <!-- Primary levers + SP alignment + SDG coverage & contributing   -->
+  <!-- levers (F4, lazy — one insights-section instance/observer).   -->
+  <!-- ============================================================ -->
+  <section aria-labelledby="act-4-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-4-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 4</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What is it aiming toward?</span>
+    </h2>
 
-  <!-- Pending revision results -->
-  <section
-    id="pending-revision-section"
-    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] shadow-xs lg:flex-1">
-    <header class="border-b border-[var(--ac-grey-200)] px-5 py-4">
-      <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Pending revision</span>
-      <span class="block font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Results pending revision on project
-        {{
-        project()?.agreement_id || contractId() }}.</span>
-    </header>
-    <app-results-center-table class="block min-h-0 flex-1 overflow-hidden" [hideFiltersToolbar]="true"
-      [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"
-      emptyMessage="No results pending revision"></app-results-center-table>
+    @if (!leversEmpty() || (isBilateral() && !spAlignmentEmpty())) {
+    <div class="grid grid-cols-1 gap-5"
+      [class.lg:grid-cols-2]="!leversEmpty() && (isBilateral() && !spAlignmentEmpty())"
+      [class.lg:items-start]="!leversEmpty() && (isBilateral() && !spAlignmentEmpty())">
+      @if (!leversEmpty()) {
+      <div class="flex flex-1">
+        <app-project-dashboard-card title="Top primary levers"
+          description="Primary levers most frequently linked to results on this project." class="h-full w-full"
+          iconClass="pi pi-sliders-h" [compact]="true" [loading]="contractDashboard.loading()"
+          [error]="contractDashboard.loadError()" [empty]="leversEmpty()"
+          errorMessage="We could not load top primary levers. Please try again."
+          emptyMessage="No primary levers were found for this project." [items]="leverItems()"
+          [options]="leverChartOptions()" [tableModel]="leverTableModel()"
+          layout="viz-bar" (chartClick)="onLeverChartClick($event)" (retry)="contractDashboard.update()">
+        </app-project-dashboard-card>
+      </div>
+      }
+
+      @if (isBilateral() && !spAlignmentEmpty()) {
+      <app-sp-alignment-graph
+        [style.animation-delay.ms]="staggerMs.spGraph"
+        [report]="contractDashboard.spAlignment()"
+        [loading]="contractDashboard.loading()"
+        [error]="contractDashboard.loadError()"
+        (retry)="contractDashboard.update()">
+      </app-sp-alignment-graph>
+      }
+    </div>
+    }
+
+    <!-- F4 Insights — SDG coverage + contributing levers (mount only —
+         R-IN-003/004; D-DN-4: this instance's own IntersectionObserver is
+         the FIRST F4 observer in DOM order; ONE insights fetch feeds this
+         AND the act 5/act 6 instances below, deduped by contractId. -->
+    <app-insights-section
+      [contractId]="contractId()"
+      [declaredSdgs]="declaredSdgs()"
+      [visibleCards]="['sdg-coverage', 'contributing-levers']"
+      instanceId="insights-act-4"
+      description="SDG coverage and contributing levers across all indicators." />
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ACT 5 — Quality & process (R-DN-003, design §2.3/D-DN-3)      -->
+  <!-- Evidence + review flow + reach (F4, lazy — same mechanics).    -->
+  <!-- ============================================================ -->
+  <section aria-labelledby="act-5-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-5-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 5</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">How solid is what's been reported?</span>
+    </h2>
+
+    <app-insights-section
+      [contractId]="contractId()"
+      [declaredSdgs]="declaredSdgs()"
+      [visibleCards]="['evidence', 'review-flow', 'reach']"
+      instanceId="insights-act-5"
+      description="Evidence coverage, review flow, and actor-group reach across all indicators." />
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ACT 6 — Depth on demand (R-DN-003, design §2.3/D-DN-3)        -->
+  <!-- F3 indicator deep-dive + keywords treemap (F4) + pending-      -->
+  <!-- revision table (closes the act, after deep-dive + keywords).   -->
+  <!-- ============================================================ -->
+  <section aria-labelledby="act-6-title" class="flex w-full flex-col gap-5">
+    <h2 id="act-6-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
+      <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 6</span>
+      <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What's behind each indicator?</span>
+    </h2>
+
+    <!-- F3 Indicator deep-dive panel (reserved F1 slot; mount only — R-DD-003/005).
+         Stays mounted through loading and load-error, hidden only when the
+         project genuinely has zero results — the component itself renders its
+         own skeleton (via [loading]) while F1's indicator summaries are still
+         loading, never the terminal "no indicators" notice during that window. -->
+    @if (!indicatorsEmpty()) {
+    <app-indicator-deep-dive
+      [contractId]="contractId()"
+      [indicators]="indicatorsWithResults()"
+      [loading]="getProjectDetailService.loading()" />
+    }
+
+    <!-- F4 Insights — keywords (mount only — R-IN-003/004). Same lazy
+         mechanics/observer/dedup as acts 4 and 5. -->
+    <app-insights-section
+      [contractId]="contractId()"
+      [declaredSdgs]="declaredSdgs()"
+      [visibleCards]="['keywords']"
+      instanceId="insights-act-6"
+      description="Top keywords by result frequency across all indicators." />
+
+    <!-- Pending revision results (closes act 6, R-PD-008) -->
+    <section
+      id="pending-revision-section"
+      class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] shadow-xs lg:flex-1">
+      <header class="border-b border-[var(--ac-grey-200)] px-5 py-4">
+        <span class="font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">Pending revision</span>
+        <span class="block font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">Results pending revision on project
+          {{
+          project()?.agreement_id || contractId() }}.</span>
+      </header>
+      <app-results-center-table class="block min-h-0 flex-1 overflow-hidden" [hideFiltersToolbar]="true"
+        [roundedBottom]="true" [excludedColumnFields]="pendingRevisionExcludedColumns"
+        emptyMessage="No results pending revision"></app-results-center-table>
+    </section>
   </section>
 
   <!-- Collapsed empty widgets group (R-HL-004, D-F1-3) -->

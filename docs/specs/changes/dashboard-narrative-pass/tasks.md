@@ -53,7 +53,7 @@ graph TD
 - **Requirements:** R-DN-002 (migration half + a11y AND-clause); design §2.2, §6, D-DN-6; reversion challenge 2.
 - **Files:** `project-dashboard-card.component.{ts,html,spec.ts}`; geo top-N region (per T-02 inventory); builders reuse F1 rankings family.
 - **Acceptance / done check:**
-  - [ ] Pills markup replaced by `app-viz-chart` horizontal bars with `tableModel` + accessible names; server order passed through; tokens only (**failing input:** any hex or `[style.width.%]` data bar surviving in the migrated surfaces → grep red).
+  - [x] Pills markup replaced by `app-viz-chart` horizontal bars with `tableModel` + accessible names; server order passed through; tokens only (**failing input:** any hex or `[style.width.%]` data bar surviving in the migrated surfaces → grep red).
   - [x] **Pill specs migrated in the SAME task** (`partnerBarWidthPercent`/`fillPercent`/`barColor` assertions → builder-output assertions, KZ-001 live-shaped fixtures); no orphaned or deleted-without-replacement test (**disqualifier:** test count on these surfaces decreasing without equivalent builder specs).
   - [x] Targeted jest `--coverage=false` + eslint green.
 - **Deps:** T-02 · **Effort:** L · **Status:** done — PASS attempt 1
@@ -73,11 +73,11 @@ graph TD
 - **Requirements:** R-DN-003 (all clauses incl. first-paint BUT + drills AND), R-DN-004 scenario; design §2.3, §6, D-DN-3/D-DN-4.
 - **Files:** `project-dashboard.component.{html,spec.ts}`; `insights-section` per-card positioning support if required (the ONE allowed structural change — flag it if used).
 - **Acceptance / done check:**
-  - [ ] Six `<section aria-labelledby>` acts, act headers with question-subtitles, card membership per D-DN-3 table; DOM-order spec asserts the full act sequence (**failing input:** swap two acts → red).
-  - [ ] F4 insights observer targets the FIRST F4 card (act 4); ONE fetch feeds all repositioned F4 cards (**failing input:** load in ngOnInit or a second fetch → zero-fetch/single-fetch specs red — F3/F4 pattern, KZ-015 transitions).
-  - [ ] First-paint request assertions unchanged (real-HTTP harness case from F4 T-08 re-run green); F1 drill + F3 panel specs green at new positions.
-  - [ ] Targeted jest `--coverage=false` + eslint + `npm run s-lint` (if SCSS) green.
-- **Deps:** T-03, T-04 · **Effort:** L · **Status:** `[~]` parked on session limit 2026-08-24 — resume protocol in execution.md T-05
+  - [x] Six `<section aria-labelledby>` acts, act headers with question-subtitles, card membership per D-DN-3 table; DOM-order spec asserts the full act sequence (**failing input:** swap two acts → red).
+  - [x] F4 insights observer targets the FIRST F4 card (act 4); ONE fetch feeds all repositioned F4 cards (**failing input:** load in ngOnInit or a second fetch → zero-fetch/single-fetch specs red — F3/F4 pattern, KZ-015 transitions).
+  - [x] First-paint request assertions unchanged (real-HTTP harness case from F4 T-08 re-run green); F1 drill + F3 panel specs green at new positions.
+  - [x] Targeted jest `--coverage=false` + eslint + `npm run s-lint` (if SCSS) green.
+- **Deps:** T-03, T-04 · **Effort:** L · **Status:** done — PASS attempt 1 (see execution.md)
 
 ### T-06 — Design-system registry update (`docs/ux-ui/design.md` §8)
 
@@ -92,10 +92,10 @@ graph TD
 - **Requirements:** NFR-DN-001…004; defect-class table rows 4–7; R-DN-004 scenario (network half).
 - **Files:** evidence in `execution.md`.
 - **Acceptance / done check:**
-  - [ ] Client full suite + coverage floors + `npm run build` + tsc-spec delta (baseline re-measured pre-cycle; no NEW errors) + `tokens:validate` — sequenced (§4.3).
-  - [ ] Bundle: initial ±5 kB vs pre-pass baseline, same branch (**disqualifier:** baselines from different branch states).
+  - [x] Client full suite + coverage floors + `npm run build` + tsc-spec delta (baseline re-measured pre-cycle; no NEW errors) + `tokens:validate` — sequenced (§4.3).
+  - [x] Bundle: initial ±5 kB vs pre-pass baseline, same branch (**disqualifier:** baselines from different branch states).
   - [ ] **HITL (KZ-014, human):** light+dark of all 6 acts vs the approved mockup; hero semaphore mobile (`md:`) check (R-1); below-the-fold network check (no insights fetch before act 4 enters viewport); F1 drill + F3 panel click-through; trend chart visibly solid→dashed.
-  - [ ] K-004 global: every cited gate observed red once (T-01's red-first counts; others per task).
+  - [x] K-004 global: every cited gate observed red once (T-01's red-first counts; others per task).
 - **Deps:** T-01, T-05, T-06 · **Effort:** M · **Status:** todo
 
 ---

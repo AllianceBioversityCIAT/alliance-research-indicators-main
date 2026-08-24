@@ -72,6 +72,12 @@ class IndicatorDeepDiveStubComponent {
 class InsightsSectionStubComponent {
   @Input() contractId = '';
   @Input() declaredSdgs: DeclaredSdg[] = [];
+  // T-05 (D-DN-4): the dashboard mounts three instances (acts 4/5/6), each
+  // projecting a named subset of the six F4 cards and carrying its own
+  // instance id / subtitle so simultaneously-mounted instances don't clash.
+  @Input() visibleCards: string[] = [];
+  @Input() instanceId = '';
+  @Input() description = '';
 }
 
 @Component({
@@ -1866,80 +1872,134 @@ describe('ProjectDashboardComponent', () => {
   });
 
   describe('T-12 dashboard integration and entry stagger (R-DA-003, R-DA-005, R-DA-007 AC.2)', () => {
-    it('should enforce DOM rendering order: Hero (KPI + Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> No data (R-HL-003, design §6)', async () => {
-      rolesServiceMock.isAdmin.mockReturnValue(true);
-      await setup('C-1', {
-        projectData: {
-          funding_type: 'Bilateral',
-          grant_amount_usd: 1000000,
-          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
-        },
-        summary: {
-          total: 10,
-          by_indicator_year: [],
-          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
-          by_year: [{ year: 2024, count: 5 }, { year: 2025, count: 5 }],
-          partner_institutions: 2
-        }
-      });
-      topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 3 }]);
-      contractSpAlignmentMock.list.set({
-        sps: [{ sp_code: 'SP1', name: 'SP 1', category: null, icon_key: null, links: [] }],
-        results_with_alignment: 1,
-        results_without_alignment: 0
-      });
-      geoScopeMock.topCountries.set([{ country_name: 'Colombia', iso_alpha_2: 'CO', count: 2 } as any]);
-      fixture.detectChanges();
+    it(
+      'should enforce the six-act DOM order (T-05, R-DN-003): Act 1 Identity&health (KPI+Hero+Caveat) -> ' +
+        'Act 2 Production (Trend/Indicator) -> Act 3 Reach (Geo/Rankings) -> Act 4 Direction (Levers/SP/F4 SDG) -> ' +
+        'Act 5 Quality&process (F4 Evidence/Review/Reach) -> Act 6 Depth on demand (F3/F4 Keywords/Pending) -> No data',
+      async () => {
+        rolesServiceMock.isAdmin.mockReturnValue(true);
+        await setup('C-1', {
+          projectData: {
+            funding_type: 'Bilateral',
+            grant_amount_usd: 1000000,
+            indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+          },
+          summary: {
+            total: 10,
+            by_indicator_year: [],
+            by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+            by_year: [{ year: 2024, count: 5 }, { year: 2025, count: 5 }],
+            partner_institutions: 2
+          }
+        });
+        topPartnersMock.list.set([{ institution_id: 1, institution_name: 'CIAT', count: 3 }]);
+        contractSpAlignmentMock.list.set({
+          sps: [{ sp_code: 'SP1', name: 'SP 1', category: null, icon_key: null, links: [] }],
+          results_with_alignment: 1,
+          results_without_alignment: 0
+        });
+        geoScopeMock.topCountries.set([{ country_name: 'Colombia', iso_alpha_2: 'CO', count: 2 } as any]);
+        fixture.detectChanges();
 
-      const root = fixture.nativeElement as HTMLElement;
-      const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]');
-      const contextStrip = root.querySelector('[aria-label="Project context summary"]');
-      const caveat = root.querySelector('button[aria-controls="dashboard-caveat-details"]')?.closest('div');
-      const trendCard = root.querySelector('app-results-trend-card');
-      const statusSection = root.querySelector('section[aria-labelledby="results-by-status-title"]');
-      const indicatorSection = root.querySelector('section[aria-labelledby="results-by-indicator-title"]');
-      const geoCard = root.querySelector('app-geo-scope-card');
-      const partnersCard = root.querySelector('#partners-card');
-      const spGraph = root.querySelector('app-sp-alignment-graph');
-      const pendingSection = root.querySelector('#pending-revision-section');
-      const noDataGroup = root.querySelector('app-no-data-group');
+        const root = fixture.nativeElement as HTMLElement;
+        const act1 = root.querySelector('section[aria-labelledby="act-1-title"]');
+        const act2 = root.querySelector('section[aria-labelledby="act-2-title"]');
+        const act3 = root.querySelector('section[aria-labelledby="act-3-title"]');
+        const act4 = root.querySelector('section[aria-labelledby="act-4-title"]');
+        const act5 = root.querySelector('section[aria-labelledby="act-5-title"]');
+        const act6 = root.querySelector('section[aria-labelledby="act-6-title"]');
+        const kpiStrip = root.querySelector('[aria-label="Key performance indicators"]');
+        const contextStrip = root.querySelector('[aria-label="Project context summary"]');
+        const caveat = root.querySelector('button[aria-controls="dashboard-caveat-details"]')?.closest('div');
+        const trendCard = root.querySelector('app-results-trend-card');
+        const statusSection = root.querySelector('section[aria-labelledby="results-by-status-title"]');
+        const indicatorSection = root.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+        const geoCard = root.querySelector('app-geo-scope-card');
+        const partnersCard = root.querySelector('#partners-card');
+        const spGraph = root.querySelector('app-sp-alignment-graph');
+        const insightsInstances = root.querySelectorAll('app-insights-section');
+        const deepDive = root.querySelector('app-indicator-deep-dive');
+        const pendingSection = root.querySelector('#pending-revision-section');
+        const noDataGroup = root.querySelector('app-no-data-group');
 
-      expect(kpiStrip).toBeTruthy();
-      expect(contextStrip).toBeTruthy();
-      expect(caveat).toBeTruthy();
-      expect(trendCard).toBeTruthy();
-      expect(statusSection).toBeTruthy();
-      expect(indicatorSection).toBeTruthy();
-      expect(geoCard).toBeTruthy();
-      expect(partnersCard).toBeTruthy();
-      expect(spGraph).toBeTruthy();
-      expect(pendingSection).toBeTruthy();
-      expect(noDataGroup).toBeTruthy();
+        // Six acts present, each with a question-subtitle (R-DN-003 scenario)
+        expect(act1).toBeTruthy();
+        expect(act2).toBeTruthy();
+        expect(act3).toBeTruthy();
+        expect(act4).toBeTruthy();
+        expect(act5).toBeTruthy();
+        expect(act6).toBeTruthy();
+        expect(root.querySelector('#act-1-title')?.textContent).toContain('What is this project and how is it going?');
+        expect(root.querySelector('#act-2-title')?.textContent).toContain('How much has been produced, and when?');
+        expect(root.querySelector('#act-3-title')?.textContent).toContain('Where, and with whom?');
+        expect(root.querySelector('#act-4-title')?.textContent).toContain('What is it aiming toward?');
+        expect(root.querySelector('#act-5-title')?.textContent).toContain('How solid is what\'s been reported?');
+        expect(root.querySelector('#act-6-title')?.textContent).toContain('What\'s behind each indicator?');
 
-      // Verify DOM document order:
-      // Hero (KPI -> Context) -> Caveat -> Executive Overview -> Trend/Status -> Indicator -> Geo Scope -> Rankings/SP -> Pending -> No data yet -> AI
-      expect(kpiStrip!.compareDocumentPosition(contextStrip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(contextStrip!.compareDocumentPosition(caveat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(caveat!.compareDocumentPosition(trendCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(trendCard!.compareDocumentPosition(indicatorSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(statusSection!.compareDocumentPosition(indicatorSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(indicatorSection!.compareDocumentPosition(geoCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(geoCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(partnersCard!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(spGraph!.compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(pendingSection!.compareDocumentPosition(noDataGroup!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(kpiStrip).toBeTruthy();
+        expect(contextStrip).toBeTruthy();
+        expect(caveat).toBeTruthy();
+        expect(trendCard).toBeTruthy();
+        expect(statusSection).toBeTruthy();
+        expect(indicatorSection).toBeTruthy();
+        expect(geoCard).toBeTruthy();
+        expect(partnersCard).toBeTruthy();
+        expect(spGraph).toBeTruthy();
+        expect(deepDive).toBeTruthy();
+        expect(insightsInstances.length).toBe(3);
+        expect(pendingSection).toBeTruthy();
+        expect(noDataGroup).toBeTruthy();
 
-      // Assert trend & status sections precede ranking cards in DOM
-      expect(trendCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(statusSection!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Verify DOM document order across the full act sequence (failing
+        // input, per T-05 acceptance: swapping two acts must turn this red).
+        expect(act1!.compareDocumentPosition(act2!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act2!.compareDocumentPosition(act3!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act3!.compareDocumentPosition(act4!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act4!.compareDocumentPosition(act5!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act5!.compareDocumentPosition(act6!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act6!.compareDocumentPosition(noDataGroup!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-      // Assert geo section is marked full-width class
-      expect(geoCard!.classList.contains('w-full')).toBe(true);
+        // Act 1 internal order: KPI -> Context (with in-hero status) -> Caveat
+        expect(kpiStrip!.compareDocumentPosition(contextStrip!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(contextStrip!.compareDocumentPosition(caveat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(contextStrip!.contains(statusSection!)).toBe(true);
+        expect(act1!.contains(caveat!)).toBe(true);
 
-      // Assert no element with gap-16 class exists in dashboard template
-      const elementsWithGap16 = root.querySelectorAll('.gap-16, [class*="gap-16"]');
-      expect(elementsWithGap16.length).toBe(0);
-    });
+        // Act 2 internal order: Trend -> Indicator
+        expect(act2!.contains(trendCard!)).toBe(true);
+        expect(act2!.contains(indicatorSection!)).toBe(true);
+        expect(trendCard!.compareDocumentPosition(indicatorSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        // Act 3 internal order: Geo -> partner ranking cards
+        expect(act3!.contains(geoCard!)).toBe(true);
+        expect(act3!.contains(partnersCard!)).toBe(true);
+        expect(geoCard!.compareDocumentPosition(partnersCard!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        // Act 4 internal order: SP alignment -> first F4 insights instance
+        // (SDG coverage/contributing levers) — the FIRST F4 observer in DOM.
+        expect(act4!.contains(spGraph!)).toBe(true);
+        expect(act4!.contains(insightsInstances[0])).toBe(true);
+        expect(spGraph!.compareDocumentPosition(insightsInstances[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        // Act 5 contains only its own F4 insights instance (evidence/review/reach)
+        expect(act5!.contains(insightsInstances[1])).toBe(true);
+
+        // Act 6 internal order: F3 deep-dive -> F4 keywords instance -> Pending
+        // (pending-revision table closes the act, mandatory pointer).
+        expect(act6!.contains(deepDive!)).toBe(true);
+        expect(act6!.contains(insightsInstances[2])).toBe(true);
+        expect(act6!.contains(pendingSection!)).toBe(true);
+        expect(deepDive!.compareDocumentPosition(insightsInstances[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(insightsInstances[2].compareDocumentPosition(pendingSection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+        // Assert geo section is marked full-width class
+        expect(geoCard!.classList.contains('w-full')).toBe(true);
+
+        // Assert no element with gap-16 class exists in dashboard template
+        const elementsWithGap16 = root.querySelectorAll('.gap-16, [class*="gap-16"]');
+        expect(elementsWithGap16.length).toBe(0);
+      }
+    );
 
     it('should isolate SP alignment error so sibling regions continue rendering data (R-PD-007, R-DA-003)', async () => {
       await setup('C-1', {
@@ -2057,7 +2117,11 @@ describe('ProjectDashboardComponent', () => {
       expect(heroSection.contains(statusSection)).toBe(true);
     });
 
-    it('renders the strip in the hero even when the project has no other context facts (R-DN-004 no regression)', async () => {
+    it(
+      'renders the strip in the hero even when the project has no other context facts, with an HONEST aria-label ' +
+        '(T-05 mandatory fix — T-04 Reviewer advisory 3: the zero-context+status-data case previously kept the ' +
+        '"Project context summary" label though nothing but the status strip renders inside)',
+      async () => {
       const noContextProject: GetProjectDetail = {
         grant_amount: null as any,
         grant_amount_usd: null,
@@ -2088,7 +2152,10 @@ describe('ProjectDashboardComponent', () => {
       expect(component.hasAnyContext()).toBe(false);
       expect(component.statusChartEmpty()).toBe(false);
 
-      const heroSection = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+      // The stale "Project context summary" label is gone — nothing but the
+      // status strip renders in this region, so its accessible name says so.
+      expect(fixture.nativeElement.querySelector('[aria-label="Project context summary"]')).toBeNull();
+      const heroSection = fixture.nativeElement.querySelector('[aria-label="Results by status"]');
       expect(heroSection).toBeTruthy();
 
       const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
@@ -2097,7 +2164,8 @@ describe('ProjectDashboardComponent', () => {
 
       // No content above it in the hero, so no top border separator is applied
       expect(statusSection.classList.contains('border-t')).toBe(false);
-    });
+      }
+    );
 
     it('hides the strip row without hiding the hero when status resolves empty, and retires the old standalone status card', async () => {
       await setup('C-1', {
@@ -3254,36 +3322,78 @@ describe('ProjectDashboardComponent', () => {
       ] as any
     };
 
-    it('mounts app-insights-section after the F3 deep-dive panel, passing contractId and the id-preserving declared SDGs (no new fetch)', async () => {
-      await setup('C-1', { projectData: projectWithSdgs });
+    it(
+      'mounts THREE app-insights-section instances (T-05, D-DN-4 — one per act 4/5/6), each passing the SAME ' +
+        'contractId and id-preserving declared SDGs (no new fetch), each with a distinct instanceId and its own ' +
+        'named card subset',
+      async () => {
+        await setup('C-1', { projectData: projectWithSdgs });
 
-      const insightsDebugEl = fixture.debugElement.query(By.css('app-insights-section'));
-      expect(insightsDebugEl).not.toBeNull();
-      const stub = insightsDebugEl.componentInstance as InsightsSectionStubComponent;
-      expect(stub.contractId).toBe('C-1');
-      expect(stub.declaredSdgs).toEqual([
-        { id: 2, label: 'SDG 2' },
-        { id: 13, label: 'SDG 13' }
-      ]);
-      expect(component.declaredSdgs()).toEqual(stub.declaredSdgs);
-    });
+        const insightsDebugEls = fixture.debugElement.queryAll(By.css('app-insights-section'));
+        expect(insightsDebugEls.length).toBe(3);
+
+        const stubs = insightsDebugEls.map(el => el.componentInstance as InsightsSectionStubComponent);
+        const declaredSdgs = [
+          { id: 2, label: 'SDG 2' },
+          { id: 13, label: 'SDG 13' }
+        ];
+
+        stubs.forEach(stub => {
+          expect(stub.contractId).toBe('C-1');
+          expect(stub.declaredSdgs).toEqual(declaredSdgs);
+        });
+        expect(component.declaredSdgs()).toEqual(declaredSdgs);
+
+        // Distinct instance ids (T-05 fix for duplicate DOM ids/aria-labelledby
+        // across three simultaneously-mounted instances).
+        const instanceIds = stubs.map(stub => stub.instanceId);
+        expect(new Set(instanceIds).size).toBe(3);
+
+        // Card membership per D-DN-3: act 4 = SDG coverage + contributing
+        // levers; act 5 = evidence + review flow + reach; act 6 = keywords.
+        expect(stubs[0].visibleCards).toEqual(['sdg-coverage', 'contributing-levers']);
+        expect(stubs[1].visibleCards).toEqual(['evidence', 'review-flow', 'reach']);
+        expect(stubs[2].visibleCards).toEqual(['keywords']);
+      }
+    );
 
     it(
-      'renders app-insights-section regardless of indicatorsEmpty() — it is not gated by the F3 panel\'s ' +
-        'visibility (F1 order preserved: after F3, before the pending-revision table)',
+      'renders all three app-insights-section instances regardless of indicatorsEmpty() — not gated by the F3 ' +
+        'panel\'s visibility (T-05 order: act 4/act 5 instances precede F3\'s act-6 position; the act-6 instance ' +
+        'and F3 both precede the pending-revision table, which closes act 6)',
       async () => {
         await setup('C-1', { projectData: { ...projectWithSdgs, indicators: [] } });
 
         expect(component.indicatorsEmpty()).toBe(true);
         expect(fixture.nativeElement.querySelector('app-indicator-deep-dive')).toBeNull();
-        expect(fixture.nativeElement.querySelector('app-insights-section')).not.toBeNull();
 
-        const insightsEl = fixture.nativeElement.querySelector('app-insights-section');
+        const insightsEls = fixture.nativeElement.querySelectorAll('app-insights-section');
         const pendingSection = fixture.nativeElement.querySelector('#pending-revision-section');
-        expect(insightsEl).not.toBeNull();
+        expect(insightsEls.length).toBe(3);
         expect(pendingSection).not.toBeNull();
-        // DOM order: Insights precedes the pending-revision table.
-        expect(insightsEl.compareDocumentPosition(pendingSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // DOM order: every Insights instance precedes the pending-revision table.
+        insightsEls.forEach((el: Element) => {
+          expect(el.compareDocumentPosition(pendingSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        });
+      }
+    );
+
+    it(
+      'positions the act-6 insights instance AFTER the F3 deep-dive panel when both are mounted (T-05 act-6 ' +
+        'internal order: F3 deep-dive -> F4 keywords -> pending-revision table)',
+      async () => {
+        await setup('C-1', {
+          projectData: { ...projectWithSdgs, indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any] }
+        });
+
+        const deepDive = fixture.nativeElement.querySelector('app-indicator-deep-dive');
+        const insightsEls = fixture.nativeElement.querySelectorAll('app-insights-section');
+        const act6InsightsEl = insightsEls[insightsEls.length - 1];
+        const pendingSection = fixture.nativeElement.querySelector('#pending-revision-section');
+
+        expect(deepDive).not.toBeNull();
+        expect(deepDive.compareDocumentPosition(act6InsightsEl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(act6InsightsEl.compareDocumentPosition(pendingSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       }
     );
 

@@ -1024,6 +1024,16 @@ export class ProjectDashboardComponent {
     () => !this.partnersEmpty() || !this.leversEmpty() || !this.mainContactPersonsEmpty() || !this.contributorsEmpty()
   );
 
+  // T-05 (R-DN-003, design §2.3/D-DN-3): act 3 ("Reach — ¿Dónde y con quién?")
+  // groups the geo scope card with the "who" rankings (partners, main
+  // contacts, contributing projects). "Top primary levers" moves to act 4
+  // ("Direction") alongside SP alignment — narrower than
+  // `hasVisibleRankingCards()` above (which still combines all four and is
+  // kept as-is for existing callers/specs), gating ONLY act 3's ranking grid.
+  readonly hasVisibleReachRankingCards = computed(
+    () => !this.partnersEmpty() || !this.mainContactPersonsEmpty() || !this.contributorsEmpty()
+  );
+
   readonly collapsedEmptyWidgets = computed<NoDataGroupItem[]>(() => {
     const items: NoDataGroupItem[] = [];
 

@@ -246,6 +246,91 @@ describe('InsightsSectionComponent (R-IN-003, D-F4-3/4/5)', () => {
     });
   });
 
+  describe(
+    'Multiple instances share ONE fetch (T-05, D-DN-4 — acts 4/5/6 each mount their own instance/observer over ' +
+      'the same contract)',
+    () => {
+      function spyOnInstanceObserver(instance: InsightsSectionComponent): {
+        observe: jest.Mock;
+        disconnect: jest.Mock;
+        callback: IntersectionObserverCallback | undefined;
+      } {
+        const fakeObserver = { observe: jest.fn(), disconnect: jest.fn() };
+        const holder: { callback: IntersectionObserverCallback | undefined } = { callback: undefined };
+        jest.spyOn(instance as any, 'createIntersectionObserver').mockImplementation(((cb: IntersectionObserverCallback) => {
+          holder.callback = cb;
+          return fakeObserver as unknown as IntersectionObserver;
+        }) as any);
+        return { ...fakeObserver, get callback() { return holder.callback; } } as any;
+      }
+
+      it(
+        'issues exactly ONE service.load() call when two instances intersect BEFORE the first request resolves ' +
+          '(failing input without the in-flight guard: two synchronous intersections -> two load() calls, since ' +
+          'GetContractInsightsService.load() only dedupes AFTER a load completes)',
+        () => {
+          const fixtureA = TestBed.createComponent(InsightsSectionComponent);
+          const componentA = fixtureA.componentInstance;
+          fixtureA.componentRef.setInput('contractId', 'C-1');
+          fixtureA.componentRef.setInput('visibleCards', ['sdg-coverage', 'contributing-levers']);
+          const obsA = spyOnInstanceObserver(componentA);
+          fixtureA.detectChanges();
+
+          const fixtureB = TestBed.createComponent(InsightsSectionComponent);
+          const componentB = fixtureB.componentInstance;
+          fixtureB.componentRef.setInput('contractId', 'C-1');
+          fixtureB.componentRef.setInput('visibleCards', ['evidence', 'review-flow', 'reach']);
+          const obsB = spyOnInstanceObserver(componentB);
+          fixtureB.detectChanges();
+
+          // Both intersect before the (mocked) request settles — the mock's
+          // `load` sets `loading` synchronously and returns a pending
+          // Promise, so B's intersection callback runs while A's request is
+          // still in flight.
+          obsA.callback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+          obsB.callback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+
+          expect(serviceMock.load).toHaveBeenCalledTimes(1);
+          expect(serviceMock.load).toHaveBeenCalledWith('C-1');
+        }
+      );
+
+      it('lets a LATER instance intersect after the shared load has already completed without issuing a second request', () => {
+        const fixtureA = TestBed.createComponent(InsightsSectionComponent);
+        const componentA = fixtureA.componentInstance;
+        fixtureA.componentRef.setInput('contractId', 'C-1');
+        const obsA = spyOnInstanceObserver(componentA);
+        fixtureA.detectChanges();
+
+        obsA.callback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+        expect(serviceMock.load).toHaveBeenCalledTimes(1);
+
+        // The shared load completes (mirrors the real service settling —
+        // the real `load()` sets BOTH `data` and `loadedContractId` on
+        // success; the mock only auto-sets `loading`, so both are set here
+        // explicitly to reproduce the real post-success state).
+        serviceMock.loading.set(false);
+        serviceMock.data.set(fullReport());
+        serviceMock.loadedContractId.set('C-1');
+
+        const fixtureB = TestBed.createComponent(InsightsSectionComponent);
+        const componentB = fixtureB.componentInstance;
+        fixtureB.componentRef.setInput('contractId', 'C-1');
+        fixtureB.componentRef.setInput('visibleCards', ['keywords']);
+        const obsB = spyOnInstanceObserver(componentB);
+        fixtureB.detectChanges();
+
+        obsB.callback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+        fixtureB.detectChanges();
+
+        expect(serviceMock.load).toHaveBeenCalledTimes(1);
+        // B still renders the (already-loaded) data for its own card subset.
+        const keywordsCard: HTMLElement = fixtureB.nativeElement.querySelector('[data-card="keywords"]');
+        expect(keywordsCard).not.toBeNull();
+      });
+    }
+  );
+
   describe('Fallback when IntersectionObserver is unavailable (declared gap, D-F3-5)', () => {
     beforeEach(() => {
       delete (globalThis as unknown as { IntersectionObserver?: unknown }).IntersectionObserver;

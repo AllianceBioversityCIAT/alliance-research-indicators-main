@@ -115,3 +115,32 @@
 - **Working tree (UNCOMMITTED, do not discard):** partial T-05 edits in `insights-section.component.{ts,html,spec.ts}` + `project-dashboard.component.{ts,html,spec.ts}`. Last commits: T-04 `53390e3f`, T-03 `7e574f5c`.
 - **Resume:** a wake message is ALREADY QUEUED in `dn-t05`'s inbox (fires when its limit resets) — if it dies again, `SendMessage` to `dn-t05` repeats the wake; its brief + 4 carried pointers stand. On its report: diff (pathspec insights-section + project-dashboard folders) → Reviewer → finalize → **T-07** (Leader battery: client full suite + coverage + build + tsc-spec delta vs re-measured baseline incl. `results-trend-card.ssr.spec.ts` [T-01 adv. 4] + bundle ±5 kB + tokens:validate; then **HITL con el owner** — mandatory named checks: viz-bar token colors light+dark over all 7 surfaces [T-03 adv. 1], hero strip CLS on project resolve + `md:` mobile [T-04 adv. 2/R-1], act-3 narrow breakpoint [T-03 adv. 3], acts vs mockup, below-the-fold network, drills).
 - **Done so far: 5/7** (T-01 `da737237`, T-02 `88f8204e`, T-03 `7e574f5c`, T-04 `53390e3f`, T-06 `b1641a58`).
+
+### T-05 — Six-act structure: reorder, subtitles, F4 observer move — **PASS** (attempt 1; one runtime interruption, no attempt consumed)
+
+- **Date:** 2026-08-24 · Skills: `angular-developer` + `ui-ux-pro-max` · Effort: high · Session-limit park/resume mid-task (wake queued, worker resumed with saved progress).
+- **Files:** `project-dashboard.component.{html,ts,spec.ts}` (six `<section aria-labelledby="act-N-title">` acts, number-chip + question headers, card markup relocated verbatim; `hasVisibleReachRankingCards` act-3 gate; T-04 pointer fixes landed), `insights-section.component.{ts,html,spec.ts}` (**RB-2 consumed once**: `visibleCards`/`instanceId`/`description` inputs, default all-six back-compat proven by the untouched T-08 real-HTTP case; + in-flight dedup guard in `triggerLoad()`).
+- **D-DN-4 clarification (Reviewer adjudication 1b — recorded so it never reads as drift):** the protected invariant is the ONE FETCH (§2.3 lazy invariant), not a literal single observer. Three per-act observers are strictly better than one: the KPI "Review queue →" scroll jumps into act 6, where a single act-4 observer could never fire and keywords would skeleton forever. The single-fetch clause is spec-proven (race specs, Expected 1 vs Received 2 red-first) — and the guard also covers the IO-undefined `ngAfterViewInit` path (3 mounts → 1 fetch).
+- **In-flight guard adjudication:** WITHIN the acceptance ("or a second fetch → red") — service dedupe only fires post-completion (`service:28` verified at source); `loading.set(true)` synchronous (`:32`) so the race spec mirrors production, not a mock fiction. Service untouched.
+- **Card membership:** roster re-derived by the Reviewer from the T-02 closure table against the LIVE template — every pre-T-05 card in exactly one act, six `data-card` keys exactly once. Two flagged placements accepted: Top contributing projects → act 3 (with-whom); F4 contributing levers → act 4. English act copy per §2.3's own ES/EN clause.
+- **Verification:** targeted 12 suites / 308 tests (`--coverage=false`) · eslint clean · tsc-spec **937 = baseline, zero new** (run by the worker) · `npm run build` clean (the one gate that could catch the `[visibleCards]` strictTemplates binding — run once, justified) · K-004 reds quoted (guard-off → Expected 1 Received 2 ×2; act swap → wrong-subtitle red).
+- **Reviewer verdict:** `STATUS: PASS` — verbatim relocation proven by diff shape; all mandatory clauses confirmed incl. zero hex, act-sequence DOM spec with observed red, first-paint set unchanged, drills/F3 intact, pending table closes act 6, tri-states preserved, shared retry re-fetches for all, zero duplicate/stale DOM ids.
+- **ADVISORY (recorded):**
+  1. **→ T-07 HITL (MANDATORY):** error-path request count — on a FAILED shared load, later instances legitimately re-fetch (recovery, up to 3 where pre-pass had 1); the below-the-fold network check must exercise the FAILURE path and record it.
+  2. Template array literals for `[visibleCards]` re-set OnPush inputs every parent CD ×3 (invisible to the suite) — hoist to readonly fields + freeze `ALL_INSIGHT_CARD_KEYS`; recorded (cosmetic/perf, outside gates).
+  3. KZ-017: multi-instance single-fetch proven at `load()` call count (1 load ⇒ 1 GET holds directionally); wire-level double-fixture assert = cheap upgrade if ever revisited.
+  4. A11y notes (nested same-name regions in zero-context branch; h2-in-h2 acts) — not AA failures → **→ T-07 HITL a11y pass**.
+  5. `hasVisibleRankingCards` test at spec `:2968` asserts a computed no longer tied to rendering — retitle/retire later; recorded.
+  6. Bookkeeping: T-03's first tasks.md box was left `[ ]` by a sed mismatch — fixed with this entry (evidence was already recorded in T-03's PASS).
+- **Requirements covered:** R-DN-003 all clauses, R-DN-004; design §2.3/§6, D-DN-3/D-DN-4 (clarified)/D-DN-6.
+- **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-07 — Full gates (automated half) — evidence
+
+- **Date:** 2026-08-24 (Leader battery, quiet window, post-T-05):
+  - Client full suite + coverage: **319 suites / 6784 tests PASS**, coverage **97.91 / 92.23 / 97.34 / 98.28** (floors 40/20/45/30 ✓).
+  - `npm run build` → 0 errors; **Initial total 1.12 MB — identical to the pre-pass baseline** (F4 T-09 battery, same branch; transfer 261.53 vs 261.52 kB = +10 bytes) ⇒ NFR-DN-002 ±5 kB ✓ (same-branch states, disqualifier respected).
+  - `tokens:validate` → STATUS: PASS (0 errors), ramps monotonic both themes.
+  - tsc-spec delta: **937 = baseline, zero new** (includes `results-trend-card.ssr.spec.ts` — T-01 advisory 4 honored).
+  - K-004 global: every cited gate observed red at least once across T-01…T-05 (per-task reds recorded above).
+- **Remaining for `[x]`: HITL (KZ-014, owner)** — named checks: (1) viz-bar token colors light+dark over ALL 7 bar surfaces (T-03 adv. 1 — the var() SVG-attribute question); (2) hero strip insert/CLS on project resolve + `md:` mobile (T-04 adv. 2 / R-1); (3) act-3 narrow-breakpoint bar labels (T-03 adv. 3); (4) six acts vs approved mockup, light+dark; (5) below-the-fold network incl. the FAILURE path (T-05 adv. 1); (6) F1 drills + F3 panel click-through; (7) trend chart visibly solid→dashed (the fixed bug, on real data); (8) a11y read-pass notes (T-05 adv. 4).

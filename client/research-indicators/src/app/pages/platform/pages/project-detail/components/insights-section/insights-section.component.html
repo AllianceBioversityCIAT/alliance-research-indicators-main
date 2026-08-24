@@ -1,20 +1,21 @@
 <section class="flex w-full flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
-  aria-labelledby="insights-section-title"
+  [attr.aria-labelledby]="instanceId() + '-title'"
   tabindex="0"
   (focusin)="onRegionFocusIn()">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div class="flex flex-col gap-1">
-      <h2 id="insights-section-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+      <h2 [id]="instanceId() + '-title'" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
         Insights
       </h2>
       <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
-        Portfolio-level reach, SDG coverage, evidence, review flow, contributing levers, and keywords across all indicators.
+        {{ description() }}
       </p>
     </div>
   </header>
 
   <div class="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3.5">
 
+    @if (isCardVisible('reach')) {
     <!-- Reach card (R-IN-003 Reach card scenario) -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="reach">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Reach</span>
@@ -70,7 +71,9 @@
         }
       }
     </div>
+    }
 
+    @if (isCardVisible('sdg-coverage')) {
     <!-- SDG coverage card (R-IN-003 SDG comparison scenario) -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="sdg-coverage">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">SDG coverage</span>
@@ -152,7 +155,9 @@
         }
       }
     </div>
+    }
 
+    @if (isCardVisible('evidence')) {
     <!-- Evidence card -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="evidence">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Evidence</span>
@@ -217,7 +222,9 @@
         }
       }
     </div>
+    }
 
+    @if (isCardVisible('review-flow')) {
     <!-- Review flow card -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="review-flow">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Review flow</span>
@@ -285,7 +292,9 @@
         }
       }
     </div>
+    }
 
+    @if (isCardVisible('contributing-levers')) {
     <!-- Contributing levers card -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="contributing-levers">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Contributing levers</span>
@@ -336,7 +345,9 @@
         }
       }
     </div>
+    }
 
+    @if (isCardVisible('keywords')) {
     <!-- Keywords card -->
     <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="keywords">
       <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Keywords</span>
@@ -387,6 +398,7 @@
         }
       }
     </div>
+    }
 
   </div>
 </section>
