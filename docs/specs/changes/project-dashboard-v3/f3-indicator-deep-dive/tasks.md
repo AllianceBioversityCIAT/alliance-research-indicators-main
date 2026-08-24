@@ -2,7 +2,7 @@
 
 - **Module:** agresso (server) + client / project-detail (STAR)
 - **Spec id:** 2026-08-project-dashboard-v3-f3
-- **Status:** not-started
+- **Status:** completed
 - **Owner:** JuanCode
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md · **Visual reference:** ./mockup/deep-dive-panel.html
@@ -139,12 +139,12 @@ graph TD
 - **Requirements covered:** NFR-DD-001…004; visual defect class (requirements table); KZ-002 co-rendered widgets.
 - **Files:** evidence records only.
 - **Acceptance / done check:**
-  - [ ] Server suites + `test:cov` ≥60%; client full suite + coverage floors + `npm run build` + tsc-spec delta ≤945 — **sequenced, never both packages concurrently** (§4.3).
-  - [ ] Bundle: initial size before/after within ±5 kB, echarts additions in the lazy chunk (**disqualifier:** baselines from different branch states).
-  - [ ] Latency: 3 timed dev runs, p95-proxy ≤ 800 ms; spread >±40% → reported inconclusive, never a pass.
-  - [ ] **HITL (KZ-014, human):** light+dark screenshots of every new chart form; lazy fetch verified with the panel **below the fold** (the in-viewport variant is disqualified per NFR-DD-001); F1 drills + F2 single-aggregate-call behavior intact; `/swagger` renders the endpoint.
-  - [ ] Global K-004 disqualifier: every cited gate observed red at least once during this spec.
-- **Deps:** T-05, T-09 · **Effort:** M · **Status:** in-progress
+  - [x] Server suites + `test:cov` ≥60%; client full suite + coverage floors + `npm run build` + tsc-spec delta ≤945 — **sequenced, never both packages concurrently** (§4.3).
+  - [x] Bundle: initial size before/after within ±5 kB, echarts additions in the lazy chunk (**disqualifier:** baselines from different branch states).
+  - [~] Latency: NOT measured — only reachable local server runs a stale build (void evidence); recorded inconclusive/pending in execution.md, owner-accepted at close; measure post-deploy on dev.
+  - [x] **HITL (KZ-014, human):** light+dark screenshots of every new chart form; lazy fetch verified with the panel **below the fold** (the in-viewport variant is disqualified per NFR-DD-001); F1 drills + F2 single-aggregate-call behavior intact; `/swagger` renders the endpoint.
+  - [x] Global K-004 disqualifier: every cited gate observed red at least once during this spec.
+- **Deps:** T-05, T-09 · **Effort:** M · **Status:** done
 
 ---
 
@@ -180,7 +180,7 @@ Branch `bilateral-visual-improvements`; commits `[SPEC:changes/project-dashboard
 
 ## 8. Done definition
 
-- [ ] T-01…T-10 done with evidence (execution.md PASS recorded before any checkbox flips — repo guardrail hook).
-- [ ] Coverage-closure table verified against final code.
-- [ ] TRD API delta (new endpoint) + mockup reference recorded at archive sync.
-- [ ] Rollout note: dev-branch pipeline post-F2; rollback = revert.
+- [x] T-01…T-10 done with evidence (execution.md PASS recorded before any checkbox flips — repo guardrail hook).
+- [x] Coverage-closure table verified against final code.
+- [x] TRD API delta (new endpoint) + mockup reference recorded at archive sync.
+- [x] Rollout note: dev-branch pipeline post-F2; rollback = revert.
