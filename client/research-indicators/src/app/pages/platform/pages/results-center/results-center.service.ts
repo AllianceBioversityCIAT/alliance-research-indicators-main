@@ -416,7 +416,7 @@ export class ResultsCenterService {
             },
             ...prev.map(indicator => ({
               ...indicator,
-              able: [0, 1, 2, 3, 4, 5].includes(indicator.indicator_id),
+              able: [0, 1, 2, 3, 4, 5, 6].includes(indicator.indicator_id),
               active: indicator.indicator_id === restoredTabId
             }))
           ];
