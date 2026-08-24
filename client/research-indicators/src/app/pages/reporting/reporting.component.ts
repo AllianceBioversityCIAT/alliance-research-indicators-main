@@ -25,6 +25,8 @@ interface Platform {
   topBorder: string;
   /** Tailwind class for the result platform name colour. */
   ink: string;
+  /** Tailwind classes for the solid "Open platform" button (bg + hover). */
+  btn: string;
 }
 
 interface Outcome {
@@ -114,7 +116,8 @@ export default class ReportingComponent {
       support: 'DMOS',
       logo: 'images/tracking.svg',
       topBorder: 'border-t-[#E8862A]',
-      ink: 'text-[#94500F]'
+      ink: 'text-[#94500F]',
+      btn: 'bg-[#94500F] hover:bg-[#7A4109]'
     },
     STAR: {
       name: 'STAR',
@@ -122,7 +125,8 @@ export default class ReportingComponent {
       support: 'MELP',
       logo: 'images/star.svg',
       topBorder: 'border-t-[#3C8DC8]',
-      ink: 'text-[#2A6D9E]'
+      ink: 'text-[#2A6D9E]',
+      btn: 'bg-[#2A6D9E] hover:bg-[#1F567E]'
     },
     PRMS: {
       name: 'PRMS',
@@ -130,7 +134,8 @@ export default class ReportingComponent {
       support: 'CGIAR Reporting Support Team',
       logo: 'images/prms-reporting-tool.svg',
       topBorder: 'border-t-[#5569DD]',
-      ink: 'text-[#5569DD]'
+      ink: 'text-[#5569DD]',
+      btn: 'bg-[#5569DD] hover:bg-[#4152BB]'
     }
   };
 
@@ -251,6 +256,7 @@ export default class ReportingComponent {
   readonly resultLogo = computed(() => this.platform()?.logo ?? '');
   readonly resultTopBorder = computed(() => this.platform()?.topBorder ?? '');
   readonly resultInk = computed(() => this.platform()?.ink ?? '');
+  readonly resultBtn = computed(() => this.platform()?.btn ?? '');
   readonly resultEvidence = computed(() => this.currentIndicator()?.evidence ?? '');
   readonly resultPitfall = computed(() => this.currentIndicator()?.pitfall ?? '');
   readonly resultResponsibility = computed(() =>
