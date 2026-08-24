@@ -12,7 +12,7 @@
 
 Reported by the product owner after checking the work already deployed to **test**. **Neither blocks what is deployed**; both are new work.
 
-### N-1 · The Results Center "INNOVATION USE" filter is inactive — **spec filed**
+### N-1 · The Results Center "INNOVATION USE" filter is inactive — **done (archived 2026-08-24)**
 
 The chip renders greyed out and cannot be selected while the other indicators can. It is not permissions and not data: it is a **hardcoded allowlist in the client**.
 
@@ -28,7 +28,7 @@ Indicator **6** (Innovation Use) is not in the array, so the chip is rendered wi
 
 **Fix:** add `6` to the array. **Before calling it closed**, grep for other allowlists of the same shape — this is the *second* site with the same defect, so assuming there are only two repeats the mistake that was already made once. A test covers this function (`results-center.service.spec.ts`), so the change has to update it.
 
-**Execution spec:** [`docs/specs/bugfix/results-center-innovation-use-filter/`](../../bugfix/results-center-innovation-use-filter/)
+**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--results-center-innovation-use-filter/`](../../archive/2026-08-24-bugfix--results-center-innovation-use-filter/)
 
 ### N-2 · The justification is not cleared when the level drops — **a design decision, not just a fix**
 
