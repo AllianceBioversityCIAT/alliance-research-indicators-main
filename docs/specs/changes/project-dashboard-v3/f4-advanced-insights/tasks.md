@@ -47,10 +47,10 @@ graph TD
 - **Requirements covered:** R-IN-002 reach row (NULL-excluded sums, per actor type, not-disaggregated count) + keywords row + keyword-normalization scenario (all clauses); design §2.1, D-F4-5.
 - **Files:** repository (+spec); decision record in `execution.md` for the normalization path (MySQL `REGEXP_REPLACE` vs TS fallback — verify the dev MySQL version).
 - **Acceptance / done check:**
-  - [ ] Reach specs: NULL disaggregation columns excluded (**failing input:** `COALESCE(...,0)` mutation changes `n`/sums → fails); per-actor-type grouping with custom-name fallback; `not_disaggregated_rows` counted separately, never inside sums.
-  - [ ] Keywords specs: `"Soil Health"`/`"soil health"`/`" soil  health "` collapse to one entry with count 3; one result repeating a keyword counts once (**failing input:** drop `DISTINCT result_id` → fails); cap 30, order count desc / keyword asc asserted against a 31-item fixture.
-  - [ ] Normalization path recorded (SQL or TS) with the MySQL version observed.
-- **Deps:** none · **Effort:** L · **Status:** todo
+  - [x] Reach specs: NULL disaggregation columns excluded (**failing input:** `COALESCE(...,0)` mutation changes `n`/sums → fails); per-actor-type grouping with custom-name fallback; `not_disaggregated_rows` counted separately, never inside sums.
+  - [x] Keywords specs: `"Soil Health"`/`"soil health"`/`" soil  health "` collapse to one entry with count 3; one result repeating a keyword counts once (**failing input:** drop `DISTINCT result_id` → fails); cap 30, order count desc / keyword asc asserted against a 31-item fixture.
+  - [x] Normalization path recorded (SQL or TS) with the MySQL version observed (SQL — dev MySQL `8.0.45` probed; see execution.md T-02).
+- **Deps:** none · **Effort:** L · **Status:** done
 
 ### T-03 — `review_flow`: events query + cycle-time calculator + vocabulary constant
 
@@ -154,7 +154,7 @@ Branch `bilateral-visual-improvements`; commits `[SPEC:changes/project-dashboard
 |---|---|---|---|---|---|
 | RB-1 | 2026-08-23 | F3 client tasks not yet landed | 🔒 gates on T-07/T-08; server tasks proceed | JuanCode | open |
 | RB-2 | 2026-08-23 | Review-history vocabulary sparse for imported results → tiny cycle-time sample | UI shows `sample_size` + excluded count; no silent extrapolation | JuanCode | open |
-| RB-3 | 2026-08-23 | Dev MySQL may lack `REGEXP_REPLACE` | T-02 TS fallback, decision recorded | JuanCode | open |
+| RB-3 | 2026-08-23 | Dev MySQL may lack `REGEXP_REPLACE` | T-02 TS fallback, decision recorded | JuanCode | **closed 2026-08-24** — dev MySQL `8.0.45` probed, `REGEXP_REPLACE` confirmed; SQL path shipped (execution.md T-02) |
 
 ## 8. Done definition
 

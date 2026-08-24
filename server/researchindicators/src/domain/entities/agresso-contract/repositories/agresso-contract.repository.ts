@@ -81,6 +81,8 @@ import {
 import {
   ContributingLeversSectionDto,
   EvidenceSectionDto,
+  KeywordsSectionDto,
+  ReachSectionDto,
   SdgCoverageSectionDto,
 } from '../dto/contract-insights-report.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -2668,6 +2670,111 @@ export class AgressoContractRepository
   // (composed by getInsightsReport, T-04; sections always present per D-F4-3)
   // ---------------------------------------------------------------------
 
+  private async getReachSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<ReachSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const overallQuery = `
+      SELECT
+        COUNT(DISTINCT ra.result_id) AS n,
+        COALESCE(SUM(ra.women_youth), 0) AS women_youth,
+        COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth,
+        COALESCE(SUM(ra.men_youth), 0) AS men_youth,
+        COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth,
+        SUM(CASE WHEN ra.sex_age_disaggregation_not_apply = TRUE THEN 1 ELSE 0 END) AS not_disaggregated_rows
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_actors ra
+        ON ra.result_id = cr.result_id
+        AND ra.is_active = TRUE
+    `;
+
+    const byActorTypeQuery = `
+      SELECT
+        cat.code AS actor_type_id,
+        CASE
+          WHEN cat.code = 5
+            THEN COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name)
+          ELSE cat.name
+        END AS actor_type_name,
+        COALESCE(SUM(ra.women_youth), 0) AS women_youth,
+        COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth,
+        COALESCE(SUM(ra.men_youth), 0) AS men_youth,
+        COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_actors ra
+        ON ra.result_id = cr.result_id
+        AND ra.is_active = TRUE
+      INNER JOIN clarisa_actor_types cat
+        ON cat.code = ra.actor_type_id
+        AND cat.is_active = TRUE
+      GROUP BY cat.code, cat.name
+      ORDER BY (
+        COALESCE(SUM(ra.women_youth), 0) +
+        COALESCE(SUM(ra.women_not_youth), 0) +
+        COALESCE(SUM(ra.men_youth), 0) +
+        COALESCE(SUM(ra.men_not_youth), 0)
+      ) DESC, cat.name ASC
+    `;
+
+    const [overallRows, byActorTypeRows] = await Promise.all([
+      this.query(overallQuery, [contractId]),
+      this.query(byActorTypeQuery, [contractId]),
+    ]);
+
+    const overallRow = (overallRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(overallRow.n ?? 0);
+    const women_youth = Number(overallRow.women_youth ?? 0);
+    const women_not_youth = Number(overallRow.women_not_youth ?? 0);
+    const men_youth = Number(overallRow.men_youth ?? 0);
+    const men_not_youth = Number(overallRow.men_not_youth ?? 0);
+    const overallTotal =
+      women_youth + women_not_youth + men_youth + men_not_youth;
+
+    const by_actor_type = (
+      byActorTypeRows as Array<Record<string, unknown>>
+    ).map((row) => {
+      const actorWomenYouth = Number(row.women_youth ?? 0);
+      const actorWomenNotYouth = Number(row.women_not_youth ?? 0);
+      const actorMenYouth = Number(row.men_youth ?? 0);
+      const actorMenNotYouth = Number(row.men_not_youth ?? 0);
+
+      return {
+        actor_type_id:
+          row.actor_type_id !== null && row.actor_type_id !== undefined
+            ? Number(row.actor_type_id)
+            : null,
+        actor_type_name: String(row.actor_type_name),
+        women_youth: actorWomenYouth,
+        women_not_youth: actorWomenNotYouth,
+        men_youth: actorMenYouth,
+        men_not_youth: actorMenNotYouth,
+        total:
+          actorWomenYouth +
+          actorWomenNotYouth +
+          actorMenYouth +
+          actorMenNotYouth,
+      };
+    });
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      overall: {
+        women_youth,
+        women_not_youth,
+        men_youth,
+        men_not_youth,
+        total: overallTotal,
+      },
+      by_actor_type,
+      not_disaggregated_rows: Number(overallRow.not_disaggregated_rows ?? 0),
+    };
+  }
+
   private async getSdgCoverageSection(
     contractId: string,
     totalResults: number,
@@ -2834,6 +2941,58 @@ export class AgressoContractRepository
         lever_id: Number(row.lever_id),
         short_name: String(row.short_name),
         full_name: String(row.full_name),
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  private async getKeywordsSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<KeywordsSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+    // D-F4-5 / T-02 (dev MySQL 8.0.45-0ubuntu0.22.04.1 — REGEXP_REPLACE confirmed
+    // available): normalize case + inner whitespace in SQL. REGEXP_REPLACE alone
+    // leaves leading/trailing spaces, so TRIM still runs after the collapse.
+    const normalizedKeywordExpr = `LOWER(TRIM(REGEXP_REPLACE(rk.keyword, '[[:space:]]+', ' ')))`;
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rk.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_keywords rk
+        ON rk.result_id = cr.result_id
+        AND rk.is_active = TRUE
+    `;
+
+    const keywordsQuery = `
+      SELECT
+        ${normalizedKeywordExpr} AS keyword,
+        COUNT(DISTINCT rk.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_keywords rk
+        ON rk.result_id = cr.result_id
+        AND rk.is_active = TRUE
+      GROUP BY ${normalizedKeywordExpr}
+      ORDER BY count DESC, keyword ASC
+      LIMIT 30
+    `;
+
+    const [countRows, keywordsRows] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(keywordsQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      keywords: (keywordsRows as Array<Record<string, unknown>>).map((row) => ({
+        keyword: String(row.keyword),
         count: Number(row.count ?? 0),
       })),
     };

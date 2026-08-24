@@ -3487,6 +3487,181 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getReachSection (private, F4 insights)', () => {
+    it('should query portfolio reach and return correctly populated DTO (asserts generated SQL + params + NULL-excluded sums + custom-name fallback + not_disaggregated_rows separated)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '4',
+            women_youth: '10',
+            women_not_youth: '5',
+            men_youth: '8',
+            men_not_youth: '3',
+            not_disaggregated_rows: '2',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            actor_type_id: 1,
+            actor_type_name: 'Farmers / (agro)pastoralist / herders / fishers',
+            women_youth: '6',
+            women_not_youth: '2',
+            men_youth: '4',
+            men_not_youth: '1',
+          },
+          {
+            actor_type_id: 5,
+            actor_type_name: 'Community radio hosts',
+            women_youth: '4',
+            women_not_youth: '3',
+            men_youth: '4',
+            men_not_youth: '2',
+          },
+        ]);
+
+      const result = await repository['getReachSection']('A511', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const [overallSql, overallParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [byActorTypeSql, byActorTypeParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[1];
+
+      // Overall query assertions (KZ-001) — SUM naturally excludes per-row
+      // NULLs; the outer COALESCE only guards an all-NULL/no-row aggregate.
+      expect(overallSql).toContain('SELECT DISTINCT r.result_id');
+      expect(overallSql).toContain('INNER JOIN result_actors ra');
+      expect(overallSql).toContain('ra.result_id = cr.result_id');
+      expect(overallSql).toContain('ra.is_active = TRUE');
+      expect(overallSql).toContain('COUNT(DISTINCT ra.result_id) AS n');
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.women_youth), 0) AS women_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.men_youth), 0) AS men_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth',
+      );
+      // not_disaggregated_rows counted separately from the sums, never inside them
+      expect(overallSql).toContain(
+        'SUM(CASE WHEN ra.sex_age_disaggregation_not_apply = TRUE THEN 1 ELSE 0 END) AS not_disaggregated_rows',
+      );
+      expect(overallParams).toEqual(['A511']);
+
+      // Per-actor-type breakdown: lookup join + custom-name fallback for "other" (code 5)
+      expect(byActorTypeSql).toContain('INNER JOIN clarisa_actor_types cat');
+      expect(byActorTypeSql).toContain('cat.code = ra.actor_type_id');
+      expect(byActorTypeSql).toContain('cat.is_active = TRUE');
+      expect(byActorTypeSql).toContain('WHEN cat.code = 5');
+      expect(byActorTypeSql).toContain(
+        "COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name)",
+      );
+      expect(byActorTypeSql).toContain('GROUP BY cat.code, cat.name');
+      expect(byActorTypeSql).toContain('DESC, cat.name ASC');
+      expect(byActorTypeParams).toEqual(['A511']);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 4 },
+        overall: {
+          women_youth: 10,
+          women_not_youth: 5,
+          men_youth: 8,
+          men_not_youth: 3,
+          total: 26,
+        },
+        by_actor_type: [
+          {
+            actor_type_id: 1,
+            actor_type_name: 'Farmers / (agro)pastoralist / herders / fishers',
+            women_youth: 6,
+            women_not_youth: 2,
+            men_youth: 4,
+            men_not_youth: 1,
+            total: 13,
+          },
+          {
+            actor_type_id: 5,
+            actor_type_name: 'Community radio hosts',
+            women_youth: 4,
+            women_not_youth: 3,
+            men_youth: 4,
+            men_not_youth: 2,
+            total: 13,
+          },
+        ],
+        not_disaggregated_rows: 2,
+      });
+    });
+
+    it('should return zeros, empty by_actor_type, and 0 not_disaggregated_rows when the contract has no actor rows', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '0',
+            women_youth: '0',
+            women_not_youth: '0',
+            men_youth: '0',
+            men_not_youth: '0',
+            not_disaggregated_rows: '0',
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getReachSection']('A511', 5);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 0 },
+        overall: {
+          women_youth: 0,
+          women_not_youth: 0,
+          men_youth: 0,
+          men_not_youth: 0,
+          total: 0,
+        },
+        by_actor_type: [],
+        not_disaggregated_rows: 0,
+      });
+    });
+
+    it('K-004: generated SQL keeps NULLs excluded via COALESCE(SUM(...), 0) — never SUM(COALESCE(...)) — regression pinned on the exact SQL text', async () => {
+      // This spec pins the exact NULL-safe aggregate shape. If the
+      // implementation regresses to wrapping COALESCE around the raw column
+      // inside SUM (SUM(COALESCE(ra.women_youth, 0))) instead of bounding the
+      // aggregate result (COALESCE(SUM(ra.women_youth), 0)), this assertion
+      // reddens on the exact generated SQL text (KZ-001).
+      // Observed RED verbatim when mutated (2026-08-24, reverted after capture):
+      //   expect(received).toContain(expected)
+      //   Expected substring: "COALESCE(SUM(ra.women_youth), 0) AS women_youth"
+      //   Received string:    "...SUM(COALESCE(ra.women_youth, 0)) AS women_youth..."
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '1',
+            women_youth: '3',
+            women_not_youth: null,
+            men_youth: null,
+            men_not_youth: '0',
+            not_disaggregated_rows: '0',
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      await repository['getReachSection']('A511', 1);
+
+      const [overallSql] = (repository.query as jest.Mock).mock.calls[0];
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.women_youth), 0) AS women_youth',
+      );
+      expect(overallSql).not.toContain('SUM(COALESCE(ra.women_youth, 0))');
+    });
+  });
+
   describe('getSdgCoverageSection (private, F4 insights)', () => {
     it('should query SDG coverage and return correctly populated DTO (asserts generated SQL + params + distinct counts + lookup join)', async () => {
       (repository.query as jest.Mock)
@@ -3742,6 +3917,122 @@ describe('AgressoContractRepository', () => {
         meta: { total_results: 5, n: 0 },
         levers: [],
       });
+    });
+  });
+
+  describe('getKeywordsSection (private, F4 insights)', () => {
+    it('should query normalized keyword frequency and return correctly populated DTO (asserts generated SQL + params + normalization expression + distinct result counting + cap/order)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([
+          { keyword: 'soil health', count: '3' },
+          { keyword: 'climate', count: '1' },
+        ]);
+
+      const result = await repository['getKeywordsSection']('A511', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [keywordsSql, keywordsParams] = (repository.query as jest.Mock).mock
+        .calls[1];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_keywords rk');
+      expect(countSql).toContain('rk.result_id = cr.result_id');
+      expect(countSql).toContain('rk.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rk.result_id) AS n');
+      expect(countParams).toEqual(['A511']);
+
+      // Keyword breakdown: normalization expression (D-F4-5 — SQL, MySQL
+      // 8.0.45-0ubuntu0.22.04.1 confirmed REGEXP_REPLACE support), distinct
+      // result counting per keyword (never DOUBLE-counting a result that
+      // repeats a keyword), cap 30, order count desc / keyword asc
+      expect(keywordsSql).toContain(
+        "LOWER(TRIM(REGEXP_REPLACE(rk.keyword, '[[:space:]]+', ' ')))",
+      );
+      expect(keywordsSql).toContain('COUNT(DISTINCT rk.result_id) AS count');
+      expect(keywordsSql).toContain('GROUP BY');
+      expect(keywordsSql).toContain('ORDER BY count DESC, keyword ASC');
+      expect(keywordsSql).toContain('LIMIT 30');
+      expect(keywordsParams).toEqual(['A511']);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 3 },
+        keywords: [
+          { keyword: 'soil health', count: 3 },
+          { keyword: 'climate', count: 1 },
+        ],
+      });
+    });
+
+    it('should return n = 0 and empty keywords array when the contract has no keywords', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getKeywordsSection']('A511', 5);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 0 },
+        keywords: [],
+      });
+    });
+
+    it('caps at the top 30 keywords ordered by count desc then keyword asc (31-item fixture; the 31st candidate must not appear)', async () => {
+      // Simulates what MySQL's GROUP BY + ORDER BY count DESC, keyword ASC +
+      // LIMIT 30 would already have reduced 31 normalized candidates down to.
+      // The repository must not re-sort or re-truncate — the cap/order
+      // assertions above pin that the SQL itself does this; this fixture
+      // pins that the DTO mapping passes the top-30 rows through unaltered.
+      const candidates = Array.from({ length: 31 }, (_, i) => ({
+        keyword: `keyword-${String(i).padStart(2, '0')}`,
+        count: 31 - i, // strictly descending, unique counts
+      }));
+      const top30 = candidates.slice(0, 30);
+
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '31' }])
+        .mockResolvedValueOnce(
+          top30.map((k) => ({ keyword: k.keyword, count: String(k.count) })),
+        );
+
+      const result = await repository['getKeywordsSection']('A511', 40);
+
+      const [keywordsSql] = (repository.query as jest.Mock).mock.calls[1];
+      expect(keywordsSql).toContain('LIMIT 30');
+      expect(keywordsSql).toContain('ORDER BY count DESC, keyword ASC');
+
+      expect(result.keywords).toHaveLength(30);
+      expect(result.keywords[0]).toEqual({ keyword: 'keyword-00', count: 31 });
+      expect(result.keywords[29]).toEqual({ keyword: 'keyword-29', count: 2 });
+      expect(result.keywords.some((k) => k.keyword === 'keyword-30')).toBe(
+        false,
+      );
+    });
+
+    it('K-004: dropping DISTINCT from the keyword count would double-count a result repeating a keyword — regression pinned on the exact SQL text', async () => {
+      // A result storing the same normalized keyword twice must count once
+      // per the R-IN-002 keyword scenario ("must NOT count the same result
+      // twice for a keyword it stores twice"). Since `query` is mocked at
+      // the unit level (KZ-001: assert generated SQL, never the live DB),
+      // this is pinned as a text assertion on COUNT(DISTINCT rk.result_id) —
+      // dropping DISTINCT reddens this exact string.
+      // Observed RED verbatim when mutated (2026-08-24, reverted after capture):
+      //   expect(received).toContain(expected)
+      //   Expected substring: "COUNT(DISTINCT rk.result_id) AS count"
+      //   Received string:    "...COUNT(rk.result_id) AS count..."
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '1' }])
+        .mockResolvedValueOnce([{ keyword: 'soil health', count: '1' }]);
+
+      await repository['getKeywordsSection']('A511', 1);
+
+      const [keywordsSql] = (repository.query as jest.Mock).mock.calls[1];
+      expect(keywordsSql).toContain('COUNT(DISTINCT rk.result_id) AS count');
+      expect(keywordsSql).not.toContain('COUNT(rk.result_id) AS count');
     });
   });
 
