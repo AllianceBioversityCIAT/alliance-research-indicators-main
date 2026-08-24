@@ -5,8 +5,8 @@
 - **Family path:** `docs/specs/changes/project-dashboard-v3/`
 - **Parent spec / Feature:** `project-detail / Project Dashboard v3 — visual reorganization, endpoint consolidation, interactivity, per-indicator analytics`
 - **Date created:** `2026-08-23`
-- **Last updated:** `2026-08-23`
-- **Spec-family status:** `open`
+- **Last updated:** `2026-08-24`
+- **Spec-family status:** `complete` — all 4 children `done` and archived (F1/F3: prior sessions; F2/F4: 2026-08-24); owner-approved flip 2026-08-24
 - **Owner / Squad:** `JuanCode`
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) (Project Dashboard / STAR analytics)
 - **Linked TRD section:** [`docs/trd/trd.md`](../../../trd/trd.md) (agresso-contract reports family, client project-detail feature)
