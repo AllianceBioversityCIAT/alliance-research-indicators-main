@@ -526,6 +526,10 @@ export class ResultCapacitySharingService {
       },
     });
 
+    if (!resultCapDev) {
+      return null;
+    }
+
     let groupResponse: CapDevGroupDto = undefined;
     let individualResponse: CapDevIndividualDto = undefined;
 

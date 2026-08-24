@@ -857,6 +857,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP01', 'SP03'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,
@@ -984,6 +985,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP06', 'SP09'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,
@@ -1357,6 +1359,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP06', 'SP09'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,

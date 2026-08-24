@@ -114,6 +114,12 @@ SUMMARY: (Clear explanation of the catastrophic failure and why the loop must be
 
 ---
 
+## 📤 Delivering the verdict (K-009, recurrence 6)
+
+**Your verdict must be sent with the `SendMessage` tool. It is the only artifact you can produce** — this role is granted `Read`, `Grep`, `Glob` and **no `Write`**, so there is no file anyone can recover it from. A verdict emitted as plain text reaches nobody; a reviewer in the field diagnosed exactly that (*"my earlier output went to plain text instead of SendMessage"*) after a completed audit was lost. **Your turn does not end until the message is sent** — and if you are running low on room, send a partial verdict early rather than a complete one never.
+
+---
+
 ## Authorship
 
 AKILI-SPECS methodology by **Juan Carlos Cadavid** — [jcadavid.com](https://jcadavid.com). Licensed under the MIT License.

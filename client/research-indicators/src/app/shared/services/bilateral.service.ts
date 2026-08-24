@@ -17,6 +17,7 @@ import { CurrentResultService } from './cache/current-result.service';
 import { CacheService } from './cache/cache.service';
 import { ErrorResponse } from '@shared/interfaces/responses.interface';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
+import { isPoolFundingCapable } from '@shared/utils/platform-code.util';
 
 export type PatchTagResult =
   | { ok: true; data: PoolFundingTagPatchResponse }
@@ -147,7 +148,16 @@ export class BilateralService {
     return !hasActivePooledFundingContract(contract);
   }
 
+  // R-PFG-001 — the guard lives here (DD-1), covering all 5 call sites in one
+  // change. The ineligible path CLEARS state rather than merely skipping the
+  // fetch (DD-3): `currentAlignment` is a root-scoped singleton with no reset on
+  // navigation, and today the failing request is the only thing that nulls it.
+  // `loadingAlignment` is never raised on this path — there is nothing to await.
   async getAlignment(resultCode: string): Promise<AlignmentResponse | null> {
+    if (!isPoolFundingCapable(resultCode)) {
+      this.currentAlignment.set(null);
+      return null;
+    }
     this.loadingAlignment.set(true);
     try {
       const res = await this.api.GET_PoolFundingAlignment(resultCode);

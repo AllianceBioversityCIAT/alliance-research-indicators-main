@@ -26,6 +26,10 @@ export enum ResultStatusEnum {
   BILATERAL_PENDING_REVIEW = 23,
   BILATERAL_APPROVED = 24,
   BILATERAL_REJECTED = 25,
+  SUBMITTED_IN_AICCRA = 22,
+  COMPLETED_IN_AICCRA = 26,
+  EXTENDED_IN_AICCRA = 27,
+  ON_GOING_IN_AICCRA = 28,
 }
 
 export const ResultStatusNameEnum = {
@@ -51,6 +55,10 @@ export const ResultStatusNameEnum = {
   23: 'Bilateral Pending Review',
   24: 'Bilateral Approved',
   25: 'Bilateral Rejected',
+  22: 'Submitted in AICCRA',
+  26: 'Completed in AICCRA',
+  27: 'Extended in AICCRA',
+  28: 'On Going in AICCRA',
 };
 
 export const getTemplateByStatus = (

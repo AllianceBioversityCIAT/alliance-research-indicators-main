@@ -3,24 +3,69 @@
     <div class="content-section w-full">
       <div class="bilateral-mapping flex w-full min-w-0 flex-col abc-white-2 p-[30px] mb-10 rounded-[10px] gap-6">
 
-        <!-- Page title + New Mapping button (T-BIL-CAM-05) -->
+        <!-- Page title, Help Popover + Action Buttons (T-BIL-CAM-05, R-BIL-UI-001, R-BIL-UI-002, R-BTE-005) -->
         <div class="flex flex-wrap items-center justify-between gap-4 px-2">
-          <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
-            Bilateral Mapping
-          </h1>
-          <p-button
-            label="New mapping"
-            icon="pi pi-plus !text-[12px]"
-            severity="primary"
-            size="small"
-            styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
-            (onClick)="openCreateDialog()"
-            data-testid="new-mapping-btn"
-            aria-label="Create a new bilateral mapping">
-          </p-button>
+          <div class="flex items-center gap-2">
+            <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
+              Bilateral Project Mapping
+            </h1>
+            <button
+              pButton
+              type="button"
+              icon="pi pi-question-circle"
+              class="p-button-text p-button-sm !p-0 !w-[22px] !h-[22px] atc-grey-700 hover:atc-primary-blue-600 cursor-pointer"
+              (click)="helpOp.toggle($event)"
+              data-testid="help-popover-btn"
+              aria-label="About Bilateral Project Mapping">
+            </button>
+            <p-popover #helpOp [style]="{ width: '380px' }" appendTo="body">
+              <div class="flex flex-col gap-3 p-2 text-sm atc-grey-800" data-testid="help-popover-content">
+                <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
+                  <span class="font-semibold text-sm atc-primary-blue-600">About Bilateral Project Mapping</span>
+                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
+                    Phase 2026
+                  </span>
+                </div>
+                <p class="m-0 leading-relaxed text-[13px]">
+                  In this module, bilateral projects from CLARISA (filtered by the active phase, e.g., Phase 2026) are mapped and reconciled against AGRESSO agreements and contracts.
+                </p>
+                <p class="m-0 leading-relaxed text-[13px]">
+                  This mapping ensures that Science Program alignments, Pool Funding contributions, and indicator reporting reflect active bilateral agreements accurately in STAR.
+                </p>
+              </div>
+            </p-popover>
+          </div>
+          <div class="flex items-center gap-2">
+            <p-button
+              label="Auto-map"
+              icon="pi pi-bolt !text-[12px]"
+              [outlined]="true"
+              size="small"
+              styleClass="!border-[var(--ac-primary-blue-400)] !text-[var(--ac-primary-blue-600)] hover:!bg-[var(--ac-primary-blue-50)] !rounded-[9px] !max-h-[27px] !text-[13px] font-medium"
+              (onClick)="openAutomapperDialog()"
+              data-testid="header-automap-btn"
+              aria-label="Open auto-mapper run preview">
+            </p-button>
+            <p-button
+              label="New mapping"
+              icon="pi pi-plus !text-[12px]"
+              severity="primary"
+              size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
+              (onClick)="openCreateDialog()"
+              data-testid="new-mapping-btn"
+              aria-label="Create a new bilateral mapping">
+            </p-button>
+          </div>
         </div>
 
-        <!-- Search + filters bar (AC-04.1 / AC-04.2 / AC-04.3) -->
+        <!-- Mapping Coverage strip (T-06 / R-CAM-004 AC.4) -->
+        <app-bilateral-mapping-coverage
+          [phase]="phase()"
+          (openAutomapper)="openAutomapperDialog()">
+        </app-bilateral-mapping-coverage>
+
+        <!-- Search + filters bar (AC-04.1 / AC-04.2 / AC-04.3, R-BTE-003) -->
         <div class="flex flex-wrap items-center gap-3 px-2">
           <!-- Search input -->
           <div class="flex flex-col gap-1 flex-1 min-w-[180px]">
@@ -30,25 +75,25 @@
               id="bilMapSearch"
               type="search"
               class="w-full"
-              placeholder="Agreement ID or project name…"
+              placeholder="Agreement ID, project name or description…"
               [ngModel]="search()"
               (ngModelChange)="onSearchInput($event)"
-              aria-label="Search by agreement ID or project name"
+              aria-label="Search by agreement ID, project name or description"
               data-testid="search-input" />
           </div>
 
-          <!-- Active-state filter (AC-04.2) -->
+          <!-- Status filter (R-BTE-003) -->
           <div class="flex flex-col gap-1 min-w-[150px]">
-            <label for="bilMapActiveFilter" class="text-sm font-medium atc-grey-800">Status</label>
+            <label for="bilMapStatusFilter" class="text-sm font-medium atc-grey-800">Status</label>
             <p-select
-              inputId="bilMapActiveFilter"
-              [options]="activeOptions"
+              inputId="bilMapStatusFilter"
+              [options]="statusOptions"
               optionLabel="label"
               optionValue="value"
-              [ngModel]="activeFilter()"
-              (ngModelChange)="onActiveFilterChange($event)"
-              aria-label="Filter by active status"
-              data-testid="active-filter">
+              [ngModel]="statusFilter()"
+              (ngModelChange)="onStatusFilterChange($event)"
+              aria-label="Filter by mapping status"
+              data-testid="status-filter">
             </p-select>
           </div>
 
@@ -104,10 +149,12 @@
           </div>
 
         } @else {
-          <!-- Table (AC-03.1) -->
+          <!-- Table (AC-03.1, R-BTE-001..004, NFR-BTE-001) -->
           <div class="w-full overflow-x-auto">
             <p-table
               [value]="rows()"
+              [customSort]="true"
+              (sortFunction)="onSort($event)"
               [tableStyle]="{ 'min-width': '700px' }"
               styleClass="bil-map-table"
               data-testid="mappings-table"
@@ -115,25 +162,37 @@
 
               <ng-template pTemplate="header">
                 <tr>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Agreement ID</div>
+                  <th pSortableColumn="agresso_agreement_id" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Agreement ID (AGRESSO)
+                      <p-sortIcon field="agresso_agreement_id"></p-sortIcon>
+                    </div>
                   </th>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">CLARISA Project</div>
+                  <th pSortableColumn="clarisa_project_short_name" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      CLARISA Project (Bilateral)
+                      <p-sortIcon field="clarisa_project_short_name"></p-sortIcon>
+                    </div>
                   </th>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Source</div>
+                  <th pSortableColumn="source" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Source
+                      <p-sortIcon field="source"></p-sortIcon>
+                    </div>
                   </th>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Confidence</div>
+                  <th pSortableColumn="mapping_status" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Status
+                      <p-sortIcon field="mapping_status"></p-sortIcon>
+                    </div>
                   </th>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Status</div>
+                  <th pSortableColumn="updated_at" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Last Updated
+                      <p-sortIcon field="updated_at"></p-sortIcon>
+                    </div>
                   </th>
-                  <th class="!text-[#112F5C]" scope="col">
-                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Last Updated</div>
-                  </th>
-                  <th class="!text-[#112F5C]" scope="col">
+                  <th class="atc-primary-blue-900" scope="col">
                     <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Actions</div>
                   </th>
                 </tr>
@@ -141,19 +200,45 @@
 
               <ng-template pTemplate="body" let-row>
                 <tr tabindex="0" class="bil-map-row" data-testid="mapping-row">
-                  <!-- AGRESSO agreement ID -->
-                  <td class="text-sm atc-grey-900 font-medium">
-                    {{ row.agresso_agreement_id }}
+                  <!-- AGRESSO agreement ID & description (R-BTE-002, NFR-BTE-001) -->
+                  <td class="text-sm">
+                    <div class="flex flex-col">
+                      <span class="font-semibold atc-grey-900">{{ row.agresso_agreement_id }}</span>
+                      @if (row.agresso_description) {
+                        <span
+                          class="text-xs text-[var(--ac-grey-600)] max-w-[260px] truncate block cursor-help focus:outline-none focus:ring-1 focus:ring-[var(--ac-primary-blue-400)] rounded"
+                          tabindex="0"
+                          role="note"
+                          [pTooltip]="row.agresso_description"
+                          tooltipPosition="top"
+                          [attr.aria-label]="row.agresso_description"
+                          data-testid="agresso-description-tooltip">
+                          {{ row.agresso_description }}
+                        </span>
+                      }
+                    </div>
                   </td>
 
-                  <!-- CLARISA project short name + (id) -->
-                  <td class="text-sm atc-grey-900">
-                    @if (row.clarisa_project_short_name) {
-                      {{ row.clarisa_project_short_name }}
-                      <span class="atc-grey-700">(id {{ row.clarisa_project_id }})</span>
-                    } @else {
-                      <span class="atc-grey-700">id {{ row.clarisa_project_id }}</span>
-                    }
+                  <!-- CLARISA project short name + (id) & full name (R-BTE-002, NFR-BTE-001) -->
+                  <td class="text-sm">
+                    <div class="flex flex-col">
+                      <div class="flex items-center gap-1 font-semibold atc-grey-900">
+                        <span>{{ row.clarisa_project_short_name || ('Project ' + row.clarisa_project_id) }}</span>
+                        <span class="text-xs font-normal text-[var(--ac-grey-600)]">(id {{ row.clarisa_project_id }})</span>
+                      </div>
+                      @if (row.clarisa_project_full_name) {
+                        <span
+                          class="text-xs text-[var(--ac-grey-600)] max-w-[280px] truncate block cursor-help focus:outline-none focus:ring-1 focus:ring-[var(--ac-primary-blue-400)] rounded"
+                          tabindex="0"
+                          role="note"
+                          [pTooltip]="row.clarisa_project_full_name"
+                          tooltipPosition="top"
+                          [attr.aria-label]="row.clarisa_project_full_name"
+                          data-testid="clarisa-fullname-tooltip">
+                          {{ row.clarisa_project_full_name }}
+                        </span>
+                      }
+                    </div>
                   </td>
 
                   <!-- Source badge -->
@@ -165,28 +250,23 @@
                     </span>
                   </td>
 
-                  <!-- Confidence — only shown when source !== MANUAL (AC-03.1) -->
-                  <td class="text-sm atc-grey-800" data-testid="confidence-cell">
-                    @if (showConfidence(row)) {
-                      <span data-testid="confidence-value">
-                        {{ row.confidence_score !== null && row.confidence_score !== undefined ? (row.confidence_score | number: '1.0-2') : '—' }}
-                      </span>
-                    } @else {
-                      <span class="atc-grey-500" data-testid="confidence-hidden">—</span>
-                    }
-                  </td>
-
-                  <!-- Active state badge -->
+                  <!-- Status badge (R-BTE-003: Mapped / Pending / Inactive) -->
                   <td>
-                    @if (row.is_active) {
+                    @if (row.mapping_status === 'Mapped' || (!row.mapping_status && row.is_active)) {
                       <span
-                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-status-badge bil-status-badge--active"
-                        data-testid="active-badge">
-                        Active
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-50 text-green-700 border border-green-200"
+                        data-testid="mapped-badge">
+                        Mapped
+                      </span>
+                    } @else if (row.mapping_status === 'Pending') {
+                      <span
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                        data-testid="pending-badge">
+                        Pending
                       </span>
                     } @else {
                       <span
-                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-status-badge bil-status-badge--inactive"
+                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-300"
                         data-testid="inactive-badge">
                         Inactive
                       </span>
@@ -198,28 +278,41 @@
                     {{ row.updated_at | date: 'dd MMM yyyy' }}
                   </td>
 
-                  <!-- Row actions (T-BIL-CAM-05: Edit; T-BIL-CAM-06: Deactivate) -->
+                  <!-- Row actions (T-BIL-CAM-05: Edit; T-BIL-CAM-06: Deactivate; R-BTE-003: + Map for Pending) -->
                   <td class="flex items-center gap-1">
-                    <button
-                      pButton
-                      type="button"
-                      icon="pi pi-pencil"
-                      class="p-button-text p-button-sm"
-                      (click)="openEditDialog(row)"
-                      [attr.aria-label]="'Edit mapping for ' + row.agresso_agreement_id"
-                      data-testid="edit-btn">
-                    </button>
-                    @if (row.is_active) {
-                      <!-- AC-07.2: confirmation is shown before the request fires -->
+                    @if (row.mapping_status === 'Pending' || row.source === 'UNMAPPED') {
                       <button
                         pButton
                         type="button"
-                        icon="pi pi-ban"
-                        class="p-button-text p-button-sm p-button-danger"
-                        (click)="requestDeactivate(row)"
-                        aria-label="Deactivate mapping"
-                        data-testid="deactivate-btn">
+                        label="+ Map"
+                        size="small"
+                        class="p-button-outlined p-button-sm !h-[26px] !px-2 !text-xs !rounded-[6px]"
+                        (click)="openMapDialogForPending(row)"
+                        [attr.aria-label]="'Map project ' + (row.clarisa_project_short_name || row.clarisa_project_id)"
+                        data-testid="pending-map-btn">
                       </button>
+                    } @else {
+                      <button
+                        pButton
+                        type="button"
+                        icon="pi pi-pencil"
+                        class="p-button-text p-button-sm"
+                        (click)="openEditDialog(row)"
+                        [attr.aria-label]="'Edit mapping for ' + row.agresso_agreement_id"
+                        data-testid="edit-btn">
+                      </button>
+                      @if (row.is_active) {
+                        <!-- AC-07.2: confirmation is shown before the request fires -->
+                        <button
+                          pButton
+                          type="button"
+                          icon="pi pi-ban"
+                          class="p-button-text p-button-sm p-button-danger"
+                          (click)="requestDeactivate(row)"
+                          aria-label="Deactivate mapping"
+                          data-testid="deactivate-btn">
+                        </button>
+                      }
                     }
                   </td>
                 </tr>
@@ -325,7 +418,7 @@
           data-testid="agresso-readonly">
           {{ editingAgreementId() }}
         </div>
-        <p class="m-0 text-xs atc-grey-600">The AGRESSO contract cannot be changed after creation.</p>
+        <p class="m-0 text-xs text-[var(--ac-grey-600)]">The AGRESSO contract cannot be changed after creation.</p>
       }
     </div>
 
@@ -372,12 +465,11 @@
         </ng-template>
       </p-select>
 
-
       <!-- Science-Program allocation preview (AC-05.2) — shown when a project is selected -->
       @if (selectedProject(); as project) {
         @if (project.science_programs && project.science_programs.length > 0) {
           <div class="bil-sp-preview mt-1 rounded px-3 py-2 flex flex-col gap-1" data-testid="sp-preview">
-            <p class="m-0 text-xs font-semibold atc-grey-700">Science Program allocations:</p>
+            <p class="m-0 text-xs font-semibold text-[var(--ac-grey-600)]">Science Program allocations:</p>
             <ul class="list-none m-0 p-0 flex flex-col gap-1" aria-label="Science Program allocations">
               @for (sp of project.science_programs; track sp.code) {
                 <li class="text-xs atc-grey-800 flex items-center justify-between gap-2">
@@ -396,7 +488,7 @@
     <!-- Notes (optional, max 500 chars) -->
     <div class="flex flex-col gap-1">
       <label for="bilMapNotes" class="text-sm font-medium atc-grey-800">
-        Notes <span class="text-xs atc-grey-500">(optional)</span>
+        Notes <span class="text-xs text-[var(--ac-grey-600)]">(optional)</span>
       </label>
       <textarea
         pTextarea
@@ -410,7 +502,7 @@
         aria-label="Mapping notes"
         data-testid="notes-input">
       </textarea>
-      <p class="m-0 text-xs atc-grey-500 text-right">{{ notes().length }}/{{ notesMaxLength }}</p>
+      <p class="m-0 text-xs text-[var(--ac-grey-600)] text-right">{{ notes().length }}/{{ notesMaxLength }}</p>
     </div>
 
     <!-- Inline save error (role="alert" — surfaces 409 / 400 message from result.message) -->
@@ -454,3 +546,10 @@
   </ng-template>
 
 </p-dialog>
+
+<!-- Automapper Dialog (T-06 / R-CAM-002, R-CAM-003) -->
+<app-automapper-dialog
+  [(visible)]="automapperDialogOpen"
+  [phase]="phase()"
+  (applied)="onAutomapperApplied()">
+</app-automapper-dialog>

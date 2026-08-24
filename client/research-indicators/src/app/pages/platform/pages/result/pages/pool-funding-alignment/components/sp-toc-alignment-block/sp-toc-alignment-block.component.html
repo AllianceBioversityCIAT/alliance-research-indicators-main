@@ -5,14 +5,39 @@
   class="sp-toc-block flex flex-col gap-5 p-5 rounded-[10px]"
   [attr.data-testid]="'sp-toc-block-' + spCode()"
   [attr.aria-label]="'Theory of Change alignment for ' + (sp().name || spCode())">
-  <!-- SP heading -->
-  <header class="flex items-center gap-2 min-w-0">
-    @if (sp().color) {
-      <span class="sp-toc-block__swatch shrink-0" [style.background]="sp().color" aria-hidden="true"></span>
-    }
-    <h3 class="sp-toc-block__title truncate" [attr.data-testid]="'sp-toc-block-title-' + spCode()">
-      <strong>{{ spCode() }}</strong>@if (sp().name) { <span class="sp-toc-block__name"> — {{ sp().name }}</span> }
-    </h3>
+  <!-- Primary SP Header & Context Guidance Banner (R-PTU-001 / DD-1) -->
+  <header
+    class="bg-white border border-[var(--ac-primary-blue-200)] rounded-[10px] p-4 flex flex-col gap-3 shadow-xs min-w-0"
+    [attr.data-testid]="'sp-toc-header-' + spCode()">
+    <div class="flex items-center justify-between gap-3 min-w-0 flex-wrap">
+      <div class="flex items-center gap-3.5 min-w-0">
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden shrink-0 shadow-xs border border-black/5"
+          [style.background]="sp().color || 'var(--ac-primary-blue-50)'">
+          <img
+            [src]="'/sps/' + (sp().icon_key || spCode()) + '.png'"
+            [alt]="spCode() + ' icon'"
+            class="w-full h-full object-cover"
+            loading="lazy" />
+        </div>
+        <h3 class="text-[15px] font-semibold text-[var(--ac-grey-900)] truncate" [attr.data-testid]="'sp-toc-block-title-' + spCode()">
+          <strong>{{ spCode() }}</strong>@if (sp().name) { <span class="sp-toc-block__name font-normal text-[var(--ac-grey-700)]"> — {{ sp().name }}</span> }
+        </h3>
+      </div>
+      <span
+        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-300)] shrink-0"
+        [attr.data-testid]="'sp-toc-primary-badge-' + spCode()">
+        <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+        Primary
+      </span>
+    </div>
+    <div
+      class="text-xs text-[var(--ac-grey-600)] bg-[var(--ac-grey-50)] border-l-2 border-l-[var(--ac-primary-blue-500)] p-2 rounded-r flex items-center gap-1.5"
+      role="note"
+      [attr.data-testid]="'sp-toc-guidance-banner-' + spCode()">
+      <i class="pi pi-info-circle text-[var(--ac-primary-blue-500)] shrink-0" aria-hidden="true"></i>
+      <span>{{ GUIDANCE_BANNER_TEXT }}</span>
+    </div>
   </header>
 
   <!-- Per-SP Yes/No: does this SP align with a ToC result? -->
@@ -62,10 +87,25 @@
       <div
         role="status"
         aria-live="polite"
-        class="sp-toc-block__notice flex items-center gap-2"
+        aria-busy="true"
+        class="flex flex-col gap-4"
         [attr.data-testid]="'sp-toc-catalog-loading-' + spCode()">
-        <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
-        <span>{{ LOADING_MESSAGE }}</span>
+        <div class="bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm flex items-center gap-2 text-[var(--ac-primary-blue-800)]">
+          <i class="pi pi-spin pi-spinner text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+          <span class="font-medium">Fetching Theory of Change catalog from PRMS...</span>
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="120px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="42px" borderRadius="8px" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="160px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="42px" borderRadius="8px" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <p-skeleton width="140px" height="1rem" styleClass="mb-1" />
+          <p-skeleton width="100%" height="70px" borderRadius="8px" />
+        </div>
       </div>
     } @else if (catalogState() === 'error') {
       <div
@@ -153,18 +193,37 @@
                 [style]="{ width: '100%' }"
                 [attr.data-testid]="'sp-toc-hlo-' + spCode()">
                 <ng-template let-option pTemplate="selectedItem">
-                  <span class="sp-toc-block__hlo-label block min-w-0 whitespace-normal break-words">
-                    @if (option.aowCode) { <strong>{{ option.aowCode }}</strong> — }{{ option.title }}
-                  </span>
+                  <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                    @if (option.aowCode) {
+                      <span class="px-2 py-0.5 rounded text-xs font-bold bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-200)] shrink-0">
+                        {{ option.aowCode }}
+                      </span>
+                    }
+                    <span class="sp-toc-block__hlo-label text-sm text-[var(--ac-grey-800)] font-medium leading-snug truncate">
+                      {{ option.title }}
+                    </span>
+                  </div>
                 </ng-template>
                 <ng-template let-option pTemplate="item">
-                  <span class="sp-toc-block__hlo-label block w-full min-w-0 whitespace-normal break-words leading-[1.3]">
-                    @if (option.aowCode) { <strong>{{ option.aowCode }}</strong> — }{{ option.title }}
-                    <!-- AC-04.1 / D-ITG-4 — hint tag only on EXACT type-matches (text, not color-only, NF-02). -->
+                  <div class="flex items-start justify-between gap-3 w-full min-w-0 py-1">
+                    <div class="flex items-start gap-2.5 min-w-0 flex-1">
+                      @if (option.aowCode) {
+                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-[var(--ac-primary-blue-50)] text-[var(--ac-primary-blue-700)] border border-[var(--ac-primary-blue-200)] shrink-0 mt-0.5">
+                          {{ option.aowCode }}
+                        </span>
+                      }
+                      <span class="sp-toc-block__hlo-label text-sm text-[var(--ac-grey-800)] font-medium leading-snug whitespace-normal break-words">
+                        {{ option.title }}
+                      </span>
+                    </div>
                     @if (option.hasTypeMatch) {
-                      <span class="sp-toc-block__type-tag">has {{ typeMatchTagLabel() }}</span>
+                      <span class="sp-toc-block__type-tag inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0"
+                            data-testid="sp-toc-typematch-badge">
+                        <i class="pi pi-check text-[10px]" aria-hidden="true"></i>
+                        has {{ typeMatchTagLabel() }}
+                      </span>
                     }
-                  </span>
+                  </div>
                 </ng-template>
               </p-select>
             </div>
@@ -247,15 +306,28 @@
                 [attr.data-testid]="'sp-toc-indicator-' + spCode()">
                 <!-- AC-02.1 — text-only group header (announced via PrimeNG group semantics, NF-02). -->
                 <ng-template let-group pTemplate="group">
-                  <span class="sp-toc-block__group-label">{{ group.label }}</span>
+                  <div class="flex items-center gap-2 px-3 py-1.5 font-semibold text-xs tracking-wider uppercase rounded"
+                       [class.bg-[var(--ac-primary-blue-50)]]="group.label.toLowerCase().includes('recommended')"
+                       [class.text-[var(--ac-primary-blue-800)]]="group.label.toLowerCase().includes('recommended')"
+                       [class.bg-[var(--ac-grey-100)]]="!group.label.toLowerCase().includes('recommended')"
+                       [class.text-[var(--ac-grey-700)]]="!group.label.toLowerCase().includes('recommended')">
+                    @if (group.label.toLowerCase().includes('recommended')) {
+                      <i class="pi pi-sparkles text-[var(--ac-primary-blue-600)] text-xs" aria-hidden="true"></i>
+                    }
+                    <span class="sp-toc-block__group-label">{{ group.label }}</span>
+                  </div>
                 </ng-template>
                 <ng-template let-option pTemplate="item">
-                  <span class="block w-full min-w-0 whitespace-normal break-words leading-[1.3]">
-                    {{ option.label }}
+                  <div class="flex items-start justify-between gap-3 w-full min-w-0 py-1">
+                    <span class="text-sm text-[var(--ac-grey-800)] font-normal leading-snug whitespace-normal break-words flex-1">
+                      {{ option.label }}
+                    </span>
                     @if (option.badge) {
-                      <span class="sp-toc-block__type-badge">{{ option.badge }}</span>
+                      <span class="sp-toc-block__type-badge inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--ac-grey-200)] text-[var(--ac-grey-700)] border border-[var(--ac-grey-300)] shrink-0">
+                        {{ option.badge }}
+                      </span>
                     }
-                  </span>
+                  </div>
                 </ng-template>
               </p-select>
             </div>
@@ -276,58 +348,73 @@
         </div>
       }
 
-      <!-- Contribution panel — appears when an indicator is selected -->
+      <!-- 3-Stat Quantitative Contribution Card (R-PTU-005 / DD-3) -->
       @if (selectedIndicator(); as indicator) {
         <div
-          class="sp-toc-block__contribution flex flex-col gap-4 p-4 rounded-[8px]"
+          class="bg-white border border-[var(--ac-grey-300)] rounded-[10px] p-5 flex flex-col gap-4 shadow-xs"
           role="group"
           aria-live="polite"
           [attr.aria-label]="'Quantitative contribution for ' + spCode()"
           [attr.data-testid]="'sp-toc-contribution-' + spCode()">
+          
           <div role="note"
-               class="flex items-center bg-[#F4F7F9] border-l-[5px] border-l-[#074B86] gap-[7px] px-2.5"
+               class="flex items-center bg-[var(--ac-primary-blue-50)] border-l-4 border-l-[var(--ac-primary-blue-600)] rounded-r-[8px] p-3 text-sm text-[var(--ac-primary-blue-800)] gap-2.5"
                [attr.data-testid]="'sp-toc-contribution-callout-' + spCode()">
-            <span class="!text-[#074b86] !font-[300] material-symbols-rounded rotate-180" aria-hidden="true">info</span>
-            <p class="text-[#777C83] font-['Barlow'] text-[14px] font-normal leading-[17px] text-left my-[15px]">
+            <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
+            <p class="text-xs leading-relaxed m-0 text-[var(--ac-grey-700)]">
               {{ CONTRIBUTION_CALLOUT }}
             </p>
           </div>
 
-          <div class="flex flex-wrap gap-6">
-            <div class="flex flex-col gap-1">
-              <span class="sp-toc-block__readonly-label">{{ UNIT_LABEL }}</span>
-              <span class="sp-toc-block__readonly-value" [attr.data-testid]="'sp-toc-unit-' + spCode()">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            <!-- Stat 1: Unit of Measurement -->
+            <div class="bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)] rounded-[8px] p-3.5 flex flex-col justify-between gap-1.5"
+                 data-testid="sp-toc-unit-stat-box">
+              <span class="sp-toc-block__readonly-label text-[11px] font-bold tracking-wider uppercase text-[var(--ac-grey-500)]">
+                {{ UNIT_LABEL }}
+              </span>
+              <span class="sp-toc-block__readonly-value text-[15px] font-semibold text-[var(--ac-grey-900)] truncate" [attr.data-testid]="'sp-toc-unit-' + spCode()">
                 {{ indicator.unit_of_measurement || '—' }}
               </span>
             </div>
-            <div class="flex flex-col gap-1">
-              <span class="sp-toc-block__readonly-label">{{ TARGET_LABEL }} ({{ indicator.target_year }})</span>
-              <span class="sp-toc-block__readonly-value" [attr.data-testid]="'sp-toc-target-' + spCode()">
+
+            <!-- Stat 2: Target -->
+            <div class="bg-[var(--ac-grey-50)] border border-[var(--ac-grey-200)] rounded-[8px] p-3.5 flex flex-col justify-between gap-1.5"
+                 data-testid="sp-toc-target-stat-box">
+              <span class="sp-toc-block__readonly-label text-[11px] font-bold tracking-wider uppercase text-[var(--ac-grey-500)]">
+                {{ TARGET_LABEL }} ({{ indicator.target_year }})
+              </span>
+              <span class="sp-toc-block__readonly-value text-[15px] font-bold text-[var(--ac-primary-blue-700)] truncate" [attr.data-testid]="'sp-toc-target-' + spCode()">
                 {{ indicator.target_value ?? '—' }}
               </span>
             </div>
+
+            <!-- Stat 3: Result Contribution Input -->
+            <div class="bg-[var(--ac-primary-blue-50)] border border-[var(--ac-primary-blue-200)] rounded-[8px] p-3.5 flex flex-col justify-between gap-1.5"
+                 data-testid="sp-toc-contribution-stat-box">
+              <label [for]="'sp-toc-contribution-input-' + spCode()" class="label inline-block text-[11px] font-bold tracking-wider uppercase text-[var(--ac-primary-blue-800)] m-0">
+                {{ CONTRIBUTION_LABEL }}
+              </label>
+              <div class="w-full">
+                <p-inputNumber
+                  [inputId]="'sp-toc-contribution-input-' + spCode()"
+                  [ngModel]="d.quantitative_contribution"
+                  (ngModelChange)="onContributionChange($event)"
+                  [min]="0"
+                  [useGrouping]="false"
+                  [disabled]="disabled()"
+                  placeholder="Enter amount"
+                  styleClass="w-full"
+                  [inputStyle]="{ width: '100%' }"
+                  [attr.data-testid]="'sp-toc-contribution-input-' + spCode()">
+                </p-inputNumber>
+              </div>
+            </div>
           </div>
 
-          <div class="flex flex-col gap-1">
-            <label [for]="'sp-toc-contribution-input-' + spCode()" class="label inline-block">
-              {{ CONTRIBUTION_LABEL }}
-            </label>
-            <div class="sp-toc-block__contribution-input">
-              <p-inputNumber
-                [inputId]="'sp-toc-contribution-input-' + spCode()"
-                [ngModel]="d.quantitative_contribution"
-                (ngModelChange)="onContributionChange($event)"
-                [min]="0"
-                [useGrouping]="false"
-                [disabled]="disabled()"
-                placeholder="Enter amount"
-                [attr.data-testid]="'sp-toc-contribution-input-' + spCode()">
-              </p-inputNumber>
-            </div>
-            @if (errors?.['quantitative_contribution']; as msg) {
-              <small role="alert" aria-live="polite" class="sp-toc-block__error" [attr.data-testid]="'sp-toc-error-contribution-' + spCode()">{{ msg }}</small>
-            }
-          </div>
+          @if (errors?.['quantitative_contribution']; as msg) {
+            <small role="alert" aria-live="polite" class="sp-toc-block__error text-xs text-red-600 font-medium" [attr.data-testid]="'sp-toc-error-contribution-' + spCode()">{{ msg }}</small>
+          }
         </div>
       }
     }

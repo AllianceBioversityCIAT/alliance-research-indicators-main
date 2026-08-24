@@ -430,5 +430,34 @@ describe('resultInterceptor', () => {
       expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
       expect(calledRequest.url).toBe('http://test.com/api/data?param1=value1&reportYear=2023&reportingPlatforms=PRMS');
     });
+
+    // Attempt-2 rework — Reviewer FAIL: the T-01 refactor to platform-code.util.ts
+    // must not widen this interceptor's URL matcher. Added, not editing the
+    // existing PLATFORM_CODES enumeration above (DD-4's safety net stays intact).
+    it('should not add a platform for an unrecognized prefix (does not widen the matcher)', () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+      mockRouter.url = '/result/FOO-123/general-information';
+      mockRouter.parseUrl.mockReturnValue({ queryParams: {} });
+
+      interceptor(request, mockHandler);
+
+      const calledRequest = mockHandler.mock.calls[0][0];
+      expect(calledRequest.url).toBe('http://test.com/api/data');
+    });
+
+    it('should not add a platform for a lowercase prefix (case-sensitivity preserved)', () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+      mockRouter.url = '/result/tip-123/general-information';
+      mockRouter.parseUrl.mockReturnValue({ queryParams: {} });
+
+      interceptor(request, mockHandler);
+
+      const calledRequest = mockHandler.mock.calls[0][0];
+      expect(calledRequest.url).toBe('http://test.com/api/data');
+    });
   });
 });
