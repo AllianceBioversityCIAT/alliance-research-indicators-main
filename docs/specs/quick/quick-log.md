@@ -18,3 +18,14 @@ One-line record of trivial, fast-tracked changes made with `/akili-quick`.
 | 2026-08-21 | quick/pool-funding-toc-clarified-banner — clarify Pool Funding Alignment main banner copy to explain aligning with SP and contributing to ToC (Outputs, Outcomes) | client/research-indicators/src/app/pages/platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component.ts | `npx jest` (351/351 passed) & `npx eslint` (0 errors) | [SPEC:quick/pool-funding-toc-clarified-banner] |
 | 2026-08-21 | quick/pool-funding-help-guide-modal — add interactive '?' help button, banner guide link, and visual workflow modal in Pool Funding Alignment | client/research-indicators/src/app/pages/platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component.html, pool-funding-alignment.component.ts, pool-funding-alignment.component.spec.ts | `npx jest` (353/353 passed) & `npx eslint` (0 errors) & `ng build` pass | [SPEC:quick/pool-funding-help-guide-modal] |
 | 2026-08-21 | quick/pool-funding-help-button-refinement — refine '?' help icon using PrimeIcons pi-question-circle with subtle hover and proportional typography alignment | client/research-indicators/src/app/pages/platform/pages/result/pages/pool-funding-alignment/pool-funding-alignment.component.html | `npx jest` (353/353 passed) & `npx eslint` (0 errors) | [SPEC:quick/pool-funding-help-button-refinement] |
+
+
+
+
+
+
+
+
+
+
+| 2026-08-23 | quick/pool-funding-post-save-wiring — **Triviality Gate FAILED (behavior change, bugfix); fast-tracked on explicit user authorization instead of `/akili-propose`.** Two bugs on the Pool Funding Alignment section: (1) sidebar green check + PRMS SYNC gate stayed stale after save — `patchAlignment` never refreshed `cache.greenChecks()` (only `ToPromiseService`'s `loadingTrigger` finalize hook does, and no PATCH goes through it); (2) Back was a dead button — `[showBack]="true"` rendered with no `(back)` binding, and `NavigationButtonsComponent` only emits an `@Output`. Back now navigates to the section above (ip-rights for indicator_id 1/2, else evidence), preserves `version`, and never saves | client/research-indicators/src/app/shared/services/bilateral.service.ts · .../pool-funding-alignment/pool-funding-alignment.component.ts · .../pool-funding-alignment.component.html · + 2 co-located specs | 7 new regression tests; full client suite `npm test -- --silent` **311/311 suites, 6515/6515 tests** green; `npx eslint` 0 errors on the 2 production files (spec files are outside the eslint config — declared limitation); K-004 mutation probe: removing the `(back)` binding and the `updateGreenChecks()` call reddened **4** of the new tests by name | [SPEC:quick/pool-funding-post-save-wiring] |

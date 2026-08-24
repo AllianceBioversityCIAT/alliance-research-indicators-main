@@ -412,6 +412,7 @@
     [showNext]="false"
     [showSave]="editable() && !isReadOnly()"
     [disableSave]="!canSave() || saving()"
+    (back)="onBack()"
     (save)="onSave()" />
 
   <!-- Help & Workflow Guide Modal -->

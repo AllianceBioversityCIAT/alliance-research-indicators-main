@@ -818,6 +818,33 @@ export default class PoolFundingAlignmentComponent {
     void this.bilateralService.getTocCatalog(this.resultCode());
   }
 
+  // Wired explicitly instead of reusing the shared linear `saveData('back')`
+  // pattern, for two reasons:
+  //   1. Pool Funding Alignment is the sidebar's only OPTIONAL section and sits
+  //      last in `allOptions` (result-sidebar.component.ts), so "back" means the
+  //      section rendered immediately above it, not a step in the linear flow.
+  //   2. Back must not attempt a save: `canSave()` blocks on an unanswered ToC
+  //      question, so a save-then-navigate Back would silently do nothing — the
+  //      exact dead-button symptom this fixes. links-to-result makes the same
+  //      choice (navigate('back') never saves).
+  onBack(): void {
+    const version = this.route.snapshot.queryParamMap.get('version');
+    const queryParams = version ? { version } : undefined;
+    void this.router.navigate(['/result', this.resultCode(), this.previousSectionPath()], {
+      queryParams,
+      replaceUrl: true
+    });
+  }
+
+  // `ip-rights` renders only for indicator_id 1 and 2 (result-sidebar.component.ts
+  // `allOptions`); for every other indicator the section directly above Pool
+  // Funding Alignment is `evidence`, which is unconditional. indicator_id 5
+  // never reaches this page — the constructor redirects it out.
+  private previousSectionPath(): string {
+    const indicatorId = this.cache.currentMetadata()?.indicator_id;
+    return indicatorId === 1 || indicatorId === 2 ? 'ip-rights' : 'evidence';
+  }
+
   async onSave(): Promise<void> {
     if (!this.canSave()) return;
     this.inlineErrors.set(null);
