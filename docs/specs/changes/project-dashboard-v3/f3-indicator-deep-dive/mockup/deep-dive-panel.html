@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F3 Mockup — Indicator Deep-Dive Panel</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap">
+<style>
+  /* Mockup approximations of the ARI token palette — implementation uses var(--ac-*) exclusively */
+  :root{
+    --blue-600:#1b3a5c; --blue-400:#2d6a9f; --lblue-400:#1689ca; --lblue-300:#4fa3d8;
+    --grey-100:#f4f6f8; --grey-200:#e2e7ec; --grey-300:#cbd4dc; --grey-600:#6b7783; --grey-700:#4c5866; --grey-800:#2e3947;
+    --white:#ffffff; --bg:#fcfcfc; --green:#7cb580; --green-d:#3e8a5a; --orange:#f58220; --red:#c4453a;
+    --ramp1:#dcebf7; --ramp3:#7db8dd; --ramp5:#1b5e93;
+  }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:'Barlow',sans-serif;color:var(--grey-800);padding:28px;}
+  .note{max-width:1080px;margin:0 auto 16px;font-size:12.5px;color:var(--grey-600);}
+  .panel{max-width:1080px;margin:0 auto;background:var(--white);border:1px solid var(--grey-200);border-radius:12px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+  h2{margin:0;font-size:15px;font-weight:600;color:var(--blue-600);} .sub{margin:2px 0 0;font-size:13px;color:var(--grey-700);}
+  .label{font-family:'Space Grotesk';font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--grey-600);}
+  /* velocity strip */
+  .velocity{display:flex;align-items:center;gap:16px;border:1px solid var(--grey-200);background:var(--grey-100);border-radius:10px;padding:10px 14px;margin:14px 0;}
+  .velocity svg{flex:1;min-width:0;height:44px}
+  /* tabs */
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--grey-200);margin-bottom:14px;flex-wrap:wrap}
+  .tab{display:flex;align-items:center;gap:7px;padding:9px 14px;font-size:13px;font-weight:600;color:var(--grey-600);border:0;background:none;border-bottom:2px solid transparent;cursor:pointer}
+  .tab .count{font-family:'Space Grotesk';font-size:11px;background:var(--grey-100);border-radius:999px;padding:1px 8px;color:var(--blue-600)}
+  .tab.active{color:var(--lblue-400);border-bottom-color:var(--lblue-400)}
+  /* sparse notice */
+  .sparse{display:flex;gap:8px;align-items:center;background:var(--grey-100);border-left:3px solid var(--lblue-300);border-radius:0 8px 8px 0;padding:8px 12px;font-size:12.5px;color:var(--grey-700);margin-bottom:14px}
+  /* grid of charts */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+  .card{border:1px solid var(--grey-200);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-height:170px}
+  .stat{font-family:'Space Grotesk';font-size:30px;font-weight:700;color:var(--blue-600);line-height:1}
+  .statsub{font-size:12px;color:var(--grey-600)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--grey-700)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+  .bars{display:flex;flex-direction:column;gap:7px;font-size:12px}
+  .bars .row{display:grid;grid-template-columns:110px 1fr 28px;align-items:center;gap:8px}
+  .bars .track{height:10px;border-radius:6px;background:var(--grey-100);overflow:hidden}
+  .bars .fill{height:100%;border-radius:6px;background:var(--blue-400)}
+  .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--blue-600);text-align:right}
+  .divider{border-top:1px dashed var(--grey-300);margin:22px 0 14px;position:relative}
+  .divider span{position:absolute;top:-9px;left:12px;background:var(--white);padding:0 8px;font-size:11px;color:var(--grey-600);font-family:'Space Grotesk';text-transform:uppercase;letter-spacing:.06em}
+  footer{max-width:1080px;margin:14px auto 0;font-size:11.5px;color:var(--grey-600)}
+  .empty{border:1px dashed var(--grey-300);border-radius:10px;padding:14px;font-size:13px;color:var(--grey-700);background:var(--grey-100)}
+</style>
+</head>
+<body>
+<p class="note"><strong>Mockup F3 — R-DD-003/004/006.</strong> Posición: dentro del tab Project Dashboard, región "Results by indicator" (slot F1). Tipografías y colores = tokens ARI reales en implementación (<code>var(--ac-*)</code>); gráficas = viz-chart (ECharts SVG) con tableModel accesible. Light mode mostrado; dark hereda por tokens.</p>
+
+<section class="panel" aria-label="Indicator deep-dive">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+    <div>
+      <h2>Indicator deep-dive</h2>
+      <p class="sub">Exclusive metadata reported per indicator type on this project.</p>
+    </div>
+    <span class="label" style="align-self:center">Source: official indicator records</span>
+  </div>
+
+  <!-- R-DD-006 reporting velocity -->
+  <div class="velocity">
+    <div style="min-width:150px">
+      <div class="label">Reporting activity</div>
+      <div class="statsub">results created per month · last 12 shown</div>
+    </div>
+    <svg viewBox="0 0 420 44" preserveAspectRatio="none" aria-label="Results created per month">
+      <polyline fill="none" stroke="#1689ca" stroke-width="2"
+        points="0,38 35,34 70,36 105,26 140,30 175,18 210,22 245,12 280,20 315,8 350,16 385,6"/>
+      <circle cx="385" cy="6" r="3" fill="#fff" stroke="#1689ca" stroke-width="2"/>
+    </svg>
+    <div style="text-align:right"><div class="stat" style="font-size:20px">20</div><div class="statsub">last 24 mo</div></div>
+  </div>
+
+  <!-- Tabs: only indicators with results, ordered by count (R-DD-003) -->
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="false">Knowledge Product <span class="count">9</span></button>
+    <button class="tab active" role="tab" aria-selected="true">Capacity Sharing <span class="count">8</span></button>
+    <button class="tab" role="tab" aria-selected="false">Policy Change <span class="count">2</span></button>
+    <button class="tab" role="tab" aria-selected="false">Innovation Dev <span class="count">1</span></button>
+  </div>
+
+  <!-- Sparse notice (n < total_results) -->
+  <div class="sparse">ⓘ Showing metadata from <strong>&nbsp;6 of 8&nbsp;</strong> Capacity Sharing results — results imported from other platforms may not include it.</div>
+
+  <!-- Capacity Sharing tab body (R-DD-002 row 1, R-DD-004) -->
+  <div class="grid">
+    <div class="card">
+      <span class="label">People trained</span>
+      <span class="stat">1,240</span>
+      <span class="statsub">across 6 sessions with participant data</span>
+    </div>
+    <div class="card">
+      <span class="label">Gender split</span>
+      <svg viewBox="0 0 120 120" style="height:110px;align-self:center" aria-label="Gender split donut">
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#e2e7ec" stroke-width="18"/>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#1b5e93" stroke-width="18" stroke-dasharray="152 276" transform="rotate(-90 60 60)"/>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#7cb580" stroke-width="18" stroke-dasharray="110 276" stroke-dashoffset="-152" transform="rotate(-90 60 60)"/>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#f58220" stroke-width="18" stroke-dasharray="14 276" stroke-dashoffset="-262" transform="rotate(-90 60 60)"/>
+      </svg>
+      <div class="legend">
+        <span><i class="dot" style="background:#1b5e93"></i>Female 680</span>
+        <span><i class="dot" style="background:#7cb580"></i>Male 498</span>
+        <span><i class="dot" style="background:#f58220"></i>Non-binary 62</span>
+      </div>
+    </div>
+    <div class="card">
+      <span class="label">Session length</span>
+      <div class="bars">
+        <div class="row"><span>Short-term</span><div class="track"><div class="fill" style="width:78%"></div></div><span class="num">5</span></div>
+        <div class="row"><span>Long-term</span><div class="track"><div class="fill" style="width:22%;background:#7cb580"></div></div><span class="num">1</span></div>
+      </div>
+      <span class="label" style="margin-top:6px">Delivery modality</span>
+      <div class="bars">
+        <div class="row"><span>Virtual</span><div class="track"><div class="fill" style="width:60%"></div></div><span class="num">4</span></div>
+        <div class="row"><span>In person</span><div class="track"><div class="fill" style="width:30%"></div></div><span class="num">2</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"><span>Vista: tab Innovation Development</span></div>
+
+  <div class="grid">
+    <div class="card">
+      <span class="label">Readiness levels (IRL)</span>
+      <svg viewBox="0 0 240 110" style="height:110px" aria-label="Readiness histogram">
+        <g fill="#2d6a9f">
+          <rect x="10"  y="80" width="26" height="20" rx="3"/>
+          <rect x="46"  y="60" width="26" height="40" rx="3"/>
+          <rect x="82"  y="90" width="26" height="10" rx="3"/>
+          <rect x="118" y="40" width="26" height="60" rx="3" fill="#1b5e93"/>
+          <rect x="154" y="95" width="26" height="5"  rx="3"/>
+          <rect x="190" y="70" width="26" height="30" rx="3"/>
+        </g>
+        <text x="10" y="108" font-size="8" fill="#6b7783">L1</text><text x="46" y="108" font-size="8" fill="#6b7783">L3</text>
+        <text x="82" y="108" font-size="8" fill="#6b7783">L4</text><text x="118" y="108" font-size="8" fill="#6b7783">L5</text>
+        <text x="154" y="108" font-size="8" fill="#6b7783">L7</text><text x="190" y="108" font-size="8" fill="#6b7783">L8</text>
+      </svg>
+    </div>
+    <div class="card">
+      <span class="label">Scalability profile <span style="text-transform:none;letter-spacing:0">(true / answered)</span></span>
+      <svg viewBox="0 0 140 130" style="height:120px;align-self:center" aria-label="Scalability radar, 7 axes">
+        <g stroke="#e2e7ec" fill="none">
+          <polygon points="70,10 122,36 135,92 96,124 44,124 5,92 18,36"/>
+          <polygon points="70,34 101,50 109,84 86,103 54,103 31,84 39,50"/>
+        </g>
+        <polygon points="70,22 110,44 118,88 88,112 60,108 22,88 32,44" fill="rgba(22,137,202,.25)" stroke="#1689ca" stroke-width="1.5"/>
+        <text x="70" y="8" font-size="7" text-anchor="middle" fill="#6b7783">Cheaper</text>
+        <text x="132" y="34" font-size="7" text-anchor="end" fill="#6b7783">Simpler</text>
+        <text x="139" y="96" font-size="7" text-anchor="end" fill="#6b7783">Performs</text>
+        <text x="98" y="132" font-size="7" text-anchor="middle" fill="#6b7783">Desirable</text>
+        <text x="42" y="132" font-size="7" text-anchor="middle" fill="#6b7783">Commercial</text>
+        <text x="2"  y="96" font-size="7" fill="#6b7783">Enabling</text>
+        <text x="8"  y="34" font-size="7" fill="#6b7783">Uptake</text>
+      </svg>
+    </div>
+    <div class="card">
+      <span class="label">Anticipated users</span>
+      <div class="bars">
+        <div class="row"><span>Farmers</span><div class="track"><div class="fill" style="width:70%"></div></div><span class="num">1</span></div>
+        <div class="row"><span>Researchers</span><div class="track"><div class="fill" style="width:35%"></div></div><span class="num">1</span></div>
+      </div>
+      <span class="statsub" style="margin-top:auto">n = 1 of 1 · new/improved varieties: 3</span>
+    </div>
+  </div>
+
+  <div class="divider"><span>Estado: metadata no disponible (n = 0)</span></div>
+  <div class="empty">ⓘ The 2 Policy Change results on this project were imported from other platforms and do not include stage/type metadata yet. <em>(sin gráficas, sin retry — no es un error: R-DD-003)</em></div>
+</section>
+
+<footer>
+  Estados no mostrados: skeleton de carga (2 líneas + placeholder de chart, distinguible de vacío — K-016) · error con retry compartido. Trazabilidad: velocity=R-DD-006 · tabs/lazy/sparse=R-DD-003 · formas=R-DD-004 · funnel de Policy y donut open-access de KP siguen los mismos patrones de card.
+</footer>
+</body>
+</html>
