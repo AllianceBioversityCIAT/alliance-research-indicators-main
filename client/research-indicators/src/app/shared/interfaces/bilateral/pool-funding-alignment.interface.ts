@@ -70,7 +70,7 @@ export interface AlignmentChangedEvent {
  * `unmapped` = it doesn't (and `science_programs` is empty, `clarisa_project` is null).
  * @sdd-spec docs/specs/bilateral-module/alignment-section-remediation (REQ-BIL-ASR-01)
  */
-export type PoolFundingMappingStatus = 'mapped' | 'unmapped';
+export type PoolFundingMappingStatus = 'mapped' | 'unmapped' | 'stale';
 
 export interface PoolFundingClarisaProject {
   id: number;
@@ -91,6 +91,7 @@ export interface PoolFundingScienceProgram {
   color?: string | null;
   icon_key: string;
   allocation: number;
+  mapping_status?: string | null;
 }
 
 /**

@@ -6,10 +6,10 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ initialData }) => {
   const [siteName, setSiteName] = useState(
-    initialData?.settings?.siteName || 'Research Indicators'
+    initialData?.settings?.siteName || 'Research Indicators',
   );
   const [maintenanceMode, setMaintenanceMode] = useState(
-    initialData?.settings?.maintenanceMode || false
+    initialData?.settings?.maintenanceMode || false,
   );
 
   const handleSubmit = (e: React.FormEvent) => {

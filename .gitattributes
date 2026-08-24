@@ -1,0 +1,18 @@
+# Append-only audit logs: both branches add rows at the end, so every merge
+# collides on the same file — it did so in four consecutive merges to `dev`
+# during AC-1676. `merge=union` keeps BOTH sides' lines instead of raising a
+# conflict, which is exactly what the manual resolution did each time.
+#
+# CAVEAT, measured (2026-08-21), not assumed:
+#   - Both sides append DIFFERENT rows            -> clean merge, both kept.
+#   - Both sides append the SAME row, same spot   -> clean merge, one copy.
+#   - A shared row surrounded by different rows   -> the shared row appears
+#     TWICE. This is the shape that actually occurs here, so expect the
+#     occasional duplicate line. It is visible and trivially deleted;
+#     a blocked merge is neither.
+#
+# Deliberately NOT applied to docs/specs/kaizen-log.md: its `## Entries` are
+# prepended, not appended, and its `## Active Lessons` table is CURATED with a
+# hard 10-row cap. Union would silently push it past the cap and interleave
+# entries — that file needs a human resolution.
+docs/specs/quick/quick-log.md merge=union

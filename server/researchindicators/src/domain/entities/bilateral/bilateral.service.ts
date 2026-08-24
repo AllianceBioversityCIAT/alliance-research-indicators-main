@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
-import { ResultRepository } from '../results/repositories/result.repository';
+import {
+  PoolFundingAlignmentContext,
+  ResultRepository,
+} from '../results/repositories/result.repository';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   AlignmentResponse,
@@ -18,9 +21,11 @@ import {
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
+import { BilateralProjectMapping } from '../bilateral-project-mapping/entities/bilateral-project-mapping.entity';
 import {
   BilateralScienceProgramItem,
   BilateralScienceProgramsResponse,
@@ -42,6 +47,11 @@ import {
   MAPPABLE_LIVE_VERSION,
   resolveResultTypeKey,
 } from './utils/toc-level-rules.util';
+import {
+  isProjectScienceProgramMapping,
+  SpMappingRowLike,
+} from './utils/sp-mapping.predicate';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -101,6 +111,27 @@ interface TocAlignmentValidationError {
     | 'contribution_without_indicator';
 }
 
+// @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / D-PSP-1 / D-PSP-5
+export type MappedProjectResolution =
+  | {
+      status: 'unmapped';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: null;
+    }
+  | {
+      status: 'stale';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: { id: number; short_name: string };
+      mapping: BilateralProjectMapping;
+    }
+  | {
+      status: 'mapped';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: { id: number; short_name: string };
+      project: ClarisaProject;
+      mapping: BilateralProjectMapping;
+    };
+
 /**
  * SINGLETON-SCOPED BY DESIGN — see docs/specs/bilateral-module/design.md §3.4 Constraint A.
  *
@@ -114,6 +145,8 @@ interface TocAlignmentValidationError {
  */
 @Injectable()
 export class BilateralService {
+  private readonly logger = new LoggerUtil({ name: BilateralService.name });
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly resultRepository: ResultRepository,
@@ -136,6 +169,107 @@ export class BilateralService {
   ) {}
 
   /**
+   * @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / T-06 / D-PSP-1 / D-PSP-6 / design §5.1
+   *
+   * Single mapping-resolution seam shared between `getScienceProgramsForResult`
+   * and `getHlosIndicatorsForResult`.
+   *
+   * Steps:
+   *   1. findPoolFundingAlignmentContext(resultId) → 404 if absent.
+   *   2. No agresso_agreement_id ⇒ unmapped, clarisa_project: null.
+   *   3. No active mapping row ⇒ unmapped, clarisa_project: null.
+   *   4. Resolve project:
+   *      a. Stable key first (clarisa_external_code normalized via normalizeExternalCode).
+   *      b. Numeric clarisa_project_id fallback.
+   *      c. Missing in both ⇒ stale (carrying snapshot project ref).
+   *   5. Drift signal: if resolved via external code with a different numeric id,
+   *      emit a warn log naming both ids and the agreement id.
+   *   6. Return mapped + project + mapping row.
+   */
+  private async resolveMappedProject(
+    resultId: number,
+  ): Promise<MappedProjectResolution> {
+    const context =
+      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const agreementId = context.agresso_agreement_id?.trim();
+
+    if (!agreementId) {
+      return {
+        status: 'unmapped',
+        context,
+        clarisa_project: null,
+      };
+    }
+
+    const mapping =
+      await this.bilateralProjectMappingService.findActiveByAgreementId(
+        agreementId,
+      );
+
+    if (!mapping) {
+      return {
+        status: 'unmapped',
+        context,
+        clarisa_project: null,
+      };
+    }
+
+    let project: ClarisaProject | null = null;
+    let resolvedViaExternalCode = false;
+
+    if (mapping.clarisa_external_code?.trim()) {
+      project = await this.clarisaProjectsService.findProjectByExternalCode(
+        mapping.clarisa_external_code,
+      );
+      if (project) {
+        resolvedViaExternalCode = true;
+      }
+    }
+
+    if (!project) {
+      project = await this.clarisaProjectsService.findProjectById(
+        mapping.clarisa_project_id,
+      );
+    }
+
+    if (!project) {
+      // Mapping points at a project CLARISA no longer exposes — treat as
+      // stale from the picker's perspective, but surface the snapshot
+      // we have so ops can spot the drift (R-PSP-004, D-PSP-5, D-PSP-6).
+      return {
+        status: 'stale',
+        context,
+        clarisa_project: {
+          id: mapping.clarisa_project_id,
+          short_name: mapping.clarisa_project_short_name ?? '',
+        },
+        mapping,
+      };
+    }
+
+    if (resolvedViaExternalCode && project.id !== mapping.clarisa_project_id) {
+      this.logger._warn(
+        `[BilateralService] CLARISA project id divergence for agreement "${agreementId}": ` +
+          `stored clarisa_project_id=${mapping.clarisa_project_id} != resolved project.id=${project.id} ` +
+          `(clarisa_external_code="${mapping.clarisa_external_code}")`,
+      );
+    }
+
+    return {
+      status: 'mapped',
+      context,
+      clarisa_project: { id: project.id, short_name: project.short_name },
+      project,
+      mapping,
+    };
+  }
+
+  /**
    * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.11 / R-BIL-076 / R-BIL-078
    *
    * Per-result Science Programs picker source. Chain:
@@ -154,60 +288,22 @@ export class BilateralService {
     resultId: number,
     resultCode: string,
   ): Promise<BilateralScienceProgramsResponse> {
-    const context =
-      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
-
-    if (!context) {
-      throw new NotFoundException('Result not found');
-    }
-
-    const agreementId = context.agresso_agreement_id?.trim();
+    const resolution = await this.resolveMappedProject(resultId);
+    const { context } = resolution;
     const baseResponse = {
       result_code: String(context.result_official_code ?? resultCode),
     };
 
-    if (!agreementId) {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
+        mapping_status: resolution.status,
+        clarisa_project: resolution.clarisa_project,
         science_programs: [],
       };
     }
 
-    const mapping =
-      await this.bilateralProjectMappingService.findActiveByAgreementId(
-        agreementId,
-      );
-
-    if (!mapping) {
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
-        science_programs: [],
-      };
-    }
-
-    const project = await this.clarisaProjectsService.findProjectById(
-      mapping.clarisa_project_id,
-    );
-
-    if (!project) {
-      // Mapping points at a project CLARISA no longer exposes — treat as
-      // unmapped from the picker's perspective, but surface the snapshot
-      // we have so ops can spot the drift.
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: {
-          id: mapping.clarisa_project_id,
-          short_name: mapping.clarisa_project_short_name ?? '',
-        },
-        science_programs: [],
-      };
-    }
-
+    const { project } = resolution;
     const derived = this.deriveSciencePrograms(project);
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const catalogByCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
@@ -220,6 +316,7 @@ export class BilateralService {
         return {
           code,
           name,
+          mapping_status: meta?.mapping_status ?? null,
           category: meta?.category ?? fallback?.category ?? null,
           color: fallback?.color ?? null,
           icon_key: fallback?.icon_key ?? null,
@@ -231,7 +328,7 @@ export class BilateralService {
     return {
       ...baseResponse,
       mapping_status: 'mapped',
-      clarisa_project: { id: project.id, short_name: project.short_name },
+      clarisa_project: resolution.clarisa_project,
       science_programs,
     };
   }
@@ -268,12 +365,8 @@ export class BilateralService {
     resultId: number,
     resultCode: string,
   ): Promise<BilateralHlosIndicatorsResponse> {
-    const context =
-      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
-
-    if (!context) {
-      throw new NotFoundException('Result not found');
-    }
+    const resolution = await this.resolveMappedProject(resultId);
+    const { context } = resolution;
 
     const resultType = resolveResultTypeKey(context.indicator_id);
     const allowedLevels = allowedLevelsFor(resultType);
@@ -285,50 +378,17 @@ export class BilateralService {
       // D-V2-7: `report_year_id` carries the literal report year (e.g. 2026).
       version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
     };
-    const agreementId = context.agresso_agreement_id?.trim();
 
-    if (!agreementId) {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
+        mapping_status: resolution.status,
+        clarisa_project: resolution.clarisa_project,
         catalogs: [],
       };
     }
 
-    const mapping =
-      await this.bilateralProjectMappingService.findActiveByAgreementId(
-        agreementId,
-      );
-
-    if (!mapping) {
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
-        catalogs: [],
-      };
-    }
-
-    const project = await this.clarisaProjectsService.findProjectById(
-      mapping.clarisa_project_id,
-    );
-
-    if (!project) {
-      // Mapping points at a project CLARISA no longer exposes — treat as
-      // unmapped, but surface the snapshot we have so ops can spot the drift.
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: {
-          id: mapping.clarisa_project_id,
-          short_name: mapping.clarisa_project_short_name ?? '',
-        },
-        catalogs: [],
-      };
-    }
-
-    const projectRef = { id: project.id, short_name: project.short_name };
+    const { project, clarisa_project: projectRef } = resolution;
     const spCodes = this.deriveSciencePrograms(project).map((p) => p.code);
 
     if (!spCodes.length || !allowedLevels.length) {
@@ -472,27 +532,18 @@ export class BilateralService {
   }
 
   /**
-   * True when a CLARISA project mapping row represents a Science Program for the
-   * bilateral picker / ToC catalog (not an Area of Work).
+   * True when a CLARISA project mapping row represents an accepted Science Program
+   * for the bilateral picker / ToC catalog (delegates to pure predicate).
    */
   private isProjectScienceProgramMapping(
-    mapping: {
-      status?: string;
-      global_unit_object?: {
-        smo_code?: string;
-        cgiar_entity_type_object?: { prefix?: string | null };
-        portfolio_object?: { acronym?: string };
-      };
-    },
+    mapping: SpMappingRowLike | null | undefined,
     activePortfolio: string,
   ): boolean {
-    const u = mapping.global_unit_object;
-    if (!u?.smo_code || mapping.status !== 'Confirmed') return false;
-    if (u.portfolio_object?.acronym !== activePortfolio) return false;
-
-    const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
-    if (prefix === 'AOW') return false;
-    return /^SP\d/i.test(u.smo_code.trim());
+    return isProjectScienceProgramMapping(
+      mapping,
+      activePortfolio,
+      ENV.BILATERAL_ACCEPTED_SP_STATUSES,
+    );
   }
 
   /**
@@ -512,11 +563,22 @@ export class BilateralService {
         portfolio_object?: { acronym?: string };
       };
     }>;
-  }): Map<string, { allocation: number | null; category: string | null }> {
+  }): Map<
+    string,
+    {
+      allocation: number | null;
+      category: string | null;
+      mapping_status: string | null;
+    }
+  > {
     const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
     const metaByCode = new Map<
       string,
-      { allocation: number | null; category: string | null }
+      {
+        allocation: number | null;
+        category: string | null;
+        mapping_status: string | null;
+      }
     >();
 
     for (const m of project.project_mappings_array ?? []) {
@@ -531,6 +593,7 @@ export class BilateralService {
         metaByCode.set(u.smo_code, {
           allocation: typeof m.allocation === 'number' ? m.allocation : null,
           category: u.cgiar_entity_type_object?.name ?? null,
+          mapping_status: m.status?.trim() ?? null,
         });
       }
     }

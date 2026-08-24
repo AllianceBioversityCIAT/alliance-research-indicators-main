@@ -103,6 +103,8 @@ Common categories the ARI server enforces by default (you may inherit without re
 
 State an NFR only if it differs from the inherited defaults.
 
+**Packaging is a defect class (K-017).** If the spec produces a runtime artifact that must exist in the *build output* — a fixture, template, asset or seed read at run time — name a **packaging** defect class and gate it with a post-build existence check (e.g. `npm run build && ls dist/<path>`). A unit suite runs over `src`, so it structurally **cannot** see that the artifact never reached `dist`: every test passes over a file that will not be there in the field.
+
 ---
 
 ## 5. Data requirements

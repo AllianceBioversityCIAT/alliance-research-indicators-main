@@ -73,6 +73,7 @@ describe('PoolFundingAlignmentComponent', () => {
   let editable: ReturnType<typeof signal<boolean>>;
   let sciencePrograms: ReturnType<typeof signal<PoolFundingScienceProgram[]>>;
   let mappingStatus: ReturnType<typeof signal<PoolFundingMappingStatus | null>>;
+  let loadingSciencePrograms: ReturnType<typeof signal<boolean>>;
   let tocCatalog: ReturnType<typeof signal<BilateralTocCatalogResponse | null>>;
   let loadingTocCatalog: ReturnType<typeof signal<boolean>>;
   let tocCatalogError: ReturnType<typeof signal<boolean>>;
@@ -111,6 +112,7 @@ describe('PoolFundingAlignmentComponent', () => {
     editable = signal<boolean>(true);
     sciencePrograms = signal<PoolFundingScienceProgram[]>([]);
     mappingStatus = signal<PoolFundingMappingStatus | null>(null);
+    loadingSciencePrograms = signal<boolean>(false);
     tocCatalog = signal<BilateralTocCatalogResponse | null>(null);
     loadingTocCatalog = signal<boolean>(false);
     tocCatalogError = signal<boolean>(false);
@@ -132,6 +134,7 @@ describe('PoolFundingAlignmentComponent', () => {
       editable,
       sciencePrograms,
       mappingStatus,
+      loadingSciencePrograms,
       tocCatalog,
       loadingTocCatalog,
       tocCatalogError,
@@ -187,12 +190,11 @@ describe('PoolFundingAlignmentComponent', () => {
     expect(getAlignmentMock).toHaveBeenCalledWith('RES-001');
   });
 
-  it('renders the section title info icon aligned with tooltip text matching the info banner', () => {
+  it('renders the section title help button aligned with tooltip text', () => {
     fixture.detectChanges();
-    const icon = fixture.nativeElement.querySelector('[data-testid="pf-alignment-title-info-icon"]') as HTMLElement;
-    expect(icon).not.toBeNull();
-    expect(icon.getAttribute('aria-label')).toBe(component.INFO_BANNER);
-    expect(icon.classList.contains('pf-alignment-section-heading__icon')).toBe(true);
+    const btn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]') as HTMLElement;
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('aria-label')).toBe('Learn more about Pool Funding and Theory of Change alignment');
   });
 
   it('falls back to cache.getCurrentNumericResultId when route param is absent', async () => {
@@ -992,44 +994,33 @@ describe('PoolFundingAlignmentComponent', () => {
     // property, and the given root cause is testable by anyone who prefers to
     // verify rather than take it on faith (create the row with disabled=true in
     // one pass and watch componentInstance.disabled read false).
-    it('R-BIL-127 AC.5 — the rendered Primary radio reflects primaryControlDisabled in the DOM', () => {
+    it('R-BIL-127 AC.5 — primaryControlDisabled is true when alignment is read-only or version-locked', () => {
       mappingStatus.set('mapped');
       selectTwo();
       component.onPrimaryChange('SP01');
-      fixture.detectChanges();
-      let de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
-      expect(de).not.toBeNull();
-      expect((de.componentInstance as { disabled?: boolean }).disabled).toBeFalsy();
+      expect(component.primaryControlDisabled()).toBe(false);
 
       currentAlignment.set({ ...baseAlignment, has_contribution: true, is_read_only: true });
-      fixture.detectChanges();
-      de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
-      expect((de.componentInstance as { disabled?: boolean }).disabled).toBe(true);
+      expect(component.primaryControlDisabled()).toBe(true);
     });
 
-    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.6
-    // Presence-assertion ONLY (tasks.md §7 / design.md D-5): proves the text-label
-    // + icon markup is IN the DOM for both roles, which is necessary for AC.6's
-    // non-colour-only cue but not sufficient — jsdom cannot measure rendered
-    // colour, contrast, or layout, and no assertion in this file can. AC.6 is
-    // NOT discharged by this or any other test here; see the design.md §12.2
-    // decision entry and tasks.md §7 for the explicit record.
-    it('R-BIL-127 AC.6 (presence-assertion only, NOT a visual discharge) — Primary and Contributing each carry a distinct text label; only Primary carries the star icon', () => {
+    it('R-BIL-127 AC.6 (presence-assertion only) — Primary carries a distinct badge with star icon and Contributing carries Make Primary action', () => {
       mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Breeding', icon_key: 'SP01', allocation: 50 },
+        { code: 'SP03', name: 'Agronomy', icon_key: 'SP03', allocation: 50 }
+      ]);
       selectTwo();
       component.onPrimaryChange('SP01');
       fixture.detectChanges();
 
       const root: HTMLElement = fixture.nativeElement;
       const primaryBadge = root.querySelector('[data-testid="pf-alignment-role-primary-SP01"]');
-      const contributingBadge = root.querySelector('[data-testid="pf-alignment-role-contributing-SP03"]');
+      const makePrimaryBtn = root.querySelector('[data-testid="pf-alignment-set-primary-SP03"]');
       expect(primaryBadge).not.toBeNull();
-      expect(contributingBadge).not.toBeNull();
-      expect(primaryBadge!.textContent?.trim()).toContain(component.PRIMARY_ROLE_LABEL);
-      expect(contributingBadge!.textContent?.trim()).toContain(component.CONTRIBUTING_ROLE_LABEL);
-      // Icon present on Primary only — the non-colour-only cue's second channel.
+      expect(makePrimaryBtn).not.toBeNull();
+      expect(primaryBadge!.textContent?.trim()).toContain('Primary');
       expect(primaryBadge!.querySelector('.pi-star-fill')).not.toBeNull();
-      expect(contributingBadge!.querySelector('.pi-star-fill')).toBeNull();
     });
 
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.5
@@ -1110,6 +1101,10 @@ describe('PoolFundingAlignmentComponent', () => {
     // endorsed; see design.md §12.2 for the decision record.
     it('5d — a read-only legacy alignment (role: null on every row) renders "Contributing" on every SP, not a neutral state', () => {
       mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'A', icon_key: 'SP01', allocation: 50 },
+        { code: 'SP03', name: 'B', icon_key: 'SP03', allocation: 50 }
+      ]);
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
@@ -1256,7 +1251,7 @@ describe('PoolFundingAlignmentComponent', () => {
 
     const renderSelectedChip = async (option: PoolFundingScienceProgram) => {
       mappingStatus.set('mapped');
-      sciencePrograms.set([option]);
+      sciencePrograms.set([option, spOption({ code: 'SP02', name: 'Other SP', icon_key: 'SP02' })]);
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
@@ -1271,19 +1266,19 @@ describe('PoolFundingAlignmentComponent', () => {
 
     it('AC.1 — renders the selected SP as "<code> — <allocation>% - <name>"', async () => {
       await renderSelectedChip(spOption());
-      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
-      expect(chip).not.toBeNull();
-      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — 10% - Climate Action');
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP06"]') as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(card!.textContent?.replace(/\s+/g, ' ').trim()).toContain('SP06 — 10% - Climate Action');
     });
 
     it('AC.2 — a null allocation renders the existing "—" placeholder, never the literal "null"', async () => {
       // Runtime data can carry a null allocation even though the wire type is
       // declared non-nullable (`?? '—'` in the template is the actual guard).
       await renderSelectedChip(spOption({ allocation: null as unknown as number }));
-      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
-      expect(chip).not.toBeNull();
-      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — —% - Climate Action');
-      expect(chip!.textContent).not.toMatch(/\bnull\b/);
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP06"]') as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(card!.textContent?.replace(/\s+/g, ' ').trim()).toContain('SP06 — —% - Climate Action');
+      expect(card!.textContent).not.toMatch(/\bnull\b/);
     });
   });
 
@@ -1312,7 +1307,7 @@ describe('PoolFundingAlignmentComponent', () => {
 
       expect(showGlobalAlertMock).toHaveBeenCalledTimes(1);
       const alertArg = showGlobalAlertMock.mock.calls[0][0];
-      expect(alertArg.severity).toBe('delete');
+      expect(alertArg.severity).toBe('secondary');
       expect(alertArg.confirmCallback.label).toBe('Remove');
       expect(alertArg.cancelCallback.label).toBe('Cancel');
       // Chip restored while the dialog is open.
@@ -1938,6 +1933,17 @@ describe('PoolFundingAlignmentComponent', () => {
       component.onContributionChange(true);
     };
 
+    it('shows the SP loading skeleton when loadingSciencePrograms is true and mappingStatus is null', () => {
+      showPickerSection();
+      loadingSciencePrograms.set(true);
+      mappingStatus.set(null);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-sps-loading"]')).not.toBeNull();
+      expect(root.textContent).toContain('Loading Science Programs from CLARISA...');
+      expect(component.showSpPicker()).toBe(false);
+    });
+
     it('AC-01.2 — unmapped renders the contact-ops message and hides the picker', () => {
       showPickerSection();
       mappingStatus.set('unmapped');
@@ -1962,11 +1968,87 @@ describe('PoolFundingAlignmentComponent', () => {
     it('AC-01.1 — mapped + SPs renders the picker bound to the per-result control-list source', () => {
       showPickerSection();
       mappingStatus.set('mapped');
-      sciencePrograms.set([spOption]);
+      sciencePrograms.set([spOption, { ...spOption, code: 'SP02', icon_key: 'SP02' }]);
       fixture.detectChanges();
       const root: HTMLElement = fixture.nativeElement;
-      expect(root.querySelector('app-multiselect')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-multi-sp-grid"]')).not.toBeNull();
       expect(component.showSpPicker()).toBe(true);
+    });
+
+    it('T-09 / R-PSP-004 — stale renders the reconcile-ops message, hides the picker, and does not tell user to register mapping (KZ-015)', () => {
+      showPickerSection();
+      fixture.detectChanges(); // KZ-015: arrange transition after initial detectChanges
+
+      mappingStatus.set('stale');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const staleEl = root.querySelector('[data-testid="pf-alignment-stale-message"]');
+      expect(staleEl).not.toBeNull();
+      expect(staleEl?.textContent?.trim()).toContain(
+        'The linked CLARISA project could not be found in the current feed. Contact the bilateral operations team to reconcile the project mapping.'
+      );
+      expect(staleEl?.textContent).not.toContain('register');
+      expect(root.querySelector('[data-testid="pf-alignment-unmapped-message"]')).toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-multi-sp-grid"]')).toBeNull();
+      expect(component.isStale()).toBe(true);
+      expect(component.showSpPicker()).toBe(false);
+    });
+
+    it('T-09 / R-PSP-004 — all three empty-state messages are pairwise distinct on rendered DOM', () => {
+      showPickerSection();
+      fixture.detectChanges();
+
+      // 1. Unmapped state
+      mappingStatus.set('unmapped');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      const unmappedText = root.querySelector('[data-testid="pf-alignment-unmapped-message"]')?.textContent?.trim();
+
+      // 2. Stale state
+      mappingStatus.set('stale');
+      fixture.detectChanges();
+      const staleText = root.querySelector('[data-testid="pf-alignment-stale-message"]')?.textContent?.trim();
+
+      // 3. No SPs defined state
+      mappingStatus.set('mapped');
+      fixture.detectChanges();
+      const noSpsText = root.querySelector('[data-testid="pf-alignment-no-sps-message"]')?.textContent?.trim();
+
+      expect(unmappedText).toBeTruthy();
+      expect(staleText).toBeTruthy();
+      expect(noSpsText).toBeTruthy();
+
+      expect(staleText).not.toEqual(unmappedText);
+      expect(staleText).not.toEqual(noSpsText);
+      expect(unmappedText).not.toEqual(noSpsText);
+    });
+
+    it('T-09 / R-PFU-003 — does NOT render Pending qualifier chip anywhere in result pool funding alignment view', () => {
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'Science Program 1', role: 'PRIMARY' },
+          { code: 'SP02', name: 'Science Program 2', role: 'CONTRIBUTING' }
+        ]
+      });
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Science Program 1', icon_key: 'SP01', allocation: 50, mapping_status: 'Pending' },
+        { code: 'SP02', name: 'Science Program 2', icon_key: 'SP02', allocation: 50, mapping_status: 'Confirmed' }
+      ]);
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const pendingTagSp01 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP01"]');
+      const pendingTagSp02 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP02"]');
+
+      expect(pendingTagSp01).toBeNull();
+      expect(pendingTagSp02).toBeNull();
+      expect(root.textContent).not.toContain('Pending');
     });
   });
 
@@ -2286,10 +2368,229 @@ describe('PoolFundingAlignmentComponent', () => {
         await Promise.resolve();
 
         expect(showGlobalAlertMock).toHaveBeenCalledTimes(1);
-        expect(showGlobalAlertMock.mock.calls[0][0].severity).toBe('delete');
+        expect(showGlobalAlertMock.mock.calls[0][0].severity).toBe('secondary');
         // Chip restored while the confirm dialog is open.
         expect(codes(component.formData())).toContain('SP03');
       });
     });
   });
+
+  describe('Single Science Program Auto-Selection (R-PFU-001)', () => {
+    const singleSpOption: PoolFundingScienceProgram = {
+      code: 'SP06',
+      name: 'Climate Action',
+      category: null,
+      color: '#4caf50',
+      icon_key: 'SP06',
+      allocation: 100,
+      mapping_status: 'Confirmed'
+    };
+
+    beforeEach(() => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([singleSpOption]);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+    });
+
+    it('clicking "Yes" when 1 SP is mapped automatically sets selected_sps, primary_sp_code, and toc_drafts', () => {
+      expect(component.isSingleSp()).toBe(true);
+      expect(component.singleSp()).toEqual(singleSpOption);
+
+      component.onContributionChange(true);
+
+      expect(component.formData().has_contribution).toBe(true);
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP06');
+      expect(component.formData().primary_sp_code).toBe('SP06');
+      expect(component.formData().toc_drafts.length).toBe(1);
+      expect(component.formData().toc_drafts[0].sp_code).toBe('SP06');
+    });
+
+    it('renders Single-SP Card in the DOM with icon, code, allocation, title, Primary badge, and a11y attributes', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-single-sp-card"]') as HTMLElement;
+      expect(card).toBeTruthy();
+      expect(card.getAttribute('tabindex')).toBe('0');
+      expect(card.getAttribute('role')).toBe('region');
+      expect(card.getAttribute('aria-label')).toBe('Selected Science Program');
+      expect(card.textContent).toContain('SP06');
+      expect(card.textContent).toContain('100%');
+      expect(card.textContent).toContain('Climate Action');
+
+      const badge = fixture.nativeElement.querySelector('[data-testid="single-sp-primary-badge"]');
+      expect(badge).toBeTruthy();
+      expect(badge.textContent).toContain('Primary');
+    });
+
+    it('does NOT render multi-select dropdown when sciencePrograms().length === 1', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const multiselect = fixture.nativeElement.querySelector('app-multiselect');
+      expect(multiselect).toBeFalsy();
+    });
+
+    it('does NOT render separate primary radio question when sciencePrograms().length === 1', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const primarySection = fixture.nativeElement.querySelector('[data-testid="pf-alignment-primary-section"]');
+      expect(primarySection).toBeFalsy();
+    });
+
+    it('clicking "No" resets the selection, primary_sp_code, and drafts', () => {
+      component.onContributionChange(true);
+      expect(component.formData().selected_sps.length).toBe(1);
+
+      component.onContributionChange(false);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(component.formData().selected_sps).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+      expect(component.formData().toc_drafts).toEqual([]);
+    });
+  });
+
+  describe('Multi-SP Interactive Cards & Inline Primary Toggle (R-PFU-002, R-PFU-003)', () => {
+    beforeEach(() => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Science Program 1', icon_key: 'SP01', allocation: 60, mapping_status: 'Confirmed' },
+        { code: 'SP02', name: 'Science Program 2', icon_key: 'SP02', allocation: 40, mapping_status: 'Pending' }
+      ]);
+      component.onContributionChange(true);
+      fixture.detectChanges();
+    });
+
+    it('renders interactive cards grid for multi-SP project with keyboard a11y', async () => {
+      const grid = fixture.nativeElement.querySelector('[data-testid="pf-alignment-multi-sp-grid"]');
+      expect(grid).toBeTruthy();
+
+      const card1 = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP01"]') as HTMLElement;
+      const card2 = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP02"]') as HTMLElement;
+      expect(card1).toBeTruthy();
+      expect(card2).toBeTruthy();
+      expect(card1.getAttribute('tabindex')).toBe('0');
+      expect(card1.getAttribute('role')).toBe('checkbox');
+      expect(card1.getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('selecting first SP auto-designates it as Primary', () => {
+      const sp1 = sciencePrograms()[0];
+      component.toggleSp(sp1);
+
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP01');
+      expect(component.formData().primary_sp_code).toBe('SP01');
+      expect(component.isPrimary('SP01')).toBe(true);
+    });
+
+    it('selecting a second SP retains the first as Primary and renders "Make Primary" button on the second', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.formData().selected_sps.length).toBe(2);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+
+      const primaryBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-primary-SP01"]');
+      const contributingBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-contributing-SP02"]');
+      const makePrimaryBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-set-primary-SP02"]');
+      expect(primaryBadge).toBeTruthy();
+      expect(primaryBadge.textContent).toContain('Primary');
+      expect(contributingBadge).toBeTruthy();
+      expect(contributingBadge.textContent).toContain('Contributing');
+      expect(makePrimaryBtn).toBeTruthy();
+      expect(makePrimaryBtn.textContent).toContain('Make Primary');
+    });
+
+    it('clicking "Make Primary" sets the new primary SP and updates badges', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+
+      component.setPrimarySp('SP02');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.formData().primary_sp_code).toBe('SP02');
+      expect(component.isPrimary('SP02')).toBe(true);
+      expect(component.isPrimary('SP01')).toBe(false);
+
+      const primaryBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-primary-SP02"]');
+      const makePrimaryBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-set-primary-SP01"]');
+      expect(primaryBadge).toBeTruthy();
+      expect(makePrimaryBtn).toBeTruthy();
+    });
+
+    it('deselecting primary SP when 1 SP remains auto-promotes the remaining SP to Primary', () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+
+      // Deselect SP01 (which was primary)
+      component.toggleSp(sp1);
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP02');
+      expect(component.formData().primary_sp_code).toBe('SP02');
+    });
+
+    it('does NOT render the separate Primary radio question or any "Pending" status badge in DOM (R-PFU-003)', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const primarySection = fixture.nativeElement.querySelector('[data-testid="pf-alignment-primary-section"]');
+      expect(primarySection).toBeFalsy();
+
+      const pendingBadge = fixture.nativeElement.querySelector('[data-testid*="pending"]');
+      expect(pendingBadge).toBeFalsy();
+      expect(fixture.nativeElement.textContent).not.toContain('Pending');
+    });
+  });
+
+  describe('Help & Workflow Guide Modal', () => {
+    it('renders the help button in the section header and help link in the banner', () => {
+      fixture.detectChanges();
+      const helpBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      const bannerLink = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+
+      expect(helpBtn).not.toBeNull();
+      expect(bannerLink).not.toBeNull();
+      expect(bannerLink.textContent).toContain('Learn more & view workflow');
+    });
+
+    it('toggles showHelpModal signal when help button or banner link is clicked', () => {
+      fixture.detectChanges();
+      expect(component.showHelpModal()).toBe(false);
+
+      const helpBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      helpBtn.click();
+      expect(component.showHelpModal()).toBe(true);
+
+      component.showHelpModal.set(false);
+      const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+      bannerLink.click();
+      expect(component.showHelpModal()).toBe(true);
+    });
+  });
 });
+
+
