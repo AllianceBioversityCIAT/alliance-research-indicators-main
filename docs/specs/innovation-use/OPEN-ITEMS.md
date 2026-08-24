@@ -8,6 +8,47 @@
 
 ---
 
+## 0. Findings from the test-environment session — 2026-08-21, to pick up Monday
+
+Reported by the product owner after checking the work already deployed to **test**. **Neither blocks what is deployed**; both are new work.
+
+### N-1 · The Results Center "INNOVATION USE" filter is inactive — **spec filed**
+
+The chip renders greyed out and cannot be selected while the other indicators can. It is not permissions and not data: it is a **hardcoded allowlist in the client**.
+
+```
+client/research-indicators/src/app/pages/platform/pages/results-center/results-center.service.ts:419
+
+    able: [0, 1, 2, 3, 4, 5].includes(indicator.indicator_id),
+```
+
+Indicator **6** (Innovation Use) is not in the array, so the chip is rendered with `able = false` and the CSS greys it out (`indicators-tab-filter.component.html`, class `able`). The server's `indicators` endpoint **does** return indicator 6 (`IndicatorsService.findAll()` filters only on `is_active`), so the data arrives correctly and the client discards it.
+
+**This is the same pattern `695b5248` already fixed** (*"fix(indicators.service): admit indicator 6 — the create-result entry point was closed all along"*). That one was the server's allowlist for creating results; this is the client's allowlist for filtering them.
+
+**Fix:** add `6` to the array. **Before calling it closed**, grep for other allowlists of the same shape — this is the *second* site with the same defect, so assuming there are only two repeats the mistake that was already made once. A test covers this function (`results-center.service.spec.ts`), so the change has to update it.
+
+**Execution spec:** [`docs/specs/bugfix/results-center-innovation-use-filter/`](../../bugfix/results-center-innovation-use-filter/)
+
+### N-2 · The justification is not cleared when the level drops — **a design decision, not just a fix**
+
+When the use level changes from one that requires a justification (`>= 6`) to one that does not (e.g. 2), the text **stays stored in the database**. That leaves a value that does not apply: a filled justification at level 2 is meaningless.
+
+**Why it happens today, confirmed:** the client omits the `innovation_use_level_explanation` key from the `PATCH` when the field was never touched (`buildPayload`, **DD-3**), and the server does a partial merge at step 6 — an absent key arrives as `undefined` and TypeORM's `UpdateQueryBuilder` leaves it out of the `SET`. So the old value **survives by design**, and that design is correct for the case it protects (`R-IUD-001` sc.1: *must NOT clear a stored justification when the field was never typed into*). The gap is that a level change is a **different** trigger, which nothing currently handles.
+
+**This is not a functional bug today — it is data hygiene.** The green check already evaluates `IF(useLevel >= 6, explanationValid, TRUE)` (`1787078283929-createInnovationUseValidation.ts:134`), so a stale justification at level 2 **blocks nothing**. It only pollutes the data and can mislead anyone reading it or building reports from it.
+
+**Four things to decide before writing code:**
+
+1. **Where the clearing happens.** The server is the safe place: it is the system of record and the API can be called directly, so clearing only in the client would let any API consumer keep storing inconsistent data.
+2. **What happens if the user lowers and then raises the level again** in the same session. Clearing on save means they lose the text. Probably acceptable, but that is a product decision, not a technical one.
+3. **⚠️ Interaction with item D1 — look at this first.** D1 (below) calls for deleting `_effectiveExplanation` as dead code. **But that resolution is exactly the shape this change needs**: resolving the effective level and effective explanation of the post-write row to decide whether to clear. Doing D1 first deletes code that would have to be written again. **Decide N-2 before executing D1**, or execute D1 knowing this brings it back.
+4. **Rows that are already inconsistent.** Are they cleaned by a backfill migration, or does this apply going forward only? And mind the versioning: what happens to already-approved versions.
+
+**Scope agreed with the product owner: for now, the justification field only.** Other conditional fields may have the same problem, but they are out of scope for this cycle.
+
+---
+
 ## 1. Where to start after a session reset
 
 ```
@@ -20,7 +61,7 @@ Then, for the only unfinished task in an active spec:
 /akili-execute bugfix/innovation-use-draft-save
 ```
 
-Branch: **`AC-1679-Create-the-innovation-use-section`**. As of this writing, **8 commits unpushed, nothing deployed.**
+Branch: **`AC-1679-Create-the-innovation-use-section`**, pushed. **Brought up to date with `staging`** (266 commits, 3 conflicts, all resolved by union). The PR to `dev` is opened from the integration branch **`AC-1679-to-dev`**, which absorbs `dev` so the feature branch never has to: **[PR #154](https://github.com/AllianceBioversityCIAT/alliance-research-indicators-main/pull/154)**, `MERGEABLE`. **The work is already deployed to test.** Rollback point: tag `backup/AC-1679-pre-staging-merge`.
 
 ---
 
@@ -40,7 +81,7 @@ Branch: **`AC-1679-Create-the-innovation-use-section`**. As of this writing, **8
 
 | # | Item | State |
 | --- | --- | --- |
-| **T-03** | Amend the affected specs and close the verification gate: Pivot `details-page` (R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row), write a **superseding record** for archived chunk 2's `R-IUA-006` AC.3/AC.4 (**do not edit the archived file**), add a follow-up row to `family.md`, file the platform finding, run Correction Closure both directions, and run both full suites in a quiet window | **`[ ]` not started** |
+| ~~**T-03**~~ | ✅ **DONE** 2026-08-21 — Reviewer PASS en el intento 3 de 3. ~~Amend the affected specs and close the verification gate: Pivot `details-page` (R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row), write a **superseding record** for archived chunk 2's `R-IUA-006` AC.3/AC.4 (**do not edit the archived file**), add a follow-up row to `family.md`, file the platform finding, run Correction Closure both directions, and run both full suites in a quiet window~~ | **`[x]` closed** |
 | **D1** | **Deferred by user ruling** — remove `_effectiveExplanation` (dead since T-01) plus three stale rationale paragraphs at `result-innovation-use.service.ts:263-264`, `:269-271`, `:278-284`, and the now-false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`. **Zero functional effect.** `tasks.md` T-01 scope item 1 is already amended to permit it | **deferred, not dropped** |
 | **D2** | **Deferred by user ruling · `ADVISORY R1` · highest-value item owed.** Nothing asserts that `result_status_workflow` **row id 30** dispatches `completenessValidation` with `enabled: true`. A future migration flipping it would leave **every test in this spec green** while removing the last server-side completeness enforcement for the section. **Test-only** close: a raw `SELECT` of row 30's config in `innovation-use-level-boundary.fixture-spec.ts`. It is the **only unasserted premise in R-IUD-002's chain** | **deferred — pick up first** |
 
@@ -79,6 +120,16 @@ Branch: **`AC-1679-Create-the-innovation-use-section`**. As of this writing, **8
 | **P1** | **`completenessValidation` is `enabled: false` on `DRAFT → SUBMITTED` for *every* indicator** (`result_status_workflow` rows 1, 7, 13, 19, 25; only the `REVISED → SUBMITTED` rows have it `true`). So **any API client can submit an incomplete result on a first submission**; only the STAR client's green-check gating prevents it, and that is client-side. Whether this is deliberate (first submit may be incomplete by design) or a config never switched on is **unknown from the repo**. Needs a product/security answer. **Deliberately not fixed inside a bugfix** — if that gate belongs on, it belongs on for all six indicators | `bugfix/innovation-use-draft-save/proposal.md` §15 |
 | **P2** | **Dark mode is unreachable** — `DarkModeService` is imported and injected at `alliance-navbar.component.ts:22,52` but appears in **no template**. A dead injection. This is what justified **DD-14**'s deferral of dark-mode verification; the §5.7 contrast defect (**1.29:1** and **1.887:1** against 4.5:1) is real but sits in an unreachable state. **If a toggle is ever exposed, `T-13` c7/c8 revert to both themes and that defect becomes blocking** | `details-page/design.md` **DD-14** · `execution.md` → *Dark-mode deferral* |
 | **P3** | The navbar injects a service it never uses — dead code in a shared component. Recorded, not minted as work | `details-page/execution.md` → *Dark-mode deferral* |
+
+---
+
+## 5b. Items raised by the test deployment — 2026-08-21
+
+| # | Item | Owner / state |
+| --- | --- | --- |
+| **S-1** | **SonarCloud Quality Gate is red on PR #154**, approved by the lead to be fixed in a separate PR. **Everything red is ours** (verified: the gate measures *New Code* = the diff against the base, so it is structurally impossible for it to report debt inherited from `dev`). The 4 CRITICAL bugs are all the same rule `S2871` (`.sort()` without a comparator) in `innovation-use-result-creation.fixture-spec.ts:697,708,711,722`; the 2 MINOR vulnerabilities are `PATH` warnings in `scripts/load-baseline.js:80,94`. **Zero findings in server source code.** **Root cause verified:** the workflow excludes `**/*.spec.ts`, but the 13 fixtures are named `*.fixture-spec.ts` — they end in `-spec.ts`, not `.spec.ts`, so the glob never reaches them and Sonar analyses them as production code. **Recommended fix: one line** in `.github/workflows/sonarcloud-analysis-backend.yml` adding `**/*.fixture-spec.ts,**/scripts/**` to the exclusions — it addresses all three conditions at once and stops the problem recurring with every new fixture. Full diagnosis is commented on the PR | **open**, separate PR |
+| **S-2** | **ID collision in `docs/specs/kaizen-log.md`** — the two lines of work evolved the registry in parallel and assigned **the same IDs to different lessons** (`KZ-002`, `KZ-007`, `KZ-008` do not mean the same thing on each side; `KZ-001` is the same lesson and `staging`'s version is the more evolved one: recurrence 13 vs 4). Merging by ID would make **every `KZ-00x` citation in the other lineage's specs point at the wrong lesson**. Both tables were kept, separated by lineage, with a visible warning. **Needs a human decision** — there is no correct mechanical resolution | **open** |
+| **S-3** | **Debt inherited from `dev` — do NOT fix inside our PRs.** (a) `dev`'s tree does not pass its own lint: **181 Prettier errors** across 9 files, with an identical config on both branches (proven: on `AC-1679` after the `staging` merge, `lint --fix` produced zero mutations). **CI runs `npm run build`, not lint, and the build passes.** Careful: `npm run lint` carries `--fix` and **mutates files**, including a migration (append-only) — re-inspect `git status` after running it. (b) **`migration:scan`** points at `scripts/scan-migration-placeholders.js`, deleted on 2026-08-13 by `2c50e1f1`, which did not remove the `package.json` entry; already reported three times in `staging`'s own docs (*"Not fixed; needs an owner"*). Same for **`migration:show`**, which the guides reference but which is not an npm script — the real command is `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`. (c) **Jest worker leak** in the server suite, absent before the `dev` merge and present after; all 3158 tests still pass | **`dev`'s**, needs its own owner |
 
 ---
 
