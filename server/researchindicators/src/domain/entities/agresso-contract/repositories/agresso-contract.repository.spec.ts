@@ -3559,7 +3559,18 @@ describe('AgressoContractRepository', () => {
       expect(byActorTypeSql).toContain('cat.code = ra.actor_type_id');
       expect(byActorTypeSql).toContain('cat.is_active = TRUE');
       expect(byActorTypeSql).toContain('WHEN cat.code = 5');
+      // T-09 owner-approved Other-label amendment (D-F4-8-adjacent
+      // correction): the code-5 custom name is used ONLY when the group is
+      // homogeneous (exactly one distinct non-blank custom name); a mixed
+      // group of custom-named "other" actors must fall back to cat.name
+      // ("Other"), never to whichever value MAX() picks alphabetically.
       expect(byActorTypeSql).toContain(
+        "COUNT(DISTINCT NULLIF(TRIM(ra.actor_type_custom_name), '')) = 1",
+      );
+      expect(byActorTypeSql).toContain(
+        "THEN MAX(NULLIF(TRIM(ra.actor_type_custom_name), ''))",
+      );
+      expect(byActorTypeSql).not.toContain(
         "COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name)",
       );
       expect(byActorTypeSql).toContain('GROUP BY cat.code, cat.name');
@@ -3628,6 +3639,49 @@ describe('AgressoContractRepository', () => {
         not_disaggregated_rows: 0,
       });
     });
+
+    it(
+      'K-004: heterogeneous code-5 "other" groups fall back to cat.name ("Other"), never a single ' +
+        'MAX()-picked custom name (failing input: the pre-amendment SQL used ' +
+        "COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name) — for a mixed group of " +
+        '"Village elders" and "Youth council" rows this silently returns whichever string MAX() picks ' +
+        'alphabetically last ("Youth council"), not the "Other" label a heterogeneous group must render)',
+      async () => {
+        // Observed RED verbatim against the pre-amendment SQL text (2026-08-24,
+        // reverted after capture):
+        //   expect(received).toContain(expected)
+        //   Expected substring: "COUNT(DISTINCT NULLIF(TRIM(ra.actor_type_custom_name), '')) = 1"
+        //   Received string:    "...WHEN cat.code = 5\n            THEN COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name)\n          ELSE cat.name..."
+        (repository.query as jest.Mock)
+          .mockResolvedValueOnce([
+            {
+              n: '2',
+              women_youth: '0',
+              women_not_youth: '0',
+              men_youth: '0',
+              men_not_youth: '0',
+              not_disaggregated_rows: '0',
+            },
+          ])
+          .mockResolvedValueOnce([]);
+
+        await repository['getReachSection']('A511', 2);
+
+        const [byActorTypeSql] = (repository.query as jest.Mock).mock.calls[1];
+
+        // The homogeneity gate is the only thing standing between a
+        // heterogeneous "other" group and a misleading single-name label —
+        // pin its exact shape so a future edit that drops the COUNT(DISTINCT
+        // ...) = 1 guard (reverting to a bare MAX()) reddens here.
+        expect(byActorTypeSql).toContain(
+          "WHEN cat.code = 5\n            AND COUNT(DISTINCT NULLIF(TRIM(ra.actor_type_custom_name), '')) = 1",
+        );
+        expect(byActorTypeSql).toContain(
+          "THEN MAX(NULLIF(TRIM(ra.actor_type_custom_name), ''))",
+        );
+        expect(byActorTypeSql).toContain('ELSE cat.name');
+      },
+    );
 
     it('K-004: generated SQL keeps NULLs excluded via COALESCE(SUM(...), 0) — never SUM(COALESCE(...)) — regression pinned on the exact SQL text', async () => {
       // This spec pins the exact NULL-safe aggregate shape. If the

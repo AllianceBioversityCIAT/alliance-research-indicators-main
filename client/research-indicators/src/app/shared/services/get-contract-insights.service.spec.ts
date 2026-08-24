@@ -5,6 +5,7 @@ import { GetContractInsightsService } from './get-contract-insights.service';
 import { ApiService } from './api.service';
 import { environment } from '../../../environments/environment';
 import { ContractInsightsReport } from '@shared/interfaces/contract-insights.interface';
+import { MainResponse } from '@shared/interfaces/responses.interface';
 
 const contractInsightsUrl = (id: string) =>
   `${environment.mainApiUrl}agresso/contracts/reports/insights?contract-id=${encodeURIComponent(id)}`;
@@ -225,7 +226,7 @@ describe('GetContractInsightsService', () => {
       successfulRequest: false,
       description: 'Internal server error',
       status: 500
-    });
+    } as unknown as MainResponse<ContractInsightsReport>);
 
     await service.load('A511');
 

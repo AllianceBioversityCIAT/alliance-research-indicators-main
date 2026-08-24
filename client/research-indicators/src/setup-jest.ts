@@ -47,6 +47,19 @@ class MockContext2D {
   fill() {}
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   closePath() {}
+  // zrender's platformApi.measureText (node_modules/zrender/lib/core/platform.js)
+  // caches this 2d context module-wide and calls `_ctx.measureText(text)` on
+  // it directly. A category axis with a SINGLE category short-circuits before
+  // ever reaching this call (echarts' `calculateCategoryInterval`: extent
+  // diff < 1 -> return 0 early) — which is why single-category fixtures never
+  // exercised this gap — but two or more categories (e.g. F4 insights'
+  // reach-stacked-bar: "Overall" + one actor type) walks the tick-label
+  // measurement loop and throws `_ctx.measureText is not a function` without
+  // this stub. Approximate width only; no test in this suite asserts on
+  // pixel layout.
+  measureText(text: string) {
+    return { width: (text?.length ?? 0) * 6 };
+  }
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   clearRect() {}
   // Add any other canvas methods you need

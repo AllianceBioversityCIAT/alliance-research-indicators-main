@@ -55,8 +55,11 @@
             <span class="ml-auto font-['Space_Grotesk'] text-[16px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ reachNotDisaggregatedRows() }}</span>
           </div>
           @if (reachHasByActorTypeRows()) {
-          <div data-slot="chart-placeholder" data-chart="reach-stacked-bar" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
-            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Actor-group reach by gender × youth (overall and per actor type) renders here.</span>
+          <div data-slot="chart-placeholder" data-chart="reach-stacked-bar" class="rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-2">
+            @if (reachStackedBarOptions(); as opts) {
+            <app-viz-chart [options]="opts" [tableModel]="reachStackedBarTableModel()"
+              chartTitle="Actor-group reach by gender × youth (overall and per actor type)" height="220px" />
+            }
           </div>
           } @else {
           <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
@@ -200,8 +203,10 @@
             </div>
           </div>
           @if (evidenceHasRoleRows()) {
-          <div data-slot="chart-placeholder" data-chart="evidence-role-bars" class="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
-            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Evidence counts per role render here.</span>
+          <div data-slot="chart-placeholder" data-chart="evidence-role-bars" class="rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-2">
+            @if (evidenceRoleBarOptions(); as opts) {
+            <app-viz-chart [options]="opts" [tableModel]="evidenceRoleBarTableModel()" chartTitle="Evidence counts per role" height="180px" />
+            }
           </div>
           } @else {
           <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
@@ -249,8 +254,10 @@
           </div>
           }
           @if (reviewFlowHasDecisionRows()) {
-          <div data-slot="chart-placeholder" data-chart="review-flow-funnel" class="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
-            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Decision funnel renders here.</span>
+          <div data-slot="chart-placeholder" data-chart="review-flow-funnel" class="rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-2">
+            @if (reviewFlowFunnelOptions(); as opts) {
+            <app-viz-chart [options]="opts" [tableModel]="reviewFlowFunnelTableModel()" chartTitle="Review decisions" height="200px" />
+            }
           </div>
           } @else {
           <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
@@ -315,8 +322,10 @@
           </div>
           }
           @if (leversHasRows()) {
-          <div data-slot="chart-placeholder" data-chart="levers-bars" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
-            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Contributing levers by result count render here.</span>
+          <div data-slot="chart-placeholder" data-chart="levers-bars" class="rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-2">
+            @if (leversBarOptions(); as opts) {
+            <app-viz-chart [options]="opts" [tableModel]="leversBarTableModel()" chartTitle="Contributing levers by result count" height="220px" />
+            }
           </div>
           } @else {
           <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
@@ -364,8 +373,10 @@
           </div>
           }
           @if (keywordsHasRows()) {
-          <div data-slot="chart-placeholder" data-chart="keywords-treemap" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
-            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Top 30 keywords treemap renders here.</span>
+          <div data-slot="chart-placeholder" data-chart="keywords-treemap" class="rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-2">
+            @if (keywordsTreemapOptions(); as opts) {
+            <app-viz-chart [options]="opts" [tableModel]="keywordsTreemapTableModel()" chartTitle="Top 30 keywords by result frequency" height="260px" />
+            }
           </div>
           } @else {
           <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">

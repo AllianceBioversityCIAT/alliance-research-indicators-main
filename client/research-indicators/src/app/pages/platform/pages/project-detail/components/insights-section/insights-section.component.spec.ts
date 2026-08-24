@@ -514,3 +514,302 @@ describe('InsightsSectionComponent — literal Http-mock assertion for the SDG d
     // afterEach's httpMock.verify(), not inferred from a spy call count.
   });
 });
+
+// ---------------------------------------------------------------------------
+// T-09 — chart option/table builders (R-IN-003 chart forms, KZ-001). Each
+// spec reads the builder's OUTPUT options/tableModel object from a
+// live-shaped fixture — never a call-sequence assertion.
+// ---------------------------------------------------------------------------
+describe('InsightsSectionComponent — T-09 chart builders (R-IN-003, KZ-001)', () => {
+  let fixture: ComponentFixture<InsightsSectionComponent>;
+  let component: InsightsSectionComponent;
+  let serviceMock: ContractInsightsServiceMock;
+  let originalIntersectionObserver: typeof IntersectionObserver | undefined;
+
+  beforeEach(async () => {
+    originalIntersectionObserver = (globalThis as unknown as { IntersectionObserver?: typeof IntersectionObserver }).IntersectionObserver;
+    (globalThis as unknown as { IntersectionObserver: unknown }).IntersectionObserver = class {
+      constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    };
+
+    serviceMock = createServiceMock();
+
+    await TestBed.configureTestingModule({
+      imports: [InsightsSectionComponent],
+      providers: [{ provide: GetContractInsightsService, useValue: serviceMock }]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InsightsSectionComponent);
+    component = fixture.componentInstance;
+    fixture.componentRef.setInput('contractId', 'C-1');
+    fixture.componentRef.setInput('declaredSdgs', []);
+    fixture.detectChanges();
+    // Past intersection so the tri-state content slot (not the skeleton)
+    // renders once a fixture calls `load()` below — the builder specs care
+    // about mounted DOM, not just the raw computed values.
+    const section: HTMLElement = fixture.nativeElement.querySelector('section');
+    section.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    (globalThis as unknown as { IntersectionObserver: typeof IntersectionObserver | undefined }).IntersectionObserver = originalIntersectionObserver;
+  });
+
+  function load(data: ContractInsightsReport): void {
+    serviceMock.loading.set(false);
+    serviceMock.data.set(data);
+    fixture.detectChanges();
+  }
+
+  const REVIEW_FLOW_WITH_DECISIONS: ContractInsightsReport['review_flow'] = {
+    meta: { total_results: 10, n: 6 },
+    by_event_type: [],
+    by_decision: [
+      { decision: 'APPROVE', label: 'Approved', count: 4 },
+      { decision: 'REJECT', label: 'Rejected', count: 2 }
+    ],
+    cycle_time: { median_days: null, p90_days: null, sample_size: 0 },
+    excluded_for_incomplete_history: 0
+  };
+
+  describe('reach-stacked-bar', () => {
+    it(
+      'never puts not_disaggregated_rows into any series (BUT-clause, failing input: folding it in as a fifth ' +
+        'category or adding its value to a series array reddens this — the sentinel 999 must not appear anywhere ' +
+        'in the series data, and there must be exactly 2 categories: Overall + the one actor type)',
+      () => {
+        const reachWithSentinel: ContractInsightsReport['reach'] = {
+          ...REACH_SPARSE,
+          not_disaggregated_rows: 999
+        };
+        load(fullReport({ reach: reachWithSentinel }));
+
+        const options = component.reachStackedBarOptions() as unknown as {
+          xAxis: { data: string[] };
+          series: { data: number[] }[];
+        };
+        expect(options).not.toBeNull();
+        expect(options.xAxis.data).toEqual(['Overall', 'Farmers']);
+        expect(options.series.length).toBe(4);
+        for (const series of options.series) {
+          expect(series.data).not.toContain(999);
+        }
+      }
+    );
+
+    it('exposes the same overall + per-actor-type sums in the accessible table (R-IN-003 Reach card AND-clause)', () => {
+      load(fullReport({ reach: REACH_SPARSE }));
+
+      const table = component.reachStackedBarTableModel();
+      expect(table).not.toBeNull();
+      expect(table?.rows).toEqual([
+        ['Overall', 3, 2, 4, 3],
+        ['Farmers', 1, 1, 2, 1]
+      ]);
+    });
+
+    it('returns null options/table when there is no by-actor-type breakdown (guards the html\'s hasRows gate)', () => {
+      load(fullReport({ reach: { ...REACH_SPARSE, by_actor_type: [] } }));
+
+      expect(component.reachStackedBarOptions()).toBeNull();
+      expect(component.reachStackedBarTableModel()).toBeNull();
+    });
+  });
+
+  describe('evidence-role-bars', () => {
+    it('renders a non-empty tableModel and one bar-series data point per role', () => {
+      load(fullReport({ evidence: EVIDENCE_SPARSE }));
+
+      const table = component.evidenceRoleBarTableModel();
+      expect(table).not.toBeNull();
+      expect(table?.rows).toEqual([['Primary', 5]]);
+
+      const options = component.evidenceRoleBarOptions() as unknown as { series: { data: number[] }[] };
+      expect(options.series[0].data).toEqual([5]);
+    });
+  });
+
+  describe('review-flow-funnel', () => {
+    it('renders the label, never the raw decision code (R-IN-002 label MUST)', () => {
+      load(fullReport({ review_flow: REVIEW_FLOW_WITH_DECISIONS }));
+
+      const options = component.reviewFlowFunnelOptions() as unknown as {
+        series: { data: { name: string }[] }[];
+      };
+      const names = options.series[0].data.map(d => d.name);
+      expect(names).toEqual(['Approved', 'Rejected']);
+      expect(names).not.toContain('APPROVE');
+      expect(names).not.toContain('REJECT');
+    });
+
+    it(
+      'is rendered in the order delivered by the server — never re-sorted client-side (design R-1, failing ' +
+        'input: sorting by count descending would swap Rejected and Approved for this deliberately non-monotone fixture)',
+      () => {
+        const outOfCountOrder: ContractInsightsReport['review_flow'] = {
+          ...REVIEW_FLOW_WITH_DECISIONS,
+          by_decision: [
+            { decision: 'REJECT', label: 'Rejected', count: 1 },
+            { decision: 'APPROVE', label: 'Approved', count: 9 }
+          ]
+        };
+        load(fullReport({ review_flow: outOfCountOrder }));
+
+        const options = component.reviewFlowFunnelOptions() as unknown as {
+          series: { sort: string; data: { name: string }[] }[];
+        };
+        expect(options.series[0].sort).toBe('none');
+        expect(options.series[0].data.map(d => d.name)).toEqual(['Rejected', 'Approved']);
+      }
+    );
+  });
+
+  describe('levers-bars', () => {
+    it('renders one bar per lever using short_name, matching the same builder family as F1 rankings', () => {
+      load(fullReport({ contributing_levers: LEVERS_COMPLETE }));
+
+      const table = component.leversBarTableModel();
+      expect(table?.rows).toEqual([['L1', 3]]);
+
+      const options = component.leversBarOptions() as unknown as { yAxis: { data: string[] } };
+      expect(options.yAxis.data).toEqual(['L1']);
+    });
+  });
+
+  describe('keywords-treemap', () => {
+    // Top 30, server-ordered desc by count (R-IN-002) — the builder must
+    // carry every item's name/count through untouched.
+    const THIRTY_KEYWORDS: { keyword: string; count: number }[] = Array.from({ length: 30 }, (_, i) => ({
+      keyword: `keyword-${i}`,
+      count: 30 - i
+    }));
+
+    it(
+      'maps all top-30 items with their counts (failing input: slicing/truncating before mapping, or dropping ' +
+        'the count, reddens the length/value assertions below)',
+      () => {
+        load(fullReport({ keywords: { meta: { total_results: 40, n: 30 }, keywords: THIRTY_KEYWORDS } }));
+
+        const table = component.keywordsTreemapTableModel();
+        expect(table?.rows.length).toBe(30);
+        expect(table?.rows[0]).toEqual(['keyword-0', 30]);
+        expect(table?.rows[29]).toEqual(['keyword-29', 1]);
+
+        const options = component.keywordsTreemapOptions() as unknown as {
+          series: { data: { name: string; value: number }[] }[];
+        };
+        const data = options.series[0].data;
+        expect(data.length).toBe(30);
+        expect(data.map(d => d.value)).toEqual(THIRTY_KEYWORDS.map(k => k.count));
+      }
+    );
+
+    it('assigns the deepest ramp bucket to the most frequent keyword and the lightest to the least frequent (sequential ramp, design §6)', () => {
+      load(fullReport({ keywords: { meta: { total_results: 40, n: 30 }, keywords: THIRTY_KEYWORDS } }));
+
+      const options = component.keywordsTreemapOptions() as unknown as {
+        series: { data: { itemStyle: { color: string } }[] }[];
+      };
+      const colors = options.series[0].data.map(d => d.itemStyle.color);
+      // Fallback var(...) tokens in jsdom (ramp CSS custom properties don't
+      // resolve here) — assert the bucket boundary, not a literal hex value.
+      expect(colors[0]).toBe('var(--ac-viz-ramp-5)');
+      expect(colors[29]).toBe('var(--ac-viz-ramp-1)');
+    });
+
+    it('never uses visualMap (T-06 forward pointer: VisualMapComponent is not registered)', () => {
+      load(fullReport({ keywords: KEYWORDS_SPARSE }));
+
+      const options = component.keywordsTreemapOptions() as unknown as Record<string, unknown>;
+      expect(options['visualMap']).toBeUndefined();
+    });
+
+    describe('label contrast reads the ACTUALLY RESOLVED ramp color (theme-aware, not a fixed bucket rule)', () => {
+      const RAMP_TOKEN_NAMES = ['--ac-viz-ramp-1', '--ac-viz-ramp-2', '--ac-viz-ramp-3', '--ac-viz-ramp-4', '--ac-viz-ramp-5'];
+      let originalRamp: (string | null)[] = [];
+
+      beforeEach(() => {
+        // Inline styles on the root ARE resolved by jsdom's getComputedStyle
+        // (unlike stylesheet rules, which jsdom does not compute) — this
+        // proves the label-color decision reads the real resolved color.
+        originalRamp = RAMP_TOKEN_NAMES.map(n => document.documentElement.style.getPropertyValue(n) || null);
+        document.documentElement.style.setProperty('--ac-viz-ramp-1', '#ffffff');
+        document.documentElement.style.setProperty('--ac-viz-ramp-2', '#dddddd');
+        document.documentElement.style.setProperty('--ac-viz-ramp-3', '#999999');
+        document.documentElement.style.setProperty('--ac-viz-ramp-4', '#333333');
+        document.documentElement.style.setProperty('--ac-viz-ramp-5', '#000000');
+      });
+
+      afterEach(() => {
+        RAMP_TOKEN_NAMES.forEach((n, i) => {
+          const value = originalRamp[i];
+          if (value) {
+            document.documentElement.style.setProperty(n, value);
+          } else {
+            document.documentElement.style.removeProperty(n);
+          }
+        });
+      });
+
+      it(
+        'pairs the darkest resolved stop with a light label and the lightest resolved stop with a dark label ' +
+          '(failing input: a fixed "bucket >= 3 -> white" rule reads the token order, not the actual resolved ' +
+          'luminance — tokens:validate independently confirms the ramp inverts direction between themes, so a ' +
+          'bucket-index rule would be right in one theme and backwards in the other)',
+        () => {
+          load(
+            fullReport({
+              keywords: {
+                meta: { total_results: 5, n: 5 },
+                keywords: [
+                  { keyword: 'a', count: 5 },
+                  { keyword: 'b', count: 4 },
+                  { keyword: 'c', count: 3 },
+                  { keyword: 'd', count: 2 },
+                  { keyword: 'e', count: 1 }
+                ]
+              }
+            })
+          );
+
+          const options = component.keywordsTreemapOptions() as unknown as {
+            series: { data: { itemStyle: { color: string }; label: { color: string } }[] }[];
+          };
+          const nodes = options.series[0].data;
+          // rank 0 (most frequent) -> deepest bucket -> ramp-5 = #000000 (dark)
+          expect(nodes[0].itemStyle.color).toBe('#000000');
+          expect(nodes[0].label.color).toBe('var(--ac-white-1)');
+          // rank 4 (least frequent of the top 5) -> lightest bucket -> ramp-1 = #ffffff
+          expect(nodes[4].itemStyle.color).toBe('#ffffff');
+          expect(nodes[4].label.color).toBe('var(--ac-grey-900)');
+        }
+      );
+    });
+  });
+
+  describe('every mounted viz-chart receives a non-empty tableModel (R-IN-003 tableModel MUST)', () => {
+    it('renders at least one app-viz-chart per chart-bearing card when all sections have breakdown rows', () => {
+      load(
+        fullReport({
+          reach: REACH_SPARSE,
+          evidence: EVIDENCE_SPARSE,
+          review_flow: REVIEW_FLOW_WITH_DECISIONS,
+          contributing_levers: LEVERS_COMPLETE,
+          keywords: KEYWORDS_SPARSE
+        })
+      );
+
+      const vizCharts = fixture.nativeElement.querySelectorAll('app-viz-chart');
+      expect(vizCharts.length).toBe(5);
+      expect(component.reachStackedBarTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.evidenceRoleBarTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.reviewFlowFunnelTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.leversBarTableModel()?.rows.length).toBeGreaterThan(0);
+      expect(component.keywordsTreemapTableModel()?.rows.length).toBeGreaterThan(0);
+    });
+  });
+});

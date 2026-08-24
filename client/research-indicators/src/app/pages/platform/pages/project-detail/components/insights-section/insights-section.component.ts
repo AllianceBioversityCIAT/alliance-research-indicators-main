@@ -2,8 +2,16 @@ import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestro
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { GetContractInsightsService } from '@shared/services/get-contract-insights.service';
+import { DarkModeService } from '@shared/services/dark-mode.service';
+import { chartTokens } from '@shared/utils/chart-tokens.util';
+import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
 import { SectionMeta } from '@shared/interfaces/contract-indicator-details.interface';
-import { ContractInsightsReport, DeclaredSdg, SdgCoverageItem } from '@shared/interfaces/contract-insights.interface';
+import {
+  ContractInsightsReport,
+  DeclaredSdg,
+  ReachDisaggregation,
+  SdgCoverageItem
+} from '@shared/interfaces/contract-insights.interface';
 
 // Per-card render states (R-IN-003, design §5 workflow rule 3). Unlike F3
 // (`indicator-deep-dive`), F4 sections are NEVER omitted from a successfully
@@ -27,13 +35,15 @@ type InsightSectionKey = keyof ContractInsightsReport;
 @Component({
   selector: 'app-insights-section',
   standalone: true,
-  imports: [ButtonModule, SkeletonModule],
+  imports: [ButtonModule, SkeletonModule, VizChartComponent],
   templateUrl: './insights-section.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InsightsSectionComponent implements AfterViewInit, OnDestroy {
   private readonly elementRef = inject(ElementRef<HTMLElement>);
   readonly getContractInsightsService = inject(GetContractInsightsService);
+  private readonly darkModeService = inject(DarkModeService);
+  readonly tokens = chartTokens(this.darkModeService.darkMode());
 
   readonly contractId = input<string>('');
   // Contract-declared SDGs (F1 hero source, already loaded on the dashboard —
@@ -163,6 +173,352 @@ export class InsightsSectionComponent implements AfterViewInit, OnDestroy {
   readonly keywords = computed(() => this.getContractInsightsService.keywords());
   readonly keywordsState = computed<InsightCardState>(() => this.cardState(this.keywords()?.meta ?? null, this.sectionFailed('keywords')));
   readonly keywordsHasRows = computed(() => (this.keywords()?.keywords ?? []).length > 0);
+
+  // ---------------------------------------------------------------------
+  // T-09 — chart option/table builders (R-IN-003 chart forms). Each builder
+  // pairs 1:1 with a table-model computed of the same prefix — a chart is
+  // only mounted (template `@if...as opts`) when its options resolve
+  // non-null, so no viz-chart instance ever receives a null options input.
+  // Same builder family as F1 rankings / F3's indicator-deep-dive (private,
+  // locally scoped — not shared across components).
+  // ---------------------------------------------------------------------
+
+  private paletteColors(count: number): string[] {
+    const t = this.tokens();
+    const resolved = [t.series1, t.series2, t.series3, t.series4, t.series5].filter(Boolean);
+    const fallback = [
+      'var(--ac-viz-series-1)',
+      'var(--ac-viz-series-2)',
+      'var(--ac-viz-series-3)',
+      'var(--ac-viz-series-4)',
+      'var(--ac-viz-series-5)'
+    ];
+    const palette = resolved.length === 5 ? resolved : fallback;
+    return Array.from({ length: count }, (_, i) => palette[i % palette.length]);
+  }
+
+  private namedCountTable(caption: string, items: { name: string; count: number }[]): VizChartTableModel {
+    return { caption, headers: ['Name', 'Count'], rows: items.map(i => [i.name, i.count]) };
+  }
+
+  // Horizontal bar, same idiom as F1 rankings / F3's `barOptions`: values are
+  // rendered in reverse array order (bars read top-to-bottom in the server's
+  // desc-by-count order) — a RENDER-ONLY reversal, never a re-sort of the
+  // underlying data the table model reads.
+  private barOptions(items: { name: string; count: number }[], seriesName: string, color?: string): EChartsOption | null {
+    if (!items || items.length === 0) {
+      return null;
+    }
+    const labels = items.map(i => i.name).slice().reverse();
+    const values = items.map(i => i.count).slice().reverse();
+    const barColor = color || this.tokens().series1 || 'var(--ac-viz-series-1)';
+    return {
+      grid: { top: 8, bottom: 16, left: 8, right: 24, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      xAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-200)' } }
+      },
+      yAxis: {
+        type: 'category',
+        data: labels,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } },
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', width: 110, overflow: 'truncate' }
+      },
+      series: [
+        {
+          name: seriesName,
+          type: 'bar',
+          cursor: 'pointer',
+          data: values,
+          itemStyle: { color: barColor, borderRadius: [0, 4, 4, 0] },
+          label: { show: true, position: 'right', color: 'var(--ac-grey-800)', fontFamily: 'Barlow' }
+        }
+      ]
+    };
+  }
+
+  // Funnel data is rendered in the order it was delivered (`sort: 'none'`) —
+  // the server owns stage/decision ordering (design R-1); the client must
+  // never re-sort.
+  private funnelOptions(items: { name: string; count: number }[], seriesName: string): EChartsOption | null {
+    if (!items || items.length === 0) {
+      return null;
+    }
+    const colors = this.paletteColors(items.length);
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+      series: [
+        {
+          name: seriesName,
+          type: 'funnel',
+          left: '6%',
+          right: '6%',
+          sort: 'none',
+          gap: 4,
+          label: { show: true, position: 'inside', color: 'var(--ac-white-1)', fontFamily: 'Barlow' },
+          itemStyle: { borderColor: 'var(--ac-white-1)', borderWidth: 1 },
+          data: items.map((it, idx) => ({ name: it.name, value: it.count, itemStyle: { color: colors[idx] } }))
+        }
+      ]
+    };
+  }
+
+  // Five-stop sequential ramp (design §6), keyed off `--ac-viz-ramp-1..5` —
+  // never `visualMap` (VisualMapComponent is not registered in viz-chart;
+  // its absence fails silently at render — T-06 forward pointer).
+  private rampColors(): string[] {
+    const t = this.tokens();
+    const resolved = [t.ramp1, t.ramp2, t.ramp3, t.ramp4, t.ramp5].filter(Boolean);
+    const fallback = ['var(--ac-viz-ramp-1)', 'var(--ac-viz-ramp-2)', 'var(--ac-viz-ramp-3)', 'var(--ac-viz-ramp-4)', 'var(--ac-viz-ramp-5)'];
+    return resolved.length === 5 ? resolved : fallback;
+  }
+
+  // Buckets a server-ordered rank (0 = most frequent) into the 5 ramp stops,
+  // most-frequent → deepest stop, least-frequent-of-the-top-30 → lightest.
+  // Discrete (not interpolated) so it stays deterministic and spec-testable.
+  private treemapRampBucket(rank: number, total: number): number {
+    if (total <= 1) {
+      return 4;
+    }
+    return 4 - Math.min(4, Math.floor((rank / (total - 1)) * 4));
+  }
+
+  // WCAG label-contrast decision (design §6), computed from the ACTUALLY
+  // RESOLVED ramp color for this node — never a fixed bucket-index rule.
+  // `npm run tokens:validate` confirms the ramp's lightness direction is
+  // intentionally inverted between themes (light mode: ramp-1 lightest ->
+  // ramp-5 darkest; dark mode: ramp-1 darkest -> ramp-5 lightest), so a rule
+  // like "buckets 3-4 always get white text" would be right in light mode
+  // and backwards in dark mode. Reading the resolved color's own luminance —
+  // never `isDarkMode()` itself, which the client conventions ban for color
+  // decisions — self-corrects in both themes without an automated pixel
+  // gate (requirements.md defect table; owned by tokens:validate + HITL).
+  // Unresolved tokens (jsdom's `var(--ac-viz-ramp-N)` placeholders in tests)
+  // fall back to a safe default.
+  private contrastingLabelColor(color: string): string {
+    const rgb = this.parseRgb(color);
+    if (!rgb) {
+      return 'var(--ac-grey-800)';
+    }
+    const [r, g, b] = rgb;
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.55 ? 'var(--ac-grey-900)' : 'var(--ac-white-1)';
+  }
+
+  private parseRgb(color: string): [number, number, number] | null {
+    const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(color.trim());
+    if (hex) {
+      let value = hex[1];
+      if (value.length === 3) {
+        value = value
+          .split('')
+          .map(c => c + c)
+          .join('');
+      }
+      const num = parseInt(value, 16);
+      return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+    }
+    const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color.trim());
+    if (rgb) {
+      return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+    }
+    return null;
+  }
+
+  // --- Reach: stacked bars, women/men × youth/not-youth ---------------------
+
+  // BUT-clause (R-IN-003 Reach card scenario): `not_disaggregated_rows`
+  // NEVER enters this series — it is rendered as the separate count tile
+  // already present in the template (T-08). Copy stays "actor groups",
+  // never people/individuals (owner directive, T-08 interface doc).
+  readonly reachStackedBarOptions = computed<EChartsOption | null>(() => {
+    const overall = this.reachOverall();
+    const byActorType = this.reach()?.by_actor_type ?? [];
+    if (!overall || byActorType.length === 0) {
+      return null;
+    }
+    const categories = ['Overall', ...byActorType.map(a => a.actor_type_name)];
+    const rows: ReachDisaggregation[] = [overall, ...byActorType];
+    const colors = this.paletteColors(4);
+    return {
+      grid: { top: 16, bottom: 40, left: 8, right: 8, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { bottom: 0, textStyle: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow', fontSize: 11 } },
+      xAxis: {
+        type: 'category',
+        data: categories,
+        axisTick: { show: false },
+        axisLine: { lineStyle: { color: 'var(--ac-grey-300)' } },
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' }
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { color: 'var(--ac-grey-700)', fontFamily: 'Barlow' },
+        splitLine: { lineStyle: { color: 'var(--ac-grey-100)', type: 'dashed' } }
+      },
+      series: [
+        {
+          name: 'Women, youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.women_youth),
+          itemStyle: { color: colors[0] }
+        },
+        {
+          name: 'Women, not youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.women_not_youth),
+          itemStyle: { color: colors[1] }
+        },
+        {
+          name: 'Men, youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.men_youth),
+          itemStyle: { color: colors[2] }
+        },
+        {
+          name: 'Men, not youth',
+          type: 'bar',
+          stack: 'reach',
+          cursor: 'pointer',
+          data: rows.map(r => r.men_not_youth),
+          itemStyle: { color: colors[3] }
+        }
+      ]
+    };
+  });
+
+  readonly reachStackedBarTableModel = computed<VizChartTableModel | null>(() => {
+    const overall = this.reachOverall();
+    const byActorType = this.reach()?.by_actor_type ?? [];
+    if (!overall || byActorType.length === 0) {
+      return null;
+    }
+    const categories = ['Overall', ...byActorType.map(a => a.actor_type_name)];
+    const rows: ReachDisaggregation[] = [overall, ...byActorType];
+    return {
+      caption: 'Actor-group reach by gender × youth, overall and per actor type',
+      headers: ['Group', 'Women, youth', 'Women, not youth', 'Men, youth', 'Men, not youth'],
+      rows: rows.map((r, idx) => [categories[idx], r.women_youth, r.women_not_youth, r.men_youth, r.men_not_youth])
+    };
+  });
+
+  // --- Evidence: counts per role --------------------------------------------
+
+  readonly evidenceRoleBarOptions = computed<EChartsOption | null>(() => {
+    const items = this.evidence()?.by_role ?? [];
+    return this.barOptions(
+      items.map(i => ({ name: i.name, count: i.count })),
+      'Evidence counts per role'
+    );
+  });
+
+  readonly evidenceRoleBarTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.evidence()?.by_role ?? [];
+    return items.length === 0
+      ? null
+      : this.namedCountTable(
+          'Evidence counts per role',
+          items.map(i => ({ name: i.name, count: i.count }))
+        );
+  });
+
+  // --- Review flow: funnel by decision --------------------------------------
+
+  // Renders `label`, never the raw `decision` code (R-IN-002 label MUST).
+  readonly reviewFlowFunnelOptions = computed<EChartsOption | null>(() => {
+    const items = this.reviewFlow()?.by_decision ?? [];
+    return this.funnelOptions(
+      items.map(i => ({ name: i.label, count: i.count })),
+      'Review decisions'
+    );
+  });
+
+  readonly reviewFlowFunnelTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.reviewFlow()?.by_decision ?? [];
+    return items.length === 0
+      ? null
+      : this.namedCountTable(
+          'Review decisions, ordered as delivered',
+          items.map(i => ({ name: i.label, count: i.count }))
+        );
+  });
+
+  // --- Contributing levers: bars per lever ----------------------------------
+
+  readonly leversBarOptions = computed<EChartsOption | null>(() => {
+    const items = this.contributingLevers()?.levers ?? [];
+    return this.barOptions(
+      items.map(i => ({ name: i.short_name, count: i.count })),
+      'Contributing levers by result count'
+    );
+  });
+
+  readonly leversBarTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.contributingLevers()?.levers ?? [];
+    return items.length === 0
+      ? null
+      : this.namedCountTable(
+          'Contributing levers by result count',
+          items.map(i => ({ name: i.short_name, count: i.count }))
+        );
+  });
+
+  // --- Keywords: treemap, top 30 by frequency -------------------------------
+
+  readonly keywordsTreemapOptions = computed<EChartsOption | null>(() => {
+    const items = this.keywords()?.keywords ?? [];
+    if (items.length === 0) {
+      return null;
+    }
+    const palette = this.rampColors();
+    const total = items.length;
+    return {
+      tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+      series: [
+        {
+          name: 'Top keywords',
+          type: 'treemap',
+          roam: false,
+          nodeClick: false,
+          breadcrumb: { show: false },
+          label: { show: true, fontFamily: 'Barlow', overflow: 'truncate' },
+          itemStyle: { borderColor: 'var(--ac-white-1)', borderWidth: 1, gapWidth: 1 },
+          data: items.map((it, idx) => {
+            const bucket = this.treemapRampBucket(idx, total);
+            return {
+              name: it.keyword,
+              value: it.count,
+              itemStyle: { color: palette[bucket] },
+              label: { color: this.contrastingLabelColor(palette[bucket]) }
+            };
+          })
+        }
+      ]
+    };
+  });
+
+  readonly keywordsTreemapTableModel = computed<VizChartTableModel | null>(() => {
+    const items = this.keywords()?.keywords ?? [];
+    if (items.length === 0) {
+      return null;
+    }
+    return {
+      caption: 'Top 30 keywords by result frequency',
+      headers: ['Keyword', 'Count'],
+      rows: items.map(i => [i.keyword, i.count])
+    };
+  });
 
   // ---------------------------------------------------------------------
   // Laziness (D-F3-5 idiom, copied from indicator-deep-dive): fetch on first

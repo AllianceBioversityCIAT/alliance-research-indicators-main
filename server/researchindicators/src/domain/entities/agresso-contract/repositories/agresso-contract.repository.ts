@@ -2851,7 +2851,8 @@ export class AgressoContractRepository
         cat.code AS actor_type_id,
         CASE
           WHEN cat.code = 5
-            THEN COALESCE(NULLIF(TRIM(MAX(ra.actor_type_custom_name)), ''), cat.name)
+            AND COUNT(DISTINCT NULLIF(TRIM(ra.actor_type_custom_name), '')) = 1
+            THEN MAX(NULLIF(TRIM(ra.actor_type_custom_name), ''))
           ELSE cat.name
         END AS actor_type_name,
         COALESCE(SUM(ra.women_youth), 0) AS women_youth,

@@ -115,13 +115,13 @@ graph TD
 - **Requirements covered:** R-IN-003 chart forms (reach stacked bars with not-disaggregated outside, funnel + cycle tiles, evidence tiles/bars, levers bars, treemap top 30, tableModel MUST); NFR-IN-001…004; visual defect class; KZ-002.
 - **Files:** insights-section builders (+spec); evidence records.
 - **Acceptance / done check:**
-  - [ ] Builder specs: not-disaggregated rows never enter stacked series (**failing input:** add them to a series → fails); treemap data = top 30 with counts; every chart gets a non-empty `tableModel`; hex-literal grep over new files → zero.
-  - [ ] Server suites + `test:cov`; client full suite + coverage + `npm run build` + tsc-spec delta ≤ 945 — **sequenced, never concurrent** (§4.3).
-  - [ ] Bundle: initial ±5 kB, Treemap in the lazy chunk (**disqualifier:** baselines from different branch states).
-  - [ ] Latency: 3 timed dev runs p95-proxy ≤ 800 ms; spread >±40% → inconclusive.
-  - [ ] **HITL (KZ-014, human):** light+dark screenshots of the six cards; laziness with the section below the fold; F1/F3 unchanged; `/swagger` renders the endpoint.
-  - [ ] K-004 global disqualifier: every cited gate observed red once.
-- **Deps:** T-05, T-06, T-08 · **Effort:** L · **Status:** todo
+  - [x] Builder specs: not-disaggregated rows never enter stacked series (**failing input:** add them to a series → fails); treemap data = top 30 with counts; every chart gets a non-empty `tableModel`; hex-literal grep over new files → zero.
+  - [x] Server suites + `test:cov`; client full suite + coverage + `npm run build` + tsc-spec delta ≤ 945 — **sequenced, never concurrent** (§4.3). *(340/2530 cov exit 0 · 318/6767 + 97.95/92.46/97.38/98.32 · build 0 errors · tsc 937 = F3 baseline, no new — 2 F4-introduced errors found and fixed; see execution.md.)*
+  - [x] Bundle: initial ±5 kB, Treemap in the lazy chunk (**disqualifier:** baselines from different branch states). *(Initial 1.12 MB identical to F3 T-10 baseline, same branch lineage.)*
+  - [x] Latency: 3 timed dev runs p95-proxy ≤ 800 ms; spread >±40% → inconclusive. *(Capture 1 inconclusive spread 46%; capture 2 PASS max 179.4 ms spread 24.9% — DB-proxy scope declared, K-021; both recorded.)*
+  - [ ] **HITL (KZ-014, human):** light+dark screenshots of the six cards; laziness with the section below the fold; F1/F3 unchanged; `/swagger` renders the endpoint. *(+ named additions: dark-mode chip groups; reach tooltip/table read-aloud; treemap rank-bucket colors.)*
+  - [x] K-004 global disqualifier: every cited gate observed red once. *(Per-task reds recorded in execution.md T-01…T-09; tsc-spec gate observed red at 939; tokens:validate observed catching the theme-inverted ramp.)*
+- **Deps:** T-05, T-06, T-08 · **Effort:** L · **Status:** `[~]` automated gates PASS — awaiting owner HITL (execution.md T-09)
 
 ---
 
