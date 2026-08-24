@@ -113,3 +113,10 @@ OQ-1 / OQ-2 — resolved at the mockup gate (this phase's approval), recorded as
 ## 15. References
 
 `./requirements.md` · probe evidence in requirements §1 · archived family `2026-08-24-changes--project-dashboard-v3*` (idiom sources) · Kaizen applied: KZ-001, KZ-002, KZ-014, KZ-015, K-004, F4 lessons 1-2 (assumption-probe at specify — practiced here; prod/test LOC split — practiced here).
+
+### D-DN-6 — OQ resolutions (owner, mockup gate 2026-08-24)
+
+| OQ | Decision | Consequence |
+|---|---|---|
+| OQ-1 | **A — status semaphore lives IN the hero** (act 1 answers "¿cómo va?" at a glance) | Standalone status card retires; its strip + legend + drill links move into the hero; `md:` behavior verified at HITL (R-1 risk) |
+| OQ-2 | **A — rankings migrate to viz-chart** (one engine everywhere) | Top regions/countries + partner/contact pills become viz-chart horizontal bars (F1 rankings builder family); pill specs migrate in the same task (reversion challenge 2); the ONLY declared non-echarts idiom left is the hero **composition strip** |
