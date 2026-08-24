@@ -108,3 +108,10 @@
   5. Evidence hygiene: jest line omitted package root (adjudicated unambiguous); `listCards[2]` identity assertion one line short (non-null+title covered) — recorded.
 - **Requirements covered:** R-DN-002 migration half + zero-hex BUT + a11y AND; design §2.2/§6, D-DN-6.
 - **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-05 — attempt 1 — **PARKED `[~]` (runtime failure: session limit)**
+
+- **Date:** 2026-08-24 ~16:20 Bogotá. `dn-t05` died mid-task on the account usage limit (resets 6:10pm Bogotá, progress saved); Leader session at the same boundary. NOT a work FAIL — no attempt consumed.
+- **Working tree (UNCOMMITTED, do not discard):** partial T-05 edits in `insights-section.component.{ts,html,spec.ts}` + `project-dashboard.component.{ts,html,spec.ts}`. Last commits: T-04 `53390e3f`, T-03 `7e574f5c`.
+- **Resume:** a wake message is ALREADY QUEUED in `dn-t05`'s inbox (fires when its limit resets) — if it dies again, `SendMessage` to `dn-t05` repeats the wake; its brief + 4 carried pointers stand. On its report: diff (pathspec insights-section + project-dashboard folders) → Reviewer → finalize → **T-07** (Leader battery: client full suite + coverage + build + tsc-spec delta vs re-measured baseline incl. `results-trend-card.ssr.spec.ts` [T-01 adv. 4] + bundle ±5 kB + tokens:validate; then **HITL con el owner** — mandatory named checks: viz-bar token colors light+dark over all 7 surfaces [T-03 adv. 1], hero strip CLS on project resolve + `md:` mobile [T-04 adv. 2/R-1], act-3 narrow breakpoint [T-03 adv. 3], acts vs mockup, below-the-fold network, drills).
+- **Done so far: 5/7** (T-01 `da737237`, T-02 `88f8204e`, T-03 `7e574f5c`, T-04 `53390e3f`, T-06 `b1641a58`).

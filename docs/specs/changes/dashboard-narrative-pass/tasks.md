@@ -77,7 +77,7 @@ graph TD
   - [ ] F4 insights observer targets the FIRST F4 card (act 4); ONE fetch feeds all repositioned F4 cards (**failing input:** load in ngOnInit or a second fetch → zero-fetch/single-fetch specs red — F3/F4 pattern, KZ-015 transitions).
   - [ ] First-paint request assertions unchanged (real-HTTP harness case from F4 T-08 re-run green); F1 drill + F3 panel specs green at new positions.
   - [ ] Targeted jest `--coverage=false` + eslint + `npm run s-lint` (if SCSS) green.
-- **Deps:** T-03, T-04 · **Effort:** L · **Status:** todo
+- **Deps:** T-03, T-04 · **Effort:** L · **Status:** `[~]` parked on session limit 2026-08-24 — resume protocol in execution.md T-05
 
 ### T-06 — Design-system registry update (`docs/ux-ui/design.md` §8)
 
