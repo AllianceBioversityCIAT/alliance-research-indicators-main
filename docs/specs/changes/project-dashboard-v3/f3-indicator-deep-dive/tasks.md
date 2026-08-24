@@ -97,9 +97,9 @@ graph TD
 - **Files:** `shared/components/viz-chart/viz-chart.component.ts` (+spec).
 - **Description:** Tree-shaken imports + ComposeOption union extension. No API change.
 - **Acceptance / done check:**
-  - [ ] `npm run tokens:validate` green; existing viz-chart specs green; `npm run build` green.
-  - [ ] Presence caveat: registration is not a rendered form — rendering is owned by T-09 specs + T-10 HITL; recorded.
-- **Deps:** none · **Effort:** S · **Status:** todo
+  - [x] `npm run tokens:validate` green; existing viz-chart specs green; `npm run build` green.
+  - [x] Presence caveat: registration is not a rendered form — rendering is owned by T-09 specs + T-10 HITL; recorded.
+- **Deps:** none · **Effort:** S · **Status:** done
 
 ### T-07 — Client interface + API method + `GetIndicatorDetailsService` 🔒 gate: F2 client landed
 

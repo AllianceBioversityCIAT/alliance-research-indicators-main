@@ -21,7 +21,13 @@ import {
   HeatmapChart,
   HeatmapSeriesOption,
   MapChart,
-  MapSeriesOption
+  MapSeriesOption,
+  PieChart,
+  PieSeriesOption,
+  FunnelChart,
+  FunnelSeriesOption,
+  RadarChart,
+  RadarSeriesOption
 } from 'echarts/charts';
 import {
   TitleComponent,
@@ -37,7 +43,9 @@ import {
   VisualMapComponent,
   VisualMapComponentOption,
   GeoComponent,
-  GeoComponentOption
+  GeoComponentOption,
+  RadarComponent,
+  RadarComponentOption
 } from 'echarts/components';
 import { SVGRenderer } from 'echarts/renderers';
 import { UniversalTransition } from 'echarts/features';
@@ -50,6 +58,9 @@ echarts.use([
   GraphChart,
   HeatmapChart,
   MapChart,
+  PieChart,
+  FunnelChart,
+  RadarChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
@@ -57,6 +68,7 @@ echarts.use([
   LegendComponent,
   VisualMapComponent,
   GeoComponent,
+  RadarComponent,
   UniversalTransition
 ]);
 
@@ -73,6 +85,9 @@ export type EChartsOption = echarts.ComposeOption<
   | GraphSeriesOption
   | HeatmapSeriesOption
   | MapSeriesOption
+  | PieSeriesOption
+  | FunnelSeriesOption
+  | RadarSeriesOption
   | TitleComponentOption
   | TooltipComponentOption
   | GridComponentOption
@@ -80,6 +95,7 @@ export type EChartsOption = echarts.ComposeOption<
   | LegendComponentOption
   | VisualMapComponentOption
   | GeoComponentOption
+  | RadarComponentOption
 >;
 
 @Component({

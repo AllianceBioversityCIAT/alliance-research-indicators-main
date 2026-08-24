@@ -132,3 +132,20 @@
 - **Reviewer Verdict:**
   - `STATUS: PASS`
   - Summary: The implementation of Task T-05 strictly adheres to the requirements and amended owner decisions. The integration test correctly isolates the module without importing AppModule or real DataSource, cleanly simulating in-process behavior. The ResponseInterceptor and GlobalExceptions filters are wired properly, and all 5 specified HTTP cases are accurately verified with zero network calls.
+
+### Task T-06 — Register Pie/Funnel/Radar in viz-chart
+
+- **Status:** PASS (Attempt 1)
+- **Implementer:** custom-implementer (flash)
+- **Reviewer:** custom-reviewer (pro)
+- **Files touched:**
+  - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.ts`
+  - `client/research-indicators/src/app/shared/components/viz-chart/viz-chart.component.spec.ts`
+- **Verification Evidence:**
+  - Unit tests: `jest src/app/shared/components/viz-chart/viz-chart.component.spec.ts --silent --coverage=false` (16/16 passed in 1.12s)
+  - Token validator: `npm run tokens:validate` (19/19 tokens valid in light/dark modes, monotonic ramps, 0 errors)
+  - Client build: `npm run build` (0 errors, clean exit 0)
+- **Presence Caveat Recorded:** Module registration and type acceptance in `viz-chart.component` makes `PieChart`, `FunnelChart`, and `RadarChart` available for use. Actual visual rendering of deep-dive charts, option generation, and token theme mapping are owned by tasks T-09 and T-10.
+- **Reviewer Verdict:**
+  - `STATUS: PASS`
+  - Summary: The implementation strictly conforms to Task T-06 specifications. `PieChart`, `FunnelChart`, `RadarChart`, and `RadarComponent` are successfully registered via tree-shaken imports and added to the `EChartsOption` union type in `viz-chart.component.ts`, with corresponding assertions passing in `viz-chart.component.spec.ts`.

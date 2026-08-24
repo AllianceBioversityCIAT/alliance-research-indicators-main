@@ -1,6 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from './viz-chart.component';
 import * as echarts from 'echarts/core';
+import { PieChart, FunnelChart, RadarChart } from 'echarts/charts';
+import { RadarComponent } from 'echarts/components';
+
+let initialRegisteredModules: unknown[] = [];
 
 const mockChartInstance = {
   setOption: jest.fn(),
@@ -49,6 +53,10 @@ describe('VizChartComponent (R-DA-006, R-DA-007, R-DA-009, D-DA-1)', () => {
   let fixture: ComponentFixture<VizChartComponent>;
   let component: VizChartComponent;
   let matchMediaMock: jest.Mock;
+
+  beforeAll(() => {
+    initialRegisteredModules = (echarts.use as jest.Mock).mock.calls[0]?.[0] || [];
+  });
 
   const mockTableModel: VizChartTableModel = {
     caption: 'Results by report year',
@@ -324,6 +332,143 @@ describe('VizChartComponent (R-DA-006, R-DA-007, R-DA-009, D-DA-1)', () => {
       expect(mockChartInstance.dispose).toHaveBeenCalledTimes(1);
       expect(observerInstance.disconnect).toHaveBeenCalledTimes(1);
       expect(component.getInstance()).toBeUndefined();
+    });
+  });
+
+  describe('Module Registration & Chart Types (T-06 / R-DD-004)', () => {
+    it('registers PieChart, FunnelChart, RadarChart, and RadarComponent with echarts.use', () => {
+      expect(initialRegisteredModules).toEqual(
+        expect.arrayContaining([PieChart, FunnelChart, RadarChart, RadarComponent])
+      );
+    });
+
+    it('accepts and applies Pie chart options at runtime', () => {
+      const pieOptions: EChartsOption = {
+        title: { text: 'Gender Distribution' },
+        tooltip: { trigger: 'item' },
+        series: [
+          {
+            type: 'pie',
+            radius: ['40%', '70%'],
+            data: [
+              { value: 60, name: 'Women' },
+              { value: 40, name: 'Men' }
+            ]
+          }
+        ]
+      };
+
+      fixture.componentRef.setInput('options', pieOptions);
+      fixture.componentRef.setInput('tableModel', mockTableModel);
+      fixture.detectChanges();
+
+      expect(mockChartInstance.setOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              type: 'pie',
+              data: [
+                { value: 60, name: 'Women' },
+                { value: 40, name: 'Men' }
+              ]
+            })
+          ]
+        }),
+        true
+      );
+    });
+
+    it('accepts and applies Funnel chart options at runtime', () => {
+      const funnelOptions: EChartsOption = {
+        title: { text: 'Policy Stages' },
+        tooltip: { trigger: 'item' },
+        series: [
+          {
+            type: 'funnel',
+            left: '10%',
+            top: 60,
+            bottom: 60,
+            width: '80%',
+            data: [
+              { value: 100, name: 'Stage 1' },
+              { value: 80, name: 'Stage 2' },
+              { value: 40, name: 'Stage 3' }
+            ]
+          }
+        ]
+      };
+
+      fixture.componentRef.setInput('options', funnelOptions);
+      fixture.componentRef.setInput('tableModel', mockTableModel);
+      fixture.detectChanges();
+
+      expect(mockChartInstance.setOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              type: 'funnel',
+              data: [
+                { value: 100, name: 'Stage 1' },
+                { value: 80, name: 'Stage 2' },
+                { value: 40, name: 'Stage 3' }
+              ]
+            })
+          ]
+        }),
+        true
+      );
+    });
+
+    it('accepts and applies Radar chart and component options at runtime', () => {
+      const radarOptions: EChartsOption = {
+        title: { text: 'Scalability Assessment' },
+        radar: {
+          indicator: [
+            { name: 'Simpler to Use', max: 10 },
+            { name: 'Cost Effective', max: 10 },
+            { name: 'Scalable', max: 10 }
+          ]
+        },
+        series: [
+          {
+            type: 'radar',
+            data: [
+              {
+                value: [8, 6, 9],
+                name: 'Readiness Flags'
+              }
+            ]
+          }
+        ]
+      };
+
+      fixture.componentRef.setInput('options', radarOptions);
+      fixture.componentRef.setInput('tableModel', mockTableModel);
+      fixture.detectChanges();
+
+      expect(mockChartInstance.setOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          radar: expect.objectContaining({
+            indicator: [
+              { name: 'Simpler to Use', max: 10 },
+              { name: 'Cost Effective', max: 10 },
+              { name: 'Scalable', max: 10 }
+            ]
+          }),
+          series: [
+            expect.objectContaining({
+              type: 'radar',
+              data: [
+                {
+                  value: [8, 6, 9],
+                  name: 'Readiness Flags'
+                }
+              ]
+            })
+          ]
+        }),
+        true
+      );
     });
   });
 });
