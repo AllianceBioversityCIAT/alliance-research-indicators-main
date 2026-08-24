@@ -116,6 +116,7 @@ import { LinkResultsResponse } from '@shared/interfaces/link-results.interface';
 import { LatestResult } from '@shared/interfaces/latest-result.interface';
 import { ContractStaffReport } from '@shared/interfaces/project-dashboard.interface';
 import { ContractDashboardReport } from '@shared/interfaces/contract-dashboard.interface';
+import { ContractIndicatorDetailsReport } from '@shared/interfaces/contract-indicator-details.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -897,6 +898,11 @@ export class ApiService {
 
   GET_ContractDashboard = (contractId: string): Promise<MainResponse<ContractDashboardReport>> => {
     const url = () => `agresso/contracts/reports/dashboard?contract-id=${encodeURIComponent(contractId)}`;
+    return this.TP.get(url(), {});
+  };
+
+  GET_IndicatorDetails = (contractId: string): Promise<MainResponse<ContractIndicatorDetailsReport>> => {
+    const url = () => `agresso/contracts/reports/indicator-details?contract-id=${encodeURIComponent(contractId)}`;
     return this.TP.get(url(), {});
   };
 

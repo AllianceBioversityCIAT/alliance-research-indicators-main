@@ -107,9 +107,9 @@ graph TD
 - **Files:** `contract-indicator-details.interface.ts` (NEW), `api.service.ts`, `get-indicator-details.service.ts` (NEW, +spec).
 - **Description:** Signal service with `load(contractId)` (no auto-load), `update()`, per-section accessors + `sectionFailed`; envelope handling.
 - **Acceptance / done check:**
-  - [ ] `HttpTestingController` spec: exact URL/params; `load` twice with the same contract → one request (**failing input:** remove the dedupe → fails); `update()` forces a re-fetch.
-  - [ ] Fixtures = live nested shapes (KZ-001); targeted jest `--coverage=false` + eslint green.
-- **Deps:** T-04 + F2-client-landed gate · **Effort:** M · **Status:** todo
+  - [x] `HttpTestingController` spec: exact URL/params; `load` twice with the same contract → one request (**failing input:** remove the dedupe → fails); `update()` forces a re-fetch.
+  - [x] Targeted jest `--coverage=false` + eslint green.
+- **Deps:** T-04 + F2-client-landed gate · **Effort:** M · **Status:** done
 
 ### T-08 — Deep-dive component: tabs, states, laziness 🔒 gate: F2 client landed
 

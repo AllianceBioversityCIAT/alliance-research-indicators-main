@@ -149,3 +149,20 @@
 - **Reviewer Verdict:**
   - `STATUS: PASS`
   - Summary: The implementation strictly conforms to Task T-06 specifications. `PieChart`, `FunnelChart`, `RadarChart`, and `RadarComponent` are successfully registered via tree-shaken imports and added to the `EChartsOption` union type in `viz-chart.component.ts`, with corresponding assertions passing in `viz-chart.component.spec.ts`.
+
+### Task T-07 — Client interface + API method + GetIndicatorDetailsService
+
+- **Status:** PASS (Attempt 1)
+- **Implementer:** custom-implementer (flash)
+- **Reviewer:** custom-reviewer (pro)
+- **Files touched:**
+  - `client/research-indicators/src/app/shared/interfaces/contract-indicator-details.interface.ts` (NEW)
+  - `client/research-indicators/src/app/shared/services/api.service.ts`
+  - `client/research-indicators/src/app/shared/services/get-indicator-details.service.ts` (NEW)
+  - `client/research-indicators/src/app/shared/services/get-indicator-details.service.spec.ts` (NEW)
+- **Verification Evidence:**
+  - Unit tests: `jest src/app/shared/services/get-indicator-details.service.spec.ts --silent --coverage=false` (11/11 passed in 0.98s)
+  - Linter: `npx eslint` on touched client files (0 errors)
+- **Reviewer Verdict:**
+  - `STATUS: PASS`
+  - Summary: The task T-07 implementation cleanly fulfills all specified requirements and passes the 4R assessment. The client interfaces strictly mirror the server DTO tri-state model, GetIndicatorDetailsService leverages Angular signals flawlessly for state management and deduplication, and testing coverage correctly verifies all edge cases, including error transitions and partial failures.
