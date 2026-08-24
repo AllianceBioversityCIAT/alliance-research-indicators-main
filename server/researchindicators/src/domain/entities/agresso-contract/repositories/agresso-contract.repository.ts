@@ -67,8 +67,12 @@ import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto
 import {
   CapacitySharingDetailsDto,
   CapacitySharingGenderSplitDto,
+  InnovationDevDetailsDto,
+  InnovationDevScalabilityProfileDto,
+  InnovationUseDetailsDto,
   KnowledgeProductDetailsDto,
   OicrDetailsDto,
+  PolicyChangeDetailsDto,
   ReportingVelocityItemDto,
 } from '../dto/contract-indicator-details-report.dto';
 
@@ -1901,6 +1905,573 @@ export class AgressoContractRepository
         externalUseRows as Array<Record<string, unknown>>
       ).map((row) => ({
         name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  async getInnovationDevDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<InnovationDevDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rid.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+    `;
+
+    const readinessLevelsQuery = `
+      SELECT
+        cirl.id AS id,
+        cirl.name AS name,
+        cirl.level AS level,
+        COUNT(DISTINCT rid.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+      INNER JOIN clarisa_innovation_readiness_levels cirl
+        ON cirl.id = rid.innovation_readiness_id
+        AND cirl.is_active = TRUE
+      GROUP BY cirl.id, cirl.name, cirl.level
+      ORDER BY cirl.level ASC
+    `;
+
+    const innovationTypesQuery = `
+      SELECT
+        cit.code AS id,
+        cit.name AS name,
+        COUNT(DISTINCT rid.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+      INNER JOIN clarisa_innovation_types cit
+        ON cit.code = rid.innovation_type_id
+        AND cit.is_active = TRUE
+      GROUP BY cit.code, cit.name
+      ORDER BY count DESC, cit.name ASC
+    `;
+
+    const innovationNaturesQuery = `
+      SELECT
+        cic.id AS id,
+        cic.name AS name,
+        COUNT(DISTINCT rid.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+      INNER JOIN clarisa_innovation_characteristics cic
+        ON cic.id = rid.innovation_nature_id
+        AND cic.is_active = TRUE
+      GROUP BY cic.id, cic.name
+      ORDER BY count DESC, cic.name ASC
+    `;
+
+    const anticipatedUsersQuery = `
+      SELECT
+        idau.id AS id,
+        idau.name AS name,
+        COUNT(DISTINCT rid.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+      INNER JOIN innovation_dev_anticipated_users idau
+        ON idau.id = rid.anticipated_users_id
+        AND idau.is_active = TRUE
+      GROUP BY idau.id, idau.name
+      ORDER BY count DESC, idau.name ASC
+    `;
+
+    const scalabilityProfileQuery = `
+      SELECT
+        SUM(CASE WHEN rid.is_cheaper_than_alternatives = 1 THEN 1 ELSE 0 END) AS is_cheaper_than_alternatives_true,
+        SUM(CASE WHEN rid.is_cheaper_than_alternatives IS NOT NULL THEN 1 ELSE 0 END) AS is_cheaper_than_alternatives_answered,
+        SUM(CASE WHEN rid.is_simpler_to_use = 1 THEN 1 ELSE 0 END) AS is_simpler_to_use_true,
+        SUM(CASE WHEN rid.is_simpler_to_use IS NOT NULL THEN 1 ELSE 0 END) AS is_simpler_to_use_answered,
+        SUM(CASE WHEN rid.does_perform_better = 1 THEN 1 ELSE 0 END) AS does_perform_better_true,
+        SUM(CASE WHEN rid.does_perform_better IS NOT NULL THEN 1 ELSE 0 END) AS does_perform_better_answered,
+        SUM(CASE WHEN rid.is_desirable_to_users = 1 THEN 1 ELSE 0 END) AS is_desirable_to_users_true,
+        SUM(CASE WHEN rid.is_desirable_to_users IS NOT NULL THEN 1 ELSE 0 END) AS is_desirable_to_users_answered,
+        SUM(CASE WHEN rid.has_commercial_viability = 1 THEN 1 ELSE 0 END) AS has_commercial_viability_true,
+        SUM(CASE WHEN rid.has_commercial_viability IS NOT NULL THEN 1 ELSE 0 END) AS has_commercial_viability_answered,
+        SUM(CASE WHEN rid.has_suitable_enabling_environment = 1 THEN 1 ELSE 0 END) AS has_suitable_enabling_environment_true,
+        SUM(CASE WHEN rid.has_suitable_enabling_environment IS NOT NULL THEN 1 ELSE 0 END) AS has_suitable_enabling_environment_answered,
+        SUM(CASE WHEN rid.has_evidence_of_uptake = 1 THEN 1 ELSE 0 END) AS has_evidence_of_uptake_true,
+        SUM(CASE WHEN rid.has_evidence_of_uptake IS NOT NULL THEN 1 ELSE 0 END) AS has_evidence_of_uptake_answered
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_innovation_dev rid
+        ON rid.result_id = cr.result_id
+        AND rid.is_active = TRUE
+    `;
+
+    const [
+      countRows,
+      readinessLevelRows,
+      innovationTypeRows,
+      innovationNatureRows,
+      anticipatedUserRows,
+      scalabilityRows,
+    ] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(readinessLevelsQuery, [contractId]),
+      this.query(innovationTypesQuery, [contractId]),
+      this.query(innovationNaturesQuery, [contractId]),
+      this.query(anticipatedUsersQuery, [contractId]),
+      this.query(scalabilityProfileQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        readiness_levels: [],
+        innovation_types: [],
+        innovation_natures: [],
+        anticipated_users: [],
+        scalability_profile: [],
+      };
+    }
+
+    const scalabilityRow =
+      (scalabilityRows as Array<Record<string, unknown>>)[0] ?? {};
+
+    const scalability_profile: InnovationDevScalabilityProfileDto[] = [
+      {
+        key: 'is_cheaper_than_alternatives',
+        name: 'Cheaper than alternatives',
+        true_count: Number(
+          scalabilityRow.is_cheaper_than_alternatives_true ?? 0,
+        ),
+        answered_count: Number(
+          scalabilityRow.is_cheaper_than_alternatives_answered ?? 0,
+        ),
+      },
+      {
+        key: 'is_simpler_to_use',
+        name: 'Simpler to use',
+        true_count: Number(scalabilityRow.is_simpler_to_use_true ?? 0),
+        answered_count: Number(scalabilityRow.is_simpler_to_use_answered ?? 0),
+      },
+      {
+        key: 'does_perform_better',
+        name: 'Does perform better',
+        true_count: Number(scalabilityRow.does_perform_better_true ?? 0),
+        answered_count: Number(
+          scalabilityRow.does_perform_better_answered ?? 0,
+        ),
+      },
+      {
+        key: 'is_desirable_to_users',
+        name: 'Desirable to users',
+        true_count: Number(scalabilityRow.is_desirable_to_users_true ?? 0),
+        answered_count: Number(
+          scalabilityRow.is_desirable_to_users_answered ?? 0,
+        ),
+      },
+      {
+        key: 'has_commercial_viability',
+        name: 'Commercial viability',
+        true_count: Number(scalabilityRow.has_commercial_viability_true ?? 0),
+        answered_count: Number(
+          scalabilityRow.has_commercial_viability_answered ?? 0,
+        ),
+      },
+      {
+        key: 'has_suitable_enabling_environment',
+        name: 'Suitable enabling environment',
+        true_count: Number(
+          scalabilityRow.has_suitable_enabling_environment_true ?? 0,
+        ),
+        answered_count: Number(
+          scalabilityRow.has_suitable_enabling_environment_answered ?? 0,
+        ),
+      },
+      {
+        key: 'has_evidence_of_uptake',
+        name: 'Evidence of uptake',
+        true_count: Number(scalabilityRow.has_evidence_of_uptake_true ?? 0),
+        answered_count: Number(
+          scalabilityRow.has_evidence_of_uptake_answered ?? 0,
+        ),
+      },
+    ];
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      readiness_levels: (
+        readinessLevelRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        level:
+          row.level !== null && row.level !== undefined
+            ? Number(row.level)
+            : null,
+        count: Number(row.count ?? 0),
+      })),
+      innovation_types: (
+        innovationTypeRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      innovation_natures: (
+        innovationNatureRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      anticipated_users: (
+        anticipatedUserRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      scalability_profile,
+    };
+  }
+
+  async getPolicyChangeDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<PolicyChangeDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rpc.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_policy_change rpc
+        ON rpc.result_id = cr.result_id
+        AND rpc.is_active = TRUE
+    `;
+
+    const stageFunnelQuery = `
+      SELECT
+        ps.policy_stage_id AS id,
+        ps.name AS name,
+        ps.policy_stage_id AS \`order\`,
+        COUNT(DISTINCT rpc.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_policy_change rpc
+        ON rpc.result_id = cr.result_id
+        AND rpc.is_active = TRUE
+      INNER JOIN policy_stage ps
+        ON ps.policy_stage_id = rpc.policy_stage_id
+        AND ps.is_active = TRUE
+      GROUP BY ps.policy_stage_id, ps.name
+      ORDER BY ps.policy_stage_id ASC
+    `;
+
+    const policyTypesQuery = `
+      SELECT
+        pt.policy_type_id AS id,
+        pt.name AS name,
+        COUNT(DISTINCT rpc.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_policy_change rpc
+        ON rpc.result_id = cr.result_id
+        AND rpc.is_active = TRUE
+      INNER JOIN policy_types pt
+        ON pt.policy_type_id = rpc.policy_type_id
+        AND pt.is_active = TRUE
+      GROUP BY pt.policy_type_id, pt.name
+      ORDER BY count DESC, pt.name ASC
+    `;
+
+    const implicatedInstitutionsQuery = `
+      SELECT
+        COUNT(DISTINCT ri.institution_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_policy_change rpc
+        ON rpc.result_id = cr.result_id
+        AND rpc.is_active = TRUE
+      INNER JOIN result_institutions ri
+        ON ri.result_id = cr.result_id
+        AND ri.is_active = TRUE
+        AND ri.institution_role_id = 4
+    `;
+
+    const [
+      countRows,
+      stageFunnelRows,
+      policyTypeRows,
+      implicatedInstitutionRows,
+    ] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(stageFunnelQuery, [contractId]),
+      this.query(policyTypesQuery, [contractId]),
+      this.query(implicatedInstitutionsQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        stage_funnel: [],
+        policy_types: [],
+        implicated_institutions_count: 0,
+      };
+    }
+
+    const implicatedRow =
+      (implicatedInstitutionRows as Array<Record<string, unknown>>)[0] ?? {};
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      stage_funnel: (stageFunnelRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+          name: String(row.name),
+          order:
+            row.order !== null && row.order !== undefined
+              ? Number(row.order)
+              : null,
+          count: Number(row.count ?? 0),
+        }),
+      ),
+      policy_types: (policyTypeRows as Array<Record<string, unknown>>).map(
+        (row) => ({
+          id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+          name: String(row.name),
+          count: Number(row.count ?? 0),
+        }),
+      ),
+      implicated_institutions_count: Number(implicatedRow.count ?? 0),
+    };
+  }
+
+  async getInnovationUseDetailsReport(
+    contractId: string,
+    totalResults: number,
+  ): Promise<InnovationUseDetailsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT cr.result_id) AS n
+      FROM (${baseSubquery}) cr
+      LEFT JOIN result_actors ra
+        ON ra.result_id = cr.result_id
+        AND ra.is_active = TRUE
+      LEFT JOIN result_institution_types rit
+        ON rit.result_id = cr.result_id
+        AND rit.is_active = TRUE
+      LEFT JOIN result_quantifications rq
+        ON rq.result_id = cr.result_id
+        AND rq.is_active = TRUE
+      WHERE ra.result_id IS NOT NULL
+         OR rit.result_id IS NOT NULL
+         OR rq.result_id IS NOT NULL
+    `;
+
+    const overallGenderYouthQuery = `
+      SELECT
+        COALESCE(SUM(ra.women_youth), 0) AS women_youth,
+        COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth,
+        COALESCE(SUM(ra.men_youth), 0) AS men_youth,
+        COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_actors ra
+        ON ra.result_id = cr.result_id
+        AND ra.is_active = TRUE
+    `;
+
+    const actorReachQuery = `
+      SELECT
+        cat.code AS actor_type_id,
+        cat.name AS actor_type_name,
+        COALESCE(SUM(ra.women_youth), 0) AS women_youth,
+        COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth,
+        COALESCE(SUM(ra.men_youth), 0) AS men_youth,
+        COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_actors ra
+        ON ra.result_id = cr.result_id
+        AND ra.is_active = TRUE
+      INNER JOIN clarisa_actor_types cat
+        ON cat.code = ra.actor_type_id
+        AND cat.is_active = TRUE
+      GROUP BY cat.code, cat.name
+      ORDER BY (
+        COALESCE(SUM(ra.women_youth), 0) +
+        COALESCE(SUM(ra.women_not_youth), 0) +
+        COALESCE(SUM(ra.men_youth), 0) +
+        COALESCE(SUM(ra.men_not_youth), 0)
+      ) DESC, cat.name ASC
+    `;
+
+    const organizationTypesQuery = `
+      SELECT
+        cit.code AS id,
+        cit.name AS name,
+        COUNT(DISTINCT rit.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_institution_types rit
+        ON rit.result_id = cr.result_id
+        AND rit.is_active = TRUE
+      INNER JOIN clarisa_institution_types cit
+        ON cit.code = rit.institution_type_id
+        AND cit.is_active = TRUE
+      GROUP BY cit.code, cit.name
+      ORDER BY count DESC, cit.name ASC
+    `;
+
+    const quantificationsQuery = `
+      SELECT
+        COALESCE(NULLIF(TRIM(rq.unit), ''), 'Unknown') AS unit,
+        COALESCE(SUM(rq.quantification_number), 0) AS total,
+        COUNT(DISTINCT rq.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_quantifications rq
+        ON rq.result_id = cr.result_id
+        AND rq.is_active = TRUE
+      GROUP BY COALESCE(NULLIF(TRIM(rq.unit), ''), 'Unknown')
+      ORDER BY count DESC, unit ASC
+    `;
+
+    const [
+      countRows,
+      overallRows,
+      actorReachRows,
+      organizationTypeRows,
+      quantificationRows,
+    ] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(overallGenderYouthQuery, [contractId]),
+      this.query(actorReachQuery, [contractId]),
+      this.query(organizationTypesQuery, [contractId]),
+      this.query(quantificationsQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+    const normalizedTotalResults = Number(totalResults ?? 0);
+
+    if (n === 0) {
+      return {
+        meta: {
+          total_results: normalizedTotalResults,
+          n: 0,
+        },
+        gender_youth_reach: {
+          overall: {
+            women_youth: 0,
+            women_not_youth: 0,
+            men_youth: 0,
+            men_not_youth: 0,
+            total: 0,
+          },
+          by_actor_type: [],
+        },
+        organization_types: [],
+        quantifications: [],
+      };
+    }
+
+    const overallRow = (overallRows as Array<Record<string, unknown>>)[0] ?? {};
+    const women_youth = Number(overallRow.women_youth ?? 0);
+    const women_not_youth = Number(overallRow.women_not_youth ?? 0);
+    const men_youth = Number(overallRow.men_youth ?? 0);
+    const men_not_youth = Number(overallRow.men_not_youth ?? 0);
+    const overallTotal =
+      women_youth + women_not_youth + men_youth + men_not_youth;
+
+    const by_actor_type = (
+      actorReachRows as Array<Record<string, unknown>>
+    ).map((row) => {
+      const actor_women_youth = Number(row.women_youth ?? 0);
+      const actor_women_not_youth = Number(row.women_not_youth ?? 0);
+      const actor_men_youth = Number(row.men_youth ?? 0);
+      const actor_men_not_youth = Number(row.men_not_youth ?? 0);
+      const actor_total =
+        actor_women_youth +
+        actor_women_not_youth +
+        actor_men_youth +
+        actor_men_not_youth;
+
+      return {
+        actor_type_id:
+          row.actor_type_id !== null && row.actor_type_id !== undefined
+            ? Number(row.actor_type_id)
+            : null,
+        actor_type_name: String(row.actor_type_name),
+        women_youth: actor_women_youth,
+        women_not_youth: actor_women_not_youth,
+        men_youth: actor_men_youth,
+        men_not_youth: actor_men_not_youth,
+        total: actor_total,
+      };
+    });
+
+    return {
+      meta: {
+        total_results: normalizedTotalResults,
+        n,
+      },
+      gender_youth_reach: {
+        overall: {
+          women_youth,
+          women_not_youth,
+          men_youth,
+          men_not_youth,
+          total: overallTotal,
+        },
+        by_actor_type,
+      },
+      organization_types: (
+        organizationTypeRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        id: row.id !== null && row.id !== undefined ? Number(row.id) : null,
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+      quantifications: (
+        quantificationRows as Array<Record<string, unknown>>
+      ).map((row) => ({
+        unit: String(row.unit),
+        total: Number(row.total ?? 0),
         count: Number(row.count ?? 0),
       })),
     };

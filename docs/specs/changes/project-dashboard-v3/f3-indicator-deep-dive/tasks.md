@@ -61,9 +61,9 @@ graph TD
 - **Files:** repository (+spec).
 - **Description:** Readiness histogram (ordered by level) + type/nature/users mixes + 7-flag `{true_count, answered_count}`; stage funnel (order per `policy_stage` order column — **resolve R-1 here and record the answer in execution.md**) + type mix + distinct role-4 institutions; actors gender×youth sums (overall + by actor type) + org-type mix + quantifications by unit.
 - **Acceptance / done check:**
-  - [ ] SQL specs: NULL boolean neither true nor answered (**failing input:** count-all-rows instead of count-non-null for `answered_count` → spec fails); funnel ordering asserted against a fixture with out-of-order ids.
-  - [ ] Actors sums exclude NULL disaggregations (absent ≠ 0).
-- **Deps:** T-01 · **Effort:** L · **Status:** todo
+  - [x] SQL specs: NULL boolean neither true nor answered (**failing input:** count-all-rows instead of count-non-null for `answered_count` → spec fails); funnel ordering asserted against a fixture with out-of-order ids.
+  - [x] Actors sums exclude NULL disaggregations (absent ≠ 0).
+- **Deps:** T-01 · **Effort:** L · **Status:** done
 
 ### T-04 — Composition method + service + controller + Swagger
 

@@ -2753,4 +2753,733 @@ describe('AgressoContractRepository', () => {
       });
     });
   });
+
+  describe('getInnovationDevDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getInnovationDevDetailsReport('', 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getInnovationDevDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getInnovationDevDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query innovation dev details and return correctly populated DTO (asserts generated SQL + params + lookup joins + scalability boolean logic)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            name: 'Level 1 - Basic principles observed',
+            level: 1,
+            count: '1',
+          },
+          {
+            id: 2,
+            name: 'Level 2 - Technology concept formulated',
+            level: 2,
+            count: '2',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 10, name: 'Technological innovation', count: '2' },
+          { id: 20, name: 'Capacity development', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 5, name: 'Research material', count: '3' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Farmers', count: '2' },
+          { id: 2, name: 'Researchers', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          {
+            is_cheaper_than_alternatives_true: '2',
+            is_cheaper_than_alternatives_answered: '3',
+            is_simpler_to_use_true: '1',
+            is_simpler_to_use_answered: '2',
+            does_perform_better_true: '3',
+            does_perform_better_answered: '3',
+            is_desirable_to_users_true: '2',
+            is_desirable_to_users_answered: '2',
+            has_commercial_viability_true: '1',
+            has_commercial_viability_answered: '3',
+            has_suitable_enabling_environment_true: '0',
+            has_suitable_enabling_environment_answered: '1',
+            has_evidence_of_uptake_true: '1',
+            has_evidence_of_uptake_answered: '2',
+          },
+        ]);
+
+      const result = await repository.getInnovationDevDetailsReport('A1676', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(6);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [readinessSql, readinessParams] = (repository.query as jest.Mock)
+        .mock.calls[1];
+      const [typesSql, typesParams] = (repository.query as jest.Mock).mock
+        .calls[2];
+      const [naturesSql, naturesParams] = (repository.query as jest.Mock).mock
+        .calls[3];
+      const [usersSql, usersParams] = (repository.query as jest.Mock).mock
+        .calls[4];
+      const [scalabilitySql, scalabilityParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[5];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_innovation_dev rid');
+      expect(countSql).toContain('rid.result_id = cr.result_id');
+      expect(countSql).toContain('rid.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rid.result_id) AS n');
+      expect(countParams).toEqual(['A1676']);
+
+      // Readiness levels lookup join assertions & ordering
+      expect(readinessSql).toContain(
+        'INNER JOIN clarisa_innovation_readiness_levels cirl',
+      );
+      expect(readinessSql).toContain('cirl.id = rid.innovation_readiness_id');
+      expect(readinessSql).toContain('cirl.is_active = TRUE');
+      expect(readinessSql).toContain('cirl.name AS name');
+      expect(readinessSql).toContain('cirl.level AS level');
+      expect(readinessSql).toContain('GROUP BY cirl.id, cirl.name, cirl.level');
+      expect(readinessSql).toContain('ORDER BY cirl.level ASC');
+      expect(readinessParams).toEqual(['A1676']);
+
+      // Innovation types lookup join assertions
+      expect(typesSql).toContain('INNER JOIN clarisa_innovation_types cit');
+      expect(typesSql).toContain('cit.code = rid.innovation_type_id');
+      expect(typesSql).toContain('cit.is_active = TRUE');
+      expect(typesSql).toContain('cit.code AS id');
+      expect(typesSql).toContain('cit.name AS name');
+      expect(typesSql).toContain('GROUP BY cit.code, cit.name');
+      expect(typesSql).toContain('ORDER BY count DESC, cit.name ASC');
+      expect(typesParams).toEqual(['A1676']);
+
+      // Innovation natures lookup join assertions
+      expect(naturesSql).toContain(
+        'INNER JOIN clarisa_innovation_characteristics cic',
+      );
+      expect(naturesSql).toContain('cic.id = rid.innovation_nature_id');
+      expect(naturesSql).toContain('cic.is_active = TRUE');
+      expect(naturesSql).toContain('cic.id AS id');
+      expect(naturesSql).toContain('cic.name AS name');
+      expect(naturesSql).toContain('GROUP BY cic.id, cic.name');
+      expect(naturesSql).toContain('ORDER BY count DESC, cic.name ASC');
+      expect(naturesParams).toEqual(['A1676']);
+
+      // Anticipated users lookup join assertions
+      expect(usersSql).toContain(
+        'INNER JOIN innovation_dev_anticipated_users idau',
+      );
+      expect(usersSql).toContain('idau.id = rid.anticipated_users_id');
+      expect(usersSql).toContain('idau.is_active = TRUE');
+      expect(usersSql).toContain('idau.id AS id');
+      expect(usersSql).toContain('idau.name AS name');
+      expect(usersSql).toContain('GROUP BY idau.id, idau.name');
+      expect(usersSql).toContain('ORDER BY count DESC, idau.name ASC');
+      expect(usersParams).toEqual(['A1676']);
+
+      // Scalability profile 7-boolean logic assertions (NULL is neither true nor answered)
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_cheaper_than_alternatives = 1 THEN 1 ELSE 0 END) AS is_cheaper_than_alternatives_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_cheaper_than_alternatives IS NOT NULL THEN 1 ELSE 0 END) AS is_cheaper_than_alternatives_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_simpler_to_use = 1 THEN 1 ELSE 0 END) AS is_simpler_to_use_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_simpler_to_use IS NOT NULL THEN 1 ELSE 0 END) AS is_simpler_to_use_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.does_perform_better = 1 THEN 1 ELSE 0 END) AS does_perform_better_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.does_perform_better IS NOT NULL THEN 1 ELSE 0 END) AS does_perform_better_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_desirable_to_users = 1 THEN 1 ELSE 0 END) AS is_desirable_to_users_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.is_desirable_to_users IS NOT NULL THEN 1 ELSE 0 END) AS is_desirable_to_users_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_commercial_viability = 1 THEN 1 ELSE 0 END) AS has_commercial_viability_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_commercial_viability IS NOT NULL THEN 1 ELSE 0 END) AS has_commercial_viability_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_suitable_enabling_environment = 1 THEN 1 ELSE 0 END) AS has_suitable_enabling_environment_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_suitable_enabling_environment IS NOT NULL THEN 1 ELSE 0 END) AS has_suitable_enabling_environment_answered',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_evidence_of_uptake = 1 THEN 1 ELSE 0 END) AS has_evidence_of_uptake_true',
+      );
+      expect(scalabilitySql).toContain(
+        'SUM(CASE WHEN rid.has_evidence_of_uptake IS NOT NULL THEN 1 ELSE 0 END) AS has_evidence_of_uptake_answered',
+      );
+      expect(scalabilityParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 5,
+          n: 3,
+        },
+        readiness_levels: [
+          {
+            id: 1,
+            name: 'Level 1 - Basic principles observed',
+            level: 1,
+            count: 1,
+          },
+          {
+            id: 2,
+            name: 'Level 2 - Technology concept formulated',
+            level: 2,
+            count: 2,
+          },
+        ],
+        innovation_types: [
+          { id: 10, name: 'Technological innovation', count: 2 },
+          { id: 20, name: 'Capacity development', count: 1 },
+        ],
+        innovation_natures: [{ id: 5, name: 'Research material', count: 3 }],
+        anticipated_users: [
+          { id: 1, name: 'Farmers', count: 2 },
+          { id: 2, name: 'Researchers', count: 1 },
+        ],
+        scalability_profile: [
+          {
+            key: 'is_cheaper_than_alternatives',
+            name: 'Cheaper than alternatives',
+            true_count: 2,
+            answered_count: 3,
+          },
+          {
+            key: 'is_simpler_to_use',
+            name: 'Simpler to use',
+            true_count: 1,
+            answered_count: 2,
+          },
+          {
+            key: 'does_perform_better',
+            name: 'Does perform better',
+            true_count: 3,
+            answered_count: 3,
+          },
+          {
+            key: 'is_desirable_to_users',
+            name: 'Desirable to users',
+            true_count: 2,
+            answered_count: 2,
+          },
+          {
+            key: 'has_commercial_viability',
+            name: 'Commercial viability',
+            true_count: 1,
+            answered_count: 3,
+          },
+          {
+            key: 'has_suitable_enabling_environment',
+            name: 'Suitable enabling environment',
+            true_count: 0,
+            answered_count: 1,
+          },
+          {
+            key: 'has_evidence_of_uptake',
+            name: 'Evidence of uptake',
+            true_count: 1,
+            answered_count: 2,
+          },
+        ],
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Level 1', level: 1, count: '2' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 10, name: 'Technological innovation', count: '2' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 5, name: 'Research material', count: '2' },
+        ])
+        .mockResolvedValueOnce([{ id: 1, name: 'Farmers', count: '2' }])
+        .mockResolvedValueOnce([
+          {
+            is_cheaper_than_alternatives_true: '1',
+            is_cheaper_than_alternatives_answered: '2',
+            is_simpler_to_use_true: '1',
+            is_simpler_to_use_answered: '2',
+            does_perform_better_true: '1',
+            does_perform_better_answered: '2',
+            is_desirable_to_users_true: '1',
+            is_desirable_to_users_answered: '2',
+            has_commercial_viability_true: '1',
+            has_commercial_viability_answered: '2',
+            has_suitable_enabling_environment_true: '1',
+            has_suitable_enabling_environment_answered: '2',
+            has_evidence_of_uptake_true: '1',
+            has_evidence_of_uptake_answered: '2',
+          },
+        ]);
+
+      const result = await repository.getInnovationDevDetailsReport('A1676', 7);
+
+      expect(result.meta).toEqual({
+        total_results: 7,
+        n: 2,
+      });
+      expect(result.readiness_levels).toEqual([
+        { id: 1, name: 'Level 1', level: 1, count: 2 },
+      ]);
+    });
+
+    it('should return empty arrays when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getInnovationDevDetailsReport('A1676', 3);
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 3,
+          n: 0,
+        },
+        readiness_levels: [],
+        innovation_types: [],
+        innovation_natures: [],
+        anticipated_users: [],
+        scalability_profile: [],
+      });
+    });
+  });
+
+  describe('getPolicyChangeDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getPolicyChangeDetailsReport('', 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getPolicyChangeDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getPolicyChangeDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query policy change details and return correctly populated DTO (asserts generated SQL + params + lookup joins + funnel ordering + implicated institutions)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Stage 1: Research taken up', order: 1, count: '1' },
+          { id: 2, name: 'Stage 2: Policy enacted', order: 2, count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 3, name: 'Policy or Strategy', count: '2' },
+        ])
+        .mockResolvedValueOnce([{ count: '5' }]);
+
+      const result = await repository.getPolicyChangeDetailsReport('A1676', 4);
+
+      expect(repository.query).toHaveBeenCalledTimes(4);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [stageFunnelSql, stageFunnelParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[1];
+      const [policyTypesSql, policyTypesParams] = (
+        repository.query as jest.Mock
+      ).mock.calls[2];
+      const [implicatedSql, implicatedParams] = (repository.query as jest.Mock)
+        .mock.calls[3];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_policy_change rpc');
+      expect(countSql).toContain('rpc.result_id = cr.result_id');
+      expect(countSql).toContain('rpc.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rpc.result_id) AS n');
+      expect(countParams).toEqual(['A1676']);
+
+      // Stage funnel lookup join assertions and ordering (R-1: ORDER BY ps.policy_stage_id ASC)
+      expect(stageFunnelSql).toContain('INNER JOIN policy_stage ps');
+      expect(stageFunnelSql).toContain(
+        'ps.policy_stage_id = rpc.policy_stage_id',
+      );
+      expect(stageFunnelSql).toContain('ps.is_active = TRUE');
+      expect(stageFunnelSql).toContain('ps.policy_stage_id AS id');
+      expect(stageFunnelSql).toContain('ps.name AS name');
+      expect(stageFunnelSql).toContain('ps.policy_stage_id AS `order`');
+      expect(stageFunnelSql).toContain('GROUP BY ps.policy_stage_id, ps.name');
+      expect(stageFunnelSql).toContain('ORDER BY ps.policy_stage_id ASC');
+      expect(stageFunnelParams).toEqual(['A1676']);
+
+      // Policy types lookup join assertions
+      expect(policyTypesSql).toContain('INNER JOIN policy_types pt');
+      expect(policyTypesSql).toContain(
+        'pt.policy_type_id = rpc.policy_type_id',
+      );
+      expect(policyTypesSql).toContain('pt.is_active = TRUE');
+      expect(policyTypesSql).toContain('pt.policy_type_id AS id');
+      expect(policyTypesSql).toContain('pt.name AS name');
+      expect(policyTypesSql).toContain('GROUP BY pt.policy_type_id, pt.name');
+      expect(policyTypesSql).toContain('ORDER BY count DESC, pt.name ASC');
+      expect(policyTypesParams).toEqual(['A1676']);
+
+      // Implicated institutions query assertions (result_institutions role 4)
+      expect(implicatedSql).toContain('INNER JOIN result_institutions ri');
+      expect(implicatedSql).toContain('ri.result_id = cr.result_id');
+      expect(implicatedSql).toContain('ri.is_active = TRUE');
+      expect(implicatedSql).toContain('ri.institution_role_id = 4');
+      expect(implicatedSql).toContain(
+        'COUNT(DISTINCT ri.institution_id) AS count',
+      );
+      expect(implicatedParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 4,
+          n: 2,
+        },
+        stage_funnel: [
+          { id: 1, name: 'Stage 1: Research taken up', order: 1, count: 1 },
+          { id: 2, name: 'Stage 2: Policy enacted', order: 2, count: 1 },
+        ],
+        policy_types: [{ id: 3, name: 'Policy or Strategy', count: 2 }],
+        implicated_institutions_count: 5,
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Stage 1: Research taken up', order: 1, count: '2' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Policy or Strategy', count: '2' },
+        ])
+        .mockResolvedValueOnce([{ count: '3' }]);
+
+      const result = await repository.getPolicyChangeDetailsReport('A1676', 6);
+
+      expect(result.meta).toEqual({
+        total_results: 6,
+        n: 2,
+      });
+      expect(result.stage_funnel).toEqual([
+        { id: 1, name: 'Stage 1: Research taken up', order: 1, count: 2 },
+      ]);
+      expect(result.implicated_institutions_count).toBe(3);
+    });
+
+    it('should return empty arrays and 0 count when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getPolicyChangeDetailsReport('A1676', 4);
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 4,
+          n: 0,
+        },
+        stage_funnel: [],
+        policy_types: [],
+        implicated_institutions_count: 0,
+      });
+    });
+  });
+
+  describe('getInnovationUseDetailsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(
+        repository.getInnovationUseDetailsReport('', 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getInnovationUseDetailsReport(null as any, 5),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getInnovationUseDetailsReport(undefined as any, 5),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query innovation use details and return correctly populated DTO (asserts generated SQL + params + lookup joins + gender youth sums + actor types breakdown + quantifications)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([
+          {
+            women_youth: '15',
+            women_not_youth: '25',
+            men_youth: '30',
+            men_not_youth: '40',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            actor_type_id: 1,
+            actor_type_name: 'Farmers',
+            women_youth: '10',
+            women_not_youth: '15',
+            men_youth: '20',
+            men_not_youth: '25',
+          },
+          {
+            actor_type_id: 2,
+            actor_type_name: 'Researchers',
+            women_youth: '5',
+            women_not_youth: '10',
+            men_youth: '10',
+            men_not_youth: '15',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 1, name: 'Government', count: '2' },
+          { id: 2, name: 'NGO', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { unit: 'Hectares', total: '500', count: '2' },
+          { unit: 'People', total: '1200', count: '1' },
+        ]);
+
+      const result = await repository.getInnovationUseDetailsReport('A1676', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(5);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [overallSql, overallParams] = (repository.query as jest.Mock).mock
+        .calls[1];
+      const [actorReachSql, actorReachParams] = (repository.query as jest.Mock)
+        .mock.calls[2];
+      const [orgTypesSql, orgTypesParams] = (repository.query as jest.Mock).mock
+        .calls[3];
+      const [quantSql, quantParams] = (repository.query as jest.Mock).mock
+        .calls[4];
+
+      // Count query assertions (KZ-001) - checks LEFT JOINs to actors, institution types, and quantifications
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('LEFT JOIN result_actors ra');
+      expect(countSql).toContain('ra.result_id = cr.result_id');
+      expect(countSql).toContain('ra.is_active = TRUE');
+      expect(countSql).toContain('LEFT JOIN result_institution_types rit');
+      expect(countSql).toContain('rit.result_id = cr.result_id');
+      expect(countSql).toContain('rit.is_active = TRUE');
+      expect(countSql).toContain('LEFT JOIN result_quantifications rq');
+      expect(countSql).toContain('rq.result_id = cr.result_id');
+      expect(countSql).toContain('rq.is_active = TRUE');
+      expect(countSql).toContain('ra.result_id IS NOT NULL');
+      expect(countSql).toContain('rit.result_id IS NOT NULL');
+      expect(countSql).toContain('rq.result_id IS NOT NULL');
+      expect(countSql).toContain('COUNT(DISTINCT cr.result_id) AS n');
+      expect(countParams).toEqual(['A1676']);
+
+      // Overall gender youth reach query assertions
+      expect(overallSql).toContain('INNER JOIN result_actors ra');
+      expect(overallSql).toContain('ra.result_id = cr.result_id');
+      expect(overallSql).toContain('ra.is_active = TRUE');
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.women_youth), 0) AS women_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.men_youth), 0) AS men_youth',
+      );
+      expect(overallSql).toContain(
+        'COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth',
+      );
+      expect(overallParams).toEqual(['A1676']);
+
+      // Actor reach breakdown query assertions (clarisa_actor_types lookup join)
+      expect(actorReachSql).toContain('INNER JOIN result_actors ra');
+      expect(actorReachSql).toContain('INNER JOIN clarisa_actor_types cat');
+      expect(actorReachSql).toContain('cat.code = ra.actor_type_id');
+      expect(actorReachSql).toContain('cat.is_active = TRUE');
+      expect(actorReachSql).toContain('cat.code AS actor_type_id');
+      expect(actorReachSql).toContain('cat.name AS actor_type_name');
+      expect(actorReachSql).toContain(
+        'COALESCE(SUM(ra.women_youth), 0) AS women_youth',
+      );
+      expect(actorReachSql).toContain(
+        'COALESCE(SUM(ra.women_not_youth), 0) AS women_not_youth',
+      );
+      expect(actorReachSql).toContain(
+        'COALESCE(SUM(ra.men_youth), 0) AS men_youth',
+      );
+      expect(actorReachSql).toContain(
+        'COALESCE(SUM(ra.men_not_youth), 0) AS men_not_youth',
+      );
+      expect(actorReachSql).toContain('GROUP BY cat.code, cat.name');
+      expect(actorReachParams).toEqual(['A1676']);
+
+      // Organization types query assertions (clarisa_institution_types lookup join)
+      expect(orgTypesSql).toContain('INNER JOIN result_institution_types rit');
+      expect(orgTypesSql).toContain('rit.result_id = cr.result_id');
+      expect(orgTypesSql).toContain('rit.is_active = TRUE');
+      expect(orgTypesSql).toContain('INNER JOIN clarisa_institution_types cit');
+      expect(orgTypesSql).toContain('cit.code = rit.institution_type_id');
+      expect(orgTypesSql).toContain('cit.is_active = TRUE');
+      expect(orgTypesSql).toContain('cit.code AS id');
+      expect(orgTypesSql).toContain('cit.name AS name');
+      expect(orgTypesSql).toContain('GROUP BY cit.code, cit.name');
+      expect(orgTypesSql).toContain('ORDER BY count DESC, cit.name ASC');
+      expect(orgTypesParams).toEqual(['A1676']);
+
+      // Quantifications query assertions
+      expect(quantSql).toContain('INNER JOIN result_quantifications rq');
+      expect(quantSql).toContain('rq.result_id = cr.result_id');
+      expect(quantSql).toContain('rq.is_active = TRUE');
+      expect(quantSql).toContain(
+        "COALESCE(NULLIF(TRIM(rq.unit), ''), 'Unknown') AS unit",
+      );
+      expect(quantSql).toContain(
+        'COALESCE(SUM(rq.quantification_number), 0) AS total',
+      );
+      expect(quantSql).toContain('COUNT(DISTINCT rq.result_id) AS count');
+      expect(quantSql).toContain('ORDER BY count DESC, unit ASC');
+      expect(quantParams).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        meta: {
+          total_results: 5,
+          n: 3,
+        },
+        gender_youth_reach: {
+          overall: {
+            women_youth: 15,
+            women_not_youth: 25,
+            men_youth: 30,
+            men_not_youth: 40,
+            total: 110,
+          },
+          by_actor_type: [
+            {
+              actor_type_id: 1,
+              actor_type_name: 'Farmers',
+              women_youth: 10,
+              women_not_youth: 15,
+              men_youth: 20,
+              men_not_youth: 25,
+              total: 70,
+            },
+            {
+              actor_type_id: 2,
+              actor_type_name: 'Researchers',
+              women_youth: 5,
+              women_not_youth: 10,
+              men_youth: 10,
+              men_not_youth: 15,
+              total: 40,
+            },
+          ],
+        },
+        organization_types: [
+          { id: 1, name: 'Government', count: 2 },
+          { id: 2, name: 'NGO', count: 1 },
+        ],
+        quantifications: [
+          { unit: 'Hectares', total: 500, count: 2 },
+          { unit: 'People', total: 1200, count: 1 },
+        ],
+      });
+    });
+
+    it('should handle sparse satellite scenario when n < totalResults', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([
+          {
+            women_youth: '15',
+            women_not_youth: '25',
+            men_youth: '30',
+            men_not_youth: '40',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            actor_type_id: 1,
+            actor_type_name: 'Farmers',
+            women_youth: '15',
+            women_not_youth: '25',
+            men_youth: '30',
+            men_not_youth: '40',
+          },
+        ])
+        .mockResolvedValueOnce([{ id: 1, name: 'Government', count: '2' }])
+        .mockResolvedValueOnce([{ unit: 'People', total: '20', count: '1' }]);
+
+      const result = await repository.getInnovationUseDetailsReport('A1676', 8);
+
+      expect(result.meta).toEqual({
+        total_results: 8,
+        n: 3,
+      });
+      expect(result.gender_youth_reach.overall).toEqual({
+        women_youth: 15,
+        women_not_youth: 25,
+        men_youth: 30,
+        men_not_youth: 40,
+        total: 110,
+      });
+    });
+
+    it('should return empty arrays and 0 reach when n is 0', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository.getInnovationUseDetailsReport('A1676', 5);
+
+      expect(result).toEqual({
+        meta: {
+          total_results: 5,
+          n: 0,
+        },
+        gender_youth_reach: {
+          overall: {
+            women_youth: 0,
+            women_not_youth: 0,
+            men_youth: 0,
+            men_not_youth: 0,
+            total: 0,
+          },
+          by_actor_type: [],
+        },
+        organization_types: [],
+        quantifications: [],
+      });
+    });
+  });
 });
