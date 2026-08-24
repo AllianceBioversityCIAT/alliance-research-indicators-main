@@ -2,7 +2,7 @@
 
 - **Module:** agresso (server) + client / project-detail (STAR)
 - **Spec id:** 2026-08-project-dashboard-v3-f4
-- **Status:** not-started
+- **Status:** complete (9/9 done, owner HITL approved 2026-08-24 — see execution.md §3 Summary)
 - **Owner:** JuanCode
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -119,9 +119,9 @@ graph TD
   - [x] Server suites + `test:cov`; client full suite + coverage + `npm run build` + tsc-spec delta ≤ 945 — **sequenced, never concurrent** (§4.3). *(340/2530 cov exit 0 · 318/6767 + 97.95/92.46/97.38/98.32 · build 0 errors · tsc 937 = F3 baseline, no new — 2 F4-introduced errors found and fixed; see execution.md.)*
   - [x] Bundle: initial ±5 kB, Treemap in the lazy chunk (**disqualifier:** baselines from different branch states). *(Initial 1.12 MB identical to F3 T-10 baseline, same branch lineage.)*
   - [x] Latency: 3 timed dev runs p95-proxy ≤ 800 ms; spread >±40% → inconclusive. *(Capture 1 inconclusive spread 46%; capture 2 PASS max 179.4 ms spread 24.9% — DB-proxy scope declared, K-021; both recorded.)*
-  - [ ] **HITL (KZ-014, human):** light+dark screenshots of the six cards; laziness with the section below the fold; F1/F3 unchanged; `/swagger` renders the endpoint. *(+ named additions: dark-mode chip groups; reach tooltip/table read-aloud; treemap rank-bucket colors.)*
+  - [x] **HITL (KZ-014, human):** light+dark screenshots of the six cards; laziness with the section below the fold; F1/F3 unchanged; `/swagger` renders the endpoint. *(+ named additions: dark-mode chip groups; reach tooltip/table read-aloud; treemap rank-bucket colors.)* *(Owner approved in-session 2026-08-24 — light screenshot reviewed, dark/laziness/F1-F3/swagger confirmed "todo ok"; execution.md T-09 HITL close.)*
   - [x] K-004 global disqualifier: every cited gate observed red once. *(Per-task reds recorded in execution.md T-01…T-09; tsc-spec gate observed red at 939; tokens:validate observed catching the theme-inverted ramp.)*
-- **Deps:** T-05, T-06, T-08 · **Effort:** L · **Status:** `[~]` automated gates PASS — awaiting owner HITL (execution.md T-09)
+- **Deps:** T-05, T-06, T-08 · **Effort:** L · **Status:** done — PASS (execution.md T-09 + HITL close)
 
 ---
 
@@ -158,7 +158,7 @@ Branch `bilateral-visual-improvements`; commits `[SPEC:changes/project-dashboard
 
 ## 8. Done definition
 
-- [ ] T-01…T-09 done with evidence (execution.md PASS recorded before any checkbox flips — repo guardrail hook).
-- [ ] Coverage-closure table verified against final code.
-- [ ] TRD API delta (new endpoint) recorded at archive sync; family manifest → complete when all four children are done.
-- [ ] Rollout note: dev-branch pipeline post-F3; rollback = revert.
+- [x] T-01…T-09 done with evidence (execution.md PASS recorded before any checkbox flips — repo guardrail hook).
+- [x] Coverage-closure table verified against final code (each clause's owning task PASSed with the clause audited by its Reviewer; the two declared-scope substitutions — T-05's assertion-level red and T-08's R-IN-004 HITL-only half — are recorded in execution.md, not silently green).
+- [ ] TRD API delta (new endpoint) recorded at archive sync; family manifest → complete when all four children are done. *(Owed to `/akili-archive` — listed in execution.md §3.)*
+- [x] Rollout note: dev-branch pipeline post-F3; rollback = revert (additive endpoint + one mounted section; no flags, no migrations — pipeline deploys code only, no migration step needed, K-015 n/a).
