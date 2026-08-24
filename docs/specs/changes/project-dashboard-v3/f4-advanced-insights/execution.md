@@ -118,3 +118,23 @@
 - **K-004/K-012 evidence:** all 4 reds verified real by Reviewer (in-code quotes + revert notes); messy fixture independently re-derived as discriminating (medians 4 vs 8).
 - **Leader adjudication:** Issue 2 = plain rework. Issue 1 = spec gap requiring owner (Pivot addendum) — escalated at this gate before attempt 2; rework proceeds once with both fixes.
 - **Pivot addendum (owner, 2026-08-24, at the attempt-1 FAIL gate):** option **(c)** approved → new decision **D-F4-8** recorded in `design.md` §12; `requirements.md` A-1 amended (vocabulary + writer contract). Submission anchor = new canonical `RESULT_SUBMITTED`; audit-edit proxies re-rejected; mapping moves into the canonical constants file. Attempt 2 dispatched with the full Reviewer report verbatim + D-F4-8. Effort held at xhigh (bump rule → max is capped by the tier rule "never `max` a cheaper tier"; the FAIL stemmed from a spec gap now closed + a missed clause, not under-thinking — recorded per protocol).
+
+### T-03 — `review_flow`: events query + cycle-time calculator + vocabulary constant — **PASS** (attempt 2)
+
+- **Date:** 2026-08-24 · **Attempts:** 2 (attempt 1 FAIL + Pivot addendum D-F4-8 above; attempt 2 rework with verbatim Reviewer feedback, effort xhigh)
+- **Files (final change set):**
+  - `result-review-history/constants/review-event-vocabulary.constants.ts` (NEW, +spec) — canonical vocabulary: `REVIEW_EVENT_TYPE` (incl. `RESULT_SUBMITTED`, D-F4-8), `REVIEW_DECISION_VALUE`, label maps (`Record<Type,string>` — compiler-exhaustive) + helpers with raw-code fallback, canonical anchors `REVIEW_FLOW_SUBMISSION_EVENT_TYPE`/`REVIEW_FLOW_APPROVAL_EVENT_TYPE`/`REVIEW_FLOW_APPROVAL_DECISION_VALUE`; doc contract: future `reviewDecision` MUST write both events importing these constants
+  - `agresso-contract/utils/review-cycle-time.util.ts` (NEW, +spec) — pure calculator, zero local vocabulary literals (imports canonical anchors), timestamp-order grouping, exclusion semantics, median + nearest-rank p90, `Number.isFinite` guard
+  - `agresso-contract/repositories/agresso-contract.repository.ts` (+spec) — `getReviewFlowSection` (counts + labels + calculator output; payloads never selected per OQ-1; `ORDER BY created_at`)
+  - `agresso-contract/dto/contract-insights-report.dto.ts` — +`label` on `ReviewFlowEventTypeCountDto`/`ReviewFlowDecisionCountDto`
+- **Verification:** targeted jest 6 suites / 208 tests PASS · eslint clean · tsc build clean · **Leader full-suite re-measure: 340 suites / 2516 tests PASS, exit 0** (`test:cov` floor check deferred to T-09, which owns it per tasks.md).
+- **K-004 (attempt 2):** wrong-but-valid anchor reassignment → membership test honestly reported GREEN (KZ-017: membership cannot catch wrong-but-valid) while the is-specifically-`RESULT_SUBMITTED` test + 5-result fixture reddened (`median 8→null, sample_size 3→0, excluded 2→5`); label-mapping drop → red; attempt-1 SQL-ordering + payload reds stand (sites grep-verified untouched). K-012 re-derived by Reviewer post-rewrite: still discriminating (median 4 vs 8).
+- **Reviewer verdict:** `STATUS: PASS` — D-F4-8 conformance verified clause by clause; `RESULT_SUBMITTED` grep-confirmed written nowhere (sample_size=0 honest today); labels compiler-exhaustive; attempt-1 clearances re-confirmed.
+- **ADVISORY (recorded):**
+  1. Label helpers index a plain object with a casted string — a code equal to an `Object.prototype` key (`constructor`…) returns the inherited function and `JSON.stringify` drops the field; one-line `hasOwnProperty` fix if ever revisited (defensive — only our code writes `event_type`).
+  2. Actual label strings pinned only in the repository happy-path spec (constants spec compares helper vs map) — adequate, single-site.
+  3. **Carry-forwards:** bilateral.service.ts parallel literals (import swap owed outside this spec); `event_type IN (…)` bound on the events fetch + fractional-day rounding — **→ T-09 perf/HITL levers**.
+  4. **→ carry to T-07 brief (MANDATORY):** mirror the required `label` field in the client `contract-insights.interface.ts`; the Review-flow card must render `label`, never raw codes (C-3 continuity).
+- **Requirements covered:** R-IN-002 review row + messy-history scenario (all clauses), R-IN-001 labels clause for review_flow; design D-F4-2, D-F4-7, D-F4-8.
+- **Final verification result:** full server suite green (2516/2516) · eslint clean · tsc clean · all named reds observed.
+- **Gate note:** auto-approved (chain pre-approval T-02→T-05; the Pivot and the FAIL adjudication were the exceptions and both got explicit owner decisions).

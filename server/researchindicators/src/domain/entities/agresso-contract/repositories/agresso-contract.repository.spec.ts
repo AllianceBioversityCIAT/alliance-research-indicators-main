@@ -4036,6 +4036,212 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getReviewFlowSection (private, F4 insights)', () => {
+    it('queries counts + events and composes the section DTO via the TS cycle-time calculator (asserts generated SQL + params + labels)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          { event_type: 'RESULT_SUBMITTED', count: '2' },
+          { event_type: 'REVIEW_DECISION', count: '1' },
+        ])
+        .mockResolvedValueOnce([{ decision: 'APPROVE', count: '1' }])
+        .mockResolvedValueOnce([
+          {
+            result_id: '501',
+            event_type: 'RESULT_SUBMITTED',
+            decision: null,
+            created_at: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            result_id: '501',
+            event_type: 'REVIEW_DECISION',
+            decision: 'APPROVE',
+            created_at: new Date('2026-01-06T00:00:00.000Z'), // +5 days
+          },
+          {
+            result_id: '502',
+            event_type: 'RESULT_SUBMITTED',
+            decision: null,
+            created_at: new Date('2026-01-03T00:00:00.000Z'), // no approval → excluded
+          },
+        ]);
+
+      const result = await repository['getReviewFlowSection']('A511', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(4);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [eventTypeSql, eventTypeParams] = (repository.query as jest.Mock)
+        .mock.calls[1];
+      const [decisionSql, decisionParams] = (repository.query as jest.Mock).mock
+        .calls[2];
+      const [eventsSql, eventsParams] = (repository.query as jest.Mock).mock
+        .calls[3];
+
+      // Count query (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_review_history rrh');
+      expect(countSql).toContain('rrh.result_id = cr.result_id');
+      expect(countSql).toContain('rrh.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rrh.result_id) AS n');
+      expect(countParams).toEqual(['A511']);
+
+      // event_type breakdown
+      expect(eventTypeSql).toContain('rrh.event_type AS event_type');
+      expect(eventTypeSql).toContain('GROUP BY rrh.event_type');
+      expect(eventTypeSql).toContain('ORDER BY count DESC, rrh.event_type ASC');
+      expect(eventTypeParams).toEqual(['A511']);
+
+      // decision breakdown — only non-null decisions
+      expect(decisionSql).toContain('rrh.decision AS decision');
+      expect(decisionSql).toContain('rrh.decision IS NOT NULL');
+      expect(decisionSql).toContain('GROUP BY rrh.decision');
+      expect(decisionParams).toEqual(['A511']);
+
+      // Events query (D-F4-2/D-F4-7 + proposal.md OQ-1): ordered by
+      // created_at, NEVER by id; payload columns NEVER selected.
+      expect(eventsSql).toContain('rrh.result_id AS result_id');
+      expect(eventsSql).toContain('rrh.event_type AS event_type');
+      expect(eventsSql).toContain('rrh.decision AS decision');
+      expect(eventsSql).toContain('rrh.created_at AS created_at');
+      expect(eventsSql).toContain('ORDER BY rrh.created_at ASC');
+      expect(eventsSql).not.toContain('ORDER BY rrh.id');
+      expect(eventsSql).not.toContain('payload_before');
+      expect(eventsSql).not.toContain('payload_after');
+      expect(eventsParams).toEqual(['A511']);
+
+      // Composed DTO — cycle time delegated to computeReviewCycleTime:
+      // result 501 contributes a 5-day duration (RESULT_SUBMITTED →
+      // REVIEW_DECISION/APPROVE, D-F4-8); 502 has no approval and is
+      // excluded and counted. Rows carry server-resolved labels (R-IN-001
+      // C-3, T-03 attempt-2 remediation, Reviewer FAIL issue 2).
+      //
+      // K-004 evidence (observed 2026-08-24, reverted after capture):
+      // temporarily dropped the `label: getReviewEventTypeLabel(event_type)`
+      // mapping from getReviewFlowSection's by_event_type map (returning
+      // only { event_type, count }). Verbatim red:
+      //   expect(received).toEqual(expected) // deep equality
+      //   - Expected  - 2
+      //   + Received  + 0
+      //       "by_event_type": Array [
+      //         Object {
+      //           "count": 2,
+      //           "event_type": "RESULT_SUBMITTED",
+      //   -       "label": "Result Submitted",
+      //         },
+      //         Object {
+      //           "count": 1,
+      //           "event_type": "REVIEW_DECISION",
+      //   -       "label": "Review Decision",
+      //         },
+      //       ],
+      // Reverted immediately; the label mapping is what ships.
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 2 },
+        by_event_type: [
+          {
+            event_type: 'RESULT_SUBMITTED',
+            label: 'Result Submitted',
+            count: 2,
+          },
+          { event_type: 'REVIEW_DECISION', label: 'Review Decision', count: 1 },
+        ],
+        by_decision: [{ decision: 'APPROVE', label: 'Approved', count: 1 }],
+        cycle_time: { median_days: 5, p90_days: 5, sample_size: 1 },
+        excluded_for_incomplete_history: 1,
+      });
+    });
+
+    it('falls back to the raw code as label for an unknown/future event_type or decision (never undefined/empty)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '1' }])
+        .mockResolvedValueOnce([
+          { event_type: 'SOME_FUTURE_EVENT_TYPE', count: '1' },
+        ])
+        .mockResolvedValueOnce([
+          { decision: 'SOME_FUTURE_DECISION', count: '1' },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getReviewFlowSection']('A511', 1);
+
+      expect(result.by_event_type).toEqual([
+        {
+          event_type: 'SOME_FUTURE_EVENT_TYPE',
+          label: 'SOME_FUTURE_EVENT_TYPE',
+          count: 1,
+        },
+      ]);
+      expect(result.by_decision).toEqual([
+        {
+          decision: 'SOME_FUTURE_DECISION',
+          label: 'SOME_FUTURE_DECISION',
+          count: 1,
+        },
+      ]);
+    });
+
+    it('returns n = 0, empty breakdowns, and null/zero cycle-time stats when the contract has no review history', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getReviewFlowSection']('A511', 5);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 0 },
+        by_event_type: [],
+        by_decision: [],
+        cycle_time: { median_days: null, p90_days: null, sample_size: 0 },
+        excluded_for_incomplete_history: 0,
+      });
+    });
+
+    it('K-004: ordering the events query by id instead of created_at would silently reintroduce insertion-order bugs — regression pinned on the exact SQL text', async () => {
+      // Observed RED verbatim when mutated (2026-08-24, reverted after
+      // capture): temporarily changed `ORDER BY rrh.created_at ASC` to
+      // `ORDER BY rrh.id ASC` in the repository —
+      //   expect(received).toContain(expected) // indexOf
+      //   Expected substring: "ORDER BY rrh.created_at ASC"
+      //   Received string: "...ORDER BY rrh.id ASC\n    "
+      // Reverted immediately; created_at ordering is what ships.
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await repository['getReviewFlowSection']('A511', 1);
+
+      const [eventsSql] = (repository.query as jest.Mock).mock.calls[3];
+      expect(eventsSql).toContain('ORDER BY rrh.created_at ASC');
+      expect(eventsSql).not.toContain('ORDER BY rrh.id');
+    });
+
+    it('K-004 (OQ-1): the events query must never select payload_before/payload_after — regression pinned on the exact SQL text', async () => {
+      // Observed RED verbatim when mutated (2026-08-24, reverted after
+      // capture): temporarily added `rrh.payload_before AS payload_before,`
+      // to the events query's SELECT list —
+      //   Expected substring: not "payload_before"
+      //   Received string: "...rrh.payload_before AS payload_before,..."
+      // Reverted immediately; payload columns are never selected.
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+
+      await repository['getReviewFlowSection']('A511', 1);
+
+      const [eventsSql] = (repository.query as jest.Mock).mock.calls[3];
+      expect(eventsSql).not.toContain('payload_before');
+      expect(eventsSql).not.toContain('payload_after');
+    });
+  });
+
   describe('getIndicatorDetailsReport', () => {
     const mockCapacitySharing: any = {
       meta: { total_results: 4, n: 3 },

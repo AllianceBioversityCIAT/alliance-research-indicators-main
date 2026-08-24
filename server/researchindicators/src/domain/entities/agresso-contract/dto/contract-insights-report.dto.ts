@@ -172,6 +172,13 @@ export class ReviewFlowEventTypeCountDto {
   @ApiProperty({ type: String, description: 'Review history event type' })
   event_type!: string;
 
+  @ApiProperty({
+    type: String,
+    description:
+      'Server-resolved display label for event_type (R-IN-001 C-3 — no bare ids; falls back to the raw code for an unknown/future value)',
+  })
+  label!: string;
+
   @ApiProperty({ type: Number, description: 'Count of events of this type' })
   count!: number;
 }
@@ -179,6 +186,13 @@ export class ReviewFlowEventTypeCountDto {
 export class ReviewFlowDecisionCountDto {
   @ApiProperty({ type: String, description: 'Review history decision value' })
   decision!: string;
+
+  @ApiProperty({
+    type: String,
+    description:
+      'Server-resolved display label for decision (R-IN-001 C-3 — no bare ids; falls back to the raw code for an unknown/future value)',
+  })
+  label!: string;
 
   @ApiProperty({
     type: Number,

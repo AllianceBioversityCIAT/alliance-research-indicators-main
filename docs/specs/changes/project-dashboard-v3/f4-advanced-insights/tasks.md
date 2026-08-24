@@ -57,10 +57,10 @@ graph TD
 - **Requirements covered:** R-IN-002 review row + messy-history scenario (all clauses); design D-F4-2, D-F4-6 as superseded by D-F4-7 (Pivot 2026-08-24).
 - **Files:** repository (events query), a pure TS calculator (`utils/review-cycle-time.util.ts` or module-local) (+specs), **canonical vocabulary constant NEW in the `result-review-history` module** (D-F4-7 — exported, forward-looking source of truth for the future `reviewDecision` writer); calculator asserts against it.
 - **Acceptance / done check:**
-  - [ ] Calculator specs with messy fixtures: insertion-order vs timestamp-order fixtures produce **different** medians (**the named failing input** — if both give the same value the fixture is not messy enough and the evidence is disqualified); anchor-less result excluded and counted; median/p90/sample_size correct on a 5-result fixture with hand-computed expected values.
-  - [ ] Constant-vs-vocabulary spec: every submission/approval value the calculator uses exists in the canonical `result-review-history` constant (**failing input:** a typo in the calculator's mapping → fails) (AMENDED per D-F4-7 — no live enum exists).
-  - [ ] SQL spec: events fetched per result ordered by `created_at`, never by id.
-- **Deps:** none · **Effort:** L · **Status:** in-progress — `[~]` Pivot resolved 2026-08-24 (owner Option A, D-F4-7); resumed with amended acceptance
+  - [x] Calculator specs with messy fixtures: insertion-order vs timestamp-order fixtures produce **different** medians (**the named failing input** — if both give the same value the fixture is not messy enough and the evidence is disqualified); anchor-less result excluded and counted; median/p90/sample_size correct on a 5-result fixture with hand-computed expected values.
+  - [x] Constant-vs-vocabulary spec: every submission/approval value the calculator uses exists in the canonical `result-review-history` constant (**failing input:** a typo in the calculator's mapping → fails) (AMENDED per D-F4-7/D-F4-8 — satisfied in stronger form: calculator imports the canonical anchors, no local mapping exists to typo; wrong-but-valid anchor caught by specific-value + fixture specs).
+  - [x] SQL spec: events fetched per result ordered by `created_at`, never by id.
+- **Deps:** none · **Effort:** L · **Status:** done — PASS attempt 2 (Pivot D-F4-7 + addendum D-F4-8; see execution.md)
 
 ### T-04 — Composition `getInsightsReport` + service + controller + Swagger
 

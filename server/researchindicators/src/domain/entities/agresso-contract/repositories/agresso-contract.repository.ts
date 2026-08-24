@@ -83,9 +83,15 @@ import {
   EvidenceSectionDto,
   KeywordsSectionDto,
   ReachSectionDto,
+  ReviewFlowSectionDto,
   SdgCoverageSectionDto,
 } from '../dto/contract-insights-report.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
+import { computeReviewCycleTime } from '../utils/review-cycle-time.util';
+import {
+  getReviewEventTypeLabel,
+  getReviewDecisionLabel,
+} from '../../result-review-history/constants/review-event-vocabulary.constants';
 
 @Injectable()
 export class AgressoContractRepository
@@ -2995,6 +3001,123 @@ export class AgressoContractRepository
         keyword: String(row.keyword),
         count: Number(row.count ?? 0),
       })),
+    };
+  }
+
+  private async getReviewFlowSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<ReviewFlowSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rrh.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_review_history rrh
+        ON rrh.result_id = cr.result_id
+        AND rrh.is_active = TRUE
+    `;
+
+    const eventTypeBreakdownQuery = `
+      SELECT
+        rrh.event_type AS event_type,
+        COUNT(*) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_review_history rrh
+        ON rrh.result_id = cr.result_id
+        AND rrh.is_active = TRUE
+      GROUP BY rrh.event_type
+      ORDER BY count DESC, rrh.event_type ASC
+    `;
+
+    const decisionBreakdownQuery = `
+      SELECT
+        rrh.decision AS decision,
+        COUNT(*) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_review_history rrh
+        ON rrh.result_id = cr.result_id
+        AND rrh.is_active = TRUE
+        AND rrh.decision IS NOT NULL
+      GROUP BY rrh.decision
+      ORDER BY count DESC, rrh.decision ASC
+    `;
+
+    // D-F4-2 / D-F4-7: cycle time is computed in TS over timestamp-ordered
+    // events (review-cycle-time.util.ts) — this query only fetches the
+    // columns the calculator needs. Ordered by created_at, NEVER by id
+    // (R-IN-002: "events ordered by timestamp, never insertion order").
+    // payload_before / payload_after are NEVER selected (proposal.md OQ-1 —
+    // they may be large).
+    const eventsQuery = `
+      SELECT
+        rrh.result_id AS result_id,
+        rrh.event_type AS event_type,
+        rrh.decision AS decision,
+        rrh.created_at AS created_at
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_review_history rrh
+        ON rrh.result_id = cr.result_id
+        AND rrh.is_active = TRUE
+      ORDER BY rrh.created_at ASC
+    `;
+
+    const [countRows, eventTypeRows, decisionRows, eventRows] =
+      await Promise.all([
+        this.query(countQuery, [contractId]),
+        this.query(eventTypeBreakdownQuery, [contractId]),
+        this.query(decisionBreakdownQuery, [contractId]),
+        this.query(eventsQuery, [contractId]),
+      ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+
+    const cycleTime = computeReviewCycleTime(
+      (eventRows as Array<Record<string, unknown>>).map((row) => ({
+        result_id: Number(row.result_id),
+        event_type: String(row.event_type),
+        decision:
+          row.decision === null || row.decision === undefined
+            ? null
+            : String(row.decision),
+        created_at: row.created_at as string | Date,
+      })),
+    );
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      by_event_type: (eventTypeRows as Array<Record<string, unknown>>).map(
+        (row) => {
+          const event_type = String(row.event_type);
+          return {
+            event_type,
+            label: getReviewEventTypeLabel(event_type),
+            count: Number(row.count ?? 0),
+          };
+        },
+      ),
+      by_decision: (decisionRows as Array<Record<string, unknown>>).map(
+        (row) => {
+          const decision = String(row.decision);
+          return {
+            decision,
+            label: getReviewDecisionLabel(decision),
+            count: Number(row.count ?? 0),
+          };
+        },
+      ),
+      cycle_time: {
+        median_days: cycleTime.median_days,
+        p90_days: cycleTime.p90_days,
+        sample_size: cycleTime.sample_size,
+      },
+      excluded_for_incomplete_history:
+        cycleTime.excluded_for_incomplete_history,
     };
   }
 
