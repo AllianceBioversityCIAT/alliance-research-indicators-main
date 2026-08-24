@@ -91,6 +91,10 @@ describe('ResultsCenterService', () => {
       const listSignal = signal<GetAllIndicators[]>([
         { indicator_id: 1, name: 'Indicator 1', able: true, active: false },
         { indicator_id: 2, name: 'Indicator 2', able: true, active: false },
+        { indicator_id: 3, name: 'Indicator 3', able: true, active: false },
+        { indicator_id: 4, name: 'Indicator 4', able: true, active: false },
+        { indicator_id: 5, name: 'Indicator 5', able: true, active: false },
+        { indicator_id: 6, name: 'Indicator 6', able: true, active: false },
         { indicator_id: 7, name: 'Indicator 7', able: false, active: false }
       ]);
       const mockIndicatorTabsLoaded = {
@@ -113,11 +117,15 @@ describe('ResultsCenterService', () => {
       TestBed.inject(ResultsCenterService);
       tick();
 
-      expect(listSignal().length).toBe(4);
-      expect(listSignal()[0]).toEqual({ name: 'All Indicators', indicator_id: 0, able: true, active: true });
-      expect(listSignal()[1].able).toBe(true);
-      expect(listSignal()[2].able).toBe(true);
-      expect(listSignal()[3].able).toBe(false);
+      const list = listSignal();
+      expect(list.find(i => i.indicator_id === 0)).toEqual({ name: 'All Indicators', indicator_id: 0, able: true, active: true });
+      expect(list.find(i => i.indicator_id === 1)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 2)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 3)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 4)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 5)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 6)?.able).toBe(true);
+      expect(list.find(i => i.indicator_id === 7)?.able).toBe(false);
     }));
   });
 
@@ -1165,6 +1173,22 @@ describe('ResultsCenterService', () => {
       const appliedFilter = service.appliedFilters();
       expect(filter['indicator-codes-tabs']).toEqual([2]);
       expect(appliedFilter['indicator-codes-tabs']).toEqual([2]);
+      expect(mainSpy).toHaveBeenCalled();
+    });
+
+    it('should set indicator-codes-tabs to [6] and active tab when indicatorId is 6', () => {
+      indicatorListSignal.set([
+        { indicator_id: 1, name: 'Indicator 1', able: true, active: false },
+        { indicator_id: 6, name: 'Innovation Use', able: true, active: false }
+      ]);
+      const mainSpy = jest.spyOn(service, 'main');
+
+      service.onSelectFilterTab(6);
+
+      const filter = service.resultsFilter();
+      const list = mockApiService.indicatorTabs.lazy().list();
+      expect(filter['indicator-codes-tabs']).toEqual([6]);
+      expect(list.find(i => i.indicator_id === 6)?.active).toBe(true);
       expect(mainSpy).toHaveBeenCalled();
     });
 
