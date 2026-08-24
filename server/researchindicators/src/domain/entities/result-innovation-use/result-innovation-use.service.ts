@@ -181,12 +181,16 @@ export class ResultInnovationUseService {
         : existingResult.innovation_use_level_explanation;
 
     // Step 3 (cont'd) — resolve the catalog's `level` scalar (trap 2),
-    // against the effective level id, not the raw payload. The resolved
-    // scalar's only consumer, the level >= 6 justification rule, was
-    // deleted by T-01 — this call is kept for its OTHER effect: a level id
-    // that resolves to no catalog row at all still throws 400 here,
-    // unrelated to R-IUD-*.
-    await this.resolveInnovationUseLevel(effectiveLevelId, resultId);
+    // against the effective level id, not the raw payload. Unknown catalog
+    // id still throws 400 here. The returned scale point decides whether
+    // step 6 writes the explanation as NULL (R-IUJ-001) or as today's DTO
+    // passthrough (R-IUJ-002). Compare `level`, never the FK (family D-1).
+    const effectiveCatalogLevel = await this.resolveInnovationUseLevel(
+      effectiveLevelId,
+      resultId,
+    );
+    const shouldClearExplanation =
+      effectiveCatalogLevel === undefined || effectiveCatalogLevel < 6;
 
     // Step 4 — duplicate-actor rule over the incoming payload. The level
     // >= 6 justification rule that used to run here (R-IUA-006,
@@ -209,15 +213,19 @@ export class ResultInnovationUseService {
     );
 
     await this.dataSource.transaction(async (manager) => {
-      // Step 6 — "omitted = preserve" still governs the *write*: TypeORM's
-      // `UpdateQueryBuilder` skips `undefined` properties outright, so an
-      // omitted key here leaves the stored column untouched. DD-14 only
-      // changed what step 4's validator sees, not this statement.
+      // Step 6 — "omitted = preserve" still governs the *write* at catalog
+      // level >= 6: TypeORM's `UpdateQueryBuilder` skips `undefined`
+      // properties, so an omitted explanation key leaves the stored column
+      // untouched (R-IUJ-002). When the effective catalog `level` is `< 6`
+      // or absent, pass `null` — only an explicit null SETs the column;
+      // skipping (`undefined`) would leave a stale justification (R-IUJ-001,
+      // DD-3). A present DTO string is ignored on that path.
       await manager.getRepository(this.mainRepo.target).update(resultId, {
         innovation_use_level_id:
           createResultInnovationUseDto?.innovation_use_level_id,
-        innovation_use_level_explanation:
-          createResultInnovationUseDto?.innovation_use_level_explanation,
+        innovation_use_level_explanation: shouldClearExplanation
+          ? null
+          : createResultInnovationUseDto?.innovation_use_level_explanation,
         ...this._currentUser.audit(SetAuditEnum.UPDATE),
       });
 

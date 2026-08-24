@@ -47,6 +47,8 @@ When the use level changes from one that requires a justification (`>= 6`) to on
 
 **Scope agreed with the product owner: for now, the justification field only.** Other conditional fields may have the same problem, but they are out of scope for this cycle.
 
+**Execution spec:** [`docs/specs/bugfix/innovation-use-stale-justification/`](../../bugfix/innovation-use-stale-justification/) — going-forward server write-time clear; no backfill. Not archived.
+
 ---
 
 ## 1. Where to start after a session reset
