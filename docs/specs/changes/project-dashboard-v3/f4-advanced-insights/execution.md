@@ -183,3 +183,9 @@
 - **Requirements covered:** R-IN-001 envelope through the real HTTP path; defect rows 1–4 blind-spot handling (incl. AMENDED cycle-time row).
 - **Final verification result:** integration suite green twice (worker + Leader re-run) · eslint clean.
 - **Gate note:** auto-approved (chain pre-approval T-02→T-05 — chain COMPLETE; pre-client pause next).
+
+### Owner-directed correction — reach DTO wording (post-T-05 ground-truth, pre-client gate)
+
+- **Date:** 2026-08-24 · **Owner decisions at the pre-client gate:** (1) client chain T-07→T-09 approved (auto-gates; always pause at T-09 HITL); (2) reach wording corrected in DTO + client-copy directive to T-08/T-09 ("actor groups", never "people/individuals"); (3) **Other-label = option (a)** — T-09 builder shows the custom name only when the code-5 group is homogeneous, "Other" when heterogeneous (no server/design change).
+- **Change:** `contract-insights-report.dto.ts` — 5 `@ApiProperty` descriptions on `ReachDisaggregationDto` corrected from individuals-headcount wording to flagged actor-group-row semantics (doc-only, zero behavior; settles the T-05 defect-class-1 finding). Applied Leader-inline under explicit owner approval of this exact micro-fix (recorded deviation from the no-code default; no logic touched, no review loop consumed).
+- **Verification:** eslint clean · tsc build clean · targeted agresso-contract suite green post-change (211/211).

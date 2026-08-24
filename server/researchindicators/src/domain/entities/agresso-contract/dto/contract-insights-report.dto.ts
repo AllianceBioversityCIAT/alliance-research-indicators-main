@@ -6,21 +6,38 @@ import { SectionMetaDto } from './contract-indicator-details-report.dto';
 // ---------------------------------------------------------------------------
 
 export class ReachDisaggregationDto {
-  @ApiProperty({ type: Number, description: 'Sum of women youth reached' })
+  @ApiProperty({
+    type: Number,
+    description:
+      'Count of actor-group rows flagged women × youth (boolean-flag sum — actor-group entries, not individuals; ground-truthed 2026-08-24, see spec execution.md T-05)',
+  })
   women_youth!: number;
 
-  @ApiProperty({ type: Number, description: 'Sum of women non-youth reached' })
+  @ApiProperty({
+    type: Number,
+    description:
+      'Count of actor-group rows flagged women × non-youth (flag sum — rows, not individuals)',
+  })
   women_not_youth!: number;
 
-  @ApiProperty({ type: Number, description: 'Sum of men youth reached' })
+  @ApiProperty({
+    type: Number,
+    description:
+      'Count of actor-group rows flagged men × youth (flag sum — rows, not individuals)',
+  })
   men_youth!: number;
 
-  @ApiProperty({ type: Number, description: 'Sum of men non-youth reached' })
+  @ApiProperty({
+    type: Number,
+    description:
+      'Count of actor-group rows flagged men × non-youth (flag sum — rows, not individuals)',
+  })
   men_not_youth!: number;
 
   @ApiProperty({
     type: Number,
-    description: 'Total individuals reached across the four disaggregations',
+    description:
+      'Sum of the four flag counts (actor-group rows, not an individuals headcount)',
   })
   total!: number;
 }
