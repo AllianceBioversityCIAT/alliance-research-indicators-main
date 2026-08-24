@@ -44,9 +44,9 @@ graph TD
 - **Requirements:** R-DN-002 scenario (inventory closes by what renders — KZ-002); design §2.2.
 - **Files:** evidence table in `execution.md` (no code).
 - **Acceptance / done check:**
-  - [ ] Grep + template read over project-detail components AND inline template regions for `style.width`/`[style.width.%]`/`app-viz-chart`/SVG markup; every data-bearing surface listed with its render mechanism. **Failing input:** the known inline status strip at `project-dashboard.component.html:383-440` — an inventory that misses it (folder-scoped scan) is disqualified.
-  - [ ] Closure table: each surface → `viz-chart` | `composition strip (declared)` | `migrate at T-03` — zero unclassified.
-- **Deps:** none · **Effort:** S · **Status:** todo
+  - [x] Grep + template read over project-detail components AND inline template regions for `style.width`/`[style.width.%]`/`app-viz-chart`/SVG markup; every data-bearing surface listed with its render mechanism. **Failing input:** the known inline status strip at `project-dashboard.component.html:383-440` — an inventory that misses it (folder-scoped scan) is disqualified.
+  - [x] Closure table: each surface → `viz-chart` | `composition strip (declared)` | `migrate at T-03` — zero unclassified.
+- **Deps:** none · **Effort:** S · **Status:** done — PASS attempt 1
 
 ### T-03 — Rankings migration to viz-chart (OQ-2-A)
 
