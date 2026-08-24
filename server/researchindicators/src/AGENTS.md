@@ -159,9 +159,10 @@ Socket.IO event names + payload shapes are **not yet documented**; capture any n
 ## 9. Tests
 
 - Framework: Jest 29 + ts-jest. Sibling `*.spec.ts` per controller / service / guard / interceptor / middleware.
-- Run from `server/researchindicators/`: `npm test`, `npm run test:watch`, `npm run test:cov`, `npm run test:e2e`.
+- Run from `server/researchindicators/`: `npm test`, `npm run test:watch`, `npm run test:cov`, `npm run test:integration`. **`npm run test:e2e` is an infrastructure smoke test, not a routine gate** (root guide K-021): its only suite boots the full `AppModule` against the shared dev MySQL/RabbitMQ/OpenSearch — it hangs in connection retries locally and must never be cited as evidence for a code task.
 - Global coverage threshold: 60% (branches / functions / lines / statements). Coverage excludes `*.entity.ts`, `db/migrations/**`, `*.enum.ts`, `*.spec.ts`.
 - Mock TypeORM repositories with `jest.fn()` factories. Do NOT spin up MySQL in unit tests; use the `TEST` datasource for integration coverage when needed.
+- **HTTP-path coverage (envelope, interceptor, exception filter):** write a `*.integration-spec.ts` under `test/` that builds a `TestingModule` with only the controller + service under test, applies the global `ResponseInterceptor`/`GlobalExceptions`, replaces repositories with `overrideProvider`, and hits `app.getHttpServer()` with supertest — seconds, no network. Never import `AppModule` or open a `DataSource` there. Template: `test/bilateral-primary-contributing-sp.integration-spec.ts`.
 - For each new role-restricted or status-guarded handler, include both an "allowed" and "denied" test case.
 
 ---
@@ -189,7 +190,8 @@ npm run build                       # build NestJS + admin
 npm run lint                        # eslint --fix
 npm test                            # jest unit
 npm run test:cov                    # jest coverage
-npm run test:e2e                    # jest e2e (test/jest-e2e.json)
+npm run test:integration            # jest HTTP-path/integration specs (test/jest-integration.json) — the gate for envelope/interceptor behavior
+npm run test:e2e                    # jest e2e (test/jest-e2e.json) — full AppModule vs remote infra: infra smoke ONLY, never a code gate (K-021)
 npm run migration:generate -- ./src/db/migrations/<name>
 npm run migration:execute           # apply against dist
 npm run migration:dev:execute       # apply against src (ts-node)
