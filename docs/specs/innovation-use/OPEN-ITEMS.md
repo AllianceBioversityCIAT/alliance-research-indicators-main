@@ -10,7 +10,7 @@
 
 ## 0. Findings from the test-environment session — 2026-08-21, to pick up Monday
 
-Reported by the product owner after checking the work already deployed to **test**. **Neither blocks what is deployed**; both are new work.
+Reported by the product owner after checking the work already deployed to **test**. **Neither blocked what was deployed.** Both are now archived (N-1, N-2).
 
 ### N-1 · The Results Center "INNOVATION USE" filter is inactive — **done (archived 2026-08-24)**
 
@@ -30,7 +30,7 @@ Indicator **6** (Innovation Use) is not in the array, so the chip is rendered wi
 
 **Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--results-center-innovation-use-filter/`](../../archive/2026-08-24-bugfix--results-center-innovation-use-filter/)
 
-### N-2 · The justification is not cleared when the level drops — **a design decision, not just a fix**
+### N-2 · The justification is not cleared when the level drops — **done (archived 2026-08-24)**
 
 When the use level changes from one that requires a justification (`>= 6`) to one that does not (e.g. 2), the text **stays stored in the database**. That leaves a value that does not apply: a filled justification at level 2 is meaningless.
 
@@ -47,7 +47,7 @@ When the use level changes from one that requires a justification (`>= 6`) to on
 
 **Scope agreed with the product owner: for now, the justification field only.** Other conditional fields may have the same problem, but they are out of scope for this cycle.
 
-**Execution spec:** [`docs/specs/bugfix/innovation-use-stale-justification/`](../../bugfix/innovation-use-stale-justification/) — going-forward server write-time clear; no backfill. Not archived.
+**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--innovation-use-stale-justification/`](../../archive/2026-08-24-bugfix--innovation-use-stale-justification/) — going-forward server write-time clear; no backfill. `_effectiveExplanation` was kept (permitted, not required); **D1** may proceed.
 
 ---
 
@@ -84,7 +84,7 @@ Branch: **`AC-1679-Create-the-innovation-use-section`**, pushed. **Brought up to
 | # | Item | State |
 | --- | --- | --- |
 | ~~**T-03**~~ | ✅ **DONE** 2026-08-21 — Reviewer PASS en el intento 3 de 3. ~~Amend the affected specs and close the verification gate: Pivot `details-page` (R-IUP-006 AC.2, `design.md:380`, `tasks.md:428`, T-09 c5, the traceability row), write a **superseding record** for archived chunk 2's `R-IUA-006` AC.3/AC.4 (**do not edit the archived file**), add a follow-up row to `family.md`, file the platform finding, run Correction Closure both directions, and run both full suites in a quiet window~~ | **`[x]` closed** |
-| **D1** | **Deferred by user ruling** — remove `_effectiveExplanation` (dead since T-01) plus three stale rationale paragraphs at `result-innovation-use.service.ts:263-264`, `:269-271`, `:278-284`, and the now-false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`. **Zero functional effect.** `tasks.md` T-01 scope item 1 is already amended to permit it | **deferred, not dropped** |
+| **D1** | **Deferred by user ruling** — remove `_effectiveExplanation` (dead since T-01) plus three stale rationale paragraphs at `result-innovation-use.service.ts:263-264`, `:269-271`, `:278-284`, and the now-false comment at `innovation-use-section-round-trip.fixture-spec.ts:992-994`. **Zero functional effect.** N-2 archived 2026-08-24 **without** deleting it (permitted, not required), so this no longer waits on N-2 | **deferred, not dropped** |
 | **D2** | **Deferred by user ruling · `ADVISORY R1` · highest-value item owed.** Nothing asserts that `result_status_workflow` **row id 30** dispatches `completenessValidation` with `enabled: true`. A future migration flipping it would leave **every test in this spec green** while removing the last server-side completeness enforcement for the section. **Test-only** close: a raw `SELECT` of row 30's config in `innovation-use-level-boundary.fixture-spec.ts`. It is the **only unasserted premise in R-IUD-002's chain** | **deferred — pick up first** |
 
 ### 3.2 `innovation-use/details-page` — **T-13 is `[~]`**
