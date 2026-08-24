@@ -189,3 +189,18 @@
 - **Date:** 2026-08-24 · **Owner decisions at the pre-client gate:** (1) client chain T-07→T-09 approved (auto-gates; always pause at T-09 HITL); (2) reach wording corrected in DTO + client-copy directive to T-08/T-09 ("actor groups", never "people/individuals"); (3) **Other-label = option (a)** — T-09 builder shows the custom name only when the code-5 group is homogeneous, "Other" when heterogeneous (no server/design change).
 - **Change:** `contract-insights-report.dto.ts` — 5 `@ApiProperty` descriptions on `ReachDisaggregationDto` corrected from individuals-headcount wording to flagged actor-group-row semantics (doc-only, zero behavior; settles the T-05 defect-class-1 finding). Applied Leader-inline under explicit owner approval of this exact micro-fix (recorded deviation from the no-code default; no logic touched, no review loop consumed).
 - **Verification:** eslint clean · tsc build clean · targeted agresso-contract suite green post-change (211/211).
+
+### T-07 — Client interface + API method + `GetContractInsightsService` — **PASS** (attempt 1)
+
+- **Date:** 2026-08-24 · Skills: `angular-developer` (deviation: `ui-ux-pro-max` deferred to T-08/T-09 — plumbing task, no UI) · Effort: medium · Family gate: OPEN (F3 archived)
+- **Files:** `shared/interfaces/contract-insights.interface.ts` (NEW — mirrors server DTO field-for-field incl. REQUIRED `label` on review-flow rows [T-03 pointer satisfied]; reuses F3's `SectionMeta`), `shared/services/api.service.ts` (+`GET_ContractInsights`), `shared/services/get-contract-insights.service.ts` (NEW +spec, 12 tests — no auto-load, `load()` dedupe, `update()` force, per-section accessors + `sectionFailed`, byte-for-byte F3 mirror verified by Reviewer).
+- **Verification:** targeted jest 12/12 (`--coverage=false`, K-020) · eslint clean · **Leader re-measure: full client suite 317 suites / 6733 tests PASS, exit 0** (coverage floors enforced by config — green).
+- **K-004 reds:** dedupe guard removed → open-request/timeout red (11/12); wrong-URL assertion → `Expected ...WRONG_ID Received ...A511` red. Reverted, green.
+- **Reviewer verdict:** `STATUS: PASS` — shape conformance walked field-by-field vs server DTO; URL verified vs controller + F3 siblings; all 3 decisions approved (SectionMeta reuse; `total` required = faithful mirror; F3 structural mirror confirmed by full read). Fixtures live-shaped (requirements-scenario ratios, T-03/T-05-consistent cycle_time).
+- **ADVISORY (recorded):**
+  1. **→ T-08 brief (MANDATORY):** card copy must say "actor groups", never "people/individuals" (owner directive); suggest carrying the wording into the `ReachDisaggregation` interface comment when T-08 touches the area.
+  2. **→ T-08 brief (MANDATORY):** `sectionFailed()` returns false for all sections when `data()` is null (undefined === null) — T-08 MUST branch on `loadError()` BEFORE `sectionFailed()` per card, else a total load failure renders six empty notices instead of the shared retry (F3-identical semantics).
+  3. Concurrent-`load()` race (last-write-wins) inherited verbatim from F3 — unreachable in one-contract-per-view; if F3/F4 ever get a fix, same fix for both. Recorded only.
+- **Requirements covered:** R-IN-003 service-level fetch/dedupe/retry rules; design §2.2, D-F4-3/D-F4-4.
+- **Final verification result:** full client suite green · eslint clean · K-004 reds observed.
+- **Gate note:** auto-approved (client chain pre-approval T-07→T-09; pause fixed at T-09 HITL).

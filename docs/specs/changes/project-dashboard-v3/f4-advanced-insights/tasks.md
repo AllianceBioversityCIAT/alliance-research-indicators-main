@@ -95,9 +95,9 @@ graph TD
 - **Requirements covered:** R-IN-003 (single fetch + retry at service level); design §2.2.
 - **Files:** `contract-insights.interface.ts` (NEW), `api.service.ts`, `get-contract-insights.service.ts` (NEW, +spec).
 - **Acceptance / done check:**
-  - [ ] `HttpTestingController` spec: exact URL/params; dedupe on repeated `load` (**failing input:** remove dedupe → fails); `update()` re-fetches; live-shaped fixtures (KZ-001).
-  - [ ] Targeted jest `--coverage=false` + eslint green.
-- **Deps:** T-04 + gate · **Effort:** M · **Status:** todo
+  - [x] `HttpTestingController` spec: exact URL/params; dedupe on repeated `load` (**failing input:** remove dedupe → fails); `update()` re-fetches; live-shaped fixtures (KZ-001).
+  - [x] Targeted jest `--coverage=false` + eslint green (full client suite 317/6733 by Leader re-measure — see execution.md).
+- **Deps:** T-04 + gate · **Effort:** M · **Status:** done
 
 ### T-08 — Insights component: laziness, tri-state, SDG chips, mount 🔒 gate: F3 client landed
 
