@@ -68,3 +68,11 @@
   4. Test-title overstatement + **→ T-07 brief:** include `results-trend-card.ssr.spec.ts` in the tsc-spec delta check (K-002 — its casts are otherwise untype-checked).
 - **Requirements covered:** R-DN-001 all clauses; design §2.1, D-DN-1/2/5.
 - **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-06 — Design-system registry update — **PASS** (attempt 2)
+
+- **Date:** 2026-08-24 · **Attempts:** 2 (attempt 1 FAIL above — stale line citations + single-mechanism wording) · doc-only, effort low→medium
+- **Files:** `docs/ux-ui/design.md` §8.1 — Chart idiom registry entry: composition-strip idiom (when-to-use, BOTH width-% mechanisms of the hero status surface named, accessible-companion wording covering both instances), progressbar-meter exclusion, rankings-via-viz-bar note. Citations by template-structural anchors (aria id / role+label text), zero line numbers — survives T-04/T-05 reorders.
+- **Reviewer verdict:** `STATUS: PASS` — every anchor verified live and unique; the Distribution companion confirmed structurally inside the same crossfade branch; unrelated §8 rows byte-identical (disqualifier not tripped); progressbar exclusion re-confirmed at source. Evidence-hygiene note recorded: implementer's brief said `:601` for the `<ul>`, it is `:602` — irrelevant to the artifact (no line numbers in it), flagged because a spot-check claim failed last round.
+- **Requirements covered:** R-DN-002 declared-idiom half; T-02 advisory 2 honored.
+- **Gate note:** auto-approved (owner fast-mode chain).

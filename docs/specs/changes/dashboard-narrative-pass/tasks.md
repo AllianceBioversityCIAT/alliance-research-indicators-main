@@ -84,8 +84,8 @@ graph TD
 - **Requirements:** R-DN-002 (declared-idiom half); design §2.2.
 - **Files:** `docs/ux-ui/design.md` §8 (this edit IS the change, not an archive sync — allowed on this branch as spec deliverable).
 - **Acceptance / done check:**
-  - [ ] §8 gains: "composition strip" idiom entry (when-to-use rule, the hero semaphore as the instance) + migrated surfaces noted as viz-chart consumers; closure table from T-02 reflected. 1–3 concise entries, no restructuring (**disqualifier:** editing unrelated §8 rows).
-- **Deps:** T-02 · **Effort:** S · **Status:** todo
+  - [x] §8 gains: "composition strip" idiom entry (when-to-use rule, the hero semaphore as the instance) + migrated surfaces noted as viz-chart consumers; closure table from T-02 reflected. 1–3 concise entries, no restructuring (**disqualifier:** editing unrelated §8 rows).
+- **Deps:** T-02 · **Effort:** S · **Status:** done — PASS attempt 2
 
 ### T-07 — Full gates + HITL close
 

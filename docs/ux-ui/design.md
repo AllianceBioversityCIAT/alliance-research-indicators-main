@@ -431,6 +431,10 @@ All shared, reusable components live under `client/research-indicators/src/app/s
 - **System feedback:** `global-alert`, `global-toast`, `alert-tag`
 - **OICR-specific:** `download-oicr-template`, `oicr-header`, `oicr-workflow-status`
 - **Utilities:** `copy-token`, `filters-action-buttons`
+- **Chart idiom registry (R-DN-002):** `viz-chart` is the default for every data-bearing surface; one non-echarts idiom is declared instead of migrating:
+  - **Composition strip** — a custom width-% part-to-whole strip paired with an accessible text companion (sr-only table or visible list), no chart engine. When to use: ≤~6 proportional segments of one whole, where a full `viz-chart` instance is overhead. The hero status composition (`project-dashboard.component.html`, the `results-by-status` region — `aria-labelledby="results-by-status-title"`) uses **two** width-% mechanisms in one idiom: the `figure[role="img"]` composition bar labelled *Composition*, and the per-status share bars inside its companion table (which doubles as the accessible table); drill links optional. The results-by-indicator **Distribution** strip (crossfade fallback, same file) is the single-mechanism case, with a visible `<ul>` as its text companion.
+  - Single-value progress meters (`role="progressbar"`, e.g. the project timeline's elapsed-% bar) are **not** data-viz surfaces and are out of scope for this registry.
+- **Rankings (R-DN-002, OQ-2-A):** top regions/countries/sub-national and other dashboard rankings render through `viz-chart` via `layout="viz-bar"` — no separate "ranking strip" idiom; all dashboard rankings share the viz-bar mechanism.
 
 > **Rule:** a new screen that introduces a "card" / "table" / "modal" pattern not covered above must either (a) extend the shared component or (b) document the new component in §12 and add it to this inventory in the same change.
 
