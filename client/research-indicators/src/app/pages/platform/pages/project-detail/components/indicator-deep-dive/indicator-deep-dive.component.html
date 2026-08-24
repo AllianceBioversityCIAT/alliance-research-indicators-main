@@ -1,0 +1,125 @@
+<section class="flex w-full flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  aria-labelledby="indicator-deep-dive-title"
+  (focusin)="onRegionFocusIn()">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex flex-col gap-1">
+      <h2 id="indicator-deep-dive-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+        Indicator deep-dive
+      </h2>
+      <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
+        Exclusive metadata reported per indicator type on this project.
+      </p>
+    </div>
+    <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">
+      Source: official indicator records
+    </span>
+  </header>
+
+  <!-- Reserved for T-09's reporting velocity strip (R-DD-006, design workflow #4) -->
+  <div data-slot="velocity"></div>
+
+  @if (tabs().length === 0) {
+    @if (loading()) {
+    <!-- The F1 indicator summaries this panel's tabs derive from are still
+         loading — skeleton, never the terminal "no indicators" notice
+         (distinct from empty, K-016). -->
+    <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading indicator deep-dive">
+      <p-skeleton width="40%" height="16px" borderRadius="4px" />
+      <div class="flex gap-2">
+        <p-skeleton width="120px" height="36px" borderRadius="8px" />
+        <p-skeleton width="120px" height="36px" borderRadius="8px" />
+        <p-skeleton width="120px" height="36px" borderRadius="8px" />
+      </div>
+      <p-skeleton width="100%" height="120px" borderRadius="8px" />
+    </div>
+    } @else {
+    <div class="flex items-center justify-center px-4 py-8 text-center">
+      <p class="m-0 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+        No indicators with results to show a deep-dive for.
+      </p>
+    </div>
+    }
+  } @else {
+  <div class="flex gap-0.5 overflow-x-auto border-b border-[var(--ac-grey-200)]" role="tablist" aria-label="Indicator deep-dive tabs">
+    @for (tab of tabs(); track tab.id; let i = $index) {
+    <button type="button"
+      role="tab"
+      [id]="'deep-dive-tab-' + tab.id"
+      [attr.aria-selected]="activeTab()?.id === tab.id"
+      [attr.aria-controls]="'deep-dive-tabpanel-' + tab.id"
+      [tabIndex]="activeTab()?.id === tab.id ? 0 : -1"
+      class="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 font-['Barlow'] text-[13px] font-semibold text-[var(--ac-grey-600)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+      [class.text-[var(--ac-light-blue-400)]]="activeTab()?.id === tab.id"
+      [class.border-b-[var(--ac-light-blue-400)]]="activeTab()?.id === tab.id"
+      [class.hover:text-[var(--ac-grey-800)]]="activeTab()?.id !== tab.id"
+      (click)="selectTab(tab)"
+      (keydown)="onTabKeydown($event, i)">
+      <span>{{ tab.label }}</span>
+      <span class="rounded-full bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Space_Grotesk'] text-[11px] text-[var(--ac-primary-blue-600)]">
+        {{ tab.value }}
+      </span>
+    </button>
+    }
+  </div>
+
+  @if (activeTab(); as tab) {
+  <div [id]="'deep-dive-tabpanel-' + tab.id"
+    role="tabpanel"
+    [attr.aria-labelledby]="'deep-dive-tab-' + tab.id"
+    class="flex flex-col gap-3"
+    tabindex="0">
+    @switch (activeTabState()) {
+      @case ('skeleton') {
+      <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" [attr.aria-label]="'Loading ' + tab.label + ' details'">
+        <p-skeleton width="60%" height="16px" borderRadius="4px" />
+        <p-skeleton width="40%" height="14px" borderRadius="4px" />
+        <p-skeleton width="100%" height="160px" borderRadius="8px" />
+      </div>
+      }
+      @case ('error') {
+      <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+        <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+        <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
+          We could not load {{ tab.label }} details. Please try again.
+        </p>
+        <button pButton type="button" severity="secondary" size="small"
+          class="!min-h-[44px] !min-w-[44px]"
+          [attr.aria-label]="'Retry loading ' + tab.label + ' details'"
+          (click)="retry()">Try again</button>
+      </div>
+      }
+      @case ('unavailable') {
+      <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+        <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+        <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+          No {{ tab.label }} data is available for this indicator yet.
+        </p>
+      </div>
+      }
+      @case ('empty') {
+      <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+        <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+        <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+          The {{ activeSectionMeta()?.total_results ?? 0 }} {{ tab.label }} results on this project were imported from other platforms and do not include this metadata yet.
+        </p>
+      </div>
+      }
+      @case ('sparse') {
+      <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+        <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+        <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+          Showing metadata from {{ activeSectionMeta()?.n }} of {{ activeSectionMeta()?.total_results }} {{ tab.label }} results — results imported from other platforms may not include it.
+        </p>
+      </div>
+      <!-- Reserved for T-09's chart grid builders (R-DD-004) -->
+      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId ?? tab.id"></div>
+      }
+      @case ('complete') {
+      <!-- Reserved for T-09's chart grid builders (R-DD-004) -->
+      <div data-slot="charts" [attr.data-indicator-id]="tab.indicatorId ?? tab.id"></div>
+      }
+    }
+  </div>
+  }
+  }
+</section>

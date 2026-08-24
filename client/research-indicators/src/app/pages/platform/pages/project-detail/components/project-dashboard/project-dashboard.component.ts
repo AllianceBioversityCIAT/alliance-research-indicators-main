@@ -20,6 +20,7 @@ import { ContractResultsSummaryStatusBucket } from '@interfaces/contract-results
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
 import { NoDataGroupComponent, NoDataGroupItem } from '../no-data-group/no-data-group.component';
+import { IndicatorDeepDiveComponent } from '../indicator-deep-dive/indicator-deep-dive.component';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
@@ -75,7 +76,8 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     ResultsTrendCardComponent,
     SpAlignmentGraphComponent,
     NoDataGroupComponent,
-    VizChartComponent
+    VizChartComponent,
+    IndicatorDeepDiveComponent
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,

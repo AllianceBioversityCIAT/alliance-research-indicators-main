@@ -117,11 +117,11 @@ graph TD
 - **Files:** `components/indicator-deep-dive/*` (NEW, +spec), `project-dashboard.component.html` (mount line, +spec delta).
 - **Description:** Tabs from F1 indicator summaries (order = bar order); IntersectionObserver behind an overridable member; states: skeleton (distinct from empty), error + shared retry (section `null`), sparse notice (`0<n<total`), notice-only (`n=0`); keyboard-navigable tablist.
 - **Acceptance / done check:**
-  - [ ] Specs (KZ-015): below-fold construct → zero fetches; intersect → one; further intersections/tab switches → still one (**failing input:** load in `ngOnInit` → the zero-fetch assertion fails).
-  - [ ] Tri-state specs per tab (`n=0` no charts; sparse shows "n of N"; section `null` → error+retry, NOT sparse).
-  - [ ] Spec (R-DD-005): indicator-bar click navigation unchanged with the panel mounted.
-  - [ ] Declared gap: real intersection is jsdom-unprovable → T-10 HITL.
-- **Deps:** T-07 · **Effort:** L · **Status:** todo
+  - [x] Specs (KZ-015): below-fold construct → zero fetches; intersect → one; further intersections/tab switches → still one (**failing input:** load in `ngOnInit` → the zero-fetch assertion fails).
+  - [x] Tri-state specs per tab (`n=0` no charts; sparse shows "n of N"; section `null` → error+retry, NOT sparse).
+  - [x] Spec (R-DD-005): indicator-bar click navigation unchanged with the panel mounted.
+  - [x] Declared gap: real intersection is jsdom-unprovable → T-10 HITL.
+- **Deps:** T-07 · **Effort:** L · **Status:** done
 
 ### T-09 — Per-tab chart grids + velocity strip
 

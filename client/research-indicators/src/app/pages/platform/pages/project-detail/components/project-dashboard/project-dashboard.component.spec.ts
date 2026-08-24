@@ -2,6 +2,7 @@ import { Component, computed, EventEmitter, Input, Output, signal } from '@angul
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
@@ -17,6 +18,7 @@ import { ProjectDashboardCardComponent } from '../project-dashboard-card/project
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
+import { IndicatorDeepDiveComponent, IndicatorDeepDiveTab } from '../indicator-deep-dive/indicator-deep-dive.component';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport, ContractSpAlignment } from '@shared/interfaces/contract-sp-alignment.interface';
@@ -47,6 +49,17 @@ class SpAlignmentGraphStubComponent {
   @Input() report: ContractSpAlignmentReport | null = null;
   @Input() loading = false;
   @Input() error = false;
+}
+
+@Component({
+  selector: 'app-indicator-deep-dive',
+  standalone: true,
+  template: ''
+})
+class IndicatorDeepDiveStubComponent {
+  @Input() contractId = '';
+  @Input() indicators: IndicatorDeepDiveTab[] = [];
+  @Input() loading = false;
 }
 
 @Component({
@@ -516,6 +529,7 @@ describe('ProjectDashboardComponent', () => {
 
     apiMock = {
       GET_ResultsCount: jest.fn(),
+      GET_IndicatorDetails: jest.fn(),
       GET_Results: jest.fn().mockResolvedValue({
         data: {
           results: [
@@ -566,10 +580,26 @@ describe('ProjectDashboardComponent', () => {
     })
       .overrideComponent(ProjectDashboardComponent, {
         remove: {
-          imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, ResultsTrendCardComponent, SpAlignmentGraphComponent, VizChartComponent]
+          imports: [
+            ProjectDashboardCardComponent,
+            GeoScopeCardComponent,
+            ResultsCenterTableComponent,
+            ResultsTrendCardComponent,
+            SpAlignmentGraphComponent,
+            VizChartComponent,
+            IndicatorDeepDiveComponent
+          ]
         },
         add: {
-          imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent, ResultsTrendCardStubComponent, SpAlignmentGraphStubComponent, VizChartStubComponent]
+          imports: [
+            ProjectDashboardCardStubComponent,
+            GeoScopeCardStubComponent,
+            ResultsCenterTableStubComponent,
+            ResultsTrendCardStubComponent,
+            SpAlignmentGraphStubComponent,
+            VizChartStubComponent,
+            IndicatorDeepDiveStubComponent
+          ]
         }
       })
       .compileComponents();
@@ -1530,6 +1560,80 @@ describe('ProjectDashboardComponent', () => {
       expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
         queryParams: { indicatorTab: 1 }
       });
+    });
+
+    it('mounts the F3 indicator deep-dive panel alongside Results by indicator and does not intercept its bar-click navigation (R-DD-005)', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+      const router = TestBed.inject(Router);
+      const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+      // Panel is mounted (R-DD-003) alongside the existing indicator region.
+      const deepDiveEl = fixture.nativeElement.querySelector('app-indicator-deep-dive');
+      expect(deepDiveEl).not.toBeNull();
+
+      // The F1 drill-through behavior is unchanged with the panel present —
+      // the deep-dive component does not intercept or alter this navigation.
+      component.onIndicatorHeatmapClick({ data: [0, 0, 2] } as any);
+      expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+        queryParams: { indicatorTab: 1 }
+      });
+    });
+
+    it('passes contractId and the bar-ordered indicatorsWithResults() to the deep-dive panel without re-deriving them', async () => {
+      await setup('C-1', {
+        summary: summaryWithMatrix,
+        projectData: {
+          indicators: [
+            { indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any,
+            { indicator_id: 99, full_name: 'Outcome', count_results: 4 } as any
+          ]
+        }
+      });
+
+      const deepDiveDebugEl = fixture.debugElement.query(By.css('app-indicator-deep-dive'));
+      expect(deepDiveDebugEl).not.toBeNull();
+      const stub = deepDiveDebugEl.componentInstance as IndicatorDeepDiveStubComponent;
+      expect(stub.contractId).toBe('C-1');
+      expect(stub.indicators).toEqual(component.indicatorsWithResults());
+      expect(stub.indicators.map(i => i.id)).toEqual([1, 99]);
+      expect(stub.loading).toBe(false);
+    });
+
+    it(
+      'passes GetProjectDetailService.loading() through to the deep-dive panel — it stays mounted and shows its own ' +
+        'skeleton, never a false "no indicators" notice, during the F1 load window ' +
+        '(failing input: no [loading] binding, the stub/component always sees loading=false)',
+      async () => {
+        await setup('C-1', {
+          projectLoading: true,
+          projectData: { indicators: [] }
+        });
+
+        // Still loading — genuinely-empty vs not-loaded-yet must stay distinguishable.
+        expect(component.indicatorsEmpty()).toBe(false);
+
+        const deepDiveDebugEl = fixture.debugElement.query(By.css('app-indicator-deep-dive'));
+        expect(deepDiveDebugEl).not.toBeNull();
+        const stub = deepDiveDebugEl.componentInstance as IndicatorDeepDiveStubComponent;
+        expect(stub.loading).toBe(true);
+      }
+    );
+
+    it('does not mount the deep-dive panel when there are no results for any indicator', async () => {
+      await setup('C-1', {
+        projectData: { indicators: [] }
+      });
+
+      expect(component.indicatorsEmpty()).toBe(true);
+      expect(fixture.nativeElement.querySelector('app-indicator-deep-dive')).toBeNull();
     });
 
     it('should support engine-native morph via universalTransition sharing series id between bar and heatmap (R-DA-007)', async () => {

@@ -652,9 +652,19 @@
     }
     }
     }
-
-    <!-- Reserved slot for F3 Indicator Deep Dive -->
   </section>
+  }
+
+  <!-- F3 Indicator deep-dive panel (reserved F1 slot; mount only — R-DD-003/005).
+       Stays mounted through loading and load-error, hidden only when the
+       project genuinely has zero results — the component itself renders its
+       own skeleton (via [loading]) while F1's indicator summaries are still
+       loading, never the terminal "no indicators" notice during that window. -->
+  @if (!indicatorsEmpty()) {
+  <app-indicator-deep-dive
+    [contractId]="contractId()"
+    [indicators]="indicatorsWithResults()"
+    [loading]="getProjectDetailService.loading()" />
   }
 
   <!-- Geographic scope -->
