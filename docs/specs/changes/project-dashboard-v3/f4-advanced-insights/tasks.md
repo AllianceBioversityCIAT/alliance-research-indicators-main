@@ -60,7 +60,7 @@ graph TD
   - [ ] Calculator specs with messy fixtures: insertion-order vs timestamp-order fixtures produce **different** medians (**the named failing input** — if both give the same value the fixture is not messy enough and the evidence is disqualified); anchor-less result excluded and counted; median/p90/sample_size correct on a 5-result fixture with hand-computed expected values.
   - [ ] Constant-vs-enum spec: every vocabulary value exists in the enum (**failing input:** a typo in the constant → fails).
   - [ ] SQL spec: events fetched per result ordered by `created_at`, never by id.
-- **Deps:** none · **Effort:** L · **Status:** todo
+- **Deps:** none · **Effort:** L · **Status:** blocked — `[~]` Pivot Record in execution.md (A-1 false: no live submission/approval vocabulary; awaiting owner call)
 
 ### T-04 — Composition `getInsightsReport` + service + controller + Swagger
 
