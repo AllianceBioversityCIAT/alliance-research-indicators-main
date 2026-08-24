@@ -41,9 +41,9 @@ graph TD
 - **Files:** `dto/contract-indicator-details-report.dto.ts` (NEW), `repositories/agresso-contract.repository.ts` (+spec).
 - **Description:** DTO classes (per-section shapes + `SectionMeta` + error entry); repository: per-indicator `total_results` from the seed; `reporting_velocity` (last 24 months, `created_at` month-truncated).
 - **Acceptance / done check:**
-  - [ ] SQL specs: velocity groups by `created_at` month, never `report_year` (**failing input:** switch the bucketing column → spec must fail); meta counts distinct results.
-  - [ ] `npm test -- --silent` (server) + `npx eslint` green.
-- **Deps:** none · **Effort:** M · **Status:** todo
+  - [x] SQL specs: velocity groups by `created_at` month, never `report_year` (**failing input:** switch the bucketing column → spec must fail); meta counts distinct results.
+  - [x] `npm test -- --silent` (server) + `npx eslint` green.
+- **Deps:** none · **Effort:** M · **Status:** done
 
 ### T-02 — Section queries: capacity_sharing, knowledge_product, oicr
 

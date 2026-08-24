@@ -64,6 +64,7 @@ import {
   ContractSpAlignmentSpDto,
 } from '../dto/contract-sp-alignment-report.dto';
 import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto';
+import { ReportingVelocityItemDto } from '../dto/contract-indicator-details-report.dto';
 
 @Injectable()
 export class AgressoContractRepository
@@ -692,12 +693,14 @@ export class AgressoContractRepository
     includeStatusId?: boolean;
     includeReportYearId?: boolean;
     includeIndicatorId?: boolean;
+    includeCreatedAt?: boolean;
   }): string {
     const columns = ['r.result_id'];
     if (options?.includeGeoScope) columns.push('r.geo_scope_id');
     if (options?.includeStatusId) columns.push('r.result_status_id');
     if (options?.includeReportYearId) columns.push('r.report_year_id');
     if (options?.includeIndicatorId) columns.push('r.indicator_id');
+    if (options?.includeCreatedAt) columns.push('r.created_at');
     const selectColumns = columns.join(', ');
 
     return `
@@ -1446,6 +1449,73 @@ export class AgressoContractRepository
       },
       errors,
     };
+  }
+
+  async getIndicatorTotalResults(
+    contractId: string,
+  ): Promise<Record<number, number>> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const subquery = this.buildPrimaryContractResultsSubquery({
+      includeIndicatorId: true,
+    });
+
+    const query = `
+      SELECT
+        cr.indicator_id,
+        COUNT(*) AS count
+      FROM (${subquery}) cr
+      WHERE cr.indicator_id IS NOT NULL
+      GROUP BY cr.indicator_id
+    `;
+
+    const rows = (await this.query(query, [contractId])) as Array<{
+      indicator_id: number;
+      count: string | number;
+    }>;
+
+    const totals: Record<number, number> = {};
+    for (const row of rows) {
+      if (row.indicator_id !== null && row.indicator_id !== undefined) {
+        totals[Number(row.indicator_id)] = Number(row.count ?? 0);
+      }
+    }
+    return totals;
+  }
+
+  async getReportingVelocityReport(
+    contractId: string,
+  ): Promise<ReportingVelocityItemDto[]> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const subquery = this.buildPrimaryContractResultsSubquery({
+      includeCreatedAt: true,
+    });
+
+    const query = `
+      SELECT
+        DATE_FORMAT(cr.created_at, '%Y-%m') AS month,
+        COUNT(*) AS count
+      FROM (${subquery}) cr
+      WHERE cr.created_at IS NOT NULL
+        AND cr.created_at >= DATE_SUB(NOW(), INTERVAL 24 MONTH)
+      GROUP BY DATE_FORMAT(cr.created_at, '%Y-%m')
+      ORDER BY month ASC
+    `;
+
+    const rows = (await this.query(query, [contractId])) as Array<{
+      month: string;
+      count: string | number;
+    }>;
+
+    return rows.map((row) => ({
+      month: String(row.month),
+      count: Number(row.count ?? 0),
+    }));
   }
 
   async getFundingTypes() {

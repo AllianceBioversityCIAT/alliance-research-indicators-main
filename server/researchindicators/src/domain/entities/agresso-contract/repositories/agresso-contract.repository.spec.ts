@@ -2145,4 +2145,120 @@ describe('AgressoContractRepository', () => {
       expect(result.data.geo_scope).toEqual(mockGeoScope);
     });
   });
+
+  describe('getIndicatorTotalResults', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getIndicatorTotalResults('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getIndicatorTotalResults(null as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getIndicatorTotalResults(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query primary contract results grouped by indicator_id (asserts generated SQL + params)', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([
+        { indicator_id: 1, count: '5' },
+        { indicator_id: 2, count: 3 },
+        { indicator_id: 6, count: '10' },
+      ]);
+
+      const result = await repository.getIndicatorTotalResults('A1676');
+
+      expect(repository.query).toHaveBeenCalledTimes(1);
+
+      const [sql, params] = (repository.query as jest.Mock).mock.calls[0];
+
+      // Assert generated SQL text + bound params (KZ-001)
+      expect(sql).toContain('SELECT DISTINCT r.result_id, r.indicator_id');
+      expect(sql).toContain('FROM results r');
+      expect(sql).toContain('INNER JOIN result_contracts rc');
+      expect(sql).toContain('rc.contract_id = ?');
+      expect(sql).toContain('rc.is_primary = TRUE');
+      expect(sql).toContain('rc.is_active = TRUE');
+      expect(sql).toContain('r.is_active = TRUE');
+      expect(sql).toContain('r.is_snapshot = FALSE');
+      expect(sql).toContain('GROUP BY cr.indicator_id');
+      expect(sql).toContain('WHERE cr.indicator_id IS NOT NULL');
+      expect(params).toEqual(['A1676']);
+
+      // Asserts mapping
+      expect(result).toEqual({
+        1: 5,
+        2: 3,
+        6: 10,
+      });
+    });
+
+    it('should return empty record when no indicator results exist', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([]);
+
+      const result = await repository.getIndicatorTotalResults('EMPTY-01');
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('getReportingVelocityReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getReportingVelocityReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getReportingVelocityReport(null as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        repository.getReportingVelocityReport(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should query monthly reporting velocity over the last 24 months grouped by created_at month (asserts generated SQL + params)', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([
+        { month: '2025-01', count: '4' },
+        { month: '2025-02', count: 2 },
+        { month: '2026-03', count: '7' },
+      ]);
+
+      const result = await repository.getReportingVelocityReport('A1676');
+
+      expect(repository.query).toHaveBeenCalledTimes(1);
+
+      const [sql, params] = (repository.query as jest.Mock).mock.calls[0];
+
+      // Assert generated SQL text + bound params (KZ-001)
+      expect(sql).toContain('SELECT DISTINCT r.result_id, r.created_at');
+      expect(sql).toContain("DATE_FORMAT(cr.created_at, '%Y-%m')");
+      expect(sql).toContain('DATE_SUB(NOW(), INTERVAL 24 MONTH)');
+      expect(sql).toContain("GROUP BY DATE_FORMAT(cr.created_at, '%Y-%m')");
+      expect(sql).toContain('ORDER BY month ASC');
+      expect(sql).toContain('rc.is_primary = TRUE');
+      expect(sql).toContain('rc.is_active = TRUE');
+      expect(sql).toContain('r.is_active = TRUE');
+      expect(sql).toContain('r.is_snapshot = FALSE');
+
+      // MUST-clause requirement: groups by created_at month, NEVER by report_year
+      expect(sql).not.toContain('report_year');
+      expect(sql).not.toContain('report_year_id');
+
+      expect(params).toEqual(['A1676']);
+
+      // Asserts returned shape
+      expect(result).toEqual([
+        { month: '2025-01', count: 4 },
+        { month: '2025-02', count: 2 },
+        { month: '2026-03', count: 7 },
+      ]);
+    });
+
+    it('should return empty list when no activity in last 24 months', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([]);
+
+      const result = await repository.getReportingVelocityReport('INACTIVE-01');
+
+      expect(result).toEqual([]);
+    });
+  });
 });
