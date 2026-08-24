@@ -222,6 +222,19 @@ export class BilateralService {
       const res = await this.api.PATCH_PoolFundingAlignment(resultCode, body);
       if (res?.successfulRequest) {
         this.currentAlignment.set(res.data);
+        // The sidebar green check AND the PRMS SYNC gate both read
+        // `cache.greenChecks()`, which is refreshed ONLY by ToPromiseService's
+        // `loadingTrigger` finalize hook — a hook no PATCH goes through. Without
+        // this the check stays stale until a full result reload; the required
+        // sections avoid it by re-GETting after their PATCH (ip-rights ->
+        // getData() -> GET_IpOwner, which carries loadingTrigger: true).
+        // Best-effort: a refresh failure must never turn a successful save into
+        // an error.
+        try {
+          await this.api.TP.updateGreenChecks();
+        } catch {
+          /* green checks are display state; the save already succeeded */
+        }
         return { ok: true, data: res.data };
       }
       const fieldErrors = this.extractFieldErrors(res?.errorDetail);
