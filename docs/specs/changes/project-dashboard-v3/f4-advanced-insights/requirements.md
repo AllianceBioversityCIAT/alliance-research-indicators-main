@@ -120,7 +120,7 @@ The `results` satellite tables hold cross-cutting, analysis-grade fields no dash
 | Defect class | Gate | Blind-spot handling |
 |---|---|---|
 | Wrong SQL over satellites (NULL disaggregation as 0, double-counting 1:N, keyword dedupe) | Repository specs on **generated SQL + params** (KZ-001) with fixtures: NULL columns, repeated keyword per result, out-of-order history | **Dev ground-truth** for `reach` sums and `keywords` top-3 on A511 vs hand-run SQL (recorded) |
-| Cycle-time correctness (ordering, anchors, exclusions) | SQL/TS specs with messy-history fixtures (R-IN-002 scenario) — **named failing input:** insertion-ordered fixture must produce a different median than timestamp order | Ground-truth on one real approved result |
+| Cycle-time correctness (ordering, anchors, exclusions) | SQL/TS specs with messy-history fixtures (R-IN-002 scenario) — **named failing input:** insertion-ordered fixture must produce a different median than timestamp order | ~~Ground-truth on one real approved result~~ **(AMENDED — Pivot T-03: impossible today, zero approval events exist)** Ground-truth = verify on dev that zero submission/approval events exist and the endpoint reports `sample_size = 0` + full `excluded_for_incomplete_history` honestly, recorded |
 | Bare ids leaking / wrong labels | DTO + HTTP-path integration spec assertions | — |
 | Envelope/partial-failure path | **In-process HTTP-path integration spec** (`npm run test:integration`, repository `overrideProvider`-mocked — never `AppModule`/real DB, K-021) | Unit mocks cannot see the interceptor (KZ-017) |
 | Eager fetch / SDG re-fetch | Component specs: zero fetch before intersection; contract SDGs taken from existing hero input, no extra request | Real laziness: HITL network with section below the fold |
@@ -142,7 +142,7 @@ STAR client only. SDG labels from `clarisa_sdgs` (already synced locally — no 
 
 ## 8. Assumptions, dependencies, risks
 
-- **A-1:** `result_review_history` rows carry `created_at` (AuditableEntity) usable as the event timestamp; `event_type`/`decision` vocabularies are enumerable (verified at implementation; recorded).
+- **A-1 (AMENDED 2026-08-24 — Pivot T-03, owner-approved Option A):** `result_review_history` rows carry `created_at` (AuditableEntity) usable as the event timestamp — **held at verification**. The second half was **false**: `event_type` (varchar 50) / `decision` (varchar 20) have no enum or CHECK constraint; `decision` is written nowhere; the only live writers are `POOL_FUNDING_ALIGNMENT_CHANGED` / `INDICATOR_MAPPING_CHANGED` audit events (`bilateral.service.ts`), and `reviewDecision` — the only plausible submission→approval writer — is a `NotImplementedException` stub. **Resolution:** the submission/approval vocabulary is defined **forward-looking** in one canonical TS constant in the `result-review-history` module (values from the archived bilateral design: `REVIEW_DECISION`; `APPROVE|REJECT|EDIT`); the future `reviewDecision` implementation MUST import it. On current data, cycle-time `sample_size = 0` is the correct, honest output — not a defect (R-1 already covers the UI honesty).
 - **A-2:** contract-declared SDGs are available to the dashboard from the F1 hero source without a new request.
 - **R-1 (risk):** review-history vocabulary may be sparse/inconsistent for imported results → cycle time may have tiny `sample_size`; the UI shows `n` and the excluded count honestly.
 - **R-2 (risk):** keyword free text quality — normalization is bounded (case/whitespace) by design; no stemming (recorded non-goal).

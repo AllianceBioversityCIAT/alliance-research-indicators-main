@@ -54,13 +54,13 @@ graph TD
 
 ### T-03 — `review_flow`: events query + cycle-time calculator + vocabulary constant
 
-- **Requirements covered:** R-IN-002 review row + messy-history scenario (all clauses); design D-F4-2, D-F4-6.
-- **Files:** repository (events query), a pure TS calculator (`utils/review-cycle-time.util.ts` or module-local) (+specs), vocabulary constant asserted against the live `event_type`/`decision` enum.
+- **Requirements covered:** R-IN-002 review row + messy-history scenario (all clauses); design D-F4-2, D-F4-6 as superseded by D-F4-7 (Pivot 2026-08-24).
+- **Files:** repository (events query), a pure TS calculator (`utils/review-cycle-time.util.ts` or module-local) (+specs), **canonical vocabulary constant NEW in the `result-review-history` module** (D-F4-7 — exported, forward-looking source of truth for the future `reviewDecision` writer); calculator asserts against it.
 - **Acceptance / done check:**
   - [ ] Calculator specs with messy fixtures: insertion-order vs timestamp-order fixtures produce **different** medians (**the named failing input** — if both give the same value the fixture is not messy enough and the evidence is disqualified); anchor-less result excluded and counted; median/p90/sample_size correct on a 5-result fixture with hand-computed expected values.
-  - [ ] Constant-vs-enum spec: every vocabulary value exists in the enum (**failing input:** a typo in the constant → fails).
+  - [ ] Constant-vs-vocabulary spec: every submission/approval value the calculator uses exists in the canonical `result-review-history` constant (**failing input:** a typo in the calculator's mapping → fails) (AMENDED per D-F4-7 — no live enum exists).
   - [ ] SQL spec: events fetched per result ordered by `created_at`, never by id.
-- **Deps:** none · **Effort:** L · **Status:** blocked — `[~]` Pivot Record in execution.md (A-1 false: no live submission/approval vocabulary; awaiting owner call)
+- **Deps:** none · **Effort:** L · **Status:** in-progress — `[~]` Pivot resolved 2026-08-24 (owner Option A, D-F4-7); resumed with amended acceptance
 
 ### T-04 — Composition `getInsightsReport` + service + controller + Swagger
 
