@@ -10,6 +10,7 @@ import {
 import { environment } from '@envs/environment';
 
 const AI_SERVICES_BUCKET = 'ai-services-ibd';
+const MAX_OVERVIEW_TEXT_LENGTH = 20_000;
 
 @Injectable({
   providedIn: 'root'
@@ -37,11 +38,13 @@ export class DocumentOverviewService {
     }
   }
 
-  async generateDocumentOverview(projectId: string): Promise<DocumentOverviewResponse> {
+  async generateDocumentOverview(projectId: string, text?: string): Promise<DocumentOverviewResponse> {
+    const trimmedText = text?.trim();
     const body: DocumentOverviewRequest = {
       bucket_name: AI_SERVICES_BUCKET,
       project_folder: this.buildProjectFolder(projectId),
-      user_id: this.cache.dataCache().user.email
+      user_id: this.cache.dataCache().user.email,
+      ...(trimmedText ? { text: trimmedText.slice(0, MAX_OVERVIEW_TEXT_LENGTH) } : {})
     };
 
     try {

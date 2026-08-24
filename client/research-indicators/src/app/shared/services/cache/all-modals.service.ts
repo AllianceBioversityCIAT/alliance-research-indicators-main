@@ -143,6 +143,11 @@ export class AllModalsService {
       isOpen: false,
       title: 'Environment variables'
     },
+    projectGroundingSetup: {
+      isOpen: false,
+      title: 'Grounding & Setup',
+      isWide: true
+    },
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
@@ -263,6 +268,7 @@ export class AllModalsService {
       addContactPerson: { ...this.modalConfig().addContactPerson, isOpen: false, isWide: false },
       selectLinkedResults: { ...this.modalConfig().selectLinkedResults, isOpen: false, isWide: false },
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
+      projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false }
     });
 

@@ -17,6 +17,9 @@ import { ProjectDashboardComponent } from './project-dashboard.component';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
+import { AllModalsService } from '@shared/services/cache/all-modals.service';
+
+jest.mock('mapbox-gl', () => ({}), { virtual: true });
 
 @Component({
   selector: 'app-project-dashboard-card',
@@ -74,6 +77,12 @@ describe('ProjectDashboardComponent', () => {
   };
   let rolesServiceMock: { isAdmin: jest.Mock };
   let actionsServiceMock: { showToast: jest.Mock };
+  let allModalsServiceMock: {
+    openModal: jest.Mock;
+    setModalWidth: jest.Mock;
+    isModalOpen: jest.Mock;
+    modalConfig: ReturnType<typeof signal>;
+  };
 
   function createFile(name: string, size = 1024, type = 'application/pdf'): File {
     return new File([new ArrayBuffer(size)], name, { type });
@@ -96,10 +105,7 @@ describe('ProjectDashboardComponent', () => {
     };
   }
 
-  async function setup(
-    contractId: string | null = 'C-1',
-    options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }
-  ) {
+  async function setup(contractId: string | null = 'C-1', options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }) {
     topContributorsMock = createRankedServiceMock();
     topMainContactsMock = createRankedServiceMock();
     topPartnersMock = createRankedServiceMock();
@@ -155,6 +161,14 @@ describe('ProjectDashboardComponent', () => {
       deleteDocumentOverviewFiles: jest.fn().mockResolvedValue(undefined)
     };
     actionsServiceMock = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
+    allModalsServiceMock = {
+      openModal: jest.fn(),
+      setModalWidth: jest.fn(),
+      isModalOpen: jest.fn().mockReturnValue({ isOpen: false, title: 'Grounding & Setup', isWide: true }),
+      modalConfig: signal({
+        projectGroundingSetup: { isOpen: false, title: 'Grounding & Setup', isWide: true }
+      })
+    };
     rolesServiceMock = { isAdmin: jest.fn().mockReturnValue(options?.isAdmin ?? true) };
     apiMock = {
       GET_ResultsCount: jest.fn().mockResolvedValue({
@@ -199,7 +213,8 @@ describe('ProjectDashboardComponent', () => {
         { provide: FileManagerService, useValue: fileManagerServiceMock },
         { provide: DocumentOverviewService, useValue: documentOverviewServiceMock },
         { provide: RolesService, useValue: rolesServiceMock },
-        { provide: ActionsService, useValue: actionsServiceMock }
+        { provide: ActionsService, useValue: actionsServiceMock },
+        { provide: AllModalsService, useValue: allModalsServiceMock }
       ]
     })
       .overrideComponent(ProjectDashboardComponent, {
@@ -241,11 +256,12 @@ describe('ProjectDashboardComponent', () => {
     await setup();
 
     expect(apiMock.GET_ResultsCount).toHaveBeenCalledWith('C-1');
-    expect(apiMock.GET_Results).toHaveBeenCalledWith(
-      { 'contract-codes': ['C-1'] },
-      undefined,
-      { page: 1, limit: 10000, sortField: 'code', sortOrder: 'DESC' }
-    );
+    expect(apiMock.GET_Results).toHaveBeenCalledWith({ 'contract-codes': ['C-1'] }, undefined, {
+      page: 1,
+      limit: 10000,
+      sortField: 'code',
+      sortOrder: 'DESC'
+    });
     expect(topContributorsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topMainContactsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topPartnersMock.main).toHaveBeenCalledWith('C-1', 4);
@@ -414,15 +430,51 @@ describe('ProjectDashboardComponent', () => {
       expect(component.canAccessGroundingSetup()).toBe(false);
     });
 
+    it('should open the grounding setup modal for admin users', async () => {
+      await setup();
+
+      component.groundingText.set('Unsaved local text');
+      component.groundedDocuments.set([{ fileName: 'local.pdf', fileKey: 'folder/local.pdf' }]);
+      await component.openGroundingSetupModal();
+
+      expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenLastCalledWith('C-1');
+      expect(component.groundingText()).toBe('');
+      expect(component.groundedDocuments()).toEqual([
+        {
+          fileName: 'stored-file.pdf',
+          fileKey: 'star/ai-insights/test/project-overview/projects/C-1/stored-file.pdf'
+        }
+      ]);
+      expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('projectGroundingSetup');
+      expect(allModalsServiceMock.setModalWidth).toHaveBeenCalledWith('projectGroundingSetup', true);
+    });
+
+    it('should not open the grounding setup modal for non-admin users', async () => {
+      await setup('C-1', { isAdmin: false });
+
+      await component.openGroundingSetupModal();
+
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalled();
+    });
+
+    it('should not open the modal when saved grounding resources cannot be loaded', async () => {
+      await setup();
+      documentOverviewServiceMock.fetchDocumentOverviewSummary.mockRejectedValueOnce(new Error('fetch failed'));
+
+      await component.openGroundingSetupModal();
+
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalled();
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'error', summary: 'Unable to open setup' })
+      );
+    });
+
     it('should load stored executive overview summary and documents on dashboard init', async () => {
       await setup();
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
       expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
-      expect(component.executiveOverviewParagraphs()).toEqual([
-        'Stored overview paragraph.',
-        'Second stored paragraph.'
-      ]);
+      expect(component.executiveOverviewParagraphs()).toEqual(['Stored overview paragraph.', 'Second stored paragraph.']);
       expect(component.groundedDocuments()).toEqual([
         {
           fileName: 'stored-file.pdf',
@@ -439,23 +491,56 @@ describe('ProjectDashboardComponent', () => {
       expect(component.showExecutiveOverview()).toBe(true);
     });
 
+    it('should expand and collapse the executive overview', async () => {
+      await setup();
+
+      expect(component.executiveOverviewExpanded()).toBe(false);
+      expect(component.executiveOverviewText()).toBe('Stored overview paragraph.\n\nSecond stored paragraph.');
+
+      component.toggleExecutiveOverview();
+      expect(component.executiveOverviewExpanded()).toBe(true);
+
+      component.toggleExecutiveOverview();
+      expect(component.executiveOverviewExpanded()).toBe(false);
+    });
+
     it('should load executive overview summary for non-admin users when data exists', async () => {
       await setup('C-1', { isAdmin: false });
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
       expect(component.canAccessGroundingSetup()).toBe(false);
-      expect(component.executiveOverviewParagraphs()).toEqual([
-        'Stored overview paragraph.',
-        'Second stored paragraph.'
-      ]);
+      expect(component.executiveOverviewParagraphs()).toEqual(['Stored overview paragraph.', 'Second stored paragraph.']);
       expect(component.showExecutiveOverview()).toBe(true);
     });
 
-    it('should hide executive overview for non-admin users when no data exists', async () => {
-      await setup('C-1', { isAdmin: false, emptyOverview: true });
+    it('should auto-generate a baseline overview on entry when no summary exists', async () => {
+      await setup('C-1', { emptyOverview: true });
+      // The auto-call awaits the fetch, then the generation — flush the extra async level.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
-      expect(component.showExecutiveOverview()).toBe(false);
+      // Baseline auto-call sends no documents or text — just the project id.
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      expect(component.executiveOverviewParagraphs()).toEqual(['First overview paragraph.', 'Second overview paragraph.']);
+      expect(component.showExecutiveOverview()).toBe(true);
+      expect(component.executiveOverviewLoading()).toBe(false);
+    });
+
+    it('should surface the executive overview for non-admin users after the baseline auto-generation', async () => {
+      await setup('C-1', { isAdmin: false, emptyOverview: true });
+      await new Promise(resolve => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      expect(component.canAccessGroundingSetup()).toBe(false);
+      expect(component.showExecutiveOverview()).toBe(true);
+    });
+
+    it('should not auto-generate a baseline overview when a stored summary already exists', async () => {
+      await setup();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
     });
 
     it('should block grounding upload actions for non-admin users', async () => {
@@ -503,10 +588,7 @@ describe('ProjectDashboardComponent', () => {
 
       expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
       expect(fileManagerServiceMock.uploadFile).not.toHaveBeenCalled();
-      expect(component.executiveOverviewParagraphs()).toEqual([
-        'First overview paragraph.',
-        'Second overview paragraph.'
-      ]);
+      expect(component.executiveOverviewParagraphs()).toEqual(['First overview paragraph.', 'Second overview paragraph.']);
       expect(component.groundedDocuments()).toEqual([
         {
           fileName: 'contract.pdf',
@@ -667,9 +749,7 @@ describe('ProjectDashboardComponent', () => {
         target: createFileInput([createFile('extra.pdf')])
       } as unknown as Event);
 
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'warning', summary: 'Upload limit reached' })
-      );
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', summary: 'Upload limit reached' }));
       expect(fileManagerServiceMock.uploadFile).not.toHaveBeenCalled();
     });
 
@@ -682,12 +762,9 @@ describe('ProjectDashboardComponent', () => {
       } as unknown as Event);
 
       expect(fileManagerServiceMock.uploadFile).toHaveBeenCalledTimes(2);
-      expect(fileManagerServiceMock.uploadFile).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'contract.pdf' }),
-        10,
-        100,
-        { projectId: 'C-1' }
-      );
+      expect(fileManagerServiceMock.uploadFile).toHaveBeenCalledWith(expect.objectContaining({ name: 'contract.pdf' }), 10, 100, {
+        projectId: 'C-1'
+      });
       expect(component.groundedDocuments()).toEqual([
         { fileName: 'contract.pdf', fileKey: expect.stringContaining('stored-file.pdf') },
         { fileName: 'scope.docx', fileKey: expect.stringContaining('stored-file.pdf') }
@@ -722,12 +799,8 @@ describe('ProjectDashboardComponent', () => {
         target: createFileInput([createFile('bad.exe'), createFile('huge.pdf', 11 * 1024 * 1024)])
       } as unknown as Event);
 
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'warning', summary: 'Unsupported file' })
-      );
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'warning', summary: 'File too large' })
-      );
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', summary: 'Unsupported file' }));
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', summary: 'File too large' }));
       expect(fileManagerServiceMock.uploadFile).not.toHaveBeenCalled();
     });
 
@@ -766,9 +839,7 @@ describe('ProjectDashboardComponent', () => {
       } as unknown as Event);
 
       expect(splitSpy).toHaveBeenCalled();
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'warning', summary: 'Unsupported file' })
-      );
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', summary: 'Unsupported file' }));
       splitSpy.mockRestore();
     });
 
@@ -779,17 +850,13 @@ describe('ProjectDashboardComponent', () => {
       await component.onGroundingFilesSelected({
         target: createFileInput([createFile('fail.pdf')])
       } as unknown as Event);
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'error', summary: 'Upload failed' })
-      );
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error', summary: 'Upload failed' }));
 
       fileManagerServiceMock.uploadFile.mockResolvedValueOnce({ data: { filename: '' } });
       await component.onGroundingFilesSelected({
         target: createFileInput([createFile('missing-name.pdf')])
       } as unknown as Event);
-      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'error', summary: 'Upload failed' })
-      );
+      expect(actionsServiceMock.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error', summary: 'Upload failed' }));
     });
 
     it('should skip remove confirmation for non-admin users', async () => {
@@ -843,6 +910,149 @@ describe('ProjectDashboardComponent', () => {
       expect(component.overviewSourceDocuments()).toEqual([]);
       expect(component.executiveOverviewGeneratedAt()).toBeNull();
       expect(component.executiveOverviewLoading()).toBe(false);
+    });
+
+    it('should not auto-generate a baseline overview when the summary fetch fails', async () => {
+      await setup('C-1', { rejectOverviewFetch: true });
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('text contextual resource', () => {
+    it('should load analyzed text as an editable text resource', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({
+        text: '  Analyzed project context.  ',
+        available_files: [
+          { file_name: 'a.pdf', file_key: 'folder/a.pdf' },
+          { file_name: 'b.pdf', file_key: 'folder/b.pdf' }
+        ]
+      });
+
+      expect(component.groundingText()).toBe('Analyzed project context.');
+      expect(component.totalGroundingResources()).toBe(3);
+      expect(component.canUploadMoreGroundingDocs()).toBe(false);
+
+      component.openGroundingTextEditor();
+      expect(component.showGroundingTextEditor()).toBe(true);
+      expect(component.groundingTextDraft()).toBe('Analyzed project context.');
+
+      component.groundingTextDraft.set('Updated project context.');
+      component.saveGroundingText();
+      expect(component.groundingText()).toBe('Updated project context.');
+    });
+
+    it('should leave the text field editable when the overview text is empty', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({ text: '   ' });
+
+      expect(component.hasGroundingText()).toBe(false);
+      expect(component.canAddGroundingText()).toBe(true);
+    });
+
+    it('should save a trimmed text resource that counts toward the resource limit', async () => {
+      await setup();
+      component.groundedDocuments.set([]);
+
+      component.openGroundingTextEditor();
+      expect(component.showGroundingTextEditor()).toBe(true);
+
+      component.groundingTextDraft.set('  Project context text.  ');
+      component.saveGroundingText();
+
+      expect(component.groundingText()).toBe('Project context text.');
+      expect(component.hasGroundingText()).toBe(true);
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.totalGroundingResources()).toBe(1);
+      expect(component.hasGroundingResources()).toBe(true);
+    });
+
+    it('should cap the text draft input at 20,000 characters', async () => {
+      await setup();
+
+      component.onGroundingTextInput({ target: { value: 'x'.repeat(25_000) } } as unknown as Event);
+
+      expect(component.groundingTextDraft().length).toBe(20_000);
+    });
+
+    it('should not save an empty or whitespace-only text resource', async () => {
+      await setup();
+      component.groundingTextDraft.set('   ');
+
+      component.saveGroundingText();
+
+      expect(component.hasGroundingText()).toBe(false);
+    });
+
+    it('should enforce a maximum of three resources across documents and text', async () => {
+      await setup();
+      component.groundedDocuments.set([
+        { fileName: 'a.pdf', fileKey: 'folder/a.pdf' },
+        { fileName: 'b.pdf', fileKey: 'folder/b.pdf' }
+      ]);
+      component.groundingText.set('A text resource.');
+
+      expect(component.totalGroundingResources()).toBe(3);
+      expect(component.canUploadMoreGroundingDocs()).toBe(false);
+      expect(component.canAddGroundingText()).toBe(false);
+      expect(component.groundedDocumentsCountColor()).toBe('#CF0808');
+    });
+
+    it('should only allow one text resource at a time', async () => {
+      await setup();
+      component.groundingText.set('Existing text.');
+
+      expect(component.canAddGroundingText()).toBe(false);
+    });
+
+    it('should pass the text resource to the generation call', async () => {
+      await setup();
+      component.groundedDocuments.set([]);
+      component.groundingText.set('Grounding context text.');
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1', 'Grounding context text.');
+    });
+
+    it('should remove the text resource and reset the editor', async () => {
+      await setup();
+      component.groundingText.set('Text to remove.');
+      component.showGroundingTextEditor.set(true);
+      component.groundingTextDraft.set('Text to remove.');
+
+      component.removeGroundingText();
+
+      expect(component.hasGroundingText()).toBe(false);
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingTextDraft()).toBe('');
+    });
+
+    it('should cancel the text editor without saving', async () => {
+      await setup();
+      component.openGroundingTextEditor();
+      component.groundingTextDraft.set('Unsaved text.');
+
+      component.cancelGroundingText();
+
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingTextDraft()).toBe('');
+      expect(component.hasGroundingText()).toBe(false);
+    });
+
+    it('should block text resource actions for non-admin users', async () => {
+      await setup('C-1', { isAdmin: false });
+
+      component.openGroundingTextEditor();
+      expect(component.showGroundingTextEditor()).toBe(false);
+
+      component.groundingTextDraft.set('Attempted text.');
+      component.saveGroundingText();
+      expect(component.hasGroundingText()).toBe(false);
     });
   });
 });

@@ -8,4 +8,5 @@ export type ModalName =
   | 'addContactPerson'
   | 'selectLinkedResults'
   | 'editEnvironmentVariable'
+  | 'projectGroundingSetup'
   | 'portfolioManagement';
