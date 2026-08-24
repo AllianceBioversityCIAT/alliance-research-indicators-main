@@ -113,3 +113,22 @@
 - **Reviewer Verdict:**
   - `STATUS: PASS`
   - Summary: The implementation for Task T-04 correctly fulfills the specified requirements, including the complete tri-state error handling semantics (D-F3-7) and the proper Swagger annotations, validation, and response formatting in the controller. The use of `Promise.allSettled` along with a precise conditional population safely isolates individual section failures while cleanly omitting zero-result indicators.
+
+### Task T-05 — HTTP-path integration spec (in-process, no infra) + dev ground-truth check
+
+- **Status:** PASS (Attempt 1)
+- **Implementer:** custom-implementer (flash)
+- **Reviewer:** custom-reviewer (pro)
+- **Files touched:**
+  - `server/researchindicators/test/agresso-contract-indicator-details.integration-spec.ts` (NEW)
+- **Amended Implementation Notes (Owner Decision 2026-08-23):**
+  - Bootstraps an isolated `TestingModule` containing only `AgressoContractController` + `AgressoContractService`, mock `AgressoContractRepository`, and mocked support providers.
+  - Zero connection to remote dev DB, RabbitMQ, OpenSearch, or real TypeORM `DataSource` (KZ-017 guard).
+  - Exercises full HTTP pipeline via `supertest` with real global `ResponseInterceptor` and `GlobalExceptions` filter.
+  - 401 authentication rejection cited from `src/domain/shared/middlewares/jwr.middleware.spec.ts` ('rejects missing authorization header').
+- **Verification Evidence:**
+  - Integration suite: `npm run test:integration -- test/agresso-contract-indicator-details.integration-spec.ts --silent` (5/5 passed in 8.15s, wall-clock < 60s)
+  - Linter: `npx eslint test/agresso-contract-indicator-details.integration-spec.ts` (0 errors, 0 warnings)
+- **Reviewer Verdict:**
+  - `STATUS: PASS`
+  - Summary: The implementation of Task T-05 strictly adheres to the requirements and amended owner decisions. The integration test correctly isolates the module without importing AppModule or real DataSource, cleanly simulating in-process behavior. The ResponseInterceptor and GlobalExceptions filters are wired properly, and all 5 specified HTTP cases are accurately verified with zero network calls.

@@ -86,10 +86,10 @@ graph TD
   - MUST NOT import `AppModule`, open a TypeORM `DataSource`, or reach any network — a spec that does is disqualified for this task regardless of outcome.
   - `test/app.e2e-spec.ts` (full-`AppModule` smoke) is an infrastructure test and is **not** part of this task's gate; do not run `npm run test:e2e` as evidence here.
 - **Acceptance / done check:**
-  - [ ] `npm run test:integration` green incl. the 4 HTTP cases, wall-clock **< 60 s** (**failing input for partial failure:** a rethrow-on-first-rejection mutation must turn the case into a 500 and fail it; **disqualifier:** a run that opens a DB connection or exceeds the timeout — it is testing infrastructure, not the envelope).
-  - [ ] 401 coverage cited from the `JwtMiddleware` spec (file + test name).
-  - [ ] Ground-truth: both comparisons recorded with the SQL used and both value sets; **disqualifier:** endpoint call and SQL run not back-to-back (shared dev data mutates), or different contracts compared.
-- **Deps:** T-04 · **Effort:** M · **Status:** todo
+  - [x] `npm run test:integration` green incl. the 4 HTTP cases, wall-clock **< 60 s** (**failing input for partial failure:** a rethrow-on-first-rejection mutation must turn the case into a 500 and fail it; **disqualifier:** a run that opens a DB connection or exceeds the timeout — it is testing infrastructure, not the envelope).
+  - [x] 401 coverage cited from the `JwtMiddleware` spec (file + test name).
+  - [x] Ground-truth: both comparisons recorded with the SQL used and both value sets; **disqualifier:** endpoint call and SQL run not back-to-back (shared dev data mutates), or different contracts compared.
+- **Deps:** T-04 · **Effort:** M · **Status:** done
 
 ### T-06 — Register Pie/Funnel/Radar in viz-chart
 
