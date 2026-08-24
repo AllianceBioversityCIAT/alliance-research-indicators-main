@@ -78,6 +78,11 @@ import {
   PolicyChangeDetailsDto,
   ReportingVelocityItemDto,
 } from '../dto/contract-indicator-details-report.dto';
+import {
+  ContributingLeversSectionDto,
+  EvidenceSectionDto,
+  SdgCoverageSectionDto,
+} from '../dto/contract-insights-report.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 @Injectable()
@@ -2653,6 +2658,182 @@ export class AgressoContractRepository
       ).map((row) => ({
         unit: String(row.unit),
         total: Number(row.total ?? 0),
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // F4 Advanced Cross-Cutting Insights — private section queries
+  // (composed by getInsightsReport, T-04; sections always present per D-F4-3)
+  // ---------------------------------------------------------------------
+
+  private async getSdgCoverageSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<SdgCoverageSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rs.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_sdgs rs
+        ON rs.result_id = cr.result_id
+        AND rs.is_active = TRUE
+    `;
+
+    const sdgBreakdownQuery = `
+      SELECT
+        cs.id AS sdg_id,
+        cs.short_name AS short_name,
+        cs.full_name AS full_name,
+        COUNT(DISTINCT rs.result_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_sdgs rs
+        ON rs.result_id = cr.result_id
+        AND rs.is_active = TRUE
+      INNER JOIN clarisa_sdgs cs
+        ON cs.id = rs.clarisa_sdg_id
+        AND cs.is_active = TRUE
+      GROUP BY cs.id, cs.short_name, cs.full_name
+      ORDER BY count DESC, cs.id ASC
+    `;
+
+    const [countRows, sdgRows] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(sdgBreakdownQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      sdgs: (sdgRows as Array<Record<string, unknown>>).map((row) => ({
+        sdg_id: Number(row.sdg_id),
+        short_name: String(row.short_name),
+        full_name: String(row.full_name),
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  private async getEvidenceSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<EvidenceSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const totalsQuery = `
+      SELECT
+        COUNT(DISTINCT re.result_id) AS n,
+        COUNT(re.result_evidence_id) AS evidences_total,
+        SUM(CASE WHEN re.is_private = TRUE THEN 1 ELSE 0 END) AS private_count,
+        SUM(CASE WHEN re.is_private = TRUE THEN 0 ELSE 1 END) AS public_count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_evidences re
+        ON re.result_id = cr.result_id
+        AND re.is_active = TRUE
+    `;
+
+    const roleBreakdownQuery = `
+      SELECT
+        er.evidence_role_id AS evidence_role_id,
+        er.name AS name,
+        COUNT(re.result_evidence_id) AS count
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_evidences re
+        ON re.result_id = cr.result_id
+        AND re.is_active = TRUE
+      INNER JOIN evidence_roles er
+        ON er.evidence_role_id = re.evidence_role_id
+        AND er.is_active = TRUE
+      GROUP BY er.evidence_role_id, er.name
+      ORDER BY count DESC, er.name ASC
+    `;
+
+    const [totalsRows, roleRows] = await Promise.all([
+      this.query(totalsQuery, [contractId]),
+      this.query(roleBreakdownQuery, [contractId]),
+    ]);
+
+    const totalsRow = (totalsRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(totalsRow.n ?? 0);
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      results_with_evidence: n,
+      evidences_total: Number(totalsRow.evidences_total ?? 0),
+      public_count: Number(totalsRow.public_count ?? 0),
+      private_count: Number(totalsRow.private_count ?? 0),
+      by_role: (roleRows as Array<Record<string, unknown>>).map((row) => ({
+        evidence_role_id: Number(row.evidence_role_id),
+        name: String(row.name),
+        count: Number(row.count ?? 0),
+      })),
+    };
+  }
+
+  private async getContributingLeversSection(
+    contractId: string,
+    totalResults: number,
+  ): Promise<ContributingLeversSectionDto> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT rl.result_id) AS n
+      FROM (${baseSubquery}) cr
+      INNER JOIN result_levers rl
+        ON rl.result_id = cr.result_id
+        AND rl.is_primary = FALSE
+        AND rl.is_active = TRUE
+    `;
+
+    const leverBreakdownQuery = `
+      SELECT
+        clarisa_lever.id AS lever_id,
+        clarisa_lever.short_name AS short_name,
+        clarisa_lever.full_name AS full_name,
+        COUNT(DISTINCT result_lever.result_id) AS count
+      FROM result_levers result_lever
+      INNER JOIN (${baseSubquery}) primary_contract_results
+        ON primary_contract_results.result_id = result_lever.result_id
+      INNER JOIN clarisa_levers clarisa_lever
+        ON clarisa_lever.id = result_lever.lever_id
+      WHERE result_lever.is_primary = FALSE
+        AND result_lever.is_active = TRUE
+      GROUP BY
+        clarisa_lever.id,
+        clarisa_lever.short_name,
+        clarisa_lever.full_name
+      ORDER BY count DESC, clarisa_lever.id
+    `;
+
+    const [countRows, leverRows] = await Promise.all([
+      this.query(countQuery, [contractId]),
+      this.query(leverBreakdownQuery, [contractId]),
+    ]);
+
+    const countRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const n = Number(countRow.n ?? 0);
+
+    return {
+      meta: {
+        total_results: Number(totalResults ?? 0),
+        n,
+      },
+      levers: (leverRows as Array<Record<string, unknown>>).map((row) => ({
+        lever_id: Number(row.lever_id),
+        short_name: String(row.short_name),
+        full_name: String(row.full_name),
         count: Number(row.count ?? 0),
       })),
     };

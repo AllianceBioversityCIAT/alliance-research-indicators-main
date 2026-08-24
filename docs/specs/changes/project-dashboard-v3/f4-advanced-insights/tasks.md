@@ -38,9 +38,9 @@ graph TD
 - **Requirements covered:** R-IN-001 (meta `{total_results, n}`, label MUST), R-IN-002 rows sdg/evidence/levers; design §2.1, D-F4-3.
 - **Files:** `dto/contract-insights-report.dto.ts` (NEW, imports F3's `SectionMeta`), `repositories/agresso-contract.repository.ts` (+spec).
 - **Acceptance / done check:**
-  - [ ] SQL specs assert generated SQL + params (KZ-001): distinct-result counts (**failing input:** a fixture with one result carrying the same SDG twice must count 1; remove `DISTINCT` → spec fails); lookup joins resolve labels (drop a join → NULL label → fails); levers filtered `is_primary = FALSE` (flip the predicate → fails).
-  - [ ] `npm test -- --silent` (server) + `npx eslint` green.
-- **Deps:** none · **Effort:** M · **Status:** todo
+  - [x] SQL specs assert generated SQL + params (KZ-001): distinct-result counts (**failing input:** a fixture with one result carrying the same SDG twice must count 1; remove `DISTINCT` → spec fails); lookup joins resolve labels (drop a join → NULL label → fails); levers filtered `is_primary = FALSE` (flip the predicate → fails).
+  - [x] `npm test -- --silent` (server) + `npx eslint` green (full suite 338/2486 by Leader re-measure; K-004 reds observed — see execution.md).
+- **Deps:** none · **Effort:** M · **Status:** done
 
 ### T-02 — `reach` + `keywords` queries
 

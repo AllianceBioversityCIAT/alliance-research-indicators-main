@@ -3487,6 +3487,264 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getSdgCoverageSection (private, F4 insights)', () => {
+    it('should query SDG coverage and return correctly populated DTO (asserts generated SQL + params + distinct counts + lookup join)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '3' }])
+        .mockResolvedValueOnce([
+          {
+            sdg_id: 2,
+            short_name: 'Zero Hunger',
+            full_name: 'SDG 2 - Zero Hunger',
+            count: '2',
+          },
+          {
+            sdg_id: 13,
+            short_name: 'Climate Action',
+            full_name: 'SDG 13 - Climate Action',
+            count: '1',
+          },
+        ]);
+
+      const result = await repository['getSdgCoverageSection']('A511', 5);
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [breakdownSql, breakdownParams] = (repository.query as jest.Mock)
+        .mock.calls[1];
+
+      // Count query assertions (KZ-001)
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_sdgs rs');
+      expect(countSql).toContain('rs.result_id = cr.result_id');
+      expect(countSql).toContain('rs.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rs.result_id) AS n');
+      expect(countParams).toEqual(['A511']);
+
+      // Breakdown query: distinct-result counting + lookup join to clarisa_sdgs
+      expect(breakdownSql).toContain('COUNT(DISTINCT rs.result_id) AS count');
+      expect(breakdownSql).toContain('INNER JOIN clarisa_sdgs cs');
+      expect(breakdownSql).toContain('cs.id = rs.clarisa_sdg_id');
+      expect(breakdownSql).toContain('cs.is_active = TRUE');
+      expect(breakdownSql).toContain('cs.short_name AS short_name');
+      expect(breakdownSql).toContain('cs.full_name AS full_name');
+      expect(breakdownSql).toContain(
+        'GROUP BY cs.id, cs.short_name, cs.full_name',
+      );
+      expect(breakdownSql).toContain('ORDER BY count DESC, cs.id ASC');
+      expect(breakdownParams).toEqual(['A511']);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 3 },
+        sdgs: [
+          {
+            sdg_id: 2,
+            short_name: 'Zero Hunger',
+            full_name: 'SDG 2 - Zero Hunger',
+            count: 2,
+          },
+          {
+            sdg_id: 13,
+            short_name: 'Climate Action',
+            full_name: 'SDG 13 - Climate Action',
+            count: 1,
+          },
+        ],
+      });
+    });
+
+    it('should return n = 0 and empty sdgs array when the contract reports no SDGs', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getSdgCoverageSection']('A511', 5);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 0 },
+        sdgs: [],
+      });
+    });
+  });
+
+  describe('getEvidenceSection (private, F4 insights)', () => {
+    it('should query evidence completeness and return correctly populated DTO (asserts generated SQL + params + lookup join)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '4',
+            evidences_total: '7',
+            private_count: '2',
+            public_count: '5',
+          },
+        ])
+        .mockResolvedValueOnce([
+          { evidence_role_id: 1, name: 'Primary source', count: '4' },
+          { evidence_role_id: 2, name: 'Supporting document', count: '3' },
+        ]);
+
+      const result = await repository['getEvidenceSection']('A511', 6);
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const [totalsSql, totalsParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [roleSql, roleParams] = (repository.query as jest.Mock).mock
+        .calls[1];
+
+      // Totals query assertions (KZ-001)
+      expect(totalsSql).toContain('SELECT DISTINCT r.result_id');
+      expect(totalsSql).toContain('INNER JOIN result_evidences re');
+      expect(totalsSql).toContain('re.result_id = cr.result_id');
+      expect(totalsSql).toContain('re.is_active = TRUE');
+      expect(totalsSql).toContain('COUNT(DISTINCT re.result_id) AS n');
+      expect(totalsSql).toContain(
+        'COUNT(re.result_evidence_id) AS evidences_total',
+      );
+      expect(totalsSql).toContain(
+        'SUM(CASE WHEN re.is_private = TRUE THEN 1 ELSE 0 END) AS private_count',
+      );
+      expect(totalsParams).toEqual(['A511']);
+
+      // Role breakdown query: lookup join to evidence_roles
+      expect(roleSql).toContain('INNER JOIN evidence_roles er');
+      expect(roleSql).toContain('er.evidence_role_id = re.evidence_role_id');
+      expect(roleSql).toContain('er.is_active = TRUE');
+      expect(roleSql).toContain('er.name AS name');
+      expect(roleSql).toContain('GROUP BY er.evidence_role_id, er.name');
+      expect(roleSql).toContain('ORDER BY count DESC, er.name ASC');
+      expect(roleParams).toEqual(['A511']);
+
+      expect(result).toEqual({
+        meta: { total_results: 6, n: 4 },
+        results_with_evidence: 4,
+        evidences_total: 7,
+        public_count: 5,
+        private_count: 2,
+        by_role: [
+          { evidence_role_id: 1, name: 'Primary source', count: 4 },
+          { evidence_role_id: 2, name: 'Supporting document', count: 3 },
+        ],
+      });
+    });
+
+    it('should return zeros and empty by_role when no evidence exists', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            n: '0',
+            evidences_total: '0',
+            private_count: '0',
+            public_count: '0',
+          },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getEvidenceSection']('A511', 6);
+
+      expect(result).toEqual({
+        meta: { total_results: 6, n: 0 },
+        results_with_evidence: 0,
+        evidences_total: 0,
+        public_count: 0,
+        private_count: 0,
+        by_role: [],
+      });
+    });
+  });
+
+  describe('getContributingLeversSection (private, F4 insights)', () => {
+    it('should query contributing (non-primary) levers and return correctly populated DTO (asserts generated SQL + params + is_primary = FALSE predicate + lookup join)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '2' }])
+        .mockResolvedValueOnce([
+          {
+            lever_id: 10,
+            short_name: 'Gender Equality',
+            full_name: 'Gender Equality Lever',
+            count: '2',
+          },
+          {
+            lever_id: 11,
+            short_name: 'Climate Adaptation',
+            full_name: 'Climate Adaptation Lever',
+            count: '1',
+          },
+        ]);
+
+      const result = await repository['getContributingLeversSection'](
+        'A511',
+        5,
+      );
+
+      expect(repository.query).toHaveBeenCalledTimes(2);
+
+      const [countSql, countParams] = (repository.query as jest.Mock).mock
+        .calls[0];
+      const [breakdownSql, breakdownParams] = (repository.query as jest.Mock)
+        .mock.calls[1];
+
+      // Count query assertions (KZ-001) — non-primary predicate
+      expect(countSql).toContain('SELECT DISTINCT r.result_id');
+      expect(countSql).toContain('INNER JOIN result_levers rl');
+      expect(countSql).toContain('rl.result_id = cr.result_id');
+      expect(countSql).toContain('rl.is_primary = FALSE');
+      expect(countSql).toContain('rl.is_active = TRUE');
+      expect(countSql).toContain('COUNT(DISTINCT rl.result_id) AS n');
+      expect(countParams).toEqual(['A511']);
+
+      // Breakdown query: same lever-join exemplar as getTopPrimaryLeversReport, flipped predicate
+      expect(breakdownSql).toContain('FROM result_levers result_lever');
+      expect(breakdownSql).toContain('INNER JOIN clarisa_levers clarisa_lever');
+      expect(breakdownSql).toContain(
+        'clarisa_lever.id = result_lever.lever_id',
+      );
+      expect(breakdownSql).toContain('WHERE result_lever.is_primary = FALSE');
+      expect(breakdownSql).toContain('result_lever.is_active = TRUE');
+      expect(breakdownSql).toContain(
+        'COUNT(DISTINCT result_lever.result_id) AS count',
+      );
+      expect(breakdownSql).toContain('ORDER BY count DESC, clarisa_lever.id');
+      expect(breakdownParams).toEqual(['A511']);
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 2 },
+        levers: [
+          {
+            lever_id: 10,
+            short_name: 'Gender Equality',
+            full_name: 'Gender Equality Lever',
+            count: 2,
+          },
+          {
+            lever_id: 11,
+            short_name: 'Climate Adaptation',
+            full_name: 'Climate Adaptation Lever',
+            count: 1,
+          },
+        ],
+      });
+    });
+
+    it('should return n = 0 and empty levers array when the contract has no non-primary levers', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([{ n: '0' }])
+        .mockResolvedValueOnce([]);
+
+      const result = await repository['getContributingLeversSection'](
+        'A511',
+        5,
+      );
+
+      expect(result).toEqual({
+        meta: { total_results: 5, n: 0 },
+        levers: [],
+      });
+    });
+  });
+
   describe('getIndicatorDetailsReport', () => {
     const mockCapacitySharing: any = {
       meta: { total_results: 4, n: 3 },
