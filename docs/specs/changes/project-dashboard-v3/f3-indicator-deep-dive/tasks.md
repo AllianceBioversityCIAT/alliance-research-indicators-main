@@ -22,7 +22,7 @@ graph TD
   T01 --> T03[T-03 Sections: innov-dev/policy/innov-use]
   T02 --> T04[T-04 Composition + controller + Swagger]
   T03 --> T04
-  T04 --> T05[T-05 e2e + dev ground-truth]
+  T04 --> T05[T-05 HTTP-path integration spec + dev ground-truth]
   T06[T-06 viz-chart Pie/Funnel/Radar] --> T09
   T04 --> T07[T-07 Client service + interface]
   T07 --> T08[T-08 Deep-dive component: states & laziness]
