@@ -76,3 +76,20 @@
 - **Reviewer verdict:** `STATUS: PASS` — every anchor verified live and unique; the Distribution companion confirmed structurally inside the same crossfade branch; unrelated §8 rows byte-identical (disqualifier not tripped); progressbar exclusion re-confirmed at source. Evidence-hygiene note recorded: implementer's brief said `:601` for the `<ul>`, it is `:602` — irrelevant to the artifact (no line numbers in it), flagged because a spot-check claim failed last round.
 - **Requirements covered:** R-DN-002 declared-idiom half; T-02 advisory 2 honored.
 - **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-04 — Status semaphore into hero (OQ-1-A) — **PASS** (attempt 1)
+
+- **Date:** 2026-08-24 · Skills: `angular-developer` + `ui-ux-pro-max` · Effort: high
+- **Files:** `project-dashboard.component.html` (template-only: hero gate widened `hasAnyContext() || !statusChartEmpty()`; status block moved verbatim into hero — figure + table + both drill anchors + aria + loading/error branches; chrome dropped per mockup Variante A; old Trend&Status row retired; trend re-paired with results-by-indicator keyed `!trendEmpty() && !indicatorsEmpty()`), `project-dashboard.component.spec.ts` (KZ-015 transition, zero-context case, status-empty collapse, re-pairing cases, drill href asserts).
+- **Verification:** targeted 110/110 (`--coverage=false`) · eslint clean · K-004 reds quoted (queryParams→{} → `Expected substring: "statusTab=6"` red; old pairing restored → 2 reds) · both T-02-advisory-2 width-% mechanisms survive (`:375`, `:412`).
+- **Reviewer verdict:** `STATUS: PASS` — verbatim move proven by diff shape (status body as context lines); re-pairing asserted via `parentElement` identity (structural, not class presence); chrome-drop matches mockup Variante A at source; header kept correctly (aria-labelledby needs the title node).
+- **Adjudication 1 — PRECISE wording (Reviewer correction, KZ-014):** the status region's own loading/error branches survive and are reachable for the contract-dashboard dimension (status skeleton/error render while that loads), **but** the block lives in the hero's `@else`: while `getProjectDetailService.loading()` is true the status region renders **nothing** — asserted by the implementer's own spec. The earlier phrasing "not gated behind hero skeleton" overstated; this is the observed behavior.
+- **ADVISORY (recorded):**
+  1. (= the wording correction above, applied.)
+  2. **→ T-07 HITL (MANDATORY):** new coupling — if summary resolves before project detail, the strip pops into the hero on project resolve; check "hero strip insert / CLS on project resolve" alongside the R-1 `md:` mobile check.
+  3. **→ T-05 brief:** zero-context + status-data case leaves the hero's `aria-label="Project context summary"` describing contents it no longer matches — address while laying act-1 wrappers (within R-DN-003's act/aria scope).
+  4. Stagger `animation-delay` attributes are presence-only (no keyframes target these widgets anywhere) — PRE-EXISTING, outside this spec; recorded only.
+  5. **→ T-05 brief:** stale "Trend/Status" DOM-order comment at spec `:1920` — fold the comment fix into T-05's act-order rewrite.
+- **Reviewer scope declaration (KZ-017):** read-only audit; jest/eslint claims stand on the implementer's runs; `strictTemplates` on the `[class.border-…]` binding form only provable by `npm run build` → T-07's battery covers it.
+- **Requirements covered:** R-DN-002 a11y AND, R-DN-004 states BUT; design D-DN-6 OQ-1-A, reversion challenge 1.
+- **Gate note:** auto-approved (owner fast-mode chain).

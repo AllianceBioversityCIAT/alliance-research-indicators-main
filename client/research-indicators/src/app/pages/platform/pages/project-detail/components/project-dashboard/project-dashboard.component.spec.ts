@@ -818,6 +818,11 @@ describe('ProjectDashboardComponent', () => {
       const firstLink = links[0];
       expect(firstLink.getAttribute('aria-label')).toContain('Approved');
       expect(firstLink.getAttribute('aria-label')).toContain('view filtered results');
+      // T-04: the drill queryParam must survive the move into the hero (R-DN-004 / K-004 named failing input)
+      expect(firstLink.getAttribute('href')).toContain('statusTab=6');
+
+      const compositionLinks = fixture.nativeElement.querySelectorAll('figure[role="img"] a[href]');
+      expect(compositionLinks[0].getAttribute('href')).toContain('statusTab=6');
     });
 
     it('should show a skeleton state while loading and transition to data (KZ-015 — arrange the transition, not the end state)', async () => {
@@ -2013,6 +2018,160 @@ describe('ProjectDashboardComponent', () => {
       expect(statusSection?.style.animationDelay).toBe('200ms');
       expect(trendCard?.style.animationDelay).toBe('300ms');
       expect(spGraph?.style.animationDelay).toBe('400ms');
+    });
+  });
+
+  describe('Status semaphore lives in the hero (T-04, D-DN-6 OQ-1-A, KZ-015)', () => {
+    it('shows the hero skeleton first, then the status strip nested in the hero region once data arrives (transition-arranged)', async () => {
+      // Construct: project context still loading, status still loading (KZ-015 — arrange the transition)
+      await setup('C-1', {
+        projectData: { grant_amount: 500 },
+        projectLoading: true,
+        summaryLoading: true,
+        summary: null
+      });
+
+      expect(fixture.nativeElement.querySelector('[aria-label="Loading project context"]')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[aria-label="Project context summary"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeNull();
+
+      // Data arrives for both
+      getProjectDetailServiceMock.loading.set(false);
+      component.project.set({ grant_amount: 500 } as any);
+      contractResultsSummaryMock.loading.set(false);
+      contractResultsSummaryMock.list.set({
+        total: 5,
+        by_indicator_year: [],
+        by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+        by_year: [],
+        partner_institutions: 0
+      });
+      fixture.detectChanges();
+
+      const heroSection = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+      const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
+      expect(heroSection).toBeTruthy();
+      expect(statusSection).toBeTruthy();
+
+      // D-DN-6 OQ-1-A: the semaphore renders INSIDE the hero, not as a standalone sibling card
+      expect(heroSection.contains(statusSection)).toBe(true);
+    });
+
+    it('renders the strip in the hero even when the project has no other context facts (R-DN-004 no regression)', async () => {
+      const noContextProject: GetProjectDetail = {
+        grant_amount: null as any,
+        grant_amount_usd: null,
+        center_amount_usd: null,
+        funding_type: null,
+        start_date: undefined,
+        end_date: undefined,
+        donor: undefined,
+        division: undefined,
+        divisionId: undefined,
+        unit: undefined,
+        unitId: undefined,
+        sdgs: null as any,
+        cgiar_entities: null as any
+      };
+
+      await setup('C-1', {
+        projectData: noContextProject,
+        summary: {
+          total: 5,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [],
+          partner_institutions: 0
+        }
+      });
+
+      expect(component.hasAnyContext()).toBe(false);
+      expect(component.statusChartEmpty()).toBe(false);
+
+      const heroSection = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+      expect(heroSection).toBeTruthy();
+
+      const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
+      expect(statusSection).toBeTruthy();
+      expect(heroSection.contains(statusSection)).toBe(true);
+
+      // No content above it in the hero, so no top border separator is applied
+      expect(statusSection.classList.contains('border-t')).toBe(false);
+    });
+
+    it('hides the strip row without hiding the hero when status resolves empty, and retires the old standalone status card', async () => {
+      await setup('C-1', {
+        projectData: { grant_amount: 500 },
+        summary: { total: 0, by_indicator_year: [], by_status: [], by_year: [], partner_institutions: 0 }
+      });
+
+      expect(component.statusChartEmpty()).toBe(true);
+
+      const heroSection = fixture.nativeElement.querySelector('[aria-label="Project context summary"]');
+      expect(heroSection).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeNull();
+    });
+  });
+
+  describe('Trend & indicator grid re-pairing (T-04, D-DN-6 reversion challenge 1)', () => {
+    it('pairs the trend card with results-by-indicator in one lg:grid-cols-2 grid, keyed on indicatorsEmpty — not the retired statusChartEmpty pairing', async () => {
+      await setup('C-1', {
+        projectData: {
+          grant_amount: 500,
+          indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 5 } as any]
+        },
+        summary: {
+          total: 5,
+          by_indicator_year: [],
+          by_status: [], // status EMPTY — the named failing input: old conditional would leave trend orphaned full-width
+          by_year: [{ year: 2024, count: 5 }],
+          partner_institutions: 0
+        }
+      });
+
+      expect(component.trendEmpty()).toBe(false);
+      expect(component.statusChartEmpty()).toBe(true);
+      expect(component.indicatorsEmpty()).toBe(false);
+
+      const trendCard = fixture.nativeElement.querySelector('app-results-trend-card');
+      const indicatorSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-indicator-title"]');
+      expect(trendCard).toBeTruthy();
+      expect(indicatorSection).toBeTruthy();
+
+      // Trend and indicator must be siblings in the SAME grid row
+      const grid = trendCard.parentElement;
+      expect(grid).toBe(indicatorSection.parentElement);
+      expect(grid.classList.contains('grid')).toBe(true);
+      expect(grid.classList.contains('lg:grid-cols-2')).toBe(true);
+
+      // The status section is no longer this grid's second slot — it lives in the hero, not here
+      const statusSection = fixture.nativeElement.querySelector('section[aria-labelledby="results-by-status-title"]');
+      expect(statusSection).toBeNull();
+      expect(grid.querySelector('section[aria-labelledby="results-by-status-title"]')).toBeNull();
+    });
+
+    it('renders trend full-width (no lg:grid-cols-2) when results-by-indicator is empty, even if status has data', async () => {
+      await setup('C-1', {
+        projectData: {
+          grant_amount: 500,
+          indicators: []
+        },
+        summary: {
+          total: 5,
+          by_indicator_year: [],
+          by_status: [{ status_id: 6, name: 'Approved', count: 5 }],
+          by_year: [{ year: 2024, count: 5 }],
+          partner_institutions: 0
+        }
+      });
+
+      expect(component.trendEmpty()).toBe(false);
+      expect(component.indicatorsEmpty()).toBe(true);
+
+      const trendCard = fixture.nativeElement.querySelector('app-results-trend-card');
+      expect(trendCard).toBeTruthy();
+      const grid = trendCard.parentElement;
+      expect(grid.classList.contains('lg:grid-cols-2')).toBe(false);
     });
   });
 

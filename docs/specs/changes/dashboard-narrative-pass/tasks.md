@@ -63,9 +63,9 @@ graph TD
 - **Requirements:** R-DN-002 (composition strip = declared idiom, a11y preserved), R-DN-004 (drills intact); design D-DN-6, reversion challenge 1.
 - **Files:** hero region + status region of `project-dashboard.component.{html,ts,spec.ts}`.
 - **Acceptance / done check:**
-  - [ ] Strip + legend + per-status drill links (routerLink/queryParams/aria/sr-only table) render inside the hero; standalone card retired; loading/error states preserved (**failing input:** remove a drill queryParam → spec red).
-  - [ ] Trend grid re-pairs with results-by-indicator (challenge-1 answer) — no orphaned `lg:grid-cols-2` conditional (**failing input:** status-empty case leaving the trend full-width asymmetric → spec asserts the new pairing).
-  - [ ] KZ-015: specs arrange the load transition (construct loading → data arrives), not pre-set end state.
+  - [x] Strip + legend + per-status drill links (routerLink/queryParams/aria/sr-only table) render inside the hero; standalone card retired; loading/error states preserved (**failing input:** remove a drill queryParam → spec red).
+  - [x] Trend grid re-pairs with results-by-indicator (challenge-1 answer) — no orphaned `lg:grid-cols-2` conditional (**failing input:** status-empty case leaving the trend full-width asymmetric → spec asserts the new pairing).
+  - [x] KZ-015: specs arrange the load transition (construct loading → data arrives), not pre-set end state.
 - **Deps:** none · **Effort:** M · **Status:** done — PASS attempt 1
 
 ### T-05 — Six-act structure: reorder, subtitles, F4 observer move
