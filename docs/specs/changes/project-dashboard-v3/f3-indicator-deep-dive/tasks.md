@@ -144,7 +144,7 @@ graph TD
   - [ ] Latency: 3 timed dev runs, p95-proxy ≤ 800 ms; spread >±40% → reported inconclusive, never a pass.
   - [ ] **HITL (KZ-014, human):** light+dark screenshots of every new chart form; lazy fetch verified with the panel **below the fold** (the in-viewport variant is disqualified per NFR-DD-001); F1 drills + F2 single-aggregate-call behavior intact; `/swagger` renders the endpoint.
   - [ ] Global K-004 disqualifier: every cited gate observed red at least once during this spec.
-- **Deps:** T-05, T-09 · **Effort:** M · **Status:** todo
+- **Deps:** T-05, T-09 · **Effort:** M · **Status:** in-progress
 
 ---
 
