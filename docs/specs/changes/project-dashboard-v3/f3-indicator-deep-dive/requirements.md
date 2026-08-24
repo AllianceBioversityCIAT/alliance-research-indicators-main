@@ -163,8 +163,8 @@ The endpoint SHALL aggregate, per section:
 | Defect class | Gate | Blind-spot handling |
 |---|---|---|
 | **Wrong SQL aggregates over satellite tables** (bad joins, absent-as-zero, double counting on 1:N satellites) | Repository specs asserting **generated SQL + params** (KZ-001) with fixtures covering: multi-row satellites, missing satellite rows, NULL booleans | Mocked query builders cannot represent SQL semantics (KZ-017) → substituted by the **dev ground-truth check**: for A511, compare endpoint numbers against hand-run SQL for ≥2 sections (capacity trainees total + KP open-access), recorded in `execution.md` |
-| Bare lookup ids leaking to the client | DTO/e2e assertions on label fields (**failing input:** drop a lookup join → label null → must fail) | — |
-| Section emitted for zero-result indicator / omitted for present one | Supertest e2e over seeded scenario + unit specs | — |
+| Bare lookup ids leaking to the client | DTO/integration-spec assertions on label fields (**failing input:** drop a lookup join → label null → must fail) | — |
+| Section emitted for zero-result indicator / omitted for present one | In-process HTTP-path integration spec (`npm run test:integration`, repository mocked — never `AppModule`/real DB) + unit specs | Amended 2026-08-23: a full-`AppModule` e2e is an infrastructure test, not this gate |
 | Eager fetch (laziness broken) | Component spec: no fetch before intersection event (KZ-015 transition: construct below-fold, assert zero calls, intersect, assert one) | jsdom has no real IntersectionObserver → mock at boundary; the **real** laziness is HITL's network check (declared) |
 | Sparse state rendered as error/empty wrongly | Component specs for `n=0`, `0<n<total`, `n=total` transitions | — |
 | **Rendered chart correctness** (radar shape, funnel order, donut labels, dark-mode contrast of new forms) | **No automated gate** — substituted: `npm run tokens:validate` for token contrast + mandatory HITL light+dark screenshots of every new chart form (KZ-014) | Presence of options objects ≠ rendered chart (declared presence caveat) |

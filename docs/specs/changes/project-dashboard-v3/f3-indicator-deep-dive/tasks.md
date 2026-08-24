@@ -8,7 +8,7 @@
 - **Linked design:** ./design.md · **Visual reference:** ./mockup/deep-dive-panel.html
 - **Last updated:** 2026-08-23
 
-> **Gate conventions** (as F2 tasks.md): server `npm test -- --silent` / `npm run test:e2e` / `test:cov`; client targeted runs with `--coverage=false` (K-020); lint via `npx eslint` only (K-001); spec-type gate = delta vs 945 baseline (K-002); the two packages' full suites never run **concurrently** (§4.3). Skills: `nestjs-expert` (T-01…T-05), `angular-developer` + `ui-ux-pro-max` (T-06…T-09), `error-handling-patterns` (T-04), `systematic-debugging` on any unexpected red.
+> **Gate conventions** (as F2 tasks.md): server `npm test -- --silent` / `npm run test:integration` (HTTP-path specs; **never** `npm run test:e2e`, whose only suite boots `AppModule` against remote dev infra) / `test:cov`; client targeted runs with `--coverage=false` (K-020); lint via `npx eslint` only (K-001); spec-type gate = delta vs 945 baseline (K-002); the two packages' full suites never run **concurrently** (§4.3). Skills: `nestjs-expert` (T-01…T-05), `angular-developer` + `ui-ux-pro-max` (T-06…T-09), `error-handling-patterns` (T-04), `systematic-debugging` on any unexpected red.
 >
 > **Family sequencing gate:** T-07…T-09 (client) MUST NOT start until F2's client tasks are merged (`family.md`: not parallel-safe; both touch `project-dashboard.component` and `api.service.ts`). Server tasks T-01…T-05 may proceed meanwhile.
 
@@ -75,13 +75,19 @@ graph TD
   - [x] Server suite + eslint green.
 - **Deps:** T-02, T-03 · **Effort:** M · **Status:** done
 
-### T-05 — Supertest e2e + dev ground-truth check
+### T-05 — HTTP-path integration spec (in-process, no infra) + dev ground-truth check
 
-- **Requirements covered:** R-DD-001 envelope behavior end-to-end (KZ-017 owner); requirements defect rows 1–3.
-- **Files:** `test/agresso-contract-indicator-details.e2e-spec.ts` (NEW); evidence in `execution.md`.
-- **Description:** e2e: mixed-indicator contract (sections present/omitted per rule), one-section failure → 200 + null + errors entry, 400, 401. Then the **ground-truth check** on dev: endpoint numbers vs hand-run SQL for capacity trainees total and KP open-access split on A511.
+> **Amended 2026-08-23 (owner decision, Correction Closure).** The original wording "supertest e2e" was read as the repo's only `*.e2e-spec.ts` example, which boots the full `AppModule` against remote dev infra (MySQL, RabbitMQ, OpenSearch) — a 26-minute connection-retry hang, and a test touching the **shared, non-disposable dev DB**. The class of defect this task owns (KZ-017: envelope composition + partial-failure path through the real interceptor/exception filter) needs the **HTTP layer**, not the infrastructure. Bootstrap scope is now explicit.
+
+- **Requirements covered:** R-DD-001 envelope behavior through the real HTTP path (KZ-017 owner); requirements defect rows 1–3.
+- **Files:** `test/agresso-contract-indicator-details.integration-spec.ts` (NEW — runs under `npm run test:integration`, the repo's no-`AppModule` config; follow `test/bilateral-primary-contributing-sp.integration-spec.ts` as the wiring template); evidence in `execution.md`.
+- **Description:** `Test.createTestingModule` with **only** `AgressoContractController` + `AgressoContractService`, the global `ResponseInterceptor` and `GlobalExceptions` filter applied to the test app, and `AgressoContractRepository` **replaced via `overrideProvider` with a mock** whose section methods resolve/reject per case. `supertest` against `app.getHttpServer()`. Cases: mixed-indicator contract (sections present/omitted per rule), one-section rejection → 200 + `null` + envelope `errors` entry, all-rejected → 500 envelope, 400 missing `contract-id`. The 401 case is a **unit test on `JwtMiddleware`** (already covered by its own spec — cite it), not a bootstrapped auth stack. Then the **ground-truth check** on dev: endpoint numbers vs hand-run SQL for capacity trainees total and KP open-access split on A511.
+- **Implementation notes:**
+  - MUST NOT import `AppModule`, open a TypeORM `DataSource`, or reach any network — a spec that does is disqualified for this task regardless of outcome.
+  - `test/app.e2e-spec.ts` (full-`AppModule` smoke) is an infrastructure test and is **not** part of this task's gate; do not run `npm run test:e2e` as evidence here.
 - **Acceptance / done check:**
-  - [ ] `npm run test:e2e` green incl. the 4 cases (**failing input for partial failure:** a rethrow-on-first-rejection mutation must turn the case into a 500 and fail it).
+  - [ ] `npm run test:integration` green incl. the 4 HTTP cases, wall-clock **< 60 s** (**failing input for partial failure:** a rethrow-on-first-rejection mutation must turn the case into a 500 and fail it; **disqualifier:** a run that opens a DB connection or exceeds the timeout — it is testing infrastructure, not the envelope).
+  - [ ] 401 coverage cited from the `JwtMiddleware` spec (file + test name).
   - [ ] Ground-truth: both comparisons recorded with the SQL used and both value sets; **disqualifier:** endpoint call and SQL run not back-to-back (shared dev data mutates), or different contracts compared.
 - **Deps:** T-04 · **Effort:** M · **Status:** todo
 
@@ -146,7 +152,7 @@ graph TD
 
 | Clause | Owner |
 |---|---|
-| R-DD-001 mixed-indicator scenario + no-zero-section BUT + label MUST + 400/Swagger | T-04 (unit) + T-05 (e2e) + T-02/T-03 (labels) |
+| R-DD-001 mixed-indicator scenario + no-zero-section BUT + label MUST + 400/Swagger | T-04 (unit) + T-05 (HTTP-path integration) + T-02/T-03 (labels) |
 | R-DD-001 `{total_results, n}` | T-01 (+ per-section T-02/T-03) |
 | R-DD-002 table rows + sparse scenario (absent≠0 BUT, small-n MUST) | T-02 (rows 1/3/5), T-03 (rows 2/4/6), T-05 (ground truth) |
 | R-DD-003 lazy scenario (zero-before / one-after / no-refetch / skeleton MUST) | T-08 (+T-10 HITL real network) |
