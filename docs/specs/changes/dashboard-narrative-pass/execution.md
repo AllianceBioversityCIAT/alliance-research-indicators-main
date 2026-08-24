@@ -48,3 +48,23 @@
 - **Requirements covered:** R-DN-002 inventory scenario + zero-unclassified BUT (KZ-002 closure by what renders).
 - **Final verification:** Reviewer's independent repo-wide re-scan = table complete.
 - **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-06 — attempt 1 — **FAIL** (Reviewer)
+
+- **Date:** 2026-08-24 · effort low. Placement/format/zero-touch clean; two content defects (one edit fixes both): (1) line-range citations wrong in the working tree (file shifting under concurrent T-04 edits — and internally inconsistent in time: prose describes post-T-04, numbers pre-T-04) → cite by component + stable DOM anchor, never line numbers; (2) only one of the surface's two width-% mechanisms named (T-02 advisory 2 unhonored) + idiom definition claims "sr-only table" but the Distribution instance's companion is a visible list → name both mechanisms, soften to "accessible text companion". Full report relayed verbatim to attempt 2.
+- **Bonus observations from the Reviewer:** T-03's working-tree state already carries explicit `layout="viz-bar"` on all three geo cards (advisory-1 hazard clear); progressbar exclusion verified at live `:278`.
+
+### T-01 — BUG: SSR regression spec + trend-series fix — **PASS** (attempt 1)
+
+- **Date:** 2026-08-24 · Skills: `angular-developer` + `systematic-debugging` · Effort: medium (Bug Mode)
+- **Files:** `results-trend-card.component.ts` (visualMap removed → two overlapping null-padded series solid/dashed, `connectNulls:false`; local `resolveDesignToken`/`axisTokens` — ALL option colors resolved-or-omitted per D-DN-5), `results-trend-card.component.spec.ts` (assertions migrated + var-omission + tooltip-dedupe tests), NEW `results-trend-card.ssr.spec.ts` (real-echarts SSR render of the real builder output).
+- **RED observed (Bug Mode mandate):** on unmodified code the SSR spec fails with `TypeError: Cannot read properties of undefined (reading 'coord') at getVisualGradient (echarts.js:42629)` — the exact probe-confirmed crash. **GREEN after fix:** SSR 2/2 (no-throw, series strokes+symbols, solid AND dashed present, zero `var(--`, visualMap undefined, contract test). Targeted 18/18 `--coverage=false` · eslint clean.
+- **Scope adjudication (implementer-flagged, Reviewer-CONFIRMED within spec):** axis/grid/symbol token resolution added beyond the series color — required by design §10 assertion (d) ("zero `var(--` in the SVG"; five pre-existing literals would have made it unsatisfiable); staying file-local was right (`chart-tokens.util`'s `resolveToken` unexported; editing it would touch 8 sibling cards against §1 non-goals).
+- **Reviewer verdict:** `STATUS: PASS` — D-DN-1 implemented exactly; every R-IN… R-DN-001 clause asserted on generated SVG output; dark-mode resolution verified at source (`data-theme` overrides); drill series-agnostic (`event.name`); tooltip dedupe null-safe (radar `cfcd223d` trap avoided); zero hex in component code.
+- **ADVISORY (recorded):**
+  1. Clause (d) passed vacuously in the red run (throw → empty svg) — covered by the specify probe record + the migrated component spec's `JSON.stringify(options)` assertion which reds without a throw; nuance recorded here per Reviewer suggestion (K-004 clause-level honesty).
+  2. **Sibling trap, unassigned:** `project-dashboard.component.ts:447,450` feeds `'var(--ac-grey-…)'` into the indicator-heatmap options — no crash (standard `inRange.color`) but axis colors silently inert. Out of T-01 scope; NO task owns it — recorded; owner may propose follow-up outside this spec.
+  3. SSR assertion (c) attribute-order-coupled (echarts emit order) — sound today, fragile on major bumps.
+  4. Test-title overstatement + **→ T-07 brief:** include `results-trend-card.ssr.spec.ts` in the tsc-spec delta check (K-002 — its casts are otherwise untype-checked).
+- **Requirements covered:** R-DN-001 all clauses; design §2.1, D-DN-1/2/5.
+- **Gate note:** auto-approved (owner fast-mode chain).

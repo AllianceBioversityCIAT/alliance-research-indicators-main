@@ -18,6 +18,28 @@ export class ResultsTrendCardComponent {
   private readonly darkModeService = inject(DarkModeService);
   readonly tokens = chartTokens(this.darkModeService.darkMode());
 
+  // General (non `--ac-viz-*`) design tokens used for axis/grid chrome. Resolved
+  // the same way as `tokens` above (D-DN-5): echarts' SVG renderer — including
+  // SSR, which the regression harness renders through — emits option colors as
+  // literal presentation-attribute strings, so an unresolved `var(--…)` value
+  // reaches the SVG unresolved rather than being computed away. Every color fed
+  // into `chartOptions` below must therefore be a resolved literal or omitted
+  // (theme default) — never a `var(--…)` fallback string.
+  private readonly axisTokens = computed(() => {
+    this.darkModeService.darkMode();
+    return {
+      axisLine: this.resolveDesignToken('--ac-grey-300'),
+      axisLabel: this.resolveDesignToken('--ac-grey-700'),
+      splitLine: this.resolveDesignToken('--ac-grey-100'),
+      symbolFill: this.resolveDesignToken('--ac-white-1')
+    };
+  });
+
+  private resolveDesignToken(name: string): string | undefined {
+    if (typeof document === 'undefined') return undefined;
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || undefined;
+  }
+
   readonly buckets = input<ContractResultsSummaryYearBucket[]>([]);
   readonly loading = input<boolean>(false);
   readonly error = input<boolean>(false);
@@ -76,14 +98,31 @@ export class ResultsTrendCardComponent {
     };
   });
 
+  // D-DN-1: two overlapping line series (no visualMap — visualMap.pieces[].lineStyle
+  // is the confirmed crash input, requirements.md §1) sharing one resolved series
+  // color: "closed" = buckets [0..lastClosedIndex] solid; "in-progress" =
+  // [lastClosedIndex..lastIndex] dashed. Both series carry the full x-axis category
+  // data with `null` outside their range so echarts still aligns them on the shared
+  // axis; the overlap point at lastClosedIndex is intentional (it is where the solid
+  // segment hands off to the dashed one) and is deduped in the tooltip formatter.
   readonly chartOptions = computed<EChartsOption | null>(() => {
     const buckets = this.validBuckets();
     if (buckets.length < 2) {
       return null;
     }
-    const tokenSeries1 = this.tokens().series1;
-    const seriesColor = tokenSeries1 || 'var(--ac-viz-series-1)';
+    const seriesColor = this.tokens().series1 || undefined;
+    const axis = this.axisTokens();
     const lastIndex = buckets.length - 1;
+    const lastClosedIndex = Math.max(0, lastIndex - 1);
+
+    const closedData: (number | null)[] = buckets.map((b, i) => (i <= lastClosedIndex ? b.count : null));
+    const inProgressData: (number | null)[] = buckets.map((b, i) => (i >= lastClosedIndex ? b.count : null));
+
+    const symbolItemStyle = {
+      ...(axis.symbolFill ? { color: axis.symbolFill } : {}),
+      ...(seriesColor ? { borderColor: seriesColor } : {}),
+      borderWidth: 2
+    };
 
     return {
       grid: {
@@ -99,7 +138,12 @@ export class ResultsTrendCardComponent {
           type: 'line'
         },
         formatter: (params: unknown) => {
-          const item = Array.isArray(params) ? params[0] : (params as { name?: string; value?: unknown });
+          const items = (Array.isArray(params) ? params : [params]) as { name?: string; value?: unknown }[];
+          // Both series share the x-axis; at the closed/in-progress handoff point
+          // BOTH carry the same real value while the other index positions carry
+          // `null` for whichever series doesn't cover them. Pick the first item
+          // with a real value so the tooltip never shows a duplicate or a `null`.
+          const item = items.find(p => p?.value !== null && p?.value !== undefined) ?? items[0];
           if (!item) return '';
           return `Report Year ${item.name}: <strong>${item.value}</strong> results`;
         }
@@ -109,12 +153,10 @@ export class ResultsTrendCardComponent {
         data: buckets.map(b => String(b.year)),
         axisTick: { show: false },
         axisLine: {
-          lineStyle: {
-            color: 'var(--ac-grey-300)'
-          }
+          lineStyle: axis.axisLine ? { color: axis.axisLine } : {}
         },
         axisLabel: {
-          color: 'var(--ac-grey-700)',
+          ...(axis.axisLabel ? { color: axis.axisLabel } : {}),
           fontFamily: 'Barlow'
         }
       },
@@ -124,37 +166,47 @@ export class ResultsTrendCardComponent {
         minInterval: 1,
         splitLine: {
           lineStyle: {
-            color: 'var(--ac-grey-100)',
+            ...(axis.splitLine ? { color: axis.splitLine } : {}),
             type: 'dashed'
           }
         },
         axisLabel: {
-          color: 'var(--ac-grey-700)',
+          ...(axis.axisLabel ? { color: axis.axisLabel } : {}),
           fontFamily: 'Barlow'
         }
       },
-      visualMap: {
-        show: false,
-        dimension: 0,
-        pieces: [
-          { lte: Math.max(0, lastIndex - 1), lineStyle: { type: 'solid', color: seriesColor, width: 2 } },
-          { gt: Math.max(0, lastIndex - 1), lineStyle: { type: 'dashed', color: seriesColor, width: 2 } }
-        ]
-      },
       series: [
         {
-          name: 'Results',
+          name: 'Results (closed)',
           type: 'line',
           cursor: 'pointer',
-          data: buckets.map(b => b.count),
+          data: closedData,
           smooth: false,
           symbol: 'circle',
           symbolSize: 6,
-          itemStyle: {
-            color: 'var(--ac-white-1)',
-            borderColor: seriesColor,
-            borderWidth: 2
-          }
+          connectNulls: false,
+          lineStyle: {
+            type: 'solid',
+            width: 2,
+            ...(seriesColor ? { color: seriesColor } : {})
+          },
+          itemStyle: symbolItemStyle
+        },
+        {
+          name: 'Results (in progress)',
+          type: 'line',
+          cursor: 'pointer',
+          data: inProgressData,
+          smooth: false,
+          symbol: 'circle',
+          symbolSize: 6,
+          connectNulls: false,
+          lineStyle: {
+            type: 'dashed',
+            width: 2,
+            ...(seriesColor ? { color: seriesColor } : {})
+          },
+          itemStyle: symbolItemStyle
         }
       ]
     };

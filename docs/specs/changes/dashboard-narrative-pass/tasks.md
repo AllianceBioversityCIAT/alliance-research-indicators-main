@@ -33,11 +33,11 @@ graph TD
 - **Requirements:** R-DN-001 (all clauses); design §2.1, D-DN-1, D-DN-2, D-DN-5.
 - **Files:** `results-trend-card.component.ts`; NEW `results-trend-card.ssr.spec.ts` (co-located); existing card spec updated.
 - **Acceptance / done check:**
-  - [ ] SSR spec renders the REAL builder output via full `echarts` (`ssr:true`, svg): asserts no-throw, ≥1 series stroke + symbols, solid AND dashed dasharray present, zero `var(--` in SVG. **RED FIRST observed on current code** (failing input = `visualMap.pieces[].lineStyle` options — probe-proven crash `TypeError ... 'coord'` in `getVisualGradient`); GREEN after the two-series fix. Quote both runs.
-  - [ ] Fix = two overlapping series (solid `[0..lastClosed]`, dashed tail), resolved token colors only — the `'var(--…)'` fallback string is REMOVED from options (D-DN-5); tooltip/click/tableModel assertions unchanged and green.
-  - [ ] **Disqualifier:** a green SSR run whose fixture has <2 buckets (options builder returns null — nothing rendered) is not evidence; the spec must assert on the ≥2-bucket path.
-  - [ ] Targeted jest `--coverage=false` + `npx eslint` green.
-- **Deps:** none · **Effort:** M · **Status:** todo
+  - [x] SSR spec renders the REAL builder output via full `echarts` (`ssr:true`, svg): asserts no-throw, ≥1 series stroke + symbols, solid AND dashed dasharray present, zero `var(--` in SVG. **RED FIRST observed on current code** (failing input = `visualMap.pieces[].lineStyle` options — probe-proven crash `TypeError ... 'coord'` in `getVisualGradient`); GREEN after the two-series fix. Quote both runs.
+  - [x] Fix = two overlapping series (solid `[0..lastClosed]`, dashed tail), resolved token colors only — the `'var(--…)'` fallback string is REMOVED from options (D-DN-5); tooltip/click/tableModel assertions unchanged and green.
+  - [x] **Disqualifier:** a green SSR run whose fixture has <2 buckets (options builder returns null — nothing rendered) is not evidence; the spec must assert on the ≥2-bucket path.
+  - [x] Targeted jest `--coverage=false` + `npx eslint` green.
+- **Deps:** none · **Effort:** M · **Status:** done — PASS attempt 1
 
 ### T-02 — Visual-surface inventory closure
 
@@ -66,7 +66,7 @@ graph TD
   - [ ] Strip + legend + per-status drill links (routerLink/queryParams/aria/sr-only table) render inside the hero; standalone card retired; loading/error states preserved (**failing input:** remove a drill queryParam → spec red).
   - [ ] Trend grid re-pairs with results-by-indicator (challenge-1 answer) — no orphaned `lg:grid-cols-2` conditional (**failing input:** status-empty case leaving the trend full-width asymmetric → spec asserts the new pairing).
   - [ ] KZ-015: specs arrange the load transition (construct loading → data arrives), not pre-set end state.
-- **Deps:** none · **Effort:** M · **Status:** todo
+- **Deps:** none · **Effort:** M · **Status:** done — PASS attempt 1
 
 ### T-05 — Six-act structure: reorder, subtitles, F4 observer move
 

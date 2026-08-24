@@ -191,22 +191,68 @@ describe('ResultsTrendCardComponent (R-PD-004, R-PD-009, R-DA-006, NFR-PD-001)',
       expect(subtitle?.textContent).toContain('by report year · 2025 in progress');
     });
 
-    it('configures ECharts options with series1 token, y-axis min: 0, and dashed in-progress segment', () => {
+    it('configures ECharts options with series1 token, y-axis min: 0, and a solid+dashed two-series split with no visualMap (D-DN-1)', () => {
       const options = component.chartOptions();
       expect(options).not.toBeNull();
 
       expect((options?.xAxis as any).data).toEqual(['2020', '2021', '2022', '2023', '2024', '2025']);
       expect((options?.yAxis as any).min).toBe(0);
 
-      const series = (options?.series as any[])[0];
-      expect(series.type).toBe('line');
-      expect(series.cursor).toBe('pointer');
-      expect(series.data).toEqual([6, 14, 22, 31, 34, 21]);
+      // D-DN-1: visualMap.pieces[].lineStyle was the confirmed crash input — the
+      // fix removes the visualMap mechanism entirely.
+      expect(options?.visualMap).toBeUndefined();
 
-      const visualMap = options?.visualMap as any;
-      expect(visualMap.show).toBe(false);
-      expect(visualMap.pieces).toBeDefined();
-      expect(visualMap.pieces[1].lineStyle.type).toBe('dashed');
+      const series = options?.series as any[];
+      expect(series.length).toBe(2);
+
+      const closed = series[0];
+      expect(closed.type).toBe('line');
+      expect(closed.cursor).toBe('pointer');
+      expect(closed.lineStyle.type).toBe('solid');
+      expect(closed.data).toEqual([6, 14, 22, 31, 34, null]);
+
+      const inProgress = series[1];
+      expect(inProgress.type).toBe('line');
+      expect(inProgress.cursor).toBe('pointer');
+      expect(inProgress.lineStyle.type).toBe('dashed');
+      expect(inProgress.data).toEqual([null, null, null, null, 34, 21]);
+    });
+
+    it('never emits an unresolved var(--…) fallback string for the series color (D-DN-5)', () => {
+      const options = component.chartOptions();
+      const series = options?.series as any[];
+      // jsdom resolves no --ac-viz-series-1 custom property in this suite, so the
+      // token resolves empty — the color key must be OMITTED, never the banned
+      // 'var(--ac-viz-series-1)' fallback string.
+      expect(series[0].lineStyle.color).toBeUndefined();
+      expect(series[1].lineStyle.color).toBeUndefined();
+      expect(JSON.stringify(options)).not.toContain('var(--');
+    });
+
+    it('dedupes the tooltip at the closed/in-progress handoff point and reports the last (in-progress-only) point correctly', () => {
+      const options = component.chartOptions();
+      const formatter = (options?.tooltip as any).formatter as (params: unknown) => string;
+
+      // Handoff point (year 2024, index 4): BOTH series carry the real value 34.
+      const handoffParams = [
+        { name: '2024', value: 34 },
+        { name: '2024', value: 34 }
+      ];
+      const handoffResult = formatter(handoffParams);
+      expect(handoffResult).toContain('Report Year 2024');
+      expect(handoffResult).toContain('34');
+      expect(handoffResult.match(/results/g)?.length).toBe(1);
+
+      // Last point (year 2025, index 5): only the in-progress series has a value;
+      // the closed series is null there. Regression: naively reading params[0]
+      // would report `null` for this point.
+      const lastPointParams = [
+        { name: '2025', value: null },
+        { name: '2025', value: 21 }
+      ];
+      const lastResult = formatter(lastPointParams);
+      expect(lastResult).toContain('Report Year 2025');
+      expect(lastResult).toContain('21');
     });
 
     describe('Interactivity and click handling (R-HL-006)', () => {
