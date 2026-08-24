@@ -1,0 +1,381 @@
+<section class="flex w-full flex-col gap-4 rounded-xl border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-5 shadow-xs"
+  aria-labelledby="insights-section-title"
+  tabindex="0"
+  (focusin)="onRegionFocusIn()">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex flex-col gap-1">
+      <h2 id="insights-section-title" class="m-0 font-['Barlow'] text-[15px] font-[550] leading-tight text-[var(--ac-primary-blue-600)]">
+        Insights
+      </h2>
+      <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
+        Portfolio-level reach, SDG coverage, evidence, review flow, contributing levers, and keywords across all indicators.
+      </p>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3.5">
+
+    <!-- Reach card (R-IN-003 Reach card scenario) -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="reach">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Reach</span>
+      @switch (reachState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading reach details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="120px" borderRadius="8px" />
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load reach data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading reach data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ reach()?.meta?.total_results ?? 0 }} results on this project report actor-group reach breakdown yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (reachState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing actor-group reach data from {{ reach()?.meta?.n }} of {{ reach()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          <div class="flex items-center gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+            <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Not disaggregated</span>
+            <span class="ml-auto font-['Space_Grotesk'] text-[16px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ reachNotDisaggregatedRows() }}</span>
+          </div>
+          @if (reachHasByActorTypeRows()) {
+          <div data-slot="chart-placeholder" data-chart="reach-stacked-bar" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
+            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Actor-group reach by gender × youth (overall and per actor type) renders here.</span>
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No per-actor-type breakdown is available for these results.</p>
+          </div>
+          }
+        }
+      }
+    </div>
+
+    <!-- SDG coverage card (R-IN-003 SDG comparison scenario) -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="sdg-coverage">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">SDG coverage</span>
+      @switch (sdgCoverageState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading SDG coverage details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <div class="flex gap-2">
+            <p-skeleton width="70px" height="24px" borderRadius="6px" />
+            <p-skeleton width="70px" height="24px" borderRadius="6px" />
+            <p-skeleton width="70px" height="24px" borderRadius="6px" />
+          </div>
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load SDG coverage data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading SDG coverage data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ sdgCoverage()?.meta?.total_results ?? 0 }} results on this project report an SDG yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (sdgCoverageState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing SDG data from {{ sdgCoverage()?.meta?.n }} of {{ sdgCoverage()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          @if (sdgHasAnyChips()) {
+          <div class="flex flex-col gap-2" aria-label="SDG coverage comparison">
+            @if (reportedAndDeclaredSdgs().length > 0) {
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">Reported &amp; declared:</span>
+              @for (sdg of reportedAndDeclaredSdgs(); track sdg.sdg_id) {
+              <span class="inline-flex items-center rounded-md border border-[var(--ac-light-blue-200)] bg-[var(--ac-light-blue-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-light-blue-500)]">
+                {{ sdg.short_name }} ({{ sdg.count }})
+              </span>
+              }
+            </div>
+            }
+            @if (declaredOnlySdgs().length > 0) {
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">Declared only:</span>
+              @for (sdg of declaredOnlySdgs(); track sdg.id) {
+              <span class="inline-flex items-center rounded-md border border-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-grey-700)]">
+                {{ sdg.label }}
+              </span>
+              }
+            </div>
+            }
+            @if (reportedOnlySdgs().length > 0) {
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="mr-1 font-['Space_Grotesk'] text-[11px] font-[600] uppercase tracking-wider text-[var(--ac-grey-600)]">Reported only:</span>
+              @for (sdg of reportedOnlySdgs(); track sdg.sdg_id) {
+              <span class="inline-flex items-center rounded-md border border-[var(--ac-green-200)] bg-[var(--ac-green-100)] px-2 py-0.5 font-['Barlow'] text-[12px] font-medium text-[var(--ac-green-700)]">
+                {{ sdg.short_name }} ({{ sdg.count }})
+              </span>
+              }
+            </div>
+            }
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No SDG rows are available to compare for these results.</p>
+          </div>
+          }
+        }
+      }
+    </div>
+
+    <!-- Evidence card -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="evidence">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Evidence</span>
+      @switch (evidenceState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading evidence details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="80px" borderRadius="8px" />
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load evidence data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading evidence data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ evidence()?.meta?.total_results ?? 0 }} results on this project have evidence recorded yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (evidenceState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing evidence data from {{ evidence()?.meta?.n }} of {{ evidence()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          <div class="grid grid-cols-3 gap-2">
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">With evidence</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ evidenceCoveragePercent() }}%</span>
+            </div>
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Public</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ evidence()?.public_count ?? 0 }}</span>
+            </div>
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Private</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ evidence()?.private_count ?? 0 }}</span>
+            </div>
+          </div>
+          @if (evidenceHasRoleRows()) {
+          <div data-slot="chart-placeholder" data-chart="evidence-role-bars" class="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
+            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Evidence counts per role render here.</span>
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No evidence role breakdown is available for these results.</p>
+          </div>
+          }
+        }
+      }
+    </div>
+
+    <!-- Review flow card -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="review-flow">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Review flow</span>
+      @switch (reviewFlowState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading review flow details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="80px" borderRadius="8px" />
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load review flow data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading review flow data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ reviewFlow()?.meta?.total_results ?? 0 }} results on this project have review history recorded yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (reviewFlowState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing review flow data from {{ reviewFlow()?.meta?.n }} of {{ reviewFlow()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          @if (reviewFlowHasDecisionRows()) {
+          <div data-slot="chart-placeholder" data-chart="review-flow-funnel" class="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
+            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Decision funnel renders here.</span>
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No decision breakdown is available for these results.</p>
+          </div>
+          }
+          <div class="grid grid-cols-3 gap-2">
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Median days</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ cycleTime()?.median_days ?? '—' }}</span>
+            </div>
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">P90 days</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ cycleTime()?.p90_days ?? '—' }}</span>
+            </div>
+            <div class="flex flex-col gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-2">
+              <span class="font-['Space_Grotesk'] text-[9.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Sample size</span>
+              <span class="font-['Space_Grotesk'] text-[18px] font-bold leading-none text-[var(--ac-primary-blue-600)]">{{ cycleTime()?.sample_size ?? 0 }}</span>
+            </div>
+          </div>
+          <p class="m-0 font-['Barlow'] text-[11.5px] leading-snug text-[var(--ac-grey-600)]">
+            {{ excludedForIncompleteHistory() }} results excluded from cycle time for incomplete history.
+          </p>
+        }
+      }
+    </div>
+
+    <!-- Contributing levers card -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="contributing-levers">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Contributing levers</span>
+      @switch (contributingLeversState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading contributing levers details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="120px" borderRadius="8px" />
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load contributing levers data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading contributing levers data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ contributingLevers()?.meta?.total_results ?? 0 }} results on this project report a contributing lever yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (contributingLeversState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing contributing lever data from {{ contributingLevers()?.meta?.n }} of {{ contributingLevers()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          @if (leversHasRows()) {
+          <div data-slot="chart-placeholder" data-chart="levers-bars" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
+            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Contributing levers by result count render here.</span>
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No contributing lever rows are available for these results.</p>
+          </div>
+          }
+        }
+      }
+    </div>
+
+    <!-- Keywords card -->
+    <div class="flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)] p-3" data-card="keywords">
+      <span class="font-['Space_Grotesk'] text-[10.5px] font-semibold uppercase tracking-wider text-[var(--ac-grey-600)]">Keywords</span>
+      @switch (keywordsState()) {
+        @case ('skeleton') {
+        <div class="flex flex-col gap-3 px-1 py-2" role="status" aria-live="polite" aria-label="Loading keywords details">
+          <p-skeleton width="60%" height="14px" borderRadius="4px" />
+          <p-skeleton width="100%" height="120px" borderRadius="8px" />
+        </div>
+        }
+        @case ('error') {
+        <div class="flex flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
+          <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
+          <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">We could not load keywords data. Please try again.</p>
+          <button pButton type="button" severity="secondary" size="small" class="!min-h-[44px] !min-w-[44px]"
+            aria-label="Retry loading keywords data" (click)="retry()">Try again</button>
+        </div>
+        }
+        @case ('empty') {
+        <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+          <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+            None of the {{ keywords()?.meta?.total_results ?? 0 }} results on this project report keywords yet.
+          </p>
+        </div>
+        }
+        @default {
+          @if (keywordsState() === 'sparse') {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-light-blue-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">
+              Showing keyword data from {{ keywords()?.meta?.n }} of {{ keywords()?.meta?.total_results }} results.
+            </p>
+          </div>
+          }
+          @if (keywordsHasRows()) {
+          <div data-slot="chart-placeholder" data-chart="keywords-treemap" class="flex min-h-[120px] items-center justify-center rounded-lg border border-dashed border-[var(--ac-grey-300)] px-3 py-6">
+            <span class="font-['Barlow'] text-[12px] text-[var(--ac-grey-600)]">Top 30 keywords treemap renders here.</span>
+          </div>
+          } @else {
+          <div class="flex items-start gap-2 rounded-lg border-l-[3px] border-l-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-2.5">
+            <i class="pi pi-info-circle mt-0.5 text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+            <p class="m-0 font-['Barlow'] text-[12.5px] leading-snug text-[var(--ac-grey-700)]">No keyword rows are available for these results.</p>
+          </div>
+          }
+        }
+      }
+    </div>
+
+  </div>
+</section>

@@ -204,3 +204,28 @@
 - **Requirements covered:** R-IN-003 service-level fetch/dedupe/retry rules; design §2.2, D-F4-3/D-F4-4.
 - **Final verification result:** full client suite green · eslint clean · K-004 reds observed.
 - **Gate note:** auto-approved (client chain pre-approval T-07→T-09; pause fixed at T-09 HITL).
+
+### T-08 — attempt 1 — **FAIL** (Reviewer)
+
+- **Date:** 2026-08-24 · effort high. Leader full client suite re-measure: 318 suites / 6752 tests PASS exit 0 — FAIL is clause conformance, not test-red.
+- **Issues (summary; full report relayed verbatim to attempt 2):**
+  1. Keyboard-focus lazy trigger structurally unreachable pre-load: `(focusin)` on a `<section>` with zero focusable descendants in skeleton state and no `tabindex` — only the spec's synthetic FocusEvent reaches it (violates R-IN-003 "or keyboard focus"; the F3 exemplar has real focusable tabs pre-load). Remediation: `tabindex="0"` on the section + spec asserting tab-order pre-load.
+  2. `declaredSdgs()` drops `'SDG 2'`-form strings (`Number('SDG 2')`=NaN→filtered) while sibling `sdgs()` handles them — silent chip misclassification (violates SDG scenario + D-F4-4 one-source-of-truth). Remediation: mirror the prefix-strip; named failing input `['SDG 2','13']` → red first.
+- **Advisories (recorded):** dark-mode chip contrast ≈2.35:1 (propagates F1 idiom; `tokens:validate` structurally cannot see it — KZ-017) **→ T-09 HITL checklist MANDATORY, chip groups incluidos**; K-004 red #3 deviation accepted but acceptance line names the Http mock — literal criterion to be satisfied in rework (provideHttpClientTesting + verify); R-IN-004 "F3 request count" unobservable in the stubbed harness → genuinely covered only by T-09 HITL (coverage table must not read as automated); `reachOverall` dead until T-09; evidence/cycle tiles already rendered (T-09 remaining = chart builders + tableModel).
+- **Clean (not to re-litigate):** tri-state exact; loadError-before-sectionFailed verified real; retry uses force; not_disaggregated separate; mount position; zero hex; zero "people/individuals"; OnPush/signals; budgets untouched.
+
+### T-08 — Insights component: laziness, tri-state, SDG chips, mount — **PASS** (attempt 2)
+
+- **Date:** 2026-08-24 · **Attempts:** 2 (attempt 1 FAIL above) · Skills: `angular-developer` + `ui-ux-pro-max` · Effort: high → xhigh (rework bump)
+- **Files (final):** `components/insights-section/insights-section.component.{ts,html,spec.ts}` (NEW — six cards, tri-state per design §5 r3, IntersectionObserver overridable member + `tabindex="0"` keyboard path, shared retry with force, SDG chip derivation, `not_disaggregated_rows` separate count, zero hex, "actor groups" copy); `contract-insights.interface.ts` (+semantics comment, +`DeclaredSdg`); `project-dashboard.component.{ts,html,spec.ts}` (mount + `declaredSdgs()` computed with `/^sdg\s*/i` prefix handling mirroring `sdgs()` — D-F4-4).
+- **Verification:** targeted jest 11 suites / 279 tests PASS (`--coverage=false`) · eslint clean · `npm run build` 0 errors · tsc-spec delta: 0 new errors (1 pre-existing out-of-diff at line 544) · **Leader re-measure: full client suite 318 suites / 6755 tests PASS, exit 0.**
+- **K-004 reds (5 across attempts):** load-in-ngOnInit → red; loadError-branch removal (second, honest mutation after the first was absorbed by a defensive fallback — reported) → `Expected: 6, Received: 0` red; tabindex removed → `Expected: 0, Received: -1` red; `['SDG 2','13']` vs unfixed code → red exactly as predicted; duplicate `load()` → `found 2 requests` red on the real-HTTP gate. K-004 deviation (attempt 1, SDG no-extra-request) superseded in attempt 2 by the literal Http-mock gate (`provideHttpClientTesting` + `expectNone` pre-trigger + exactly one GET + `verify()`).
+- **Reviewer verdict:** `STATUS: PASS` — both issues remediated behaviorally; component `.ts` blob byte-identical across attempts (template-only fix verified by blob hash); D-F4-4 agreement asserted on the same fixture for both computeds; HTTP-level proof replaces the spy inference.
+- **ADVISORY (recorded):**
+  1. `tabindex="0"` on non-interactive container = accepted cost (focus stop, default UA ring — WCAG 2.4.7 via default; `focus-visible` styling optional T-09 polish).
+  2. **→ T-09 HITL checklist (MANDATORY):** dark-mode chip contrast — "Reported only" pair ≈2.35:1 (F1 idiom ≈2.41:1, propagated not new); `tokens:validate` structurally blind to it (KZ-017) — light+dark HITL must NAME the chip groups.
+  3. **KZ-017:** R-IN-004 "F3 request count unchanged" unobservable in the stubbed harness — covered ONLY by T-09 HITL; coverage table must not read as automated.
+  4. `reachOverall` computed dead until T-09; evidence/cycle tiles already rendered → T-09 remaining client surface = chart builders + `tableModel` (+ HITL + gates).
+- **Requirements covered:** R-IN-003 (lazy incl. keyboard path, tri-state, SDG scenario all clauses, reach BUT-clause), R-IN-004 (automated half; HITL half → T-09); design §2.2/§5/§6, D-F4-3/D-F4-4.
+- **Final verification result:** full client suite green (6755/6755) · build 0 errors · eslint clean.
+- **Gate note:** auto-approved (client chain pre-approval; pause fixed at T-09 HITL).

@@ -21,6 +21,8 @@ import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-c
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
 import { NoDataGroupComponent, NoDataGroupItem } from '../no-data-group/no-data-group.component';
 import { IndicatorDeepDiveComponent } from '../indicator-deep-dive/indicator-deep-dive.component';
+import { InsightsSectionComponent } from '../insights-section/insights-section.component';
+import { DeclaredSdg } from '@shared/interfaces/contract-insights.interface';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
@@ -77,7 +79,8 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     SpAlignmentGraphComponent,
     NoDataGroupComponent,
     VizChartComponent,
-    IndicatorDeepDiveComponent
+    IndicatorDeepDiveComponent,
+    InsightsSectionComponent
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -219,6 +222,43 @@ export class ProjectDashboardComponent {
         return upper.startsWith('SDG') ? upper : `SDG ${str}`;
       })
       .filter((label): label is string => label !== null && label !== '');
+  });
+
+  // Contract-declared SDGs, id-preserving (R-IN-003 SDG comparison scenario,
+  // D-F4-4) — the same `project()?.sdgs` source as `sdgs()` above, but kept
+  // as `{id, label}` pairs so the Insights section can compare against
+  // `sdg_coverage.sdgs[].sdg_id` by numeric id, never by re-parsing a
+  // formatted "SDG N" string. Passed down as an input — NOT a new fetch.
+  readonly declaredSdgs = computed<DeclaredSdg[]>(() => {
+    const rawSdgs = this.project()?.sdgs;
+    if (!Array.isArray(rawSdgs) || rawSdgs.length === 0) {
+      return [];
+    }
+    return rawSdgs
+      .map(item => {
+        if (item === null || item === undefined) return null;
+        if (typeof item === 'object') {
+          const sdg = item as { id?: number | string; short_name?: string };
+          const id = typeof sdg.id === 'number' ? sdg.id : Number(sdg.id);
+          if (!Number.isFinite(id)) return null;
+          const label = sdg.short_name?.trim() || `SDG ${id}`;
+          return { id, label: label.toUpperCase() };
+        }
+        // Mirrors sdgs()'s primitive-string handling (D-F4-4 — one source of
+        // truth over the same field): strip a leading case-insensitive "SDG"
+        // prefix before parsing the id, so 'SDG 2' resolves the same numeric
+        // id as '2' (Reviewer FAIL #2 — Number('SDG 2') alone is NaN and
+        // silently drops the entry).
+        const str = String(item).trim();
+        if (!str) return null;
+        const withoutPrefix = str.replace(/^sdg\s*/i, '');
+        const id = Number(withoutPrefix);
+        if (!Number.isFinite(id)) return null;
+        const upper = str.toUpperCase();
+        const label = upper.startsWith('SDG') ? upper : `SDG ${str}`;
+        return { id, label };
+      })
+      .filter((sdg): sdg is DeclaredSdg => sdg !== null);
   });
 
   readonly cgiarEntities = computed<ContractCgiarEntity[]>(() => {

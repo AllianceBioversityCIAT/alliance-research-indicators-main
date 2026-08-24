@@ -104,11 +104,11 @@ graph TD
 - **Requirements covered:** R-IN-003 (lazy rules, tri-state, SDG scenario all clauses, reach not-disaggregated BUT), R-IN-004 scenario; design §2.2/§5/§6, D-F4-3/4.
 - **Files:** `components/insights-section/*` (NEW, +spec), `project-dashboard.component.html` (mount line + declared-SDGs input, +spec delta).
 - **Acceptance / done check:**
-  - [ ] Specs (KZ-015): zero fetch before intersection → one after → no re-fetch on further intersections (**failing input:** load in `ngOnInit` → fails).
-  - [ ] Per-card tri-state specs (null → error+retry; `n=0` → notice only; sparse → chart + "n of N").
-  - [ ] SDG derivation spec: declared {2,13} × reported {2,15} → ∩{2}, declared-only{13}, reported-only{15}; **no** additional HTTP request for SDGs (assert on the Http mock: only the insights call).
-  - [ ] R-IN-004 spec: F1 drill navigation + F3 panel request count unchanged with Insights mounted.
-- **Deps:** T-07 · **Effort:** L · **Status:** todo
+  - [x] Specs (KZ-015): zero fetch before intersection → one after → no re-fetch on further intersections (**failing input:** load in `ngOnInit` → fails).
+  - [x] Per-card tri-state specs (null → error+retry; `n=0` → notice only; sparse → chart + "n of N").
+  - [x] SDG derivation spec: declared {2,13} × reported {2,15} → ∩{2}, declared-only{13}, reported-only{15}; **no** additional HTTP request for SDGs (assert on the Http mock: only the insights call). *(Satisfied literally in attempt 2: real service + HttpTestingController.)*
+  - [x] R-IN-004 spec: F1 drill navigation + F3 panel request count unchanged with Insights mounted. *(Automated half; the F3-request-count clause is only observable at T-09 HITL — KZ-017 note in execution.md.)*
+- **Deps:** T-07 · **Effort:** L · **Status:** done — PASS attempt 2 (see execution.md)
 
 ### T-09 — Chart builders + full gates + HITL close
 

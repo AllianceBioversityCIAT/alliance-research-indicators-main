@@ -749,6 +749,14 @@
   </div>
   }
 
+  <!-- F4 Insights section (mount only — R-IN-003/004): after the F3 deep-dive
+       panel, before the pending-revision table (F1 order preserved
+       otherwise). Contract-declared SDGs come from the F1 hero's already-
+       loaded project data (`declaredSdgs()`) — no new fetch. -->
+  <app-insights-section
+    [contractId]="contractId()"
+    [declaredSdgs]="declaredSdgs()" />
+
   <!-- Pending revision results -->
   <section
     id="pending-revision-section"

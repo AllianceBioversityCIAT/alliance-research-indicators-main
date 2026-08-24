@@ -19,7 +19,9 @@ import { ResultsCenterTableComponent } from '../../../results-center/components/
 import { ResultsTrendCardComponent } from '../results-trend-card/results-trend-card.component';
 import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-graph.component';
 import { IndicatorDeepDiveComponent, IndicatorDeepDiveTab } from '../indicator-deep-dive/indicator-deep-dive.component';
+import { InsightsSectionComponent } from '../insights-section/insights-section.component';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
+import { DeclaredSdg } from '@shared/interfaces/contract-insights.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport, ContractSpAlignment } from '@shared/interfaces/contract-sp-alignment.interface';
 import { ContractDashboardReport, ContractDashboardTops } from '@shared/interfaces/contract-dashboard.interface';
@@ -60,6 +62,16 @@ class IndicatorDeepDiveStubComponent {
   @Input() contractId = '';
   @Input() indicators: IndicatorDeepDiveTab[] = [];
   @Input() loading = false;
+}
+
+@Component({
+  selector: 'app-insights-section',
+  standalone: true,
+  template: ''
+})
+class InsightsSectionStubComponent {
+  @Input() contractId = '';
+  @Input() declaredSdgs: DeclaredSdg[] = [];
 }
 
 @Component({
@@ -587,7 +599,8 @@ describe('ProjectDashboardComponent', () => {
             ResultsTrendCardComponent,
             SpAlignmentGraphComponent,
             VizChartComponent,
-            IndicatorDeepDiveComponent
+            IndicatorDeepDiveComponent,
+            InsightsSectionComponent
           ]
         },
         add: {
@@ -598,7 +611,8 @@ describe('ProjectDashboardComponent', () => {
             ResultsTrendCardStubComponent,
             SpAlignmentGraphStubComponent,
             VizChartStubComponent,
-            IndicatorDeepDiveStubComponent
+            IndicatorDeepDiveStubComponent,
+            InsightsSectionStubComponent
           ]
         }
       })
@@ -3056,6 +3070,88 @@ describe('ProjectDashboardComponent', () => {
         expect(firstTableLink.getAttribute('aria-label')).toContain('view filtered results');
       });
     });
+  });
+
+  describe('F4 Insights section mount (R-IN-003 mount, R-IN-004 no regression, D-F4-4)', () => {
+    it(
+      'declaredSdgs() parses the "SDG N" string shape that its sibling sdgs() already handles — never silently ' +
+        'drops it (Reviewer FAIL #2, failing input: sdgs = [\'SDG 2\', \'13\'] against the buggy Number(\'SDG 2\') ' +
+        'branch returns NaN for the first entry and yields only [{id:13,...}])',
+      async () => {
+        await setup('C-1', { projectData: { sdgs: ['SDG 2', '13'] as any } });
+
+        expect(component.sdgs()).toEqual(['SDG 2', 'SDG 13']);
+        expect(component.declaredSdgs()).toEqual([
+          { id: 2, label: 'SDG 2' },
+          { id: 13, label: 'SDG 13' }
+        ]);
+      }
+    );
+
+    const projectWithSdgs: GetProjectDetail = {
+      sdgs: [
+        { id: 2, short_name: 'SDG 2', full_name: 'Zero Hunger' },
+        { id: 13, short_name: 'SDG 13', full_name: 'Climate Action' }
+      ] as any
+    };
+
+    it('mounts app-insights-section after the F3 deep-dive panel, passing contractId and the id-preserving declared SDGs (no new fetch)', async () => {
+      await setup('C-1', { projectData: projectWithSdgs });
+
+      const insightsDebugEl = fixture.debugElement.query(By.css('app-insights-section'));
+      expect(insightsDebugEl).not.toBeNull();
+      const stub = insightsDebugEl.componentInstance as InsightsSectionStubComponent;
+      expect(stub.contractId).toBe('C-1');
+      expect(stub.declaredSdgs).toEqual([
+        { id: 2, label: 'SDG 2' },
+        { id: 13, label: 'SDG 13' }
+      ]);
+      expect(component.declaredSdgs()).toEqual(stub.declaredSdgs);
+    });
+
+    it(
+      'renders app-insights-section regardless of indicatorsEmpty() — it is not gated by the F3 panel\'s ' +
+        'visibility (F1 order preserved: after F3, before the pending-revision table)',
+      async () => {
+        await setup('C-1', { projectData: { ...projectWithSdgs, indicators: [] } });
+
+        expect(component.indicatorsEmpty()).toBe(true);
+        expect(fixture.nativeElement.querySelector('app-indicator-deep-dive')).toBeNull();
+        expect(fixture.nativeElement.querySelector('app-insights-section')).not.toBeNull();
+
+        const insightsEl = fixture.nativeElement.querySelector('app-insights-section');
+        const pendingSection = fixture.nativeElement.querySelector('#pending-revision-section');
+        expect(insightsEl).not.toBeNull();
+        expect(pendingSection).not.toBeNull();
+        // DOM order: Insights precedes the pending-revision table.
+        expect(insightsEl.compareDocumentPosition(pendingSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      }
+    );
+
+    it(
+      'leaves F1 drill navigation and the F3/dashboard request counts unchanged with Insights mounted ' +
+        '(R-IN-004 no-regression scenario — Insights issues no request of its own here since it is stubbed)',
+      async () => {
+        await setup('C-1', {
+          projectData: {
+            ...projectWithSdgs,
+            indicators: [{ indicator: { indicator_id: 1, name: 'Output' }, count_results: 6 } as any]
+          }
+        });
+
+        expect(getProjectDetailServiceMock.load).toHaveBeenCalledTimes(1);
+        expect(contractDashboardMock.load).toHaveBeenCalledTimes(1);
+        expect(fixture.nativeElement.querySelector('app-indicator-deep-dive')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('app-insights-section')).not.toBeNull();
+
+        const router = TestBed.inject(Router);
+        const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+        component.onIndicatorHeatmapClick({ data: [0, 0, 2] } as any);
+        expect(navSpy).toHaveBeenCalledWith(['/project-detail', 'C-1'], {
+          queryParams: { indicatorTab: 1 }
+        });
+      }
+    );
   });
 });
 

@@ -4,6 +4,10 @@ import { SectionMeta } from '@shared/interfaces/contract-indicator-details.inter
 // Reach (result_actors) — portfolio-wide gender x youth disaggregation
 // ---------------------------------------------------------------------------
 
+// Semantics (owner directive, T-08): every count here is a flagged
+// actor-group ROW count (`result_actors` rows), never a count of people or
+// individuals. UI copy consuming this shape MUST say "actor groups" — never
+// "people/individuals reached" — in labels, tooltips, and notices.
 export interface ReachDisaggregation {
   women_youth: number;
   women_not_youth: number;
@@ -130,4 +134,17 @@ export interface ContractInsightsReport {
   review_flow: ReviewFlowSection | null;
   contributing_levers: ContributingLeversSection | null;
   keywords: KeywordsSection | null;
+}
+
+// ---------------------------------------------------------------------------
+// Contract-declared SDG (F1 hero source, `GetProjectDetail.sdgs`) — the
+// client-side comparison set for the SDG coverage card's chip derivation
+// (R-IN-003 SDG comparison scenario). Never fetched separately from Insights
+// — the insights-section component receives this as an input from the data
+// the dashboard's F1 hero already loaded (D-F4-4).
+// ---------------------------------------------------------------------------
+
+export interface DeclaredSdg {
+  id: number;
+  label: string;
 }
