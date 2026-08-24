@@ -27,7 +27,9 @@ import {
   FunnelChart,
   FunnelSeriesOption,
   RadarChart,
-  RadarSeriesOption
+  RadarSeriesOption,
+  TreemapChart,
+  TreemapSeriesOption
 } from 'echarts/charts';
 import {
   TitleComponent,
@@ -61,6 +63,7 @@ echarts.use([
   PieChart,
   FunnelChart,
   RadarChart,
+  TreemapChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
@@ -88,6 +91,7 @@ export type EChartsOption = echarts.ComposeOption<
   | PieSeriesOption
   | FunnelSeriesOption
   | RadarSeriesOption
+  | TreemapSeriesOption
   | TitleComponentOption
   | TooltipComponentOption
   | GridComponentOption

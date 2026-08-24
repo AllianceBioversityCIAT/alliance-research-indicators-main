@@ -86,9 +86,9 @@ graph TD
 - **Requirements covered:** R-IN-003 (treemap registration + token clauses); NFR-IN-003 partial.
 - **Files:** `shared/components/viz-chart/viz-chart.component.ts` (+spec).
 - **Acceptance / done check:**
-  - [ ] `npm run tokens:validate` green (treemap label contrast on the sequential ramp); viz-chart specs + `npm run build` green.
-  - [ ] Presence caveat: registration ≠ rendered treemap → T-09 HITL.
-- **Deps:** none · **Effort:** S · **Status:** todo
+  - [x] `npm run tokens:validate` green (treemap label contrast on the sequential ramp); viz-chart specs + `npm run build` green.
+  - [x] Presence caveat: registration ≠ rendered treemap → T-09 HITL (recorded in execution.md; VisualMapComponent forward pointer carried).
+- **Deps:** none · **Effort:** S · **Status:** done
 
 ### T-07 — Client interface + API method + `GetContractInsightsService` 🔒 gate: F3 client landed
 

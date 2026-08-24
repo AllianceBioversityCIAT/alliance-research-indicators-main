@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from './viz-chart.component';
 import * as echarts from 'echarts/core';
-import { PieChart, FunnelChart, RadarChart } from 'echarts/charts';
+import { PieChart, FunnelChart, RadarChart, TreemapChart } from 'echarts/charts';
 import { RadarComponent } from 'echarts/components';
 
 let initialRegisteredModules: unknown[] = [];
@@ -336,9 +336,9 @@ describe('VizChartComponent (R-DA-006, R-DA-007, R-DA-009, D-DA-1)', () => {
   });
 
   describe('Module Registration & Chart Types (T-06 / R-DD-004)', () => {
-    it('registers PieChart, FunnelChart, RadarChart, and RadarComponent with echarts.use', () => {
+    it('registers PieChart, FunnelChart, RadarChart, TreemapChart, and RadarComponent with echarts.use', () => {
       expect(initialRegisteredModules).toEqual(
-        expect.arrayContaining([PieChart, FunnelChart, RadarChart, RadarComponent])
+        expect.arrayContaining([PieChart, FunnelChart, RadarChart, TreemapChart, RadarComponent])
       );
     });
 
@@ -463,6 +463,41 @@ describe('VizChartComponent (R-DA-006, R-DA-007, R-DA-009, D-DA-1)', () => {
                   value: [8, 6, 9],
                   name: 'Readiness Flags'
                 }
+              ]
+            })
+          ]
+        }),
+        true
+      );
+    });
+
+    it('accepts and applies Treemap chart options at runtime', () => {
+      const treemapOptions: EChartsOption = {
+        title: { text: 'Top Keywords' },
+        tooltip: { trigger: 'item', formatter: '{b}: {c}' },
+        series: [
+          {
+            type: 'treemap',
+            data: [
+              { name: 'irrigation', value: 42 },
+              { name: 'seed systems', value: 30 }
+            ]
+          }
+        ]
+      };
+
+      fixture.componentRef.setInput('options', treemapOptions);
+      fixture.componentRef.setInput('tableModel', mockTableModel);
+      fixture.detectChanges();
+
+      expect(mockChartInstance.setOption).toHaveBeenCalledWith(
+        expect.objectContaining({
+          series: [
+            expect.objectContaining({
+              type: 'treemap',
+              data: [
+                { name: 'irrigation', value: 42 },
+                { name: 'seed systems', value: 30 }
               ]
             })
           ]
