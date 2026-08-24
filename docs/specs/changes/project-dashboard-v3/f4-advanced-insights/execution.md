@@ -138,3 +138,30 @@
 - **Requirements covered:** R-IN-002 review row + messy-history scenario (all clauses), R-IN-001 labels clause for review_flow; design D-F4-2, D-F4-7, D-F4-8.
 - **Final verification result:** full server suite green (2516/2516) · eslint clean · tsc clean · all named reds observed.
 - **Gate note:** auto-approved (chain pre-approval T-02→T-05; the Pivot and the FAIL adjudication were the exceptions and both got explicit owner decisions).
+
+## Constitution Impact: T-03
+
+- **Module reshaped:** `result-review-history` gained a public constants surface (`constants/review-event-vocabulary.constants.ts`) — the canonical review vocabulary + labels + cycle-time anchors. It carries a **forward contract**: the future `bilateral.service.reviewDecision` implementation MUST import it and write `RESULT_SUBMITTED` + `REVIEW_DECISION` events (D-F4-7/D-F4-8).
+- **Child guide:** no new child CLAUDE.md needed; the server child guide is unaffected structurally.
+- **Docs owing update at archive sync:** TRD data-model/API notes should mention the canonical vocabulary; the archived bilateral spec's illustrative vocabulary comment is superseded by this constant (pointer, not edit — archive is point-in-time).
+- **CodeGraph re-index pending** (new files in two modules).
+
+### T-04 — attempt 1 — **FAIL** (Reviewer)
+
+- **Date:** 2026-08-24 · effort medium. Full-suite re-measure (Leader): 340 suites / 2527 tests PASS exit 0 — FAIL is coverage-convention conformance, not test-red.
+- **Issue (verbatim summary; full report relayed unchanged to attempt 2):** `agresso-contract.service.ts` gains public `getInsightsReport` but `agresso-contract.service.spec.ts` untouched — zero service-tier coverage, mock repository surface diverged. Violates tasks.md T-04 Files "(+specs)" + root `CLAUDE.md` §4.1 sibling-spec rule. Remediation: mock + describe block mirroring the sibling pass-through pattern (resolve + reject-propagation), K-004 red via `return null` mutation.
+- **Everything else adjudicated conformant:** D-F4-3 structurally impossible to violate (keys initialized null); allSettled idiom byte-for-byte F3; shared-total call check behavioral; isEmpty+trim deviation accepted (bare isEmpty provably misses `'   '`); Swagger/envelope/auth parity.
+- **Advisories (recorded):** test title asserts more than fixture builds (all-empty vs one-empty — rename or extend); `getInsightsTotalResults` awaited outside allSettled unguarded (raw driver 500 bypasses LoggerUtil — consider try/catch+rethrow); raw driver messages in `errors` = exact F2/F3 parity (family-wide if ever sanitized); guard divergence from ~25 bare-isEmpty sites (future `RequiredContractIdPipe` idea — recorded only).
+
+### T-04 — Composition `getInsightsReport` + service + controller + Swagger — **PASS** (attempt 2)
+
+- **Date:** 2026-08-24 · **Attempts:** 2 (attempt 1 FAIL above — missing service spec; attempt 2 effort high)
+- **Files (final):** `repositories/agresso-contract.repository.ts` (+`getInsightsTotalResults` private COUNT, +`getInsightsReport` public composition — allSettled, six keys always present per D-F4-3, null+error+`LoggerUtil` per rejected section, throw on all-six-rejected, isEmpty+trim guard), `agresso-contract.service.ts` (pass-through), `agresso-contract.controller.ts` (`GET reports/insights`, full Swagger, 400 guard, no `@Roles` — parity), + all three sibling specs.
+- **Verification:** targeted jest 5 suites / 211 tests PASS · eslint clean · tsc build clean (KZ-017: tsc excludes spec files; jest run covers them) · **Leader full-suite re-measure: 340 suites / 2529 tests PASS, exit 0.**
+- **K-004 reds (4 total across attempts):** omit-empty-section → red; rethrow-on-first-rejection → red; removed 400 guard → red; (attempt 2) service swallows rejection → `Resolved to value: null` red. All reverted to byte-identical backups, green after.
+- **Reviewer verdict:** `STATUS: PASS` — remediation faithful to the exemplar; production blobs byte-identical across attempts (no scope creep); isEmpty+trim deviation accepted (bare `isEmpty` provably misses `'   '`); D-F4-3 structurally unviolable (keys initialized null).
+- **Leader decisions recorded at dispatch:** (1) is_active asymmetry (SDG filters lookup, levers doesn't) left AS-IS deliberately — lever-chart semantic consistency with F1's shipped exemplar outweighs cross-section symmetry; (2) the 400 guard is THE validation point for the six guard-free private sections.
+- **ADVISORY (recorded):** delegate test's red only reachable via `return {data:null}` mutation (recorded, not owed); `getInsightsTotalResults` unguarded outside allSettled (raw driver 500 via GlobalExceptions, no LoggerUtil line) — **family-level follow-up alongside F2/F3**, not a T-04 reopen; raw driver messages in `errors` = F2/F3 parity; guard-style divergence from ~25 bare-isEmpty sites (`RequiredContractIdPipe` idea recorded).
+- **Requirements covered:** R-IN-001 full scenario (always-present, null-on-failure, never-omit, 400, Swagger); design §2.1/§4/§5, D-F4-3.
+- **Final verification result:** full server suite green (2529/2529) · eslint clean · tsc clean.
+- **Gate note:** auto-approved (chain pre-approval T-02→T-05).

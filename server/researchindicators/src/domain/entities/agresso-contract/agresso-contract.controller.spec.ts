@@ -46,6 +46,7 @@ describe('AgressoContractController', () => {
     getFundingTypes: jest.fn(),
     getContractDashboard: jest.fn(),
     getIndicatorDetailsReport: jest.fn(),
+    getInsightsReport: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -316,6 +317,160 @@ describe('AgressoContractController', () => {
       expect(operation).toMatchObject({
         summary:
           'Get per-indicator-type aggregates and reporting velocity for a contract',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'query',
+            name: 'contract-id',
+            required: true,
+          }),
+        ]),
+      );
+      expect(response).toBeDefined();
+    });
+  });
+
+  describe('getInsightsReport', () => {
+    const mockData = {
+      reach: {
+        meta: { total_results: 20, n: 12 },
+        overall: {
+          women_youth: 10,
+          women_not_youth: 20,
+          men_youth: 15,
+          men_not_youth: 25,
+          total: 70,
+        },
+        by_actor_type: [],
+        not_disaggregated_rows: 2,
+      },
+      sdg_coverage: {
+        meta: { total_results: 20, n: 8 },
+        sdgs: [
+          {
+            sdg_id: 2,
+            short_name: 'SDG 2',
+            full_name: 'Zero Hunger',
+            count: 5,
+          },
+        ],
+      },
+      evidence: {
+        meta: { total_results: 20, n: 6 },
+        results_with_evidence: 6,
+        evidences_total: 9,
+        public_count: 7,
+        private_count: 2,
+        by_role: [],
+      },
+      review_flow: {
+        meta: { total_results: 20, n: 0 },
+        by_event_type: [],
+        by_decision: [],
+        cycle_time: { median_days: null, p90_days: null, sample_size: 0 },
+        excluded_for_incomplete_history: 0,
+      },
+      contributing_levers: {
+        meta: { total_results: 20, n: 3 },
+        levers: [],
+      },
+      keywords: {
+        meta: { total_results: 20, n: 4 },
+        keywords: [{ keyword: 'soil health', count: 3 }],
+      },
+    };
+
+    it('should return contract insights report with all six sections present and errors', async () => {
+      const mockResult = { data: mockData, errors: [] };
+
+      mockAgressoContractService.getInsightsReport.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getInsightsReport('A511');
+
+      expect(mockAgressoContractService.getInsightsReport).toHaveBeenCalledWith(
+        'A511',
+      );
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract insights report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+      expect(result).toEqual({
+        description: 'Contract insights report retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+    });
+
+    it('should return partial failure errors when a section query fails', async () => {
+      const partialData = { ...mockData, reach: null };
+      const mockResult = {
+        data: partialData,
+        errors: ['reach: query timeout'],
+      };
+
+      mockAgressoContractService.getInsightsReport.mockResolvedValue(
+        mockResult,
+      );
+
+      const result = await controller.getInsightsReport('A511');
+
+      expect(mockAgressoContractService.getInsightsReport).toHaveBeenCalledWith(
+        'A511',
+      );
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Contract insights report retrieved successfully',
+        status: HttpStatus.OK,
+        data: partialData,
+        errors: ['reach: query timeout'],
+      });
+      expect(result).toEqual({
+        description: 'Contract insights report retrieved successfully',
+        status: HttpStatus.OK,
+        data: partialData,
+        errors: ['reach: query timeout'],
+      });
+    });
+
+    it('should throw BadRequestException when contract-id is empty or missing', async () => {
+      await expect(controller.getInsightsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.getInsightsReport('   ' as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.getInsightsReport(null as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        controller.getInsightsReport(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(
+        mockAgressoContractService.getInsightsReport,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should declare Swagger operation, query parameter, and response metadata', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getInsightsReport,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getInsightsReport,
+      );
+      const response = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        controller.getInsightsReport,
+      );
+
+      expect(operation).toMatchObject({
+        summary: 'Get cross-cutting portfolio insights for a contract',
       });
       expect(parameters).toEqual(
         expect.arrayContaining([

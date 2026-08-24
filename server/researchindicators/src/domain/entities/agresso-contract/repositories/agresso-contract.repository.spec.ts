@@ -4531,4 +4531,237 @@ describe('AgressoContractRepository', () => {
       expect(result.errors).toEqual([]);
     });
   });
+
+  describe('getInsightsReport (T-04 composition)', () => {
+    const mockReach: any = {
+      meta: { total_results: 20, n: 12 },
+      overall: {
+        women_youth: 10,
+        women_not_youth: 20,
+        men_youth: 15,
+        men_not_youth: 25,
+        total: 70,
+      },
+      by_actor_type: [],
+      not_disaggregated_rows: 2,
+    };
+    const mockSdgCoverage: any = {
+      meta: { total_results: 20, n: 8 },
+      sdgs: [
+        { sdg_id: 2, short_name: 'SDG 2', full_name: 'Zero Hunger', count: 5 },
+      ],
+    };
+    const mockEvidence: any = {
+      meta: { total_results: 20, n: 6 },
+      results_with_evidence: 6,
+      evidences_total: 9,
+      public_count: 7,
+      private_count: 2,
+      by_role: [],
+    };
+    // n = 0: the empty signal (D-F4-3) — key must remain present, never omitted.
+    const mockReviewFlow: any = {
+      meta: { total_results: 20, n: 0 },
+      by_event_type: [],
+      by_decision: [],
+      cycle_time: { median_days: null, p90_days: null, sample_size: 0 },
+      excluded_for_incomplete_history: 0,
+    };
+    const mockContributingLevers: any = {
+      meta: { total_results: 20, n: 3 },
+      levers: [],
+    };
+    const mockKeywords: any = {
+      meta: { total_results: 20, n: 4 },
+      keywords: [{ keyword: 'soil health', count: 3 }],
+    };
+
+    const spyAllSections = () => {
+      jest
+        .spyOn(repository as any, 'getInsightsTotalResults')
+        .mockResolvedValue(20);
+      const reachSpy = jest
+        .spyOn(repository as any, 'getReachSection')
+        .mockResolvedValue(mockReach);
+      const sdgSpy = jest
+        .spyOn(repository as any, 'getSdgCoverageSection')
+        .mockResolvedValue(mockSdgCoverage);
+      const evidenceSpy = jest
+        .spyOn(repository as any, 'getEvidenceSection')
+        .mockResolvedValue(mockEvidence);
+      const reviewFlowSpy = jest
+        .spyOn(repository as any, 'getReviewFlowSection')
+        .mockResolvedValue(mockReviewFlow);
+      const leversSpy = jest
+        .spyOn(repository as any, 'getContributingLeversSection')
+        .mockResolvedValue(mockContributingLevers);
+      const keywordsSpy = jest
+        .spyOn(repository as any, 'getKeywordsSection')
+        .mockResolvedValue(mockKeywords);
+      return {
+        reachSpy,
+        sdgSpy,
+        evidenceSpy,
+        reviewFlowSpy,
+        leversSpy,
+        keywordsSpy,
+      };
+    };
+
+    it('should throw BadRequestException when contractId is missing, null, undefined, or blank/whitespace', async () => {
+      const totalsSpy = jest.spyOn(
+        repository as any,
+        'getInsightsTotalResults',
+      );
+
+      await expect(repository.getInsightsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(repository.getInsightsReport(null as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        repository.getInsightsReport(undefined as any),
+      ).rejects.toThrow(BadRequestException);
+      await expect(repository.getInsightsReport('   ')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(totalsSpy).not.toHaveBeenCalled();
+    });
+
+    it('should compose all six sections, always present, over one shared totalResults', async () => {
+      const spies = spyAllSections();
+
+      const result = await repository.getInsightsReport('A511');
+
+      expect(result.data.reach).toEqual(mockReach);
+      expect(result.data.sdg_coverage).toEqual(mockSdgCoverage);
+      expect(result.data.evidence).toEqual(mockEvidence);
+      // n = 0 section: key present (not omitted), matching D-F4-3.
+      expect('review_flow' in result.data).toBe(true);
+      expect(result.data.review_flow).toEqual(mockReviewFlow);
+      expect(result.data.contributing_levers).toEqual(mockContributingLevers);
+      expect(result.data.keywords).toEqual(mockKeywords);
+      expect(result.errors).toEqual([]);
+
+      // Shared portfolio totalResults (D-F4-3) passed identically to all six.
+      expect(spies.reachSpy).toHaveBeenCalledWith('A511', 20);
+      expect(spies.sdgSpy).toHaveBeenCalledWith('A511', 20);
+      expect(spies.evidenceSpy).toHaveBeenCalledWith('A511', 20);
+      expect(spies.reviewFlowSpy).toHaveBeenCalledWith('A511', 20);
+      expect(spies.leversSpy).toHaveBeenCalledWith('A511', 20);
+      expect(spies.keywordsSpy).toHaveBeenCalledWith('A511', 20);
+    });
+
+    it('should never omit a key even when one section carries n = 0 (review_flow)', async () => {
+      spyAllSections();
+
+      const result = await repository.getInsightsReport('A511');
+
+      for (const key of [
+        'reach',
+        'sdg_coverage',
+        'evidence',
+        'review_flow',
+        'contributing_levers',
+        'keywords',
+      ]) {
+        expect(key in result.data).toBe(true);
+      }
+    });
+
+    it('should set a rejected section to null, log the error, and keep the others resolved', async () => {
+      const loggerSpy = jest
+        .spyOn(repository['logger'], '_error')
+        .mockImplementation();
+
+      jest
+        .spyOn(repository as any, 'getInsightsTotalResults')
+        .mockResolvedValue(20);
+      jest
+        .spyOn(repository as any, 'getReachSection')
+        .mockRejectedValue(new Error('reach query timeout'));
+      jest
+        .spyOn(repository as any, 'getSdgCoverageSection')
+        .mockResolvedValue(mockSdgCoverage);
+      jest
+        .spyOn(repository as any, 'getEvidenceSection')
+        .mockResolvedValue(mockEvidence);
+      jest
+        .spyOn(repository as any, 'getReviewFlowSection')
+        .mockResolvedValue(mockReviewFlow);
+      jest
+        .spyOn(repository as any, 'getContributingLeversSection')
+        .mockResolvedValue(mockContributingLevers);
+      jest
+        .spyOn(repository as any, 'getKeywordsSection')
+        .mockResolvedValue(mockKeywords);
+
+      const result = await repository.getInsightsReport('A511');
+
+      expect(result.data.reach).toBeNull();
+      expect('reach' in result.data).toBe(true);
+      expect(result.data.sdg_coverage).toEqual(mockSdgCoverage);
+      expect(result.errors).toEqual(['reach: reach query timeout']);
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Failed to get reach section for contract A511',
+        ),
+      );
+    });
+
+    it('should throw InternalServerErrorException when all six sections fail', async () => {
+      jest.spyOn(repository['logger'], '_error').mockImplementation();
+
+      jest
+        .spyOn(repository as any, 'getInsightsTotalResults')
+        .mockResolvedValue(20);
+      jest
+        .spyOn(repository as any, 'getReachSection')
+        .mockRejectedValue(new Error('e1'));
+      jest
+        .spyOn(repository as any, 'getSdgCoverageSection')
+        .mockRejectedValue(new Error('e2'));
+      jest
+        .spyOn(repository as any, 'getEvidenceSection')
+        .mockRejectedValue(new Error('e3'));
+      jest
+        .spyOn(repository as any, 'getReviewFlowSection')
+        .mockRejectedValue(new Error('e4'));
+      jest
+        .spyOn(repository as any, 'getContributingLeversSection')
+        .mockRejectedValue(new Error('e5'));
+      jest
+        .spyOn(repository as any, 'getKeywordsSection')
+        .mockRejectedValue(new Error('e6'));
+
+      await expect(repository.getInsightsReport('A511')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
+  });
+
+  describe('getInsightsTotalResults (private, F4 insights)', () => {
+    it('should query a single portfolio-wide count over the seed subquery', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([{ n: '17' }]);
+
+      const result = await repository['getInsightsTotalResults']('A511');
+
+      expect(repository.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = (repository.query as jest.Mock).mock.calls[0];
+      expect(sql).toContain('SELECT DISTINCT r.result_id');
+      expect(sql).toContain('SELECT COUNT(*) AS n');
+      expect(params).toEqual(['A511']);
+      expect(result).toBe(17);
+    });
+
+    it('should return 0 when the count query yields no rows', async () => {
+      (repository.query as jest.Mock).mockResolvedValueOnce([]);
+
+      const result = await repository['getInsightsTotalResults']('A511');
+
+      expect(result).toBe(0);
+    });
+  });
 });

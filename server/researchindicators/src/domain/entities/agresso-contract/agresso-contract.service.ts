@@ -186,6 +186,10 @@ export class AgressoContractService {
     );
   }
 
+  async getInsightsReport(contractId: string) {
+    return this._agressoContractRepository.getInsightsReport(contractId);
+  }
+
   async getGeoScopeReport(contractId: string, limit?: number) {
     return this._agressoContractRepository.getGeoScopeReport(contractId, limit);
   }

@@ -40,6 +40,7 @@ import { RolesGuard } from '../../shared/guards/roles.guard';
 import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ContractDashboardReportDto } from './dto/contract-dashboard-report.dto';
 import { ContractIndicatorDetailsReportDto } from './dto/contract-indicator-details-report.dto';
+import { ContractInsightsResponseDto } from './dto/contract-insights-report.dto';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -187,6 +188,34 @@ export class AgressoContractController {
     return ResponseUtils.format({
       data,
       description: 'Contract indicator details report retrieved successfully',
+      status: HttpStatus.OK,
+      errors,
+    });
+  }
+
+  @Get('reports/insights')
+  @ApiOperation({
+    summary: 'Get cross-cutting portfolio insights for a contract',
+  })
+  @ApiQuery({
+    name: 'contract-id',
+    required: true,
+    description: 'Contract ID',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ContractInsightsResponseDto,
+    description: 'Contract insights report retrieved successfully',
+  })
+  async getInsightsReport(@Query('contract-id') contractId: string) {
+    if (isEmpty(contractId) || isEmpty(contractId.trim())) {
+      throw new BadRequestException('contract-id query parameter is required');
+    }
+    const { data, errors } =
+      await this.agressoContractService.getInsightsReport(contractId);
+    return ResponseUtils.format({
+      data,
+      description: 'Contract insights report retrieved successfully',
       status: HttpStatus.OK,
       errors,
     });

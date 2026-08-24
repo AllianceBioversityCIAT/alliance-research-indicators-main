@@ -50,6 +50,7 @@ describe('AgressoContractService', () => {
     getFundingTypes: jest.fn(),
     getContractDashboard: jest.fn(),
     getIndicatorDetailsReport: jest.fn(),
+    getInsightsReport: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -726,6 +727,39 @@ describe('AgressoContractService', () => {
         BadRequestException,
       );
       expect(repository.getIndicatorDetailsReport).toHaveBeenCalledWith('');
+    });
+  });
+
+  describe('getInsightsReport', () => {
+    it('should delegate insights report retrieval to repository', async () => {
+      const mockResult = {
+        data: {
+          reach: null,
+          sdg_coverage: null,
+          evidence: null,
+          review_flow: null,
+          contributing_levers: null,
+          keywords: null,
+        },
+        errors: [],
+      };
+      mockRepository.getInsightsReport.mockResolvedValue(mockResult);
+
+      const result = await service.getInsightsReport('A100');
+
+      expect(repository.getInsightsReport).toHaveBeenCalledWith('A100');
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should propagate errors from repository', async () => {
+      mockRepository.getInsightsReport.mockRejectedValue(
+        new BadRequestException('contract_id is required'),
+      );
+
+      await expect(service.getInsightsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(repository.getInsightsReport).toHaveBeenCalledWith('');
     });
   });
 });

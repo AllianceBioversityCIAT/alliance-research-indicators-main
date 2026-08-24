@@ -67,9 +67,9 @@ graph TD
 - **Requirements covered:** R-IN-001 scenario (always-present sections, null-on-failure MUST, never-omit BUT, 400, Swagger); design §2.1/§4.
 - **Files:** repository composition, `agresso-contract.service.ts`, `agresso-contract.controller.ts` (+specs).
 - **Acceptance / done check:**
-  - [ ] Unit specs: all six keys present even when a section has `n = 0` (**failing input:** omit an empty section → fails); one-rejected → null + error entry + logger; all-rejected → throw; 400 on missing param.
-  - [ ] Server suite + eslint green.
-- **Deps:** T-01, T-02, T-03 · **Effort:** M · **Status:** todo
+  - [x] Unit specs: all six keys present even when a section has `n = 0` (**failing input:** omit an empty section → fails); one-rejected → null + error entry + logger; all-rejected → throw; 400 on missing param.
+  - [x] Server suite + eslint green (full suite 340/2529 by Leader re-measure; PASS attempt 2 — see execution.md).
+- **Deps:** T-01, T-02, T-03 · **Effort:** M · **Status:** done
 
 ### T-05 — HTTP-path integration spec (in-process, no infra) + dev ground-truth
 

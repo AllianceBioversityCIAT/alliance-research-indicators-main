@@ -79,6 +79,7 @@ import {
   ReportingVelocityItemDto,
 } from '../dto/contract-indicator-details-report.dto';
 import {
+  ContractInsightsReportDto,
   ContributingLeversSectionDto,
   EvidenceSectionDto,
   KeywordsSectionDto,
@@ -2668,6 +2669,155 @@ export class AgressoContractRepository
         total: Number(row.total ?? 0),
         count: Number(row.count ?? 0),
       })),
+    };
+  }
+
+  // ---------------------------------------------------------------------
+  // F4 Advanced Cross-Cutting Insights — composition (T-04)
+  // ---------------------------------------------------------------------
+
+  private async getInsightsTotalResults(contractId: string): Promise<number> {
+    const baseSubquery = this.buildPrimaryContractResultsSubquery();
+
+    const query = `
+      SELECT COUNT(*) AS n
+      FROM (${baseSubquery}) cr
+    `;
+
+    const rows = (await this.query(query, [contractId])) as Array<
+      Record<string, unknown>
+    >;
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async getInsightsReport(
+    contractId: string,
+  ): Promise<{ data: ContractInsightsReportDto; errors: string[] }> {
+    // Deliberate deviation from the bare isEmpty(contractId) exemplar idiom
+    // used elsewhere in this file: R-IN-001 requires "missing/blank -> 400"
+    // and this is THE validation point for all six sections (no private
+    // section method guards contractId — T-01 advisory 7 / Leader decision).
+    if (isEmpty(contractId) || isEmpty(contractId.trim())) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    // D-F4-3: all six sections are portfolio-wide (unlike F3's per-indicator
+    // sections), so the shared totalResults is computed ONCE and passed to
+    // every section query instead of recomputing it six times.
+    const totalResults = await this.getInsightsTotalResults(contractId);
+
+    const [
+      reachResult,
+      sdgCoverageResult,
+      evidenceResult,
+      reviewFlowResult,
+      contributingLeversResult,
+      keywordsResult,
+    ] = await Promise.allSettled([
+      this.getReachSection(contractId, totalResults),
+      this.getSdgCoverageSection(contractId, totalResults),
+      this.getEvidenceSection(contractId, totalResults),
+      this.getReviewFlowSection(contractId, totalResults),
+      this.getContributingLeversSection(contractId, totalResults),
+      this.getKeywordsSection(contractId, totalResults),
+    ]);
+
+    const errors: string[] = [];
+
+    // D-F4-3: sections are NEVER omitted — n = 0 is the empty signal, a
+    // rejected section is null (not absent). All six keys are always present.
+    const data: ContractInsightsReportDto = {
+      reach: null,
+      sdg_coverage: null,
+      evidence: null,
+      review_flow: null,
+      contributing_levers: null,
+      keywords: null,
+    };
+
+    let rejectedCount = 0;
+
+    if (reachResult.status === 'fulfilled') {
+      data.reach = reachResult.value;
+    } else {
+      rejectedCount++;
+      const err = reachResult.reason?.message ?? String(reachResult.reason);
+      errors.push(`reach: ${err}`);
+      this.logger._error(
+        `Failed to get reach section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (sdgCoverageResult.status === 'fulfilled') {
+      data.sdg_coverage = sdgCoverageResult.value;
+    } else {
+      rejectedCount++;
+      const err =
+        sdgCoverageResult.reason?.message ?? String(sdgCoverageResult.reason);
+      errors.push(`sdg_coverage: ${err}`);
+      this.logger._error(
+        `Failed to get SDG coverage section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (evidenceResult.status === 'fulfilled') {
+      data.evidence = evidenceResult.value;
+    } else {
+      rejectedCount++;
+      const err =
+        evidenceResult.reason?.message ?? String(evidenceResult.reason);
+      errors.push(`evidence: ${err}`);
+      this.logger._error(
+        `Failed to get evidence section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (reviewFlowResult.status === 'fulfilled') {
+      data.review_flow = reviewFlowResult.value;
+    } else {
+      rejectedCount++;
+      const err =
+        reviewFlowResult.reason?.message ?? String(reviewFlowResult.reason);
+      errors.push(`review_flow: ${err}`);
+      this.logger._error(
+        `Failed to get review flow section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (contributingLeversResult.status === 'fulfilled') {
+      data.contributing_levers = contributingLeversResult.value;
+    } else {
+      rejectedCount++;
+      const err =
+        contributingLeversResult.reason?.message ??
+        String(contributingLeversResult.reason);
+      errors.push(`contributing_levers: ${err}`);
+      this.logger._error(
+        `Failed to get contributing levers section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (keywordsResult.status === 'fulfilled') {
+      data.keywords = keywordsResult.value;
+    } else {
+      rejectedCount++;
+      const err =
+        keywordsResult.reason?.message ?? String(keywordsResult.reason);
+      errors.push(`keywords: ${err}`);
+      this.logger._error(
+        `Failed to get keywords section for contract ${contractId}: ${err}`,
+      );
+    }
+
+    if (rejectedCount === 6) {
+      throw new InternalServerErrorException(
+        'All insight section queries failed',
+      );
+    }
+
+    return {
+      data,
+      errors,
     };
   }
 
