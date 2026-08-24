@@ -7,6 +7,120 @@ import {
   GeoScopeMetric,
   GeoScopeSubNationalSummary
 } from '@interfaces/geo-scope-card.interface';
+import { ProjectDashboardRankedListItem } from '@interfaces/project-dashboard.interface';
+import { projectDashboardBarColor } from '@shared/constants/project-dashboard-chart-colors.constants';
+import { VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function extractTooltipParam(params: unknown): { dataIndex?: number; name?: string; value?: number } {
+  if (Array.isArray(params)) {
+    return (params[0] ?? {}) as { dataIndex?: number; name?: string; value?: number };
+  }
+  return (params ?? {}) as { dataIndex?: number; name?: string; value?: number };
+}
+
+/**
+ * Builds the shared horizontal-bar `EChartsOption` for a geo-scope ranking
+ * surface (regions / countries / sub-national levels), mirroring the F1
+ * rankings builder family in `project-dashboard.component.ts` (partner /
+ * lever / contact / contributor cards) — one bar chart engine everywhere
+ * (R-DN-002, D-DN-6 OQ-2-A).
+ */
+function buildGeoRankingChartOptions(items: readonly ProjectDashboardRankedListItem[], caption: string): EChartsOption | null {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    grid: {
+      top: 8,
+      bottom: 8,
+      left: 8,
+      right: 28,
+      containLabel: true
+    },
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: unknown) => {
+        const p = extractTooltipParam(params);
+        const idx = p.dataIndex ?? 0;
+        const item = items[idx];
+        const name = item?.label ?? p.name ?? '';
+        const count = item?.count ?? p.value ?? 0;
+        return `<strong>${escapeHtml(name)}</strong><br/>Results: ${count}`;
+      }
+    },
+    xAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLabel: {
+        color: 'var(--ac-grey-700)',
+        fontFamily: 'Barlow'
+      },
+      splitLine: {
+        lineStyle: { color: 'var(--ac-grey-200)' }
+      }
+    },
+    yAxis: {
+      type: 'category',
+      data: items.map(item => item.label),
+      inverse: true,
+      axisTick: { show: false },
+      axisLine: {
+        lineStyle: { color: 'var(--ac-grey-300)' }
+      },
+      axisLabel: {
+        color: 'var(--ac-grey-700)',
+        fontFamily: 'Barlow',
+        width: 120,
+        overflow: 'truncate'
+      }
+    },
+    series: [
+      {
+        type: 'bar',
+        name: caption,
+        cursor: 'default',
+        data: items.map((item, index) => ({
+          value: item.count,
+          itemStyle: {
+            color: projectDashboardBarColor(index, items.length),
+            borderRadius: [0, 4, 4, 0]
+          }
+        })),
+        label: {
+          show: true,
+          position: 'right',
+          color: 'var(--ac-grey-800)',
+          fontFamily: 'Barlow'
+        }
+      }
+    ]
+  };
+}
+
+function buildGeoRankingTableModel(
+  items: readonly ProjectDashboardRankedListItem[],
+  caption: string,
+  labelHeader: string
+): VizChartTableModel | null {
+  if (items.length === 0) {
+    return null;
+  }
+  return {
+    caption,
+    headers: [labelHeader, 'Results'],
+    rows: items.map(item => [item.label, item.count])
+  };
+}
 
 @Component({
   selector: 'app-geo-scope-card',
@@ -109,5 +223,29 @@ export class GeoScopeCardComponent {
       label: subNational.label,
       count: subNational.count
     }))
+  );
+
+  readonly regionTableModel = computed<VizChartTableModel | null>(() =>
+    buildGeoRankingTableModel(this.topRegions(), 'Top regions', 'Region')
+  );
+
+  readonly regionChartOptions = computed<EChartsOption | null>(() =>
+    buildGeoRankingChartOptions(this.topRegions(), 'Top regions')
+  );
+
+  readonly countryTableModel = computed<VizChartTableModel | null>(() =>
+    buildGeoRankingTableModel(this.topCountryItems(), 'Top countries', 'Country')
+  );
+
+  readonly countryChartOptions = computed<EChartsOption | null>(() =>
+    buildGeoRankingChartOptions(this.topCountryItems(), 'Top countries')
+  );
+
+  readonly subNationalTableModel = computed<VizChartTableModel | null>(() =>
+    buildGeoRankingTableModel(this.topSubNationalItems(), 'Top sub-national levels', 'Sub-national level')
+  );
+
+  readonly subNationalChartOptions = computed<EChartsOption | null>(() =>
+    buildGeoRankingChartOptions(this.topSubNationalItems(), 'Top sub-national levels')
   );
 }

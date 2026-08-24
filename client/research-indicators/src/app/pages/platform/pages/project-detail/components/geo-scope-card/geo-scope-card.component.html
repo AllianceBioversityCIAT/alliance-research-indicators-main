@@ -29,8 +29,8 @@
         <div class="min-w-0">
           <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ac-primary-blue-600)]">Top
             regions</h3>
-          <app-project-dashboard-card variant="list" [items]="topRegions()" layout="rows-partners" barHeightClass="h-4"
-            [itemHeightPx]="18"></app-project-dashboard-card>
+          <app-project-dashboard-card variant="list" title="Top regions" [items]="topRegions()" layout="viz-bar"
+            [options]="regionChartOptions()" [tableModel]="regionTableModel()"></app-project-dashboard-card>
         </div>
         }
 
@@ -38,8 +38,8 @@
         <div class="min-w-0">
           <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ac-primary-blue-600)]">Top
             countries</h3>
-          <app-project-dashboard-card variant="list" [items]="topCountryItems()" layout="rows-partners"
-            barHeightClass="h-4" [itemHeightPx]="18"></app-project-dashboard-card>
+          <app-project-dashboard-card variant="list" title="Top countries" [items]="topCountryItems()" layout="viz-bar"
+            [options]="countryChartOptions()" [tableModel]="countryTableModel()"></app-project-dashboard-card>
         </div>
         }
 
@@ -47,8 +47,8 @@
         <div class="min-w-0">
           <h3 class="mb-2 mt-0 font-['Barlow'] text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ac-primary-blue-600)]">Top
             sub-national levels</h3>
-          <app-project-dashboard-card variant="list" [items]="topSubNationalItems()" layout="rows-partners"
-            barHeightClass="h-4" [itemHeightPx]="18"></app-project-dashboard-card>
+          <app-project-dashboard-card variant="list" title="Top sub-national levels" [items]="topSubNationalItems()"
+            layout="viz-bar" [options]="subNationalChartOptions()" [tableModel]="subNationalTableModel()"></app-project-dashboard-card>
         </div>
         }
       </div>

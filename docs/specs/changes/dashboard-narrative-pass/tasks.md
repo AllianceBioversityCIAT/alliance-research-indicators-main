@@ -54,9 +54,9 @@ graph TD
 - **Files:** `project-dashboard-card.component.{ts,html,spec.ts}`; geo top-N region (per T-02 inventory); builders reuse F1 rankings family.
 - **Acceptance / done check:**
   - [ ] Pills markup replaced by `app-viz-chart` horizontal bars with `tableModel` + accessible names; server order passed through; tokens only (**failing input:** any hex or `[style.width.%]` data bar surviving in the migrated surfaces → grep red).
-  - [ ] **Pill specs migrated in the SAME task** (`partnerBarWidthPercent`/`fillPercent`/`barColor` assertions → builder-output assertions, KZ-001 live-shaped fixtures); no orphaned or deleted-without-replacement test (**disqualifier:** test count on these surfaces decreasing without equivalent builder specs).
-  - [ ] Targeted jest `--coverage=false` + eslint green.
-- **Deps:** T-02 · **Effort:** L · **Status:** todo
+  - [x] **Pill specs migrated in the SAME task** (`partnerBarWidthPercent`/`fillPercent`/`barColor` assertions → builder-output assertions, KZ-001 live-shaped fixtures); no orphaned or deleted-without-replacement test (**disqualifier:** test count on these surfaces decreasing without equivalent builder specs).
+  - [x] Targeted jest `--coverage=false` + eslint green.
+- **Deps:** T-02 · **Effort:** L · **Status:** done — PASS attempt 1
 
 ### T-04 — Status semaphore into hero (OQ-1-A)
 

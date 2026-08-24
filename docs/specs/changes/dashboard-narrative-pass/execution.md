@@ -93,3 +93,18 @@
 - **Reviewer scope declaration (KZ-017):** read-only audit; jest/eslint claims stand on the implementer's runs; `strictTemplates` on the `[class.border-…]` binding form only provable by `npm run build` → T-07's battery covers it.
 - **Requirements covered:** R-DN-002 a11y AND, R-DN-004 states BUT; design D-DN-6 OQ-1-A, reversion challenge 1.
 - **Gate note:** auto-approved (owner fast-mode chain).
+
+### T-03 — Rankings migration to viz-chart (OQ-2-A) — **PASS** (attempt 1)
+
+- **Date:** 2026-08-24 · Skills: `angular-developer` + `ui-ux-pro-max` · Effort: medium
+- **Files:** `geo-scope-card.component.{ts,html,spec.ts}` only — 3 callers switched to explicit `layout="viz-bar"` with file-local builder helpers (exemplar's are private/unexported); `project-dashboard-card.*` untouched (pointer 2 honored).
+- **Verification:** targeted 2 suites / 20 tests (`--coverage=false`) · eslint clean · K-004 reds: dropped-layout → `Expected: "viz-bar" / Received: ""` red (pointer-1 pinned); hex/width-% grep clean AND proven capable against a synthetic pill string.
+- **Reviewer verdict:** `STATUS: PASS` — verified independently: test counts reconcile (14+6, zero deletions — disqualifier not tripped; reversion-challenge-2 vacuous, pill specs still exercise live methods); accessible-name chain traced end-to-end; `rows-partners` caller count now zero in production; all 5 decisions match exemplar conventions.
+- **ADVISORY (recorded):**
+  1. **→ T-07 HITL (MANDATORY):** the viz-bar builder family (these 3 geo bars AND the 4 already-shipped F1 rankings) feeds `var(--…)` colors into echarts options — the same silent-SVG-attribute trap D-DN-5 fixed for the trend. HITL must state explicitly whether all bars paint in token colors (not black/default) in light AND dark; a negative opens a follow-up over all 7 surfaces (outside this spec) and relocates the 2 pinning assertions.
+  2. Unreachable-layout follow-up list is now THREE (`rows-partners` joins `columns` + default) — recorded here; T-06's §8 entry stands (it declares idioms by what renders).
+  3. **→ T-07 HITL:** narrow-breakpoint look at act 3 (label width 120 + 200px height copied from a full-width host into a third-width column — jsdom can't evaluate, KZ-017).
+  4. `escapeHtml`/`extractTooltipParam` duplicated (only in-scope option); natural later home `shared/utils/chart-tooltip.util.ts` — outside this spec.
+  5. Evidence hygiene: jest line omitted package root (adjudicated unambiguous); `listCards[2]` identity assertion one line short (non-null+title covered) — recorded.
+- **Requirements covered:** R-DN-002 migration half + zero-hex BUT + a11y AND; design §2.2/§6, D-DN-6.
+- **Gate note:** auto-approved (owner fast-mode chain).
