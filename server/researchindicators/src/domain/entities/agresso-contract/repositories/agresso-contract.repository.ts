@@ -65,6 +65,10 @@ import {
   ContractSpAlignmentReportDto,
   ContractSpAlignmentSpDto,
 } from '../dto/contract-sp-alignment-report.dto';
+import {
+  ContractLeverSpFlowLinkDto,
+  ContractLeverSpFlowsDto,
+} from '../dto/contract-lever-sp-flows.dto';
 import { ContractDashboardReportDto } from '../dto/contract-dashboard-report.dto';
 import {
   CapacitySharingDetailsDto,
@@ -1384,6 +1388,208 @@ export class AgressoContractRepository
     };
   }
 
+  async getLeverSpFlowsReport(
+    contractId: string,
+  ): Promise<ContractLeverSpFlowsDto> {
+    if (isEmpty(contractId)) {
+      throw new BadRequestException('contract_id is required');
+    }
+
+    const primaryContractResultsSubquery =
+      this.buildPrimaryContractResultsSubquery();
+
+    // Lever → SP links, aligned arm: one link per (lever, sp, role) with a
+    // resolvable active SP. INNER JOIN all the way through
+    // clarisa_science_programs so a dangling alignment row (active row
+    // pointing at a deactivated/absent SP) can never surface here — it falls
+    // through to the unaligned arm below instead.
+    const leverAlignedLinksQuery = `
+      SELECT
+        clarisa_lever.id AS lever_id,
+        clarisa_lever.short_name AS lever_short_name,
+        clarisa_lever.full_name AS lever_full_name,
+        csp.official_code AS sp_code,
+        csp.name AS sp_name,
+        rpfas.sp_role AS role,
+        COUNT(DISTINCT primary_results.result_id) AS count
+      FROM (${primaryContractResultsSubquery}) primary_results
+      INNER JOIN result_levers result_lever
+        ON result_lever.result_id = primary_results.result_id
+        AND result_lever.is_primary = TRUE
+        AND result_lever.is_active = TRUE
+      INNER JOIN clarisa_levers clarisa_lever
+        ON clarisa_lever.id = result_lever.lever_id
+      INNER JOIN result_pool_funding_alignment rpfa
+        ON rpfa.result_id = primary_results.result_id
+        AND rpfa.is_active = TRUE
+      INNER JOIN result_pool_funding_alignment_sp rpfas
+        ON rpfas.alignment_id = rpfa.id
+        AND rpfas.is_active = TRUE
+      INNER JOIN clarisa_science_programs csp
+        ON csp.official_code = rpfas.sp_code
+        AND csp.is_active = TRUE
+      GROUP BY
+        clarisa_lever.id,
+        clarisa_lever.short_name,
+        clarisa_lever.full_name,
+        csp.official_code,
+        csp.name,
+        rpfas.sp_role
+      ORDER BY clarisa_lever.id, csp.official_code
+    `;
+
+    // "Does a resolvable active SP alignment exist for this result" —
+    // the single anti-join predicate shared, byte-identical, by BOTH
+    // unaligned arms below (lever and no-lever). Sharing it guarantees every
+    // unaligned result lands in exactly one ARM (no gap, no double-home);
+    // DD-9's equality (Σ(unaligned link counts) === results_without_alignment)
+    // can still exceed on data carrying >1 active primary lever per result
+    // (no unique index on result_levers(result_id, is_primary)) — verified
+    // live at T-05. Never decide "unaligned" from a row-level NULL after a
+    // LEFT JOIN — a result with one resolvable and one unresolvable
+    // alignment row would leak into both arms at once.
+    const resolvableActiveSpAlignmentExists = `
+      SELECT 1
+      FROM result_pool_funding_alignment rpfa
+      INNER JOIN result_pool_funding_alignment_sp rpfas
+        ON rpfas.alignment_id = rpfa.id
+        AND rpfas.is_active = TRUE
+      INNER JOIN clarisa_science_programs csp
+        ON csp.official_code = rpfas.sp_code
+        AND csp.is_active = TRUE
+      WHERE rpfa.result_id = primary_results.result_id
+        AND rpfa.is_active = TRUE
+    `;
+
+    // Lever → Unaligned remainder, one link per lever.
+    const leverUnalignedLinksQuery = `
+      SELECT
+        clarisa_lever.id AS lever_id,
+        clarisa_lever.short_name AS lever_short_name,
+        clarisa_lever.full_name AS lever_full_name,
+        COUNT(DISTINCT primary_results.result_id) AS count
+      FROM (${primaryContractResultsSubquery}) primary_results
+      INNER JOIN result_levers result_lever
+        ON result_lever.result_id = primary_results.result_id
+        AND result_lever.is_primary = TRUE
+        AND result_lever.is_active = TRUE
+      INNER JOIN clarisa_levers clarisa_lever
+        ON clarisa_lever.id = result_lever.lever_id
+      WHERE NOT EXISTS (
+        ${resolvableActiveSpAlignmentExists}
+      )
+      GROUP BY
+        clarisa_lever.id,
+        clarisa_lever.short_name,
+        clarisa_lever.full_name
+      ORDER BY clarisa_lever.id
+    `;
+
+    // "No lever" pseudo-source: primary results with NO active primary lever
+    // (anti-join, mirrors the lever arm's result_lever.result_id IS NULL)
+    // AND no resolvable active SP alignment (the identical NOT EXISTS
+    // predicate above — every unaligned result gets exactly one home).
+    // A result_levers row with is_primary/is_active TRUE but a NULL
+    // lever_id would fall through both arms; lever_id is `nullable: false`
+    // at the column level (result-lever.entity.ts), so that row cannot
+    // exist and this branch is unreachable, not merely unhandled.
+    const noLeverUnalignedQuery = `
+      SELECT
+        COUNT(DISTINCT primary_results.result_id) AS count
+      FROM (${primaryContractResultsSubquery}) primary_results
+      LEFT JOIN result_levers result_lever
+        ON result_lever.result_id = primary_results.result_id
+        AND result_lever.is_primary = TRUE
+        AND result_lever.is_active = TRUE
+      WHERE result_lever.result_id IS NULL
+        AND NOT EXISTS (
+          ${resolvableActiveSpAlignmentExists}
+        )
+    `;
+
+    // Distinct-count totals, lever-agnostic (never a sum of link counts).
+    const countQuery = `
+      SELECT
+        COUNT(DISTINCT primary_results.result_id) AS total_results,
+        COUNT(DISTINCT CASE
+          WHEN csp.official_code IS NOT NULL THEN primary_results.result_id
+        END) AS results_with_alignment
+      FROM (${primaryContractResultsSubquery}) primary_results
+      LEFT JOIN result_pool_funding_alignment rpfa
+        ON rpfa.result_id = primary_results.result_id
+        AND rpfa.is_active = TRUE
+      LEFT JOIN result_pool_funding_alignment_sp rpfas
+        ON rpfas.alignment_id = rpfa.id
+        AND rpfas.is_active = TRUE
+      LEFT JOIN clarisa_science_programs csp
+        ON csp.official_code = rpfas.sp_code
+        AND csp.is_active = TRUE
+    `;
+
+    const [alignedLinkRows, unalignedLinkRows, noLeverRows, countRows] =
+      await Promise.all([
+        this.query(leverAlignedLinksQuery, [contractId]),
+        this.query(leverUnalignedLinksQuery, [contractId]),
+        this.query(noLeverUnalignedQuery, [contractId]),
+        this.query(countQuery, [contractId]),
+      ]);
+
+    const links: ContractLeverSpFlowLinkDto[] = (
+      alignedLinkRows as Array<Record<string, unknown>>
+    ).map((row) => ({
+      lever_id: Number(row.lever_id),
+      lever_short_name: String(row.lever_short_name ?? ''),
+      lever_full_name: String(row.lever_full_name ?? ''),
+      sp_code: String(row.sp_code),
+      sp_name: String(row.sp_name ?? ''),
+      role: (row.role as 'PRIMARY' | 'CONTRIBUTING' | null) ?? 'UNKNOWN',
+      count: Number(row.count ?? 0),
+    }));
+
+    for (const row of unalignedLinkRows as Array<Record<string, unknown>>) {
+      links.push({
+        lever_id: Number(row.lever_id),
+        lever_short_name: String(row.lever_short_name ?? ''),
+        lever_full_name: String(row.lever_full_name ?? ''),
+        sp_code: null,
+        sp_name: null,
+        role: null,
+        count: Number(row.count ?? 0),
+      });
+    }
+
+    const noLeverCount = Number(
+      (noLeverRows as Array<Record<string, unknown>>)[0]?.count ?? 0,
+    );
+    if (noLeverCount > 0) {
+      links.push({
+        lever_id: null,
+        lever_short_name: 'No lever',
+        lever_full_name: 'No lever',
+        sp_code: null,
+        sp_name: null,
+        role: null,
+        count: noLeverCount,
+      });
+    }
+
+    const summaryRow = (countRows as Array<Record<string, unknown>>)[0] ?? {};
+    const resultsTotal = Number(summaryRow.total_results ?? 0);
+    const resultsWithAlignment = Number(summaryRow.results_with_alignment ?? 0);
+    const resultsWithoutAlignment = Math.max(
+      0,
+      resultsTotal - resultsWithAlignment,
+    );
+
+    return {
+      contract_id: contractId,
+      results_total: resultsTotal,
+      results_with_alignment: resultsWithAlignment,
+      results_without_alignment: resultsWithoutAlignment,
+      links,
+    };
+  }
+
   async getContractDashboard(
     contractId: string,
   ): Promise<{ data: ContractDashboardReportDto; errors: string[] }> {
@@ -1399,6 +1605,7 @@ export class AgressoContractRepository
       contributorsResult,
       geoScopeResult,
       spAlignmentResult,
+      leverSpFlowsResult,
     ] = await Promise.allSettled([
       this.getResultsSummaryReport(contractId),
       this.getTopPartnersReport(contractId),
@@ -1407,6 +1614,7 @@ export class AgressoContractRepository
       this.getTopContributorsReport(contractId),
       this.getGeoScopeReport(contractId),
       this.getSpAlignmentReport(contractId),
+      this.getLeverSpFlowsReport(contractId),
     ]);
 
     const errors: string[] = [];
@@ -1467,6 +1675,14 @@ export class AgressoContractRepository
           ),
           null);
 
+    const lever_sp_flows =
+      leverSpFlowsResult.status === 'fulfilled'
+        ? (leverSpFlowsResult.value ?? null)
+        : (errors.push(
+            `lever_sp_flows: ${leverSpFlowsResult.reason?.message ?? leverSpFlowsResult.reason}`,
+          ),
+          null);
+
     return {
       data: {
         summary,
@@ -1478,6 +1694,7 @@ export class AgressoContractRepository
         },
         geo_scope,
         sp_alignment,
+        lever_sp_flows,
       },
       errors,
     };

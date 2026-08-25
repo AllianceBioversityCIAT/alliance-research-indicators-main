@@ -6,6 +6,7 @@ import { ContributorContractCountDto } from './reports-contributors.dto';
 import { ContractResultsSummaryReportDto } from './contract-results-summary-report.dto';
 import { ContractGeoScopeReportDto } from './reports-contracts.dto';
 import { ContractSpAlignmentReportDto } from './contract-sp-alignment-report.dto';
+import { ContractLeverSpFlowsDto } from './contract-lever-sp-flows.dto';
 
 export class ContractDashboardTopsDto {
   @ApiProperty({
@@ -74,4 +75,12 @@ export class ContractDashboardReportDto {
       'Science Program alignments breakdown (null for non-bilateral contracts)',
   })
   sp_alignment!: ContractSpAlignmentReportDto | null;
+
+  @ApiProperty({
+    type: ContractLeverSpFlowsDto,
+    nullable: true,
+    description:
+      'Lever → Science Program flow links for the SP Alignments Sankey (null on sub-report failure)',
+  })
+  lever_sp_flows!: ContractLeverSpFlowsDto | null;
 }

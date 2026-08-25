@@ -1865,6 +1865,300 @@ describe('AgressoContractRepository', () => {
     });
   });
 
+  describe('getLeverSpFlowsReport', () => {
+    it('should throw BadRequestException when contract id is empty', async () => {
+      await expect(repository.getLeverSpFlowsReport('')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    // Call order matches production: leverAlignedLinksQuery,
+    // leverUnalignedLinksQuery, noLeverUnalignedQuery, countQuery.
+    it('maps two aligned-arm rows for one lever to two role-links (row→link fidelity; SQL GROUP BY shape is pinned separately below)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-01',
+            sp_name: 'Science Program 1',
+            role: 'PRIMARY',
+            count: 1,
+          },
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-02',
+            sp_name: 'Science Program 2',
+            role: 'CONTRIBUTING',
+            count: 1,
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([
+          { total_results: 1, results_with_alignment: 1 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      expect(result.links).toHaveLength(2);
+      expect(result.links).toEqual([
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever One',
+          sp_code: 'SP-01',
+          sp_name: 'Science Program 1',
+          role: 'PRIMARY',
+          count: 1,
+        },
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever One',
+          sp_code: 'SP-02',
+          sp_name: 'Science Program 2',
+          role: 'CONTRIBUTING',
+          count: 1,
+        },
+      ]);
+    });
+
+    it('maps one unaligned-arm row to exactly one unaligned link for a lever that also has an aligned row (row→link fidelity; the clause guaranteeing at most one unaligned row per lever is pinned in the SQL-text test below)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-01',
+            sp_name: 'Science Program 1',
+            role: 'PRIMARY',
+            count: 1,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            count: 1,
+          },
+        ])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([
+          { total_results: 2, results_with_alignment: 1 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      const unalignedLinksForLever1 = result.links.filter(
+        (link) => link.lever_id === 1 && link.sp_code === null,
+      );
+      expect(unalignedLinksForLever1).toHaveLength(1);
+      expect(result.links).toEqual([
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever One',
+          sp_code: 'SP-01',
+          sp_name: 'Science Program 1',
+          role: 'PRIMARY',
+          count: 1,
+        },
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever One',
+          sp_code: null,
+          sp_name: null,
+          role: null,
+          count: 1,
+        },
+      ]);
+      // The result the chip counts as aligned (results_with_alignment: 1)
+      // is not the same result the unaligned link counts — Σ(unaligned
+      // links) === results_without_alignment (DD-9) still holds: 1 === 1.
+      expect(result.results_without_alignment).toBe(1);
+    });
+
+    it('should place a no-lever unaligned result under the "No lever" pseudo-source (row→link append fidelity; the count is sourced from a dedicated no-lever query, using the same anti-join predicate as the lever-unaligned arm)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: 1 }])
+        .mockResolvedValueOnce([
+          { total_results: 1, results_with_alignment: 0 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      expect(result.links).toEqual([
+        {
+          lever_id: null,
+          lever_short_name: 'No lever',
+          lever_full_name: 'No lever',
+          sp_code: null,
+          sp_name: null,
+          role: null,
+          count: 1,
+        },
+      ]);
+      expect(result.results_without_alignment).toBe(1);
+    });
+
+    it('should keep Σ(unaligned link counts) === results_without_alignment across per-lever and "No lever" unaligned links (DD-9)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-01',
+            sp_name: 'Science Program 1',
+            role: 'PRIMARY',
+            count: 2,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            count: 3,
+          },
+        ])
+        .mockResolvedValueOnce([{ count: 4 }])
+        .mockResolvedValueOnce([
+          { total_results: 9, results_with_alignment: 2 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      const unalignedLinkSum = result.links
+        .filter((link) => link.sp_code === null)
+        .reduce((sum, link) => sum + link.count, 0);
+
+      expect(result.results_without_alignment).toBe(7);
+      expect(unalignedLinkSum).toBe(7);
+      expect(unalignedLinkSum).toBe(result.results_without_alignment);
+    });
+
+    it('should compute totals as DISTINCT counts via a dedicated count query, never as a sum of link counts, and both unaligned arms (lever and no-lever) share the identical NOT EXISTS predicate', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-01',
+            sp_name: 'Science Program 1',
+            role: 'PRIMARY',
+            count: 2,
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([
+          { total_results: 2, results_with_alignment: 2 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      expect(repository.query).toHaveBeenCalledTimes(4);
+      const [alignedSql, unalignedSql, noLeverSql, countSql] = (
+        repository.query as jest.Mock
+      ).mock.calls.map((call) => call[0]);
+
+      // Aligned arm: INNER JOIN all the way to clarisa_science_programs,
+      // GROUP BY includes sp_code/sp_role — the clause that keeps a
+      // 2-SP result from collapsing into 1 link (K-012).
+      expect(alignedSql).toContain(
+        'COUNT(DISTINCT primary_results.result_id) AS count',
+      );
+      expect(alignedSql).toContain('INNER JOIN result_levers');
+      expect(alignedSql).toContain('is_primary = TRUE');
+      expect(alignedSql).toContain('INNER JOIN clarisa_science_programs csp');
+      expect(alignedSql).toContain(
+        'GROUP BY\n        clarisa_lever.id,\n        clarisa_lever.short_name,\n        clarisa_lever.full_name,\n        csp.official_code,\n        csp.name,\n        rpfas.sp_role',
+      );
+
+      // Unaligned arm: GROUP BY lever only (structurally at most one row
+      // per lever) and the NOT EXISTS predicate matches countQuery's
+      // "resolvable active SP alignment" definition exactly (DD-9).
+      expect(unalignedSql).toContain('WHERE NOT EXISTS (');
+      expect(unalignedSql).toContain(
+        'GROUP BY\n        clarisa_lever.id,\n        clarisa_lever.short_name,\n        clarisa_lever.full_name\n      ORDER BY clarisa_lever.id',
+      );
+
+      // "No lever" arm: anti-join on the lever side (no active primary
+      // lever), AND the identical NOT EXISTS predicate as the lever-arm's
+      // unaligned query — never a row-level NULL after a LEFT JOIN (that
+      // pattern is the join-miss double-count bug: a result with one
+      // resolvable and one unresolvable alignment row would leak into both
+      // "aligned" and "unaligned" at once).
+      expect(noLeverSql).toContain('result_lever.result_id IS NULL');
+      expect(noLeverSql).toContain('AND NOT EXISTS (');
+      expect(noLeverSql).not.toContain(
+        'LEFT JOIN result_pool_funding_alignment',
+      );
+      expect(noLeverSql).not.toContain('LEFT JOIN clarisa_science_programs');
+
+      // Byte-identical predicate: both unaligned arms interpolate the same
+      // shared JS string, so the same substring must appear verbatim in
+      // both generated SQL texts (not just an equivalent-looking one).
+      const sharedPredicateFragment =
+        'INNER JOIN clarisa_science_programs csp\n        ON csp.official_code = rpfas.sp_code\n        AND csp.is_active = TRUE';
+      expect(unalignedSql).toContain(sharedPredicateFragment);
+      expect(noLeverSql).toContain(sharedPredicateFragment);
+
+      expect(countSql).toContain(
+        'COUNT(DISTINCT CASE\n          WHEN csp.official_code IS NOT NULL THEN primary_results.result_id\n        END) AS results_with_alignment',
+      );
+
+      expect(
+        (repository.query as jest.Mock).mock.calls.every(
+          (call) => call[1]?.[0] === 'A100' && call[1].length === 1,
+        ),
+      ).toBe(true);
+
+      // results_total (2) equals results_with_alignment (2) here — NOT the
+      // link-count sum (also 2 in this fixture); the assertion above pins
+      // the SQL source of the totals, not a coincidental numeric match.
+      expect(result.results_total).toBe(2);
+      expect(result.results_with_alignment).toBe(2);
+      expect(result.results_without_alignment).toBe(0);
+    });
+
+    it('should map a legacy NULL role on an aligned link to UNKNOWN (never to the Unaligned null-role)', async () => {
+      (repository.query as jest.Mock)
+        .mockResolvedValueOnce([
+          {
+            lever_id: 1,
+            lever_short_name: 'L1',
+            lever_full_name: 'Lever One',
+            sp_code: 'SP-01',
+            sp_name: 'Science Program 1',
+            role: null,
+            count: 1,
+          },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ count: 0 }])
+        .mockResolvedValueOnce([
+          { total_results: 1, results_with_alignment: 1 },
+        ]);
+
+      const result = await repository.getLeverSpFlowsReport('A100');
+
+      expect(result.links[0].role).toBe('UNKNOWN');
+      expect(result.links[0].sp_code).toBe('SP-01');
+    });
+  });
+
   describe('getContractDashboard', () => {
     const mockSummary = {
       total: 10,
@@ -1969,6 +2263,24 @@ describe('AgressoContractRepository', () => {
       results_without_alignment: 0,
     };
 
+    const mockLeverSpFlows = {
+      contract_id: 'C-100',
+      results_total: 1,
+      results_with_alignment: 1,
+      results_without_alignment: 0,
+      links: [
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever One',
+          sp_code: 'SP-01',
+          sp_name: 'Science Program 1',
+          role: 'PRIMARY' as const,
+          count: 1,
+        },
+      ],
+    };
+
     it('should throw BadRequestException when contract id is empty', async () => {
       await expect(repository.getContractDashboard('')).rejects.toThrow(
         BadRequestException,
@@ -1981,7 +2293,7 @@ describe('AgressoContractRepository', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should execute all 7 subqueries in parallel and return fully-populated composite object for bilateral contracts', async () => {
+    it('should execute all 8 subqueries in parallel and return fully-populated composite object for bilateral contracts', async () => {
       jest
         .spyOn(repository, 'getResultsSummaryReport')
         .mockResolvedValue(mockSummary as any);
@@ -2003,6 +2315,9 @@ describe('AgressoContractRepository', () => {
       jest
         .spyOn(repository, 'getSpAlignmentReport')
         .mockResolvedValue(mockSpAlignment as any);
+      jest
+        .spyOn(repository, 'getLeverSpFlowsReport')
+        .mockResolvedValue(mockLeverSpFlows as any);
 
       const result = await repository.getContractDashboard('C-100');
 
@@ -2017,6 +2332,7 @@ describe('AgressoContractRepository', () => {
       expect(repository.getTopContributorsReport).toHaveBeenCalledWith('C-100');
       expect(repository.getGeoScopeReport).toHaveBeenCalledWith('C-100');
       expect(repository.getSpAlignmentReport).toHaveBeenCalledWith('C-100');
+      expect(repository.getLeverSpFlowsReport).toHaveBeenCalledWith('C-100');
 
       expect(result.errors).toEqual([]);
       expect(result.data).toEqual({
@@ -2029,6 +2345,7 @@ describe('AgressoContractRepository', () => {
         },
         geo_scope: mockGeoScope,
         sp_alignment: mockSpAlignment,
+        lever_sp_flows: mockLeverSpFlows,
       });
     });
 
@@ -2054,6 +2371,9 @@ describe('AgressoContractRepository', () => {
       jest
         .spyOn(repository, 'getSpAlignmentReport')
         .mockResolvedValue(mockSpAlignment as any);
+      jest
+        .spyOn(repository, 'getLeverSpFlowsReport')
+        .mockResolvedValue(mockLeverSpFlows as any);
 
       const result = await repository.getContractDashboard('C-100');
 
@@ -2070,7 +2390,54 @@ describe('AgressoContractRepository', () => {
         mockContributors.top_contributors,
       );
       expect(result.data.sp_alignment).toEqual(mockSpAlignment);
+      expect(result.data.lever_sp_flows).toEqual(mockLeverSpFlows);
       expect(result.errors).toEqual(['geo_scope: Geo query timeout']);
+    });
+
+    it('should isolate a lever_sp_flows failure and record error without failing the dashboard, siblings intact', async () => {
+      jest
+        .spyOn(repository, 'getResultsSummaryReport')
+        .mockResolvedValue(mockSummary as any);
+      jest
+        .spyOn(repository, 'getTopPartnersReport')
+        .mockResolvedValue(mockPartners as any);
+      jest
+        .spyOn(repository, 'getTopPrimaryLeversReport')
+        .mockResolvedValue(mockLevers as any);
+      jest
+        .spyOn(repository, 'getTopMainContactPersonsReport')
+        .mockResolvedValue(mockContacts as any);
+      jest
+        .spyOn(repository, 'getTopContributorsReport')
+        .mockResolvedValue(mockContributors as any);
+      jest
+        .spyOn(repository, 'getGeoScopeReport')
+        .mockResolvedValue(mockGeoScope as any);
+      jest
+        .spyOn(repository, 'getSpAlignmentReport')
+        .mockResolvedValue(mockSpAlignment as any);
+      jest
+        .spyOn(repository, 'getLeverSpFlowsReport')
+        .mockRejectedValue(new Error('Flows query timeout'));
+
+      const result = await repository.getContractDashboard('C-100');
+
+      expect(result.data.lever_sp_flows).toBeNull();
+      expect(result.errors).toEqual(['lever_sp_flows: Flows query timeout']);
+      // Siblings intact — the degrade contract must not touch any other block.
+      expect(result.data.summary).toEqual(mockSummary);
+      expect(result.data.tops?.partners).toEqual(mockPartners.top_partners);
+      expect(result.data.tops?.primary_levers).toEqual(
+        mockLevers.top_primary_levers,
+      );
+      expect(result.data.tops?.main_contacts).toEqual(
+        mockContacts.top_main_contact_persons,
+      );
+      expect(result.data.tops?.contributors).toEqual(
+        mockContributors.top_contributors,
+      );
+      expect(result.data.geo_scope).toEqual(mockGeoScope);
+      expect(result.data.sp_alignment).toEqual(mockSpAlignment);
     });
 
     it('should isolate multiple subquery failures and populate errors array with each failure descriptor', async () => {
@@ -2095,6 +2462,9 @@ describe('AgressoContractRepository', () => {
       jest
         .spyOn(repository, 'getSpAlignmentReport')
         .mockResolvedValue(mockSpAlignment as any);
+      jest
+        .spyOn(repository, 'getLeverSpFlowsReport')
+        .mockResolvedValue(mockLeverSpFlows as any);
 
       const result = await repository.getContractDashboard('C-100');
 
@@ -2111,6 +2481,7 @@ describe('AgressoContractRepository', () => {
       );
       expect(result.data.geo_scope).toEqual(mockGeoScope);
       expect(result.data.sp_alignment).toEqual(mockSpAlignment);
+      expect(result.data.lever_sp_flows).toEqual(mockLeverSpFlows);
       expect(result.errors).toEqual([
         'summary: Summary syntax error',
         'partners: Partners DB lock',
@@ -2139,6 +2510,9 @@ describe('AgressoContractRepository', () => {
       jest
         .spyOn(repository, 'getSpAlignmentReport')
         .mockResolvedValue(null as any);
+      jest
+        .spyOn(repository, 'getLeverSpFlowsReport')
+        .mockResolvedValue(mockLeverSpFlows as any);
 
       const result = await repository.getContractDashboard('C-POOL');
 
@@ -2147,6 +2521,7 @@ describe('AgressoContractRepository', () => {
       expect(result.data.summary).toEqual(mockSummary);
       expect(result.data.tops?.partners).toEqual(mockPartners.top_partners);
       expect(result.data.geo_scope).toEqual(mockGeoScope);
+      expect(result.data.lever_sp_flows).toEqual(mockLeverSpFlows);
     });
   });
 

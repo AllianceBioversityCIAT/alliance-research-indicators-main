@@ -23,7 +23,7 @@ One new degradable server sub-report (`lever_sp_flows`) feeds a Sankey that repl
 
 **Query design (one raw SQL, no N+1 — NFR-2):** from `buildPrimaryContractResultsSubquery` (repository.ts:723-748), JOIN `result_levers` (`is_primary = TRUE AND is_active = TRUE`, entity col `is_primary` at result-lever.entity.ts:68) and `clarisa_levers`; LEFT JOIN `result_pool_funding_alignment` (`is_active = TRUE`) → `result_pool_funding_alignment_sp` (`is_active = TRUE`) → `clarisa_science_programs` (`is_active = TRUE`) — the same join spine as `getSpAlignmentReport` (repository.ts:1295-1317). GROUP BY (lever_id, sp_code with NULL = unaligned). A second cheap query (or the same result set aggregated) supplies `results_total` and `results_with_alignment` as `COUNT(DISTINCT result_id)` — **never** the sum of link counts.
 
-**Cardinality (scouted, binding):** a result has at most ONE active PRIMARY SP (unique generated-column index, migration 1786636994078) but unbounded CONTRIBUTING and legacy NULL-role rows (surfacing as UNKNOWN per R-BIL-126). Therefore link-count sums exceed distinct-result counts whenever multi-SP results exist — the DTO carries both totals so no consumer can honestly conflate them (R-DCR-001 AND-IT-MUST).
+**Cardinality (scouted, binding):** a result has at most ONE active PRIMARY SP (unique generated-column index, migration 1786636994078) but unbounded CONTRIBUTING and legacy NULL-role rows (surfacing as UNKNOWN per R-BIL-126). Therefore link-count sums exceed distinct-result counts whenever multi-SP results exist — the DTO carries both totals so no consumer can honestly conflate them (R-DCR-001 AND-IT-MUST). *Amended 2026-08-25 (T-01 review adjudication):* the same holds on the UNALIGNED side — `result_levers` has no unique index on `(result_id, is_primary)` and the write paths produce multi-primary-lever rows, so `Σ(unaligned link counts)` may exceed `results_without_alignment` on such data. Accepted and carried honestly, exactly like the aligned side (per-lever attribution is the owner-confirmed OQ-2 story; chips read distinct counts). DD-9's fixture equality stands for single-primary-lever data; T-05's live check verifies the equality or explains any delta via multi-primary rows.
 
 ### 2.2 Client
 
@@ -45,7 +45,7 @@ No new folders. Touched files: server `agresso-contract/{repositories,dto}` (+1 
 No schema change. **New DTO `ContractLeverSpFlowsDto`** (server) mirrored by client interface `ContractLeverSpFlows`:
 
 - `contract_id`
-- `results_total` (distinct primary results with a primary lever)
+- `results_total` (distinct primary results — lever-agnostic; *corrected 2026-08-25 at T-01 review: the earlier "with a primary lever" parenthetical predated the "No lever" pseudo-source and contradicted DD-9*)
 - `results_with_alignment` (distinct, aligned)
 - `links[]`: `{ lever_id, lever_short_name, lever_full_name, sp_code | null, sp_name | null, role: 'PRIMARY' | 'CONTRIBUTING' | 'UNKNOWN' | null, count }` — grouped by (lever, sp, role); `sp_code: null` = the per-lever Unaligned remainder (`role: null` there); a **"No lever"** pseudo-source (`lever_id: null`) carries unaligned results that have no primary lever, so every unaligned result has exactly one home (challenge #5).
 - `results_without_alignment` (distinct) — the single number the header chip renders; the server unit test asserts `Σ(unaligned link counts) === results_without_alignment` on the fixture (named failing input: a result with no lever at all, which a lever-only GROUP BY silently drops).
@@ -56,7 +56,7 @@ No new route. `GET /api/agresso/contracts/reports/dashboard` response `data` gai
 
 ## 6. Backend Module Design
 
-- `getLeverSpFlowsReport(contractId, limit?)` private repository method following the `getTopPrimaryLeversReport` shape (repository.ts:1035-1077): guard, shared subquery, one `this.query`, DTO cast. No cap server-side beyond sane `LIMIT` on distinct levers/SPs (cap-to-12 is a CLIENT rendering rule per R-DCR-002 — the server returns complete links so the "N folded" note is truthful).
+- `getLeverSpFlowsReport(contractId, limit?)` repository method (public, like its seven siblings — dashboard unit tests spy on it; *wording corrected 2026-08-25*) following the `getTopPrimaryLeversReport` shape (repository.ts:1035-1077): guard, shared subquery, raw SQL via `this.query` (implemented as four fixed concurrent queries — aligned links, per-lever unaligned, no-lever, counts — still no N+1; *corrected 2026-08-25*), DTO cast. No cap server-side beyond sane `LIMIT` on distinct levers/SPs (cap-to-12 is a CLIENT rendering rule per R-DCR-002 — the server returns complete links so the "N folded" note is truthful).
 - Tests: repository unit spec with seeded fixture rows (incl. the named failing input: one result with 2 SPs → 2 link counts); integration spec NOT required — the degrade path is covered by extending the existing dashboard integration/unit pattern with an injected rejection (K-021: no AppModule, overridden providers).
 
 ## 7. Frontend / UX Component Architecture
