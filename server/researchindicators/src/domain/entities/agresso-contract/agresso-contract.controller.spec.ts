@@ -47,6 +47,7 @@ describe('AgressoContractController', () => {
     getContractDashboard: jest.fn(),
     getIndicatorDetailsReport: jest.fn(),
     getInsightsReport: jest.fn(),
+    findClarisaProjectByAgreementId: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -697,6 +698,98 @@ describe('AgressoContractController', () => {
         status: HttpStatus.OK,
         data: mockContract,
       });
+    });
+  });
+
+  // @sdd-spec docs/specs/changes/executive-overview-grounded-context — T-01 / R-EOC-001
+  describe('getClarisaProjectByAgreementId', () => {
+    it('returns the envelope with the mapped CLARISA project and no errors', async () => {
+      const mockData = {
+        id: 501,
+        short_name: 'Short Name',
+        science_programs: [],
+      };
+      mockAgressoContractService.findClarisaProjectByAgreementId.mockResolvedValue(
+        { data: mockData, errors: [] },
+      );
+
+      const result = await controller.getClarisaProjectByAgreementId('AGR-1');
+
+      expect(
+        mockAgressoContractService.findClarisaProjectByAgreementId,
+      ).toHaveBeenCalledWith('AGR-1');
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Clarisa project context retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+      expect(result).toEqual({
+        description: 'Clarisa project context retrieved successfully',
+        status: HttpStatus.OK,
+        data: mockData,
+        errors: [],
+      });
+    });
+
+    it('returns data: null with status 200 when the contract is unmapped (R-EOC-001 AC.2)', async () => {
+      mockAgressoContractService.findClarisaProjectByAgreementId.mockResolvedValue(
+        { data: null, errors: [] },
+      );
+
+      const result =
+        await controller.getClarisaProjectByAgreementId('AGR-UNMAPPED');
+
+      expect(result).toEqual({
+        description: 'Clarisa project context retrieved successfully',
+        status: HttpStatus.OK,
+        data: null,
+        errors: [],
+      });
+    });
+
+    it('returns data: null + errors: ["clarisa_unavailable"] on a CLARISA cold-cache degrade, never a 5xx (R-EOC-001 AC.4)', async () => {
+      mockAgressoContractService.findClarisaProjectByAgreementId.mockResolvedValue(
+        { data: null, errors: ['clarisa_unavailable'] },
+      );
+
+      const result = await controller.getClarisaProjectByAgreementId('AGR-1');
+
+      expect(result).toEqual({
+        description: 'Clarisa project context retrieved successfully',
+        status: HttpStatus.OK,
+        data: null,
+        errors: ['clarisa_unavailable'],
+      });
+    });
+
+    it('declares Swagger operation, param, and response metadata', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        controller.getClarisaProjectByAgreementId,
+      );
+      const parameters = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        controller.getClarisaProjectByAgreementId,
+      );
+      const response = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        controller.getClarisaProjectByAgreementId,
+      );
+
+      expect(operation).toMatchObject({
+        summary:
+          'Get the CLARISA project linked to an Agresso bilateral contract, when mapped',
+      });
+      expect(parameters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            in: 'path',
+            name: 'agreementId',
+          }),
+        ]),
+      );
+      expect(response).toBeDefined();
     });
   });
 

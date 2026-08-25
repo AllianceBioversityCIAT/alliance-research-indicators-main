@@ -31,7 +31,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-01 — Server: `GET /agresso/contracts/:agreementId/clarisa-project`
 
-- [ ] **Covers:** R-EOC-001 · **Skills:** `nestjs-expert`, `api-design-principles` · **Effort:** medium
+- [x] **Covers:** R-EOC-001 · **Skills:** `nestjs-expert`, `api-design-principles` · **Effort:** medium
 - Add `ContractClarisaProjectDto` (design §3), `findClarisaProjectByAgreementId()` in `AgressoContractService` (mapping lookup → `ClarisaProjectsService.findProjectById` via `moduleRef`), controller route + Swagger.
 - Degrade paths: unmapped → `data: null`; CLARISA cold-cache `ServiceUnavailableException` → `data: null` + `errors: ['clarisa_unavailable']` + `LoggerUtil` warn.
 - Tests: service spec (mapped/unmapped/degrade), controller spec, integration spec per design §10 (K-021 bootstrap scope: controller+service only, `overrideProvider` for mapping repo + ClarisaProjectsService; NO AppModule).

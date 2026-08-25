@@ -41,6 +41,7 @@ import { QueryParseBool } from '../../shared/pipes/query-parse-boolean.pipe';
 import { ContractDashboardReportDto } from './dto/contract-dashboard-report.dto';
 import { ContractIndicatorDetailsReportDto } from './dto/contract-indicator-details-report.dto';
 import { ContractInsightsResponseDto } from './dto/contract-insights-report.dto';
+import { ContractClarisaProjectDto } from './dto/contract-clarisa-project.dto';
 
 @ApiTags('Agresso Contracts')
 @Controller()
@@ -266,6 +267,36 @@ export class AgressoContractController {
           data: response,
         }),
       );
+  }
+
+  @Get(':agreementId/clarisa-project')
+  @ApiOperation({
+    summary:
+      'Get the CLARISA project linked to an Agresso bilateral contract, when mapped',
+  })
+  @ApiParam({
+    name: 'agreementId',
+    description: 'Agresso contract agreement id',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ContractClarisaProjectDto,
+    description:
+      'Linked CLARISA project (null when unmapped, or degraded to null with a clarisa_unavailable error on a cold-cache CLARISA failure)',
+  })
+  async getClarisaProjectByAgreementId(
+    @Param('agreementId') agreementId: string,
+  ) {
+    const { data, errors } =
+      await this.agressoContractService.findClarisaProjectByAgreementId(
+        agreementId,
+      );
+    return ResponseUtils.format({
+      data,
+      description: 'Clarisa project context retrieved successfully',
+      status: HttpStatus.OK,
+      errors,
+    });
   }
 
   @Get('find-contracts')

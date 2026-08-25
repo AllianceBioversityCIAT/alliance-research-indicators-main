@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { AgressoContractService } from './agresso-contract.service';
 import { AgressoContractRepository } from './repositories/agresso-contract.repository';
@@ -13,6 +17,9 @@ import { OrderFieldsEnum } from './enum/order-fields.enum';
 import { AgressoContractStatus } from '../../shared/enum/agresso-contract.enum';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
+import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
+import { BilateralProjectMappingRepository } from '../bilateral-project-mapping/repositories/bilateral-project-mapping.repository';
 
 // Mock the utility functions
 jest.mock('../../shared/utils/object.utils', () => ({
@@ -69,8 +76,21 @@ describe('AgressoContractService', () => {
     resolveIconUrl: jest.fn(),
   };
 
+  const mockClarisaProjectsService = {
+    findProjectById: jest.fn(),
+  };
+
+  const mockModuleRef = {
+    resolve: jest.fn(),
+  };
+
+  const mockBilateralProjectMappingRepository = {
+    findOne: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockModuleRef.resolve.mockResolvedValue(mockClarisaProjectsService);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -88,12 +108,20 @@ describe('AgressoContractService', () => {
           useValue: mockCurrentUser,
         },
         {
+          provide: ModuleRef,
+          useValue: mockModuleRef,
+        },
+        {
           provide: AppConfig,
           useValue: mockAppConfig,
         },
         {
           provide: ClarisaLeversService,
           useValue: mockClarisaLeversService,
+        },
+        {
+          provide: BilateralProjectMappingRepository,
+          useValue: mockBilateralProjectMappingRepository,
         },
       ],
     }).compile();
@@ -760,6 +788,184 @@ describe('AgressoContractService', () => {
         BadRequestException,
       );
       expect(repository.getInsightsReport).toHaveBeenCalledWith('');
+    });
+  });
+
+  // @sdd-spec docs/specs/changes/executive-overview-grounded-context — T-01 / R-EOC-001
+  describe('findClarisaProjectByAgreementId', () => {
+    const clarisaProject: ClarisaProject = {
+      id: 501,
+      short_name: 'Short Name',
+      full_name: 'Full Project Name',
+      summary: 'Summary text',
+      description: 'Description text',
+      start_date: '2024-01-01',
+      end_date: '2026-12-31',
+      total_budget: '1000000',
+      annual: '250000',
+      source_of_funding: 'Bilateral',
+      funder_institution_object: {
+        id: 10,
+        name: 'Funder Org',
+        acronym: 'FO',
+      },
+      lead_institution_object: {
+        id: 20,
+        name: 'Lead Org',
+        acronym: 'LO',
+      },
+      external_code: 'EXT-1',
+      phase: '2025',
+      project_mappings_array: [
+        {
+          id: 1,
+          project_id: 501,
+          program_id: 9,
+          allocation: 60,
+          status: 'Confirmed',
+          global_unit_object: {
+            id: 9,
+            name: 'SP09 name',
+            smo_code: 'SP09',
+            cgiar_entity_type_object: { code: 22, name: 'Science programs' },
+          },
+        },
+        {
+          // Not entity type 22 -> excluded from science_programs projection.
+          id: 2,
+          project_id: 501,
+          program_id: 26,
+          allocation: 40,
+          status: 'Confirmed',
+          global_unit_object: {
+            id: 26,
+            name: 'AOW name',
+            smo_code: 'AOW06',
+            cgiar_entity_type_object: { code: 26, name: 'Key Area of Work' },
+          },
+        },
+        {
+          // Rejected status -> excluded.
+          id: 3,
+          project_id: 501,
+          program_id: 12,
+          allocation: 10,
+          status: 'Draft',
+          global_unit_object: {
+            id: 12,
+            name: 'SP12 name',
+            smo_code: 'SP12',
+            cgiar_entity_type_object: { code: 22, name: 'Science programs' },
+          },
+        },
+      ],
+    };
+
+    it('returns data: null when no active mapping exists for the agreement id (unmapped, R-EOC-001 AC.2)', async () => {
+      mockBilateralProjectMappingRepository.findOne.mockResolvedValue(null);
+
+      const result =
+        await service.findClarisaProjectByAgreementId('AGR-UNMAPPED');
+
+      expect(
+        mockBilateralProjectMappingRepository.findOne,
+      ).toHaveBeenCalledWith({
+        where: {
+          agresso_agreement_id: 'AGR-UNMAPPED',
+          is_active: true,
+        },
+        order: { updated_at: 'DESC' },
+      });
+      expect(mockModuleRef.resolve).not.toHaveBeenCalled();
+      expect(result).toEqual({ data: null, errors: [] });
+    });
+
+    it('returns the mapped CLARISA project projected to ContractClarisaProjectDto, science_programs filtered to accepted status + entity type 22', async () => {
+      mockBilateralProjectMappingRepository.findOne.mockResolvedValue({
+        clarisa_project_id: 501,
+      });
+      mockClarisaProjectsService.findProjectById.mockResolvedValue(
+        clarisaProject,
+      );
+
+      const result = await service.findClarisaProjectByAgreementId('AGR-1');
+
+      expect(mockModuleRef.resolve).toHaveBeenCalledWith(
+        ClarisaProjectsService,
+        undefined,
+        { strict: false },
+      );
+      expect(mockClarisaProjectsService.findProjectById).toHaveBeenCalledWith(
+        501,
+      );
+      expect(result).toEqual({
+        data: {
+          id: 501,
+          short_name: 'Short Name',
+          full_name: 'Full Project Name',
+          summary: 'Summary text',
+          description: 'Description text',
+          start_date: '2024-01-01',
+          end_date: '2026-12-31',
+          total_budget: '1000000',
+          annual: '250000',
+          funder_institution: { id: 10, name: 'Funder Org', acronym: 'FO' },
+          lead_institution: { id: 20, name: 'Lead Org', acronym: 'LO' },
+          external_code: 'EXT-1',
+          phase: '2025',
+          science_programs: [
+            { code: 'SP09', name: 'SP09 name', allocation: 60 },
+          ],
+        },
+        errors: [],
+      });
+    });
+
+    it('degrades to data: null + errors: ["clarisa_unavailable"] on a CLARISA cold-cache failure (R-EOC-001 AC.4, NFR-2)', async () => {
+      mockBilateralProjectMappingRepository.findOne.mockResolvedValue({
+        clarisa_project_id: 501,
+      });
+      mockClarisaProjectsService.findProjectById.mockRejectedValue(
+        new ServiceUnavailableException(
+          'CLARISA /api/projects temporarily unreachable',
+        ),
+      );
+
+      const result = await service.findClarisaProjectByAgreementId('AGR-1');
+
+      expect(result).toEqual({ data: null, errors: ['clarisa_unavailable'] });
+    });
+
+    it('rethrows a non-ServiceUnavailableException error from CLARISA rather than degrading it', async () => {
+      mockBilateralProjectMappingRepository.findOne.mockResolvedValue({
+        clarisa_project_id: 501,
+      });
+      const unexpected = new Error('unexpected failure');
+      mockClarisaProjectsService.findProjectById.mockRejectedValue(unexpected);
+
+      await expect(
+        service.findClarisaProjectByAgreementId('AGR-1'),
+      ).rejects.toThrow(unexpected);
+    });
+
+    it('returns data: null when the mapping points at a clarisa_project_id CLARISA cannot find', async () => {
+      mockBilateralProjectMappingRepository.findOne.mockResolvedValue({
+        clarisa_project_id: 999,
+      });
+      mockClarisaProjectsService.findProjectById.mockResolvedValue(null);
+
+      const result = await service.findClarisaProjectByAgreementId('AGR-1');
+
+      expect(result).toEqual({ data: null, errors: [] });
+    });
+
+    it('returns data: null without querying the repository when agreementId is blank', async () => {
+      const result = await service.findClarisaProjectByAgreementId('   ');
+
+      expect(
+        mockBilateralProjectMappingRepository.findOne,
+      ).not.toHaveBeenCalled();
+      expect(result).toEqual({ data: null, errors: [] });
     });
   });
 });
