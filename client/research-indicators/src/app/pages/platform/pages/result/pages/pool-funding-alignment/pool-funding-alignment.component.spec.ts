@@ -162,6 +162,9 @@ describe('PoolFundingAlignmentComponent', () => {
       snapshot: {
         paramMap: {
           get: (k: string) => (k === 'id' ? 'RES-001' : null)
+        },
+        queryParamMap: {
+          get: (_k: string) => null as string | null
         }
       }
     };
@@ -188,6 +191,57 @@ describe('PoolFundingAlignmentComponent', () => {
   it('should create and call getAlignment with the route resultCode on init', () => {
     expect(component).toBeTruthy();
     expect(getAlignmentMock).toHaveBeenCalledWith('RES-001');
+  });
+
+  // Regression: `[showBack]="true"` was rendered with NO `(back)` binding — the
+  // shared NavigationButtonsComponent only emits an @Output, so the button was
+  // inert. Clicking the real DOM button (not calling onBack() directly) is what
+  // makes this test able to fail if the template binding is dropped again.
+  describe('Back button (dead-button regression)', () => {
+    const clickBack = (): void => {
+      fixture.detectChanges();
+      const icon = fixture.nativeElement.querySelector('button i.pi-arrow-left') as HTMLElement | null;
+      expect(icon).not.toBeNull();
+      (icon as HTMLElement).closest('button')!.click();
+    };
+
+    it('navigates to the previous section when clicked', () => {
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'evidence'], {
+        queryParams: undefined,
+        replaceUrl: true
+      });
+    });
+
+    it('targets ip-rights for indicator_id 1 (the section directly above the optional one)', () => {
+      TestBed.inject(CacheService).currentMetadata.set({ result_title: 'Test Title', indicator_id: 1 } as never);
+
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'ip-rights'], {
+        queryParams: undefined,
+        replaceUrl: true
+      });
+    });
+
+    it('preserves the version query param', () => {
+      const route = TestBed.inject(ActivatedRoute);
+      jest.spyOn(route.snapshot.queryParamMap, 'get').mockImplementation((k: string) => (k === 'version' ? '2026' : null));
+
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'evidence'], {
+        queryParams: { version: '2026' },
+        replaceUrl: true
+      });
+    });
+
+    it('does not attempt a save (canSave() may be blocking it)', () => {
+      clickBack();
+
+      expect(patchAlignmentMock).not.toHaveBeenCalled();
+    });
   });
 
   it('renders the section title help button aligned with tooltip text', () => {
