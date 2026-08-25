@@ -8,7 +8,7 @@ import {
   GeoScopeSubNationalSummary
 } from '@interfaces/geo-scope-card.interface';
 import { ProjectDashboardRankedListItem } from '@interfaces/project-dashboard.interface';
-import { projectDashboardBarColor } from '@shared/constants/project-dashboard-chart-colors.constants';
+import { valueRampColor } from '@shared/constants/project-dashboard-chart-colors.constants';
 import { VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
 
 function escapeHtml(text: string): string {
@@ -39,9 +39,11 @@ function buildGeoRankingChartOptions(items: readonly ProjectDashboardRankedListI
     return null;
   }
 
+  const maxCount = items.reduce((max, item) => Math.max(max, item.count), 0);
+
   return {
     grid: {
-      top: 8,
+      top: 44,
       bottom: 8,
       left: 8,
       right: 28,
@@ -61,9 +63,11 @@ function buildGeoRankingChartOptions(items: readonly ProjectDashboardRankedListI
     xAxis: {
       type: 'value',
       minInterval: 1,
+      splitNumber: 3,
       axisLabel: {
         color: 'var(--ac-grey-700)',
-        fontFamily: 'Barlow'
+        fontFamily: 'Barlow',
+        hideOverlap: true
       },
       splitLine: {
         lineStyle: { color: 'var(--ac-grey-200)' }
@@ -89,10 +93,10 @@ function buildGeoRankingChartOptions(items: readonly ProjectDashboardRankedListI
         type: 'bar',
         name: caption,
         cursor: 'default',
-        data: items.map((item, index) => ({
+        data: items.map(item => ({
           value: item.count,
           itemStyle: {
-            color: projectDashboardBarColor(index, items.length),
+            color: valueRampColor(item.count, maxCount),
             borderRadius: [0, 4, 4, 0]
           }
         })),

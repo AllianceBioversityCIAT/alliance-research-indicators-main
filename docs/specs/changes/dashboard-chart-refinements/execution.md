@@ -61,3 +61,18 @@
 - **FINAL — Task PASS (3 attempts).** Requirements covered: R-DCR-002 all three scenarios (option-shape acceptance + on-screen cursor/legibility owed to T-05 per declared KZ-017 disqualifiers), R-DCR-005 a11y clauses (rendered-focus/contrast owed to T-05 HITL).
 - **Leader actions at finalize:** design.md corrected (DD-4 + §7.2 mechanism: lineStyle.type premise falsified at renderer source, encoding moved to borderType/borderWidth/borderColor; §7.2 tableModel two-table split annotation). Attempt-3 advisories recorded: DD-4 doc drift (now closed by this correction); unreachable `leverId != null` branch (by construction, not a gap); comment cites Handler.js:95 where dispatch is :99 (cosmetic); unconditional handler binding on chartInit emission (idempotent today).
 - **T-05 checklist additions accumulated from this loop:** inert nodes/links show no pointer/move cursor and are not draggable (real browser); three role weights/patterns distinguishable in a GREYSCALE screenshot, both themes; panel stacking at 768px (table must not collapse to a sliver); contract_id vs `/project-detail/:id` identifier on live data; scroll-region keyboard access + double-table announcement noted for owner judgment.
+
+### Budget tripwire — 2026-08-25
+
+- Design §10 budget (~750 LOC / 7 review rounds) exceeded after T-03: rounds 7 consumed (T-01: 3, T-02: 1, T-03: 3) with two tasks owed; LOC ~1,470 vs ~750. Cause: review-driven hardening within approved scope (T-01 unaligned-SQL two rewrites; T-03 renderer-level encoding substitution after two design premises were falsified at source). No scope creep.
+- Escalated to owner with delta and cause; **owner approved CONTINUE** (T-04 + T-05 automated portion, stopping at the T-05 HITL visual gate).
+
+### T-04 — Geo card: value-ramp bars + defect fixes — PASS (attempt 1) — 2026-08-25
+
+- **Covers:** R-DCR-003 (all clauses), R-DCR-004 (both scenarios), R-DCR-005 token clauses.
+- **Attempts:** 1 (Implementer effort medium, skills `angular-developer` + `ui-ux-pro-max`; Reviewer full 4R).
+- **Files changed (4, 236 diff lines):** `project-dashboard-chart-colors.constants.ts` (+`valueRampColor`, pure, `var(--ac-viz-ramp-N)` by ceil(share×5), guarded edges), `geo-scope-card.component.ts` (swap rank→value ramp at the builder; grid.top 8→44; xAxis splitNumber:3 + hideOverlap:true; labels confirmed position:'right' outside fill), both spec files (+9 tests, 1 corrected with more discriminating assertions).
+- **Implementer verification:** targeted 27/27; `tokens:validate` PASS (ramp monotonic both themes); build exit 0 (initial 1.12 MB); eslint clean. Three K-004 reds via Edit-toggle quoted (unconditional stub 6-fail; plausible ramp-3 stub 3-fail proving new tests discriminate; corrected region assertion red). KZ-017 disqualifier declared verbatim.
+- **Reviewer verdict: PASS.** §7.3 implemented exactly; value=0→ramp-1 adjudicated conformant (only spec-consistent option; zero bar renders no fill); rank vocabulary fully removed with discriminating negatives covering all 5 rank tokens; one shared builder → all three charts; correct (value) axis; no out-of-scope touches; corrected test GAINED discriminating power (KZ-001); tokens both themes verified at colors.scss.
+- **Advisories (recorded → folded into T-05 checklist):** map is continuous visualMap vs bars' discrete 5-step quantization — sample a MID-VALUE country in the visual pass, not only the max; grid.top reserve costs ~20% plot height at default 200px — screenshot the fullest ranking; dark-theme ramp-1 near card background — dark screenshot to confirm value labels carry legibility.
+- **Gate note:** continue auto-approved (owner CONTINUE decision post-tripwire).

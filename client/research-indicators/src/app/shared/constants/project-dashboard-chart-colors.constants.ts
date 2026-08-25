@@ -25,3 +25,19 @@ export function projectDashboardBarColor(index: number, total: number): string {
   }
   return PROJECT_DASHBOARD_RANK_BAR_COLORS.middle;
 }
+
+/**
+ * Maps a value's share of the list max onto the shared 5-stop sequential viz
+ * ramp (`--ac-viz-ramp-1..5`), so bars colored by this function read as the
+ * same magnitude family as the geo-scope-map choropleth for the same value
+ * (R-DCR-003). Pure and theme-agnostic — the tokens themselves flip per
+ * theme (colors.scss), this function only ever emits `var()` names (DD-6).
+ */
+export function valueRampColor(value: number, max: number, rampLength = 5): string {
+  if (!(max > 0) || !(value > 0)) {
+    return 'var(--ac-viz-ramp-1)';
+  }
+  const share = Math.min(value, max) / max;
+  const index = Math.min(rampLength, Math.max(1, Math.ceil(share * rampLength)));
+  return `var(--ac-viz-ramp-${index})`;
+}

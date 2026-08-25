@@ -291,13 +291,34 @@ describe('GeoScopeCardComponent', () => {
     });
 
     const options = component.regionChartOptions() as EChartsOption & {
+      grid: { top: number };
+      xAxis: { splitNumber: number; axisLabel: { hideOverlap: boolean } };
       yAxis: { data: string[] };
       series: { data: { value: number; itemStyle: { color: string } }[] }[];
     };
     expect(options.yAxis.data).toEqual(['Latin America', 'Africa', 'Asia']);
     expect(options.series[0].data.map(point => point.value)).toEqual([2, 9, 5]);
-    expect(options.series[0].data[0].itemStyle.color).toBe('var(--ac-green-500)');
-    options.series[0].data.forEach(point => expect(point.itemStyle.color).toMatch(/^var\(--/));
+
+    // R-DCR-003: colors are value-share ramp tokens (max = Africa's 9), not
+    // rank-based `projectDashboardBarColor` output. Africa (value=max) gets
+    // the darkest step; Latin America (2/9) and Asia (5/9) get lighter,
+    // monotonically-ordered steps — never a `--ac-green-*` rank token.
+    expect(options.series[0].data.map(point => point.itemStyle.color)).toEqual([
+      'var(--ac-viz-ramp-2)',
+      'var(--ac-viz-ramp-5)',
+      'var(--ac-viz-ramp-3)'
+    ]);
+    options.series[0].data.forEach(point => {
+      expect(point.itemStyle.color).toMatch(/^var\(--ac-viz-ramp-[1-5]\)$/);
+      expect(point.itemStyle.color).not.toMatch(/--ac-green-/);
+    });
+
+    // R-DCR-004: axis/help-corner defect-fix config is present on the emitted
+    // options (KZ-017: jsdom cannot measure rendered layout/overlap — this is
+    // a presence assertion only, visual truth is owed to T-05).
+    expect(options.grid.top).toBe(44);
+    expect(options.xAxis.splitNumber).toBe(3);
+    expect(options.xAxis.axisLabel.hideOverlap).toBe(true);
   });
 
   it('should build country viz-chart options ranked by count with accessible tableModel (OQ-2-A)', () => {
@@ -362,6 +383,66 @@ describe('GeoScopeCardComponent', () => {
     expect(component.countryTableModel()).toBeNull();
     expect(component.subNationalChartOptions()).toBeNull();
     expect(component.subNationalTableModel()).toBeNull();
+  });
+
+  // --- T-04 (R-DCR-003/R-DCR-004): value-ramp bars + axis/help defect fixes.
+  // KZ-017: jsdom cannot evaluate rendered color/contrast or measure layout
+  // overlap — these are presence/value assertions on the emitted echarts
+  // option object only. Visual truth (Kenya's bar hue vs. map fill, no
+  // overlap at 768px) is owed to T-05's HITL visual pass, not this suite.
+
+  it('should color country bars by value-share ramp, never rank tokens, and hold the axis fix for 3-digit values (R-DCR-003, R-DCR-004 3-digit case)', () => {
+    service.topCountries.set([
+      { iso_alpha_2: 'IN', country_name: 'India', count: 128 },
+      { iso_alpha_2: 'KE', country_name: 'Kenya', count: 320 },
+      { iso_alpha_2: 'CO', country_name: 'Colombia', count: 4 }
+    ]);
+
+    const options = component.countryChartOptions() as EChartsOption & {
+      grid: { top: number };
+      xAxis: { splitNumber: number; axisLabel: { hideOverlap: boolean } };
+      series: { data: { value: number; itemStyle: { color: string } }[] }[];
+    };
+
+    // Kenya (320) is the list max -> darkest ramp step, mirroring the map's
+    // darkest choropleth fill for the same country (R-DCR-003 Correspondence).
+    expect(options.series[0].data.map(point => point.value)).toEqual([320, 128, 4]);
+    expect(options.series[0].data[0].itemStyle.color).toBe('var(--ac-viz-ramp-5)');
+    options.series[0].data.forEach(point => {
+      expect(point.itemStyle.color).not.toMatch(/--ac-green-/);
+      expect(point.itemStyle.color).not.toMatch(/--ac-primary-blue-/);
+      expect(point.itemStyle.color).not.toMatch(/--ac-light-blue-/);
+    });
+
+    // Axis fix must still hold with a 3-digit max value on the value axis.
+    expect(options.grid.top).toBe(44);
+    expect(options.xAxis.splitNumber).toBe(3);
+    expect(options.xAxis.axisLabel.hideOverlap).toBe(true);
+  });
+
+  it('should keep bar value labels outside the bar fill, axis-side (R-DCR-003 AND-IT-MUST label contrast)', () => {
+    service.topRegions.set([{ region_name: 'Africa', results_count: 3 }]);
+
+    const options = component.regionChartOptions() as EChartsOption & {
+      series: { label: { show: boolean; position: string } }[];
+    };
+
+    expect(options.series[0].label.show).toBe(true);
+    expect(options.series[0].label.position).toBe('right');
+  });
+
+  it('should floor a zero-value item at the lightest ramp step rather than an out-of-range index (valueRampColor edge: value=0 in a real list)', () => {
+    service.topRegions.set([
+      { region_name: 'Empty region', results_count: 0 },
+      { region_name: 'Active region', results_count: 6 }
+    ]);
+
+    const options = component.regionChartOptions() as EChartsOption & {
+      series: { data: { itemStyle: { color: string } }[] }[];
+    };
+
+    expect(options.series[0].data[0].itemStyle.color).toBe('var(--ac-viz-ramp-1)');
+    expect(options.series[0].data[1].itemStyle.color).toBe('var(--ac-viz-ramp-5)');
   });
 
   it('should render all three migrated ranking surfaces as explicit viz-bar (never the default columns layout) with matching options/tableModel (pointer 1, R-DN-002)', () => {
