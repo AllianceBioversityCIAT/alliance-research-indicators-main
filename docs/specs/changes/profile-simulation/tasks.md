@@ -113,11 +113,11 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - Do **not** inject `CurrentUserUtil` anywhere in this module (design §2.0).
   - No cache (D-imp-4).
 - **Acceptance / done check:**
-  - [ ] Unit spec covers: admin target → 409; self → 409; inactive → 404; second start supersedes first; resolve foreign → `invalid`; resolve expired → `expired` + update called with `end_reason='expired'`; end twice → same row.
-  - [ ] `npx eslint src/domain/entities/impersonation` clean.
+  - [x] Unit spec covers: admin target → 409; self → 409; inactive → 404; second start supersedes first; resolve foreign → `invalid`; resolve expired → `expired` + update called with `end_reason='expired'`; end twice → same row.
+  - [x] `npx eslint src/domain/entities/impersonation` clean (+ `app-config.util.ts`, KZ-017).
 - **Verification — failing input:** in the supersede test, stub the repo to return an open session and assert the update is called with `end_reason: 'superseded'`; remove the update call in the service → the test must go red.
 - **Disqualifier:** a spec that asserts on SQL text (KZ-001) is not evidence; only behaviour via mocked repo results counts here, DB truth belongs to T-06.
-- **Dependencies:** T-01 · **Effort:** M · **Skills:** `nestjs-expert`, `error-handling-patterns` · **Status:** todo
+- **Dependencies:** T-01 · **Effort:** M · **Skills:** `nestjs-expert`, `error-handling-patterns` · **Status:** done (PASS, execution.md T-02)
 
 ### T-03 — Middleware `applyImpersonation`, exception + header, CORS
 
@@ -157,6 +157,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - `server/researchindicators/src/domain/shared/Interceptors/impersonation-audit.interceptor.ts` + `.spec.ts`
   - `…/Interceptors/logging.interceptor.ts`, `…/Interceptors/response.interceptor.ts`, `…/error-management/global.exception.ts` (+ their specs: `actorId`, `impersonationSessionId` fields)
   - `server/researchindicators/src/app.module.ts` (`APP_INTERCEPTOR`)
+  - `…/impersonation/impersonation.service.ts` + spec — add the NFR-IMP-004 `warn` lines for `end` (actor/target/session/reason) and lazy `expired` marking (T-02 review advisory; NFR-IMP-004 is already this task's)
 - **Description:** Implement design §5 "Audit" (`tap({next, error})`, status from DTO / `HttpException.getStatus()`, fire-and-forget, `route_pattern` + `path` + `result_official_code`). Re-run the identity-reader enumeration: `grep -rn "req\.user\|request\.user\|request\['user'\]" server/researchindicators/src server/researchindicators/test` and reconcile with design §2.4 (record total count before reading, K-014).
 - **Acceptance / done check:**
   - [ ] Spec: GET → no insert; POST returning `{status:201}` → insert with 201; handler throwing `ConflictException` → insert with 409 **and** the error still propagates; insert rejecting → response unchanged + `LoggerUtil.error` called.

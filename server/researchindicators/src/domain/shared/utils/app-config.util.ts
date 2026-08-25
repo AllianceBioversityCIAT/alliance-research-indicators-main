@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AppConfig as AppConfigEntity } from '../../entities/app-config/entities/app-config.entity';
+import { LoggerUtil } from './logger.util';
 
 /**
  * Class to get all application configurations from environment variables or .env file
@@ -9,6 +10,10 @@ import { AppConfig as AppConfigEntity } from '../../entities/app-config/entities
  */
 @Injectable()
 export class AppConfig {
+  private readonly logger: LoggerUtil = new LoggerUtil({
+    name: AppConfig.name,
+  });
+
   constructor(private readonly dataSource: DataSource) {}
   //RabbitMQ host
   get ARI_MQ_HOST(): string {
@@ -397,5 +402,41 @@ export class AppConfig {
 
   get PDF_VIEWER_URL(): string {
     return process.env.ARI_PDF_VIEWER_URL;
+  }
+
+  /**
+   * Get the profile-simulation (impersonation) session TTL in minutes.
+   * Reads ARI_IMPERSONATION_TTL_MINUTES; clamped to a sane integer range.
+   * Unset -> default silently. Present-but-garbage (non-integer, out of
+   * [1, 1440]) -> warn and fall back to the default (forward pointer from
+   * the T-01 review: never trust this env var unclamped).
+   * @readonly
+   * @type {number}
+   * @memberof AppConfig
+   */
+  get IMPERSONATION_TTL_MINUTES(): number {
+    const DEFAULT_TTL_MINUTES = 240;
+    const MIN_TTL_MINUTES = 1;
+    const MAX_TTL_MINUTES = 1440;
+
+    const raw = process.env.ARI_IMPERSONATION_TTL_MINUTES;
+    if (raw === undefined || raw === null || raw.trim() === '') {
+      return DEFAULT_TTL_MINUTES;
+    }
+
+    const parsed = Number(raw);
+    const isValid =
+      Number.isInteger(parsed) &&
+      parsed >= MIN_TTL_MINUTES &&
+      parsed <= MAX_TTL_MINUTES;
+
+    if (!isValid) {
+      this.logger._warn(
+        `Invalid ARI_IMPERSONATION_TTL_MINUTES="${raw}"; falling back to default ${DEFAULT_TTL_MINUTES} minutes`,
+      );
+      return DEFAULT_TTL_MINUTES;
+    }
+
+    return parsed;
   }
 }

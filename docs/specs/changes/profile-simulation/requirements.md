@@ -349,7 +349,7 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 
 ### NFR-IMP-003 — Performance
 - **Category:** performance
-- **Target:** Session lookup adds ≤ 10 ms p95 per request (single indexed PK read, no joins); user search ≤ 500 ms p95 on the dev DB.
+- **Target:** Session resolution adds ≤ 15 ms p95 per request (one indexed PK read on `impersonation_sessions` plus one profile read joining `sec_user_roles`→`sec_roles`, no cache — D-imp-4); user search ≤ 500 ms p95 on the dev DB.
 - **How verified:** timing logged in the middleware at `debug` level over 50 requests; **disqualifier:** if the 50 samples span more than 2× the median (shared dev DB noise) the number is not evidence — report the spread.
 
 ### NFR-IMP-004 — Observability

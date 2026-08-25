@@ -53,3 +53,24 @@ _(entries appended per task)_
 - [x] `npm run migration:revert` → FK, 3 indexes, both tables dropped in reverse order; `Migration … has been reverted successfully` → `migration:show`: `[ ] CreateImpersonationTables1787699586530`
 - [x] `npm run migration:dev:execute` (re-apply) → the shell wrapper hit a 5-min cap during output capture, so the final state was **re-measured separately**: `migration:show` → `[X] 384 CreateImpersonationTables1787699586530`; `INFORMATION_SCHEMA.TABLES` → `impersonation_actions`, `impersonation_sessions` both present. Forward and backward paths proven (K-006).
 - Disqualifier check: no `error` line in any of the three runs' stripped output.
+
+---
+
+## T-02 — Repository + `ImpersonationService`
+
+- **Status:** **PASS** (attempt 1) → `[x]`
+- **Date:** 2026-08-25
+- **Attempts:** 1 (Implementer `akili-implementer`/sonnet, effort high; Reviewer `akili-reviewer`/opus, lenses reliability + risk)
+- **Requirements covered:** R-IMP-001 (search rules), R-IMP-002 (all clauses), R-IMP-004 (end/expiry/current), R-IMP-005 (`logAction`); T-01 forward pointers (TTL clamp, single Node clock) discharged
+- **Files (9 new/changed, +1,294):** `impersonation/{impersonation.service.ts,+spec, impersonation.module.ts, repositories/impersonation-user.repository.ts,+spec, types/impersonation.types.ts, errors/impersonation-service.error.ts}`, `shared/utils/app-config.util.ts` (+spec) `IMPERSONATION_TTL_MINUTES` clamp [1,1440] default 240
+- **Implementer verification:** `npx jest src/domain/entities/impersonation src/domain/shared/utils/app-config.util.spec.ts --silent` → 3 suites / 41 tests green · mutation proof: supersede block removed → `expect(queryBuilder.set).toHaveBeenCalledWith(...) — Number of calls: 0` (spec:258), restored · `npx eslint` over both paths clean (after `prettier --write`, a fixer not a gate) · `tsc -p tsconfig.build.json --noEmit` 0 errors
+- **Leader full-suite re-measure (isolated):** `npm test -- --silent` → 340 suites / 2,449 tests passed
+- **Reviewer verdict:** PASS — "every acceptance item implemented and proven at the level the task's disqualifier permits; DI constraints hold exactly (no `CurrentUserUtil`, repository = `EntityManager` only, no cache); `?`+array parameterization is the exempted case in `src/CLAUDE.md` §7; all four recorded deviations defensible." Deviations accepted: no `roleName` (client computes), `blocked_reason` precedence self > system_admin > inactive, plain `@Injectable` repository (no local entity for `sec_*`), `ImpersonationServiceError extends HttpException` keeps `errors` a string (verified against `global.exception.ts:29`).
+- **Decisions (Leader, recorded in design):** D-imp-16 — `TargetProfileDto` without `roleName`; middleware derives `req.user.roles` from active `user_role_list`; null target ⇒ `SESSION_INVALID`. NFR-IMP-003 wording corrected (PK read + profile join, ≤ 15 ms).
+
+### ADVISORY (recorded, non-gating)
+- **→ T-03:** derive `roles[]` on swap (D-imp-16); guard `resolve()` returning `valid` with `target: null` → `403 SESSION_INVALID`.
+- **→ T-04:** coerce `is_active` tinyint `1/0` → boolean in the DTO mapping (client `RolesService` may compare `=== true`); LIKE wildcards `%`/`_` in `search` are not escaped (parameterized, admin-only, capped at 20) — escape in the DTO/service if desired.
+- **→ T-05:** `impersonation.service.ts` added to the file list — `warn` lines for `end` and lazy `expired` (NFR-IMP-004).
+- **→ T-06:** assert on `is_active` wire type; the ownership check (`findOne` `where` with `actor_user_id` + `is_active`) is only falsifiable there (KZ-001 — the unit suite drives `findOne` by return value; a `resolve` that dropped the actor filter stays green).
+- Test hygiene: TTL mutated in a test body rather than `beforeEach`; supersede-before-insert ordering not asserted. Recorded; no task change.
