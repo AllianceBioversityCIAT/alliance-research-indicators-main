@@ -160,10 +160,10 @@ No process-level cache keyed by user id found (`CacheService`, `ClarisaProjectsS
 | --- | --- |
 | `action_id` | `bigint AI PK` |
 | `session_id` | `char(36) NOT NULL`, `@ManyToOne(ImpersonationSession)` FK |
-| `method` | `varchar(10)` |
-| `route_pattern` | `varchar(255)` — Express `req.route?.path` (e.g. `/results/:resultCode/general-information`) |
-| `path` | `varchar(512)` — `originalUrl` truncated |
-| `status_code` | `smallint` |
+| `method` | `varchar(10) NOT NULL` |
+| `route_pattern` | `varchar(255) NOT NULL` — Express `req.route?.path ?? req.originalUrl` (coalesce: unmatched routes have no `req.route`) (e.g. `/results/:resultCode/general-information`) |
+| `path` | `varchar(512) NOT NULL` — `originalUrl` truncated |
+| `status_code` | `smallint NOT NULL` |
 | `result_official_code` | `bigint NULL` — from `req.params[RESULT_CODE_PARAM]` (this is the **official code**, not `result_id`) |
 | `created_at` | `timestamp(6) default now` |
 | index | `idx_impersonation_actions_session (session_id)` |
@@ -186,7 +186,7 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 ### POST /api/v1/impersonation/start
 - **Roles/Guards:** `@UseGuards(RolesGuard)` `@Roles(SYSTEM_ADMIN)` · **Body DTO:** `StartImpersonationDto { target_user_id: positive int; reason?: ≤ 500 }`
 - **Response data:** `{ session: {session_id, started_at, expires_at}, user: TargetProfileDto }`
-- **`TargetProfileDto`** = the client `UserCache` shape: `sec_user_id, first_name, last_name, email, is_active, status_id, roleName, user_role_list: [{ is_active, user_id, role_id, role: { role_id, sec_role_id, focus_id, name, is_active, justification_update } }]` — sourced from `sec_user_roles` + `sec_roles` (columns to confirm in T-01; any column absent from `sec_roles` is returned `null`, and `RolesService.userHasCenterAdminAccess` is exercised in the e2e with a real Center Admin target).
+- **`TargetProfileDto`** = the client `UserCache` shape: `sec_user_id, first_name, last_name, email, is_active, status_id, roleName, user_role_list: [{ is_active, user_id, role_id, role: { role_id, sec_role_id, focus_id, name, is_active, justification_update } }]` — sourced from `sec_user_roles` + `sec_roles`. **OQ-5 resolved (T-01, `DESCRIBE` on dev 2026-08-25):** `sec_roles` has `sec_role_id (PK), name varchar(60), focus_id bigint NOT NULL, is_active, justification_update text, description, is_internal`; `sec_user_roles` has `sec_user_role_id (PK), user_id, role_id, is_active`; `sec_users` has `sec_user_id, first_name, last_name, email, status_id, is_active, deleted_at, last_login_at, carnet`. Every field the client `Role` reads exists — no `null` fallback needed. Role names come only via `sec_user_roles.role_id → sec_roles.sec_role_id`. `RolesService.userHasCenterAdminAccess` is exercised in the e2e with a real Center Admin target.
 - **Errors:** `400` · `403` non-admin · `404` `TARGET_NOT_FOUND` (missing/inactive) · `409` `TARGET_IS_ADMIN` / `TARGET_IS_SELF` · `409` `NESTED` (middleware)
 
 ### POST /api/v1/impersonation/end
@@ -301,6 +301,7 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 | D-imp-12 | 2026-08-25 | Impersonation header gated on the `X-Ari-Auth-Call` marker, not on host strings | `mainApiUrl` may equal `managementApiUrl` (J-17) |
 | D-imp-13 | 2026-08-25 | `ImpersonationService` depends only on cache/api/router; side effects by callers | Break DI cycle (J-09) |
 | D-imp-14 | 2026-08-25 | Banner inside the navbar component; platform padding bound to `navbarHeight()` | Only measured path (J-04) |
+| D-imp-15 | 2026-08-25 | `ImpersonationAction` does **not** extend `AuditableEntity` (append-only, `created_at` only) — a deliberate exception to `src/CLAUDE.md` §7; FK named readably `fk_impersonation_actions_session` and declared on the entity | An audit row is immutable by definition; a derived sha1 FK name would drift on the next `migration:generate` (T-01 review advisories) |
 
 **Reversion challenge (Step 2.3):** replacing the hardcoded `pt-[88px]/[109px]` with the measured height changes delivered layout code. *What does removing it break?* Nothing that is covered: the values are visual constants with no test; the measured value equals them when no banner is present (88/109 = navbar heights). Recorded; no design change.
 
@@ -315,7 +316,9 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 Still **Full**. `/akili-execute` trips on > 15 tasks, > 2,200 LOC, or > 3 review rounds.
 
 ## 14. Open questions
-Carried from requirements §10 (OQ-1..4) with the stated defaults; plus **OQ-5**: exact `sec_roles` columns (`focus_id`, `sec_role_id`, `justification_update`) — resolved by T-01's query against dev.
+Carried from requirements §10 (OQ-1..4) with the stated defaults. **OQ-5 closed** — see §4 `TargetProfileDto` (all columns present on dev).
+
+**Environment note (T-01):** `npm run migration:generate` currently fails against dev with `Table 'alliancereportingdb.orm_metadata' doesn't exist` (TypeORM's bookkeeping table for stored generated columns; pre-existing, caused by `result_pool_funding_alignment_sp.active_primary_alignment`). The T-01 migration was hand-authored to the generator's format. Creating `orm_metadata` on dev is a human decision outside this spec.
 
 ## 15. References
 - TRD §10 security model; `app.module.ts` for server interceptor registration; `docs/ux-ui/design.md` §7.1 tokens, §8.1 components.

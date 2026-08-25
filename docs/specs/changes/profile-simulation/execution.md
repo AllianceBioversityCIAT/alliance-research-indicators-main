@@ -17,3 +17,37 @@
 ## Task Execution History
 
 _(entries appended per task)_
+
+---
+
+## T-01 — Schema, entities, migration, enums
+
+- **Status:** Reviewer **PASS** (attempt 2) · task **`[~]` in-progress** — code complete; acceptance boxes 1–2 (human migration apply on dev + revert/re-apply) owed to RB-2
+- **Date:** 2026-08-25
+- **Attempts:** 2 (Implementer `akili-implementer`/sonnet; Reviewers `akili-reviewer`/opus ×2 in parallel on attempt 1 — migration surface → lens split: A readability/reliability, B risk/resilience; scoped re-audit by A on attempt 2)
+- **Requirements covered:** requirements §5 (data), R-IMP-002/004/005 data columns, OQ-5 (closed)
+
+### Attempt 1 — effort high
+- Files: `src/domain/entities/impersonation/entities/impersonation-{session,action}.entity.ts`, `…/enum/impersonation-{end-reason,error-code}.enum.ts`, `src/db/migrations/1787699586530-createImpersonationTables.ts`, `.env.example`
+- Implementer verification: `npx eslint <paths>` clean · `npx tsc -p tsconfig.build.json --noEmit` 0 errors · `migration:show` (ANSI-stripped) exactly 1 pending `[ ] CreateImpersonationTables1787699586530` · migration **not** applied (K-015) · `DESCRIBE sec_roles / sec_user_roles / sec_users` captured (read-only ts-node script, deleted afterwards)
+- **Environment finding:** `npm run migration:generate` fails on dev — `QueryFailedError: Table 'alliancereportingdb.orm_metadata' doesn't exist` (TypeORM bookkeeping for stored generated columns; pre-existing, caused by `result_pool_funding_alignment_sp.active_primary_alignment`). Migration hand-authored to the generator's format; Reviewer B byte-matched the `AuditableEntity` DDL prefix against `1782400514019-CreateStrategicObjectivesTable.ts`. Creating `orm_metadata` on dev = human decision (recorded in design §14).
+- Reviewer A — **FAIL**: (1) OQ-5 not recorded in design §4/§14, RB-1 open; (2) `impersonation_actions.method/route_pattern/path/status_code` nullable in entity + migration while design §3 / requirements §5 mark only `result_official_code` NULL. Uncovered (human): migration unexecuted (K-006/RB-2).
+- Reviewer B — **FAIL**: (1) OQ-5 not recorded (same); (2) migration unexecuted — human-owned, not chargeable. Verified DDL column-for-column, `down` order, no `namedPlaceholders` trap; FK sha1 name "unverified".
+- Leader adjudication: OQ-5 = Leader doc edit (Implementer delivered the `DESCRIBE` in its report) → written into design §4/§14, RB-1 closed, not charged. Nullability = real conformance defect → attempt 2. FK-name advisory adopted as D-imp-15 (design §3 does not name the FK).
+
+### Attempt 2 — effort xhigh
+- Files: `impersonation-action.entity.ts` (four columns `nullable: false`/`!`; `@JoinColumn({ foreignKeyConstraintName: 'fk_impersonation_actions_session' })` — option confirmed at `node_modules/typeorm/decorator/options/JoinColumnOptions.d.ts:16`; append-only comment), migration (four `NOT NULL`; FK renamed in `up`/`down`)
+- Implementer verification: eslint clean · tsc build 0 errors · `grep -n NULL` on migration → only `result_official_code` bare NULL in the actions table · `migration:show` still exactly one pending
+- Reviewer A — **PASS**: "Both blocking issues are closed … entity and DDL agree column-for-column; delta touched exactly the two files claimed (blob hashes), no collateral edits; `namedPlaceholders` trap still untripped."
+
+### ADVISORY (recorded, non-gating)
+- **Forward pointer → T-05:** `route_pattern` is now `NOT NULL` but design §3 sources it from `req.route?.path` (undefined on unmatched routes) → `logAction` would silently drop the row. T-05 must coalesce (`req.route?.path ?? req.originalUrl`) and cover `req.route === undefined`.
+- **Forward pointer → T-12:** `sec_roles.focus_id` is `NOT NULL` on dev, so the "Center Admin with `focus_id = null`" failing input is only constructible in the unit spec (fabricated DTO), not e2e.
+- **Forward pointer → T-02:** clamp/parse `IMPERSONATION_TTL_MINUTES` (a ms value pasted as minutes overflows `TIMESTAMP` 2038 ceiling); pick one clock (Node) for `expires_at` write and comparison and state it.
+- **Forward pointer → T-13:** `package.json` `migration:scan` script vs `src/CLAUDE.md` §7 claim that the scanner "was withdrawn" — one is stale.
+- `action_id` typed `number` for a bigint PK (safe: `bigNumberStrings: false`), sibling exemplar uses `string` — cosmetic.
+- Design §3 `impersonation_actions` rows now carry explicit `NOT NULL` markers (Leader edit after PASS).
+
+### Owed before `[x]` (RB-2, owner: human)
+- [ ] `npm run migration:dev:execute` on dev → `migration:show` shows `[X] CreateImpersonationTables1787699586530`
+- [ ] `npm run migration:revert` then re-apply both succeed (outputs pasted here)
