@@ -12,6 +12,16 @@
       @if (!getProjectDetailService.loading()) {
         <span class="self-center"><app-chart-explainer #chxAct1 key="act-1-identity" /></span>
       }
+      @if (hasLoadedInitialProjectDetail()) {
+        <button type="button"
+          class="ml-auto flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center self-center rounded-full border-0 bg-transparent p-0 text-[var(--ac-grey-700)] transition-colors duration-150 hover:text-[var(--ac-light-blue-400)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Refresh dashboard data"
+          [disabled]="refreshing() || getProjectDetailService.loading()"
+          [attr.aria-busy]="refreshing()"
+          (click)="refreshAll()">
+          <i class="pi pi-refresh text-[16px]" [class.pi-spin]="refreshing()" aria-hidden="true"></i>
+        </button>
+      }
     </h2>
 
     <!-- KPI summary strip (R-PD-002, R-HL-002) -->

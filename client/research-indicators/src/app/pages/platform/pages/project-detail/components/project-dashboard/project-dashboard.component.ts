@@ -10,6 +10,7 @@ import { ProjectDashboardCardComponent } from '../project-dashboard-card/project
 import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
+import { GetContractInsightsService } from '@shared/services/get-contract-insights.service';
 import { environment } from '@envs/environment';
 import { GetProjectDetail, GetProjectDetailIndicator } from '@shared/interfaces/get-project-detail.interface';
 import { ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
@@ -131,6 +132,7 @@ export class ProjectDashboardComponent {
   readonly getProjectDetailService = inject(GetProjectDetailService);
   readonly contractDashboard = inject(GetContractDashboardService);
   readonly clarisaProject = inject(GetClarisaProjectService);
+  readonly insights = inject(GetContractInsightsService);
   private readonly fileManagerService = inject(FileManagerService);
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
@@ -142,6 +144,26 @@ export class ProjectDashboardComponent {
   readonly staggerMs = WIDGET_ENTRY_STAGGER_MS;
 
   readonly indicatorView = signal<'bars' | 'heatmap'>('bars');
+
+  // R-DRF-002/NFR-DRF-001: true while refreshAll() is in flight — drives the Refresh button's
+  // `disabled`/`aria-busy` state.
+  readonly refreshing = signal(false);
+
+  // R-DRF-002/NFR-DRF-001/KZ-015 (Reviewer rework attempt 2): gates the Refresh button's presence
+  // in the DOM. This is a LATCH, not a live derivation — deliberately NOT
+  // `!getProjectDetailService.loading()` (the pattern the `chxAct1` explainer icon uses just
+  // below: that signal flips true again MID-refresh, since refreshAll() invalidates and reloads
+  // project detail as one of its four sources, and gating visibility on it would unmount the
+  // button — and steal its DOM focus — partway through every refresh), and ALSO deliberately NOT
+  // `computed(() => !!getProjectDetailService.project())` (attempt 1's approach: sound for the
+  // happy path, but `GetProjectDetailService.fetchProjectDetail` sets `project` to null on BOTH
+  // its failure paths, so a live derivation off it unmounts the button on a FAILED refresh too —
+  // exactly when the user most needs to retry). The latch is flipped true (and only true, never
+  // reset — see the `effect()` below) the first time `project()` resolves non-null, so it answers
+  // "has the initial load completed at least once" — true for the rest of the component's
+  // lifetime regardless of what any later refresh does or doesn't resolve to.
+  private readonly hasEverLoadedProjectDetail = signal(false);
+  readonly hasLoadedInitialProjectDetail = computed(() => this.hasEverLoadedProjectDetail());
 
   // R-CXP-003: each Act section's `aria-describedby` resolves to that Act's own explainer
   // description. The `#chxActN` template refs live inside the same `@if`-gated `<h2>`/`<section>`
@@ -1343,6 +1365,14 @@ export class ProjectDashboardComponent {
   constructor() {
     this.initReducedMotionDetection();
 
+    // R-DRF-002/NFR-DRF-001 latch (Reviewer rework attempt 2) — see hasEverLoadedProjectDetail's
+    // own comment above for why this must be a one-way latch and not a live derivation.
+    effect(() => {
+      if (this.getProjectDetailService.project()) {
+        this.hasEverLoadedProjectDetail.set(true);
+      }
+    });
+
     effect(() => {
       const contractId = this.contractId();
       if (contractId) {
@@ -1618,6 +1648,37 @@ export class ProjectDashboardComponent {
     if (contractId) {
       this.getProjectDetailService.invalidate(contractId);
       void this.syncProjectFromSharedService(contractId);
+    }
+  }
+
+  // Explicit Refresh control (R-DRF-002, DD-2). Force-reloads all four dashboard data sources —
+  // project detail, dashboard report, insights, CLARISA project — via `Promise.allSettled` so one
+  // source failing doesn't strand `refreshing` true or block the others (each region keeps its
+  // own scoped error UI). Deliberately does NOT call `generateExecutiveOverview()` or
+  // `loadExecutiveOverviewSummary()` — the AI executive overview stays first-load/user-driven
+  // (DD-4); refreshing must never trigger or clear it.
+  async refreshAll(): Promise<void> {
+    const contractId = this.contractId();
+    if (!contractId || this.refreshing()) {
+      return;
+    }
+
+    this.refreshing.set(true);
+    try {
+      await Promise.allSettled([
+        (async () => {
+          this.getProjectDetailService.invalidate(contractId);
+          await this.syncProjectFromSharedService(contractId);
+        })(),
+        this.contractDashboard.load(contractId, { force: true }),
+        this.insights.load(contractId, { force: true }),
+        (async () => {
+          this.clarisaProject.invalidate(contractId);
+          await this.clarisaProject.load(contractId);
+        })()
+      ]);
+    } finally {
+      this.refreshing.set(false);
     }
   }
 

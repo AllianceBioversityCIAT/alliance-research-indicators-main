@@ -8,6 +8,7 @@ import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
+import { GetContractInsightsService } from '@shared/services/get-contract-insights.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
@@ -160,6 +161,14 @@ describe('ProjectDashboardComponent', () => {
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let getClarisaProjectServiceMock: {
     data: ReturnType<typeof signal<ContractClarisaProject | null>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    loadError: ReturnType<typeof signal<boolean>>;
+    loadedContractId: ReturnType<typeof signal<string | null>>;
+    load: jest.Mock;
+    invalidate: jest.Mock;
+  };
+  let getContractInsightsServiceMock: {
+    data: ReturnType<typeof signal<unknown>>;
     loading: ReturnType<typeof signal<boolean>>;
     loadError: ReturnType<typeof signal<boolean>>;
     loadedContractId: ReturnType<typeof signal<string | null>>;
@@ -651,6 +660,24 @@ describe('ProjectDashboardComponent', () => {
       invalidate: jest.fn()
     };
 
+    // T-02, R-DRF-002: not previously injected by ProjectDashboardComponent (only by the three
+    // InsightsSectionComponent instances, stubbed in this suite) — refreshAll() injects it
+    // directly so Refresh can force-reload insights alongside the other three sources.
+    // `loadedContractId` mirrors the real service (set on successful load) so a spec can assert
+    // `contractDashboard.update()`/"Try again" isn't a no-op after refreshAll() resolves — the
+    // service's `load(id, {force:true})` repopulates it on success, same as GetContractDashboardService.
+    const insightsLoadedContractId = signal<string | null>(null);
+    getContractInsightsServiceMock = {
+      data: signal<unknown>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      loadedContractId: insightsLoadedContractId,
+      load: jest.fn().mockImplementation(async (contractId: string) => {
+        insightsLoadedContractId.set(contractId);
+      }),
+      invalidate: jest.fn()
+    };
+
     apiMock = {
       GET_ResultsCount: jest.fn(),
       GET_IndicatorDetails: jest.fn(),
@@ -677,6 +704,7 @@ describe('ProjectDashboardComponent', () => {
         { provide: GetProjectDetailService, useValue: getProjectDetailServiceMock },
         { provide: GetContractDashboardService, useValue: contractDashboardMock },
         { provide: GetClarisaProjectService, useValue: getClarisaProjectServiceMock },
+        { provide: GetContractInsightsService, useValue: getContractInsightsServiceMock },
         {
           provide: ProjectUtilsService,
           useValue: {
@@ -4890,6 +4918,150 @@ describe('ProjectDashboardComponent', () => {
       component.setIndicatorView('bars');
       fixture.detectChanges();
       expect(explainerButtons().length).toBe(6);
+    });
+  });
+
+  describe('Refresh button + refreshAll() (T-02, R-DRF-002, NFR-DRF-001)', () => {
+    function refreshButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('[aria-label="Refresh dashboard data"]');
+    }
+
+    it('reloads all four dashboard data sources when Refresh is clicked', async () => {
+      await setup();
+      // Clear the initial-mount calls (constructor effect) so assertions below are only about
+      // what the click itself triggers.
+      getProjectDetailServiceMock.invalidate.mockClear();
+      getProjectDetailServiceMock.load.mockClear();
+      contractDashboardMock.load.mockClear();
+      getContractInsightsServiceMock.load.mockClear();
+      getClarisaProjectServiceMock.invalidate.mockClear();
+      getClarisaProjectServiceMock.load.mockClear();
+
+      const button = refreshButton();
+      expect(button).toBeTruthy();
+      button!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(getProjectDetailServiceMock.invalidate).toHaveBeenCalledWith('C-1');
+      expect(getProjectDetailServiceMock.load).toHaveBeenCalledWith('C-1');
+      expect(contractDashboardMock.load).toHaveBeenCalledWith('C-1', { force: true });
+      expect(getContractInsightsServiceMock.load).toHaveBeenCalledWith('C-1', { force: true });
+      expect(getClarisaProjectServiceMock.invalidate).toHaveBeenCalledWith('C-1');
+      expect(getClarisaProjectServiceMock.load).toHaveBeenCalledWith('C-1');
+    });
+
+    it('keeps the button disabled with aria-busy while a reload is in flight, then re-enables it once allSettled resolves (KZ-015)', async () => {
+      await setup();
+      let resolveLoad!: () => void;
+      contractDashboardMock.load.mockImplementation(() => new Promise<void>(resolve => (resolveLoad = resolve)));
+
+      const button = refreshButton();
+      expect(button).toBeTruthy();
+      // Arrange the transition: not-busy first.
+      expect(button!.disabled).toBe(false);
+      expect(button!.getAttribute('aria-busy')).toBe('false');
+
+      const refreshPromise = component.refreshAll();
+      fixture.detectChanges();
+
+      expect(button!.disabled).toBe(true);
+      expect(button!.getAttribute('aria-busy')).toBe('true');
+
+      resolveLoad();
+      await refreshPromise;
+      fixture.detectChanges();
+
+      expect(button!.disabled).toBe(false);
+      expect(button!.getAttribute('aria-busy')).toBe('false');
+    });
+
+    it('does not call generateExecutiveOverview on refresh (DD-4 — generation stays first-load/user-driven)', async () => {
+      await setup();
+      const genSpy = jest.spyOn(component, 'generateExecutiveOverview');
+
+      await component.refreshAll();
+
+      expect(genSpy).not.toHaveBeenCalled();
+    });
+
+    // T-01 review note: GetContractDashboardService/GetContractInsightsService only repopulate
+    // `loadedContractId` on a SUCCESSFUL load — `contractDashboard.update()` ("Try again") is a
+    // no-op while it's null. A refreshAll() that force-reloads without landing back on the
+    // current contract id would silently break the very "Try again" retry it's meant to support.
+    it('repopulates loadedContractId for the force-reloaded services once refreshAll() resolves', async () => {
+      await setup();
+      contractDashboardMock.loadedContractId.set(null);
+      getContractInsightsServiceMock.loadedContractId.set(null);
+
+      await component.refreshAll();
+
+      expect(contractDashboardMock.loadedContractId()).toBe('C-1');
+      expect(getContractInsightsServiceMock.loadedContractId()).toBe('C-1');
+    });
+
+    it('is absent while the initial project-detail skeleton is loading, then appears once loaded (KZ-015)', async () => {
+      await setup('C-1', { projectLoading: true, projectData: null });
+      expect(refreshButton()).toBeNull();
+
+      getProjectDetailServiceMock.loading.set(false);
+      getProjectDetailServiceMock.project.set({
+        grant_amount: 1,
+        divisionId: 'D1',
+        division: 'Division',
+        unitId: 'U1',
+        unit: 'Unit',
+        indicators: []
+      } as unknown as GetProjectDetail);
+      fixture.detectChanges();
+
+      const button = refreshButton();
+      expect(button).toBeTruthy();
+      expect(button!.disabled).toBe(false);
+    });
+
+    it('keeps DOM focus on the Refresh button through a full refresh cycle (NFR-DRF-001)', async () => {
+      await setup();
+      const button = refreshButton();
+      expect(button).toBeTruthy();
+      button!.focus();
+      expect(document.activeElement).toBe(button);
+
+      button!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(document.activeElement).toBe(button);
+    });
+
+    // Reviewer rework attempt 2: `hasLoadedInitialProjectDetail` must be a LATCH ("has the
+    // initial load completed at least once"), not a live derivation off `project()`.
+    // `GetProjectDetailService.fetchProjectDetail` sets `project` to null on BOTH its failure
+    // paths (bad response, thrown error) — so a derived-from-`project()` gate unmounts the
+    // button, and steals its DOM focus, on the very refresh that failed and most needs a retry
+    // affordance. NFR-DRF-001 ("focus stays on the button after refresh") is unqualified: it does
+    // not carve out an exception for a failed refresh.
+    it('keeps the button present, enabled, and focused after a FAILED refresh (Reviewer rework attempt 2)', async () => {
+      await setup();
+      const button = refreshButton();
+      expect(button).toBeTruthy();
+      button!.focus();
+      expect(document.activeElement).toBe(button);
+
+      // Simulate GetProjectDetailService.fetchProjectDetail's failure path: `project()` -> null,
+      // exactly as the real service does on both `successfulRequest === false` and a thrown error.
+      getProjectDetailServiceMock.load.mockImplementation(async () => {
+        getProjectDetailServiceMock.project.set(null);
+      });
+
+      await component.refreshAll();
+      fixture.detectChanges();
+
+      const buttonAfter = refreshButton();
+      expect(buttonAfter).toBeTruthy();
+      expect(buttonAfter).toBe(button);
+      expect(buttonAfter!.disabled).toBe(false);
+      expect(document.activeElement).toBe(button);
     });
   });
 });

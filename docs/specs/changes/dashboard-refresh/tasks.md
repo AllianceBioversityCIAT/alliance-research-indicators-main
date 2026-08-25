@@ -13,4 +13,4 @@
 - **Files:** `project-dashboard.component.{ts,html,spec.ts}` only.
 - **Tests (K-004 red first):** click → 4 loads called with force/invalidate (red if one dropped); `disabled`+`aria-busy` true during in-flight promise, false after `allSettled` (arrange a pending promise, resolve, assert transition — KZ-015); `generateExecutiveOverview` spy NOT called; button absent/disabled while `getProjectDetailService.loading()`; `document.activeElement` remains the button after refresh.
 - **Done:** targeted jest green; `npm run build`; spec-tsc = 942 (HEAD baseline re-measured 2026-08-25); eslint; hex grep on html clean. Owner visual glance on D514 (declared jsdom gap).
-- Skills: `angular-developer`, `ui-ux-pro-max`, `tdd` · Effort: medium · Deps: T-01 · **Status:** todo
+- Skills: `angular-developer`, `ui-ux-pro-max`, `tdd` · Effort: medium · Deps: T-01 · **Status:** done
