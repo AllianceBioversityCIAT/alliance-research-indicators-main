@@ -47,7 +47,7 @@ T-01 (server) ∥ client chain — cross-package parallel OK. T-02→T-03→T-04
 
 ### T-05 — Validation sweep (final gate)
 
-- [ ] **Covers:** every clause's runtime/visual owed evidence; NFR-1/2/3 · **Design:** §11 · **Skills:** `systematic-debugging` · **Effort:** high
+- [~] **Covers:** every clause's runtime/visual owed evidence; NFR-1/2/3 · **Design:** §11 · **Skills:** `systematic-debugging` · **Effort:** high
 - Scope: full server + client suites (clean scope if the concurrent session is still active — `--testPathIgnorePatterns='chart-explainer'`, contamination noted); coverage floors; `tokens:validate`; build + budgets + chunk stats; **live HTTP check** on dev DB (D514: flows block vs hand-computed expectation from the SP/lever reports — closes T-01's SQL disqualifier); **HITL visual pass** (owner screenshots or browser): Sankey renders with role line-styles + legend + cap note, map↔bars color correspondence both themes, axis no-collision at 768px with 3-digit values, "?" button clear of data, label contrast on all ramp steps used (closes the R-DCR-008-style contrast gap named in requirements §7).
 - **Verify:** each command's raw output recorded; failures verbatim. **Disqualifier:** a green full suite that includes the foreign session's in-flight specs is contaminated — measure clean-scope or after their landing; the visual pass without BOTH themes is incomplete evidence, report it as partial.
 
