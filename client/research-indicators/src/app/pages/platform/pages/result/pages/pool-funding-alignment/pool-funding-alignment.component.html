@@ -387,6 +387,12 @@
                       <span>{{ NO_TOC_ALIGNMENT_MESSAGE }}</span>
                     }
                   </div>
+                  @if (row.isOrphaned) {
+                    <span class="text-[12px] text-[var(--ac-grey-600)]"
+                          [attr.data-testid]="'pf-alignment-orphaned-explanation-' + row.alignment.sp_code">
+                      {{ ORPHANED_TOC_EXPLANATION }}
+                    </span>
+                  }
                 </div>
               }
 

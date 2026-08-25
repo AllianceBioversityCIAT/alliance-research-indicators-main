@@ -170,6 +170,14 @@ export default class PoolFundingAlignmentComponent {
   // Read-only orphan tag (display-only) — reuses the stale tag's `.pf-stale-tag`
   // visual treatment verbatim (D-C2-10); only the copy differs.
   readonly ORPHANED_TOC_TAG = 'Not the current Primary — read-only';
+  // The tag above states WHAT the row is; this states WHY it is still on screen.
+  // R-BIL-129's own rationale — "data that is still stored — and still bound for
+  // PRMS — does not vanish from the screen" — was never surfaced in the UI, and
+  // three independent reviewers (QA Bug 1a, twice, and a product review
+  // 2026-08-25) each read the retained row as a defect. Copy only: the row, its
+  // retention, and OQ-3 are all untouched.
+  readonly ORPHANED_TOC_EXPLANATION =
+    'Retained for PRMS. This Science Program is submitted as Contributing, without Theory of Change mapping.';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16, applying T-15's
   // Reviewer finding (design.md §12.2, superseded-string record kept there). The
   // row this labels holds an explicit saved "No" answer — data that IS stored —
