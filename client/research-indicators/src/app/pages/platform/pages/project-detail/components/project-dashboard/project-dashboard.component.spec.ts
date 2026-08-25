@@ -258,7 +258,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
     contractDashboardMock.data.set({
@@ -272,7 +273,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
     contractDashboardMock.data.set({
@@ -286,7 +288,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
     contractDashboardMock.data.set({
@@ -300,7 +303,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     const currentTops = current.tops ?? { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
     contractDashboardMock.data.set({
@@ -314,7 +318,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     contractDashboardMock.data.set({
       ...current,
@@ -327,7 +332,8 @@ describe('ProjectDashboardComponent', () => {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     contractDashboardMock.data.set({
       ...current,
@@ -335,16 +341,62 @@ describe('ProjectDashboardComponent', () => {
     });
   }
 
+  // DD-8: lever_sp_flows single-sources the panel/chips/states, sp_alignment
+  // feeds only the detailed table. Test fixtures still author sp_alignment
+  // shorthand, so this derives a matching flows block (KZ-002-consistent)
+  // rather than requiring every call site to author both.
+  function deriveLeverSpFlows(sp_alignment: any | null) {
+    if (!sp_alignment) {
+      return null;
+    }
+    const links = (sp_alignment.sps ?? []).flatMap((sp: any) => {
+      const spLinks = sp.links ?? [];
+      if (spLinks.length > 0) {
+        return spLinks.map((link: any) => ({
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever 1',
+          sp_code: sp.sp_code,
+          sp_name: sp.name,
+          role: link.role ?? null,
+          count: 1
+        }));
+      }
+      // A real SP entry always implies at least one aligned result, even when
+      // the fixture omits its per-result links array.
+      return [
+        {
+          lever_id: 1,
+          lever_short_name: 'L1',
+          lever_full_name: 'Lever 1',
+          sp_code: sp.sp_code,
+          sp_name: sp.name,
+          role: null,
+          count: 1
+        }
+      ];
+    });
+    return {
+      contract_id: 'C-1',
+      results_total: (sp_alignment.results_with_alignment ?? 0) + (sp_alignment.results_without_alignment ?? 0),
+      results_with_alignment: sp_alignment.results_with_alignment ?? 0,
+      results_without_alignment: sp_alignment.results_without_alignment ?? 0,
+      links
+    };
+  }
+
   function setSpAlignment(sp_alignment: any | null) {
     const current = contractDashboardMock.data() ?? {
       summary: null,
       tops: { partners: [], primary_levers: [], main_contacts: [], contributors: [] },
       geo_scope: null,
-      sp_alignment: null
+      sp_alignment: null,
+      lever_sp_flows: null
     };
     contractDashboardMock.data.set({
       ...current,
-      sp_alignment
+      sp_alignment,
+      lever_sp_flows: deriveLeverSpFlows(sp_alignment)
     });
   }
 
@@ -386,7 +438,8 @@ describe('ProjectDashboardComponent', () => {
           contributors: []
         },
         geo_scope: options?.geoScope ?? null,
-        sp_alignment: options?.spAlignment ?? null
+        sp_alignment: options?.spAlignment ?? null,
+        lever_sp_flows: deriveLeverSpFlows(options?.spAlignment ?? null)
       };
     }
 

@@ -1097,6 +1097,7 @@
       <app-sp-alignment-graph
         [style.animation-delay.ms]="staggerMs.spGraph"
         [report]="contractDashboard.spAlignment()"
+        [flows]="contractDashboard.data()?.lever_sp_flows ?? null"
         [loading]="contractDashboard.loading()"
         [error]="contractDashboard.loadError()"
         (retry)="contractDashboard.update()">

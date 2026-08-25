@@ -1144,12 +1144,20 @@ export class ProjectDashboardComponent {
     return valid.length === 0;
   });
 
-  readonly spAlignmentEmpty = computed(
-    () =>
-      !this.contractDashboard.loading() &&
-      !this.contractDashboard.loadError() &&
-      (this.contractDashboard.spAlignment()?.sps ?? []).length === 0
-  );
+  // Single-sourced from lever_sp_flows (DD-8): sp_alignment feeds only the
+  // detailed table inside sp-alignment-graph, never this gate. A null flows
+  // block (sub-report degrade) is an error state, not an empty one — only a
+  // present-but-empty links[] collapses the panel into the no-data group.
+  readonly spAlignmentEmpty = computed(() => {
+    if (this.contractDashboard.loading() || this.contractDashboard.loadError()) {
+      return false;
+    }
+    const flows = this.contractDashboard.data()?.lever_sp_flows ?? null;
+    if (flows === null) {
+      return false;
+    }
+    return (flows.links ?? []).length === 0;
+  });
 
   readonly hasVisibleRankingCards = computed(
     () => !this.partnersEmpty() || !this.leversEmpty() || !this.mainContactPersonsEmpty() || !this.contributorsEmpty()

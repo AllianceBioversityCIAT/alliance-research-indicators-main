@@ -6,7 +6,7 @@
         Science Program Alignments
       </h2>
       <p class="m-0 font-['Barlow'] text-[14px] leading-4 text-[var(--ac-grey-700)]">
-        Bipartite view of primary results mapped to CLARISA Science Programs
+        Flow of primary results from Levers to CLARISA Science Programs
       </p>
     </div>
     @if (hasData()) {
@@ -33,7 +33,7 @@
         <p-skeleton width="25%" height="14px" borderRadius="4px" />
       </div>
     </div>
-    } @else if (error()) {
+    } @else if (isFlowsError()) {
     <div class="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center" role="alert">
       <i class="pi pi-exclamation-triangle text-[24px] text-[var(--ac-red-1)]" aria-hidden="true"></i>
       <p class="m-0 max-w-64 font-['Barlow'] text-[13px] leading-snug text-[var(--ac-grey-700)]">
@@ -56,18 +56,23 @@
       @if (isCapped()) {
       <div class="flex items-center gap-1.5 rounded-md bg-[var(--ac-grey-100)] px-3 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-700)]">
         <i class="pi pi-info-circle text-[13px] text-[var(--ac-light-blue-400)]" aria-hidden="true"></i>
-        <span>Showing {{ maxResultNodes }} of {{ totalResultNodesCount() }} results</span>
+        <span>Showing top {{ maxLinks }} of {{ totalLinksCount() }} links</span>
       </div>
       }
 
       <app-viz-chart
         [options]="chartOptions()"
         [tableModel]="tableModel()"
-        [chartTitle]="'Science Program and Result Alignments bipartite graph'"
+        [chartTitle]="'Lever to Science Program alignment flow'"
         (chartClick)="onChartClick($event)"
-        height="360px" />
+        (chartInit)="onChartInit($event)"
+        height="320px" />
 
-      <!-- Role Legend (WCAG 1.4.1 non-color-alone: stroke pattern + weight + label) -->
+      <!-- Role Legend (WCAG 1.4.1 non-color-alone): describes the ribbon
+           OUTLINE pattern + weight + label actually rendered per role
+           (lineStyle.borderType/borderWidth/borderColor — the sankey ribbon
+           is a filled path, so the non-color encoding is a stroked border,
+           not the fill line itself). -->
       <div class="flex flex-wrap items-center justify-center gap-5 pt-1" role="region" aria-label="Alignment role legend">
         <div class="flex items-center gap-2">
           <span class="inline-block h-0 w-5 border-t-[3px] border-solid border-[var(--ac-viz-role-primary)]" aria-hidden="true"></span>
@@ -81,6 +86,63 @@
           <span class="inline-block h-0 w-5 border-t-[1.5px] border-dotted border-[var(--ac-viz-role-unknown)]" aria-hidden="true"></span>
           <span class="font-['Barlow'] text-[12.5px] font-medium text-[var(--ac-grey-700)]">Role unknown</span>
         </div>
+      </div>
+
+      <!-- Detailed per-result table (challenge #3): the only non-visual path to
+           per-result data; Result Code is a real anchor, closing the pre-existing
+           keyboard-only drill-through gap. Falls back to aggregate per-link rows
+           when sp_alignment has degraded but the chart still renders (DD-8). -->
+      <div class="mt-1 min-h-0 flex-1 overflow-y-auto rounded-md border border-[var(--ac-grey-200)]">
+        @if (usesDetailedRows()) {
+        <table class="m-0 w-full border-collapse text-left">
+          <caption class="sr-only">Science-Program alignments by result and role</caption>
+          <thead>
+            <tr class="sticky top-0 bg-[var(--ac-grey-100)]">
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Science Program</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Result Code</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Result Title</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of detailedRows(); track row.sp + row.resultCode + row.role) {
+            <tr class="border-t border-[var(--ac-grey-200)]">
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.sp }}</td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px]">
+                <a [routerLink]="['/result', row.resultCode]"
+                  class="rounded text-[var(--ac-primary-blue-600)] underline decoration-dotted underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]">
+                  {{ row.resultCode }}
+                </a>
+              </td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.resultTitle }}</td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.role }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+        } @else {
+        <table class="m-0 w-full border-collapse text-left">
+          <caption class="sr-only">Lever to Science-Program alignment counts (detailed results unavailable)</caption>
+          <thead>
+            <tr class="sticky top-0 bg-[var(--ac-grey-100)]">
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Lever</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Science Program</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Role</th>
+              <th scope="col" class="px-2.5 py-1.5 font-['Barlow'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-700)]">Results</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of aggregateRows(); track row.lever + row.sp + row.role) {
+            <tr class="border-t border-[var(--ac-grey-200)]">
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.lever }}</td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.sp }}</td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] text-[var(--ac-grey-800)]">{{ row.role }}</td>
+              <td class="px-2.5 py-1.5 font-['Barlow'] text-[12px] tabular-nums text-[var(--ac-grey-800)]">{{ row.count }}</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+        }
       </div>
     </div>
     }
