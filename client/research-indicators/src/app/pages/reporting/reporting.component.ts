@@ -97,7 +97,7 @@ export default class ReportingComponent {
       pitfall: 'Confusing dissemination, training or awareness with use.'
     },
     policy: {
-      label: 'Policy Change & Investment Contribution',
+      label: 'Policy Change',
       type: 'funding',
       evidence: 'Policy documents, legal instruments, implementation evidence.',
       pitfall: 'Reporting consultations or advocacy without evidence of change.'
