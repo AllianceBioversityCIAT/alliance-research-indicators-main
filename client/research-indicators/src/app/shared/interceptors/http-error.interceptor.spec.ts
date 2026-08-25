@@ -1,12 +1,22 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpErrorResponse } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import {
+  HttpInterceptorFn,
+  HttpRequest,
+  HttpHandlerFn,
+  HttpErrorResponse,
+  HttpClient,
+  provideHttpClient,
+  withInterceptors
+} from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { of, throwError, firstValueFrom } from 'rxjs';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
 import { Router } from '@angular/router';
 import { httpErrorInterceptor } from './http-error.interceptor';
 import { fakeAsync, tick } from '@angular/core/testing';
+import { environment } from '../../../environments/environment';
 
 describe('httpErrorInterceptor', () => {
   const interceptor: HttpInterceptorFn = (req, next) => TestBed.runInInjectionContext(() => httpErrorInterceptor(req, next));
@@ -726,5 +736,166 @@ describe('httpErrorInterceptor', () => {
         done();
       }
     });
+  });
+});
+
+// R-SEL-001 — regression coverage for the saveErrors self-reporting loop.
+// Unlike the suite above (which invokes the interceptor function directly
+// against a mocked HttpHandlerFn), these tests mount the interceptor on a
+// REAL HttpClient pipeline via HttpTestingController. That is load-bearing:
+// the self-reporting recursion is only observable when api.saveErrors()'s
+// own POST is routed back through the SAME interceptor instance, which only
+// happens through the real HttpClient interceptor chain (KZ-017 — a test
+// that never flushes the saveErrors response cannot observe the recursion).
+describe('httpErrorInterceptor — saveErrors self-reporting loop (R-SEL-001)', () => {
+  const testSaveErrorsUrl = '/save-errors-test/';
+  const originalSaveErrorsUrl = environment.saveErrorsUrl;
+
+  let httpClient: HttpClient;
+  let httpMock: HttpTestingController;
+  let mockActionsService: any;
+  let mockCacheService: any;
+  let mockApiService: any;
+  let mockRouter: any;
+
+  const matchesSaveErrorsUrl = (req: HttpRequest<any>) => req.url.startsWith(testSaveErrorsUrl);
+
+  beforeEach(() => {
+    environment.saveErrorsUrl = testSaveErrorsUrl;
+
+    mockActionsService = { showToast: jest.fn() };
+    mockCacheService = {
+      isLoggedIn: jest.fn().mockReturnValue(true),
+      dataCache: jest.fn().mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      })
+    };
+    mockRouter = { url: '/test-route' };
+    mockApiService = {
+      // Mirrors the real ApiService.saveErrors: a POST issued through the
+      // SAME HttpClient (and therefore through httpErrorInterceptor itself)
+      // -- which is exactly the mechanism that produces the self-reporting
+      // recursion in production. A mock that bypassed HttpClient could never
+      // exercise the bug.
+      saveErrors: jest.fn((error: unknown) => firstValueFrom(TestBed.inject(HttpClient).post(environment.saveErrorsUrl, { error })))
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([httpErrorInterceptor])),
+        provideHttpClientTesting(),
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: ApiService, useValue: mockApiService },
+        { provide: Router, useValue: mockRouter }
+      ]
+    });
+
+    httpClient = TestBed.inject(HttpClient);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    environment.saveErrorsUrl = originalSaveErrorsUrl;
+    httpMock.verify();
+  });
+
+  it('does not trigger a second saveErrors request when the error-reporting endpoint itself is down (504, null body)', () => {
+    httpClient.get('/app/data').subscribe({ next: () => {}, error: () => {} });
+
+    const appReq = httpMock.expectOne('/app/data');
+    appReq.flush({ errors: 'boom' }, { status: 500, statusText: 'Internal Server Error' });
+
+    // Exactly one saveErrors report should have been produced by the
+    // original failure so far.
+    const firstReport = httpMock.expectOne(matchesSaveErrorsUrl);
+    expect(firstReport.request.method).toBe('POST');
+
+    // Simulate the saveErrors endpoint itself being unreachable -- the exact
+    // shape observed live on localhost:4200 (504, null body).
+    firstReport.flush(null, { status: 504, statusText: 'Gateway Timeout' });
+
+    // No further saveErrors request should exist: the bypass must stop the
+    // failure of the reporting request from re-entering the interceptor's
+    // error-reporting branch. On HEAD this fails: a second, unflushed
+    // saveErrors request is pending here (recursion).
+    const recursiveReports = httpMock.match(matchesSaveErrorsUrl);
+    expect(recursiveReports.length).toBe(0);
+
+    // The ORIGINAL request's own toast handling must still fire, unaffected
+    // by the reporting endpoint's failure.
+    expect(mockActionsService.showToast).toHaveBeenCalledWith({
+      detail: 'boom',
+      severity: 'error',
+      summary: 'Error'
+    });
+  });
+
+  it('reports exactly one saveErrors request when the reporting endpoint is healthy', () => {
+    httpClient.get('/app/data').subscribe({ next: () => {}, error: () => {} });
+
+    const appReq = httpMock.expectOne('/app/data');
+    appReq.flush({ errors: 'boom' }, { status: 500, statusText: 'Internal Server Error' });
+
+    const firstReport = httpMock.expectOne(matchesSaveErrorsUrl);
+    firstReport.flush({ success: true }, { status: 200, statusText: 'OK' });
+
+    // No additional saveErrors request should ever appear for one failure.
+    expect(httpMock.match(matchesSaveErrorsUrl).length).toBe(0);
+  });
+
+  it('does not throw and falls back to error.message for the toast when a failing request has a null error body (DD-2)', () => {
+    let caught: HttpErrorResponse | undefined;
+    httpClient.get('/app/other').subscribe({
+      next: () => {},
+      error: err => {
+        caught = err;
+      }
+    });
+
+    const req = httpMock.expectOne('/app/other');
+    req.flush(null, { status: 502, statusText: 'Bad Gateway' });
+
+    // On HEAD, `error.error.errors` throws a TypeError inside the
+    // interceptor's catchError, which replaces the original HttpErrorResponse
+    // with that TypeError downstream -- so `caught` would NOT be the original
+    // 502 HttpErrorResponse.
+    expect(caught).toBeInstanceOf(HttpErrorResponse);
+    expect(caught?.status).toBe(502);
+    expect(mockActionsService.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'error', summary: 'Error' })
+    );
+    expect(mockActionsService.showToast.mock.calls[0][0].detail).toEqual(expect.stringContaining('Http failure response'));
+
+    // Flush the saveErrors report the failing /app/other request itself triggers,
+    // so no dangling request is left for the new afterEach httpMock.verify() advisory.
+    httpMock.expectOne(matchesSaveErrorsUrl).flush({ success: true }, { status: 200, statusText: 'OK' });
+  });
+
+  it('still reports and shows the toast for an ordinary app request when saveErrorsUrl is the empty string (Reviewer finding, K-005 empty-string variant)', () => {
+    // `environment.example.ts` ships `saveErrorsUrl: ''`, and `isErrorReportingRequest` reads
+    // it live on every call -- this override matches that shape without a fresh TestBed.
+    environment.saveErrorsUrl = '';
+
+    httpClient.get('/app/data').subscribe({ next: () => {}, error: () => {} });
+
+    const appReq = httpMock.expectOne('/app/data');
+    appReq.flush({ errors: 'boom' }, { status: 500, statusText: 'Internal Server Error' });
+
+    // On HEAD: `'/app/data'.startsWith('')` is always true, so
+    // `isErrorReportingRequest` misclassifies this ORDINARY app request as the
+    // error-reporting endpoint itself -- the early `return next(req)` then
+    // bypasses the entire merge/catchError block, and no toast (or saveErrors
+    // report) is ever produced for a real failure.
+    expect(mockActionsService.showToast).toHaveBeenCalledWith({
+      detail: 'boom',
+      severity: 'error',
+      summary: 'Error'
+    });
+
+    // After the fix, this ordinary failure ALSO produces its own saveErrors report (correctly,
+    // since it is a real app request, not the reporting endpoint) -- flush it so no dangling
+    // request is left for the afterEach httpMock.verify() advisory.
+    httpMock.expectOne(req => req.method === 'POST' && req.url === '').flush({ success: true }, { status: 200, statusText: 'OK' });
   });
 });

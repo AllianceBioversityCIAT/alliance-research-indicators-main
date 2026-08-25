@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { catchError, timer, merge, throwError, ignoreElements, from, switchMap } from 'rxjs';
 import { inject } from '@angular/core';
 import { ActionsService } from '@services/actions.service';
@@ -6,6 +6,24 @@ import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
 import { PostError } from '../interfaces/post-error.interface';
 import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
+
+// R-SEL-001 / K-005 — `saveErrorsUrl` stays a distinct branch selector (do
+// not collapse it onto another environment URL). This predicate bypasses
+// error/timeout reporting for requests TO the error-reporting endpoint
+// itself, so a failure of that endpoint can never re-enter this interceptor
+// and recurse into reporting itself.
+//
+// DD-1 (amended after Reviewer FAIL): the `!!environment.saveErrorsUrl` guard
+// is load-bearing. `'anything'.startsWith('')` is always `true`, and
+// `environment.example.ts` ships `saveErrorsUrl: ''` — an unguarded
+// `req.url.startsWith(environment.saveErrorsUrl)` would then match EVERY
+// request, silently disabling the whole interceptor (no toasts, no
+// reporting, no timeout telemetry) on a template-copied local env with zero
+// signal. `undefined` was already safe (`startsWith(undefined)` coerces to
+// the literal string `"undefined"`); `''` is the dangerous, reachable case.
+const isErrorReportingRequest = (req: HttpRequest<unknown>): boolean =>
+  (!!environment.saveErrorsUrl && req.url.startsWith(environment.saveErrorsUrl)) || req.url.includes('ciat-errors.yecksin.workers.dev');
 
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const actions = inject(ActionsService);
@@ -13,8 +31,9 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const api = inject(ApiService);
   const router = inject(Router);
 
-  // Skip timeout check for error endpoint to avoid infinite loop
-  if (req.url.includes('ciat-errors.yecksin.workers.dev')) {
+  // Skip timeout/error reporting for the error-reporting endpoint itself to
+  // avoid a self-reporting infinite loop (R-SEL-001).
+  if (isErrorReportingRequest(req)) {
     return next(req);
   }
 
@@ -72,7 +91,7 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingTagValidationError &&
           !isPoolFundingAlignmentValidationError
         ) {
-          actions.showToast({ detail: error.error.errors, severity: 'error', summary: 'Error' });
+          actions.showToast({ detail: error.error?.errors ?? error.message, severity: 'error', summary: 'Error' });
         }
 
         return throwError(() => error);
