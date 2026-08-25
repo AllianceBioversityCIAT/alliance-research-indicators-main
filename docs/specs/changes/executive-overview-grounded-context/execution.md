@@ -48,3 +48,17 @@ Adjudication: T-04/T-05 proceed on `project-dashboard.component.*` (the approved
 **KZ-017 declarations (what checks cannot reach):** unit specs ≠ route registration/envelope (integration covers via supertest); integration ≠ real DI boot (covered by module-graph read, NOT by build — see advisory #1); JWT/401 out of scope (jwr.middleware.spec.ts); repository SQL shape unasserted (TypeORM base untouched); NFR-3 TTL inherited from ClarisaProjectsService, not re-verified.
 
 **Decisions:** moduleRef.resolve kept per design §2.1 literal instruction (matches existing OpenSearch idiom); Implementer judgment call recorded.
+
+---
+
+## T-04 + T-05 (batched) — rework loop in progress
+
+**Batching adjudication:** T-04 AC.3 routes the long-text action to T-05's modal; separate landings would ship a dead trigger in the intermediate commit. Same files, strictly sequential — one Implementer run, one Reviewer audit covering both scopes.
+
+### Attempt 1 — FAIL (2026-08-24)
+
+- **Implementer (sonnet, medium):** threshold `isLongOverview` (>700 chars / >2 ¶), 75ch measure + leading-relaxed, permanent clamp for long, skeleton (role="status", reserved height), Retry with load-vs-generate branch, `executiveOverviewReader` modal (types + all-modals config + sibling app-modal, 70ch, sources chips, admin footer). Targeted jest 231/231; build green; spec type-check 938 < 945 baseline (0 in touched files); eslint clean; two K-004 red-first observations. Leader re-measured full client suite: 6852/6852.
+- **Not Done/Assumptions adjudicated by Leader:** (1) duplicate shell-header overview → handled as T-08; (2) focus-return on shared host's X icon is a pre-existing app-wide gap (~10 modals) — AC.2 focus-return read as satisfied on feature-owned close paths, gap recorded; (3) provenance line → T-06 scope.
+- **Reviewer (opus): STATUS: FAIL — 1 issue.** Esc cannot close the reader modal for non-admins: only Escape handler bound on a projected *descendant* div (`html:602`); shared host's `onKeydown` is Tab-trap only (`modal.component.ts:74-75`); for non-admins the projected content has zero focusables so `focusFirstElement()` falls through to `#modalRoot` (ancestor, tabindex=-1); keydown bubbles upward only → handler unreachable. Reachable path confirmed (non-admin + stored long overview; also admins after clicking paragraph text). Violates R-EOC-005 AC.2 ("closes with Esc"). Remediation: `@HostListener('document:keydown.escape')` gated on `isModalOpen('executiveOverviewReader')`; test must dispatch a real KeyboardEvent, not call the close method directly.
+- **Advisories (recorded, never gate):** (a) two reader admin buttons omit cursor-pointer + focus-visible ring pair others carry (UA default outline still present — no AC violation); Tailwind preflight cursor default unresolved (no tailwind.config found from Reviewer's position); (b) R-EOC-008 AC.2 contrast has no measurable evidence in jsdom — claim limited to "reuses already-validated `--ac-*` tokens", recorded as gap not coverage; (c) empty `<header>` rendered when generated-at is null (`html:603-607`); (d) two modal-content tests assert against the unconditional stub — prove composition, not gating (open/close tests cover that).
+- **Action:** verbatim Reviewer report passed to Implementer; attempt 2 dispatched, effort bumped medium→high; scope: issue 1 only.
