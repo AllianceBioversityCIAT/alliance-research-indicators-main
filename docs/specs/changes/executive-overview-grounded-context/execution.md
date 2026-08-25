@@ -20,3 +20,5 @@ Reported by Implementer (T-04/05) before writing code; Leader verified against s
 - Net: dashboard tab shows the overview twice; both fetch `fetchDocumentOverviewSummary` independently.
 
 Adjudication: T-04/T-05 proceed on `project-dashboard.component.*` (the approved spec's target). Deduplication (which placement survives) is a spec gap — escalated to the owner as a decision; NOT minted as a task from an advisory. Pending user decision recorded below when made.
+
+**Owner decision (2026-08-24):** Dashboard Act 1 survives; shell-header instance retired. Spec amended: R-EOC-009 added to requirements.md, T-08 added to tasks.md (serialized after T-04/T-05). Correction-closure sweep: spec folder greps for `executive-overview.component`/shell-header references — none existed prior to this amendment (spec never referenced the shell instance); no backward citations to repoint.

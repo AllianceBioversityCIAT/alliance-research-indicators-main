@@ -128,6 +128,19 @@ Not changing: the AI microservice itself (external Lambda, owned by the Executiv
 3. All interactive elements: visible focus ring, `cursor-pointer`, ≥ 44px touch target on mobile, aria labels on icon-only buttons (setup cog already has one).
 4. `prefers-reduced-motion` respected (no new animation beyond the existing stagger, which already honors it).
 
+### R-EOC-009 — Deduplicate: single Executive Overview surface (dashboard Act 1)
+
+- **As a** STAR user on the project detail view
+- **I want** exactly one Executive Overview — the rich Act-1 dashboard block
+- **So that** the summary isn't shown twice nor fetched twice per visit
+
+**Acceptance criteria**
+1. The shell-header instance is removed: `<app-executive-overview>` gone from `project-detail.component.html`, the `ExecutiveOverviewComponent` files deleted, imports cleaned.
+2. The dashboard Act-1 block (this spec's target) is the only renderer and the only `fetchDocumentOverviewSummary` caller on the project-detail route.
+3. No dead references remain (build + lint green; no orphan spec files).
+
+> Added 2026-08-24 by owner decision after the Implementer's duplicate-surface finding (see execution.md). Supersedes the placement decision of commit `5b506f42` (2026-08-23, shell header).
+
 ---
 
 ## 4. Non-functional requirements

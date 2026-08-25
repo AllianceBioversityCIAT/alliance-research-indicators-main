@@ -19,6 +19,7 @@
 T-01 (server endpoint) ──► T-02 (client service+interface) ──► T-03 (context builder + wiring)
 T-04 (card states + threshold) ──► T-05 (reading modal)
 T-03, T-05 ──► T-06 (provenance footer)
+T-04/T-05 ──► T-08 (dedup shell header; owner decision 2026-08-24)
 all ──► T-07 (validation sweep)
 ```
 
@@ -71,6 +72,13 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 - [ ] **Covers:** R-EOC-007 · **Skills:** `angular-developer` · **Effort:** low
 - Footer line composing docs count, text-resource presence, and project-data source (CLARISA vs Agresso) from the T-03 builder's provenance output; shown in card + modal.
 - **Verify:** `npx jest <spec> --coverage=false`.
+
+### T-08 — Deduplicate: retire shell-header Executive Overview
+
+- [ ] **Covers:** R-EOC-009 · **Skills:** `angular-developer` · **Effort:** low
+- Remove `<app-executive-overview>` from `project-detail.component.html` (+ its import in `project-detail.component.ts`); delete `components/executive-overview/executive-overview.component.{ts,html,spec.ts}`.
+- Constraint: serialize AFTER T-04/T-05 (same client package); touches only shell files, not the dashboard component.
+- **Verify:** `npx jest src/app/pages/platform/pages/project-detail --coverage=false` (route-level specs still green), `npm run build`, grep `app-executive-overview`/`ExecutiveOverviewComponent` returns no live references.
 
 ### T-07 — Validation sweep
 
