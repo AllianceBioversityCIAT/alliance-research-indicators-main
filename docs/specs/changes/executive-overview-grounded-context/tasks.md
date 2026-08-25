@@ -75,7 +75,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-08 — Deduplicate: retire shell-header Executive Overview
 
-- [ ] **Covers:** R-EOC-009 · **Skills:** `angular-developer` · **Effort:** low
+- [x] **Covers:** R-EOC-009 · **Skills:** `angular-developer` · **Effort:** low
 - Remove `<app-executive-overview>` from `project-detail.component.html` (+ its import in `project-detail.component.ts`); delete `components/executive-overview/executive-overview.component.{ts,html,spec.ts}`.
 - Constraint: serialize AFTER T-04/T-05 (same client package); touches only shell files, not the dashboard component.
 - **Verify:** `npx jest src/app/pages/platform/pages/project-detail --coverage=false` (route-level specs still green), `npm run build`, grep `app-executive-overview`/`ExecutiveOverviewComponent` returns no live references.
