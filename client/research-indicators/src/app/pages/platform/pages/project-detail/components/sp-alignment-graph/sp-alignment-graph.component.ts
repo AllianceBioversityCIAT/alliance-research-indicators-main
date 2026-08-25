@@ -116,6 +116,46 @@ export class SpAlignmentGraphComponent {
     return { color: style.color, borderWidth: style.borderWidth, borderColor: style.color, borderType: style.borderType };
   }
 
+  // Bugfix/sp-alignment-sankey-empty-lever-names, R-SKY-001/DD-1: `clarisa_levers.short_name`
+  // is empty/null for some levers (11-14 confirmed live) — never use a possibly-empty display
+  // field as node identity. Runtime payloads can send `null` even though the DTO types the
+  // field as `string` (root cause diagnosis, proposal.md), so this reads defensively rather
+  // than trusting the declared type.
+  private leverLabel(link: ContractLeverSpFlowLink): string {
+    const shortName = (link.lever_short_name ?? '').trim();
+    if (shortName) {
+      return shortName;
+    }
+    const fullName = (link.lever_full_name ?? '').trim();
+    if (fullName) {
+      return fullName;
+    }
+    return `Lever ${link.lever_id}`;
+  }
+
+  // DD-3 collision guard: two distinct lever ids can resolve to the same `leverLabel` (e.g.
+  // both empty short names AND identical full names) — ECharts sankey resolves `links[].source`
+  // by node `name`, so a duplicate name would silently merge two levers into one node. Suffix
+  // with the id only when a collision is actually detected, scoped to the levers appearing in
+  // this render (KZ-001: this feeds `series[0].data`, not asserted via call order).
+  private resolveLeverNodeNames(links: ContractLeverSpFlowLink[]): Map<number, string> {
+    const labelById = new Map<number, string>();
+    for (const link of links) {
+      if (link.lever_id != null && !labelById.has(link.lever_id)) {
+        labelById.set(link.lever_id, this.leverLabel(link));
+      }
+    }
+    const countByLabel = new Map<string, number>();
+    for (const label of labelById.values()) {
+      countByLabel.set(label, (countByLabel.get(label) ?? 0) + 1);
+    }
+    const nameById = new Map<number, string>();
+    for (const [leverId, label] of labelById) {
+      nameById.set(leverId, (countByLabel.get(label) ?? 0) > 1 ? `${label} (${leverId})` : label);
+    }
+    return nameById;
+  }
+
   readonly chartOptions = computed<EChartsOption | null>(() => {
     if (!this.hasData()) {
       return null;
@@ -123,16 +163,17 @@ export class SpAlignmentGraphComponent {
 
     const leverNodes = new Map<string, SankeyNodeDatum>();
     const spNodes = new Map<string, SankeyNodeDatum>();
+    const leverNodeNames = this.resolveLeverNodeNames(this.visibleLinks());
 
     const ensureLeverNode = (link: ContractLeverSpFlowLink): string => {
       const isNoLever = link.lever_id == null;
       const key = isNoLever ? '__no_lever__' : `lever:${link.lever_id}`;
       if (!leverNodes.has(key)) {
         leverNodes.set(key, {
-          name: isNoLever ? NO_LEVER_NODE : link.lever_short_name,
+          name: isNoLever ? NO_LEVER_NODE : (leverNodeNames.get(link.lever_id as number) ?? this.leverLabel(link)),
           nodeType: isNoLever ? 'no-lever' : 'lever',
           leverId: isNoLever ? undefined : (link.lever_id ?? undefined),
-          tooltip: isNoLever ? 'Results with no primary lever recorded' : link.lever_full_name,
+          tooltip: isNoLever ? 'Results with no primary lever recorded' : (link.lever_full_name ?? '').trim() || this.leverLabel(link),
           itemStyle: { color: isNoLever ? 'var(--ac-grey-400)' : 'var(--ac-viz-series-1)' }
         });
       }
@@ -159,7 +200,7 @@ export class SpAlignmentGraphComponent {
         source: ensureLeverNode(link),
         target: ensureSpNode(link),
         value: link.count,
-        leverFullName: link.lever_id == null ? NO_LEVER_NODE : link.lever_full_name,
+        leverFullName: link.lever_id == null ? NO_LEVER_NODE : (link.lever_full_name ?? '').trim() || this.leverLabel(link),
         spName: link.sp_code == null ? UNALIGNED_NODE : link.sp_name || link.sp_code || '',
         role: link.role ?? 'UNKNOWN',
         lineStyle: this.linkLineStyle(style)
@@ -250,7 +291,7 @@ export class SpAlignmentGraphComponent {
     caption: 'Lever to Science-Program alignment flows by role',
     headers: ['Lever', 'Science Program', 'Alignment Role', 'Results'],
     rows: this.flowLinks().map(link => [
-      link.lever_id == null ? NO_LEVER_NODE : link.lever_short_name,
+      link.lever_id == null ? NO_LEVER_NODE : this.leverLabel(link),
       link.sp_code == null ? UNALIGNED_NODE : link.sp_name || link.sp_code || '',
       link.role ?? 'UNKNOWN',
       link.count
@@ -281,7 +322,7 @@ export class SpAlignmentGraphComponent {
 
   readonly aggregateRows = computed<AggregateRow[]>(() =>
     this.flowLinks().map(link => ({
-      lever: link.lever_id == null ? NO_LEVER_NODE : link.lever_short_name,
+      lever: link.lever_id == null ? NO_LEVER_NODE : this.leverLabel(link),
       sp: link.sp_code == null ? UNALIGNED_NODE : link.sp_name || link.sp_code || '',
       role: link.role ?? 'UNKNOWN',
       count: link.count

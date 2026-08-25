@@ -289,6 +289,112 @@ describe('SpAlignmentGraphComponent (R-DCR-002, R-DCR-005, DD-2..DD-10)', () => 
     });
   });
 
+  describe('Lever label chain + collision guard (bugfix/sp-alignment-sankey-empty-lever-names, R-SKY-001)', () => {
+    it('gives levers with an empty short_name distinct, non-empty node names falling back to full_name, keeps a named lever unchanged, and links every source to exactly one node (D514 case)', () => {
+      const flows = makeFlows([
+        { lever_id: 11, lever_short_name: '', lever_full_name: 'Multifunctional Landscapes', sp_code: 'SP06', sp_name: 'SP Six', role: 'PRIMARY', count: 4 },
+        { lever_id: 12, lever_short_name: '', lever_full_name: 'Climate Action', sp_code: 'SP06', sp_name: 'SP Six', role: 'CONTRIBUTING', count: 2 },
+        { lever_id: 3, lever_short_name: 'Lever 3', lever_full_name: 'Lever 3: Climate Action', sp_code: 'SP06', sp_name: 'SP Six', role: 'PRIMARY', count: 1 }
+      ]);
+      fixture.componentRef.setInput('loading', false);
+      fixture.componentRef.setInput('flows', flows);
+      fixture.detectChanges();
+
+      const options = component.chartOptions();
+      const series = (options?.series as any[])[0];
+      const leverNodeNames: string[] = series.data.filter((n: any) => n.nodeType === 'lever').map((n: any) => n.name);
+
+      // (a) all lever node names non-empty and pairwise distinct.
+      expect(leverNodeNames.every((name: string) => name.length > 0)).toBe(true);
+      expect(new Set(leverNodeNames).size).toBe(leverNodeNames.length);
+
+      // (b) every link source resolves to exactly one node name.
+      const nodeNames = new Set(series.data.map((n: any) => n.name));
+      series.links.forEach((link: any) => {
+        expect(nodeNames.has(link.source)).toBe(true);
+      });
+
+      // (c) a lever that does have a short name keeps it unchanged.
+      expect(leverNodeNames).toContain('Lever 3');
+
+      // (e) node tooltip and link leverFullName show the real full name when one exists
+      // (Leader amendment) — for lever 3 that means the FULL name, not the short label
+      // repeated; for lever 11 (empty short_name) it falls back to leverLabel, same as name.
+      const lever3Node = series.data.find((n: any) => n.name === 'Lever 3');
+      expect(lever3Node.tooltip).toBe('Lever 3: Climate Action');
+      const lever3Link = series.links.find((l: any) => l.source === 'Lever 3');
+      expect(lever3Link.leverFullName).toBe('Lever 3: Climate Action');
+
+      const lever11Node = series.data.find((n: any) => n.name === 'Multifunctional Landscapes');
+      expect(lever11Node.tooltip).toBe('Multifunctional Landscapes');
+      const lever11Link = series.links.find((l: any) => l.source === 'Multifunctional Landscapes');
+      expect(lever11Link.leverFullName).toBe('Multifunctional Landscapes');
+
+      // (d) the tableModel lever cells never contain "".
+      const table = component.tableModel();
+      expect(table.rows.some(row => row[0] === '')).toBe(false);
+      expect(table.rows.map(row => row[0])).toEqual(expect.arrayContaining(['Multifunctional Landscapes', 'Climate Action', 'Lever 3']));
+
+      // Leader-adjudicated same-cause-root scope: aggregateRows feeds the fallback detail
+      // table (DD-8 third cell) and shares the identical bug (raw lever_short_name).
+      const aggregateLevers = component.aggregateRows().map(row => row.lever);
+      expect(aggregateLevers.some(lever => lever === '')).toBe(false);
+      expect(aggregateLevers).toEqual(expect.arrayContaining(['Multifunctional Landscapes', 'Climate Action', 'Lever 3']));
+    });
+
+    it('falls back the same way when lever_short_name is null (tops-shaped payload)', () => {
+      const flows = makeFlows([
+        // Real API payloads (`tops.primary_levers`) send null, not '' — the interface types it as
+        // `string` (non-nullable), so this fixture goes through `unknown` to represent that
+        // runtime/type mismatch honestly rather than widening the interface (out of this task's scope).
+        {
+          lever_id: 13,
+          lever_short_name: null,
+          lever_full_name: 'Biodiversity for Food and Agriculture',
+          sp_code: 'SP06',
+          sp_name: 'SP Six',
+          role: 'PRIMARY',
+          count: 3
+        } as unknown as ContractLeverSpFlowLink
+      ]);
+      fixture.componentRef.setInput('loading', false);
+      fixture.componentRef.setInput('flows', flows);
+      fixture.detectChanges();
+
+      const options = component.chartOptions();
+      const series = (options?.series as any[])[0];
+      const leverNode = series.data.find((n: any) => n.nodeType === 'lever');
+      expect(leverNode.name).toBe('Biodiversity for Food and Agriculture');
+
+      const table = component.tableModel();
+      expect(table.rows[0][0]).toBe('Biodiversity for Food and Agriculture');
+    });
+
+    it('appends " (<id>)" to disambiguate two distinct lever ids that share the same empty-short-name fallback label (collision guard, DD-3)', () => {
+      const flows = makeFlows([
+        { lever_id: 21, lever_short_name: '', lever_full_name: 'Duplicate Full Name', sp_code: 'SP06', sp_name: 'SP Six', role: 'PRIMARY', count: 2 },
+        { lever_id: 22, lever_short_name: '', lever_full_name: 'Duplicate Full Name', sp_code: 'SP06', sp_name: 'SP Six', role: 'CONTRIBUTING', count: 1 }
+      ]);
+      fixture.componentRef.setInput('loading', false);
+      fixture.componentRef.setInput('flows', flows);
+      fixture.detectChanges();
+
+      const options = component.chartOptions();
+      const series = (options?.series as any[])[0];
+      const leverNodeNames: string[] = series.data.filter((n: any) => n.nodeType === 'lever').map((n: any) => n.name);
+
+      expect(new Set(leverNodeNames).size).toBe(2);
+      expect(leverNodeNames).toEqual(expect.arrayContaining(['Duplicate Full Name (21)', 'Duplicate Full Name (22)']));
+
+      // Every link source must still resolve to exactly one node (the suffix must be applied
+      // consistently to the node's own name, not just asserted in isolation).
+      const nodeNames = new Set(series.data.map((n: any) => n.name));
+      series.links.forEach((link: any) => {
+        expect(nodeNames.has(link.source)).toBe(true);
+      });
+    });
+  });
+
   describe('Top-12 cap with visible fold note (DD-3, K-014)', () => {
     it('caps 13 links to 12 rendered + one folded "Other" link, and states the real N in the on-panel note', () => {
       const links: ContractLeverSpFlowLink[] = Array.from({ length: 13 }, (_, i) => ({

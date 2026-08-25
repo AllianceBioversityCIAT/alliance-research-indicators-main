@@ -7,7 +7,7 @@
 Separate **identity** from **display** in `sp-alignment-graph.component.ts` `chartOptions()`: the lever node `name` becomes a stable key derived from `lever_id`, and the visible text comes from a label chain. `viz-chart`, server and DTO untouched.
 
 ## Component change (conceptual — no code here)
-- Add a private helper `leverLabel(link)` → `short_name?.trim() || full_name?.trim() || \`Lever ${lever_id}\``; reuse it for the node display, the tooltip, the link `leverFullName`, and the `tableModel` row (NFR-SKY-001).
+- Add a private helper `leverLabel(link)` → `short_name?.trim() || full_name?.trim() || \`Lever ${lever_id}\``; reuse it for the node display (name) and the `tableModel`/`aggregateRows` lever cells (NFR-SKY-001). **Amended 2026-08-25 (Reviewer advisory, attempt 1):** the node `tooltip` and link `leverFullName` use `full_name?.trim() || leverLabel(link)` — full name when one exists, chain otherwise — so a lever with a short name keeps its informative tooltip (mirrors the SP side: code as name, long name as tooltip).
 - Node `name` for real levers: use the label chain **as the name** (full names are unique in CLARISA) — chosen over a synthetic `lever:<id>` name because ECharts' sankey shows `name` as the label and a formatter-only approach would need per-node label config plus tooltip rewiring (more surface for a Lite fix). Uniqueness guard: if two distinct `lever_id`s resolve to the same label, suffix ` (<id>)` to the second — makes the invariant "distinct ids → distinct names" hold by construction.
 - `No lever` / `Other levers` buckets unchanged.
 

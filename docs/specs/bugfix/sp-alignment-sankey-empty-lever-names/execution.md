@@ -1,0 +1,21 @@
+# Execution Log — Bugfix / SP-alignment Sankey with empty lever `short_name`
+
+## Document Control
+- **Spec:** `bugfix/sp-alignment-sankey-empty-lever-names` · Lite · Bug Mode · Approval: pre-approved (owner 2026-08-25)
+- **Leader:** Claude (Fable 5) · **Implementer:** `akili-implementer` (sonnet) · **Reviewer:** `akili-reviewer` (opus)
+- **Budget:** 1 task · ≈40 LOC · 1 review round
+- **Concurrency note:** `sp-alignment-graph.component.*` is owned by the active `dashboard-chart-refinements` session (its T-05 HITL pending); commits by pathspec, additive change only.
+
+## Task Execution History
+
+## T-01 — Lever label chain + collision guard — attempt 1 (in progress, 2026-08-25)
+- **Implementer (sonnet, medium):** regression tests written first; **red on HEAD verbatim:** `Expected: true / Received: false` (empty node names), `Expected: "Biodiversity for Food and Agriculture" / Received: null` (null short name), `Expected: 2 / Received: 1` (collision guard). Fix: `leverLabel()` chain + `resolveLeverNodeNames()` with ` (<id>)` suffix on label collisions across distinct ids; wired at node name/tooltip, link `leverFullName`, `tableModel`. 26/26 green; build green; eslint clean.
+- **Baseline drift (isolated by the Implementer, KZ-007):** spec-tsc count is **942 on unmodified HEAD** (was 938 at chart-explainers T-01..T-03) — +4 pre-exists on the branch from other landed work; zero net-new from this fix. New baseline for subsequent comparisons on this branch: **942** (re-measure before trusting).
+- **Scope adjudication (Leader):** Implementer flagged `aggregateRows` (fallback table) carries the identical latent `""` — same root cause, same requirement → folded into this attempt before review (+1 line, +1 assert with its own red).
+- **Process note:** the Implementer ran `npm run build` while a sibling worker was active in the package (not forbidden in its brief — the second worker was spawned after); build was green, no phantom failure observed. Subsequent builds are Leader-run.
+- **aggregateRows amendment:** red on HEAD `Expected: false / Received: true` at `expect(aggregateLevers.some(lever => lever === '')).toBe(false)`; fixed; 26/26 green; eslint clean; final diff 139+/5-.
+- **Reviewer (opus): STATUS: PASS** — root cause targeted (display string as identity); collision guard counts over distinct ids (not links) and suffixes both members (better than design's "the second"); KZ-001 clean (all asserts on `series[0].data/links`, `tableModel`, `aggregateRows`); `aggregateRows` extension endorsed and its red discriminates; DD-1 sound for Lite (Option B is the refactor if a second node-name consumer ever appears — on record).
+- **Advisories:** (a) **accepted as a Leader design defect, amended post-PASS:** tooltip/`leverFullName` via `leverLabel` lost the full name for levers that have a short name (asymmetric with the SP side). design.md/tasks.md amended → `full_name?.trim() || leverLabel(link)` + 2 asserts, delta re-reviewed before commit. (b) tasks.md tsc gate updated to 942. (c) actual LOC 139+/5- vs ≈40 estimate — recorded; no tripwire in this Lite design. (d) contrived re-collision case noted. (e) process: repo-root-relative paths don't resolve in the Reviewer's cwd (`client/research-indicators`) — cite absolute paths in briefs.
+- **Post-PASS delta (tooltip/leverFullName) — Reviewer confirmed PASS holds:** `:176`/`:203` now `(lever_full_name ?? '').trim() || leverLabel(link)`; name/table cells unchanged; SP-side symmetry restored; both wirings asserted (lever 3 → "Lever 3: Climate Action" with node name "Lever 3"; lever 11 → label fallback). Red verbatim `Expected: "Lever 3: Climate Action" / Received: "Lever 3"`. Final: 26/26, eslint clean, 152+/5-.
+- **Artifact note:** Reviewer saw a dropped `/` in the diff file; Leader verified the artifact on disk reads `//` correctly (line 55) and the spec file too (line 338) — a rendering glitch on the Reviewer's read, not an extraction defect. Recorded so the "corrupted pipeline" hypothesis does not propagate (KZ-007).
+- **Final status: T-01 PASS** (code committed; the `npm run build` done-check runs once at batch close with no workers active — tasks.md status flips then).
