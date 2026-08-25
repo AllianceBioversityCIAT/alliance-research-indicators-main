@@ -6,6 +6,7 @@ import { By } from '@angular/platform-browser';
 import { ApiService } from '@shared/services/api.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
 import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
+import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { FileManagerService } from '@shared/services/file-manager.service';
@@ -23,6 +24,7 @@ import { SpAlignmentGraphComponent } from '../sp-alignment-graph/sp-alignment-gr
 import { IndicatorDeepDiveComponent, IndicatorDeepDiveTab } from '../indicator-deep-dive/indicator-deep-dive.component';
 import { InsightsSectionComponent } from '../insights-section/insights-section.component';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
+import { ContractClarisaProject } from '@shared/interfaces/contract-clarisa-project.interface';
 import { DeclaredSdg } from '@shared/interfaces/contract-insights.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport, ContractSpAlignment } from '@shared/interfaces/contract-sp-alignment.interface';
@@ -154,6 +156,7 @@ describe('ProjectDashboardComponent', () => {
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
+  let getClarisaProjectServiceMock: { data: ReturnType<typeof signal<ContractClarisaProject | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
   let contractDashboardMock: {
     data: ReturnType<typeof signal<ContractDashboardReport | null>>;
     loading: ReturnType<typeof signal<boolean>>;
@@ -570,6 +573,14 @@ describe('ProjectDashboardComponent', () => {
       invalidate: jest.fn()
     };
 
+    getClarisaProjectServiceMock = {
+      data: signal<ContractClarisaProject | null>(null),
+      loading: signal(false),
+      loadError: signal(false),
+      load: jest.fn().mockResolvedValue(undefined),
+      invalidate: jest.fn()
+    };
+
     apiMock = {
       GET_ResultsCount: jest.fn(),
       GET_IndicatorDetails: jest.fn(),
@@ -595,6 +606,7 @@ describe('ProjectDashboardComponent', () => {
         { provide: ApiService, useValue: apiMock },
         { provide: GetProjectDetailService, useValue: getProjectDetailServiceMock },
         { provide: GetContractDashboardService, useValue: contractDashboardMock },
+        { provide: GetClarisaProjectService, useValue: getClarisaProjectServiceMock },
         {
           provide: ProjectUtilsService,
           useValue: {
@@ -670,6 +682,7 @@ describe('ProjectDashboardComponent', () => {
     expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
     expect(apiMock.GET_Results).not.toHaveBeenCalled();
     expect(contractDashboardMock.load).toHaveBeenCalledWith('C-1');
+    expect(getClarisaProjectServiceMock.load).toHaveBeenCalledWith('C-1');
     expect(resultsCenterServiceMock.initializeProjectDashboardResultsTable).toHaveBeenCalledWith('C-1');
   });
 
@@ -687,6 +700,7 @@ describe('ProjectDashboardComponent', () => {
 
     expect(getProjectDetailServiceMock.load).not.toHaveBeenCalled();
     expect(apiMock.GET_ResultsCount).not.toHaveBeenCalled();
+    expect(getClarisaProjectServiceMock.load).not.toHaveBeenCalled();
     expect(component.contractId()).toBe('');
     expect(component.indicatorSharePercent(1)).toBe(0);
   });

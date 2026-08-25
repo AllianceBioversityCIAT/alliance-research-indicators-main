@@ -31,6 +31,7 @@ import { ContactPersonResponse } from '../interfaces/contact-person.interface';
 import { GlobalTarget } from '../interfaces/global-target.interface';
 import { GetResultsByContract } from '../interfaces/get-results-by-contract.interface';
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
+import { ContractClarisaProject } from '../interfaces/contract-clarisa-project.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
@@ -889,6 +890,14 @@ export class ApiService {
 
   GET_ResultsCount = (agreementId: string): Promise<MainResponse<GetProjectDetail>> => {
     const url = () => `agresso/contracts/${agreementId}/results/count`;
+    return this.TP.get(url(), {});
+  };
+
+  // @sdd-spec docs/specs/changes/executive-overview-grounded-context — T-02 / R-EOC-001, design.md §4
+  // `data: null` (200) is a normal state: unmapped contract, or CLARISA
+  // cold-cache degrade (see `errors[]`) — never a 4xx/5xx.
+  GET_ContractClarisaProject = (agreementId: string): Promise<MainResponse<ContractClarisaProject | null>> => {
+    const url = () => `agresso/contracts/${agreementId}/clarisa-project`;
     return this.TP.get(url(), {});
   };
 

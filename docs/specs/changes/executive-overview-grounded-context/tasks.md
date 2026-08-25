@@ -39,7 +39,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-02 — Client: `GET_ContractClarisaProject` + `GetClarisaProjectService`
 
-- [ ] **Covers:** R-EOC-001 (client side), NFR-1 · **Skills:** `angular-developer` · **Effort:** medium
+- [x] **Covers:** R-EOC-001 (client side), NFR-1 · **Skills:** `angular-developer` · **Effort:** medium
 - `ApiService.GET_ContractClarisaProject(agreementId)` → `agresso/contracts/${id}/clarisa-project`; interface `ContractClarisaProject`; signal service mirroring `GetProjectDetailService` (session memo + `invalidate`); dashboard effect adds `load(contractId)`.
 - Tests: service spec with `HttpTestingController` on the `MainResponse<T>` envelope (data, null-data, error → loadError signal).
 - **Verify:** `npx jest <specs> --coverage=false`, `npm run build`.

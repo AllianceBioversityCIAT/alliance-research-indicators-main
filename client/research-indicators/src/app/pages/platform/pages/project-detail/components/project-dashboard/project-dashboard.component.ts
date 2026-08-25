@@ -9,6 +9,7 @@ import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.componen
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
 import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
+import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
 import { environment } from '@envs/environment';
 import { GetProjectDetail, GetProjectDetailIndicator } from '@shared/interfaces/get-project-detail.interface';
 import { ProjectDashboardRankedItem } from '@interfaces/project-dashboard.interface';
@@ -126,6 +127,7 @@ export class ProjectDashboardComponent {
   private readonly darkModeService = inject(DarkModeService);
   readonly getProjectDetailService = inject(GetProjectDetailService);
   readonly contractDashboard = inject(GetContractDashboardService);
+  readonly clarisaProject = inject(GetClarisaProjectService);
   private readonly fileManagerService = inject(FileManagerService);
   private readonly documentOverviewService = inject(DocumentOverviewService);
   private readonly rolesService = inject(RolesService);
@@ -1275,6 +1277,7 @@ export class ProjectDashboardComponent {
       if (contractId) {
         void this.syncProjectFromSharedService(contractId);
         void this.contractDashboard.load(contractId);
+        void this.clarisaProject.load(contractId);
         this.resultsCenterService.initializeProjectDashboardResultsTable(contractId);
         void this.loadExecutiveOverviewSummary();
       }
