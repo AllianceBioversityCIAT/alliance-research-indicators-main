@@ -25,6 +25,7 @@ import { IndicatorDeepDiveComponent, IndicatorDeepDiveTab } from '../indicator-d
 import { InsightsSectionComponent } from '../insights-section/insights-section.component';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
 import { ContractClarisaProject } from '@shared/interfaces/contract-clarisa-project.interface';
+import * as projectContextUtil from '@shared/utils/project-context.util';
 import { DeclaredSdg } from '@shared/interfaces/contract-insights.interface';
 import { ContractResultsSummary, ContractResultsSummaryYearBucket } from '@interfaces/contract-results-summary.interface';
 import { ContractSpAlignmentReport, ContractSpAlignment } from '@shared/interfaces/contract-sp-alignment.interface';
@@ -156,7 +157,14 @@ describe('ProjectDashboardComponent', () => {
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
   let getProjectDetailServiceMock: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
-  let getClarisaProjectServiceMock: { data: ReturnType<typeof signal<ContractClarisaProject | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
+  let getClarisaProjectServiceMock: {
+    data: ReturnType<typeof signal<ContractClarisaProject | null>>;
+    loading: ReturnType<typeof signal<boolean>>;
+    loadError: ReturnType<typeof signal<boolean>>;
+    loadedContractId: ReturnType<typeof signal<string | null>>;
+    load: jest.Mock;
+    invalidate: jest.Mock;
+  };
   let contractDashboardMock: {
     data: ReturnType<typeof signal<ContractDashboardReport | null>>;
     loading: ReturnType<typeof signal<boolean>>;
@@ -573,11 +581,19 @@ describe('ProjectDashboardComponent', () => {
       invalidate: jest.fn()
     };
 
+    // Mirrors GetClarisaProjectService: `loadedContractId` is set only when `load()` resolves for a
+    // given id, so a test can desync it from `data` to simulate the cross-contract race the
+    // Reviewer caught (rework attempt 2) — data() holding a DIFFERENT contract's payload while the
+    // component builds output for the current one.
+    const clarisaLoadedContractId = signal<string | null>(null);
     getClarisaProjectServiceMock = {
       data: signal<ContractClarisaProject | null>(null),
       loading: signal(false),
       loadError: signal(false),
-      load: jest.fn().mockResolvedValue(undefined),
+      loadedContractId: clarisaLoadedContractId,
+      load: jest.fn().mockImplementation(async (contractId: string) => {
+        clarisaLoadedContractId.set(contractId);
+      }),
       invalidate: jest.fn()
     };
 
@@ -3891,7 +3907,13 @@ describe('ProjectDashboardComponent', () => {
         component.retryExecutiveOverview();
         await fixture.whenStable();
 
-        expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+        // No user text ⇒ undefined; the default project fixture still yields a project_context
+        // digest (R-EOC-002/R-EOC-003 — built best-effort at call time from in-memory data).
+        const [projectId, text, projectContext] = documentOverviewServiceMock.generateDocumentOverview.mock.calls.at(-1)!;
+        expect(projectId).toBe('C-1');
+        expect(text).toBeUndefined();
+        expect(projectContext).toContain('[PROJECT — source: Agresso]');
+        expect(projectContext).toContain('[CONTRACT — source: Agresso]');
         expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).not.toHaveBeenCalled();
       });
 
@@ -3929,8 +3951,12 @@ describe('ProjectDashboardComponent', () => {
       fixture.detectChanges();
 
       expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
-      // Baseline auto-call sends no documents or text — just the project id.
-      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      // Baseline auto-call sends no documents or text — just the project id and, best-effort, the
+      // assembled project_context digest (R-EOC-002/R-EOC-003).
+      const [baselineProjectId, baselineText, baselineContext] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(baselineProjectId).toBe('C-1');
+      expect(baselineText).toBeUndefined();
+      expect(baselineContext).toContain('[PROJECT — source: Agresso]');
       expect(component.executiveOverviewParagraphs()).toEqual(['First overview paragraph.', 'Second overview paragraph.']);
       expect(component.showExecutiveOverview()).toBe(true);
       expect(component.executiveOverviewLoading()).toBe(false);
@@ -3941,7 +3967,10 @@ describe('ProjectDashboardComponent', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
       fixture.detectChanges();
 
-      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      const [nonAdminProjectId, nonAdminText, nonAdminContext] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(nonAdminProjectId).toBe('C-1');
+      expect(nonAdminText).toBeUndefined();
+      expect(nonAdminContext).toContain('[PROJECT — source: Agresso]');
       expect(component.canAccessGroundingSetup()).toBe(false);
       expect(component.showExecutiveOverview()).toBe(true);
     });
@@ -3995,7 +4024,11 @@ describe('ProjectDashboardComponent', () => {
 
       await component.generateExecutiveOverview();
 
-      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+      const [generateProjectId, generateText, generateContext] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(generateProjectId).toBe('C-1');
+      expect(generateText).toBeUndefined();
+      expect(generateContext).toContain('[PROJECT — source: Agresso]');
+      expect(generateContext).toContain('[CONTRACT — source: Agresso]');
       expect(fileManagerServiceMock.uploadFile).not.toHaveBeenCalled();
       expect(component.executiveOverviewParagraphs()).toEqual(['First overview paragraph.', 'Second overview paragraph.']);
       expect(component.groundedDocuments()).toEqual([
@@ -4425,7 +4458,106 @@ describe('ProjectDashboardComponent', () => {
 
       await component.generateExecutiveOverview();
 
-      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1', 'Grounding context text.');
+      // R-EOC-003 AC.3: the user's text is forwarded exactly as typed — never concatenated with,
+      // or overwritten by, the assembled project_context digest (which travels as its own field).
+      const [projectId, text, context] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(projectId).toBe('C-1');
+      expect(text).toBe('Grounding context text.');
+      expect(context).toContain('[PROJECT — source: Agresso]');
+      expect(context).not.toContain('Grounding context text.');
+    });
+
+    it('sends a project_context digest that prefers CLARISA over Agresso per field (R-EOC-002 AC.2)', async () => {
+      await setup('C-1', { projectData: { full_name: 'Agresso Title', description: 'Agresso description.' } });
+      getClarisaProjectServiceMock.data.set({
+        id: 7,
+        short_name: 'CX',
+        full_name: 'CLARISA Title',
+        description: 'CLARISA description.',
+        science_programs: []
+      });
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      const [, , context] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(context).toContain('[PROJECT — source: CLARISA (updated)]');
+      expect(context).toContain('Title: CLARISA Title');
+      expect(context).toContain('Description: CLARISA description.');
+      expect(context).not.toContain('Agresso Title');
+      expect(context).not.toContain('Agresso description.');
+    });
+
+    // T-03 rework attempt 2 — Reviewer risk finding: contractDashboard.data() and clarisaProject.data()
+    // are root-scoped, unkeyed signals only overwritten when a fetch resolves. On rapid A -> B
+    // navigation without component destroy, they can hold contract A's payload for the whole
+    // duration of B's in-flight fetch. The fix contract-matches each input's `loadedContractId()`
+    // against the contract actually being generated for before trusting it.
+    it('omits stale RESULTS/REACH/STRATEGY data when contractDashboard.loadedContractId no longer matches the generating contract (cross-contract mixing)', async () => {
+      await setup('C-1', {
+        summary: { total: 999, by_status: [], by_year: [], by_indicator_year: [], partner_institutions: 1 },
+        tops: { partners: [{ institution_name: 'Stale Contract A Partner' }], primary_levers: [], main_contacts: [], contributors: [] }
+      });
+      // Desync: the dashboard aggregate resolved is still A's — the shape of B's route arriving
+      // before B's own aggregate fetch has resolved.
+      contractDashboardMock.loadedContractId.set('OTHER-CONTRACT');
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      const [, , context] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(context).not.toContain('Stale Contract A Partner');
+      expect(context).not.toContain('999');
+      expect(context).not.toContain('[RESULTS ANALYTICS');
+      expect(context).not.toContain('[REACH');
+      expect(context).not.toContain('[STRATEGY');
+    });
+
+    it('omits stale CLARISA project data when clarisaProject.loadedContractId no longer matches the generating contract (cross-contract mixing)', async () => {
+      await setup('C-1', { projectData: { full_name: 'Agresso Title' } });
+      getClarisaProjectServiceMock.data.set({
+        id: 9,
+        short_name: 'STALE',
+        full_name: 'Stale Contract A CLARISA Title',
+        science_programs: []
+      });
+      // Desync: the CLARISA project resolved is still A's.
+      getClarisaProjectServiceMock.loadedContractId.set('OTHER-CONTRACT');
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      const [, , context] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(context).toContain('[PROJECT — source: Agresso]');
+      expect(context).toContain('Agresso Title');
+      expect(context).not.toContain('Stale Contract A CLARISA Title');
+      expect(context).not.toContain('CLARISA (updated)');
+    });
+
+    it('proceeds with generation, omitting project_context, when context assembly throws (best-effort, R-EOC-003 AC.4)', async () => {
+      await setup();
+      component.groundedDocuments.set([{ fileName: 'contract.pdf', fileKey: 'folder/contract.pdf' }]);
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+      const buildSpy = jest.spyOn(projectContextUtil, 'buildProjectContext').mockImplementation(() => {
+        throw new Error('context assembly failed');
+      });
+
+      await component.generateExecutiveOverview();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1', undefined, undefined);
+      expect(component.executiveOverviewError()).toBe(false);
+      expect(component.executiveOverviewParagraphs()).toEqual(['First overview paragraph.', 'Second overview paragraph.']);
+
+      buildSpy.mockRestore();
+    });
+
+    it('omits project_context when there is no Agresso, CLARISA, or dashboard data to build it from (R-EOC-002 AC.4)', async () => {
+      await setup('C-1', { projectData: null });
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+
+      expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1', undefined, undefined);
     });
 
     it('should remove the text resource and reset the editor', async () => {

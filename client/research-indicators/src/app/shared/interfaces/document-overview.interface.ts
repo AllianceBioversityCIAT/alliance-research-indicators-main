@@ -4,6 +4,12 @@ export interface DocumentOverviewRequest {
   user_id: string;
   /** Optional free-text contextual resource (max 20,000 chars). Counts as one grounding resource. */
   text?: string;
+  /**
+   * Optional structured project-context digest (max 8,000 chars) built from Agresso/CLARISA/dashboard
+   * data by `buildProjectContext` (R-EOC-002/R-EOC-003). Never merged into `text` — `text` is the
+   * user's own free-text resource and round-trips through the summary GET.
+   */
+  project_context?: string;
 }
 
 export interface DocumentOverviewSummaryRequest {

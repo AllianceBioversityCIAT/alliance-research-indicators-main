@@ -28,6 +28,18 @@ import { ContractClarisaProject } from '../interfaces/contract-clarisa-project.i
  * route component (no `ngOnDestroy`) or when nothing invalidates this
  * root-scoped service on navigate-away (Reviewer-caught cross-contract
  * staleness, R-EOC-001 §3 / R-EOC-002 AC.2).
+ *
+ * `loadedContractId` (T-03 rework, attempt 2 — Reviewer-caught risk finding)
+ * names the contract id `data` currently, definitively resolves to. It is
+ * set ONLY on a successful resolution (memo hit or fetch success, including
+ * a legitimate `data: null`) — never on a transport failure/`loadError`, so
+ * a failed load for contract B leaves it pointing at whatever contract last
+ * resolved successfully rather than falsely vouching for B. Consumers with
+ * two contracts' loads racing concurrently (e.g. rapid A → B navigation
+ * without component destroy) MUST compare `loadedContractId()` against the
+ * contract they're building output for before trusting `data()` — reading
+ * `data()` alone is unkeyed and can silently hold a DIFFERENT contract's
+ * payload for the whole duration of the current contract's in-flight fetch.
  */
 @Injectable({ providedIn: 'root' })
 export class GetClarisaProjectService {
@@ -36,6 +48,7 @@ export class GetClarisaProjectService {
   readonly data = signal<ContractClarisaProject | null>(null);
   readonly loading = signal(false);
   readonly loadError = signal(false);
+  readonly loadedContractId = signal<string | null>(null);
 
   private readonly inFlightByContractId = new Map<string, Promise<void>>();
   private readonly resolvedByContractId = new Map<string, ContractClarisaProject | null>();
@@ -53,6 +66,7 @@ export class GetClarisaProjectService {
 
     if (this.resolvedByContractId.has(contractId)) {
       this.data.set(this.resolvedByContractId.get(contractId) ?? null);
+      this.loadedContractId.set(contractId);
       return;
     }
 
@@ -92,6 +106,7 @@ export class GetClarisaProjectService {
       const data = response?.data ?? null;
       this.data.set(data);
       this.resolvedByContractId.set(contractId, data);
+      this.loadedContractId.set(contractId);
     } catch (error) {
       this.data.set(null);
       this.loadError.set(true);

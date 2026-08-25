@@ -113,6 +113,57 @@ describe('DocumentOverviewService', () => {
     expect(body).not.toHaveProperty('text');
   });
 
+  // R-EOC-003 AC.1/AC.2: project_context is a NEW, independent optional field — sent alongside
+  // (never merged into) the user's own `text` resource.
+  it('generateDocumentOverview should include the trimmed project_context in the payload when provided', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', 'User text.', '  [PROJECT — source: Agresso]\nTitle: X  ');
+
+    expect(httpClientMock.post).toHaveBeenCalledWith(
+      `${environment.documentOverviewUrl}/api/document-overview`,
+      {
+        bucket_name: 'ai-services-ibd',
+        project_folder: `${environment.keyProjectOverview}A492`,
+        user_id: cacheServiceMock.dataCache().user.email,
+        text: 'User text.',
+        project_context: '[PROJECT — source: Agresso]\nTitle: X'
+      },
+      expect.any(Object)
+    );
+  });
+
+  it('generateDocumentOverview should omit the project_context field when it is empty, whitespace, or not provided (R-EOC-003 AC.4)', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', undefined, '   ');
+    let body = httpClientMock.post.mock.calls[0][1];
+    expect(body).not.toHaveProperty('project_context');
+
+    await service.generateDocumentOverview('A492');
+    body = httpClientMock.post.mock.calls[1][1];
+    expect(body).not.toHaveProperty('project_context');
+  });
+
+  it('generateDocumentOverview should never merge project_context into text — both can be present, independently valued (R-EOC-003 AC.3)', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', 'Exact user text, untouched.', 'Assembled project digest.');
+
+    const body = httpClientMock.post.mock.calls[0][1];
+    expect(body.text).toBe('Exact user text, untouched.');
+    expect(body.project_context).toBe('Assembled project digest.');
+  });
+
+  it('generateDocumentOverview should cap project_context at 8,000 characters', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', undefined, 'x'.repeat(9_000));
+
+    const body = httpClientMock.post.mock.calls[0][1];
+    expect(body.project_context).toHaveLength(8_000);
+  });
+
   it('fetchDocumentOverviewSummary should throw error on failure', async () => {
     httpClientMock.get.mockReturnValue(throwError(() => new Error('fail')));
 

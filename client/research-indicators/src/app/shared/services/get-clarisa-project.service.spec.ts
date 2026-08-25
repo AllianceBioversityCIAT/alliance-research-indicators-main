@@ -214,6 +214,62 @@ describe('GetClarisaProjectService', () => {
     expect(service.loading()).toBe(false);
   });
 
+  // T-03 rework attempt 2 — Reviewer-caught risk: consumers must be able to
+  // tell WHICH contract `data()` currently resolves to before trusting it
+  // for a concurrently-in-flight different contract (cross-contract mixing).
+  it('should set loadedContractId to the resolved contract id on a fresh fetch', async () => {
+    expect(service.loadedContractId()).toBeNull();
+
+    const load = service.load('A-1');
+    httpMock.expectOne(clarisaProjectUrl('A-1')).flush({ data: { id: 1, short_name: 'CL-A1', science_programs: [] } });
+    await load;
+
+    expect(service.loadedContractId()).toBe('A-1');
+  });
+
+  it('should set loadedContractId on a legitimate null resolution (unmapped contract) — data:null is still a resolved state', async () => {
+    const load = service.load('A-1');
+    httpMock.expectOne(clarisaProjectUrl('A-1')).flush({ data: null });
+    await load;
+
+    expect(service.data()).toBeNull();
+    expect(service.loadedContractId()).toBe('A-1');
+  });
+
+  it('should update loadedContractId to match on re-entering a previously-loaded contract (memo hit, A -> B -> A)', async () => {
+    const loadA = service.load('A-1');
+    httpMock.expectOne(clarisaProjectUrl('A-1')).flush({ data: { id: 1, short_name: 'CL-A1', science_programs: [] } });
+    await loadA;
+
+    const loadB = service.load('B-2');
+    httpMock.expectOne(clarisaProjectUrl('B-2')).flush({ data: { id: 2, short_name: 'CL-B2', science_programs: [] } });
+    await loadB;
+
+    expect(service.loadedContractId()).toBe('B-2');
+
+    await service.load('A-1'); // memo hit — no HTTP request
+
+    expect(service.loadedContractId()).toBe('A-1');
+    expect(service.data()?.short_name).toBe('CL-A1');
+  });
+
+  it('should NOT set loadedContractId to the failed contract on a transport failure — it stays at the last successfully-resolved id', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const loadA = service.load('A-1');
+    httpMock.expectOne(clarisaProjectUrl('A-1')).flush({ data: { id: 1, short_name: 'CL-A1', science_programs: [] } });
+    await loadA;
+    expect(service.loadedContractId()).toBe('A-1');
+
+    const loadB = service.load('B-2');
+    httpMock.expectOne(clarisaProjectUrl('B-2')).error(new ProgressEvent('error'), { status: 500, statusText: 'Server Error' });
+    await loadB;
+
+    expect(service.loadError()).toBe(true);
+    expect(service.loadedContractId()).toBe('A-1'); // unchanged — B never resolved successfully
+    consoleSpy.mockRestore();
+  });
+
   it('should resolve the in-flight awaiter with the same data as the original caller', async () => {
     const first = service.load('A-1');
     const second = service.load('A-1');

@@ -43,6 +43,7 @@ import {
   mapOverviewSourceDocuments,
   parseDocumentOverviewParagraphs
 } from '@shared/interfaces/document-overview.interface';
+import { buildProjectContext } from '@shared/utils/project-context.util';
 
 const MAX_GROUNDING_DOCS = 3;
 const MAX_GROUNDING_RESOURCES = 3;
@@ -1845,9 +1846,8 @@ export class ProjectDashboardComponent {
 
     try {
       const text = this.groundingText().trim();
-      const response = text
-        ? await this.documentOverviewService.generateDocumentOverview(projectId, text)
-        : await this.documentOverviewService.generateDocumentOverview(projectId);
+      const projectContext = this.buildProjectContextText(projectId);
+      const response = await this.documentOverviewService.generateDocumentOverview(projectId, text || undefined, projectContext);
       this.applyDocumentOverviewResponse(response);
     } catch {
       this.executiveOverviewError.set(true);
@@ -1886,10 +1886,39 @@ export class ProjectDashboardComponent {
 
   private async autoGenerateBaselineOverview(projectId: string): Promise<void> {
     try {
-      const response = await this.documentOverviewService.generateDocumentOverview(projectId);
+      const projectContext = this.buildProjectContextText(projectId);
+      const response = await this.documentOverviewService.generateDocumentOverview(projectId, undefined, projectContext);
       this.applyDocumentOverviewResponse(response);
     } catch {
       this.executiveOverviewError.set(true);
+    }
+  }
+
+  // Best-effort project-context assembly (R-EOC-002/R-EOC-003 AC.4): builds from whatever Agresso
+  // detail, CLARISA project, and dashboard report are in memory at call time — waits for none of
+  // them — and any thrown error yields `undefined` so generation always proceeds unaffected.
+  //
+  // Reviewer-caught risk (rework attempt 2): `contractDashboard.data()` and `clarisaProject.data()`
+  // are root-scoped, unkeyed signals that only get overwritten when a fetch resolves — on rapid
+  // navigation between contracts without component destroy, they can hold ANOTHER contract's
+  // payload for the entire duration of `projectId`'s in-flight fetch. Both services expose
+  // `loadedContractId` (a signal set ONLY on that service's own successful resolution — see
+  // GetClarisaProjectService's docblock); an input is used only when its `loadedContractId` matches
+  // `projectId`, otherwise it is treated as `null` (a state `buildProjectContext` already handles:
+  // the section is omitted, or the whole call returns `undefined` if every input mismatches).
+  //
+  // `this.project()` (Agresso detail) has the SAME hazard class — it is populated from
+  // `GetProjectDetailService.project()`, itself a root-scoped, unkeyed signal — but that service
+  // exposes no public "resolved for id X" signal (only a private `loadedContractIds` membership
+  // Set, not a last-resolved tracker) to gate against without widening this fix into that service.
+  // Left ungated here by explicit scope decision; flagged for a follow-up.
+  private buildProjectContextText(projectId: string): string | undefined {
+    try {
+      const dashboardReport = this.contractDashboard.loadedContractId() === projectId ? this.contractDashboard.data() : null;
+      const clarisaProject = this.clarisaProject.loadedContractId() === projectId ? this.clarisaProject.data() : null;
+      return buildProjectContext(this.project(), clarisaProject, dashboardReport)?.text;
+    } catch {
+      return undefined;
     }
   }
 

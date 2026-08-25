@@ -46,7 +46,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-03 — Client: `buildProjectContext` util + generation wiring
 
-- [ ] **Covers:** R-EOC-002, R-EOC-003 · **Skills:** `angular-developer`, `error-handling-patterns` · **Effort:** xhigh (source-preference + truncation correctness)
+- [x] **Covers:** R-EOC-002, R-EOC-003 · **Skills:** `angular-developer`, `error-handling-patterns` · **Effort:** xhigh (source-preference + truncation correctness)
 - Pure util `@shared/utils/project-context.util.ts` per design §5.1 (section order, per-field CLARISA preference, provenance labels, 8k bound at section boundaries, all-null → `undefined`).
 - `DocumentOverviewRequest.project_context?`; `generateDocumentOverview(projectId, text?, projectContext?)`; both dashboard call sites (auto-baseline + regenerate) pass the built context; builder failure ⇒ field omitted, generation unchanged.
 - Tests: util matrix (CLARISA-wins per field, Agresso-only, STAR-analytics sections, truncation boundary, undefined case); dashboard spec asserts the POST body field on both call sites and the omission path.
