@@ -17,6 +17,9 @@ import { filter } from 'rxjs';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
 import { GetProjectDetailService } from '@shared/services/get-project-detail.service';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
+import { GetContractInsightsService } from '@shared/services/get-contract-insights.service';
+import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
 
 interface ViewTab {
   label: string;
@@ -49,6 +52,12 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
   private readonly projectUtils = inject(ProjectUtilsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly getProjectDetailService = inject(GetProjectDetailService);
+  // changes/dashboard-refresh T-01, R-DRF-001, DD-1: dashboard-report, insights, and
+  // CLARISA-project caches are invalidated on route leave alongside the existing
+  // GetProjectDetailService invalidation, so a return visit re-fetches fresh data.
+  private readonly contractDashboardService = inject(GetContractDashboardService);
+  private readonly contractInsightsService = inject(GetContractInsightsService);
+  private readonly clarisaProjectService = inject(GetClarisaProjectService);
   contractId = signal('');
   lastSegment = signal('project-results');
   currentProject = signal<GetProjectDetail | null>(null);
@@ -216,6 +225,9 @@ export default class ProjectDetailComponent implements OnInit, OnDestroy {
     this.resultsCenterService.showFiltersSidebar.set(false);
     this.resultsCenterService.showConfigurationsSidebar.set(false);
     this.getProjectDetailService.invalidate(this.contractId());
+    this.contractDashboardService.invalidate(this.contractId());
+    this.contractInsightsService.invalidate(this.contractId());
+    this.clarisaProjectService.invalidate(this.contractId());
   }
 
   async getProjectDetail() {

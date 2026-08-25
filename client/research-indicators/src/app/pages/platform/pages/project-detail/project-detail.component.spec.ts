@@ -11,6 +11,9 @@ import { ResultsCenterService } from '../results-center/results-center.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
 import { GetProjectDetail } from '@shared/interfaces/get-project-detail.interface';
+import { GetContractDashboardService } from '@shared/services/get-contract-dashboard.service';
+import { GetContractInsightsService } from '@shared/services/get-contract-insights.service';
+import { GetClarisaProjectService } from '@shared/services/get-clarisa-project.service';
 
 @Component({
   selector: 'app-results-center-table',
@@ -81,6 +84,10 @@ describe('ProjectDetailComponent', () => {
   let fixture: ComponentFixture<ProjectDetailComponent>;
   let apiService: { GET_ResultsCount: jest.Mock };
   let getProjectDetailService: { project: ReturnType<typeof signal<GetProjectDetail | null>>; loading: ReturnType<typeof signal<boolean>>; loadError: ReturnType<typeof signal<boolean>>; load: jest.Mock; invalidate: jest.Mock };
+  // changes/dashboard-refresh T-01, R-DRF-001: minimal mocks — this task only exercises invalidate() being called on destroy.
+  let contractDashboardService: { invalidate: jest.Mock };
+  let contractInsightsService: { invalidate: jest.Mock };
+  let clarisaProjectService: { invalidate: jest.Mock };
   let queryParamMapSubject: BehaviorSubject<ParamMap>;
   let activatedRoute: { snapshot: { params: { id: string }; queryParamMap: ParamMap }; queryParamMap: ReturnType<typeof queryParamMapSubject.asObservable> };
   let router: {
@@ -149,6 +156,9 @@ describe('ProjectDetailComponent', () => {
       }),
       invalidate: jest.fn()
     };
+    contractDashboardService = { invalidate: jest.fn() };
+    contractInsightsService = { invalidate: jest.fn() };
+    clarisaProjectService = { invalidate: jest.fn() };
     queryParamMapSubject = new BehaviorSubject<ParamMap>(convertToParamMap({}));
     activatedRoute = {
       snapshot: {
@@ -201,6 +211,9 @@ describe('ProjectDetailComponent', () => {
       providers: [
         { provide: ApiService, useValue: apiService },
         { provide: GetProjectDetailService, useValue: getProjectDetailService },
+        { provide: GetContractDashboardService, useValue: contractDashboardService },
+        { provide: GetContractInsightsService, useValue: contractInsightsService },
+        { provide: GetClarisaProjectService, useValue: clarisaProjectService },
         { provide: ActivatedRoute, useValue: activatedRoute },
         { provide: Router, useValue: router },
         { provide: ResultsCenterService, useValue: resultsCenterService },
@@ -432,6 +445,20 @@ describe('ProjectDetailComponent', () => {
     expect(resultsCenterService.showFiltersSidebar()).toBe(false);
     expect(resultsCenterService.showConfigurationsSidebar()).toBe(false);
     expect(getProjectDetailService.invalidate).toHaveBeenCalledWith('mock-id');
+  });
+
+  it('invalidates the dashboard, insights, and CLARISA-project caches for the contract on destroy (changes/dashboard-refresh T-01, R-DRF-001)', () => {
+    // KZ-015: arrange the loaded state first, then act on the leave transition.
+    component.contractId.set('mock-id');
+    expect(contractDashboardService.invalidate).not.toHaveBeenCalled();
+    expect(contractInsightsService.invalidate).not.toHaveBeenCalled();
+    expect(clarisaProjectService.invalidate).not.toHaveBeenCalled();
+
+    component.ngOnDestroy();
+
+    expect(contractDashboardService.invalidate).toHaveBeenCalledWith('mock-id');
+    expect(contractInsightsService.invalidate).toHaveBeenCalledWith('mock-id');
+    expect(clarisaProjectService.invalidate).toHaveBeenCalledWith('mock-id');
   });
 
   it('should load project detail via the shared service and sync currentProject (full_name mutation deleted — D-PD-7)', async () => {

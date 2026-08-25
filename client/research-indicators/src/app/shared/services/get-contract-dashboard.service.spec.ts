@@ -233,4 +233,36 @@ describe('GetContractDashboardService', () => {
     expect(service.loadError()).toBe(false);
     expect(service.summary()).toBeNull();
   });
+
+  describe('invalidate(contractId?) — changes/dashboard-refresh T-01, R-DRF-001', () => {
+    it('issues a fresh HTTP request after invalidate(id) clears the cache for that id', async () => {
+      const first = service.load('A1676');
+      httpMock.expectOne(dashboardUrl('A1676')).flush({ data: mockReport, successfulRequest: true });
+      await first;
+      expect(service.loadedContractId()).toBe('A1676');
+
+      service.invalidate('A1676');
+
+      const second = service.load('A1676');
+      const req2 = httpMock.expectOne(dashboardUrl('A1676'));
+      req2.flush({ data: mockReport, successfulRequest: true });
+      await second;
+
+      expect(service.loadedContractId()).toBe('A1676');
+    });
+
+    it('does NOT invalidate a different contract id currently loaded (no HTTP re-issue for it)', async () => {
+      const load = service.load('B-2');
+      httpMock.expectOne(dashboardUrl('B-2')).flush({ data: mockReport, successfulRequest: true });
+      await load;
+      expect(service.loadedContractId()).toBe('B-2');
+
+      service.invalidate('A1676');
+
+      // A subsequent non-forced load of B-2 must be served from cache — no new HTTP call.
+      await service.load('B-2');
+      httpMock.expectNone(dashboardUrl('B-2'));
+      expect(service.loadedContractId()).toBe('B-2');
+    });
+  });
 });

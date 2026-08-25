@@ -55,4 +55,13 @@ export class GetContractInsightsService {
       await this.load(contractId, { force: true });
     }
   }
+
+  // changes/dashboard-refresh T-01, R-DRF-001, DD-1: per-id invalidate mirroring
+  // GetProjectDetailService — a single-slot cache, so invalidating a DIFFERENT id than the one
+  // currently loaded must be a no-op (must NOT invalidate other contracts' entries).
+  invalidate(contractId?: string): void {
+    if (contractId === undefined || this.loadedContractId() === contractId) {
+      this.loadedContractId.set(null);
+    }
+  }
 }
