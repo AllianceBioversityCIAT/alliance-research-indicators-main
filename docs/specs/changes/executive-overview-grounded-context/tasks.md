@@ -20,6 +20,7 @@ T-01 (server endpoint) ──► T-02 (client service+interface) ──► T-03 
 T-04 (card states + threshold) ──► T-05 (reading modal)
 T-03, T-05 ──► T-06 (provenance footer)
 T-04/T-05 ──► T-08 (dedup shell header; owner decision 2026-08-24)
+T-08 ──► T-09 (stable hero + tabs; owner decision 2026-08-25)
 all ──► T-07 (validation sweep)
 ```
 
@@ -79,6 +80,13 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 - Remove `<app-executive-overview>` from `project-detail.component.html` (+ its import in `project-detail.component.ts`); delete `components/executive-overview/executive-overview.component.{ts,html,spec.ts}`.
 - Constraint: serialize AFTER T-04/T-05 (same client package); touches only shell files, not the dashboard component.
 - **Verify:** `npx jest src/app/pages/platform/pages/project-detail --coverage=false` (route-level specs still green), `npm run build`, grep `app-executive-overview`/`ExecutiveOverviewComponent` returns no live references.
+
+### T-09 — Stable identity hero + tab affordance
+
+- [ ] **Covers:** R-EOC-010, R-EOC-011 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
+- Rework `project-detail.component.html/.ts`: contacts to horizontal row in hero; remove the hero's `lastSegment()` conditional; relocate the metadata `<dl>` grid into the Results-tab body below the tab bar; upgrade the tab bar (icons, hit area, hover pill, focus ring, tablist/tab aria).
+- Tests: hero identical across both route states (no conditional content), meta grid present on results state only (below tabs), tab aria attributes, contacts row renders all persons.
+- **Verify:** `npx jest src/app/pages/platform/pages/project-detail --coverage=false`, `npm run build`, `npm run lint -- --quiet`.
 
 ### T-07 — Validation sweep
 

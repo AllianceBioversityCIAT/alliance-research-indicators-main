@@ -141,6 +141,32 @@ Not changing: the AI microservice itself (external Lambda, owned by the Executiv
 
 > Added 2026-08-24 by owner decision after the Implementer's duplicate-surface finding (see execution.md). Supersedes the placement decision of commit `5b506f42` (2026-08-23, shell header).
 
+### R-EOC-010 — Stable identity hero across tabs
+
+- **As a** STAR user switching between Project Dashboard and Project Results
+- **I want** the project hero to be identical on both tabs — identity only, no dead space
+- **So that** the page doesn't jump on tab switch and the dashboard tab shows no vacant region
+
+**Acceptance criteria**
+1. The shell hero renders the SAME content on both tabs: title, department, status chips, and CONTACT PERSONS as a compact horizontal row (avatar initials + name + role) under the chips — the vertical right-hand column is removed.
+2. The metadata grid (Budget, Start/End/Extension dates, Lever, Foundress, Division, Unit) moves OUT of the hero and INTO the Results tab body, rendered as that tab's own header section below the tab bar (dashboard context remains owned by Act 1 — no duplication).
+3. Switching tabs produces no hero height change (no layout jump); no conditional `lastSegment()` branch remains inside the hero itself.
+4. Tokens only; contacts row wraps on narrow viewports; long titles keep current truncation behavior.
+
+### R-EOC-011 — Tab affordance for Dashboard / Results
+
+- **As a** STAR user landing on the project detail
+- **I want** the two tabs to read unmistakably as interactive controls
+- **So that** I discover the Results/Dashboard views without hunting
+
+**Acceptance criteria**
+1. Each tab gains an icon (`pi-chart-bar` dashboard / `pi-list` results), a ≥44px hit area, `cursor-pointer`, a visible hover state (subtle pill background), and a focus-visible ring.
+2. Active tab: existing underline emphasis + primary-blue text; inactive: mid-grey with hover affordance.
+3. A11y: container `role="tablist"`, each tab `role="tab"` + `aria-selected`; keyboard focusable in DOM order.
+4. Tokens only; both themes.
+
+> R-EOC-010/011 added 2026-08-25 by owner decision (hero dead space + hero jump on tab switch + tab affordance, screenshots on record). Direction chosen: "identity hero" + "underline tabs improved".
+
 ---
 
 ## 4. Non-functional requirements
