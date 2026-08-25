@@ -29,6 +29,26 @@ import { chartTokens } from '@shared/utils/chart-tokens.util';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
 import type { ECElementEvent } from 'echarts/core';
 import { ContractCgiarEntity } from '@shared/interfaces/find-contracts.interface';
+import { FileManagerService } from '@shared/services/file-manager.service';
+import { DocumentOverviewService } from '@shared/services/document-overview.service';
+import { RolesService } from '@shared/services/cache/roles.service';
+import { ActionsService } from '@shared/services/actions.service';
+import { AllModalsService } from '@shared/services/cache/all-modals.service';
+import { ModalComponent } from '@shared/components/modal/modal.component';
+import {
+  DocumentOverviewResponse,
+  GroundedProjectDocument,
+  mapAvailableOverviewFiles,
+  mapOverviewSourceDocuments,
+  parseDocumentOverviewParagraphs
+} from '@shared/interfaces/document-overview.interface';
+
+const MAX_GROUNDING_DOCS = 3;
+const MAX_GROUNDING_RESOURCES = 3;
+const MAX_GROUNDING_TEXT_LENGTH = 20_000;
+const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
+const GROUNDING_MAX_SIZE_MB = 10;
+const GROUNDING_PAGE_LIMIT = 100;
 
 export interface ProjectContextTimeline {
   startDate: string;
@@ -80,7 +100,8 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     NoDataGroupComponent,
     VizChartComponent,
     IndicatorDeepDiveComponent,
-    InsightsSectionComponent
+    InsightsSectionComponent,
+    ModalComponent
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -101,6 +122,11 @@ export class ProjectDashboardComponent {
   private readonly darkModeService = inject(DarkModeService);
   readonly getProjectDetailService = inject(GetProjectDetailService);
   readonly contractDashboard = inject(GetContractDashboardService);
+  private readonly fileManagerService = inject(FileManagerService);
+  private readonly documentOverviewService = inject(DocumentOverviewService);
+  private readonly rolesService = inject(RolesService);
+  private readonly actions = inject(ActionsService);
+  private readonly allModalsService = inject(AllModalsService);
 
   readonly tokens = chartTokens(this.darkModeService.darkMode());
 
@@ -1183,6 +1209,51 @@ export class ProjectDashboardComponent {
 
   readonly pendingRevisionExcludedColumns = ['status', 'year', 'versions', 'creation_date', 'public_link', 'project'] as const;
 
+  // --- Executive Overview (grounded AI summary, AC-1714) -----------------
+  readonly maxGroundingDocs = MAX_GROUNDING_DOCS;
+  readonly maxGroundingResources = MAX_GROUNDING_RESOURCES;
+  readonly maxGroundingTextLength = MAX_GROUNDING_TEXT_LENGTH;
+  readonly groundingAcceptedFormats = GROUNDING_ACCEPTED_FORMATS;
+  readonly groundedDocuments = signal<GroundedProjectDocument[]>([]);
+  readonly overviewSourceDocuments = signal<GroundedProjectDocument[]>([]);
+  readonly executiveOverviewGeneratedAt = signal<string | null>(null);
+  readonly uploadingGroundingDoc = signal(false);
+  readonly executiveOverviewParagraphs = signal<string[]>([]);
+  readonly executiveOverviewExpanded = signal(false);
+  readonly executiveOverviewText = computed(() => this.executiveOverviewParagraphs().join('\n\n'));
+  readonly executiveOverviewLoading = signal(false);
+  readonly executiveOverviewError = signal(false);
+  /** Saved free-text contextual resource (empty string means no text resource). */
+  readonly groundingText = signal<string>('');
+  readonly showGroundingTextEditor = signal(false);
+  readonly groundingTextDraft = signal<string>('');
+
+  readonly hasGroundedDocuments = computed(() => this.groundedDocuments().length > 0);
+  readonly hasGroundingText = computed(() => this.groundingText().trim().length > 0);
+  /** Total contextual resources = uploaded docs + at most one text resource. Capped at MAX_GROUNDING_RESOURCES. */
+  readonly totalGroundingResources = computed(() => this.groundedDocuments().length + (this.hasGroundingText() ? 1 : 0));
+  readonly hasGroundingResources = computed(() => this.hasGroundedDocuments() || this.hasGroundingText());
+  readonly canUploadMoreGroundingDocs = computed(() => this.totalGroundingResources() < MAX_GROUNDING_RESOURCES);
+  readonly canAddGroundingText = computed(() => !this.hasGroundingText() && this.totalGroundingResources() < MAX_GROUNDING_RESOURCES);
+  readonly canGenerateExecutiveOverview = computed(
+    () => this.hasGroundingResources() && !this.executiveOverviewLoading() && !this.uploadingGroundingDoc()
+  );
+  readonly groundedDocumentsCountColor = computed(() => {
+    const count = this.totalGroundingResources();
+    if (count === 0) return 'var(--ac-grey-500)';
+    if (count >= MAX_GROUNDING_RESOURCES) return 'var(--ac-red-1)';
+    return 'var(--ac-viz-status-approved)';
+  });
+  readonly canAccessGroundingSetup = computed(() => this.rolesService.isAdmin());
+  readonly hasExecutiveOverviewData = computed(() => this.executiveOverviewParagraphs().length > 0);
+  readonly showExecutiveOverview = computed(() => {
+    if (this.canAccessGroundingSetup()) {
+      return this.hasGroundingResources() || this.executiveOverviewLoading() || this.executiveOverviewError() || this.hasExecutiveOverviewData();
+    }
+
+    return this.hasExecutiveOverviewData();
+  });
+
   constructor() {
     this.initReducedMotionDetection();
 
@@ -1192,6 +1263,7 @@ export class ProjectDashboardComponent {
         void this.syncProjectFromSharedService(contractId);
         void this.contractDashboard.load(contractId);
         this.resultsCenterService.initializeProjectDashboardResultsTable(contractId);
+        void this.loadExecutiveOverviewSummary();
       }
     });
   }
@@ -1460,6 +1532,318 @@ export class ProjectDashboardComponent {
       this.getProjectDetailService.invalidate(contractId);
       void this.syncProjectFromSharedService(contractId);
     }
+  }
+
+  // --- Executive Overview methods (grounded AI summary, AC-1714) ---------
+
+  toggleExecutiveOverview(): void {
+    this.executiveOverviewExpanded.update(expanded => !expanded);
+  }
+
+  async openGroundingSetupModal(): Promise<void> {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    const projectId = this.contractId();
+    if (!projectId) {
+      return;
+    }
+
+    try {
+      const response = await this.documentOverviewService.fetchDocumentOverviewSummary(projectId);
+      this.applyDocumentOverviewResponse(response);
+      this.showGroundingTextEditor.set(false);
+      this.groundingTextDraft.set('');
+      this.allModalsService.openModal('projectGroundingSetup');
+      this.allModalsService.setModalWidth('projectGroundingSetup', true);
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Unable to open setup',
+        detail: 'The saved grounding resources could not be loaded. Please try again.'
+      });
+    }
+  }
+
+  triggerGroundingUpload(fileInput: HTMLInputElement): void {
+    if (!this.canAccessGroundingSetup() || !this.canUploadMoreGroundingDocs() || this.uploadingGroundingDoc()) {
+      return;
+    }
+
+    fileInput.value = '';
+    fileInput.click();
+  }
+
+  async onGroundingFilesSelected(event: Event): Promise<void> {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    const input = event.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+
+    if (!files.length) {
+      return;
+    }
+
+    const remainingSlots = MAX_GROUNDING_RESOURCES - this.totalGroundingResources();
+    if (remainingSlots <= 0) {
+      this.actions.showToast({
+        severity: 'warning',
+        summary: 'Upload limit reached',
+        detail: `You can add up to ${MAX_GROUNDING_RESOURCES} contextual resources in total.`
+      });
+      return;
+    }
+
+    const filesToUpload = files.slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      this.actions.showToast({
+        severity: 'info',
+        summary: 'Upload limit',
+        detail: `Only ${remainingSlots} more document${remainingSlots === 1 ? '' : 's'} can be uploaded.`
+      });
+    }
+
+    this.uploadingGroundingDoc.set(true);
+
+    try {
+      for (const file of filesToUpload) {
+        if (!this.isValidGroundingFile(file)) {
+          continue;
+        }
+
+        const response = await this.fileManagerService.uploadFile(file, GROUNDING_MAX_SIZE_MB, GROUNDING_PAGE_LIMIT, {
+          projectId: this.contractId()
+        });
+        const storedFilename = response.data.filename;
+
+        if (!storedFilename) {
+          throw new Error('Could not get the name of the uploaded file.');
+        }
+
+        this.groundedDocuments.update(current => [
+          ...current,
+          {
+            fileName: file.name,
+            fileKey: `${environment.keyProjectOverview}${this.contractId()}/${storedFilename}`
+          }
+        ]);
+      }
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Upload failed',
+        detail: 'Something went wrong while uploading the document. Please try again.'
+      });
+    } finally {
+      this.uploadingGroundingDoc.set(false);
+    }
+  }
+
+  private isValidGroundingFile(file: File): boolean {
+    const extension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (!GROUNDING_ACCEPTED_FORMATS.includes(extension)) {
+      this.actions.showToast({
+        severity: 'warning',
+        summary: 'Unsupported file',
+        detail: `Accepted formats: ${GROUNDING_ACCEPTED_FORMATS.join(', ')}.`
+      });
+      return false;
+    }
+
+    const maxBytes = GROUNDING_MAX_SIZE_MB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      this.actions.showToast({
+        severity: 'warning',
+        summary: 'File too large',
+        detail: `Each document can be up to ${GROUNDING_MAX_SIZE_MB} MB.`
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  removeGroundingDocument(fileKey: string): void {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    const document = this.groundedDocuments().find(item => item.fileKey === fileKey);
+    if (!document) {
+      return;
+    }
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: 'Remove document',
+      icon: 'pi pi-exclamation-triangle',
+      color: '#E69F00',
+      detail:
+        'Removing this document may make the current Executive Overview outdated. ' + 'We recommend regenerating it to update the grounded summary.',
+      confirmCallback: {
+        label: 'Continue',
+        event: () => {
+          void this.removeGroundingDocumentAsync(fileKey);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel'
+      },
+      buttonColor: '#035BA9'
+    });
+  }
+
+  private async removeGroundingDocumentAsync(fileKey: string): Promise<void> {
+    const projectId = this.contractId();
+    if (!projectId) {
+      return;
+    }
+
+    const document = this.groundedDocuments().find(item => item.fileKey === fileKey);
+    if (!document) {
+      return;
+    }
+
+    try {
+      await this.documentOverviewService.deleteDocumentOverviewFiles(projectId, [document.fileName]);
+      this.groundedDocuments.update(current => current.filter(item => item.fileKey !== fileKey));
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Remove failed',
+        detail: 'Something went wrong while removing the document. Please try again.'
+      });
+    }
+  }
+
+  openGroundingTextEditor(): void {
+    if (!this.canAccessGroundingSetup() || (!this.hasGroundingText() && !this.canAddGroundingText())) {
+      return;
+    }
+
+    this.groundingTextDraft.set(this.groundingText());
+    this.showGroundingTextEditor.set(true);
+  }
+
+  onGroundingTextInput(event: Event): void {
+    const value = (event.target as HTMLTextAreaElement).value ?? '';
+    this.groundingTextDraft.set(value.slice(0, MAX_GROUNDING_TEXT_LENGTH));
+  }
+
+  saveGroundingText(): void {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    const value = this.groundingTextDraft().trim().slice(0, MAX_GROUNDING_TEXT_LENGTH);
+    if (!value) {
+      return;
+    }
+
+    this.groundingText.set(value);
+    this.showGroundingTextEditor.set(false);
+    this.groundingTextDraft.set('');
+  }
+
+  cancelGroundingText(): void {
+    this.showGroundingTextEditor.set(false);
+    this.groundingTextDraft.set('');
+  }
+
+  removeGroundingText(): void {
+    if (!this.canAccessGroundingSetup()) {
+      return;
+    }
+
+    this.groundingText.set('');
+    this.showGroundingTextEditor.set(false);
+    this.groundingTextDraft.set('');
+  }
+
+  async generateExecutiveOverview(): Promise<void> {
+    if (!this.canAccessGroundingSetup() || !this.hasGroundingResources()) {
+      return;
+    }
+
+    const projectId = this.contractId();
+    if (!projectId) {
+      return;
+    }
+
+    this.executiveOverviewLoading.set(true);
+    this.executiveOverviewError.set(false);
+
+    try {
+      const text = this.groundingText().trim();
+      const response = text
+        ? await this.documentOverviewService.generateDocumentOverview(projectId, text)
+        : await this.documentOverviewService.generateDocumentOverview(projectId);
+      this.applyDocumentOverviewResponse(response);
+    } catch {
+      this.executiveOverviewError.set(true);
+    } finally {
+      this.executiveOverviewLoading.set(false);
+    }
+  }
+
+  private async loadExecutiveOverviewSummary(): Promise<void> {
+    const projectId = this.contractId();
+    if (!projectId) {
+      return;
+    }
+
+    this.executiveOverviewLoading.set(true);
+    this.executiveOverviewError.set(false);
+
+    try {
+      const response = await this.documentOverviewService.fetchDocumentOverviewSummary(projectId);
+      this.applyDocumentOverviewResponse(response);
+
+      // When a project has no stored summary yet, auto-generate a baseline overview from the
+      // project's own information (no documents or text) so users always see a summary on entry.
+      // It runs once per entry; enriching it afterwards requires an explicit "Generate" click,
+      // which avoids wasting AI-service calls on every visit.
+      if (!this.hasExecutiveOverviewData()) {
+        await this.autoGenerateBaselineOverview(projectId);
+      }
+    } catch {
+      this.clearGeneratedExecutiveOverview();
+      this.groundedDocuments.set([]);
+    } finally {
+      this.executiveOverviewLoading.set(false);
+    }
+  }
+
+  private async autoGenerateBaselineOverview(projectId: string): Promise<void> {
+    try {
+      const response = await this.documentOverviewService.generateDocumentOverview(projectId);
+      this.applyDocumentOverviewResponse(response);
+    } catch {
+      this.executiveOverviewError.set(true);
+    }
+  }
+
+  private applyDocumentOverviewResponse(response: DocumentOverviewResponse): void {
+    this.executiveOverviewParagraphs.set(parseDocumentOverviewParagraphs(response));
+    this.executiveOverviewExpanded.set(false);
+    this.groundedDocuments.set(mapAvailableOverviewFiles(response));
+    this.overviewSourceDocuments.set(mapOverviewSourceDocuments(response));
+    this.executiveOverviewGeneratedAt.set(response.generated_at ?? null);
+
+    const responseText = response.text?.trim() ?? '';
+    this.groundingText.set(responseText);
+    this.showGroundingTextEditor.set(false);
+    this.groundingTextDraft.set('');
+  }
+
+  private clearGeneratedExecutiveOverview(): void {
+    this.executiveOverviewParagraphs.set([]);
+    this.overviewSourceDocuments.set([]);
+    this.executiveOverviewGeneratedAt.set(null);
   }
 
 }
