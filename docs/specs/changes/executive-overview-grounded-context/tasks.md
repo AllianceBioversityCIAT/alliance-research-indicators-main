@@ -83,7 +83,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-09 — Stable identity hero + tab affordance
 
-- [ ] **Covers:** R-EOC-010, R-EOC-011 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
+- [x] **Covers:** R-EOC-010, R-EOC-011 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
 - Rework `project-detail.component.html/.ts`: contacts to horizontal row in hero; remove the hero's `lastSegment()` conditional; relocate the metadata `<dl>` grid into the Results-tab body below the tab bar; upgrade the tab bar (icons, hit area, hover pill, focus ring, tablist/tab aria).
 - Tests: hero identical across both route states (no conditional content), meta grid present on results state only (below tabs), tab aria attributes, contacts row renders all persons.
 - **Verify:** `npx jest src/app/pages/platform/pages/project-detail --coverage=false`, `npm run build`, `npm run lint -- --quiet`.

@@ -852,11 +852,8 @@ describe('ProjectDetailComponent', () => {
     });
   });
 
-  describe('Hero fact rows conditional rendering (R-HL-001, D-F1-1, RC-4)', () => {
-    it('should render fact rows <dl> when on project-results tab (RC-4 regression)', () => {
-      router.url = '/projects/mock-id/project-results';
-      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-results'));
-      component.ngOnInit();
+  describe('Stable identity hero + tab affordance (R-EOC-010, R-EOC-011)', () => {
+    const setProject = () => {
       component.currentProject.set({
         agreement_id: 'AG-123',
         description: 'Test Project',
@@ -871,12 +868,55 @@ describe('ProjectDetailComponent', () => {
         unitId: 'U-2',
         unit: 'Crops'
       });
+    };
+
+    it('renders an identical hero (no <dl>, same markup) on project-dashboard and after switching to project-results (R-EOC-010 AC1/AC3)', () => {
+      router.url = '/projects/mock-id/project-dashboard';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
+      component.ngOnInit();
+      setProject();
+      contractStaffService.staff.set([
+        { name: 'Smith, John', role: 'Principal Investigator' },
+        { name: 'Jane Doe', role: 'Co-Investigator' }
+      ]);
       fixture.detectChanges();
 
-      const dlElements = fixture.nativeElement.querySelectorAll('header dl');
-      expect(dlElements.length).toBe(2);
+      const heroOnDashboard = fixture.nativeElement.querySelector('header');
+      expect(heroOnDashboard.querySelectorAll('dl').length).toBe(0);
+      const dashboardHeroHtml = heroOnDashboard.innerHTML;
 
-      const text = fixture.nativeElement.querySelector('header').textContent;
+      // Arrange the TRANSITION (KZ-015): flip the SAME fixture to project-results.
+      router.url = '/projects/mock-id/project-results';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-results'));
+      component.getLastSegment();
+      fixture.detectChanges();
+
+      const heroOnResults = fixture.nativeElement.querySelector('header');
+      expect(heroOnResults.querySelectorAll('dl').length).toBe(0);
+      expect(heroOnResults.innerHTML).toBe(dashboardHeroHtml);
+    });
+
+    it('shows the meta grid below the tab bar only on the non-dashboard state, never inside the hero (R-EOC-010 AC2)', () => {
+      router.url = '/projects/mock-id/project-dashboard';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
+      component.ngOnInit();
+      setProject();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="project-detail-meta-grid"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('header dl')).toBeNull();
+
+      // Arrange the TRANSITION (KZ-015): flip the SAME fixture to project-results.
+      router.url = '/projects/mock-id/project-results';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-results'));
+      component.getLastSegment();
+      fixture.detectChanges();
+
+      const metaGrid = fixture.nativeElement.querySelector('[data-testid="project-detail-meta-grid"]');
+      expect(metaGrid).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('header dl')).toBeNull();
+
+      const text = metaGrid.textContent;
       expect(text).toContain('Budget');
       expect(text).toContain('$1,500,000');
       expect(text).toContain('Start date');
@@ -892,32 +932,65 @@ describe('ProjectDetailComponent', () => {
       expect(text).toContain('DIV-1 - Research');
       expect(text).toContain('Unit');
       expect(text).toContain('U-2 - Crops');
+
+      // Meta grid renders below (after, in document order) the tab bar.
+      const tablist = fixture.nativeElement.querySelector('[role="tablist"]');
+      expect(!!(tablist.compareDocumentPosition(metaGrid) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
     });
 
-    it('should hide fact rows <dl> when on project-dashboard tab (D-F1-1)', () => {
+    it('renders tablist/tab roles with aria-selected flipping across a tab switch (R-EOC-011 AC3)', () => {
       router.url = '/projects/mock-id/project-dashboard';
       router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
       component.ngOnInit();
-      component.currentProject.set({
-        agreement_id: 'AG-123',
-        description: 'Test Project',
-        department: 'Science',
-        grant_amount: 1500000,
-        start_date: '2024-01-01',
-        end_date: '2026-12-31',
-        extension_date: '2027-06-30',
-        donor: 'Donor Foundation',
-        divisionId: 'DIV-1',
-        division: 'Research',
-        unitId: 'U-2',
-        unit: 'Crops'
-      });
       fixture.detectChanges();
 
-      const dlElements = fixture.nativeElement.querySelectorAll('header dl');
-      expect(dlElements.length).toBe(0);
+      const tablist = fixture.nativeElement.querySelector('[role="tablist"]');
+      expect(tablist).not.toBeNull();
+      const tabButtons: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('[role="tab"]'));
+      expect(tabButtons.length).toBe(2);
 
-      // Identity band remains rendered on both tabs (R-HL-001)
+      const dashboardTab = tabButtons.find(btn => btn.textContent?.includes('Project Dashboard'));
+      const resultsTab = tabButtons.find(btn => btn.textContent?.includes('Project Results'));
+      expect(dashboardTab?.getAttribute('aria-selected')).toBe('true');
+      expect(resultsTab?.getAttribute('aria-selected')).toBe('false');
+
+      // Arrange the TRANSITION (KZ-015): flip the SAME fixture to project-results.
+      router.url = '/projects/mock-id/project-results';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-results'));
+      component.getLastSegment();
+      fixture.detectChanges();
+
+      expect(dashboardTab?.getAttribute('aria-selected')).toBe('false');
+      expect(resultsTab?.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('renders the contacts row with one entry per contact person, on the dashboard state (R-EOC-010 AC1/AC4)', () => {
+      contractStaffService.staff.set([
+        { name: 'Smith, John', role: 'Principal Investigator' },
+        { name: 'Jane Doe', role: 'Co-Investigator' },
+        { name: 'Madonna', role: 'Advisor' }
+      ]);
+      router.url = '/projects/mock-id/project-dashboard';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
+      component.ngOnInit();
+      fixture.detectChanges();
+
+      const contactsRow = fixture.nativeElement.querySelector('[data-testid="project-detail-contacts-row"]');
+      expect(contactsRow).not.toBeNull();
+      expect(contactsRow.querySelectorAll('article').length).toBe(3);
+      expect(contactsRow.textContent).toContain('Smith, John');
+      expect(contactsRow.textContent).toContain('Principal Investigator');
+      expect(contactsRow.textContent).toContain('Jane Doe');
+      expect(contactsRow.textContent).toContain('Madonna');
+    });
+
+    it('keeps the identity band (title + department) rendered on both tabs (R-EOC-010 AC1)', () => {
+      router.url = '/projects/mock-id/project-dashboard';
+      router.parseUrl.mockReturnValue(parseUrlWithSegments('projects', 'mock-id', 'project-dashboard'));
+      component.ngOnInit();
+      setProject();
+      fixture.detectChanges();
+
       const headerText = fixture.nativeElement.querySelector('header').textContent;
       expect(headerText).toContain('AG-123 - Test Project');
       expect(headerText).toContain('Science Department');
