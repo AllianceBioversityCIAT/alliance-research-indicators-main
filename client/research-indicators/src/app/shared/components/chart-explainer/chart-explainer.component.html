@@ -1,0 +1,35 @@
+@if (explainer(); as entry) {
+  <span class="chart-explainer inline-flex" [class.chart-explainer--surface]="placement() === 'surface'">
+    <button
+      #triggerButton
+      type="button"
+      class="chart-explainer__trigger flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 text-[var(--ac-grey-700)] transition-colors duration-150 hover:text-[var(--ac-light-blue-400)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+      [attr.aria-label]="'Explain this chart: ' + entry.title"
+      [attr.aria-expanded]="isOpen()"
+      [attr.aria-controls]="isOpen() ? panelId : null"
+      (click)="toggle($event)">
+      <i class="pi pi-question-circle text-[16px]" aria-hidden="true"></i>
+    </button>
+
+    <span class="sr-only" [id]="descriptionId">{{ srOnlyDescription() }}</span>
+
+    <p-popover
+      #explainerPopover
+      [style]="{ width: '340px', maxWidth: 'calc(100vw - 24px)' }"
+      appendTo="body"
+      [focusOnShow]="false"
+      (onHide)="onPopoverHide()">
+      <div [id]="panelId" role="region" [attr.aria-labelledby]="titleId" class="flex flex-col gap-2 p-1.5 text-sm">
+        <h3 [id]="titleId" class="m-0 font-['Barlow'] text-[13px] font-[600] text-[var(--ac-primary-blue-600)]">
+          {{ entry.title }}
+        </h3>
+        <p class="m-0 font-['Barlow'] text-[14px] leading-[1.5] text-[var(--ac-grey-700)]">{{ entry.what }}</p>
+        <p class="m-0 font-['Barlow'] text-[14px] leading-[1.5] text-[var(--ac-grey-700)]">{{ entry.howToRead }}</p>
+        <p class="m-0 font-['Barlow'] text-[14px] leading-[1.5] text-[var(--ac-grey-700)]">{{ entry.source }}</p>
+        @if (entry.emptyHint) {
+          <p class="m-0 font-['Barlow'] text-[14px] italic leading-[1.5] text-[var(--ac-grey-600)]">{{ entry.emptyHint }}</p>
+        }
+      </div>
+    </p-popover>
+  </span>
+}

@@ -1,0 +1,33 @@
+:host {
+  display: contents;
+}
+
+// `inline` (default): sits in normal flow wherever the host places it (a card header slot).
+// `surface`: absolute, top-right, inset 8px, over the chart it explains — the host (viz-chart's
+// wrapper) is already `position: relative` (design.md §5.2). Single token for both themes —
+// `--ac-background` was measured (Reviewer, attempt 1 rework, see colors.scss for the literal
+// values) to clear the 3:1 UI-icon contrast threshold (design.md R-CXP-006 AC.3) for the
+// resting glyph (`--ac-grey-700`) against it in both themes. `--ac-white-1` was tried first but
+// its dark-theme value is a near-white "card surface" tone, not a dark background, and fell
+// well under threshold against the dark-mode glyph. No theme branch needed: the token itself
+// already flips per theme (colors.scss).
+.chart-explainer--surface {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  border-radius: 9999px;
+  background-color: var(--ac-background);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

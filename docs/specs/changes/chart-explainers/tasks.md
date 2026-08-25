@@ -57,16 +57,16 @@ T-02 and T-03 are split on purpose: T-02 lands placeholder copy (`TODO:` sentenc
   - Two fixtures: opening B hides A **and** A's button is **not** focused afterwards (`focus` spy on A's button not called). *Red if:* service `open()` passes `returnFocus=true`.
   - Arrange transitions, not end state (KZ-015): construct closed, assert closed, then act.
 - **Acceptance / done check:**
-  - [ ] `npx jest src/app/shared/components/chart-explainer src/app/shared/services/chart-explainer --coverage=false --silent` green, **after** each listed red was observed
-  - [ ] `grep -nE '#[0-9a-fA-F]{3,8}\b' src/app/shared/components/chart-explainer/*` → no output (**this check cannot see** token misuse such as `var(--ac-red-1)` for a neutral glyph — the T-04 HITL screenshot covers appearance)
-  - [ ] `npm run build` green (app type-check incl. `strictTemplates`)
-  - [ ] `npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -c 'error TS'` ≤ 945 baseline (**disqualifier:** if the baseline itself moved on this branch, re-measure it on `HEAD~` before comparing; a count is not evidence without its baseline)
+  - [x] `npx jest src/app/shared/components/chart-explainer src/app/shared/services/chart-explainer --coverage=false --silent` green, **after** each listed red was observed
+  - [x] `grep -nE '#[0-9a-fA-F]{3,8}\b' src/app/shared/components/chart-explainer/*` → no output (**this check cannot see** token misuse such as `var(--ac-red-1)` for a neutral glyph — the T-04 HITL screenshot covers appearance)
+  - [x] `npm run build` green (app type-check incl. `strictTemplates`)
+  - [x] `npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -c 'error TS'` ≤ 945 baseline (**disqualifier:** if the baseline itself moved on this branch, re-measure it on `HEAD~` before comparing; a count is not evidence without its baseline)
 - **Evidence disqualifiers:** a green targeted run **without** `--coverage=false` exits 1 regardless (K-020) — an exit code from such a run is not a signal either way.
 - **Dependencies:** none
 - **Estimated effort:** M
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
 - **Effort dial:** `medium` (a11y focus logic → bump to `high` on any rework)
-- **Status:** todo
+- **Status:** done
 
 ---
 
