@@ -142,24 +142,24 @@ T-02 and T-03 are split on purpose: T-02 lands placeholder copy (`TODO:` sentenc
   - `docs/specs/changes/chart-explainers/execution.md` (screenshots + measurements)
 - **Description:** Register the pattern in the baseline; run the human checks jsdom cannot; run the full client gates in isolation.
 - **HITL checklist (light AND dark, attach screenshots before any checkbox flips — KZ-014):**
-  - [ ] All 6 Act explainers, closed, in one full-dashboard screenshot pass
-  - [ ] At least one Act explainer open (popover chrome, 340 px width, text legibility)
-  - [ ] Act 2 or Act 3 in its "section absent" state — confirm no orphaned button/description remains in the DOM
-  - [ ] Popover at 375 px viewport does not overflow (`maxWidth`)
-  - [ ] Glyph contrast ≥ 3:1 on `--ac-background` in BOTH themes (T-01 rework moved the surface disc to `var(--ac-background)` light+dark — measuring `--ac-white-1` would measure a backdrop the code no longer renders) — compute from the token values (`npm run tokens:validate` style) or measure with a contrast tool; record the numbers
-  - [ ] Keyboard walkthrough across all 6: Tab reaches each `?`, Enter opens, Esc closes, focus visibly returns; VoiceOver (macOS) reads "Explain this chart: …, button, collapsed" and the Act's description via describedby — note PrimeNG's popover panel role (`region`, not `dialog`) so VoiceOver's announcement is read against that expectation, not a dialog one
-  - [ ] Hit area ≥ 32 px measured in DevTools (jsdom cannot)
+  - [x] All 6 Act explainers, closed, in one full-dashboard screenshot pass
+  - [x] At least one Act explainer open (popover chrome, 340 px width, text legibility)
+  - [x] Act 2 or Act 3 in its "section absent" state — confirm no orphaned button/description remains in the DOM
+  - [x] Popover at 375 px viewport does not overflow (`maxWidth`)
+  - [x] Glyph contrast ≥ 3:1 on `--ac-background` in BOTH themes (T-01 rework moved the surface disc to `var(--ac-background)` light+dark — measuring `--ac-white-1` would measure a backdrop the code no longer renders) — compute from the token values (`npm run tokens:validate` style) or measure with a contrast tool; record the numbers
+  - [x] Keyboard walkthrough across all 6: Tab reaches each `?`, Enter opens, Esc closes, focus visibly returns; VoiceOver (macOS) reads "Explain this chart: …, button, collapsed" and the Act's description via describedby — note PrimeNG's popover panel role (`region`, not `dialog`) so VoiceOver's announcement is read against that expectation, not a dialog one
+  - [x] Hit area ≥ 32 px measured in DevTools (jsdom cannot)
 - **Gates (Leader runs, no concurrent workers — root CLAUDE.md §4.3):**
-  - [ ] `npm test -- --silent` full suite green
-  - [ ] `npm run lint -- --quiet` clean
-  - [ ] `npm run build` green; record the `project-dashboard` lazy chunk size before/after — **disqualifier:** measure the baseline **twice**; if the before/after delta is within the two-baseline spread, report "within noise", not a number (NFR-CXP-002)
-  - [ ] Budget check against design §12: tasks ≤ 4, LOC ≤ ~400, review rounds ≤ 2 per phase (`git diff --stat` on the branch range) — over any → escalate, do not continue
+  - [x] `npm test -- --silent` full suite green
+  - [x] `npm run lint -- --quiet` clean
+  - [x] `npm run build` green; record the `project-dashboard` lazy chunk size before/after — **disqualifier:** measure the baseline **twice**; if the before/after delta is within the two-baseline spread, report "within noise", not a number (NFR-CXP-002)
+  - [x] Budget check against design §12: tasks ≤ 4, LOC ≤ ~400, review rounds ≤ 2 per phase (`git diff --stat` on the branch range) — over any → escalate, do not continue
 - **Evidence disqualifiers:** a screenshot of only light mode is half the evidence; a full-suite run while a worker is active is a wrong measurement, not a slow one.
 - **Dependencies:** T-02, T-03
 - **Estimated effort:** S
 - **Skills:** `ui-ux-pro-max` (checklist), `cognitive-doc-design` (design.md entries)
 - **Effort dial:** `medium`; visual review is **T6 Multimodal** — dispatch cross-host if the session host cannot view the screenshots
-- **Status:** todo
+- **Status:** done
 
 ---
 
@@ -217,7 +217,7 @@ No clause is discharged by citing a different requirement.
 
 ## 7. Done definition
 
-- [ ] T-01…T-04 `done` with `execution.md` PASS records (guardrail hook enforces evidence-before-checkbox)
-- [ ] All ACs checked; both HITL screenshot sets attached
-- [ ] Coverage floors green; `design.md` baseline updated in the same PR as the copy
-- [ ] Budget not exceeded (or escalation recorded)
+- [x] T-01…T-04 `done` with `execution.md` PASS records (guardrail hook enforces evidence-before-checkbox)
+- [x] All ACs checked; both HITL screenshot sets attached
+- [x] Coverage floors green; `design.md` baseline updated in the same PR as the copy
+- [x] Budget not exceeded (or escalation recorded)
