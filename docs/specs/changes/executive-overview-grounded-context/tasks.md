@@ -69,7 +69,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-06 — Provenance footer
 
-- [ ] **Covers:** R-EOC-007 · **Skills:** `angular-developer` · **Effort:** low
+- [x] **Covers:** R-EOC-007 · **Skills:** `angular-developer` · **Effort:** low
 - Footer line composing docs count, text-resource presence, and project-data source (CLARISA vs Agresso) from the T-03 builder's provenance output; shown in card + modal.
 - **Verify:** `npx jest <spec> --coverage=false`.
 

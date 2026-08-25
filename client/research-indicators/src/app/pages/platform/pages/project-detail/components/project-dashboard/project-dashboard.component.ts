@@ -43,7 +43,7 @@ import {
   mapOverviewSourceDocuments,
   parseDocumentOverviewParagraphs
 } from '@shared/interfaces/document-overview.interface';
-import { buildProjectContext } from '@shared/utils/project-context.util';
+import { buildProjectContext, ProjectContextProvenance, ProjectContextResult } from '@shared/utils/project-context.util';
 
 const MAX_GROUNDING_DOCS = 3;
 const MAX_GROUNDING_RESOURCES = 3;
@@ -1234,6 +1234,12 @@ export class ProjectDashboardComponent {
   readonly groundingText = signal<string>('');
   readonly showGroundingTextEditor = signal(false);
   readonly groundingTextDraft = signal<string>('');
+  // R-EOC-007 (T-06): the project-data provenance of the CURRENTLY DISPLAYED summary — set ONLY at
+  // the moment a generation call in THIS session actually sent a `project_context` digest, never
+  // inferred from stored/loaded data. A summary loaded via the stored GET (generated who-knows-when,
+  // possibly pre-feature) leaves this `null`, so the footer never claims project-data grounding for
+  // it — a false "project data (CLARISA)" claim is the poison; an absent claim is safe.
+  readonly executiveOverviewProjectProvenance = signal<ProjectContextProvenance | null>(null);
 
   readonly hasGroundedDocuments = computed(() => this.groundedDocuments().length > 0);
   readonly hasGroundingText = computed(() => this.groundingText().trim().length > 0);
@@ -1267,6 +1273,33 @@ export class ProjectDashboardComponent {
       this.executiveOverviewText().length > EXECUTIVE_OVERVIEW_LONG_TEXT_CHARS ||
       this.executiveOverviewParagraphs().length > EXECUTIVE_OVERVIEW_LONG_PARAGRAPH_COUNT
   );
+
+  // R-EOC-007 AC.1: "Grounded on: N document(s) · text resource · project data (source)". Each
+  // clause is included only when it is truthfully knowable for the CURRENTLY DISPLAYED summary —
+  // docs count and text-resource presence come straight off the current response and are always
+  // safe to state; the project-data clause additionally requires `executiveOverviewProjectProvenance`
+  // to be set (this session actually sent a project_context for this summary). `null` when nothing
+  // is known, so callers fall back to the existing static caveat line.
+  readonly executiveOverviewProvenanceFooter = computed<string | null>(() => {
+    const parts: string[] = [];
+
+    const docsCount = this.overviewSourceDocuments().length;
+    if (docsCount > 0) {
+      parts.push(`${docsCount} document${docsCount === 1 ? '' : 's'}`);
+    }
+
+    if (this.hasGroundingText()) {
+      parts.push('text resource');
+    }
+
+    const provenance = this.executiveOverviewProjectProvenance();
+    if (provenance && provenance.projectSource !== 'none') {
+      const sourceLabel = provenance.projectSource === 'clarisa' ? 'CLARISA' : 'Agresso';
+      parts.push(`project data (${sourceLabel})`);
+    }
+
+    return parts.length > 0 ? `Grounded on: ${parts.join(' · ')}` : null;
+  });
 
   private executiveOverviewReaderTriggerElement: HTMLElement | null = null;
 
@@ -1846,9 +1879,12 @@ export class ProjectDashboardComponent {
 
     try {
       const text = this.groundingText().trim();
-      const projectContext = this.buildProjectContextText(projectId);
-      const response = await this.documentOverviewService.generateDocumentOverview(projectId, text || undefined, projectContext);
+      const contextResult = this.buildProjectContextResult(projectId);
+      const response = await this.documentOverviewService.generateDocumentOverview(projectId, text || undefined, contextResult?.text);
       this.applyDocumentOverviewResponse(response);
+      // R-EOC-007: this session DID send project_context for the summary just displayed — record
+      // the truthful provenance now, after the reset `applyDocumentOverviewResponse` performs.
+      this.executiveOverviewProjectProvenance.set(contextResult?.provenance ?? null);
     } catch {
       this.executiveOverviewError.set(true);
     } finally {
@@ -1886,9 +1922,10 @@ export class ProjectDashboardComponent {
 
   private async autoGenerateBaselineOverview(projectId: string): Promise<void> {
     try {
-      const projectContext = this.buildProjectContextText(projectId);
-      const response = await this.documentOverviewService.generateDocumentOverview(projectId, undefined, projectContext);
+      const contextResult = this.buildProjectContextResult(projectId);
+      const response = await this.documentOverviewService.generateDocumentOverview(projectId, undefined, contextResult?.text);
       this.applyDocumentOverviewResponse(response);
+      this.executiveOverviewProjectProvenance.set(contextResult?.provenance ?? null);
     } catch {
       this.executiveOverviewError.set(true);
     }
@@ -1912,11 +1949,11 @@ export class ProjectDashboardComponent {
   // exposes no public "resolved for id X" signal (only a private `loadedContractIds` membership
   // Set, not a last-resolved tracker) to gate against without widening this fix into that service.
   // Left ungated here by explicit scope decision; flagged for a follow-up.
-  private buildProjectContextText(projectId: string): string | undefined {
+  private buildProjectContextResult(projectId: string): ProjectContextResult | undefined {
     try {
       const dashboardReport = this.contractDashboard.loadedContractId() === projectId ? this.contractDashboard.data() : null;
       const clarisaProject = this.clarisaProject.loadedContractId() === projectId ? this.clarisaProject.data() : null;
-      return buildProjectContext(this.project(), clarisaProject, dashboardReport)?.text;
+      return buildProjectContext(this.project(), clarisaProject, dashboardReport);
     } catch {
       return undefined;
     }
@@ -1928,6 +1965,11 @@ export class ProjectDashboardComponent {
     this.groundedDocuments.set(mapAvailableOverviewFiles(response));
     this.overviewSourceDocuments.set(mapOverviewSourceDocuments(response));
     this.executiveOverviewGeneratedAt.set(response.generated_at ?? null);
+    // R-EOC-007: default to "unknown" on every response — a generate call site that actually sent
+    // project_context overwrites this immediately afterward with the truthful provenance; a plain
+    // stored-summary GET (fetchDocumentOverviewSummary) leaves it here, so the footer makes no
+    // project-data claim for a summary this session never (re)generated with context.
+    this.executiveOverviewProjectProvenance.set(null);
 
     const responseText = response.text?.trim() ?? '';
     this.groundingText.set(responseText);
@@ -1939,6 +1981,7 @@ export class ProjectDashboardComponent {
     this.executiveOverviewParagraphs.set([]);
     this.overviewSourceDocuments.set([]);
     this.executiveOverviewGeneratedAt.set(null);
+    this.executiveOverviewProjectProvenance.set(null);
   }
 
 }

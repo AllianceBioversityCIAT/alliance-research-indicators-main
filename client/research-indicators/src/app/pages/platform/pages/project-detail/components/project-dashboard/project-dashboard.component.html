@@ -614,21 +614,26 @@
               }
             </div>
 
-            @if (overviewSourceDocuments().length > 0) {
+            @if (overviewSourceDocuments().length > 0 || executiveOverviewProvenanceFooter()) {
               <div class="mx-auto flex w-full max-w-[70ch] flex-col gap-2 border-t border-[var(--ac-grey-200)] pt-4">
                 <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">
                   Grounding sources
                 </span>
-                <div class="flex w-full flex-wrap items-center gap-2">
-                  @for (document of overviewSourceDocuments(); track document.fileKey) {
-                    <div class="flex min-w-0 items-center gap-2 rounded-md border border-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-1.5">
-                      <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-grey-700)]" aria-hidden="true"></i>
-                      <span class="max-w-52 truncate font-['Barlow'] text-[12px] text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
-                        document.fileName
-                      }}</span>
-                    </div>
-                  }
-                </div>
+                @if (overviewSourceDocuments().length > 0) {
+                  <div class="flex w-full flex-wrap items-center gap-2">
+                    @for (document of overviewSourceDocuments(); track document.fileKey) {
+                      <div class="flex min-w-0 items-center gap-2 rounded-md border border-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-1.5">
+                        <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-grey-700)]" aria-hidden="true"></i>
+                        <span class="max-w-52 truncate font-['Barlow'] text-[12px] text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                          document.fileName
+                        }}</span>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (executiveOverviewProvenanceFooter()) {
+                  <p class="m-0 font-['Barlow'] text-[12px] font-normal leading-snug text-[var(--ac-grey-600)]">{{ executiveOverviewProvenanceFooter() }}</p>
+                }
               </div>
             }
 
@@ -734,7 +739,9 @@
             </div>
 
             @if (!executiveOverviewLoading() && !executiveOverviewError() && executiveOverviewParagraphs().length > 0) {
-              <p class="m-0 font-['Barlow'] text-[12px] font-normal leading-snug text-[var(--ac-grey-600)]">AI-generated from grounded sources.</p>
+              <p class="m-0 font-['Barlow'] text-[12px] font-normal leading-snug text-[var(--ac-grey-600)]">
+                {{ executiveOverviewProvenanceFooter() ?? 'AI-generated from grounded sources.' }}
+              </p>
             }
           </section>
         }

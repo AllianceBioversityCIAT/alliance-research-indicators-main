@@ -4596,6 +4596,120 @@ describe('ProjectDashboardComponent', () => {
       expect(component.hasGroundingText()).toBe(false);
     });
   });
+
+  describe('R-EOC-007: provenance footer (T-06)', () => {
+    it('KZ-015: a summary loaded via the stored GET makes no project-data claim; regenerating in THIS session then adds the truthful claim', async () => {
+      await setup();
+      fixture.detectChanges();
+      const card = () => fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+
+      // Phase 1 — the state the product actually reaches on entry: a stored summary loaded via
+      // fetchDocumentOverviewSummary only (autoGenerateBaselineOverview never ran because stored
+      // data already exists — see 'should not auto-generate a baseline overview...' above). This
+      // session never sent project_context for the summary on screen, so the footer may name docs
+      // it can see (from the response itself) but must NOT claim project-data grounding.
+      expect(documentOverviewServiceMock.generateDocumentOverview).not.toHaveBeenCalled();
+      expect(component.executiveOverviewProjectProvenance()).toBeNull();
+      expect(card().textContent).toContain('Grounded on: 1 document');
+      expect(card().textContent).not.toContain('project data');
+
+      // Phase 2 — an explicit regenerate click in THIS session actually sends project_context; only
+      // now may the footer claim project-data grounding, and only with the truthful source.
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+      await component.generateExecutiveOverview();
+      fixture.detectChanges();
+
+      expect(component.executiveOverviewProjectProvenance()?.projectSource).toBe('agresso');
+      expect(card().textContent).toContain('Grounded on: 1 document · project data (Agresso)');
+    });
+
+    it('a sparse CLARISA row that contributes no usable field never produces a false "project data (CLARISA)" claim (T-06 scope fix)', async () => {
+      await setup('C-1', {
+        projectData: {
+          full_name: 'Agresso Title',
+          description: 'Agresso description',
+          donor: 'Agresso Donor',
+          project_lead_description: 'Agresso Lead'
+        }
+      });
+      // Real upstream responses can be this sparse despite the TS type promising more.
+      getClarisaProjectServiceMock.data.set({ id: 42, science_programs: [] } as unknown as ContractClarisaProject);
+      fixture.detectChanges();
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+      fixture.detectChanges();
+
+      const card = fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+      expect(component.executiveOverviewProjectProvenance()?.projectSource).toBe('agresso');
+      expect(card.textContent).toContain('project data (Agresso)');
+      expect(card.textContent).not.toContain('CLARISA');
+    });
+
+    it('a digest with no [PROJECT] section (dashboard-only, no project/CLARISA data) claims no project-data source at all', async () => {
+      await setup('C-1', {
+        projectData: null,
+        summary: { total: 5, by_status: [], by_year: [], by_indicator_year: [], partner_institutions: 1 }
+      });
+      fixture.detectChanges();
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+      fixture.detectChanges();
+
+      const [, , context] = documentOverviewServiceMock.generateDocumentOverview.mock.calls[0];
+      expect(context).toContain('[RESULTS ANALYTICS');
+      expect(context).not.toContain('[PROJECT');
+      expect(component.executiveOverviewProjectProvenance()?.projectSource).toBe('none');
+      const card = fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+      expect(card.textContent).not.toContain('project data');
+    });
+
+    it('composes doc count, text-resource presence, and project-data source, joined by " · " (design.md §6.1 example)', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({
+        overview: { project_summary: 'Overview with a text resource.' },
+        text: 'A grounding text resource.',
+        documents_processed: [
+          { file_name: 'a.pdf', file_key: 'folder/a.pdf' },
+          { file_name: 'b.pdf', file_key: 'folder/b.pdf' }
+        ]
+      });
+      // Simulates the truthful provenance a same-session generation call would have set.
+      component.executiveOverviewProjectProvenance.set({ projectSource: 'clarisa', sections: ['PROJECT'] });
+      fixture.detectChanges();
+
+      expect(component.executiveOverviewProvenanceFooter()).toBe('Grounded on: 2 documents · text resource · project data (CLARISA)');
+      const card = fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+      expect(card.textContent).toContain('Grounded on: 2 documents · text resource · project data (CLARISA)');
+    });
+
+    it('also renders the provenance line in the reading modal sources section (design.md §6.2)', async () => {
+      await setup();
+      documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+      await component.generateExecutiveOverview();
+      fixture.detectChanges();
+
+      const modalHost = fixture.debugElement.query(
+        (debugEl: any) => debugEl.componentInstance?.modalName === 'executiveOverviewReader'
+      );
+      const modalText = (modalHost.nativeElement as HTMLElement).textContent ?? '';
+      expect(modalText).toContain('project data (Agresso)');
+    });
+
+    it('falls back to the existing static caveat line when nothing about the current summary is known', async () => {
+      await setup();
+
+      (component as any).applyDocumentOverviewResponse({ overview: { project_summary: 'Bare overview only.' } });
+      fixture.detectChanges();
+
+      expect(component.executiveOverviewProvenanceFooter()).toBeNull();
+      const card = fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+      expect(card.textContent).toContain('AI-generated from grounded sources.');
+    });
+  });
 });
 
 

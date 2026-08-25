@@ -21,7 +21,13 @@ import { ContractDashboardReport } from '@shared/interfaces/contract-dashboard.i
 const MAX_CONTEXT_CHARS = 8_000;
 
 export interface ProjectContextProvenance {
-  projectSource: 'clarisa' | 'agresso';
+  /**
+   * 'clarisa' | 'agresso': at least one PROJECT field in the emitted digest actually came from
+   * that source. 'none': no [PROJECT] section was emitted at all (T-06 / R-EOC-007 truthfulness —
+   * derived from field EMISSION, not from the mere presence of the `clarisaProject` block; a
+   * sparse CLARISA row that contributes nothing usable must not be labeled 'clarisa').
+   */
+  projectSource: 'clarisa' | 'agresso' | 'none';
   sections: string[];
 }
 
@@ -42,8 +48,8 @@ export function buildProjectContext(
 ): ProjectContextResult | undefined {
   const sections: ContextSection[] = [];
 
-  const projectSection = buildProjectSection(project, clarisaProject);
-  if (projectSection) sections.push(projectSection);
+  const projectSectionResult = buildProjectSection(project, clarisaProject);
+  if (projectSectionResult) sections.push(projectSectionResult.section);
 
   const contractSection = buildContractSection(project);
   if (contractSection) sections.push(contractSection);
@@ -63,10 +69,16 @@ export function buildProjectContext(
 
   const { text, includedSections } = boundSections(sections);
 
+  const projectSource: ProjectContextProvenance['projectSource'] = !projectSectionResult
+    ? 'none'
+    : projectSectionResult.usedClarisaField
+      ? 'clarisa'
+      : 'agresso';
+
   return {
     text,
     provenance: {
-      projectSource: clarisaProject ? 'clarisa' : 'agresso',
+      projectSource,
       sections: includedSections
     }
   };
@@ -74,41 +86,64 @@ export function buildProjectContext(
 
 // --- Section builders -------------------------------------------------------------------------
 
-function buildProjectSection(project: GetProjectDetail | null, clarisaProject: ContractClarisaProject | null): ContextSection | undefined {
+function buildProjectSection(
+  project: GetProjectDetail | null,
+  clarisaProject: ContractClarisaProject | null
+): { section: ContextSection; usedClarisaField: boolean } | undefined {
   if (!project && !clarisaProject) {
     return undefined;
   }
 
+  // Header label stays presence-based (digest text is unchanged by T-06 — only the provenance
+  // metadata below is corrected). `usedClarisaField` tracks, per line, whether the value actually
+  // emitted came from `clarisaProject` rather than merely from the block existing.
   const sourceLabel = clarisaProject ? 'CLARISA (updated)' : 'Agresso';
   const lines: string[] = [`[PROJECT — source: ${sourceLabel}]`];
+  let usedClarisaField = false;
 
   const title = clarisaProject?.full_name ?? clarisaProject?.short_name ?? project?.full_name;
-  if (title) lines.push(`Title: ${title}`);
+  if (title) {
+    lines.push(`Title: ${title}`);
+    if (clarisaProject?.full_name || clarisaProject?.short_name) usedClarisaField = true;
+  }
 
   const description = clarisaProject?.description ?? clarisaProject?.summary ?? project?.description ?? project?.projectDescription;
-  if (description) lines.push(`Description: ${description}`);
+  if (description) {
+    lines.push(`Description: ${description}`);
+    if (clarisaProject?.description || clarisaProject?.summary) usedClarisaField = true;
+  }
 
   const startDate = clarisaProject?.start_date ?? project?.start_date;
   const endDate = clarisaProject?.end_date ?? project?.end_date;
   if (startDate || endDate) {
     lines.push(`Dates: ${startDate ?? 'unknown'} to ${endDate ?? 'unknown'}`);
+    if (clarisaProject?.start_date || clarisaProject?.end_date) usedClarisaField = true;
   }
 
   const budget = formatProjectBudget(clarisaProject, project);
-  if (budget) lines.push(`Budget: ${budget}`);
+  if (budget) {
+    lines.push(`Budget: ${budget}`);
+    if (clarisaProject?.total_budget) usedClarisaField = true;
+  }
 
   const funder = clarisaProject?.funder_institution?.name ?? project?.donor;
-  if (funder) lines.push(`Funder: ${funder}`);
+  if (funder) {
+    lines.push(`Funder: ${funder}`);
+    if (clarisaProject?.funder_institution?.name) usedClarisaField = true;
+  }
 
   const lead = clarisaProject?.lead_institution?.name ?? project?.project_lead_description;
-  if (lead) lines.push(`Lead: ${lead}`);
+  if (lead) {
+    lines.push(`Lead: ${lead}`);
+    if (clarisaProject?.lead_institution?.name) usedClarisaField = true;
+  }
 
   if (lines.length === 1) {
     // Header only — neither source carried a usable PROJECT field.
     return undefined;
   }
 
-  return { name: 'PROJECT', text: lines.join('\n') };
+  return { section: { name: 'PROJECT', text: lines.join('\n') }, usedClarisaField };
 }
 
 function formatProjectBudget(clarisaProject: ContractClarisaProject | null, project: GetProjectDetail | null): string | undefined {

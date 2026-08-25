@@ -115,7 +115,9 @@ describe('project-context.util — buildProjectContext', () => {
     const result = buildProjectContext(null, null, dashboard);
 
     expect(result).toBeDefined();
-    expect(result?.provenance.projectSource).toBe('agresso'); // no CLARISA block present
+    // R-EOC-007 truthfulness: no [PROJECT] section was emitted at all (no project/CLARISA input),
+    // so the footer must not claim a project-data source of either kind.
+    expect(result?.provenance.projectSource).toBe('none');
     expect(result?.text).not.toContain('[PROJECT');
     expect(result?.text).not.toContain('[CONTRACT');
     expect(result?.text).toContain('[RESULTS ANALYTICS — source: STAR]');
@@ -194,6 +196,34 @@ describe('project-context.util — buildProjectContext', () => {
     // Cut at a sentence boundary: the text ends with the sentence-ending period, not mid-word.
     expect(result!.text.endsWith('.')).toBe(true);
     expect(result!.text.endsWith('boundary.') || result!.text.endsWith(sentence.trim())).toBe(true);
+  });
+
+  it('R-EOC-007: sparse CLARISA row (id only, no usable field) over an all-Agresso body is NOT labeled clarisa — the bug the leader flagged, provenance must reflect field EMISSION, not mere block presence', () => {
+    // Real upstream responses can be this sparse (id only) despite the TS type promising more —
+    // cast bypasses the type to represent that degraded shape.
+    const clarisaProject = { id: 42, science_programs: [] } as unknown as ContractClarisaProject;
+    const project: GetProjectDetail = {
+      full_name: 'Agresso Title',
+      description: 'Agresso description',
+      start_date: '2020-01-01',
+      end_date: '2020-12-31',
+      grant_amount_usd: 100,
+      donor: 'Agresso Donor',
+      project_lead_description: 'Agresso Lead'
+    };
+
+    const result = buildProjectContext(project, clarisaProject, null);
+
+    expect(result).toBeDefined();
+    // Every PROJECT line actually emitted comes from Agresso — the sparse CLARISA block
+    // contributed nothing usable.
+    expect(result?.text).toContain('Title: Agresso Title');
+    expect(result?.text).toContain('Description: Agresso description');
+    expect(result?.text).toContain('Funder: Agresso Donor');
+    expect(result?.text).toContain('Lead: Agresso Lead');
+    // The presence-based bug would label this 'clarisa' purely because `clarisaProject` is
+    // non-null — truthful derivation must say 'agresso' since no CLARISA field was emitted.
+    expect(result?.provenance.projectSource).toBe('agresso');
   });
 
   it('is deterministic: same inputs produce byte-identical output across repeated calls', () => {
