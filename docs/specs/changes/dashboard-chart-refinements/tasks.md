@@ -20,14 +20,14 @@ T-01 (server) ∥ client chain — cross-package parallel OK. T-02→T-03→T-04
 
 ### T-01 — Server: `lever_sp_flows` sub-report
 
-- [ ] **Covers:** R-DCR-001 (Mapped flows: all AND/BUT clauses; Degrade: all clauses) · **Design:** §2.1, §4, §5, §6, DD-1/DD-9 · **Skills:** `nestjs-expert` · **Effort:** medium · **Size:** ~200 LOC
+- [~] **Covers:** R-DCR-001 (Mapped flows: all AND/BUT clauses; Degrade: all clauses) · **Design:** §2.1, §4, §5, §6, DD-1/DD-9 · **Skills:** `nestjs-expert` · **Effort:** medium · **Size:** ~200 LOC
 - Scope: `ContractLeverSpFlowsDto`; `getLeverSpFlowsReport(contractId)` (role-grouped links incl. per-lever Unaligned `sp_code:null` and "No lever" pseudo-source `lever_id:null`; distinct-count totals); 8th `Promise.allSettled` entry + errors[] prefix; Swagger on the report DTO.
 - Tests (named failing inputs from requirements §7): fixture with a 2-SP result → 2 role-links (a count-by-result returns 1 and MUST fail); fixture with a no-lever unaligned result → appears under "No lever" (a lever-only GROUP BY drops it and MUST fail); `Σ(unaligned link counts) === results_without_alignment`; totals are DISTINCT counts, never link sums; degrade injection → block null + errors entry, siblings intact, HTTP unchanged.
 - **Verify:** targeted `npx jest` on repository/service specs; bare `npx eslint`; `npm run build`. **Disqualifier:** mocked-query tests cannot see real SQL (KZ-017/KZ-001) — SQL correctness is owed to T-05's live HTTP check; a green here is NOT evidence of SQL correctness and must not be reported as such.
 
 ### T-02 — Client plumbing: interfaces + Sankey registration
 
-- [ ] **Covers:** R-DCR-005 bundle clause (lazy-chunk placement); enables R-DCR-002 · **Design:** §7.1, §8 · **Skills:** `angular-developer` · **Effort:** low · **Size:** ~60 LOC
+- [x] **Covers:** R-DCR-005 bundle clause (lazy-chunk placement); enables R-DCR-002 · **Design:** §7.1, §8 · **Skills:** `angular-developer` · **Effort:** low · **Size:** ~60 LOC
 - Scope: `ContractLeverSpFlows` interface; `ContractDashboardReport += lever_sp_flows`; viz-chart 3 edits (import SankeyChart, `use([])`, `SankeySeriesOption` in the union). NOTHING else in viz-chart (GraphChart deregistration is DEFERRED, DD-11).
 - **Verify:** `npm run build` + build-stats check naming the chunk that contains the sankey module (failing input: an eager import in a shared module puts it in the initial bundle — the check MUST be able to show that); existing viz-chart spec green; bare eslint. **Disqualifier:** "build green" alone doesn't prove chunk placement — the stats check is the gate.
 

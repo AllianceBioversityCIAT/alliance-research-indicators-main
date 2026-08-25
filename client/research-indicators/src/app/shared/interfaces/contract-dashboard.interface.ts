@@ -10,9 +10,28 @@ export interface ContractDashboardTops {
   contributors: ProjectDashboardRankedItem[] | null;
 }
 
+export interface ContractLeverSpFlowLink {
+  lever_id: number | null;
+  lever_short_name: string;
+  lever_full_name: string;
+  sp_code: string | null;
+  sp_name: string | null;
+  role: 'PRIMARY' | 'CONTRIBUTING' | 'UNKNOWN' | null;
+  count: number;
+}
+
+export interface ContractLeverSpFlows {
+  contract_id: string;
+  results_total: number;
+  results_with_alignment: number;
+  results_without_alignment: number;
+  links: ContractLeverSpFlowLink[];
+}
+
 export interface ContractDashboardReport {
   summary: ContractResultsSummary | null;
   tops: ContractDashboardTops | null;
   geo_scope: GeoScopeResponse | null;
   sp_alignment: ContractSpAlignment | null;
+  lever_sp_flows: ContractLeverSpFlows | null;
 }
