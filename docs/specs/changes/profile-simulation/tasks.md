@@ -2,7 +2,7 @@
 
 - **Module:** auth (cross-cutting, server + STAR client)
 - **Spec id:** 2026-08-profile-simulation
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** Juan Carlos Cadavid
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-Judgment-Day revision, ./judgment.md)
@@ -93,12 +93,12 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - Indexes named per design §3.
   - Migration `down` drops actions then sessions.
 - **Acceptance / done check:**
-  - [ ] `npm run migration:generate` output reviewed; migration applied on dev **by a human** (K-015) and `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts | sed 's/\x1b\[[0-9;]*m//g'` shows it `[X]` (K-014: strip ANSI before reading).
-  - [ ] `npm run migration:revert` then re-apply both succeed (recorded in `execution.md`).
-  - [ ] OQ-5 answered with the `DESCRIBE sec_roles` output pasted into design §4.
+  - [x] `npm run migration:generate` unavailable on dev (`orm_metadata` missing — execution.md T-01); migration hand-authored, reviewed byte-for-byte, applied on dev by a human-approved run (K-015) and `migration:show` shows it `[X] 384`.
+  - [x] `npm run migration:revert` then re-apply both succeed (recorded in `execution.md`).
+  - [x] OQ-5 answered with the `DESCRIBE sec_roles` output pasted into design §4.
 - **Verification — failing input:** run `migration:show` **before** applying: the migration must appear `[ ]`; if it does not appear at all, the file is not being picked up — not evidence of "applied".
 - **Disqualifier:** a `migration:show` count taken from a command that errored (connection refused) is a confident zero — check for an error line first.
-- **Dependencies:** none · **Effort:** S · **Skills:** `nestjs-expert` · **Status:** in-progress — code PASSed (execution.md T-01); awaiting human migration apply (RB-2)
+- **Dependencies:** none · **Effort:** S · **Skills:** `nestjs-expert` · **Status:** done (PASS, execution.md T-01)
 
 ### T-02 — Repository + `ImpersonationService`
 
@@ -313,7 +313,7 @@ PR 2's description links PR 1 and states the migration must be applied on the ta
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-08-25 | `sec_roles` may lack `focus_id`/`sec_role_id` (OQ-5) | T-01 verified on dev 2026-08-25: all columns present (`DESCRIBE` recorded in design §4) | Implementer T-01 | **closed** |
-| RB-2 | 2026-08-25 | Migration unapplied on dev blocks T-06 | Human applies at T-01; `migration:show` evidence | Human | open |
+| RB-2 | 2026-08-25 | Migration unapplied on dev blocks T-06 | Applied 2026-08-25 with user approval; apply/revert/re-apply evidence in execution.md T-01 | Human | **closed** |
 | RB-3 | 2026-08-25 | A process cache keyed by user id surfaces during T-05 enumeration | Record in design §2.4 and add a clearing hook, or escalate | Leader | open |
 | RB-4 | 2026-08-25 | Binding platform padding to `navbarHeight()` shifts layout on pages that relied on the constants | T-12 human check on Home, Results Center, Result detail; revert to constants + explicit banner height if regressions | Implementer T-11 | open |
 

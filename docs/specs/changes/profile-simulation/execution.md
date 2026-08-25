@@ -22,7 +22,7 @@ _(entries appended per task)_
 
 ## T-01 — Schema, entities, migration, enums
 
-- **Status:** Reviewer **PASS** (attempt 2) · task **`[~]` in-progress** — code complete; acceptance boxes 1–2 (human migration apply on dev + revert/re-apply) owed to RB-2
+- **Status:** **PASS** — Reviewer PASS (attempt 2) + RB-2 human gate satisfied → task **`[x]`**
 - **Date:** 2026-08-25
 - **Attempts:** 2 (Implementer `akili-implementer`/sonnet; Reviewers `akili-reviewer`/opus ×2 in parallel on attempt 1 — migration surface → lens split: A readability/reliability, B risk/resilience; scoped re-audit by A on attempt 2)
 - **Requirements covered:** requirements §5 (data), R-IMP-002/004/005 data columns, OQ-5 (closed)
@@ -48,6 +48,8 @@ _(entries appended per task)_
 - `action_id` typed `number` for a bigint PK (safe: `bigNumberStrings: false`), sibling exemplar uses `string` — cosmetic.
 - Design §3 `impersonation_actions` rows now carry explicit `NOT NULL` markers (Leader edit after PASS).
 
-### Owed before `[x]` (RB-2, owner: human)
-- [ ] `npm run migration:dev:execute` on dev → `migration:show` shows `[X] CreateImpersonationTables1787699586530`
-- [ ] `npm run migration:revert` then re-apply both succeed (outputs pasted here)
+### RB-2 — human-approved migration apply on dev (user approved option 1, 2026-08-25 18:13 COT; executed by the Leader)
+- [x] `npm run migration:dev:execute` → `1 migrations are new migrations must be executed` … `Migration CreateImpersonationTables1787699586530 has been executed successfully` (6 DDL statements logged: 2 CREATE TABLE, 3 CREATE INDEX, 1 ADD CONSTRAINT `fk_impersonation_actions_session`) → `migration:show`: `[X] 383 CreateImpersonationTables1787699586530`
+- [x] `npm run migration:revert` → FK, 3 indexes, both tables dropped in reverse order; `Migration … has been reverted successfully` → `migration:show`: `[ ] CreateImpersonationTables1787699586530`
+- [x] `npm run migration:dev:execute` (re-apply) → the shell wrapper hit a 5-min cap during output capture, so the final state was **re-measured separately**: `migration:show` → `[X] 384 CreateImpersonationTables1787699586530`; `INFORMATION_SCHEMA.TABLES` → `impersonation_actions`, `impersonation_sessions` both present. Forward and backward paths proven (K-006).
+- Disqualifier check: no `error` line in any of the three runs' stripped output.
