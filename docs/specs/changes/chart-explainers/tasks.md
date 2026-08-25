@@ -91,17 +91,17 @@ T-02 and T-03 are split on purpose: T-02 lands placeholder copy (`TODO:` sentenc
   - `project-dashboard.component.spec.ts`: with all 6 Acts visible → exactly 6 explainer buttons, each `aria-label` naming its own Act; `getProjectDetailService.loading()` true → 0 buttons, then flip to false → 6 (KZ-015: arrange loading-then-loaded, not loaded-only); each Act's `<section>` `aria-describedby` resolves to that Act's description text; Act 2 or Act 3 rendering nothing (its own `@if` false) → 0 buttons for that Act specifically, not a missing-element error. *Red if:* `@if` dropped, attribute hard-coded, or a duplicate explainer appears after an in-Act re-render (e.g. the Bars/Heatmap toggle inside Act 2).
   - Distinct-keys assertion: `Object.keys(CHART_EXPLAINERS)` contains all 6 Act keys (one-line assert, template scan already proves the template side).
 - **Acceptance / done check:**
-  - [ ] Completeness spec green after both reds observed
-  - [ ] Build-gate red observed (`not-a-key`) and recorded, then reverted
-  - [ ] `grep -c '<h2 id="act-' src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` totals **6** — if it differs, **stop and update design §5.3 before wiring** (a count over a moved target is not evidence)
-  - [ ] `npm run build` green; registry lint test (T-01's shape rules) **fails** on the `TODO:` placeholders — this red is expected and is T-03's starting state; do **not** weaken the test to get green here
-  - [ ] Existing `project-dashboard.component.spec.ts` suite stays green unchanged except additive tests
+  - [x] Completeness spec green after both reds observed
+  - [x] Build-gate red observed (`not-a-key`) and recorded, then reverted
+  - [x] `grep -c '<h2 id="act-' src/app/pages/platform/pages/project-detail/components/project-dashboard/project-dashboard.component.html` totals **6** — if it differs, **stop and update design §5.3 before wiring** (a count over a moved target is not evidence)
+  - [x] `npm run build` green; registry lint test (T-01's shape rules) **fails** on the `TODO:` placeholders — this red is expected and is T-03's starting state; do **not** weaken the test to get green here
+  - [x] Existing `project-dashboard.component.spec.ts` suite stays green unchanged except additive tests
 - **Evidence disqualifiers:** the template scan passing while `npm run build` was not run proves nothing about a future computed key slipping in unregistered. A count taken with `head`/`tail` is not a count (K-014).
 - **Dependencies:** T-01
 - **Estimated effort:** M (down from L — one host instead of eight)
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Effort dial:** `medium`; bump to `high` on this attempt specifically — it is a resumed/re-scoped task (per root CLAUDE.md's re-baseline rule: a `[~]`-resumed task starts one level higher)
-- **Status:** todo (re-scoped 2026-08-25)
+- **Status:** done
 
 ---
 
@@ -146,7 +146,7 @@ T-02 and T-03 are split on purpose: T-02 lands placeholder copy (`TODO:` sentenc
   - [ ] At least one Act explainer open (popover chrome, 340 px width, text legibility)
   - [ ] Act 2 or Act 3 in its "section absent" state — confirm no orphaned button/description remains in the DOM
   - [ ] Popover at 375 px viewport does not overflow (`maxWidth`)
-  - [ ] Glyph contrast ≥ 3:1 on `--ac-white-1` (light) and `--ac-background` (dark) — compute from the token values (`npm run tokens:validate` style) or measure with a contrast tool; record the numbers
+  - [ ] Glyph contrast ≥ 3:1 on `--ac-background` in BOTH themes (T-01 rework moved the surface disc to `var(--ac-background)` light+dark — measuring `--ac-white-1` would measure a backdrop the code no longer renders) — compute from the token values (`npm run tokens:validate` style) or measure with a contrast tool; record the numbers
   - [ ] Keyboard walkthrough across all 6: Tab reaches each `?`, Enter opens, Esc closes, focus visibly returns; VoiceOver (macOS) reads "Explain this chart: …, button, collapsed" and the Act's description via describedby — note PrimeNG's popover panel role (`region`, not `dialog`) so VoiceOver's announcement is read against that expectation, not a dialog one
   - [ ] Hit area ≥ 32 px measured in DevTools (jsdom cannot)
 - **Gates (Leader runs, no concurrent workers — root CLAUDE.md §4.3):**

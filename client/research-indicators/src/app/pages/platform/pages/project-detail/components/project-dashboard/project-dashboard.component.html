@@ -5,10 +5,13 @@
   <!-- Hero F1 (KPI strip + context chips + in-hero status semaphore, -->
   <!-- T-04/D-DN-6 OQ-1-A) + the compact caveat banner.               -->
   <!-- ============================================================ -->
-  <section aria-labelledby="act-1-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-1-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act1ExplainerDescribedBy()">
     <h2 id="act-1-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 1</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What is this project and how is it going?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct1 key="act-1-identity" /></span>
+      }
     </h2>
 
     <!-- KPI summary strip (R-PD-002, R-HL-002) -->
@@ -784,10 +787,13 @@
   <!-- Results over time (R-DN-001 fix) + Results by indicator.      -->
   <!-- ============================================================ -->
   @if (!trendEmpty() || !indicatorsEmpty()) {
-  <section aria-labelledby="act-2-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-2-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act2ExplainerDescribedBy()">
     <h2 id="act-2-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 2</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">How much has been produced, and when?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct2 key="act-2-production" /></span>
+      }
     </h2>
 
     <div class="grid grid-cols-1 gap-5" [class.lg:grid-cols-2]="!trendEmpty() && !indicatorsEmpty()" [class.lg:items-stretch]="!trendEmpty() && !indicatorsEmpty()">
@@ -994,10 +1000,13 @@
   <!-- contacts + contributing projects (all "who" rankings).        -->
   <!-- ============================================================ -->
   @if (!geoScopeEmpty() || hasVisibleReachRankingCards()) {
-  <section aria-labelledby="act-3-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-3-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act3ExplainerDescribedBy()">
     <h2 id="act-3-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 3</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">Where, and with whom?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct3 key="act-3-reach" /></span>
+      }
     </h2>
 
     @if (!geoScopeEmpty()) {
@@ -1057,10 +1066,13 @@
   <!-- Primary levers + SP alignment + SDG coverage & contributing   -->
   <!-- levers (F4, lazy — one insights-section instance/observer).   -->
   <!-- ============================================================ -->
-  <section aria-labelledby="act-4-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-4-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act4ExplainerDescribedBy()">
     <h2 id="act-4-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 4</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What is it aiming toward?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct4 key="act-4-direction" /></span>
+      }
     </h2>
 
     @if (!leversEmpty() || (isBilateral() && !spAlignmentEmpty())) {
@@ -1109,10 +1121,13 @@
   <!-- ACT 5 — Quality & process (R-DN-003, design §2.3/D-DN-3)      -->
   <!-- Evidence + review flow + reach (F4, lazy — same mechanics).    -->
   <!-- ============================================================ -->
-  <section aria-labelledby="act-5-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-5-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act5ExplainerDescribedBy()">
     <h2 id="act-5-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 5</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">How solid is what's been reported?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct5 key="act-5-quality" /></span>
+      }
     </h2>
 
     <app-insights-section
@@ -1128,10 +1143,13 @@
   <!-- F3 indicator deep-dive + keywords treemap (F4) + pending-      -->
   <!-- revision table (closes the act, after deep-dive + keywords).   -->
   <!-- ============================================================ -->
-  <section aria-labelledby="act-6-title" class="flex w-full flex-col gap-5">
+  <section aria-labelledby="act-6-title" class="flex w-full flex-col gap-5" [attr.aria-describedby]="act6ExplainerDescribedBy()">
     <h2 id="act-6-title" class="m-0 flex flex-wrap items-baseline gap-2.5">
       <span class="inline-flex shrink-0 items-center rounded-full bg-[var(--ac-primary-blue-600)] px-2.5 py-1 font-['Barlow'] text-[10.5px] font-bold uppercase tracking-wider text-[var(--ac-white-1)]">Act 6</span>
       <span class="font-['Space_Grotesk'] text-[12px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">What's behind each indicator?</span>
+      @if (!getProjectDetailService.loading()) {
+        <span class="self-center"><app-chart-explainer #chxAct6 key="act-6-depth" /></span>
+      }
     </h2>
 
     <!-- F3 Indicator deep-dive panel (reserved F1 slot; mount only — R-DD-003/005).

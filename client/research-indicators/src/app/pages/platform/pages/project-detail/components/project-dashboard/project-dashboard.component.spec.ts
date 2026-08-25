@@ -1,4 +1,5 @@
 import { Component, computed, EventEmitter, Input, Output, signal } from '@angular/core';
+import { CHART_EXPLAINERS } from '@shared/constants/chart-explainers.constants';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -4708,6 +4709,134 @@ describe('ProjectDashboardComponent', () => {
       expect(component.executiveOverviewProvenanceFooter()).toBeNull();
       const card = fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
       expect(card.textContent).toContain('AI-generated from grounded sources.');
+    });
+  });
+
+  describe('chart explainers — 6 Act sections (T-02 re-scoped, R-CXP-001/003/004)', () => {
+    const summaryWithYear: ContractResultsSummary = {
+      total: 5,
+      by_status: [],
+      by_year: [{ year: 2024, count: 5 }],
+      by_indicator_year: [],
+      partner_institutions: 1
+    };
+
+    const topsWithPartner = {
+      partners: [{ institution_id: 1, institution_name: 'Test Institution' } as any],
+      primary_levers: [],
+      main_contacts: [],
+      contributors: []
+    };
+
+    const emptyTops = { partners: [], primary_levers: [], main_contacts: [], contributors: [] };
+
+    const ACT_SECTIONS: { anchor: string; key: string }[] = [
+      { anchor: 'act-1-title', key: 'act-1-identity' },
+      { anchor: 'act-2-title', key: 'act-2-production' },
+      { anchor: 'act-3-title', key: 'act-3-reach' },
+      { anchor: 'act-4-title', key: 'act-4-direction' },
+      { anchor: 'act-5-title', key: 'act-5-quality' },
+      { anchor: 'act-6-title', key: 'act-6-depth' }
+    ];
+
+    function explainerButtons(): HTMLButtonElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('button.chart-explainer__trigger'));
+    }
+
+    function expectedDescription(key: string): string {
+      const entry = (CHART_EXPLAINERS as Record<string, { what: string; howToRead: string; source: string; emptyHint?: string }>)[key];
+      const sentences = [entry.what, entry.howToRead, entry.source];
+      if (entry.emptyHint) {
+        sentences.push(entry.emptyHint);
+      }
+      return sentences.join(' ');
+    }
+
+    // Table-driven over all 6 Acts (Reviewer rework attempt 2, issue 2): equality — not mere
+    // presence — is what makes a copy-paste mis-pairing between `actNExplainerRef` and
+    // `actNExplainerDescribedBy` visible. Also proves AC.3 for Act 3 specifically, since the
+    // caller mounts it RENDERING (not absent) before this runs.
+    function assertAllSixDescribedByLinkages(): void {
+      for (const { anchor, key } of ACT_SECTIONS) {
+        const section = fixture.nativeElement.querySelector(`section[aria-labelledby="${anchor}"]`);
+        expect(section).toBeTruthy();
+
+        const describedById = section.getAttribute('aria-describedby');
+        expect(describedById).toBeTruthy();
+
+        const descriptionEl = fixture.nativeElement.querySelector(`#${describedById}`);
+        expect(descriptionEl).toBeTruthy();
+        expect(descriptionEl.classList).toContain('sr-only');
+        expect(descriptionEl.textContent).toBe(expectedDescription(key));
+      }
+    }
+
+    it('renders exactly 6 explainer buttons when all Acts are visible, each aria-label naming its own Act', async () => {
+      await setup('C-1', { summary: summaryWithYear, tops: topsWithPartner });
+
+      const buttons = explainerButtons();
+      expect(buttons.length).toBe(6);
+
+      const labels = buttons.map(b => b.getAttribute('aria-label'));
+      expect(labels).toEqual([
+        'Explain this chart: Identity',
+        'Explain this chart: Production',
+        'Explain this chart: Reach',
+        'Explain this chart: Direction',
+        'Explain this chart: Quality',
+        'Explain this chart: Depth'
+      ]);
+    });
+
+    it('hides all 6 explainers while loading, then shows all 6 once loaded (KZ-015 transition)', async () => {
+      // Arrange the transition (KZ-015): construct loading (closed state) first, assert none.
+      await setup('C-1', { summary: summaryWithYear, tops: topsWithPartner, projectLoading: true });
+      expect(explainerButtons().length).toBe(0);
+
+      getProjectDetailServiceMock.loading.set(false);
+      fixture.detectChanges();
+
+      expect(explainerButtons().length).toBe(6);
+    });
+
+    it("each of the 6 Act sections' aria-describedby resolves to THAT Act's own sr-only description — not a neighboring Act's (cross-wiring check, R-CXP-003 AC.2/AC.3)", async () => {
+      // Act 3 is conditionally rendered (R-CXP-003 AC.3) — `topsWithPartner` makes it visible
+      // here alongside the other 5, so this single table-driven assertion proves the linkage
+      // for all 6 Acts, including the one that can otherwise be entirely absent.
+      await setup('C-1', { summary: summaryWithYear, tops: topsWithPartner });
+      assertAllSixDescribedByLinkages();
+    });
+
+    it('re-verifies all 6 aria-describedby linkages after the loading→loaded transition (KZ-015)', async () => {
+      await setup('C-1', { summary: summaryWithYear, tops: topsWithPartner, projectLoading: true });
+      expect(explainerButtons().length).toBe(0);
+
+      getProjectDetailServiceMock.loading.set(false);
+      fixture.detectChanges();
+
+      assertAllSixDescribedByLinkages();
+    });
+
+    it('Act 3 renders 0 explainer buttons — its own @if is false, not a missing-element error', async () => {
+      await setup('C-1', { summary: summaryWithYear, tops: emptyTops });
+
+      const section3 = fixture.nativeElement.querySelector('section[aria-labelledby="act-3-title"]');
+      expect(section3).toBeNull();
+      // Acts 1, 2, 4, 5, 6 still render their explainers — Act 3 alone is absent.
+      expect(explainerButtons().length).toBe(5);
+    });
+
+    it('stays at exactly 6 buttons before and after an in-Act re-render (Bars/Heatmap toggle inside Act 2)', async () => {
+      await setup('C-1', { summary: summaryWithYear, tops: topsWithPartner });
+      expect(explainerButtons().length).toBe(6);
+
+      component.setIndicatorView('heatmap');
+      fixture.detectChanges();
+      expect(explainerButtons().length).toBe(6);
+
+      component.setIndicatorView('bars');
+      fixture.detectChanges();
+      expect(explainerButtons().length).toBe(6);
     });
   });
 });

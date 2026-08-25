@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, signal, viewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { trigger, transition, style, animate } from '@angular/animations';
@@ -28,6 +28,7 @@ import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/
 import { DarkModeService } from '@shared/services/dark-mode.service';
 import { chartTokens } from '@shared/utils/chart-tokens.util';
 import { VizChartComponent, VizChartTableModel, EChartsOption } from '@shared/components/viz-chart/viz-chart.component';
+import { ChartExplainerComponent } from '@shared/components/chart-explainer/chart-explainer.component';
 import type { ECElementEvent } from 'echarts/core';
 import { ContractCgiarEntity } from '@shared/interfaces/find-contracts.interface';
 import { FileManagerService } from '@shared/services/file-manager.service';
@@ -107,7 +108,8 @@ const STATUS_TOKEN_FALLBACK = '--ac-grey-500';
     VizChartComponent,
     IndicatorDeepDiveComponent,
     InsightsSectionComponent,
-    ModalComponent
+    ModalComponent,
+    ChartExplainerComponent
   ],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -140,6 +142,33 @@ export class ProjectDashboardComponent {
   readonly staggerMs = WIDGET_ENTRY_STAGGER_MS;
 
   readonly indicatorView = signal<'bars' | 'heatmap'>('bars');
+
+  // R-CXP-003: each Act section's `aria-describedby` resolves to that Act's own explainer
+  // description. The `#chxActN` template refs live inside the same `@if`-gated `<h2>`/`<section>`
+  // as the `[attr.aria-describedby]` binding, but the button itself is ALSO behind its own
+  // `@if (!getProjectDetailService.loading())` — a structural block's local refs are scoped to
+  // that block's own embedded view (confirmed by a `strictTemplates` NG9 build error when first
+  // tried as a direct `chxActN.descriptionId` cross-reference), so a `viewChild()` + `computed()`
+  // signal on the class is what makes the id reachable from the section's own attribute binding
+  // regardless of which `@if` currently renders the button.
+  private readonly act1ExplainerRef = viewChild<ChartExplainerComponent>('chxAct1');
+  readonly act1ExplainerDescribedBy = computed<string | null>(() => this.act1ExplainerRef()?.descriptionId ?? null);
+
+  private readonly act2ExplainerRef = viewChild<ChartExplainerComponent>('chxAct2');
+  readonly act2ExplainerDescribedBy = computed<string | null>(() => this.act2ExplainerRef()?.descriptionId ?? null);
+
+  private readonly act3ExplainerRef = viewChild<ChartExplainerComponent>('chxAct3');
+  readonly act3ExplainerDescribedBy = computed<string | null>(() => this.act3ExplainerRef()?.descriptionId ?? null);
+
+  private readonly act4ExplainerRef = viewChild<ChartExplainerComponent>('chxAct4');
+  readonly act4ExplainerDescribedBy = computed<string | null>(() => this.act4ExplainerRef()?.descriptionId ?? null);
+
+  private readonly act5ExplainerRef = viewChild<ChartExplainerComponent>('chxAct5');
+  readonly act5ExplainerDescribedBy = computed<string | null>(() => this.act5ExplainerRef()?.descriptionId ?? null);
+
+  private readonly act6ExplainerRef = viewChild<ChartExplainerComponent>('chxAct6');
+  readonly act6ExplainerDescribedBy = computed<string | null>(() => this.act6ExplainerRef()?.descriptionId ?? null);
+
   readonly isCaveatExpanded = signal(false);
   readonly useCrossfadeFallback = signal<boolean>(this.checkReducedMotion());
 
