@@ -92,7 +92,7 @@
            per-result data; Result Code is a real anchor, closing the pre-existing
            keyboard-only drill-through gap. Falls back to aggregate per-link rows
            when sp_alignment has degraded but the chart still renders (DD-8). -->
-      <div class="mt-1 min-h-0 flex-1 overflow-y-auto rounded-md border border-[var(--ac-grey-200)]">
+      <div class="mt-1 max-h-64 min-h-0 flex-1 overflow-y-auto rounded-md border border-[var(--ac-grey-200)]">
         @if (usesDetailedRows()) {
         <table class="m-0 w-full border-collapse text-left">
           <caption class="sr-only">Science-Program alignments by result and role</caption>
