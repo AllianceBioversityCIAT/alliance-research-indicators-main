@@ -138,3 +138,32 @@ Adjudication: T-04/T-05 proceed on `project-dashboard.component.*` (the approved
 - **Reviewer (opus): STATUS: PASS.** Verified truthfulness on every reachable path (docs clause reads `overviewSourceDocuments` not `groundedDocuments` — upload-without-regenerate cannot over-claim; error paths leave no stale claim; auto-baseline not missed); per-field guards traced incl. the non-obvious budget branch; empty-string CLARISA cannot false-positive the flag; `projectSource` union widening safe (no other consumer, grep 13 hits all in-patch); tokens only.
 - **Leader measurements:** targeted 192/192; build green; spec-tsc 938 = baseline. Full-suite note: checkout shared with a concurrent foreign session (chart-explainers) — 6873/6873 at 322 suites INCLUDES its 2 suites; this task's green claim rests on targeted runs + prior clean 6855 baseline + build. T-06 commit made with pathspec-only semantics to exclude foreign staged files.
 - **Advisories (recorded, never gate):** (a) "text resource" clause over-claims after save-without-regenerate (AC.1 reads as presence; the binding truthfulness rule named only project-data — recorded; comment at ts:1279 inaccurate for this clause); (b) project-data claim evaporates on opening the setup modal (fetch+apply resets — under-claim direction, visible inconsistency); (c) single boolean over mixed-source section labels "CLARISA" when ≥1 field was CLARISA (matches AC.1's binary wording); (d) footer contrast inherited-by-class-reuse is an argument, not a measurement — carried to T-07's manual pass with the existing AC.2 gap. (e) Evidence note: constitutional 945 spec-tsc baseline is stale for this branch (real: 938) — correct the child guide at archive.
+
+---
+
+## T-07 — Validation sweep — IN PROGRESS `[~]`
+
+**Owner decisions (2026-08-24):** measure now noting contamination (foreign chart-explainers session shares this checkout); Leader drives the manual pass via Chrome.
+
+### Automated gates (all observed, 2026-08-24/25)
+
+| Gate | Result |
+| --- | --- |
+| Client full suite (raw tree) | 6875 tests: **1 failure, in the FOREIGN session's `chart-explainer.component.spec.ts:190`** — contamination, not spec scope |
+| Client full suite + coverage (clean scope: `--testPathIgnorePatterns/--coveragePathIgnorePatterns='chart-explainer'`) | **320 suites / 6862 tests PASS, exit 0**; coverage 97.03/91.90/94.22/97.46 — floors 40/20/45/30 exceeded |
+| `npm run tokens:validate` | PASS — 19 viz tokens valid both modes, ramps monotonic |
+| `npx tsc -p tsconfig.spec.json --noEmit` | 938 errors = branch baseline (guide's 945 is stale — correct at archive) |
+| Client `npm run lint -- --quiet` | All files pass |
+| Client `npm run build` | Complete, no errors |
+| Server full suite | 340 suites / 2540 PASS |
+| Server `npm run build` | nest + vite green |
+| Server `npx eslint` (touched area) | exit 0 |
+
+### Live HTTP verification (local stack rebuilt to current branch — containers were 9h/2h stale, pre-T-01/T-04; `docker compose up --build -d` re-run first)
+
+- **Unmapped contract (`TEST`):** `GET /api/agresso/contracts/TEST/clarisa-project` → 200, `data:null`, `errors:[]` — R-EOC-001 AC.2 on the real HTTP path against the real dev DB.
+- **Mapped bilateral (`A631`, mapping id 13, clarisa_project_id 1501):** → 200 with the full 14-field CLARISA block: `total_budget: 212326.00`, `phase: 2026`, dates 2026-01-07→2028-03-31, funder/lead institutions, `science_programs: [SP05 50%, SP07 50%]` — R-EOC-001 AC.1 against live CLARISA-sourced data.
+
+### Remaining (blocked on browser)
+
+Visual pass on `A631` (mapped) + an unmapped contract: card states (skeleton/content/footer), reader modal + Esc, provenance line after regenerate, both themes incl. the carried R-EOC-008 AC.2 contrast gap, live digest discrimination check ([RESULTS ANALYTICS]/[REACH] present in the POST body — the KZ-001 runtime evidence from T-03's advisory). **Blocker: Claude-in-Chrome extension not connected (2 attempts).** Deferral records this probe per the leader playbook's deferred-check rule.

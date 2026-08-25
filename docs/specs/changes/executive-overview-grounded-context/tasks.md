@@ -82,7 +82,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-07 — Validation sweep
 
-- [ ] **Covers:** all ACs · **Skills:** `systematic-debugging` · **Effort:** high
+- [~] **Covers:** all ACs · **Skills:** `systematic-debugging` · **Effort:** high
 - Full client suite `npm test -- --silent`; full server suite; `npm run build`; spec type-check vs baseline; token validation `npm run tokens:validate`; manual pass on a mapped bilateral (CLARISA block present — remember the 5-min TTL, K-016) and an unmapped contract (Agresso-only).
 - Record PASS evidence in `execution.md` BEFORE flipping any checkbox (guardrail hook).
 
