@@ -147,6 +147,8 @@ All 6 buttons hide together while `getProjectDetailService.loading()` is true; a
 | Narrow viewport (≤ 375 px) | popover `maxWidth: calc(100vw - 24px)`; PrimeNG flips placement automatically |
 | Dark mode | tokens flip; component unchanged from T-01 |
 
+> **Note carried over from the superseded per-chart T-02 attempt (still true, currently harmless):** `chart-explainer.component.ts` assigns `descriptionId`/`panelId`/`titleId` once in `ngOnInit`, derived from `key()` at that moment; if `key()` later changes on the *same* component instance, those id strings do **not** re-derive to reflect the new key (only the live `explainer()` computed — and therefore the button's `aria-label` and the popover's copy — updates). This never mattered for the superseded per-chart hero header (the one case with a changing key) and is fully moot in this section-level design, since **every Act key is fixed for the component instance's whole lifetime** — no Act's key ever changes post-`ngOnInit`. Recorded here only so a future spec that reintroduces a dynamic key (e.g. a view-mode-dependent Act) checks this behavior deliberately rather than discovering it by surprise.
+
 ---
 
 ## 6. Shared contracts
