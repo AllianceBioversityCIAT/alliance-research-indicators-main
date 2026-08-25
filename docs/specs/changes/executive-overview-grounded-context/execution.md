@@ -167,3 +167,9 @@ Adjudication: T-04/T-05 proceed on `project-dashboard.component.*` (the approved
 ### Remaining (blocked on browser)
 
 Visual pass on `A631` (mapped) + an unmapped contract: card states (skeleton/content/footer), reader modal + Esc, provenance line after regenerate, both themes incl. the carried R-EOC-008 AC.2 contrast gap, live digest discrimination check ([RESULTS ANALYTICS]/[REACH] present in the POST body — the KZ-001 runtime evidence from T-03's advisory). **Blocker: Claude-in-Chrome extension not connected (2 attempts).** Deferral records this probe per the leader playbook's deferred-check rule.
+
+### T-07 — owner-provided runtime evidence (2026-08-25)
+
+Owner screenshot of project D514 dashboard (current branch build): Act-1 card renders clamped long overview with "View full overview" trigger (long-path routing live), generated-at header, GROUNDED AI SUMMARY chip + admin cog, and footer "Grounded on: 2 documents · text resource" WITHOUT a project-data claim — the T-06 truthfulness rule observed working on a stored (pre-feature) summary. Remaining visual items: reader modal open/Esc, dark mode contrast, unmapped-contract render, digest POST content check.
+
+**New owner request (2026-08-25):** the shell hero on the dashboard tab shows dead space (meta grid intentionally hidden there since Act-1 owns context; CONTACT PERSONS column stretches the row). Improvement to be specified as an amendment after owner picks a direction.
