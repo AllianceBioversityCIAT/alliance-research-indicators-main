@@ -40,7 +40,7 @@ Not changing: the AI microservice itself (external Lambda, owned by the Executiv
 - **So that** downstream features (AI overview, dashboard header) can use the freshest project info when it exists
 
 **Acceptance criteria**
-1. New endpoint `GET /api/agresso/contracts/:agreementId/clarisa-project` returns the linked `ClarisaProject` fields (`id, short_name, full_name, summary, description, start_date, end_date, total_budget, annual, funder_institution_object, lead_institution_object, external_code, phase, science program allocations`) when a `bilateral_project_mapping` row exists for the contract.
+1. New endpoint `GET /api/agresso/contracts/:agreementId/clarisa-project` returns the linked `ClarisaProject` fields (`id, short_name, full_name, summary, description, start_date, end_date, total_budget, annual, funder_institution, lead_institution, external_code, phase, science program allocations`) when a `bilateral_project_mapping` row exists for the contract.
 2. When no mapping exists, the endpoint returns `data: null` with status 200 (not 404) — "no CLARISA record" is a normal state, not an error.
 3. Response uses the standard `ServerResponseDto` envelope; endpoint requires JWT (no role restriction — read-only project info already visible to project viewers).
 4. Data is served from `ClarisaProjectsService`'s existing 5-minute TTL cache; a cold-cache upstream failure degrades to `data: null` + a warning in `errors[]`, never a 5xx to the dashboard.
