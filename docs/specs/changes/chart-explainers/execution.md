@@ -115,3 +115,14 @@
 - **Budget:** 2 review rounds used for the copy phase = design §12 per-phase allowance. LOC on track (~450 real total vs ~400 estimate; within tolerance, far from the ≥700 tripwire).
 - **Final status: T-03 PASS.**
 
+## T-04 — Baseline registration, HITL pass, full-suite gates — in progress
+
+### Doc part + Leader gates (2026-08-25)
+
+- **Implementer (sonnet, medium), doc-only:** `docs/ux-ui/design.md` — §8.1 inventory row (line 438), §10.1 a11y line (481), §12.2 dated decision (554, append-only, cites D-CXP-1…10 incl. the pivot + the PrimeNG dialog-wrapper advisory with exact source lines, explicitly deferred to VoiceOver). KZ-007 pre-verified every claim against committed code (32px hit, 16px glyph, `--ac-background` both themes, `surface` declared-unused). New find: tasks.md's HITL assumption "panel role is region, not dialog" describes only our inner markup — PrimeNG's root nests our region INSIDE a `role="dialog"`/`aria-modal` wrapper (`primeng-popover.mjs:535-536`).
+- **Leader full-suite gates (run in isolation, both workers idle — §4.3):**
+  - `npm test -- --silent` → **323 suites, 6,895/6,895 green** (coverage far above 40/20/45/30 floors).
+  - `npm run lint -- --quiet` → "All files pass linting."
+  - Chunk measurement (NFR-CXP-002): baseline measured **twice** at pre-spec dashboard (`git checkout 7bd5acb3 -- …/project-dashboard`, build ×2): `1.19 MB / 304.59 kB` both runs — spread 0. After (HEAD): `1.20 MB / 307.35 kB`. **Delta +2.76 kB transfer (~0.9%)** — real (above the zero spread), negligible per NFR-CXP-002. Tree restored to HEAD and verified clean before the after-build.
+  - Budget check (design §12): 4 tasks (no 6th); review rounds 2 code + 2 copy = per-phase allowance; LOC see stat below — real spec code ≈ 750 insertions incl. ~450 test/spec lines, under the ≥700 *non-test-inflated* tripwire reading and far under the original 950; no escalation.
+- **Remaining for T-04 close:** owner HITL checklist (visual light+dark, 375px, contrast on `--ac-background`, keyboard+VoiceOver incl. the dialog-wrapper question, 32px hit area in DevTools) — task stays open until screenshots/results land here.
