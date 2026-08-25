@@ -148,6 +148,10 @@ export class AllModalsService {
       title: 'Grounding & Setup',
       isWide: true
     },
+    executiveOverviewReader: {
+      isOpen: false,
+      title: 'Executive Overview'
+    },
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
@@ -269,6 +273,7 @@ export class AllModalsService {
       selectLinkedResults: { ...this.modalConfig().selectLinkedResults, isOpen: false, isWide: false },
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
+      executiveOverviewReader: { ...this.modalConfig().executiveOverviewReader, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false }
     });
 

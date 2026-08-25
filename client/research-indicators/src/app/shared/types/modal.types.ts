@@ -9,4 +9,5 @@ export type ModalName =
   | 'selectLinkedResults'
   | 'editEnvironmentVariable'
   | 'projectGroundingSetup'
+  | 'executiveOverviewReader'
   | 'portfolioManagement';

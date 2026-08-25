@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, HostListener, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { trigger, transition, style, animate } from '@angular/animations';
@@ -49,6 +49,10 @@ const MAX_GROUNDING_TEXT_LENGTH = 20_000;
 const GROUNDING_ACCEPTED_FORMATS = ['.pdf', '.docx', '.txt'];
 const GROUNDING_MAX_SIZE_MB = 10;
 const GROUNDING_PAGE_LIMIT = 100;
+// Disclosure threshold (R-EOC-004 AC.3, D-EOC-4, OQ-3): past this, the overview routes to the
+// reading modal instead of inline expansion so long AI text never pushes Acts 2-6 off-screen.
+const EXECUTIVE_OVERVIEW_LONG_TEXT_CHARS = 700;
+const EXECUTIVE_OVERVIEW_LONG_PARAGRAPH_COUNT = 2;
 
 export interface ProjectContextTimeline {
   startDate: string;
@@ -1253,6 +1257,15 @@ export class ProjectDashboardComponent {
 
     return this.hasExecutiveOverviewData();
   });
+  // R-EOC-004 AC.3/AC.4, D-EOC-4: long overviews never expand inline — the reading modal
+  // (R-EOC-005) is the only way to see the full text past this threshold.
+  readonly isLongOverview = computed(
+    () =>
+      this.executiveOverviewText().length > EXECUTIVE_OVERVIEW_LONG_TEXT_CHARS ||
+      this.executiveOverviewParagraphs().length > EXECUTIVE_OVERVIEW_LONG_PARAGRAPH_COUNT
+  );
+
+  private executiveOverviewReaderTriggerElement: HTMLElement | null = null;
 
   constructor() {
     this.initReducedMotionDetection();
@@ -1537,7 +1550,57 @@ export class ProjectDashboardComponent {
   // --- Executive Overview methods (grounded AI summary, AC-1714) ---------
 
   toggleExecutiveOverview(): void {
+    // Long overviews never expand inline (R-EOC-004 AC.3) — "View full overview" opens the
+    // reading modal instead, via openExecutiveOverviewReader.
+    if (this.isLongOverview()) {
+      return;
+    }
     this.executiveOverviewExpanded.update(expanded => !expanded);
+  }
+
+  // Reading modal trigger (R-EOC-005). Only wired for long overviews; short overviews keep the
+  // inline "View more/View less" toggle above.
+  openExecutiveOverviewReader(event: Event): void {
+    if (!this.isLongOverview()) {
+      return;
+    }
+    this.executiveOverviewReaderTriggerElement = event.currentTarget as HTMLElement;
+    this.allModalsService.openModal('executiveOverviewReader');
+  }
+
+  // Document-level, not bound on the projected content (R-EOC-005 AC.2 rework): the shared modal
+  // host focuses #modalRoot itself when the reader has no focusable content (non-admin, no
+  // "Grounding & Setup"/"Regenerate" buttons) — an ancestor of any handler bound inside the
+  // projected div, so a descendant-bound (keydown.escape) never receives the bubbled event.
+  @HostListener('document:keydown.escape')
+  onDocumentEscapeKeydown(): void {
+    if (this.allModalsService.isModalOpen('executiveOverviewReader')?.isOpen) {
+      this.closeExecutiveOverviewReader();
+    }
+  }
+
+  // Closes the reading modal and returns focus to whichever element opened it (R-EOC-005 AC.2).
+  closeExecutiveOverviewReader(): void {
+    this.allModalsService.closeModal('executiveOverviewReader');
+    this.executiveOverviewReaderTriggerElement?.focus();
+    this.executiveOverviewReaderTriggerElement = null;
+  }
+
+  // Bridges the reading modal's admin footer to the existing setup modal (R-EOC-005 AC.1).
+  async openGroundingSetupFromReader(): Promise<void> {
+    this.closeExecutiveOverviewReader();
+    await this.openGroundingSetupModal();
+  }
+
+  // Scoped retry for the executive overview region (R-EOC-006 AC.2). The error can surface from
+  // either the entry-load path (no data yet — re-run the load, which re-attempts the baseline
+  // auto-generation) or an explicit regenerate click (data already present — re-run generation).
+  retryExecutiveOverview(): void {
+    if (this.hasExecutiveOverviewData()) {
+      void this.generateExecutiveOverview();
+    } else {
+      void this.loadExecutiveOverviewSummary();
+    }
   }
 
   async openGroundingSetupModal(): Promise<void> {

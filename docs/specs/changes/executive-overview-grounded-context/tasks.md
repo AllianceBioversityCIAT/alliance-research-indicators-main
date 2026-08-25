@@ -54,7 +54,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-04 — UX: Act-1 card states, reading measure, disclosure threshold
 
-- [ ] **Covers:** R-EOC-004, R-EOC-006, R-EOC-008 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
+- [x] **Covers:** R-EOC-004, R-EOC-006, R-EOC-008 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
 - `max-w-prose` body, `leading-relaxed`; 4-line clamp; `isLongOverview` computed (>700 chars or >2 paragraphs) routing to modal trigger vs inline expand; skeleton loading state (`role="status"`, reserved height); error state with Retry.
 - Tokens only; verify both themes; focus rings + touch targets.
 - Tests (KZ-015 — arrange the transition): construct loading → resolve → assert clamp; short vs long routing; retry re-invokes load.
@@ -62,7 +62,7 @@ T-01 and T-04 are independent — safe to start either first, but NOT two concur
 
 ### T-05 — UX: `executiveOverviewReader` modal
 
-- [ ] **Covers:** R-EOC-005 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
+- [x] **Covers:** R-EOC-005 · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** medium
 - Add modal name to `modal.types.ts` + `all-modals.service.ts` config; modal content per design §6.2 (70ch column, paragraphs, generated-at, sources, admin actions bridging to setup modal / regenerate).
 - Tests: opens via trigger only when long; admin actions visible only for admins; sources render.
 - **Verify:** `npx jest <specs> --coverage=false`, `npm run build`.

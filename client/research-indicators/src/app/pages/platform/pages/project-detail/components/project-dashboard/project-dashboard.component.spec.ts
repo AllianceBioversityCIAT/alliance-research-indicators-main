@@ -186,7 +186,7 @@ describe('ProjectDashboardComponent', () => {
   };
   let rolesServiceMock: { isAdmin: jest.Mock };
   let actionsServiceMock: any;
-  let allModalsServiceMock: { openModal: jest.Mock; closeModal: jest.Mock; setModalWidth: jest.Mock };
+  let allModalsServiceMock: { openModal: jest.Mock; closeModal: jest.Mock; setModalWidth: jest.Mock; isModalOpen: jest.Mock };
 
   function createFile(name: string, size = 1024, type = 'application/pdf'): File {
     return new File([new ArrayBuffer(size)], name, { type });
@@ -535,7 +535,19 @@ describe('ProjectDashboardComponent', () => {
     };
     actionsServiceMock = { showToast: jest.fn(), showGlobalAlert: jest.fn() } as any;
     rolesServiceMock = { isAdmin: jest.fn().mockReturnValue(options?.isAdmin ?? true) };
-    allModalsServiceMock = { openModal: jest.fn(), closeModal: jest.fn(), setModalWidth: jest.fn() };
+    // Tracks isOpen per modal name so isModalOpen() reflects real openModal/closeModal calls —
+    // needed to exercise the document-level Escape listener (R-EOC-005 AC.2).
+    const modalOpenState: Partial<Record<string, boolean>> = {};
+    allModalsServiceMock = {
+      openModal: jest.fn((name: string) => {
+        modalOpenState[name] = true;
+      }),
+      closeModal: jest.fn((name: string) => {
+        modalOpenState[name] = false;
+      }),
+      setModalWidth: jest.fn(),
+      isModalOpen: jest.fn((name: string) => ({ isOpen: !!modalOpenState[name] }))
+    };
 
     const defaultProjectData: GetProjectDetail = {
       grant_amount: 1234,
@@ -3667,6 +3679,224 @@ describe('ProjectDashboardComponent', () => {
 
       component.toggleExecutiveOverview();
       expect(component.executiveOverviewExpanded()).toBe(false);
+    });
+
+    describe('disclosure threshold, reading modal and states (R-EOC-004, R-EOC-005, R-EOC-006, R-EOC-008)', () => {
+      it('is long when the joined text exceeds 700 characters', async () => {
+        await setup();
+        expect(component.isLongOverview()).toBe(false);
+
+        component.executiveOverviewParagraphs.set(['A'.repeat(701)]);
+        expect(component.isLongOverview()).toBe(true);
+      });
+
+      it('is long when there are more than 2 paragraphs, even if short', async () => {
+        await setup();
+
+        component.executiveOverviewParagraphs.set(['One.', 'Two.', 'Three.']);
+        expect(component.isLongOverview()).toBe(true);
+      });
+
+      it('routes a short overview to the inline View more/View less toggle, reading-width clamped', async () => {
+        await setup();
+        fixture.detectChanges();
+
+        const inlineToggle = fixture.nativeElement.querySelector('[data-testid="executive-overview-inline-toggle"]');
+        expect(inlineToggle).toBeTruthy();
+        expect(inlineToggle.getAttribute('aria-expanded')).toBe('false');
+        expect(inlineToggle.textContent.trim()).toBe('View more');
+        expect(fixture.nativeElement.querySelector('[data-testid="executive-overview-reader-trigger"]')).toBeNull();
+
+        const paragraph = fixture.nativeElement.querySelector('p.line-clamp-4');
+        expect(paragraph).toBeTruthy();
+        expect(paragraph.className).toContain('max-w-[75ch]');
+        expect(paragraph.className).toContain('leading-relaxed');
+
+        inlineToggle.click();
+        fixture.detectChanges();
+        expect(component.executiveOverviewExpanded()).toBe(true);
+        expect(fixture.nativeElement.querySelector('p.line-clamp-4')).toBeNull();
+      });
+
+      it('routes a long overview to "View full overview" (modal trigger) instead of inline expansion', async () => {
+        await setup();
+        component.executiveOverviewParagraphs.set(['One.', 'Two.', 'Three.']);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="executive-overview-inline-toggle"]')).toBeNull();
+        const modalTrigger = fixture.nativeElement.querySelector('[data-testid="executive-overview-reader-trigger"]');
+        expect(modalTrigger).toBeTruthy();
+        expect(modalTrigger.getAttribute('aria-haspopup')).toBe('dialog');
+        expect(modalTrigger.textContent.trim()).toBe('View full overview');
+
+        // Clamp stays applied — long text is never expanded inline (R-EOC-004 AC.3).
+        component.toggleExecutiveOverview();
+        expect(component.executiveOverviewExpanded()).toBe(false);
+        expect(fixture.nativeElement.querySelector('p.line-clamp-4')).toBeTruthy();
+      });
+
+      it('opens the reading modal via the trigger only when the overview is long', async () => {
+        await setup();
+        const shortEvent = { currentTarget: document.createElement('button') } as unknown as Event;
+
+        component.openExecutiveOverviewReader(shortEvent);
+        expect(allModalsServiceMock.openModal).not.toHaveBeenCalledWith('executiveOverviewReader');
+
+        component.executiveOverviewParagraphs.set(['One.', 'Two.', 'Three.']);
+        const trigger = document.createElement('button');
+        component.openExecutiveOverviewReader({ currentTarget: trigger } as unknown as Event);
+
+        expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('executiveOverviewReader');
+      });
+
+      it('closes the reading modal and returns focus to the trigger that opened it', async () => {
+        await setup();
+        component.executiveOverviewParagraphs.set(['One.', 'Two.', 'Three.']);
+        const trigger = document.createElement('button');
+        document.body.appendChild(trigger);
+        const focusSpy = jest.spyOn(trigger, 'focus');
+
+        component.openExecutiveOverviewReader({ currentTarget: trigger } as unknown as Event);
+        component.closeExecutiveOverviewReader();
+
+        expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('executiveOverviewReader');
+        expect(focusSpy).toHaveBeenCalled();
+
+        trigger.remove();
+      });
+
+      it('closes the reading modal on Escape even when focus lands outside the projected content (non-admin, no focusables — R-EOC-005 AC.2)', async () => {
+        await setup('C-1', { isAdmin: false });
+        component.executiveOverviewParagraphs.set(['One.', 'Two.', 'Three.']);
+        const trigger = document.createElement('button');
+        document.body.appendChild(trigger);
+        component.openExecutiveOverviewReader({ currentTarget: trigger } as unknown as Event);
+        expect(allModalsServiceMock.isModalOpen('executiveOverviewReader').isOpen).toBe(true);
+
+        // Simulates the host falling through to container.focus() on #modalRoot for a non-admin
+        // reader (no focusable content) — the event originates OUTSIDE the projected div that any
+        // descendant-bound handler would need, and must still reach a document-level listener.
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('executiveOverviewReader');
+
+        trigger.remove();
+      });
+
+      it('does not close other modals or act when the reading modal is not open', async () => {
+        await setup();
+
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        expect(allModalsServiceMock.closeModal).not.toHaveBeenCalledWith('executiveOverviewReader');
+      });
+
+      it('renders the reading modal generated-at header, full paragraphs and grounding sources', async () => {
+        await setup();
+        fixture.detectChanges();
+
+        const modalHost = fixture.debugElement.query(
+          (debugEl: any) => debugEl.componentInstance?.modalName === 'executiveOverviewReader'
+        );
+        expect(modalHost).toBeTruthy();
+        const modalText = (modalHost.nativeElement as HTMLElement).textContent ?? '';
+        expect(modalText).toContain('Stored overview paragraph.');
+        expect(modalText).toContain('Second stored paragraph.');
+        expect(modalText).toContain('Generated on');
+        expect(modalText).toContain('stored-file.pdf');
+      });
+
+      it('shows the reading modal admin actions ("Grounding & Setup" / "Regenerate summary") only for admins', async () => {
+        await setup('C-1', { isAdmin: false });
+        fixture.detectChanges();
+
+        const modalHost = fixture.debugElement.query(
+          (debugEl: any) => debugEl.componentInstance?.modalName === 'executiveOverviewReader'
+        );
+        const modalText = (modalHost.nativeElement as HTMLElement).textContent ?? '';
+        expect(modalText).not.toContain('Grounding & Setup');
+        expect(modalText).not.toContain('Regenerate summary');
+      });
+
+      it('bridges "Grounding & Setup" from the reading modal to the existing setup modal', async () => {
+        await setup();
+        const trigger = document.createElement('button');
+        component.openExecutiveOverviewReader({ currentTarget: trigger } as unknown as Event);
+        allModalsServiceMock.closeModal.mockClear();
+
+        await component.openGroundingSetupFromReader();
+
+        expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('executiveOverviewReader');
+        expect(allModalsServiceMock.openModal).toHaveBeenCalledWith('projectGroundingSetup');
+      });
+
+      it('renders a text skeleton while loading (role="status", reserved reading-width height) and the resolved paragraph after (KZ-015)', async () => {
+        await setup();
+        // Scoped to the card itself — the (always-rendered-by-stub) reading modal carries its own
+        // copy of the paragraphs regardless of the card's loading state, so asserting on the whole
+        // fixture would see the modal's text and miss a real card regression.
+        const card = () => fixture.nativeElement.querySelector('[data-testid="executive-overview-card"]');
+        expect(card().textContent).toContain('Stored overview paragraph.');
+
+        // Arrange the transition: flip to the loading state the product renders mid-fetch, assert
+        // the negative (no stale text, no error), THEN resolve back and assert the positive.
+        component.executiveOverviewLoading.set(true);
+        fixture.detectChanges();
+
+        const skeleton = card().querySelector('[aria-label="Loading executive overview"]');
+        expect(skeleton).toBeTruthy();
+        expect(skeleton.getAttribute('role')).toBe('status');
+        expect(card().textContent).not.toContain('Stored overview paragraph.');
+        expect(card().textContent).not.toContain('Unable to generate the executive overview');
+
+        component.executiveOverviewLoading.set(false);
+        fixture.detectChanges();
+
+        expect(card().querySelector('[aria-label="Loading executive overview"]')).toBeNull();
+        expect(card().textContent).toContain('Stored overview paragraph.');
+      });
+
+      it('offers a Retry action on error that never hides the admin setup entry point', async () => {
+        await setup();
+        component.executiveOverviewError.set(true);
+        fixture.detectChanges();
+
+        const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+        const retry = buttons.find(button => button.textContent?.trim() === 'Retry');
+        expect(retry).toBeTruthy();
+        expect(fixture.nativeElement.textContent).toContain('Unable to generate the executive overview');
+        expect(fixture.nativeElement.querySelector('[aria-label="Open Grounding & Setup"]')).toBeTruthy();
+      });
+
+      it('retries via generateExecutiveOverview when the overview already has data (regenerate failed)', async () => {
+        await setup();
+        component.executiveOverviewError.set(true);
+        documentOverviewServiceMock.fetchDocumentOverviewSummary.mockClear();
+        documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+        component.retryExecutiveOverview();
+        await fixture.whenStable();
+
+        expect(documentOverviewServiceMock.generateDocumentOverview).toHaveBeenCalledWith('C-1');
+        expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).not.toHaveBeenCalled();
+      });
+
+      it('retries via loadExecutiveOverviewSummary when no overview data exists yet (baseline generation failed)', async () => {
+        await setup();
+        // Arrange the target state directly: no data yet, but an error is showing — the shape a
+        // failed baseline auto-generation (R-EOC-006 AC.2) leaves behind.
+        component.executiveOverviewParagraphs.set([]);
+        component.executiveOverviewError.set(true);
+        expect(component.hasExecutiveOverviewData()).toBe(false);
+
+        documentOverviewServiceMock.fetchDocumentOverviewSummary.mockClear();
+        documentOverviewServiceMock.generateDocumentOverview.mockClear();
+
+        component.retryExecutiveOverview();
+        await fixture.whenStable();
+
+        expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).toHaveBeenCalledWith('C-1');
+      });
     });
 
     it('should load executive overview summary for non-admin users when data exists', async () => {

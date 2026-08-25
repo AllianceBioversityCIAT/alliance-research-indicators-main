@@ -598,8 +598,64 @@
           }
         </app-modal>
 
+        <app-modal modalName="executiveOverviewReader">
+          <div class="flex min-w-0 flex-col gap-5 px-10 py-8">
+            <header class="flex flex-col gap-1">
+              @if (executiveOverviewGeneratedAt()) {
+                <p class="m-0 font-['Barlow'] text-[12px] font-normal leading-snug text-[var(--ac-grey-600)]">
+                  Generated on {{ executiveOverviewGeneratedAt() | date: 'dd/MM/yyyy HH:mm' }}
+                </p>
+              }
+            </header>
+
+            <div class="mx-auto flex w-full max-w-[70ch] flex-col gap-4">
+              @for (paragraph of executiveOverviewParagraphs(); track $index) {
+                <p class="m-0 whitespace-pre-line font-['Barlow'] text-[14px] font-normal leading-relaxed text-[var(--ac-grey-800)]">{{ paragraph }}</p>
+              }
+            </div>
+
+            @if (overviewSourceDocuments().length > 0) {
+              <div class="mx-auto flex w-full max-w-[70ch] flex-col gap-2 border-t border-[var(--ac-grey-200)] pt-4">
+                <span class="font-['Space_Grotesk'] text-[11px] font-semibold uppercase tracking-wide text-[var(--ac-grey-600)]">
+                  Grounding sources
+                </span>
+                <div class="flex w-full flex-wrap items-center gap-2">
+                  @for (document of overviewSourceDocuments(); track document.fileKey) {
+                    <div class="flex min-w-0 items-center gap-2 rounded-md border border-[var(--ac-grey-300)] bg-[var(--ac-grey-100)] px-3 py-1.5">
+                      <i class="pi pi-file !text-[12px] shrink-0 text-[var(--ac-grey-700)]" aria-hidden="true"></i>
+                      <span class="max-w-52 truncate font-['Barlow'] text-[12px] text-[var(--ac-primary-blue-600)]" [title]="document.fileName">{{
+                        document.fileName
+                      }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
+            @if (canAccessGroundingSetup()) {
+              <div class="mx-auto flex w-full max-w-[70ch] flex-wrap items-center justify-end gap-3 border-t border-[var(--ac-grey-200)] pt-4">
+                <button
+                  type="button"
+                  class="min-h-[44px] rounded-md border border-[var(--ac-grey-700)] bg-transparent px-3 py-1.5 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-grey-700)]"
+                  (click)="openGroundingSetupFromReader()">
+                  Grounding & Setup
+                </button>
+                <button
+                  type="button"
+                  class="min-h-[44px] rounded-md border border-[var(--ac-light-blue-400)] bg-transparent px-3 py-1.5 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-light-blue-400)] disabled:cursor-default disabled:border-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
+                  [disabled]="!canGenerateExecutiveOverview()"
+                  [attr.aria-label]="executiveOverviewLoading() ? 'Generating executive overview' : 'Regenerate summary'"
+                  (click)="generateExecutiveOverview()">
+                  <i class="pi pi-sparkles !text-[12px]" aria-hidden="true"></i>
+                  Regenerate summary
+                </button>
+              </div>
+            }
+          </div>
+        </app-modal>
+
         @if (showExecutiveOverview()) {
-          <section class="flex flex-col gap-5 bg-[var(--ac-white-1)] px-6 py-6">
+          <section class="flex flex-col gap-5 bg-[var(--ac-white-1)] px-6 py-6" data-testid="executive-overview-card">
             <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div class="flex min-w-0 flex-col gap-2">
                 <h2 class="m-0 font-['Barlow'] text-[15px] font-semibold leading-tight text-[var(--ac-primary-blue-600)]">Executive Overview</h2>
@@ -632,21 +688,43 @@
 
             <div class="flex flex-col gap-4">
               @if (executiveOverviewLoading()) {
-                <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">Generating grounded summary...</p>
+                <!-- Reserved-height text skeleton (R-EOC-006 AC.1) — no layout jump when the summary resolves. -->
+                <div class="flex max-w-[75ch] flex-col gap-2" role="status" aria-label="Loading executive overview">
+                  <p-skeleton width="100%" height="14px" borderRadius="4px" />
+                  <p-skeleton width="100%" height="14px" borderRadius="4px" />
+                  <p-skeleton width="95%" height="14px" borderRadius="4px" />
+                  <p-skeleton width="70%" height="14px" borderRadius="4px" />
+                </div>
               } @else if (executiveOverviewError()) {
-                <p class="m-0 font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-700)]">
+                <p class="m-0 max-w-[75ch] font-['Barlow'] text-[14px] font-normal leading-relaxed text-[var(--ac-grey-700)]">
                   Unable to generate the executive overview. Please try again.
                 </p>
+                <button
+                  type="button"
+                  class="w-fit min-h-[44px] cursor-pointer rounded-md border border-[var(--ac-light-blue-400)] bg-transparent px-3 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-light-blue-400)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                  (click)="retryExecutiveOverview()">
+                  Retry
+                </button>
               } @else {
                 <p
-                  class="m-0 whitespace-pre-line font-['Barlow'] text-[14px] font-normal leading-[1.6] text-[var(--ac-grey-800)]"
+                  class="m-0 max-w-[75ch] whitespace-pre-line font-['Barlow'] text-[14px] font-normal leading-relaxed text-[var(--ac-grey-800)]"
                   [class.line-clamp-4]="!executiveOverviewExpanded()">
                   {{ executiveOverviewText() }}
                 </p>
-                @if (executiveOverviewParagraphs().length > 0) {
+                @if (isLongOverview()) {
                   <button
                     type="button"
-                    class="w-fit border-0 bg-transparent p-0 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-light-blue-400)]"
+                    class="inline-flex w-fit min-h-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-light-blue-400)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                    data-testid="executive-overview-reader-trigger"
+                    aria-haspopup="dialog"
+                    (click)="openExecutiveOverviewReader($event)">
+                    View full overview
+                  </button>
+                } @else if (executiveOverviewParagraphs().length > 0) {
+                  <button
+                    type="button"
+                    class="inline-flex w-fit min-h-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-['Barlow'] text-[12px] font-semibold text-[var(--ac-light-blue-400)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ac-light-blue-400)]"
+                    data-testid="executive-overview-inline-toggle"
                     [attr.aria-expanded]="executiveOverviewExpanded()"
                     (click)="toggleExecutiveOverview()">
                     {{ executiveOverviewExpanded() ? 'View less' : 'View more' }}
