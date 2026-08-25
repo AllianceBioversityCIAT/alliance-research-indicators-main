@@ -121,15 +121,15 @@ T-02 and T-03 are split on purpose: T-02 lands placeholder copy (`TODO:` sentenc
 - **Tests:**
   - Registry lint (`chart-explainers.constants.spec.ts`): no `TODO:`; non-empty fields; ≤ 3 sentences; ≤ 220 chars/sentence; listed jargon (`bipartite|treemap|funnel|heatmap`) only with a gloss in the same sentence; acronyms `IRL|SP|AOW|HLO|OICR` glossed on first use per entry. *Red if:* leave one `TODO:` — observed at the start of this task by construction (T-02 leaves it red). **Cannot reach:** semantic truth and unlisted jargon — declared, covered by the human review below.
 - **Acceptance / done check:**
-  - [ ] Registry lint test green (was red at task start — cite the T-02 record)
-  - [ ] Reviewer reads **all 6** entries against `derivedFrom` and records a per-key PASS table in `execution.md` (R-CXP-005 AC.1) — a sample is not a review
-  - [ ] Every "click …" sentence corresponds to at least one `(chartClick)` binding within that Act's region of `project-dashboard.component.html` (or a component it renders) — verified by grep and listed in the PR
+  - [x] Registry lint test green (was red at task start — cite the T-02 record)
+  - [x] Reviewer reads **all 6** entries against `derivedFrom` and records a per-key PASS table in `execution.md` (R-CXP-005 AC.1) — a sample is not a review
+  - [x] Every "click …" sentence corresponds to at least one `(chartClick)` binding within that Act's region of `project-dashboard.component.html` (or a component it renders) — verified by grep and listed in the PR
 - **Evidence disqualifiers:** a green lint with a shortened jargon list is not evidence — the list in the test must be the one in R-CXP-005 AC.2 verbatim.
 - **Dependencies:** T-02
 - **Estimated effort:** S (down from M — 6 entries, not 38)
 - **Skills:** `cognitive-doc-design`, `ui-ux-pro-max`
 - **Effort dial:** `high` (content correctness is the dominant defect class D2)
-- **Status:** todo
+- **Status:** done
 
 ---
 

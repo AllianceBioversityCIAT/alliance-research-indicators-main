@@ -81,3 +81,37 @@
 - **Unmeasured at this task (declared):** full client suite + coverage floors → T-04 (Leader runs in isolation); registry lint red on TODO — the lint test does not exist yet (T-03 writes it and starts from that red by construction).
 - **Final status: T-02 (re-scoped) PASS.**
 
+## T-03 — Author the 6 explanations — rework loop in progress
+
+### Attempt 1 — FAIL (2026-08-25)
+
+- **Implementer (sonnet, high):** 6 real entries (Acts 2/3 + emptyHint), 7-test registry lint (incl. pairwise-distinct `what`), all K-004 reds observed (starting TODO red with 20 violations + 6 induced mutations, each verbatim); 200/200 targeted green; build green; spec-tsc 938; eslint 0; per-key semantic table with grep evidence for every interaction claim; KZ-007 extra find: Act grouping traces to a third archive (`2026-08-24-changes--dashboard-narrative-pass` R-DN-003), verified pure-reorg.
+- **Reviewer (opus, content-truth lens, 100% of entries): STATUS: FAIL — 2 issues.**
+  1. Acts 5/6 promise "open each chart's data table" — no such affordance exists (`viz-chart.component.html` has only an sr-only table, no toggle/button; nothing to "open" for either audience). Violates T-03's "do not describe interactions a surface does not have". Remediation: delete the clause from both entries (replacement sentences supplied).
+  2. Every `derivedFrom` cites `R-DN-003` to the redesign archive, but R-DN-003 lives only in `2026-08-24-changes--dashboard-narrative-pass` — the audit trail points at a folder that lacks the cited requirement. Introduced in T-02 (Reviewer disclosure: its T-02 PASS verified non-empty + real archive, not that R-DN-003 lived there — weigh accordingly); Implementer found it in attempt 1 and wrongly declined as "out of file scope" (`derivedFrom` lives in constants.ts, the file T-03 edits; requirements allow multi-source citations). Remediation: two module constants (redesign = chart semantics; narrative-pass = Act grouping), composed per entry — six string edits, no copy change.
+- **Per-key verdict table (R-CXP-005 AC.1, verbatim from the Reviewer):**
+
+| Key | Verdict | Checked against | Wording concern |
+| --- | --- | --- | --- |
+| act-1-identity | PASS on content; carries issue 2 | 4 KPI tiles activatable (:28/:56/:89/:106); status-bar segments clickable as `<a [routerLink]>` :389-397 (a `(click)` grep cannot see this); Timeline tile :279-297; caveat faithful to :774-778; no status-exclusion filter exists → departure from the "except Rejected" example is correct | tiles 3–4 scroll, not open — suggest "…to open or jump to…"; Timeline tile not clickable |
+| act-2-production | PASS; carries issue 2 | trend :806, indicator bars/heatmap :881/:972; ramp phrasing avoids "heatmap"; emptyHint matches the @if guard exactly | none — strongest entry |
+| act-3-reach | PASS; carries issue 2 | contributing-projects the ONLY binding in Act 3 range (:1055); geo templates contain no click (grepped by direct file path after a glob zero — K-014) | none |
+| act-4-direction | PASS; carries issue 2 | levers :1091; SP node click self-contained, fires only dataType node + category===1 → copy's "a result node" precisely right; SDG spelled out before acronym | none |
+| act-5-quality | FAIL (issue 1) + issue 2 | "None of these charts are clickable" TRUE; content matches §5.3; source caveat truthful | only the data-table clause |
+| act-6-depth | FAIL (issue 1) + issue 2 | pending-revision row click TRUE (:1186 + results-center-table:89-91); deep-dive/keywords no click | same single clause |
+
+- **Lint audit:** term lists verbatim vs R-CXP-005 AC.2; avoidance strategy verified (all 9 terms absent, each paraphrased); 3-sentence rule holds; longest ~190/220.
+- **Advisories (recorded, never tasks):** (a) gloss heuristic accepts ANY parenthesis/em-dash anywhere in the sentence — protects nothing it would catch; tighten to adjacency when an acronym first ships; (b) acronym lint flags EVERY occurrence, stricter than the spec's gloss-once rule — fails SAFE, fix before anyone needs an acronym; (c) splitSentences inflates on internal periods (latent); (d) scope note: only jargon-gloss + 3-sentence are AC-mandated, the other 5 lint tests are extras — recorded as such.
+- **Leader adjudication:** both issues in-scope → attempt 2, effort xhigh (rework bump). Also apply the Act-1 wording suggestion ("open or jump to") — it is issue-1-adjacent truthfulness, same clause class.
+
+### Attempt 2 — PASS (2026-08-25)
+
+- **Implementer (sonnet, xhigh), scope: the 2 issues + adjudicated Act-1 wording.** Act 5/6 data-table clauses deleted (Reviewer's replacement sentences verbatim); constant split `PROJECT_DASHBOARD_REDESIGN` (bare path) + `DASHBOARD_NARRATIVE_PASS` (R-DN-003/D-DN-3), all 6 `derivedFrom` composing both; Act 1 → "…open or jump to the matching results" (130 chars). Acts 2/3/4 byte-identical.
+- **Reviewer (opus): STATUS: PASS.** Both issues discharged exactly; re-checked the citation's SECOND half unprompted (`D-DN-3` also lives only in narrative-pass — both halves now route correctly); "nothing else moved" verified field-by-field against the attempt-1 full read, not from the stat; lint internals confirmed untouched.
+- **Per-key table, attempt 2 (supersedes attempt 1's status column; evidence stands):** act-1 PASS (wording fixed; status segments still open filtered results via routerLink) · act-2 PASS (byte-identical) · act-3 PASS (byte-identical) · act-4 PASS (byte-identical) · act-5 PASS (clause deleted, remainder true) · act-6 PASS (clause deleted, row-click claim still true). **R-CXP-005 AC.1 satisfied: 100% of entries read against derivedFrom across the two rounds, no sampling.**
+- **Verification (Implementer-run):** targeted jest 200/200 (dashboard equality test picked up the new copy automatically); edited sentences 130/106/117 ≤ 220; build green; spec-tsc 938 = baseline; eslint 0; hex grep clean; diff confined to the 2 constants files (177+/26-).
+- **Advisories (recorded, never tasks):** (a) optional polish "open, jump to, or break down" for tile 2's popover — Reviewer explicitly not gating on its own wording; (b) carried lint latencies (gloss-adjacency, every-occurrence acronym flag, splitSentences internal periods) — all fail safe, fix before any acronym ships; (c) scope note: 5 of the 7 lint tests are extras beyond AC.2, recorded as such.
+- **Requirements covered:** R-CXP-005 (AC.1 human table + AC.2 lint + scenario), R-CXP-004 AC.4.
+- **Budget:** 2 review rounds used for the copy phase = design §12 per-phase allowance. LOC on track (~450 real total vs ~400 estimate; within tolerance, far from the ≥700 tripwire).
+- **Final status: T-03 PASS.**
+
