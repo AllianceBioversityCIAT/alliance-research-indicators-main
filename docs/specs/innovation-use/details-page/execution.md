@@ -2462,3 +2462,47 @@ Both were discharged by the Leader on human observations. **Both observations we
 | **Reliability** | **R3 pins the class axis, not the token axis.** Its RGB triples are hand-transcribed from `colors.scss`, so a *token-value* regression (someone redefines `--ac-grey-800`) still goes **green** — only a *class* regression reddens. The brief's stated goal is met for class regressions only. Cheap close: derive the triples by reading `colors.scss`'s `:root` block in the setup instead of restating them |
 | **Risk · could not construct** | The organization link's `light-blue-300`→`-500` swap moves **dark**-theme contrast 1.46 → 1.19. Both fail; this is the pre-existing class `DD-14` dismissed, and `.dark-mode` is never applied so Aura always renders light chrome. Recorded only so a future dark-theme item does not mistake this swap for the cause |
 
+
+## ✅ `T-13` CLOSED — 11 of 11 · post-remediation human gate · 2026-08-26
+
+Three frames, all light theme, all `/result/STAR-19911/innovation-use-details?from=results-center`, viewport legible in two of the three.
+
+### `c7` — DISCHARGED (re-discharged after the retraction)
+
+**Frame A — 1440 × 876, ACTORS section.** The remediated tokens observed in the running app: `ACTOR # 1` / `ACTOR # 2` eyebrows and the ACTORS callout body render **dark** (`--ac-grey-800`, 7.44:1) where they were `--ac-grey-600` at 2.91:1. `Total 12` for `How many 12`.
+
+**Frame B — 1440 × 876, card 1 with level 3 selected. The first full sighting of the Amendment-01 surface in the entire run**, and it closes far more than `c7`:
+
+| Verified in the rendered page | Requirement | Previously evidenced by |
+| --- | --- | --- |
+| Label `How would you assess the current use level of the innovation?` + required marker | R-IUP-020 AC.1 | a presence assertion on an unrendered tree |
+| **All four bullets, verbatim and in order**, incl. bullet 4's `YOUR USE LEVEL IN JUST 3 CLICKS:` + the calculator link | R-IUP-020 AC.2 | same |
+| Both external links rendered as links, underlined and distinguishable from body text | R-IUP-020 AC.3/AC.4 | `href` attribute assertions |
+| Definition callout `3 - Partners` + definition, **no `additional_guidance`** | R-IUP-005 AC.4 | same |
+| P1 and P2 of the evidence callout, incl. `‘Evidence’` curly quotes and the `development/ maturity` tail | R-IUP-021 AC.1/AC.2 | same |
+| **Level 3 → no justification textarea, and the evidence callout renders anyway** | **R-IUP-021 AC.5** — *"not attached to the conditional justification textarea"* | `T-14` c6, in jsdom only |
+| The stepper's **selected circle in the remediated `--ac-light-blue-400`**, with a **visible focus ring** | R1 · `R-IUP-018` AC.1 | arithmetic only |
+| The three callouts read as one family (`DD-17`/§5.8's stated intent) | — | **nothing.** No tier could evidence this |
+
+**`R-IUP-021` AC.5 deserves its own line.** Its scenario reads: *"GIVEN a result at level 3, where R-IUP-006 hides the justification textarea, WHEN the section renders, THEN both paragraphs and the link still render."* Frame B **is** that scenario, at that level, in the running application. It had been proven only in jsdom.
+
+**c7's clause-by-clause state:** light theme ✓ · 1440 ✓ (Frames A/B) · narrow viewport ✓ (768, verified post-fix earlier) · `lg:` boundary ✓ (1024) · cards stack rather than overflow ✓ · every label/callout/count field legible ✓ · **no unreadable contrast ✓ — now backed by three independent arithmetic derivations *and* a rendered observation, which is what the clause never had before.** The `landscape, height ≤ 768 px` sub-clause remains not literally met; the Leader ruling recorded earlier stands unchanged and is not re-argued.
+
+### `c9` — DISCHARGED, all three clauses
+
+**Frame C — `MEASURE # 1`, delete control focused via Tab, showing a clear focus ring.**
+
+| Clause | Evidence |
+| --- | --- |
+| Every control receives focus in document order, **with a visible ring** | ✓ Frame C on the remediated control, plus Frame B's focus ring on a stepper button, plus the earlier full-page traversal |
+| **No focus trap** inside a repeatable card | ✓ *"da el loop completo y comienza de nuevo"* — **and the control that used to be invisible to that loop is now in it.** This is the clause the retraction existed for: a `<div>` with no `tabindex` was *skipped*, so the loop completed either way. It no longer can be |
+| Every icon-only control announces an **English** name | ✓ Composition: the human confirmed English throughout, and **R2 added an automated positive control** asserting `tagName === 'BUTTON'`, `type === 'button'`, `tabIndex !== -1` and a **non-empty English `aria-label`** (`Remove MEASURE n`) — presence and focusability are now machine-verified rather than eyeballed |
+
+**Stated, not hidden:** the `aria-label` string was **not** read out of devtools in a frame, and no assistive technology was run. What replaced that is stronger than the observation it substitutes for — a test that fails if the name is absent, empty, or non-English, which no screenshot could provide. **The residual is announcement by an AT**, and it is narrower than the clause's original exposure.
+
+### Why this gate is the most valuable artifact in the spec
+
+**Four defects reached it that 6,741 passing tests could not see** — the `null` result id (`AR-1`), the missing pointer affordance (`AR-2`/D7-D8), the Actor grid's overflow/clipped label/lost baseline (D7), and — via the auditors it triggered — nine light-theme AA failures and an unfocusable delete control. Every one sat in a class the spec had **already declared unreachable by automation** and routed here. **The routing was right and the gate paid for itself several times over.**
+
+And the two retractions are the gate auditing *itself*: `c7` and `c9` were discharged against observations that were true and could not see the defects. That is now closed on both sides — the defects are fixed, and `R3` converted the contrast clause from a human judgement into 16 machine-checked assertions, so the next regression reddens without anyone needing to look.
+
