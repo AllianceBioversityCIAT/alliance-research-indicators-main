@@ -2084,3 +2084,17 @@ Corroborated on four independent axes: Tailwind is **absent** from `client/resea
 
 **A near-miss worth recording, because it is this log's own lesson turned on the Leader.** The Leader's first pass grepped `dist/` for `cursor-pointer`, found **zero**, and was one step from reporting that the class was inert and that DD-17's contrast decision might therefore be shipping unstyled text — a serious and **entirely wrong** claim. What stopped it was asking which region the check could structurally reach before trusting its zero: **KZ-017**, and **KZ-014**'s rule that an argument binds as tightly as a command. The build output was the wrong region by construction. *Recorded because a confident zero from a mis-scoped grep is exactly the failure mode this spec has now logged three times, and this instance was the auditor's own.*
 
+
+#### ✅ Human confirmation of PV-T14-1 and PV-T14-2 — 2026-08-26
+
+**Observed by the user at a browser, quoted rather than paraphrased** (KZ-002 recurrence 6 — a criterion discharged by a human observation must quote what that observation actually covered):
+
+| Quote | What it discharges |
+| --- | --- |
+| *"efectivamente ya hace redirecto"* | **PV-T14-1.** The Evidence navigation resolves in the real router to the real Evidence section. This is the **only** tier that could prove it: the unit tier asserts a mocked `Router`'s arguments and, per **AR-1**, no client test in this spec reaches a real navigation |
+| *"quedó funcionando perfectamente"* | **PV-T14-2.** The pointer affordance renders. **D7/D8 has no automated gate**, and jsdom plus a runtime-injected Tailwind stylesheet makes it unreachable at the unit tier by construction — a human at a browser was the only available evidence |
+
+**What these two quotes do NOT discharge — stated so the ticks are not read wider than the observation.** `T-13` stays `[~]` with all four of its human criteria open. The user exercised **one control**; `c7` requires the full page at 1440 px *and* the `md:` breakpoint with every label, callout, count field and card border legible; `c1` requires the whole end-to-end pass (sidebar → fill → save → re-read → green tick) in one go; `c8` requires the two screenshots; `c9` requires the keyboard pass. **None of those is advanced by this confirmation**, and crediting them from it would be exactly the recurrence-6 failure.
+
+**Standing observation about this spec's verification design, on the record because it now has two data points rather than an argument.** Both defects fixed after `T-14`'s PASS — the `null` result id and the missing pointer affordance — were found by a human clicking, not by 6,724 passing tests. Each sat squarely in a class the spec had *already* declared unreachable by automation (**AR-1** for real navigation, **AR-2**/D7/D8 for visual affordance) and routed to the human gate. The routing was correct and the gate worked; what the two escapes show is that `T-13`'s four open criteria are the load-bearing ones in this spec, not the residue.
+
