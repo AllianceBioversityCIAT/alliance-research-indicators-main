@@ -2349,3 +2349,77 @@ All four human criteria discharged: **c1** (save → re-read → green tick, ver
 
 **What this gate caught, recorded because it is the argument for the gate's own cost.** Four defects reached it, none of which any of the 6,724 tests could see, and every one sat in a class the spec had **already declared unreachable by automation** and routed here: the `null` result id (**AR-1** — no client test reaches a real navigation), the missing pointer affordance (**AR-2 / D7-D8**), and the Actor grid's overflow, clipped label and lost baseline (**D7**). The routing was correct and the gate paid for itself.
 
+
+#### `c8` — four further frames, narrowing the gap the ruling had absorbed · 2026-08-26
+
+Received after the user's ruling closed `c8`. They do not change the verdict; they **narrow the recorded coverage gap** and add evidence no earlier frame carried.
+
+| Frame | Region | Finding |
+| --- | --- | --- |
+| 1440 × 876 | `ORGANIZATIONS` / `ORGANIZATION # 1` — `Is the organization known?` unchecked, type `Research organizations and universities`, empty sub-type and count | Clean. **Every field on its own full-width row**, corroborating `PV-T13-2`'s report that this card has no multi-column grid and so could not carry the Actor card's defect |
+| 1440 × 876 | `ACTORS` — guidance callout, `ACTOR # 1` (aggregate mode), `ACTOR # 2` | Clean |
+| **1024 × 876** | **The evidence callout's P2**, plus `ACTORS` / `ACTOR # 1` | **First sighting of any part of card 1** — see below |
+| 768 × 876 | `ACTORS`, `ACTOR # 1` and `# 2` | Clean post-fix |
+
+**The 1024 frame closes two claims that had no rendered evidence at all:**
+
+1. **`T-14` c4's rendered half.** P2 renders as `Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication materials that provide evidence of the current development/ maturity stage of the innovation.` — **compared character-for-character by the Leader against `requirements.md:857`, including the `development/ maturity` space after the slash.** That spacing is the deliberate verbatim retention from proposal decision **D-3** (tracked as `OQ-IUP-6`), and it is now confirmed to survive to the rendered page rather than only to the DOM. c4's automated evidence was, by its own admission, a presence assertion on an unrendered tree.
+2. **First visual confirmation of `DD-17`'s token treatment.** The callout renders with its `--ac-grey-100` background, its `--ac-light-blue-300` left border, and legible dark body text. `T-14` **c12** could only ever assert *class names* and compute *arithmetic* — jsdom paints nothing and Tailwind's CSS is injected at runtime. This is the first observation that the intended treatment actually reaches the pixel, and it is the piece `c12`'s own disqualifier said it could not supply.
+
+**Recorded as NOT defects, so a later reader does not "fix" correct behaviour:**
+
+- At 768 the actor-type select renders `Farmers / (agro)pastoralist / h…` — a **controlled ellipsis** on a long option in a narrow select, not clipped text. Distinct from `V-2`, which cut a label mid-glyph.
+- `Total` renders **empty** in the aggregate cards because `How many` is empty — `T-05` **c4**/**c5** require exactly that.
+
+**Residual coverage gap, now precisely bounded.** Still unseen at any viewport: the **top** of card 1 — the question label, the guidance callout's four bullets, the calculator link, the level stepper, the definitions link, and P1 with its `Click here to go there` control. P1's link is nonetheless **functionally** confirmed (the user activated it and the navigation was verified in both directions), and the four bullets are confirmed **present** by the user's earlier *"los bulletpoints están"*. So what remains unevidenced visually is the label text, the bullets' rendered layout and the stepper's rendered appearance. **The ruling stands; this is the gap it covers, stated at its true size rather than its original one.**
+
+
+#### `/akili-validate` — runtime failure recorded, not absorbed · 2026-08-26
+
+The Phase 4 / Phase 6 auditor's turn terminated on an **API error: the host machine slept mid-response.** It had read the spec documents and was entering the working tree; it delivered no report.
+
+**Recorded as a runtime failure, per root `CLAUDE.md` §4.3:** *"A delegated worker that does not deliver is not a worker that found nothing. A silent reviewer is indistinguishable from a clean one, and reading the silence as a verdict discards findings nobody knows are missing."* The auditor was **resumed** rather than re-spawned — its spec reading was the expensive half and survives in its transcript — with the deliverable restated and a priority order in case it runs short.
+
+**The Leader did not substitute itself.** `/akili-execute`'s runtime-failure table is explicit that the Reviewer role is **never** filled inline: a Leader auditing work it supervised breaks `author ≠ auditor`, and an environment failure does not suspend a correctness constraint. This validation's independence requirement is the same one, so the phase waits for the auditor.
+
+
+---
+
+## ⛔ `/akili-validate` — FAIL · two discharges RETRACTED · `T-13` reopened · 2026-08-26
+
+Two independent T3 auditors (fresh context, `opus`, neither having implemented anything) returned **FAIL** and converged on the same primary finding without seeing each other's work.
+
+### The blocking finding, verified independently by the Leader
+
+**`R-IUP-017` AC.3 is unmet.** Its text binds the **section**, not the amendment: *"Both light and dark themes render **the section** legibly, with no unreadable contrast."*
+
+`--ac-grey-600 #8d9299` on `--ac-grey-100 #f4f7f9` = **2.91:1** against AA's 4.5:1. *Leader-computed independently in sRGB/WCAG 2.1, reproducing both auditors and `DD-17`'s own published figure.* Failing sites in files this spec authored: the ACTORS callout (`innovation-use-details.component.html:129`), both repeatable-card eyebrows (`innovation-use-actor-item.component.html:11`, `innovation-use-organization-item.component.html:11`), the three `Add other …` buttons and the org callout (`--ac-light-blue-300` at **3.84:1** / **3.21:1**, `--ac-grey-700` at **3.51:1**), and the stepper digits. Auditor A counts 7 sites, Auditor B counts 9 across a wider surface including the §5.7 binding classes (`.description` 4.20:1, `.section-title` 2.38:1).
+
+**Why this is the sharpest finding in the run.** `innovation-use-details.component.html:19` — a comment the Leader dispatched and reviewed — reads: *"Mirrors the ACTORS callout's shape **but NOT its color: `--ac-grey-600` measures 2.91:1 and fails AA**."* One hundred and ten lines later, **line 129 is that ACTORS callout, still `text-[var(--ac-grey-600)]`.** The spec measured the right number for the right reason, wrote it down, fixed the two blocks the amendment owned, and left the block it was comparing itself against untouched **in the same file**. `DD-17`'s own words — *"copying the nearest precedent would ship a reachable light-theme C-4 violation"* — are true, and the precedent it refused to copy is shipping on the same page.
+
+**This is a scope-fence defect, not a measurement defect.** `OQ-IUP-8` deferred the light-theme C-4 problem on the stated grounds that *"fixing `.description` edits a **shared stylesheet** consumed app-wide"* — and asserted the defect paints *"the `ACTORS` guidance text"*. **That assertion is false** (Auditor A, F-2): the ACTORS text uses no `.description`; it is a local Tailwind utility on a line this spec authored, fixable in one word with **zero** blast radius. The deferral's cost argument does not reach it, and that error is precisely what made the defect look out-of-scope. Five further failing sites appear in no open question at all.
+
+### Second blocking finding
+
+**`R-IUP-018` AC.1/AC.2 unmet for the rendered section.** `shared/components/quantification-item/quantification-item.component.html:6` is `<div class="cursor-pointer …" (click)="onDelete()" (keydown.enter)="onDelete()">` — **no `role`, no `tabindex`, no `aria-label`.** *Leader-verified by reading the file.* Without `tabindex` the element never receives focus, so **`(keydown.enter)` is dead code**: the control is mouse-only and announces nothing. The sibling actor card, eleven lines away in its own template, does it correctly with a native `<button [attr.aria-label]>` — `T-11` fixed exactly this class on the actor card and the **promoted shared card was outside that sweep's file set**. The fact was known: `innovation-use-details.component.spec.ts:472-474` states in a comment that the delete icon has no `aria-label` and works around it, rather than routing it to a finding.
+
+### ⛔ RETRACTIONS — `T-13` c7 and c9 discharges withdrawn, `T-13` back to `[~]`
+
+Both were discharged by the Leader on human observations. **Both observations were sound; neither could see these defects, and the Leader recorded the ticks without asking whether the check could reach the claim.**
+
+| Criterion | Why the discharge does not hold |
+| --- | --- |
+| **c9** | Clause 1 was closed by *"se ve el anillo al usarse y da el loop completo"*. **A `<div>` with no `tabindex` is *skipped* by the Tab loop** — so the loop still completes and the ring is still visible on every control that does focus. **A Tab pass structurally cannot distinguish "every control receives focus" from "every focusable control receives focus."** Clause 3 was closed by *"lo veo todo en inglés"*, which is **trivially true of a control that has no accessible name in any language.** Both observations are true and neither is evidence for the clause it was credited to |
+| **c7** | Closed for *"no unreadable contrast"* on *"todo se ve bien"*. A 2.91:1 grey-on-light-grey is exactly the defect a human eye passes over — which is why the criterion's own text says *"'the page renders' does not discharge 'contrast ≥ 4.5:1'"*. **The Leader quoted that warning in this log and then discharged the clause against it anyway** |
+
+**This is KZ-002 recurrence 6 for the third time in this run, and all three were the Leader's.** The first was retracting c7 for the 768px viewport. The second was recording c7's height clause as a ruling. This is the third, and it is the worst, because the rule was quoted in the same entry that broke it. **The durable lesson is not "quote the observation" — the spec does that faithfully. It is: before crediting an observation, state what the check can structurally NOT see, and check whether the clause lives there.** Both auditors found these defects in exactly that blind region.
+
+### What the audit found sound — recorded so the FAIL is not read as a verdict on the whole spec
+
+- **Traceability is genuinely clause-level.** Auditor A independently reproduced **97 ACs**, **45 clauses**, 21 requirements, 22 scenarios and the per-requirement AC distribution **exactly**, verified §5's 45 rows map 1:1 onto the 44 clause lines with `R-IUP-006`'s documented split, and confirmed the split is substantive rather than bookkeeping (render half in `onLevelSelected()`, serialize half in `buildPayload()`). **No scenario-level orphan. The KZ-002 recurrence-6 trap is not present in the traceability machinery.**
+- **`R-IUP-019` holds byte-identically** — `git diff` empty on the Innovation Development tree; §2.3's blast radius re-derived as 18 templates minus this spec's 2 = the enumerated 16.
+- **`DD-16` matches its amended text**, so the `/result/null/evidence` defect is closed and the platform-coded id survives verbatim.
+- **`DD-1`…`DD-17` conform** except `DD-12` (line-number citations, already open as `I-3`) and `DD-17`-as-a-rule (the finding above).
+- 15 of 21 requirements **PASS** outright; the payload/wire tests, the falsifiers and the `DD-16` route-tree reproduction were called *"better than the norm for this repo"*.
+- Auditor A: *"This spec's self-documentation is unusually honest — it retracted a c7 discharge against itself, recorded a Leader ruling as a ruling rather than as satisfaction, named the c8 coverage gap and the remedy, and refused to let a targeted suite count."*
+
