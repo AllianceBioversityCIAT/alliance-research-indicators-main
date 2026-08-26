@@ -23,7 +23,7 @@
 | Server files modified | **zero** |
 | File inventory | **Deliberately not stated as a count here.** The authoritative enumeration is **§2.1** (`New — the page`, `New — the contract layer`, `Promoted`, `Modified`) plus **§10.2**'s spec table, which marks each spec `(updated)` or new. Judgment Day round 1 confirmed the counts previously asserted in this row (`8` modified, `13 implementation + 9 spec` new) survived neither recomputation from §2.1 nor a glob of the tree — three of the nine "new" specs already exist — and that the stated derivation pointed at the wrong sections. Per **KZ-005** the remedy is not a corrected number but **no number**: derive from §2.1 + §10.2 at the moment one is needed, and never restate it here (`judgment.md` → `C-1`) |
 | Migrations | none |
-| Budget | see §12 — **13 tasks · ~3,200 LOC · ~28 review rounds** |
+| Budget | see §12 — **13 tasks · ~3,200 LOC · ~28 review rounds**. **Amended 2026-08-26 (Amendment 01): 14 tasks · ~3,400 LOC · ~31 review rounds** against §12's *written* baseline. ⚠️ **§12's written figure is not the governing one:** the user **re-baselined LOC to ~4,600 after T-07**, and the actual at T-09 is already **4,871 — above that too** (`execution.md` → Budget ledger, the single home for the actual). So Amendment 01's delta applies to **both** baselines: ~3,400 against the written one, **~4,800** against the re-baseline. |
 | Reversion challenge run | **1** — DD-2 (declining the proposal's Option A). Challenged; a concrete cost was named; the design was narrowed rather than reversed. See §11 |
 | Skills loaded | `brainstorming` (Phase 1), `angular-developer` (Phase 2). **`ui-ux-pro-max` deliberately not loaded** — see DD-13 |
 
@@ -220,7 +220,7 @@ This spec **consumes** a frozen contract and defines no endpoint. Full producer 
 
 | Card | `.section-title` | Contents |
 | --- | --- | --- |
-| 1 | `INNOVATION USE DETAILS` | The question label, the 0–9 stepper, the definition callout, the conditional justification textarea |
+| 1 | `INNOVATION USE DETAILS` | The question label, **the guidance callout (Amendment 01)**, the 0–9 stepper, the definition callout, **the definitions link + the evidence callout (Amendment 01)**, the conditional justification textarea — see **§5.8** |
 | 2 | `ACTORS` | Guidance callout, `n` actor cards, `Add other actor` |
 | 3 | `ORGANIZATIONS` | `n` organization cards, `Add other organization` |
 | 4 | `OTHER QUANTITATIVE MEASURES` | `n` quantification cards, `Add other measure` |
@@ -309,6 +309,47 @@ Per [`docs/ux-ui/design.md`](../../../ux-ui/design.md) §7.1, which is a **bindi
 **Zero hex literals in new files (DD-7).** The reference `innovation-details` page is saturated with them (`#1689CA`, `#E8EBED`, `#F4F7F9`, `#E69F00`, `#CF0808`, …). It is a *layout and interaction* reference; its color practice is a documented violation of §7.1 and matching it would propagate the violation into a file that has no legacy excuse. Where a reference hex has no existing token, the token is added to `src/styles/colors.scss` and registered in §7.1 in the same change — **not** inlined.
 
 Dark mode requires no branch: tokens flip under `:root[data-theme="dark"]` and the `.dark-mode` body class. **Never** branch on `isDarkMode()` for a color (R-IUP-017 scenario).
+
+---
+
+### 5.8 Amendment 01 — the two guidance blocks (R-IUP-020, R-IUP-021)
+
+Both blocks are **plain markup inside `innovation-use-details.component.html`**. No new component, no new input, no new service. They sit in card 1 in this order: label → guidance callout → `app-innovation-use-level-stepper` (untouched) → definitions link → evidence callout → conditional `app-textarea` (untouched).
+
+**Why the copy is not attached to the textarea.** `app-textarea` already exposes `helperText`, which is the obvious home for P1 — and it does not work here, for two independent reasons:
+
+1. `helperText` renders through `[innerHTML]`. Angular sanitizes that string and **does not compile bindings in it**, so a `routerLink` inside it is inert. A raw `href` would work visually and then full-page-reload the SPA, dropping the in-memory `body()`.
+2. The textarea is conditional on `showJustification()` (`level >= 6`). Evidence is required at **every** level, so guidance hosted by the textarea would disappear at levels 0–5 — the exact population least likely to know it applies (R-IUP-021 AC.5).
+
+**Token choices — and why the two obvious precedents are both wrong.** The instinct is to copy the neighbouring callout: either the in-page `ACTORS` guidance block, or the Innovation Dev page's readiness callout. **Both fail WCAG 2.1 AA in the light theme**, which PRD **C-4** makes non-negotiable and which **DD-14** explicitly keeps fully gated. Measured, not assumed:
+
+| Role | Token | Ratio on `--ac-grey-100` (`#f4f7f9`) | Verdict |
+| --- | --- | --- | --- |
+| Body text — `ACTORS` callout's current choice | `--ac-grey-600` `#8d9299` | **2.91:1** | ❌ fails AA |
+| Body text — Dev page's choice (as hex) | `#777c83` = `--ac-grey-700` | **3.91:1** | ❌ fails AA (large text only) |
+| **Body text — use this** | **`--ac-grey-800`** `#4c5158` | **7.44:1** | ✅ |
+| Link — Dev page's choice (as hex) | `#1689ca` = `--ac-light-blue-300` | **3.57:1** | ❌ fails AA |
+| **Link — use this** | **`--ac-light-blue-400`** `#035ba9` | **6.35:1** | ✅ |
+| Link — darker alternative | `--ac-light-blue-500` `#074b86` | **8.27:1** | ✅ |
+
+Background `--ac-grey-100`; left border `--ac-light-blue-300` (decorative, not text — the 3.57:1 figure does not apply to it). The callout reuses the `ACTORS` block's `bg` / `border-l` / `rs-p-*` shape so the two callouts read as one family.
+
+**⚠️ `.description` cannot carry these colours on its own — two traps, read out of the stylesheets themselves, not assumed. They live in **two different files**, which is the detail this warning originally got wrong:** the body-colour rule is `src/styles/custom-fields.scss:99–101`; the link repaint is `src/styles/styles.scss:193–199` (a nested SCSS `a` inside `.description`). *(Corrected 2026-08-26 at `T-14` finalization — this line read "both read out of `src/styles/custom-fields.scss`", which is false for the second row. Found by the Implementer, verified against both files by the Leader before writing, and independently re-confirmed by the Reviewer. **KZ-007:** a correction record is the highest-risk artifact class — and a wrong file path inside a trap warning is worse than no warning, because the next reader greps the named file, finds nothing, and concludes the trap is gone.)*
+
+| Trap | What the stylesheet actually does | Consequence | What `T-14` must do |
+| --- | --- | --- | --- |
+| **Body colour** | `.description { color: #777c83; … }` — a **hardcoded hex in a shared stylesheet**, resolving to `--ac-grey-700` | **3.91:1** on `--ac-grey-100` → **fails AA**. Using `.description` alone silently ships the exact defect DD-17 exists to prevent | Use `.description` for **typography only** and pair it with an explicit `--ac-grey-800` colour utility on the same element |
+| **Link colour** | `.description a { color: #2e2e2e; text-decoration: underline; }` — a nested selector, **in `styles.scss:193–199`, not `custom-fields.scss`** | Any link **inside** a `.description` element is repainted **near-black**. It passes contrast (**12.62:1**) and fails *discoverability*: it becomes visually identical to body text apart from the underline, silently defeating DD-17's link token | Keep the two links **outside** any `.description` element, or give them a colour utility that wins the cascade — and prove which, at `c12` |
+
+Do **not** read the second row as a contrast problem. It is a **D8/D7** problem that every contrast gate passes, which is why it is written down here rather than left to the ratio table.
+
+> **Advisory with a reachability verdict, filed rather than left in prose (KZ-008).** `.description`'s `#777c83` is **already shipped** and is **already used by this page's stepper definition callout** (`innovation-use-level-stepper.component.html`, delivered by `T-04`) and by the `ACTORS` guidance text. Those render at **4.20:1** on `--ac-white-1` and **2.91:1**–**3.91:1** on `--ac-grey-100`.
+>
+> **Reachability verdict: REACHABLE.** Light theme, default route, no toggle required — a reporter sees it today. This is therefore a **live PRD C-4 defect**, not a hypothetical, and stating it here is what keeps it from being "recorded as an advisory three times" (KZ-008's own failure mode).
+>
+> **It is nonetheless OUT of Amendment 01's scope**, deliberately: fixing `.description` edits a **shared stylesheet** consumed across the whole SPA, whose blast radius is every screen — not this card. Widening `T-14` to cover it would put an app-wide style change inside a copy amendment, with a copy amendment's gate. Filed as **OQ-IUP-8** for its own spec. `T-14` avoids inheriting it by not relying on `.description` for colour (row 1 above).
+
+> **This closes `OQ-IUP-4` for this amendment, and does not reopen it.** Every colour these blocks need already exists in `src/styles/colors.scss` — verified by reading the file, not inferred. **No token is added, so `colors.scss` and `docs/ux-ui/design.md` §7.1 are untouched**, `T-11 c4`'s gate is not re-entered, and **DD-7**'s zero-hex rule is satisfiable with existing tokens alone.
 
 ---
 
@@ -508,6 +549,10 @@ A check that cannot fail is not evidence. Each of these must be shown to fail ag
 | **DD-13** | 2026-08-20 | `ui-ux-pro-max` was **not** loaded, though the command prefers it for UI work | Its value is style, palette, and font-pairing selection. All three are already fixed by `docs/ux-ui/design.md` §7.1's binding contract, and this section must match an existing production page. Loading a style-selection skill here adds a source of non-conforming suggestions with no decision left to make. `angular-developer` was loaded instead. Recorded because it is a deviation from the command's stated preference, not an omission |
 | **DD-14** | **2026-08-21** | **Dark mode is dropped from this spec's *verification* obligations, and kept in its *implementation* obligations.** The human visual check (`T-13` c7), the T6-Multimodal review (`T-13` c8), the D7 substitute, and the §closure checklist all become **light-theme only**. The token-based implementation rules stay exactly as they are: DD-7's zero-hex rule, R-IUP-017's "never branch on `isDarkMode()` for a color", and `T-11` c5 (already `[x]`) are **unchanged and still binding** | **User ruling, 2026-08-21, on verified evidence — not a waiver.** Dark mode is **not reachable by any user**: `DarkModeService` is imported and injected at `alliance-navbar.component.ts:22,52` but appears **nowhere** in `alliance-navbar.component.html`, and no other control exposes a toggle. It is a dead injection. The §5.7 contrast defect the T-11 review found (**1.29:1** and **1.887:1** against 4.5:1) is therefore in an **unreachable state**, and an unreachable state is not a defect worth spending a human gate on — this is **KZ-008's reachability discipline applied in the negative direction**, the same test that turns an advisory *into* a defect used to rule this one out. **The split is deliberate:** the verification half costs a human pass per theme and buys nothing today, while the implementation half already passed, costs nothing to keep, and is precisely what would make dark mode work if it is ever wired up — deleting it would be a real loss disguised as a saving. **Reopening condition:** if a dark-mode toggle is ever exposed, `T-13` c7/c8 revert to both themes and the §5.7 contrast defect becomes live and blocking. **Light-mode WCAG 2.1 AA remains fully gated** (PRD **C-4**); only the dark half is lifted. Full record: `execution.md` → *Dark-mode deferral* |
 
+| **DD-15** | **2026-08-26** | **Amendment 01's guidance blocks are plain markup in the page template, not a new component and not `app-textarea`'s `helperText`** | `helperText` renders via `[innerHTML]`, which Angular sanitizes and does not compile — a `routerLink` inside it is inert, and a raw `href` would full-page-reload the SPA. And the textarea is conditional on `showJustification()`, while the guidance must render at every level. A dedicated component would be one consumer, zero inputs, zero outputs. §5.8 |
+| **DD-16** | **2026-08-26** | **The Evidence link builds its own `['/result', id, 'evidence']` + query params rather than reusing the sidebar's `navigateTo()`** | `navigateTo()` is a private method on `ResultSidebarComponent` taking a `SidebarOption`; calling it would mean injecting a sibling component or exporting a helper for one caller. The *contract* is copied — same commands shape, same `version` / `from` forwarding — and R-IUP-021 AC.4 asserts that contract on the built arguments, which is what actually protects it. **The duplication is named, not hidden:** if the sidebar's param policy changes, this call site must change with it, and AC.4 is the test that will fail if it does not |
+| **DD-17** | **2026-08-26** | **The new blocks use `--ac-grey-800` for body text and `--ac-light-blue-400` for links — not the tokens the two neighbouring callouts use** | **Measured, not assumed** (§5.8): the `ACTORS` callout's `--ac-grey-600` is **2.91:1** and the Dev page's `#777c83` / `#1689ca` are **3.91:1** / **3.57:1** on `--ac-grey-100`, all below AA's 4.5:1. Copying the nearest precedent would ship a **reachable** light-theme **C-4** violation — the same defect class **DD-14** dismissed only because its instance was in unreachable dark mode. Applying KZ-008's reachability test in the positive direction makes this one blocking |
+
 ### 11.1 Reversion challenge (Step 2.3) — DD-2
 
 **Trigger.** DD-2 declines a refactor rather than removing shipped behavior, so the strict trigger is not met. Run anyway, per *"when in doubt, run it: one question is cheaper than one rework attempt"* — DD-2 overturns the proposal's own recommendation, which is the class of decision that reaches implementation unaudited.
@@ -524,6 +569,21 @@ A check that cannot fail is not evidence. Each of these must be shown to fail ag
 
 **What the challenge did not find:** no test covers `actor-item` or `organization-item` in a way that DD-2 breaks — they are untouched, so the whole spec set DD-2 measures keeps passing unmodified, which is R-IUP-019 AC.2's requirement rather than a casualty of it.
 
+
+### 11.2 Reversion challenge (Step 2.3) — R-IUP-020 AC.1, the label change
+
+**Trigger — met.** `T-07` shipped the label `Level of use of this innovation`; **R-IUP-020 AC.1 replaces it.** Replacing shipped user-visible text is a reversion, so the challenge is owed.
+
+**Question: what does changing this label break?**
+
+**Answer — one real thing, and it is not a test.** Nothing automated breaks: the string is asserted **nowhere**. Verified by grep across `requirements.md`, `design.md`, `tasks.md`, and `client/research-indicators/src` — the only hits are the template itself and the amendment proposal. The two spec tests that reason about this label are scoped to the `TextareaComponent` instance (`By.directive(TextareaComponent)`), explicitly *because* a page-wide search would match the stepper's own label vacuously — so they are indifferent to its text.
+
+What does break is **cross-page consistency of a different kind than expected**. The Innovation **Development** page asks `How would you assess the current readiness of this innovation?`. Today the two pages are inconsistent (`Level of use of this innovation` vs `How would you assess…`); after this change they become **parallel**. So the change *reduces* inconsistency rather than creating it — which inverts the usual reversion finding and is the reason to record it rather than assume it.
+
+**Design not narrowed — one risk registered instead.** The change also makes the two pages' copy near-identical, which raises the odds that a future edit to one is assumed to have covered the other. Filed as **OQ-IUP-7** (mirror the Dev page's label? out of scope here — R-IUP-019 forbids touching it), so the divergence is a named backlog item rather than a silent one.
+
+**What the challenge did not find:** no test, no green-check key, no payload field, and no `docs/ux-ui/design.md` entry depends on the old string. The reversion is safe.
+
 ---
 
 ## 12. Budget (Step 2.4)
@@ -535,6 +595,16 @@ A check that cannot fail is not evidence. Each of these must be shown to fail ag
 | **Review rounds** | **~28** | **Derived from chunk 2's actuals, not from optimism.** Chunk 2 ran 13 tasks / ≥ 26 rounds ≈ 2.0 rounds per task, after its specify-time estimate of 6–8 proved ~3× low — as chunk 1's had. Chunk 3 has the same task count and a **weaker** automated gate (visual defects are human-gated), so 2.0–2.3 rounds per task is the honest baseline. Estimating 6–8 again would repeat a documented error twice over |
 
 **Sizing verdict: the estimate matches the declared `Full` depth.** Comparable to chunk 2 in task count, larger in LOC, and carrying an irreducible human-gated verification. Neither dropping to `Standard` nor splitting is indicated: the task graph has one hard sequence (contract layer → cards → page → wiring → verification) and splitting it would put the page in one PR and its reachability in another, shipping a page no user can open.
+
+#### Amendment 01 delta (2026-08-26)
+
+| Dimension | Was | Amendment 01 | New total |
+| --- | --- | --- | --- |
+| Tasks | 13 | **+1** (`T-14`) | **14** |
+| LOC | ~3,200 *(written)* / **~4,600** *(user re-baseline after T-07)* | **+180 … +260** (~45 template/TS, ~150–215 spec — the spec tier dominates on every task this branch has run) | **~3,400** / **~4,800** |
+| Review rounds | ~28 | **+2 … +3** | **~31** |
+
+**The running actual is already ~4,871 LOC against the pre-amendment ~3,200** (`execution.md` → Budget ledger, whose figure is that number's single home — re-derive with `git diff --stat`, do not restate). Amendment 01 does **not** reconcile that overrun and must not be read as absorbing it: `T-13 c10` still owns the reconciliation, and it now reconciles against **~3,400 / ~31**, not ~3,200 / ~28. Adding the delta here rather than silently is the point — **KZ-005**'s escalation is *fewer sites asserting a derived figure*, so this table is the only place the amended budget lives.
 
 **This is a tripwire, not a cap.** `/akili-execute` compares actuals and **stops and escalates** on a breach. Exceeding it is information; passing it silently is how a UI feature grows a fourteen-task machinery.
 
@@ -592,3 +662,4 @@ Contract layer → shared additive edits → child components → page → wirin
 | Date | Change |
 | --- | --- |
 | 2026-08-20 | Initial draft. OQ-IUP-1 and OQ-IUP-3 closed at design time (DD-2, DD-3). Step 2.3 reversion challenge run on DD-2 — found a concrete cost, design narrowed. Budget re-baselined from chunk 2's actuals rather than its specify-time estimate. |
+| **2026-08-26** | **Amendment 01 — level-selector guidance & evidence copy.** Added §5.8, **DD-15** (markup, not `helperText`), **DD-16** (own router call, contract copied), **DD-17** (contrast-driven token choice), §11.2 (reversion challenge on the label change), and the budget delta in §12. Amended §5.1's card-1 row. **`OQ-IUP-4` closed for this amendment — no token added.** Source: [`proposal-amendment-01-level-guidance.md`](./proposal-amendment-01-level-guidance.md). |

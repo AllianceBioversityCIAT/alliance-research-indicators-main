@@ -22,9 +22,22 @@ import { QuantificationItemComponent, QuantificationItemData } from '@components
 import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
+import {
+  RESULT_ENTRY_SOURCE_QUERY,
+  RESULT_ENTRY_SOURCE_VALUE_HOME,
+  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
+} from '@shared/constants/result-entry-source';
 
 /** §6.4 / R-IUP-006 AC.4: the justification is gated on the resolved `level`, never on the id. */
 const JUSTIFICATION_MIN_LEVEL = 6;
+
+/**
+ * R-IUP-020 (Amendment 01 / T-14, §5.8) — the guidance callout's calculator link and the
+ * definitions link's target, as module-level `const`s rather than inline template literals so
+ * both the template binding and this task's `c3` spec assertion read from the one place.
+ */
+const INNOVATION_USE_CALCULATOR_URL = 'https://www.scalingreadiness.org/calculator-use-headless/';
+const INNOVATION_USE_DEFINITIONS_URL = 'https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view';
 
 /**
  * §6.6 / R-IUP-009 AC.2: CLARISA actor-type value reserved for "OTHER". A client-side literal,
@@ -114,6 +127,10 @@ export default class InnovationUseDetailsComponent {
   levelsService = inject(GetInnovationUseLevelsService);
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+
+  /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
+  readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
+  readonly definitionsUrl = INNOVATION_USE_DEFINITIONS_URL;
 
   /**
    * DD-11 — distinct from an empty `body`, and never inferred from its shape. A failed GET sets
@@ -544,6 +561,31 @@ export default class InnovationUseDetailsComponent {
     }
 
     if (page) this.navigateTo(page);
+  }
+
+  /**
+   * R-IUP-021 AC.3/AC.4 · DD-16: copies the sidebar's navigation *contract* — same commands shape,
+   * same `version`/`from` forwarding rule as `ResultSidebarComponent.navigateTo()` — rather than
+   * calling that private method on a sibling component. Never a document `href`: the R-IUP-021
+   * scenario forbids one, because a full-page navigation here would full-page-reload the SPA and
+   * drop the in-memory `body()` this page holds (§5.8). Public so the template's `(click)` binding
+   * can reach it.
+   */
+  goToEvidence(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    const queryParamMap = this.route.snapshot.queryParamMap;
+    const version = queryParamMap.get('version');
+    const from = queryParamMap.get('from');
+
+    const queryParams: Record<string, string> = {};
+    if (version) {
+      queryParams['version'] = version;
+    }
+    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+      queryParams[RESULT_ENTRY_SOURCE_QUERY] = from;
+    }
+
+    this.router.navigate(['/result', id, 'evidence'], { queryParams });
   }
 
   private navigateTo(page: 'back' | 'next'): void {

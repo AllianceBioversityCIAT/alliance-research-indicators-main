@@ -15,7 +15,7 @@
 | Rework ceiling | 3 attempts per task |
 | Triad | Leader (T1 · opus) → Implementer (`akili-implementer` · T2 · sonnet) → Reviewer (`akili-reviewer` · T3 · opus, read-only). `author ≠ auditor` holds on both model and context for every task below |
 | Concurrency | **One task at a time in this checkout.** Two client tasks are not parallel-safe (root `CLAUDE.md` §4.3); `tasks.md` Document Control repeats the rule. No measurement command was run while a worker was active |
-| Budget authority | [`design.md`](./design.md) §12 — 13 tasks · ~3,200 LOC · ~28 review rounds. `tasks.md` §6 is a *derivation*, not a second budget |
+| Budget authority | [`design.md`](./design.md) §12 — 13 tasks · ~3,200 LOC · ~28 review rounds; **re-baselined by the user to ~4,600 LOC after T-07** (see the T-07 re-assessment below). **Amended 2026-08-26 by Amendment 01 to 14 tasks · ~3,400 (written) / ~4,800 (re-baseline) · ~31 rounds** — see §12's *Amendment 01 delta*. `tasks.md` §6 is a *derivation*, not a second budget |
 | Budget tracking | Running actuals in the *Budget ledger* below. A breach stops execution and escalates; it is not absorbed silently |
 | Advisory policy | `ADVISORY` findings are recorded here and **die here**. They never gate, never consume a rework attempt, and never mint or widen a task in this spec (`/akili-execute` §2.4) |
 
@@ -34,6 +34,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
 | T-08 | 400 | **1,081** (+1,081 / −14, 3 files) | 3 | **2.7× its derivation** — the largest overrun of the run. 806 of 1,081 are the spec file |
 | T-09 | 160 | **327** (+327 / −2, 3 files) | 2 | 2.0× derivation; attempt-1 FAIL (whitespace silent block) closed by page-owned message. Running total **4,871** |
+| T-10 … T-13 | — | — | — | **Actuals live in T-13's `c10` reconciliation table below, their single home** (KZ-005: a measured figure gets ONE home and cites its deriving command — `git show --numstat` per task commit). Not restated here |
+| **T-14** | *(no §6 line — added by Amendment 01; budgeted in `design.md` §12's delta at +180…+260)* | **457** (+457 / −3, 3 files) | **1** | ⚠️ **Tripwire breach: ~1.8–2.5× the +180…+260 band.** 352 of 457 are the spec file — **the spec-tier over-run pattern holds for a tenth task.** Cause is the Leader's `tdd` assignment (each falsifying input became a permanent regression test), not scope creep. Escalated to the user, not absorbed |
 | **Running total** | **3,202** | **4,871** | **17** | ⚠️ Above re-baseline ~4,600; continuing under the T-07/T-08 ruling. T-13 c10 reconciles. Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
@@ -1812,3 +1814,114 @@ This spec's own record — written before the bugfix existed — documented the 
 ### Not touched
 
 This `execution.md` is append-only history and is not rewritten by this Pivot: the T-09 (`:1183`, `:1188`, `:1192`, `:1196`) and T-07 (`:830`, `:1027`) entries describing the original save-block design and review stand as written — they were true when recorded. `family.md` and `OPEN-ITEMS.md` carry their own follow-up rows for this bugfix (see `bugfix/innovation-use-draft-save/tasks.md` T-03), not a rewrite of this spec's history.
+
+---
+
+### T-14 — Amendment 01: level-selector guidance, definitions link, evidence callout + Evidence navigation
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** on attempt **1** |
+| **Date** | 2026-08-26 |
+| **Implementer attempts** | **1** |
+| **Effort / skills assigned** | `high` · `angular-developer`, **`tdd`** |
+| **Requirements covered** | R-IUP-020 (AC.1–AC.6), R-IUP-021 (AC.1–AC.6) |
+| **Triad this task** | Leader (T1 · opus) → Implementer (T2 · **sonnet**) → Reviewer (T3 · **opus**, instructed read-only). `author ≠ auditor` holds on both model and context |
+| **Commit** | see the `[SPEC:docs/specs/innovation-use/details-page]` commit for T-14 |
+
+#### Environment deviation, recorded because it changes what was *enforced* versus *instructed*
+
+The session driving this task was rooted in a **different checkout** (`alliance-research-indicators-management/server/app-authorization`), so this repo's `.claude/` was not loaded. Consequences, stated rather than discovered later:
+
+| Normally enforced | This task |
+| --- | --- |
+| Step 8E wrappers `akili-implementer`→`sonnet`, `akili-reviewer`→`opus` + `tools: Read, Grep, Glob` | Documented fallback: general-purpose subagents seeded with `.agents/implementer.md` / `.agents/reviewer.md`, with **explicit model overrides** (sonnet / opus). Model and context independence **held**; the Reviewer's read-only restriction was **instructed, not enforced** — it made no writes, confirmed by `git status` |
+| `.claude/hooks/akili-tasks-gate.sh` blocking a `[x]` increment without `PASS` in `execution.md` | **Not active.** Evidence-before-checkbox was followed manually: this entry was written and saved **before** any `tasks.md` box was flipped |
+
+#### Leader deviations from the task file, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Added **`tdd`** to the task's listed skills (`angular-developer` only) | T-14's *Falsifying inputs* table names one input per check, and root `CLAUDE.md` §4.3 / KZ-014 forbid asserting a red that was not **seen**. Red→green is the only way c2/c3/c5/c6/c8/c12 become real gates rather than presence checks — the exact failure their own Disqualifiers name. **This decision is the direct cause of the c13 budget breach below** (each falsifying input became a permanent regression test rather than a one-off manual break-and-revert), and it is recorded here as a Leader cost, not an Implementer overrun |
+| Effort set to **`high`**, above the `medium` default for a Size-S T2 task | Size understates difficulty here: verbatim copy including a curly-quote pair, a two-argument router assertion at KZ-001's fourth recurrence, and a live CSS-cascade trap that silently defeats the token choice |
+| **c11 discharged by the Leader inline, before dispatch**, rather than deferred to the human gate | `.agents/leader.md` → *Deferring a check*: the assumption "this needs a logged-out browser" was probed cheaply instead of parked. Evidence below. The probe also removed a criterion the Implementer would otherwise have had to report as blocked |
+| The task's two **skill exclusions** (`ui-ux-pro-max`, `cognitive-doc-design`) were **upheld**, not overridden | Concurred with the task file's recorded reasoning: DD-17 closes every palette/token/contrast question with measured ratios, so a style-selection skill could only supply non-conforming alternatives; and this task ships template strings, not a document |
+
+#### c11 — Leader probe (D11: dead or permission-walled outbound link)
+
+Unauthenticated `curl`, no cookies, no session:
+
+| URL | Result |
+| --- | --- |
+| `https://www.scalingreadiness.org/calculator-use-headless/` | **HTTP 200**, 51,904 bytes, `<title>Calculator – Use (headless) | Scaling readiness</title>`, zero sign-in / request-access markers |
+| `https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view` | **HTTP 200**, 82,106 bytes, `<title>IPSR Infographic Innovation Use.pdf - Google Drive</title>`, zero `You need access` / `Request access` markers. The file title being served to an unauthenticated client **is** the evidence the ACL is `anyone-with-the-link` |
+
+**What this probe cannot reach (KZ-017):** `curl` is not a browser. It proves HTTP status and Drive's ACL — i.e. it closes defect class **D11** in both directions — but it does not prove the PDF viewer paints. That residual is a **D7** visual concern and is routed to `T-13`'s human visual pass, **not** claimed here. Recorded this way deliberately: crediting a probe for a question it did not cover is KZ-002 recurrence 6.
+
+#### Per-criterion evidence (attempt 1)
+
+| # | Evidence | Red observed (K-004 / KZ-014) |
+| --- | --- | --- |
+| c1 | Label span text === `How would you assess the current use level of the innovation?`; the required marker is a distinct `span.text-red-500`. Reviewer re-compared as programmatic string equality against `requirements.md`, not by eye | — |
+| c2 | Four `<li>` asserted as a full **ordered array**, scoped to `[data-testid="use-level-guidance"] li` | Swapped bullets 2/3 → red **on order**, not merely presence; reverted → green |
+| c3 | Both links carry exact URL, `target="_blank"`, `rel="noopener noreferrer"`, discernible text | Stripped `rel` → red (`Received: null`); reverted → green |
+| c4 | P1 and P2 byte-exact, including P1's `‘Evidence’` (U+2018/U+2019, emitted `&lsquo;`/`&rsquo;`) and P2's verbatim `current development/ maturity stage` spacing — **kept on purpose per proposal D-3**, not a typo | — |
+| c5 | 5 tests, each `toHaveBeenCalledWith(['/result','1','evidence'], { queryParams: … })` — **both arguments together**. Cases: version+results-center, from=home, from dropped (non-whitelisted), version dropped. One test shows `toHaveBeenCalled()` passing and then requires the two-argument form, making KZ-001 rec. 4 explicit in the suite | Removed `{ queryParams }` from the navigate call → **all 5** red; reverted → green |
+| c6 | All three blocks present at level `null`, `0`, `9`, and with `isEditableStatus()` false | Wrapped the evidence callout in `@if (showJustification())` → 4 red at `null`/`0`/non-editable **while level 9 stayed green** — the check discriminating exactly at its boundary rather than passing by accident. Reviewer additionally confirmed the component uses **default** change detection, without which the non-editable test would have passed vacuously |
+| c7 | `git diff -U0` shows no `+`/`-` line touching `showJustification` / `justificationMissing` / `justificationWhitespaceOnly`. The new blocks are **siblings** of the `@if` branch | Structurally confirmed by c6's falsifying input |
+| c8 | `grep -nE '#[0-9a-fA-F]{3,8}'` → **exit 1 on each of the three Scope paths, named individually** (KZ-005: the file set is a bounded axis) | Injected a hex const → exit 0 with the hit reported; reverted → exit 1. **And it caught 5 real, unintentional violations** in the Implementer's own first-draft spec file (WCAG math + explanatory comments) before they shipped — rewritten to decimal RGB triples. A gate that found something is a gate |
+| c9 | **Full** `npm test -- --silent`, unfiltered → **316 suites / 6720 tests green.** Implementer ran it twice; **Leader re-ran it independently in a quiet tree** (no worker active) → identical. Coverage **98.19 / 96.30 / 97.76 / 98.49** vs floors 40/20/45/30. Baseline moved 312/6510 → 316/6720 because the two `innovation-use-*` bugfix specs landed after T-13's measurement | Targeted runs are recorded as **inconclusive**, never as a pass (KZ-003) |
+| c10 | `git diff --exit-code` clean **per path** on `innovation-details.component.spec.ts`, `actor-item.component.spec.ts`, `organization-item.component.spec.ts` (R-IUP-019 AC.2) | — |
+| c11 | Leader probe above | — |
+| c12 | **Cascade resolved, not assumed:** `grep 'class="[^"]*description'` over the page template returns **nothing** — no `.description` exists in this file, so neither trap can reach the new nodes, and the explicit `text-[var(--ac-grey-800)]` / `text-[var(--ac-light-blue-400)]` utilities are what render. Asserted per element via `.closest('.description') === null` plus a per-role `className` check. Computed ratios: grey-800/grey-100 **7.44:1**, light-blue-400/grey-100 **6.35:1**, grey-800/white-1 **8.00:1**, light-blue-400/white-1 **6.83:1** — all ≥ 4.5:1, light theme (DD-14) | Swapped grey-800 → grey-600 on all four bullets → red on the "which selector won" class assertion; a pure-function test independently recomputes grey-600/grey-100 as **2.91:1** and fails the threshold. Reverted → green |
+| c13 | `git diff --stat`: html `+66/-1`, ts `+42`, spec `+352/-2` = **457 insertions / 3 deletions**, 3 files | Reported, **not absorbed** — see the tripwire below |
+
+**Also verified, beyond the criteria:** `npm run lint -- --quiet` → `All files pass linting.`, with `git status` / `git diff --stat` byte-identical before and after **both** runs — so the `--fix` script mutated nothing, which is what its Disqualifier demands of a script that is a fixer and not a gate. `npm run build` → exit 0, all warnings pre-existing on unrelated components. `npx tsc -p tsconfig.spec.json --noEmit` → 934 project-wide errors against the documented ~945 baseline, **zero in the three T-14 files**.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> All 13 exact-string, token, cascade, navigation, unconditional-rendering, scope, and hex-literal criteria for T-14 verify against `requirements.md` R-IUP-020/R-IUP-021, `design.md` §5.8 / DD-15–DD-17, and the stylesheets as they actually are. Both declared judgment calls are acceptable.
+
+The Reviewer verified independently rather than on report: programmatic string equality for all six copy constants; every DD-17 token resolved against `colors.scss`; the c8 grep re-run per path; the DD-16 contract compared line-by-line against `result-sidebar.component.ts` → `navigateTo()`; mock hygiene (`jest.clearAllMocks()` in both `beforeEach` and `afterEach`, so the shared `router.navigate` spy cannot carry a stale matching call); **no page-wide `textContent` search anywhere in the new tests** — the named Disqualifier; and every new `rs-*` / `fs-*` utility confirmed to exist in `responsive-size.scss`, so no class is inert. It also confirmed the old label string `Level of use of this innovation` has **zero** remaining repo-wide references, which is why §11.2's reversion challenge held: nothing asserted it.
+
+**Both Implementer judgment calls ruled acceptable:** the 2-line `activatedRouteMock` type widening is in-scope (same file the Scope names, caused solely by this task's own `c5` additions, a type annotation with zero runtime effect, and c10's three protected files untouched); and reporting the `design.md` §5.8 file-location error as a **finding rather than a fix** was correct — an Implementer silently editing an approved spec document would put a spec amendment inside a copy task's gate.
+
+#### `ADVISORY` — 4R lens findings, recorded and closed here
+
+Per Document Control's advisory policy and `/akili-execute` §2.4, these **never gate, never consume a rework attempt, and never mint or widen a task in this spec.** They are recorded and they die here. Any that deserves action needs its own proposal.
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | The five `c5` tests restore `activatedRouteMock.snapshot.queryParamMap.get` on the **last statement** of each `it`, not in `afterEach`. **Reviewer marked this reachable and constructed it:** if `goToEvidence()` ever drops `version`, test 1's assertion throws *before* its restore line, permanently leaving `get` returning stale values for every later test in the file — and because the mock is module-level and shared with the second `describe`, the pre-existing Back/Next specs then fail spuriously and **bury the one real red**. Remedy: hoist the restore into an `afterEach` inside the `c5` describe. **The most actionable advisory of the six** — carried to the user's decision, not actioned here |
+| **Readability** | Four "falsifying input" tests restate the assertion immediately above them. They do discriminate (none is tautological), but the Falsifying-inputs table asks for a red *observed during development*, which was separately done against real code mutations — so committing the restatements duplicates coverage without adding a distinct gate |
+| **Readability** | `{{ ' ' }}` as bullet 4's label/link separator is an unusual idiom; `&ngsp;` states the intent more plainly |
+| **Resilience** | The copied contract omits the sidebar's explicit `replaceUrl: false`. Behavior is identical today (it is Angular's default), but DD-16's own commitment is that "the duplication is named, not hidden" — carrying the option across would make a future sidebar policy change a visible diff at both call sites |
+| **Readability** | The definitions-link paragraph's own body text is the one new text node verified only by reading markup; it is not among c12's four named roles, so no criterion is unmet |
+| **Risk** | `Click here` / `Click here to go there` are non-descriptive accessible names. AC.4 is satisfied as written (discernible, not icon-only, not a bare URL) and both strings are **user-ruled verbatim copy**, so this is not actionable here — noted only so that if `T-13`'s human a11y pass objects, `aria-label` is the remedy that touches neither the approved copy nor a token |
+
+#### ⚠️ Budget tripwire — breached at T-14, escalated not absorbed
+
+| Dimension | §12 *Amendment 01 delta* | T-14 actual | Verdict |
+| --- | --- | --- | --- |
+| Template + TS | ~45 | **108** | ~2.4× |
+| Spec | ~150–215 | **352** | ~1.6–2.3× |
+| **Total** | **+180 … +260** | **+457 / −3** | ⚠️ **~1.8–2.5× over** |
+| Review rounds | +2 … +3 | **1** | ✅ under |
+
+**Cause named, and it is the Leader's:** the `tdd` assignment above turned each of the six falsifying inputs into a **permanent regression test** rather than a one-off manual break-and-revert, and c12's per-selector cascade assertions across two backgrounds carry real weight. This is bought coverage, not scope creep — the Implementer explicitly declined to trim coverage to fit the number and flagged it instead, which is the correct behavior. **Escalated to the user at the Step 5 gate.** Review rounds moved in the opposite direction (1 against +2…+3 budgeted), as they have all run.
+
+This sits **on top of** the pre-existing spec-wide overrun the user has already ruled on twice with full information. `T-13 c10` owns the reconciliation and now reconciles against **14 tasks · ~3,400 / ~4,800 · ~31 rounds**.
+
+#### Leader corrections to the spec, from findings this task surfaced
+
+| Correction | Basis |
+| --- | --- |
+| `design.md` §5.8 attributed **both** `.description` cascade traps to `custom-fields.scss`. The link-repaint rule `.description a { color: #2e2e2e }` actually lives in `client/research-indicators/src/styles/styles.scss:193–199` (nested SCSS); `custom-fields.scss:99–101` carries only `.description { color: #777c83 }` | Found by the Implementer, **verified inline by the Leader against both files before writing** (KZ-007: a correction record is the highest-risk artifact class — verify against the source, do not relay), and independently re-confirmed by the Reviewer. A wrong citation inside a *trap warning* is precisely the artifact that gets trusted while wrong |
+| `tasks.md` Document Control `Task count` read **13**, and §9's done definition read `All 13 T-NN tasks` — both stale the moment Amendment 01 added `T-14`, and both contradicted `design.md` §12, which the same amendment updated to **14** | Amendment 01's own correction closure, incomplete at the specify pass. This is **KZ-005**, the branch's highest-recurrence lesson (6): a correction applied at its cited sites and missed elsewhere. Swept in **both directions** across the spec folder |
+
+**Reported, deliberately NOT fixed:** `tasks.md` §9's human-visual line still reads *"in both themes"*, which **DD-14** (2026-08-21) superseded — dark mode is unreachable by any user, so the gate is **light theme only**, as `requirements.md` §9 row D7 and §12 already record. Left in place because documentation-hygiene rows in this spec are the user's explicit **Phase-2** scope decision (`judgment.md` `I-2`/`I-3`/`I-5`); folding an unrelated doc fix into a copy task's commit is what that decision exists to prevent. Flagged for `/akili-validate` or the archive sweep.
+
+#### What this task's evidence still does not prove
+
+`c1`–`c4`, `c6` and `c8` are **presence assertions on an unrendered tree**: they prove the strings and attributes exist in the DOM jsdom builds, and nothing about where the blocks sit visually, whether the three callouts read as one family, whether the two new links are distinguishable from body text, or focus order through them. `c12` is arithmetic over token values and asserted class names — jsdom paints nothing. Those are defect classes **D7**/**D8**, have **no** automated gate, and remain routed to `T-13` c7/c8/c9 as **AR-2**. `c5` proves the mocked `Router` receives the right two arguments; it does not prove the real Router resolves them or that the Evidence page consumes them (**AR-1**).
+

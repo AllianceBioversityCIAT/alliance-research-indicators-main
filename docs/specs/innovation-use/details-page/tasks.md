@@ -19,7 +19,7 @@
 | --- | --- |
 | Type | Change |
 | Approval Mode | gated |
-| Task count | **13** — matches `design.md` §12's budget line, whose derivation is §13's decomposition preview |
+| Task count | **14** — 13 as originally specified **+ `T-14`, added 2026-08-26 by Amendment 01**. Matches `design.md` §12's budget line as amended by its *Amendment 01 delta*; §13's decomposition preview covers the original 13. *(Corrected 2026-08-26 at T-14 finalization — this cell read **13** and contradicted §12 from the moment the amendment landed: KZ-005, a correction applied at its cited sites and missed here.)* |
 | Server files modified | **zero**. No migration, no endpoint, no entity |
 | Budget authority | **[`design.md`](./design.md) §12 is the single home for the budget figures** (KZ-005). §6 below records a per-task LOC split as *derivation*, and reports where the split disagrees with §12 rather than silently reconciling |
 | Coverage closure | §5 — every one of the **39** `BUT it must NOT` / `AND IT MUST` clauses and all **85** ACs are owned by a named task. Requirement-ID presence is **not** accepted as closure |
@@ -36,7 +36,7 @@ Read these once; they are not repeated per task.
 
 | Rule | Consequence if ignored |
 | --- | --- |
-| **The budget is a tripwire, not a cap** (`design.md` §12: 13 tasks · ~3,200 LOC · ~28 review rounds) | `/akili-execute` **stops and escalates** on a breach. Exceeding it is information; passing it silently is the failure |
+| **The budget is a tripwire, not a cap** (`design.md` §12: 13 tasks · ~3,200 LOC · ~28 review rounds; **amended by Amendment 01 to 14 · ~3,400 · ~31**, and see §12's delta note on the user's ~4,600 LOC re-baseline, which is the governing figure) | `/akili-execute` **stops and escalates** on a breach. Exceeding it is information; passing it silently is the failure |
 | **Full suite only for R-IUP-019** (KZ-003) | A targeted `npm test -- <pattern>` run is **inconclusive**, never a pass, for any Innovation Dev non-regression claim |
 | **`npm run lint` mutates files** — the script carries `--fix` | It is not a read-only check. Re-inspect `git status` after every run |
 | **No measurement while a worker is active** (root `CLAUDE.md` §4.3) | A build or budget number taken during delegated work is a **wrong** number, not a slow one. Report *inconclusive* and re-measure in a quiet window |
@@ -80,12 +80,17 @@ graph TD
   T06 --> T11
   T07 --> T11
   T11 --> T12[T-12 ux-ui registration]
+  T07 --> T14[T-14 Amendment 01 guidance copy<br/>+ Evidence navigation]
+  T10 --> T14
   T09 --> T13[T-13 verification gate]
   T10 --> T13
   T12 --> T13
+  T14 --> T13
 ```
 
 **No cycles.** One hard sequence: contract layer → shared additive edits → child components → page → wiring → verification.
+
+**Amendment 01 (2026-08-26)** inserts `T-14` between `T-10` and `T-13`. It does **not** reopen `T-11` or `T-12`, both `done`: their evidence stands for the surface they audited, and `T-14` carries its own equivalents scoped to its own file set (`c8` mirrors `T-11 c1`'s zero-hex grep; `c3` mirrors `T-11 c2`'s accessible-name check; no `docs/ux-ui/design.md` registration is owed because **no token is added** — `design.md` §5.8).
 
 **Parallel-safe in principle, not in practice.** `T-01`/`T-02` touch disjoint files, as do `T-04`/`T-05`/`T-06`. Root `CLAUDE.md` §4.3 still forbids two concurrent tasks in one package, so run them sequentially in one worktree.
 
@@ -553,7 +558,7 @@ graph TD
 
 ### T-13 — Verification gate: full suite, coverage, build, budget, human visual + a11y review
 
-- **Status:** `[~]` **7 of 11 discharged — c1/c7/c8/c9 owed to the human gate** (see `execution.md`) · **Size:** M · **Dependencies:** T-09, T-10, T-12
+- **Status:** `[~]` **7 of 11 discharged — c1/c7/c8/c9 owed to the human gate** (see `execution.md`) · **Size:** M · **Dependencies:** T-09, T-10, T-12, **T-14** *(added 2026-08-26 by Amendment 01 — the four open criteria are human passes over the rendered page, so they must see the amended surface; discharging them before `T-14` would spend them on a page that no longer exists)*
 - **Requirements covered:** R-IUP-019 (all 4), R-IUP-017 (AC.3), R-IUP-018 (AC.1, AC.3, AC.4, AC.5), NFR-IUP-001, NFR-IUP-002, NFR-IUP-003, NFR-IUP-004, NFR-IUP-006
 - **Design references:** §10.1, §10.4, §10.5, §12, requirements §9 (D5, D7, D8, D9), **AR-1**, **AR-2**
 - **Skills:** `systematic-debugging` (on any failure)
@@ -575,7 +580,7 @@ graph TD
   > **Amended 2026-08-21 by user ruling — dark mode dropped from this criterion.** Originally *"both themes"*, and the dark half was known to fail (1.29:1 and 1.887:1 against 4.5:1, produced by following `design.md` §5.7 exactly). **Verified reachability before accepting the reduction:** `DarkModeService` is imported and injected at `alliance-navbar.component.ts:22,52` but appears **nowhere in `alliance-navbar.component.html`** — a dead injection. No control anywhere exposes the toggle, so dark mode is **not reachable by any user**. An unreachable state is not a defect worth spending on; this is **KZ-008's reachability discipline applied in the negative direction**, not a waiver of it. If dark mode is ever wired up, this criterion and the §5.7 contrast defect both reopen — see `execution.md` → *Dark-mode deferral*.
 - [ ] c8 — **T6-Multimodal screenshot review** of the section, **light theme only, at both viewports — two screenshots, not four** (amended 2026-08-21 with c7, same user ruling and same reachability evidence). Per the model registry's *Cross-host dispatch*, the strongest column for T6 may not be this session's host; if no T6-capable reviewer is reachable, record the criterion as **blocked**, not passed.
 - [ ] c9 — **Keyboard pass:** Tab through the whole page — every control receives focus in document order with a visible ring, **no focus trap inside a repeatable card**, and every icon-only control announces an English name. Human-observed; quote what was observed.
-- [x] c10 — **Budget reconciliation against `design.md` §12** (13 tasks · ~3,200 LOC · ~28 review rounds). Report actuals. A breach **stops execution and escalates to the user** — it is not absorbed silently.
+- [x] c10 — **Budget reconciliation against `design.md` §12** (13 tasks · ~3,200 LOC · ~28 review rounds). ⚠️ **Re-opened in effect by Amendment 01 (2026-08-26):** the figures to reconcile against are now **14 tasks · ~3,400 LOC · ~31 rounds** (written) / **~4,800** (against the user's ~4,600 re-baseline), and `T-14`'s actuals were not in the tick that discharged this. Re-run the reconciliation when `T-14` lands. Report actuals. A breach **stops execution and escalates to the user** — it is not absorbed silently.
 - [x] c11 — **Accepted risks re-stated as still open, not closed:** **AR-1** — no client-tier test reaches a live API, so server acceptance rests on chunk 2's archived fixture tier plus §4.3's transcription. **AR-2** — visual and a11y correctness rest on human observation. **Family FR-7 / AC-1718** is **not** discharged by this spec (§8).
 
 **Disqualifiers — when a green run here is not evidence**
@@ -590,6 +595,79 @@ graph TD
 | T6 review | A reviewer that cannot see images has not performed a visual review. Record **blocked** rather than passed |
 
 **Falsifying input** — run `npm test -- innovation-use` (a targeted run) and confirm the gate **rejects it as inconclusive** rather than accepting it as c2. If a targeted run can satisfy c2, the gate is blind to defect class **D5**, which is the one it exists to catch.
+
+---
+
+### T-14 — Amendment 01: level-selector guidance, definitions link, evidence callout + Evidence navigation
+
+> **Added 2026-08-26 by Amendment 01** ([`proposal-amendment-01-level-guidance.md`](./proposal-amendment-01-level-guidance.md)). Sequenced **after `T-10`** (it owns the route this navigation targets) and **before `T-13`**, whose four open human criteria must see the final surface.
+
+- **Status:** done · **Size:** S · **Dependencies:** T-07, T-10
+- **Requirements covered:** R-IUP-020 (AC.1–AC.6), R-IUP-021 (AC.1–AC.6)
+- **Design references:** **§5.8**, **DD-15**, **DD-16**, **DD-17**, §11.2, §12 *Amendment 01 delta*, requirements §9 rows **D7**, **D8**, **D11**, **AR-2**
+- **Skills:** `angular-developer`
+
+> **Skill note — two deliberate exclusions, recorded because both are defensible the other way.**
+> **`cognitive-doc-design` dropped** (it was in this task's first draft, for "copy fidelity"): the skill designs *documents* to reduce cognitive load, and this task ships **template strings**, not a document. Exact-string fidelity is enforced by `c1`–`c4`, which assert the rendered text — a skill cannot add to that and naming one implies a discipline the criteria already carry.
+> **`ui-ux-pro-max` not loaded**, though it is in the repo's `## Skill Map` and `T-11` loaded it for exactly this page's a11y/token review. **DD-13**'s rationale applies here more strongly than it did there: every choice this task could ask the skill about — palette, tokens, contrast — is **already fixed by DD-17 with measured ratios**. Loading a style-selection skill against a closed decision only supplies non-conforming alternatives.
+
+**Scope — the file set, named explicitly** (KZ-005: bound the search space on the file-set axis):
+
+| File | Change |
+| --- | --- |
+| `innovation-use-details.component.html` | Label text; guidance callout; definitions link; evidence callout |
+| `innovation-use-details.component.ts` | One `goToEvidence()` method; the two URLs as module-level `const`s |
+| `innovation-use-details.component.spec.ts` | New specs for AC coverage below |
+
+**Out of the file set, and this is load-bearing:** `innovation-use-level-stepper.*` (T-04's, untouched — the blocks render *around* it), `textarea.component.*` (DD-15), `result-sidebar.component.*` (DD-16), `colors.scss` and `docs/ux-ui/design.md` §7.1 (§5.8 — **no token is added**), and every `innovation-details/` file (R-IUP-019).
+
+**Implementation notes**
+
+- **Tokens are already decided and are not the neighbours' tokens** (**DD-17**, §5.8): body text `--ac-grey-800`, links `--ac-light-blue-400`, background `--ac-grey-100`, left border `--ac-light-blue-300`. Copying the `ACTORS` callout's `--ac-grey-600` ships a **2.91:1** light-theme AA failure. Zero hex literals (**DD-7**).
+- **The Evidence navigation copies the sidebar's contract, not its code** (**DD-16**): `['/result', <id>, 'evidence']`, forwarding `version` when present and `from` when it is `results-center` or `home`.
+- Guidance renders unconditionally — **not** inside `showJustification()`, **not** gated on `submission.isEditableStatus()` (R-IUP-020 AC.5, R-IUP-021 AC.5).
+- **Do not touch** `showJustification()`, `justificationMissing()`, or `justificationWhitespaceOnly()`. The `bugfix/innovation-use-draft-save` Pivot settled that behavior.
+
+**Done criteria**
+
+- [x] c1 — The label renders exactly `How would you assess the current use level of the innovation?` plus the required marker (R-IUP-020 AC.1).
+- [x] c2 — Four bullets render in order with the exact strings in R-IUP-020's Details. Assert the **rendered text of each bullet element**, not a page-wide substring search — the page already contains other guidance copy (R-IUP-020 AC.2).
+- [x] c3 — Both external links carry their exact URL, `target="_blank"`, and `rel="noopener noreferrer"` (R-IUP-020 AC.3), and both have a discernible accessible name (AC.4).
+- [x] c4 — P1 and P2 render with their exact strings, P1 adapted and P2 verbatim per R-IUP-021's recorded copy decisions (R-IUP-021 AC.1, AC.2).
+- [x] c5 — Activating `Click here to go there` calls `Router.navigate` with commands `['/result', '<id>', 'evidence']` **and** query params carrying `version` and `from` — **asserted on both arguments**. A spec asserting only that `navigate` was called does **not** discharge this (KZ-001, recurrence 4) (R-IUP-021 AC.3, AC.4).
+- [x] c6 — Guidance, definitions link, and evidence callout all render at level `null`, `0`, and `9`, **and** with `isEditableStatus()` false (R-IUP-020 AC.5, R-IUP-021 AC.5).
+- [x] c7 — The evidence callout is **not** a descendant of the `showJustification()` branch, and `showJustification()` / `justificationMissing()` / `justificationWhitespaceOnly()` are byte-identical: `git diff` on those three symbols is empty.
+- [x] c8 — `grep -nE '#[0-9a-fA-F]{3,8}'` over **the three files named in Scope** returns zero hits (**DD-7**). State the three paths in the evidence; a grep over the folder that misses one is not a clean result (KZ-005).
+- [x] c9 — **Full** `npm test -- --silent` green. The blast radius is *what renders*, not this folder (KZ-002): the existing page spec carries **page-wide negative** assertions — `expect(fixture.nativeElement.textContent).not.toContain('Justification')` and `…not.toContain('This field is required')` at level 3 (two sites each). New copy that reintroduced either string page-wide would break them. A **targeted** run is reported as **inconclusive**, never as a pass (KZ-003).
+- [x] c10 — `innovation-details.component.spec.ts`, `actor-item.component.spec.ts`, `organization-item.component.spec.ts` pass unmodified: `git diff --exit-code` on those three paths is clean (R-IUP-019 AC.2).
+- [x] c11 — **Human check, D11:** open both URLs in a **logged-out** browser; quote the HTTP status and what rendered. The Drive PDF must be shared `anyone-with-the-link` — a reporter outside the owning account otherwise hits a permission wall. **A spec asserting the `href` does not discharge this**; it is a presence assertion and CI has no network. **Discharged 2026-08-26 by a Leader inline probe, not by a browser session:** unauthenticated `curl` returned **HTTP 200** for both URLs — calculator `<title>Calculator – Use (headless) | Scaling readiness</title>`, Drive `<title>IPSR Infographic Innovation Use.pdf - Google Drive</title>`, zero `You need access` / `Request access` markers, which is the evidence the Drive ACL is `anyone-with-the-link`. **What the probe did NOT cover:** `curl` is not a browser, so it proves status and ACL (defect class **D11**, closed) but not that the PDF viewer paints — that residual is **D7** and is routed to `T-13`, not claimed here. See `execution.md` → T-14.
+- [x] c12 — **Contrast, measured not eyeballed:** compute the ratio of the **resolved** body-text and link colours against the callout background and report the numbers against 4.5:1 (R-IUP-020 AC.6, R-IUP-021 AC.6). §5.8's table is the **expected** result, not the evidence. **Resolve the cascade first** — §5.8's two `.description` traps mean the class you applied and the colour that renders can differ; state which selector won for each of the four text roles (bullets, P1, P2, links).
+- [x] c13 — `design.md` §12's *Amendment 01 delta* is the only place this task's budget lives; report actuals with `git diff --stat` against it.
+
+**What this task's automated criteria cannot prove — stated, not implied**
+
+`c1`–`c4`, `c6` and `c8` are **presence assertions on an unrendered tree.** They prove the strings and attributes exist in the DOM jsdom builds. They prove **nothing** about where the blocks sit visually, whether the callouts read as one family, whether the two new links are distinguishable from body text, or focus order through them. Those are defect classes **D7** and **D8**, have **no automated gate**, and are routed to `T-13` c7/c8/c9 as **AR-2**. `c12` is a computation over token values, **not** a measurement of rendered pixels — it cannot see a colour overridden by a later cascade rule.
+
+**Falsifying inputs — name one per check, or the check is not evidence**
+
+| Check | Input that must make it FAIL |
+| --- | --- |
+| c2 | Swap bullets 2 and 3 → c2 must fail on order, not just on presence |
+| c3 | Drop `rel="noopener noreferrer"` from one link → c3 must fail |
+| c5 | Make `goToEvidence()` navigate without query params → c5 must fail. **If it still passes, it is asserting only the call and is not evidence** |
+| c6 | Wrap the evidence callout in `@if (showJustification())` → c6 must fail at level 0 |
+| c8 | Add one hex literal to the `.ts` file → c8 must fail. If it passes, the file set was mis-bounded |
+| c9 | Run `npm test -- innovation-use` → the gate must reject it as **inconclusive**, not accept it |
+| c12 | Substitute `--ac-grey-600` for the body text → c12 must report **2.91:1** and FAIL |
+
+**Disqualifiers — when a green run here is not evidence**
+
+| Signal | Disqualifier |
+| --- | --- |
+| Copy assertions | A page-wide `textContent` substring search is not evidence of *which element* carries the copy — the page holds several guidance blocks. Scope every copy assertion to its own element |
+| c5 | A `Router` spy asserted with `expect(navigate).toHaveBeenCalled()` is **not** evidence. Both arguments, or inconclusive |
+| c11 | Opening the links while logged into a CGIAR Google account proves nothing about Drive's ACL. Logged-out, or inconclusive |
+| c12 | A ratio computed against the token's **dark** value is the wrong number — DD-14 scopes this to the light theme. **And a ratio computed from the class you *intended* is not evidence of the colour that *renders*:** §5.8 documents two live cascade traps, **in two different files** — `custom-fields.scss:99–101` hardcodes `.description`'s `#777c83` (**3.91:1**, fails AA) and `styles.scss:193–199`'s nested `.description a` repaints links `#2e2e2e` (passes contrast at 12.62:1, destroys link discoverability). *(File attribution corrected 2026-08-26 at T-14 finalization, together with §5.8's — this line said both traps were in `custom-fields.scss`. Second site of the same error: **KZ-005** is fixing the cited site and missing the rest, so the sweep ran in both directions across the spec folder)*. **Report the computed colour of the rendered element, not the token you meant to apply** |
 
 ---
 
@@ -616,6 +694,8 @@ graph TD
 | R-IUP-017 | AC.1–AC.3 | **T-11** (c1–c3, c5) · AC.3 rendered → **T-13** (c7, c8) · AC.4 → **T-12** (c1–c3) |
 | R-IUP-018 | AC.2 | **T-11** (c2) + **T-04** (c6) · AC.1, AC.3, AC.5 → **T-13** (c7, c9) · AC.4 → **T-13** (c5) |
 | R-IUP-019 | AC.1 | `design.md` §2.3 (delivered) · AC.2–AC.4 → **T-13** (c2, c3) + **T-02** (c4) + **T-03** (c5) |
+| **R-IUP-020** | AC.1 | **T-14** (c1) · AC.2 → **T-14** (c2) · AC.3 → **T-14** (c3) · AC.4 → **T-14** (c3) · AC.5 → **T-14** (c6) · AC.6 → **T-14** (c12, computed) + **T-13** (c7, rendered) |
+| **R-IUP-021** | AC.1, AC.2 | **T-14** (c4) · AC.3 → **T-14** (c5, commands) · AC.4 → **T-14** (c5, query params) · AC.5 → **T-14** (c6, c7) · AC.6 → **T-14** (c12, computed) + **T-13** (c7, rendered) |
 | NFR-IUP-001 | — | **T-11**, **T-13** (c7–c9) |
 | NFR-IUP-002 | — | **T-11** (c1, c5), **T-13** (c7, c8) |
 | NFR-IUP-003 | — | **T-13** (c5) |
@@ -625,11 +705,11 @@ graph TD
 
 ---
 
-## 5. Clause-level closure — all 39 `BUT` / `AND IT MUST` clauses
+## 5. Clause-level closure — all 45 `BUT` / `AND IT MUST` clauses
 
 **Requirement-ID presence is not closure.** Each row quotes the clause it claims to cover; no gap may be discharged by citing a different requirement.
 
-> **Why 39 clauses from 38 clause lines.** `requirements.md` carries 19 `BUT it must NOT` lines and 19 `AND IT MUST` lines (verified by grep). R-IUP-006's `BUT` line conjoins **two independent prohibitions** — *"must NOT clear the value on the toggle, and must NOT send an explicit `null` for it"* — whose owners are different tasks (`T-07` renders, `T-08` serializes). Splitting it is the point: had it stayed one row, one of the two halves would have been discharged by the other's evidence. Rows 11 and 12 below are that split.
+> **Why 45 clauses from 44 clause lines** *(was 39 from 38 before Amendment 01; +6 lines, +6 clauses — re-derive with `grep -cE '^- (BUT it must NOT|AND IT MUST)' requirements.md`)*. `requirements.md` carries **22** `BUT it must NOT` lines and **22** `AND IT MUST` lines (verified by grep; **was 19 + 19** before Amendment 01). R-IUP-006's `BUT` line conjoins **two independent prohibitions** — *"must NOT clear the value on the toggle, and must NOT send an explicit `null` for it"* — whose owners are different tasks (`T-07` renders, `T-08` serializes). Splitting it is the point: had it stayed one row, one of the two halves would have been discharged by the other's evidence. Rows 11 and 12 below are that split.
 
 | # | Req | Clause (quoted) | Owner |
 | --- | --- | --- | --- |
@@ -672,8 +752,14 @@ graph TD
 | 37 | 018 | MUST "expose an English accessible name for every icon-only control" | **T-11** c2 (presence) + **T-13** c9 (announced) |
 | 38 | 019 | BUT NOT "be verified by a targeted suite" | **T-13** c2 + its falsifying input |
 | 39 | 019 | MUST NOT "require any change to Innovation Dev's existing assertions" | **T-13** c3 |
+| **40** | **020** | BUT NOT "be hidden, collapsed, or disabled when `submission.isEditableStatus()` is false" | **T-14** c6 |
+| **41** | **020** | MUST NOT "depend on `innovation_use_level_id` being set" | **T-14** c6 (level `null`) |
+| **42** | **021** | BUT NOT "be a document `href` — that would full-page-reload the SPA" | **T-14** c5 + its falsifying input |
+| **43** | **021** | MUST NOT "drop `version`" | **T-14** c5 (query-param assertion) |
+| **44** | **021** | BUT NOT "be placed inside the `showJustification()` branch" | **T-14** c7 |
+| **45** | **021** | MUST NOT "alter `showJustification()`, `justificationMissing()`, or `justificationWhitespaceOnly()` in any way" | **T-14** c7 (`git diff` empty) |
 
-**Closure verdict: 39 / 39 owned.** Four clauses (**36**, and the rendered halves of **34/35/37**) are owned by a **human-gated** criterion because no automated gate exists for defect classes **D7**/**D8** — recorded as **AR-2**, not as coverage.
+**Closure verdict: 45 / 45 owned.** Four clauses (**36**, and the rendered halves of **34/35/37**) are owned by a **human-gated** criterion because no automated gate exists for defect classes **D7**/**D8** — recorded as **AR-2**, not as coverage. **Amendment 01 adds a fifth human-gated obligation of a new kind:** neither R-IUP-020 AC.3 nor AC.6 is fully closed by `T-14`'s automated criteria — the `href` assertion cannot prove the URL resolves for a logged-out reporter (**D11**, `T-14` c11) and the token-value computation cannot prove the rendered pixel (`T-14` c12's own disqualifier). Both are recorded as human/verified-externally, **not** as automated coverage.
 
 ---
 
@@ -696,21 +782,22 @@ graph TD
 | T-11 | 60 | 20 | 80 |
 | T-12 | 40 (docs) | — | 40 |
 | T-13 | 0 (evidence only) | — | 0 |
-| **Sum** | **1,852** | **1,660** | **~3,510** |
+| **T-14** *(Amendment 01)* | **45** | **175** | **220** |
+| **Sum** | **1,897** | **1,835** | **~3,730** |
 
-**Disagreement with §12, reported rather than reconciled.** §12's implementation line (~1,700) matches this split's page/card/stepper/contract figures exactly; its **spec** line (~1,500) is ~160 lines below this split's 1,660, putting the total ~5–10% above §12's ~3,200. That is inside estimate noise and does **not** change §12's sizing verdict (`Full` depth, no split indicated). It is recorded here so `T-13 c10`'s reconciliation compares against a known starting delta instead of discovering one.
+**Disagreement with §12, reported rather than reconciled.** §12's implementation line (~1,700) matches this split's page/card/stepper/contract figures exactly; its **spec** line (~1,500) is ~160 lines below this split's 1,660, putting the total ~5–10% above §12's ~3,200. That is inside estimate noise and does **not** change §12's sizing verdict (`Full` depth, no split indicated). It is recorded here so `T-13 c10`'s reconciliation compares against a known starting delta instead of discovering one. **Amendment 01 adds `T-14` (220) to this split, taking the sum to ~3,730** — which *widens* the same disagreement rather than resolving it, and is why §12's delta table names both baselines.
 
 ---
 
 ## 7. PR strategy
 
-**Three PRs, chained.** ~3,200–3,500 LOC exceeds the ~400-LOC single-PR threshold by an order of magnitude, and the task graph has natural seams.
+**Three PRs, chained.** ~3,200–3,500 LOC exceeds the ~400-LOC single-PR threshold by an order of magnitude, and the task graph has natural seams. **Amendment 01 does not add a fourth PR:** `T-14` (~220 LOC) rides in **PR 3**, because it must land before `T-13`'s human criteria and it touches only the page file PR 2 already introduced.
 
 | PR | Tasks | LOC | Why this boundary |
 | --- | --- | --- | --- |
 | **PR 1 — shared foundation** | T-01, T-02, T-03 | ~450 | Every additive shared edit and the file move, behind default-preserving defaults. **Reviewed on one question: does anything outside Innovation Use change?** Independently shippable and independently revertable |
 | **PR 2 — the section** | T-04 … T-09 | ~2,750 | The page and its four components. Large but cohesive; splitting it would land cards without a page that renders them |
-| **PR 3 — reachability + gate** | T-10, T-11, T-12, T-13 | ~310 | Wiring, tokens/a11y, docs, and the verification gate. **This is the PR that makes the section reachable** |
+| **PR 3 — reachability + gate** | T-10, T-11, T-12, **T-14**, T-13 | ~530 | Wiring, tokens/a11y, docs, **Amendment 01's guidance copy**, and the verification gate. **This is the PR that makes the section reachable** |
 
 **Do not ship PR 3 without PR 2**, and note in each description (per `cognitive-doc-design` review-empathy rules): what to review first, what is explicitly out of scope, and links to the previous/next PR.
 
@@ -740,8 +827,8 @@ Append-only.
 
 The spec is complete when:
 
-- [ ] All 13 `T-NN` tasks are `done`.
-- [ ] **All 85 ACs are individually checked** — and all **39** clauses in §5 are checked at their owning criterion. A spec-wide "every AC is checked" tick over unflipped boxes is the exact KZ-002 recurrence-5 failure; do not write one.
+- [ ] All **14** `T-NN` tasks are `done` *(13 + `T-14`; corrected 2026-08-26 — same KZ-005 miss as the Document Control cell above)*.
+- [ ] **All 97 ACs are individually checked** (**was 85 before Amendment 01, +12**) — and all **45** clauses in §5 (**was 39, +6**) are checked at their owning criterion. A spec-wide "every AC is checked" tick over unflipped boxes is the exact KZ-002 recurrence-5 failure; do not write one.
 - [ ] Full `npm test -- --silent` green; coverage floors held.
 - [ ] `npm run build` within budgets, measured in a quiet window.
 - [ ] `npm run lint -- --quiet` clean, with `git status` re-inspected after.

@@ -28,7 +28,7 @@ Indicator **6** (Innovation Use) is not in the array, so the chip is rendered wi
 
 **Fix:** add `6` to the array. **Before calling it closed**, grep for other allowlists of the same shape — this is the *second* site with the same defect, so assuming there are only two repeats the mistake that was already made once. A test covers this function (`results-center.service.spec.ts`), so the change has to update it.
 
-**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--results-center-innovation-use-filter/`](../../archive/2026-08-24-bugfix--results-center-innovation-use-filter/)
+**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--results-center-innovation-use-filter/`](../archive/2026-08-24-bugfix--results-center-innovation-use-filter/)
 
 ### N-2 · The justification is not cleared when the level drops — **done (archived 2026-08-24)**
 
@@ -47,7 +47,7 @@ When the use level changes from one that requires a justification (`>= 6`) to on
 
 **Scope agreed with the product owner: for now, the justification field only.** Other conditional fields may have the same problem, but they are out of scope for this cycle.
 
-**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--innovation-use-stale-justification/`](../../archive/2026-08-24-bugfix--innovation-use-stale-justification/) — going-forward server write-time clear; no backfill. `_effectiveExplanation` was kept (permitted, not required); **D1** may proceed.
+**Execution spec (archived):** [`docs/specs/archive/2026-08-24-bugfix--innovation-use-stale-justification/`](../archive/2026-08-24-bugfix--innovation-use-stale-justification/) — going-forward server write-time clear; no backfill. `_effectiveExplanation` was kept (permitted, not required); **D1** may proceed.
 
 ---
 
