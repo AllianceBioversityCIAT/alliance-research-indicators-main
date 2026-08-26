@@ -2506,3 +2506,45 @@ Three frames, all light theme, all `/result/STAR-19911/innovation-use-details?fr
 
 And the two retractions are the gate auditing *itself*: `c7` and `c9` were discharged against observations that were true and could not see the defects. That is now closed on both sides — the defects are fixed, and `R3` converted the contrast clause from a human judgement into 16 machine-checked assertions, so the next regression reddens without anyone needing to look.
 
+
+---
+
+## 📌 NEXT SESSION — R4 and R5 are the only work owed · handoff written 2026-08-26
+
+**Read this first on resume.** `tasks.md` shows **14/14 `done` and zero open criteria**, so a task-state scan will report the spec complete. **It is not.** The remaining work lives in [`validation-report.md`](./validation-report.md), not in `tasks.md`, and `/akili-resume` will not surface it from task state alone. That is the specific reason this block exists.
+
+### State at handoff
+
+| | |
+| --- | --- |
+| Branch | `AC-1679-Create-the-innovation-use-section`, tree **clean**, 16 commits this session |
+| Code | **Stable and deployed/deployable.** `npm test -- --silent` **316 suites / 6741 tests** green · coverage 98.19 / 96.30 / 97.76 / 98.49 · build exit 0, 0 errors, **1.33 MB / 274.88 kB** · lint clean with `git status` clean after. All re-measured by the Leader in a quiet tree |
+| Server | **Zero server files, zero migrations** — verified, not assumed. `K-015`'s unapplied-migration trap does not apply |
+| Tasks | 14/14 `done`, `T-13` closed 11/11 |
+| Validation | **`validation-report.md` still reads FAIL.** Two of its five FAILs (**F-1** contrast, **A-2** delete control) were closed by the R1/R2/R3 remediation. **Three remain, all documentation** |
+
+### The three open FAILs — all doc work, no code
+
+| ID | What is wrong | Fix |
+| --- | --- | --- |
+| **F-2** (**R5**) | `OQ-IUP-8` defers the light-theme C-4 defect on the stated grounds that the fix *"edits a shared stylesheet consumed app-wide"*, and asserts it paints *"the `ACTORS` guidance text"*. **That assertion is false** — the ACTORS text used a local Tailwind utility, which is why R1 could fix it in one word with zero blast radius | Narrow `OQ-IUP-8` to `custom-fields.scss`'s `.description` rule — its true app-wide subject — and record that the local-utility half was closed by R1. **Also fold in the advisory below** |
+| **F-3** (**R4**) | `T-13` c10's reconciliation table is **inconsistent with itself and with its own source**: row 1 says T-01…T-09 = **2,802** where the ledger and `tasks.md` §6 both give **3,202** (off by exactly T-08's 400 line), and its **Total 3,510** is not the sum of its own column (2,802+190+80+40+0 = 3,112) | Recompute the column from `tasks.md` §6; make the total the column's sum; cite the deriving command rather than restating figures (`KZ-005`) |
+| **F-4** (**R4**) | **The amended budget was never reconciled, and c10 — the criterion that owns it — is ticked.** c10's table is dated 08-21 and stops at `T-13`; `T-14` landed 08-26. **No document carries a post-amendment total.** It is **~5,621** LOC (~5,816 with RB-9's stylesheet) and **21** of ~31 rounds, before this session's remediation commits | Re-run c10 including `T-14` **and** the R1/R2/R3 remediation, against `design.md` §12's amended ~3,400 / ~31, and record **one** post-amendment total in **one** place |
+
+**Carry into R5 — the advisory that is F-1's own pattern surviving its remediation.** `quantification-item.component.html:3`'s eyebrow is `text-[#8D9299]` on `bg-[#F4F7F9]` = **2.911:1** — byte-identical in role and number to the eyebrows R1 just fixed, **in a file the remediation diff touched**. Left unfixed deliberately: `RB-5` owns that file's hex literals with **OICR in the blast radius**, and the standing instruction was stability before a deploy. **But `RB-5` records it as tokenization debt (`DD-7`), not as the live AA failure it is**, so nobody is tracking it against `R-IUP-017` AC.3. R5 should name this site with its ratio so it is inherited correctly. It is a one-word swap (`#8D9299` → `var(--ac-grey-800)`) that also reduces the recorded hex debt — but it changes OICR's rendering, so it is the user's call, not a sweep.
+
+### Then, in order
+
+1. Close **R4** and **R5** (above).
+2. Re-run **`/akili-validate docs/specs/innovation-use/details-page`** — the two code FAILs are closed but **the report has not been re-issued**, so it still reads FAIL on its front page. Both prior auditors ran on `opus` with fresh context; keep `author ≠ auditor`.
+3. Then **`/akili-archive docs/specs/innovation-use/details-page`**, whose sweep also owes: a **`## Constitution Impact`** note (`DD-3` promoted `quantification-item` into `shared/components/` — a shared public surface the client child guide does not mention), a **CodeGraph re-index**, and the **Kaizen step** — where **`KZ-001` should rise to recurrence 5** with the variant this run exposed: *a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behaviour.*
+4. `F-5`…`F-17` are WARN/advisory and archive-compatible; `design.md`/`requirements.md` still read `Status: draft` and `Last updated: 2026-08-20` (`F-16`).
+
+### Out of this spec, reported and unowned — needs the user's decision, not a sweep
+
+- **`pool-funding-alignment.component.ts:379-384`** carries the identical `paramMap.get('id')` defect at the same route depth, and fails **silently**: dead primary branch, numeric-only fallback stripping platform prefixes (`TIP-1234` → `'1234'`), misclassifying non-STAR results, dropping the prefix from a redirect, possibly no-opping a websocket filter. Its own spec is green over it by the same `KZ-001` mechanism. **Not reachable by normal UI navigation; no route guard blocks direct URL entry.** Best scoped as *"audit every `route.snapshot.paramMap.get('id')` under `pages/platform/pages/result/pages/`"* — there are exactly two call sites today.
+- **`result.component.scss:3`** is `grid-template-columns: 322px 1fr` with **no `@media` in the file** — an unconditional 322 px sidebar column that cramps **every** result page at narrow viewports.
+- **`src/index.html:13`** loads Tailwind v4 from **unpkg.com at runtime**, with no local fallback: the app's entire visual layer has an undocumented CDN dependency. Owed to `docs/infrastructure.md`.
+- **`app-input` emits duplicate cross-wired DOM ids** (`id="username"`, `inputId="minmax-buttons"` hardcoded) — six elements share one id on one fixture, so `label[for]` resolves to another field's control. **Reachable deterministically, platform-wide.**
+- **`RB-8`'s two user-visible product defects** (indicator-1 Home progress shows 75% where truth is 86%; *"7/7 sections completed"* beside a disabled Submit) still have no ticket.
+
