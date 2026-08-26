@@ -207,7 +207,7 @@ preference:
 
 Execution shape: **one new task, T-14**, placed **before T-11** so the a11y/token/design-registration
 tasks see the final surface. `tasks.md` §6's derivation and `design.md` §12's budget both need the
-delta recorded — the running total is already **4,871 LOC against ~3,200 budgeted**, so T-14 must be
+delta recorded — the running total is already **4,871 LOC against ~3,200 budgeted** *(the T-09 figure as read on 2026-08-26 at drafting; corrected to **4,874** on 2026-08-26 — see `execution.md` → `T-13` c10, the single home. The amendment's reasoning is unaffected by 3 lines)*, so T-14 must be
 added to the ledger explicitly, not absorbed.
 
 ## Risks, Dependencies, And Open Questions

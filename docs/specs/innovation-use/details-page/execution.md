@@ -25,7 +25,7 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 
 | Task | `tasks.md` §6 derivation | Actual LOC | Review rounds | Note |
 | --- | --- | --- | --- | --- |
-| T-01 | 210 | **344** (+344 / −1, 6 files) | 1 | Over its derivation line by 134. Cause: the spec tier is larger than estimated — 252 of the 344 lines are test code across two spec files. See T-01's *Decisions* |
+| T-01 | 210 | **347** (+347 / −1, 6 files) *(corrected 2026-08-26 — was 344, a transcription slip; see c10)* | 1 | Over its derivation line by **137**. Cause: the spec tier is larger than estimated — 252 of the 347 lines are test code across two spec files. See T-01's *Decisions* |
 | T-02 | 72 | **133** (+133 / −0, 3 files) | 2 | Over its derivation line by 61 — impl 4 lines against 12 budgeted, spec ~129 against 60. Cause: c1 inlines the TestBed setup that `renderNumberInput()` already encapsulates (~22 duplicated lines), plus the rework additions. Recorded, not reconciled |
 | T-03 | 170 | **90** (+90 / −8, 4 files; 3 `git mv` renames) | 1 | **Under** its derivation line by 80 — the first task to come in below estimate. Cause: the move carried the bulk of the code, so only the two inputs, the template branch and 5 new `it` blocks are new lines |
 | T-04 | 300 | **363** (+363 / −0, 3 new files) | 2 | Over by 63. 270 of the 363 lines are the spec file — the **spec tier over-runs again**, matching T-01/T-02 and unlike T-03's move |
@@ -33,10 +33,10 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-06 | 600 | **824** (+824 / −0, 3 new files) | 2 | Over by 224 — the largest single-task overrun so far. 500 of 824 are the spec file |
 | T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
 | T-08 | 400 | **1,081** (+1,081 / −14, 3 files) | 3 | **2.7× its derivation** — the largest overrun of the run. 806 of 1,081 are the spec file |
-| T-09 | 160 | **327** (+327 / −2, 3 files) | 2 | 2.0× derivation; attempt-1 FAIL (whitespace silent block) closed by page-owned message. Running total **4,871** |
+| T-09 | 160 | **327** (+327 / −2, 3 files) | 2 | 2.0× derivation; attempt-1 FAIL (whitespace silent block) closed by page-owned message. Running total **4,874** *(corrected 2026-08-26 from 4,871, which carried T-01's 344)* |
 | T-10 … T-13 | — | — | — | **Actuals live in T-13's `c10` reconciliation table below, their single home** (KZ-005: a measured figure gets ONE home and cites its deriving command — `git show --numstat` per task commit). Not restated here |
-| **T-14** | *(no §6 line — added by Amendment 01; budgeted in `design.md` §12's delta at +180…+260)* | **457** (+457 / −3, 3 files) | **1** | ⚠️ **Tripwire breach: ~1.8–2.5× the +180…+260 band.** 352 of 457 are the spec file — **the spec-tier over-run pattern holds for a tenth task.** Cause is the Leader's `tdd` assignment (each falsifying input became a permanent regression test), not scope creep. Escalated to the user, not absorbed |
-| **Running total — T-01…T-09 only** | **3,202** | **4,871** | **17** | ⛔ **This row stops at `T-09` and is NOT the spec's total.** `T-10`…`T-14`, the three Pivots and the `R1/R2/R3` remediation live in **`T-13` c10's reconciliation, their single home** (`KZ-005`), which was re-run 2026-08-26 and reports **6,133 LOC / 24 of ~31 rounds** post-amendment (6,328 / 25 with `RB-9`). **Re-derive there; do not restate here.** The running commentary this row used to carry — a stack of superseded per-task projections, each written before the next task falsified it — is removed: its live conclusion (*the spec tier over-runs, implementation tracks*) is stated once in c10 with the figures that support it |
+| **T-14** | *(no §6 line — added by Amendment 01; budgeted in `design.md` §12's delta at +180…+260)* | **457** (+457 / −3, 3 files) | **1** | ⚠️ **Tripwire breach: ~1.8–2.5× the +180…+260 band.** **350** of 457 are the spec file *(corrected 2026-08-26 — was 352; see c10)* — **the spec-tier over-run pattern holds for a tenth task.** Cause is the Leader's `tdd` assignment (each falsifying input became a permanent regression test), not scope creep. Escalated to the user, not absorbed |
+| **Running total — T-01…T-09 only** | **3,202** | **4,874** | **17** | ⛔ **This row stops at `T-09` and is NOT the spec's total.** `T-10`…`T-14`, the three Pivots and the `R1/R2/R3` remediation live in **`T-13` c10's reconciliation, their single home** (`KZ-005`), re-run 2026-08-26. **This row does not carry that total — read it there.** The running commentary this row used to carry — a stack of superseded per-task projections, each written before the next task falsified it — is removed: its live conclusion (*the spec tier over-runs, implementation tracks*) is stated once in c10 with the figures that support it |
 
 ---
 
@@ -118,7 +118,7 @@ Dropped `loadingTrigger` from `GET_InnovationUseDetails`'s config → c2's asser
 3. **A separate `describe` block, not a retrofit.** The existing block's `beforeEach` replaces `ToPromiseService` wholesale and cannot intercept real HTTP. Appending was necessary, not stylistic — and it left the existing 2,280 lines untouched.
 4. **`isOpenSearch = signal(false)` on the new service is conformance, not drift.** §2.1 and the scope table both order "mirroring `GetInnovationReadinessLevelsService`", which carries that signal.
 5. **Leader added comment-only traceability markers after the PASS**, per `/akili-execute` Step 3.4: a single `// @akili-spec docs/specs/innovation-use/details-page (T-01 — contract layer)` line at the head of the three new production files. Comment-only — no logic, no reviewed content altered. `npm run lint -- --quiet` re-run afterwards: `All files pass linting.`, and `git status` re-inspected (the `--fix` hazard) — nothing mutated. Recorded here because touching a diff after its verdict should never be silent. **Future briefs will ask the Implementer to include the marker**, so this is not repeated as a post-hoc Leader edit.
-6. **LOC over the §6 derivation line, reported rather than reconciled.** 344 actual vs 210 derived. 252 of the 344 lines are test code. `tasks.md` §6 is explicitly a derivation for sequencing, not a budget; §12 is the budget and is not breached. Recorded so T-13 c10 compares against a known delta instead of discovering one.
+6. **LOC over the §6 derivation line, reported rather than reconciled.** **347** actual vs 210 derived *(corrected 2026-08-26 — was 344; see c10)*. 252 of the 347 lines are test code. `tasks.md` §6 is explicitly a derivation for sequencing, not a budget; §12 is the budget and is not breached. Recorded so T-13 c10 compares against a known delta instead of discovering one.
 
 #### `ADVISORY` — 4R lens findings (recorded; **not** gating, **not** rework, **not** new tasks)
 
@@ -980,7 +980,7 @@ Full client suite green (**312/312 suites · 6445/6445 tests**), coverage above 
 
 | Task | §6 derivation | Actual | Delta | Spec-file share of actual |
 | --- | --- | --- | --- | --- |
-| T-01 | 210 | 344 | +134 | 252 / 344 |
+| T-01 | 210 | **347** | +137 | 252 / 347 |
 | T-02 | 72 | 133 | +61 | 129 / 133 |
 | T-03 | 170 | **90** | **−80** | — (a `git mv` carries code without authoring it) |
 | T-04 | 300 | 363 | +63 | 270 / 363 |
@@ -1180,7 +1180,7 @@ Remaining §6 derivation: T-09 160 · T-10 190 · T-11 80 · T-12 40 · T-13 0 =
 | **Implementer** | `akili-implementer` · T2 · `claude-sonnet-5-thinking-high` · effort `high` → `xhigh` on rework |
 | **Reviewer** | Attempt 1: `akili-reviewer` · T3 · `claude-opus-5-thinking-high`. Attempt 2: primary T3 models (opus / fable / gpt / gemini) hit **host usage limits** — runtime failure, not a work FAIL. Substitute auditor: `akili-reviewer` · `composer-2.5-fast` (≠ Implementer model; `author ≠ auditor` held on model family). Recorded per `/akili-execute` Reviewer runtime-failure fallback |
 | **Skills** | `angular-developer` (+ `systematic-debugging` on attempt 2). No deviation from task list beyond the rework add |
-| **LOC** | **327** (+327 / −2, 3 files) vs §6 derivation **160** — 2.0×; same spec-tier density pattern. Running total **4,544 + 327 = 4,871** (above the ~4,600 re-baseline; continuing under the prior ruling; T-13 c10 reconciles) |
+| **LOC** | **327** (+327 / −2, 3 files) vs §6 derivation **160** — 2.0×; same spec-tier density pattern. Running total **4,547 + 327 = 4,874** *(corrected 2026-08-26 from 4,544 + 327 = 4,871; see c10)* (above the ~4,600 re-baseline; continuing under the prior ruling; T-13 c10 reconciles) |
 | **Review rounds** | 2 (this task) · cumulative **17** vs ~28 |
 | **Requirements** | R-IUP-009 (all 3), R-IUP-010 AC.5, R-IUP-006 AC.2, R-IUP-014 AC.3 |
 | **Design** | §6.6, §5.4 (`duplicateType`), §6.4, §6.7 step 2, §4.3 |
@@ -1584,7 +1584,13 @@ It extended the authority boundary correctly on its own initiative: the prohibit
 git show --numstat --format="" <commit> -- 'client/'   # sum column 1 = LOC authored
 ```
 
-The convention — **client-tier deliverable files only**, additions counted, spec-process documents (`execution.md`, `tasks.md`, `design.md`, `requirements.md`) excluded — was calibrated against the ledger's own `T-09` entry, and is **re-verified here against `T-14`**: the command over `e508eeea` returns `+457 / −3, 3 files`, reproducing the ledger's recorded **457** exactly. A convention that reproduces an independently recorded figure is checked, not assumed.
+The convention — **deliverable files only**, additions counted, spec-process documents (`execution.md`, `tasks.md`, `design.md`, `requirements.md`) excluded — was calibrated against the ledger's own `T-09` entry, and is **re-verified here against `T-14`**: the command over `e508eeea` returns `+457 / −3, 3 files`, reproducing the ledger's recorded **457** exactly. A convention that reproduces an independently recorded figure is checked, not assumed.
+
+**Second rule, stated because the command alone does not produce the total.** `T-14`'s deliverable was a *documentation* one — `docs/ux-ui/design.md`, not `client/` — so its **18** lines come from `git show --numstat --format="" 04517285 -- 'docs/ux-ui/'` (+18 / −3). `T-12` is the only row this applies to. Naming the rule rather than letting one row be unreproducible is the point: **every figure in the table below must be recomputable by a command written next to it.**
+
+**Three `client/`-touching commits on this branch are deliberately EXCLUDED, named so that *considered and excluded* is distinguishable from *missed*:** `c7a0b307` (+140 / −44) and `bf3f8872` (+30 / −6) are **other specs' deliverables** (`bugfix/innovation-use-draft-save`, `bugfix/results-center-innovation-use-filter`), and `c4356d3d` (+7,059 / −894, 61 files) is the `staging` **merge commit**, which authors nothing.
+
+**And the one-home rule this table claims, stated precisely enough to be checkable.** `KZ-005`'s property is *fewer sites asserting a derived figure*, not zero prose. The rule in force here: **this block is the only place that derives the total; the spec's live reference documents — `design.md` §12, `tasks.md` c10, the ledger row above — must point here and must NOT carry the number.** Dated session narrative (a task record, a handoff block) may quote a result as of its date, because it is a log entry and not a reference. A number in a reference document is a second home; a number in a dated log is a citation with a timestamp.
 
 #### What `F-3` corrected
 
@@ -1620,7 +1626,7 @@ The convention — **client-tier deliverable files only**, additions counted, sp
 | T-10 | 190 | **180** | 1 | `fb7e62d0` |
 | T-11 | 80 | **95** | 1 | `69b3f049` |
 | T-12 *(docs deliverable — no `client/` file)* | 40 | **18** | 0 | — |
-| T-13 *(evidence gate only)* | 0 | **0** | 1 | — |
+| T-13 *(evidence gate only)* | 0 | **0** | **0** — `Review: Deliberately deferred`; the Reviewer that was to *"audit the complete gate"* was never spawned, and the gate closed on human frames plus the Leader | — |
 | `PV-T13-1` — `indicators.service.ts` allowlist admits indicator 6 | — | **27** | 1 | `695b5248` |
 | **T-14** — Amendment 01 | **220** | **457** | 1 | `e508eeea` |
 | `PV-T14-1` — result id read from the cache, not the child `paramMap` | — | **152** | 1 | `e74fe042` |
@@ -1628,9 +1634,9 @@ The convention — **client-tier deliverable files only**, additions counted, sp
 | `PV-T14-2` — `cursor-pointer` on the Evidence link | — | **1** | 0 — Leader-verified inline | `ef2e3a20` |
 | `PV-T13-2` — actor count grid splits at `lg:`, not `md:` | — | **20** | 0 — Leader-verified inline | `ca90131e` |
 | **`R1` / `R2` / `R3`** — validation remediation (`F-1` contrast · `A-2` delete control · contrast instrument 4 → 16 roles) | — | **294** | 1 | `abbf7a53` |
-| **TOTAL — post-amendment. The single figure this spec reports.** | **3,732** | **6,133** | **24 of ~31 (77%)** | |
+| **TOTAL — post-amendment. The single figure this spec reports.** | **3,732** | **6,133** | **23 of ~31 (74%)** | |
 
-**Addendum, disclosed rather than folded in or omitted:** `RB-9`'s user-authorized `src/styles/responsive-size.scss` (`0c9f3389`) added **195** LOC and **1** review round as a non-task change, making the **real authored footprint 6,328 over 25 rounds**. It is held out of the reconciled total because it is not a task deliverable, and named here because a reconciliation silently narrower than the diff is the failure `KZ-005` exists to prevent.
+**Addendum, disclosed rather than folded in or omitted:** `RB-9`'s user-authorized `src/styles/responsive-size.scss` (`0c9f3389`) added **195** LOC and **1** review round as a non-task change, making the **real authored footprint 6,328 over 24 rounds**. It is held out of the reconciled total because it is not a task deliverable, and named here because a reconciliation silently narrower than the diff is the failure `KZ-005` exists to prevent.
 
 **Two discrepancies against previously recorded figures, reported rather than smoothed:**
 
@@ -1645,15 +1651,15 @@ The convention — **client-tier deliverable files only**, additions counted, sp
 | --- | --- | --- | --- |
 | §12 **written**, amended | ~3,400 | **6,133** | **+2,733 (+80.4%)** |
 | §12 **user re-baseline** (post-`T-07`), amended | ~4,800 | **6,133** | **+1,333 (+27.8%)** |
-| Review rounds | ~31 | **24** | **−7 · 77% consumed — still under** |
+| Review rounds | ~31 | **23** | **−8 · 74% consumed — still under** |
 
-*(With `RB-9`'s 195 / 1 round: **+2,928 (+86.1%)** and **+1,528 (+31.8%)**, 25 rounds / 81%.)*
+*(With `RB-9`'s 195 / 1 round: **+2,928 (+86.1%)** and **+1,528 (+31.8%)**, 24 rounds / 77%.)*
 
 ⚠️ **The LOC tripwire is breached. Recorded, not absorbed — and deliberately not re-escalated.** The user has ruled on this same overrun **three times with full information**: the `T-07` re-baseline, the `T-08` ruling, and the `T-14` gate (*"accepted as bought coverage"*). `T-14`'s ruling is explicit that only a **fresh per-task breach** escalates, not the standing total. **No task since has breached its own line**, so this figure is a report, not a new gate.
 
 **Cause is unchanged and now supported by every row above: spec-tier density, not scope creep.** `T-03`, `T-10` and `T-12` came in *under* their derivations. `T-14`'s 457 splits **350 spec / 65 template / 42 TS**. The largest post-amendment addition, `R1/R2/R3`'s 294, splits **281 test lines against 13 template lines**, on a remediation with **zero production `.ts`**. And the three Pivots together — the only items that could plausibly be called scope creep — total **200 lines, 3.3% of the run**, every one of them a defect the gates had already shipped.
 
-**The two dimensions moved independently, and that is the finding.** LOC breached by 80.4% while review rounds finished at **77% of budget**. A run that needed 24 rounds to produce 6,133 lines was not thrashing; it wrote more test and spec code per unit of reviewed behaviour than §12 estimated. **The figure to correct in a future §12 is the ~1,500-line spec estimate.** The eight tasks that recorded a tier split (`T-01`, `T-02`, `T-04`…`T-08`, `T-14`) account for **≥ 3,408 spec lines on their own — 2.3× §12's ~1,500 before `T-03`, `T-09`…`T-13`, the four non-task changes and the remediation are counted at all.** The ~1,700 implementation line, by contrast, tracked.
+**The two dimensions moved independently, and that is the finding.** LOC breached by 80.4% while review rounds finished at **74% of budget**. A run that needed 23 rounds to produce 6,133 lines was not thrashing; it wrote more test and spec code per unit of reviewed behaviour than §12 estimated. **The figure to correct in a future §12 is the ~1,500-line spec estimate.** The eight tasks that recorded a tier split (`T-01`, `T-02`, `T-04`…`T-08`, `T-14`) account for **≥ 3,408 spec lines on their own — 2.3× §12's ~1,500 before `T-03`, `T-09`…`T-13`, the four non-task changes and the remediation are counted at all.** The ~1,700 implementation line, by contrast, tracked.
 
 **c11 — the three risks, written as open.** **AR-1**: no client-tier test reaches a live API, so server acceptance rests on chunk 2's archived fixture tier plus §4.3's transcription — *"this verification gate adds no new evidence toward AR-1."* **AR-2**: D7/D8 have no automated gate and rest on human observation. **Family FR-7 / AC-1718 is not discharged by this spec.** All three stated as open. Closing any here would have been false.
 
@@ -1936,7 +1942,7 @@ Unauthenticated `curl`, no cookies, no session:
 | c10 | `git diff --exit-code` clean **per path** on `innovation-details.component.spec.ts`, `actor-item.component.spec.ts`, `organization-item.component.spec.ts` (R-IUP-019 AC.2) | — |
 | c11 | Leader probe above | — |
 | c12 | **Cascade resolved, not assumed:** `grep 'class="[^"]*description'` over the page template returns **nothing** — no `.description` exists in this file, so neither trap can reach the new nodes, and the explicit `text-[var(--ac-grey-800)]` / `text-[var(--ac-light-blue-400)]` utilities are what render. Asserted per element via `.closest('.description') === null` plus a per-role `className` check. Computed ratios: grey-800/grey-100 **7.44:1**, light-blue-400/grey-100 **6.35:1**, grey-800/white-1 **8.00:1**, light-blue-400/white-1 **6.83:1** — all ≥ 4.5:1, light theme (DD-14) | Swapped grey-800 → grey-600 on all four bullets → red on the "which selector won" class assertion; a pure-function test independently recomputes grey-600/grey-100 as **2.91:1** and fails the threshold. Reverted → green |
-| c13 | `git diff --stat`: html `+66/-1`, ts `+42`, spec `+352/-2` = **457 insertions / 3 deletions**, 3 files | Reported, **not absorbed** — see the tripwire below |
+| c13 | `git diff --stat`: html `+65/-1`, ts `+42/-0`, spec `+350/-2` = **457 insertions / 3 deletions**, 3 files *(corrected 2026-08-26 — the original read `+66` / `+352`, which sums to **460**, not to its own stated 457; see c10)* | Reported, **not absorbed** — see the tripwire below |
 
 **Also verified, beyond the criteria:** `npm run lint -- --quiet` → `All files pass linting.`, with `git status` / `git diff --stat` byte-identical before and after **both** runs — so the `--fix` script mutated nothing, which is what its Disqualifier demands of a script that is a fixer and not a gate. `npm run build` → exit 0, all warnings pre-existing on unrelated components. `npx tsc -p tsconfig.spec.json --noEmit` → 934 project-wide errors against the documented ~945 baseline, **zero in the three T-14 files**.
 
@@ -1966,7 +1972,7 @@ Per Document Control's advisory policy and `/akili-execute` §2.4, these **never
 | Dimension | §12 *Amendment 01 delta* | T-14 actual | Verdict |
 | --- | --- | --- | --- |
 | Template + TS | ~45 | **108** | ~2.4× |
-| Spec | ~150–215 | **352** | ~1.6–2.3× |
+| Spec | ~150–215 | **350** | ~1.6–2.3× |
 | **Total** | **+180 … +260** | **+457 / −3** | ⚠️ **~1.8–2.5× over** |
 | Review rounds | +2 … +3 | **1** | ✅ under |
 
@@ -1992,7 +1998,7 @@ This sits **on top of** the pre-existing spec-wide overrun the user has already 
 
 | Ruling | Decision | Consequence |
 | --- | --- | --- |
-| **Budget tripwire (c13)** — +457 against §12's *Amendment 01 delta* band of +180…+260 | ✅ **Accepted as bought coverage.** Third ruling on this spec's overrun, made with the delta and the cause in hand | The breach is **recorded, not reconciled here.** `T-13 c10` reconciles the total against **14 tasks · ~3,400 written / ~4,800 re-baseline · ~31 rounds**, and ✅ **did so on 2026-08-26**: **6,133 LOC / 24 rounds** (6,328 / 25 with `RB-9`). ⛔ **The `5,646` / `5,841` figures this cell originally carried are RETIRED** — they chained off `PV-T13-1`'s net-line arithmetic and were one of the three competing totals validation `F-4` found. **c10 is the single home** (`KZ-005`); re-derive there. **Do not re-escalate the *standing* overrun as if it were new** — escalate only a fresh per-task breach |
+| **Budget tripwire (c13)** — +457 against §12's *Amendment 01 delta* band of +180…+260 | ✅ **Accepted as bought coverage.** Third ruling on this spec's overrun, made with the delta and the cause in hand | The breach is **recorded, not reconciled here.** `T-13 c10` reconciles the total against **14 tasks · ~3,400 written / ~4,800 re-baseline · ~31 rounds**, and ✅ **did so on 2026-08-26** — **the figure lives there, not here.** ⛔ **The `5,646` / `5,841` figures this cell originally carried are RETIRED** — they chained off `PV-T13-1`'s net-line arithmetic and were one of the three competing totals validation `F-4` found. **c10 is the single home** (`KZ-005`); re-derive there. **Do not re-escalate the *standing* overrun as if it were new** — escalate only a fresh per-task breach |
 | **The reliability `ADVISORY`** (un-restored shared mock in the `c5` tests) | ✅ **Actioned as a follow-up commit**, outside T-14's closed gate | Executed below. This is the sanctioned route for an advisory: recorded, then promoted **only by explicit user decision** — it did **not** widen T-14, mint a task, or reopen the gate (`/akili-execute` §2.4) |
 | **Next step** | ⏸️ **Pause.** `T-13`'s four remaining criteria are human-owed and need a browser | No further task dispatched. `/akili-resume` rebuilds from this log |
 
@@ -2598,44 +2604,73 @@ Three sites corrected, because the false assertion had propagated to three:
 
 **The re-derivation found more than `F-4` reported.** Enumerating every `client/`-touching commit on the branch (`git log <merge-base>..HEAD -- 'client/'`) rather than working from the handoff's commit list surfaced three further defects the finding had not named:
 
-1. **`PV-T13-1` (`695b5248`) was in no post-amendment total at all** — the handoff's `5,621` chained off c10's `5,164`, skipping it.
+1. **`PV-T13-1` (`695b5248`) was absent from the handoff's `5,621`**, which chained off c10's `5,164` and skipped it. *(Corrected 2026-08-26 after independent audit: the stronger claim first written here — that it was in **no** post-amendment total — is **false**. `T-14`'s tripwire cell carried `5,646` = `5,189 + 457`, which does include it.)*
 2. **It had been counted as `+25` *net*** against a convention that counts **additions** (`+27 / −2`).
 3. **Three running totals were live simultaneously** — `5,164`, `5,189`, `5,646` — each correct when written, none retired. Both stale sites now cite c10 instead of restating.
 4. **`RB-9`'s Reviewer PASS was never counted as a review round**, and `T-01`'s ledger figure is **347**, not the recorded 344.
 
-**Result: 6,133 LOC / 24 of ~31 rounds** (6,328 / 25 including `RB-9`'s non-task stylesheet) against §12's amended ~3,400 written / ~4,800 re-baseline — **+80.4% / +27.8%**, rounds **under** at 77%.
+**Result: 6,133 LOC / 23 of ~31 rounds** (6,328 / 24 including `RB-9`'s non-task stylesheet) against §12's amended ~3,400 written / ~4,800 re-baseline — **+80.4% / +27.8%**, rounds **under** at 77%.
 
-⚠️ **The LOC tripwire is breached and it is reported, not absorbed.** It is **not re-escalated**: the user has ruled on this same overrun three times with full information, and `T-14`'s ruling is explicit that only a **fresh per-task breach** escalates. No task since has breached its own line. **Cause re-confirmed by the per-commit split, not asserted:** the three Pivots — the only plausible scope creep — total **200 lines, 3.3% of the run**, and every one closed a defect the gates had already shipped.
+⚠️ **The LOC tripwire is breached and it is reported, not absorbed.** It is **not re-escalated**: the user has ruled on this same overrun three times with full information, and `T-14`'s ruling is explicit that only a **fresh per-task breach** escalates. No task since has breached its own line. **Cause re-confirmed by the per-commit split, not asserted:** the three Pivots and their one follow-up — the only plausible scope creep — total **215 lines, 3.5% of the run**, and every one closed a defect the gates had already shipped.
 
 **What this remediation does not do:** it changes **no** `validation-report.md` verdict. That report still reads `FAIL` on its front page and can only be re-issued by `/akili-validate`, by an auditor that did not author this. Nothing here should be read as a passing verdict.
 
+
+
+### ⛔ Independent audit of `R4`/`R5` — 8 findings, all upheld, all remediated · 2026-08-26
+
+`b1dc2f23` was Leader-authored with no independent review, and said so. An independent auditor (T3, fresh context, read-only, seeded from `.agents/reviewer.md`, briefed to **falsify** rather than confirm) audited it and returned **WARN with 8 findings**. **The Leader verified each one at the source before accepting it** — a subagent verdict is evidence, not an authority. All eight held.
+
+| # | Finding | Verified how | Remediation |
+| --- | --- | --- | --- |
+| **N-1** · High | **`R5`'s narrowing orphaned a live AA failure.** Narrowing `OQ-IUP-8` to *"`.description` and nothing else"* dropped **`.section-title` `#a2a9af` = 2.378:1**, a role named in `F-1`'s own ratio table, in the same shared stylesheet, rendering **4×** in this section. `RB-5` covers only `quantification-item`; `R1` fenced it. **For one commit, nothing owned it** | Recomputed the ratio in sRGB/WCAG 2.1 (**2.3781**) and grepped the four sites: `innovation-use-details.component.html:13, 125, 166, 194` | `OQ-IUP-8`'s subject widened from one rule to **`custom-fields.scss`'s failing shared-class roles**, both named with ratios and sites; `.label` reported as the zero-finding unit |
+| **N-2** · Med | **The `F-2` correction struck the site and kept the number.** `OQ-IUP-8` still asserted `.description` at **3.91:1 on `--ac-grey-100`** — but the only demonstrated grey-100 site was the `loadFailed` banner, a **local utility** `R1` also fixed | Traced the 3.91 to `abbf7a53`'s own message | Both ends of the old range re-attributed to local utilities; the surviving cited figure is the on-white **4.20:1**. Swept to `design.md` §5.8 and `tasks.md` c12 |
+| **N-3** · Med | **The round count 24 is not defensible — it is 23.** `T-13`'s row carried **1**, but `execution.md` records *"Review \| Deliberately deferred"* and *"Reviewer deliberately NOT spawned yet … will audit the complete gate"* — **that Reviewer never was spawned**, and the gate closed on human frames plus the Leader. `T-12`, identical in shape, correctly carries 0 | Read both task headers and searched the whole log for a `T-13` Reviewer verdict. There is none | `T-13` → **0**. Total **23 of ~31 (74%)**, 24 with `RB-9` |
+| **N-4** · Med | **Two corrections were recorded and not applied.** c10 declared `T-01` = 347 (not 344) and `T-14`'s spec file = 350 (not 352) — and both old figures still stood at their original sites, six of them, including a cell that read `+66 + 42 + 352` = *"457"* when it sums to **460** | Grepped every site | All six corrected in place with a dated marker; the `460` arithmetic fixed to `65 / 42 / 350` |
+| **N-5** · Med | **The `KZ-005` \"one home\" claim was false by its own text.** The total was restated at 6 sites, one of which said *"**6,133 LOC / 24 rounds** … this table does not restate it"* in a single sentence. And `design.md:26` carried a **competing single-home designation** pointing at the ledger, with the superseded 4,871 | Grepped every restatement | The live reference documents (`design.md` §12, `tasks.md` c10, the ledger row, `T-14`'s tripwire cell) now **point and carry no number**. `design.md:26`'s competing designation is withdrawn. The rule is now **stated in c10** so it is checkable: a number in a reference document is a second home; a number in a dated log entry is a citation with a timestamp |
+| **N-6** · Low | **18 lines of the total were not reproducible by the published command.** `T-12`'s deliverable was `docs/ux-ui/design.md`, which `-- 'client/'` excludes | Re-ran the command; it returns 0 | Second rule stated and its commit named (`04517285 -- 'docs/ux-ui/'`) |
+| **N-7** · Low | ***"Every commit enumerated and attributed"* was not satisfied** — three `client/`-touching commits appear in no row and no note. Excluding them is right; excluding them **silently** is not attribution | Re-ran the enumeration | `c7a0b307`, `bf3f8872` and the merge `c4356d3d` named as **considered and excluded**, with the reason |
+| **N-8** · Low | **Two narrative overclaims.** (a) *"`PV-T13-1` was in no post-amendment total at all"* — **false**, `T-14`'s `5,646` includes it. (b) *"the three Pivots total 200 lines"* — 200 is four rows and omits a fifth; all five total **215** | Read `5,646`'s derivation | (a) narrowed to the defensible claim with the overclaim recorded as struck; (b) **215 lines, 3.5%** |
+
+**The pattern across N-1, N-2, N-4 and N-5 is one pattern, and it is worth naming:** every one of them is *a correction that was recorded but not carried to the sites it governs* — which is the **exact** defect `F-3`/`F-4` were raised about, reproduced by the commit that closed them. `KZ-005`'s standing rule is *fewer sites asserting a derived figure*; the variant this run adds is **narrower and sharper**:
+
+> **A correction is not applied until it is applied at every site it falsifies — including the sites the correction itself creates.** A correction that narrows a scope must state what it drops (`N-1`), and a correction that strikes a claim must re-examine every figure that claim was carrying (`N-2`).
+
+**What the audit confirmed, recorded so the WARN is not read as a verdict on the whole commit:** `F-2`'s underlying fact is **true** — the auditor replayed the ACTORS line across all eight commits that touched the file and it never carried `.description` in any revision. The budget arithmetic **reproduces to the line**: all 20 rows, both column sums, the derivation reconciliation with `tasks.md` §6, the deltas, and the `281 / 13` and `350 / 65 / 42` splits. `2.911:1` recomputes to **2.9115**. And the `R1` ratios recompute to 2 dp across all nine roles.
+
+**Residual independence gap, stated rather than hidden:** the remediation of these 8 findings is, again, **Leader-authored**. The auditor found them; the Leader fixed them; no third party has audited the fixes. That gap is owed to the re-validation.
+
 ---
 
-## 📌 NEXT SESSION — R4 and R5 are CLOSED · re-validate, then archive · updated 2026-08-26
+## 📌 NEXT SESSION — validation RE-ISSUED as WARN · two acceptances, then archive · updated 2026-08-26
 
-**Read this first on resume.** `tasks.md` shows **14/14 `done` and zero open criteria**, and that is *still* not the whole state: [`validation-report.md`](./validation-report.md) **has not been re-issued and still reads `FAIL` on its front page.** A task-state scan will report this spec complete. It is complete *in work*; it is not complete *in verdict*.
+**Read this first on resume.** The spec is **out of FAIL**. [`validation-report.md`](./validation-report.md) was re-issued on 2026-08-26 and now reads **WARN**, archive-ready on **two named acceptances**. Nothing is blocked; two things are **owed to you as decisions**, and neither is a sweep an agent should take unasked.
 
 ### State at handoff
 
 | | |
 | --- | --- |
 | Branch | `AC-1679-Create-the-innovation-use-section` |
-| Code | **Stable and deployable, and untouched by this session.** Last measured green: `npm test -- --silent` **316 suites / 6741 tests** · coverage 98.19 / 96.30 / 97.76 / 98.49 · build exit 0, **1.33 MB / 274.88 kB** · lint clean with `git status` clean after |
+| Code | **Stable and deployable.** `npm test` **316 suites / 6741 tests** · coverage 98.19 / 96.30 / 97.76 / 98.49 · lint clean with `git status` clean after · build **exit 0**, **1.33 MB / 274.88 kB**. All re-measured 2026-08-26 in a quiet tree; `git log abbf7a53..HEAD -- 'client/'` is **empty**, so the code is provably unchanged since it was recorded |
 | Server | **Zero server files, zero migrations** — verified, not assumed |
-| Tasks | 14/14 `done`, `T-13` closed 11/11 |
-| Validation findings | **All five FAILs are now closed in the documents.** `F-1` + `A-2` by `R1`/`R2`/`R3` (code, 2026-08-26). **`F-2` by `R5`; `F-3` and `F-4` by `R4`** (documentation, this session). **The report itself has not been re-issued** |
-| Budget | ✅ Reconciled **once**, in `T-13` c10: **6,133 LOC / 24 of ~31 rounds** (6,328 / 25 with `RB-9`). LOC tripwire breached (+80.4% written / +27.8% re-baseline), **recorded, ruled on three times, not re-escalated** |
+| Tasks | 14/14 `done`, 120/120 criteria, `T-13` closed 11/11 |
+| Validation | ⚠️ **WARN — 0 FAIL.** All five original FAILs closed. The `R4`/`R5` audit's 8 findings raised **and** remediated in the same session |
+| Budget | ✅ Reconciled **once**, in `T-13` c10 — **the figures live there and nowhere else** |
 
-### Then, in order
+### The two acceptances that gate the archive
 
-1. **`/akili-validate docs/specs/innovation-use/details-page`.** All five FAILs are closed; the verdict is stale, not the work. Both prior auditors ran on `opus` with fresh context — **keep `author ≠ auditor`**, and note that `R4`/`R5` were authored by the Leader with no delegation, so their independence is owed *here*.
-2. **`/akili-archive docs/specs/innovation-use/details-page`**, whose sweep still owes:
+1. **The remediation of the 8 audit findings has no independent review.** An independent auditor found them in `b1dc2f23`; the **Leader** fixed all 8; nobody has audited the fixes. Accept the gap, or spend one more audit pass on it. **This is the honest residual of a session that ran without the `akili-*` wrappers loaded.**
+2. **Two live light-theme AA defects ship, both deliberately deferred:** `RB-5`'s `quantification-item.component.html:3` at **2.9115:1** (one-word fix, but it changes **every OICR details page**) and `OQ-IUP-8`'s `custom-fields.scss` roles — `.description` 4.20:1 and **`.section-title` 2.378:1**, the latter rendering four times in this section. Both are now tracked as **accessibility defects**, not as styling debt. Neither has a ticket.
+
+### Then
+
+1. **`/akili-archive docs/specs/innovation-use/details-page`**, whose sweep owes:
    - a **`## Constitution Impact`** note — `DD-3` promoted `quantification-item` into `shared/components/`, a shared public surface the client child guide does not mention;
    - a **CodeGraph re-index**;
-   - the **Kaizen step**, where **`KZ-001` should rise to recurrence 5** with the variant this run exposed: *a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behaviour*;
-   - ⚠️ **new, from `R4`:** a **`KZ-005` variant worth recording** — *a derived figure does not acquire a second home by being wrong; it acquires one by being **superseded and not retired**.* Three correct-at-the-time totals coexisted here (`5,164`, `5,189`, `5,646`) and the arithmetic error in `F-3` was the smaller half of `F-4`.
-3. `F-5`…`F-17` are WARN/advisory and archive-compatible; `design.md` / `requirements.md` still read `Status: draft` and `Last updated: 2026-08-20` (`F-16`).
-4. ⚠️ **Session hygiene:** launch from **`alliance-research-indicators-main`**. This session and `T-14`'s both ran from the `-management` repo, where the `akili-*` agent wrappers and the tasks-gate hook **silently do not load**.
+   - the document-status refresh (`F-16`: all three docs still read `draft` / `in-progress`, `Last updated: 2026-08-20`) and `tasks.md` §9's Done definition, **0 of 11 ticked**;
+   - the **Kaizen** step: **`KZ-001` → recurrence 5** (*a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behaviour*), plus the **`KZ-005` variant this cycle earned** — *a correction is not applied until it is applied at every site it falsifies, including the sites the correction itself creates; a correction that narrows must state what it drops, and one that strikes a claim must re-examine every figure that claim was carrying.*
+2. `R6`…`R10` remain open WARN remediation (`validation-report.md` §11) — archive-compatible, none blocking.
+3. ⚠️ **Session hygiene:** launch from **`alliance-research-indicators-main`**. This session, `T-14`'s and the `R4`/`R5` one all ran from the `-management` repo, where the `akili-*` agent wrappers and the tasks-gate hook **silently do not load** — which is exactly why acceptance 1 exists.
 
 ### Owed to the user as a decision, not a sweep
 
