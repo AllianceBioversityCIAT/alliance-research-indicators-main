@@ -130,3 +130,11 @@ _(entries appended per task)_
 **Leader full-suite re-measure after T-03+T-04 (isolated):** `npm test -- --silent` →
 Test Suites: 343 passed, 343 total
 Tests:       2496 passed, 2496 total
+
+---
+
+## Budget tripwire — fired after T-04, resolved
+
+- Design §13 budget: ≈1,700 LOC, tripwire >2,200. Actual server-only at T-04: **3,413 insertions** (prod 1,541 / tests 1,872; `git diff 701821be..HEAD --numstat -- server/`).
+- Cause: test volume ~55% of insertions (T-03/T-04 security matrices, review-mandated proofs); no scope creep (all files within task lists).
+- User decision 2026-08-26: **continue** — budget revised in design §13 to ≈4,500 (trip >6,000), rounds unchanged.

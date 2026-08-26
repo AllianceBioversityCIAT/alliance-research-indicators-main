@@ -309,13 +309,13 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 
 ## 13. Budget (Step 2.4)
 
-| Metric | Estimate |
-| --- | --- |
-| Tasks | 13 |
-| LOC | ≈ 1,700 (server ≈ 750, client ≈ 950, tests included) |
-| Review rounds | 2 |
+| Metric | Estimate | Revised (2026-08-26, tripwire fired after T-04, user-approved continue) |
+| --- | --- | --- |
+| Tasks | 13 | 13 (unchanged) |
+| LOC | ≈ 1,700 (server ≈ 750, client ≈ 950, tests included) | ≈ 4,500 total (server actual 3,413 at T-04: prod 1,541 / tests 1,872; client ≈ 1,100 remaining) |
+| Review rounds | 2 | 2 average per task (3-attempt ceiling unchanged) |
 
-Still **Full**. `/akili-execute` trips on > 15 tasks, > 2,200 LOC, or > 3 review rounds.
+Still **Full**. `/akili-execute` trips on > 15 tasks, > **6,000** LOC, or > 3 review rounds on any task. Original estimate undercounted test volume (~55% of insertions — security matrices and review-driven proofs); production LOC is proportionate and no out-of-scope files exist.
 
 ## 14. Open questions
 Carried from requirements §10 (OQ-1..4) with the stated defaults. **OQ-5 closed** — see §4 `TargetProfileDto` (all columns present on dev).
