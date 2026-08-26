@@ -2128,3 +2128,42 @@ Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: 
 
 **c11 caveat answered, 2026-08-26.** The note above recorded that the user had not stated whether they were logged out. They since confirmed: *"los links son públicos."* This **corroborates the Leader's probe rather than replacing it** — and the distinction is worth keeping, because the two are different kinds of claim: the user's statement is about the **intended sharing configuration**, while the probe is an **observation** that an unauthenticated client with no session actually received the Drive file's own title over HTTP 200. A file believed to be public and a file that answers a stranger are not the same fact, and D11 is about the second one. They now agree, from two independent directions, which is the strongest form this criterion can reach at any tier. **No residual.**
 
+
+#### `T-13` c7 — one sub-check discharged, 2026-08-26
+
+**Quoted:** *"el from-header se mantiene"* [sic — `form-header`].
+
+**Discharges the `form-header` regression sub-check**, which T-13's own entry named as required: that component renders on **13 pages** and its typography moved when `rs-*` began resolving, so an unrelated result tab had to be inspected. Confirmed unchanged.
+
+**c7 remains open.** Its other clauses are untouched by this: both viewports (**1440 px** *and* the `md:` breakpoint at height ≤ 768 px), every label / callout / count field / card border legible, and the repeatable cards **stacking rather than overflowing horizontally**.
+
+
+#### `T-13` c7 — DISCHARGED, and `c9` — two of three clauses discharged · 2026-08-26
+
+**Quoted verbatim** (KZ-002 recurrence 6 — the tick must quote what the observation covered):
+
+> **c9:** *"si correcto se ve el anillo al usarse y si da el loop completo y comienza de nuevo"*
+> **c7:** *"todo se ve bien no se corta por mas cards que genero, en pantallas pequeñas se mantiene acorde todas las tabs de actor, mesures, organizations estan bien"*
+
+**`c7` — clause-by-clause, with the evidence each clause actually rests on:**
+
+| Clause | Discharged by |
+| --- | --- |
+| Repeatable cards **stack rather than overflow horizontally** | *"no se corta por mas cards que genero"* — and the phrasing matters: the user generated **multiple** cards and the layout held, which is the load-bearing form of this check. A single-card page would not have tested it |
+| Legible at the narrow viewport | *"en pantallas pequeñas se mantiene acorde"* |
+| Every label / count field / card border legible across the three repeatable card types | *"todas las tabs de actor, mesures, organizations estan bien"* — all three card families named individually, not aggregated |
+| `form-header` regression on an unrelated result tab | *"el from-header se mantiene"* (recorded above) |
+
+**Two residuals on `c7`, named rather than absorbed:**
+
+1. **The viewport widths were not stated numerically.** The criterion specifies **1440 px** and the **`md:` breakpoint at height ≤ 768 px**. A wide state and a narrow state were both observed, and the narrow one is the one that could have failed — but *"pantallas pequeñas"* is not the same statement as the two named viewports. **Recorded as a wording gap, not as a failure**, since the substantive risk (horizontal overflow of repeatable cards) was exercised directly and held.
+2. **Rendered contrast is not measured by this observation, and cannot be.** *"todo se ve bien"* is precisely the phrase the criterion warns about: *"the page renders" does not discharge "contrast ≥ 4.5:1"*. The AA claim for the **new** blocks rests on `T-14` **c12**'s arithmetic over resolved tokens (**7.44:1**, **6.35:1**, **8.00:1**, **6.83:1**, cascade resolved and `.description` proven absent from the file), **not** on this observation. What this observation adds is the absence of a *visible* legibility defect — real evidence, and a weaker claim than a measured ratio. **PRD C-4 for the new blocks therefore stands on computation plus a negative human check, and that composition is stated rather than implied.**
+
+**`c9` — the ambiguity is resolved, and the answer discharges two clauses:**
+
+| Clause | Verdict |
+| --- | --- |
+| Every control receives focus **with a visible ring** | ✅ *"se ve el anillo al usarse"* — this was the reading in doubt; confirmed as the focus ring, not a traversal loop |
+| **No focus trap inside a repeatable card** | ✅ *"da el loop completo y comienza de nuevo"* — a page-wide cycle that returns to the start is the direct negation of a trap. Had the cycle closed **inside** a card, it would have been the defect the clause exists to catch |
+| Every **icon-only** control announces an **English** name | ⏳ **OPEN.** Not addressed, and a Tab pass structurally cannot reveal it — an accessible name is exposed to assistive technology, not to the focus ring. **Presence** has unit-tier evidence (`T-04` c6: every stepper button carries an English `aria-label`, zero Spanish strings in the file; `T-11` added `[ariaLabel]` to all four selects and native `<button>`s for both remove controls). What is unproven is **announcement** — that a screen reader reads those names. This is the last open clause of c9 |
+
