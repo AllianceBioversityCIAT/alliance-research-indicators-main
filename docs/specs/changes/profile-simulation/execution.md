@@ -74,3 +74,59 @@ _(entries appended per task)_
 - **→ T-05:** `impersonation.service.ts` added to the file list — `warn` lines for `end` and lazy `expired` (NFR-IMP-004).
 - **→ T-06:** assert on `is_active` wire type; the ownership check (`findOne` `where` with `actor_user_id` + `is_active`) is only falsifiable there (KZ-001 — the unit suite drives `findOne` by return value; a `resolve` that dropped the actor filter stays green).
 - Test hygiene: TTL mutated in a test body rather than `beforeEach`; supersede-before-insert ordering not asserted. Recorded; no task change.
+
+---
+
+## T-03 — Middleware `applyImpersonation`, exception + header, CORS
+
+- **Status:** **PASS** (attempt 3 of 3 — ceiling reached, passed on final) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 3 (Implementer sonnet, xhigh; Reviewers opus ×2 parallel lenses on attempt 1: security PASS / resilience FAIL; scoped re-audits by the resilience reviewer)
+- **Requirements covered:** R-IMP-003 (all steps + scenarios + AC.1/2), R-IMP-002 nested 409, R-IMP-001 nested 403, R-IMP-004 foreign `/end` 403, NFR-IMP-001/002
+
+### Attempt 1 — logic correct, evidence FAIL
+- `applyImpersonation(req,res,credential)` called from all 3 credential branches; 15 new spec cases; security reviewer PASS ("no path reaches next() with a header but no ownership check; tolerance unreachable by a foreign session — verified in the service source; CORS additive-only").
+- Resilience reviewer FAIL: the claimed K-004 red (`{state:'valid'}` stub swap) could not have produced the pasted output — the stub carries no `target`, so the null-target reject keeps the test green; also not the mandated middleware mutation (KZ-014).
+
+### Attempt 2 — evidence fixed, new FAIL (Leader-induced)
+- Real middleware mutation (tolerate `invalid` on `/end` inside step 5) → verbatim red `Received promise resolved instead of rejected`, restore proven by line-count stat + green re-run. Reviewer closed issue 1 and **withdrew** its own step-6 mutation suggestion (TS2367 dead code).
+- Leader-directed additions: human messages per code (R-IMP-003 verbatim), `resolve()` failure → 503. FAIL on the Leader's own directive: `X-Impersonation-Error: RESOLVE_FAILED` extended design §4's closed vocabulary and, with §2.2's presence-based client rule, a DB blip would silently end a valid simulation.
+
+### Attempt 3 — PASS
+- Header + enum member removed (`grep -rn RESOLVE_FAILED src` → 0); `applyImpersonation` moved out of the JWT `try` (catch reverted to original narrow form — pre-existing auth path now byte-equivalent in behaviour); `actorId` declared after step 3; 503 spec case asserts the header is NOT set.
+- Reviewer PASS: "impersonation rejections escape `use` structurally; no behavioural change to the pre-existing auth path; 11-case matrix + header-on-every-rejection contract intact." 22/22 green · eslint clean · tsc 0 errors.
+
+### ADVISORY (recorded)
+- `Logger` vs `LoggerUtil` (3 call sites) — accepted whole-file convention deviation from design §9; normalize only as its own task.
+- `RequestWithUser.user/credential` non-optional though unset on JwtMiddleware-excluded routes.
+- Rejection `warn` lines unasserted → owned by T-05 (spy on the middleware logger).
+- Session-id shape guard (uuid-v4 precheck) and role-definition `is_active` question (does real login filter `sec_roles.is_active`? verify at T-06) — recorded for T-06.
+- Boot-level DI proof (middleware ← ImpersonationService via EntitiesModule) → T-06.
+
+---
+
+## T-04 — Controller, DTOs, module wiring, Swagger
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet, medium→high; Reviewer opus full 4R)
+- **Requirements covered:** R-IMP-001 (400/403/≤20/simulable + LIKE escaping), R-IMP-002 (201 payload, 404/409), R-IMP-004 (`/end` 400-without-header/idempotent, `/current` both states), §6 Swagger
+
+### Attempt 1 — code conformant, evidence FAIL
+- Reviewer: all endpoints/DTOs/wiring/filter conform (filter scoping verified against Nest's router-exception-filters source; `is_active` coercion at all 3 levels; LIKE escaping correct end-to-end). FAIL: acceptance box #2 (runtime route enumeration) substituted by a decorator grep — a presence count; the spec's testing module had no RouterModule/prefix, so a wrong mount would stay green.
+- **Reviewer discovery, repo-wide:** this app registers **no `/v1` segment** — live paths are `/api/impersonation/*`. Spec docs corrected (requirements §6, design §4, tasks acceptance filter), recorded as **D-imp-17**; TRD §6.2 drift flagged for T-13/archive.
+
+### Attempt 2 — PASS
+- New `impersonation.routes.spec.ts`: static assertion over the real `route` array + live HTTP proof (`RouterModule.register` + real `ImpersonationModule` with mocked providers + `setGlobalPrefix('api')`): users 200 / start 201 / end-no-header 400 / current 200 / `GET /api/v1/...` 404. K-004: deleting the routes node → 6/6 red (`impersonationRouteEntry … Received: undefined`; live block cascades in `RouterModule.deepCloneRoutes`), restored byte-identical.
+- Shared `RequestWithUser` imported (local stand-in deleted); `actorId()` throws `UnauthorizedException` when unresolvable (+test); live `GET /users?search=ro` → 400 proves the pipe is attached. 5 suites / 60 tests green · eslint clean · tsc 0 errors. Leader fixed two stray `/api/v1` docstrings inline.
+- Reviewer PASS; also verified the working tree already had both docstring fixes and the three spec docs clean of `/api/v1/impersonation`.
+
+### ADVISORY (recorded)
+- routes.spec `/v1` 404 test cannot fail for its stated reason (harness never enables versioning) — the four positive assertions carry the box; retitle when convenient.
+- `/end` returns `ImpersonationSessionSummary` (superset of design §4's `{session_id, ended_at, end_reason}`) — **T-07 must write the client contract against what ships.**
+- `end`/`current` accept an unvalidated inline body (unknown `reason` → 'manual', tested) — matches exemplar convention.
+- Middleware spec fixtures still use `/v1` URLs — harmless (matcher is version-agnostic); T-03's file.
+
+**Leader full-suite re-measure after T-03+T-04 (isolated):** `npm test -- --silent` →
+Test Suites: 343 passed, 343 total
+Tests:       2496 passed, 2496 total

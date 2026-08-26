@@ -46,7 +46,7 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 - **So that** I can find the exact account to simulate
 
 **Details:**
-- Inputs: `GET /api/v1/impersonation/users?search=<text>`; `search` trimmed, min 3 chars, max 100.
+- Inputs: `GET /api/impersonation/users?search=<text>`; `search` trimmed, min 3 chars, max 100.
 - Behavior: case-insensitive `LIKE` over `sec_users.email`, `first_name`, `last_name`; max 20 rows ordered by email; each row carries `sec_user_id`, `first_name`, `last_name`, `email`, `is_active`, `roles[] {role_id, name}` and a computed `simulable: boolean` with `blocked_reason` (`'system_admin' | 'inactive' | 'self'`) when false.
 - Outputs: `200`, data `ImpersonationUserDto[]`.
 - Errors: `400` when `search` < 3 chars; `403` for any effective user without `SYSTEM_ADMIN`; `403` when the request itself carries a session header (see R-IMP-003).
@@ -79,7 +79,7 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 - **So that** the platform behaves as that user from now on
 
 **Details:**
-- Inputs: `POST /api/v1/impersonation/start` body `{ target_user_id: number, reason?: string (≤ 500) }`.
+- Inputs: `POST /api/impersonation/start` body `{ target_user_id: number, reason?: string (≤ 500) }`.
 - Behavior: validates the target is active, exists, is not a `SYSTEM_ADMIN`, is not the actor; closes any still-open session of the same actor (one open session per actor); inserts `impersonation_sessions` row (`actor_user_id`, `target_user_id`, `reason`, `started_at`, `expires_at = now + TTL`); returns the session and the **target profile** in the **full** shape the client stores as `dataCache().user` (`sec_user_id, first_name, last_name, email, is_active, status_id, user_role_list[{is_active, user_id, role_id, role:{role_id, sec_role_id, focus_id, name, is_active, justification_update}}]` — the role sub-fields are what `RolesService` reads for Center Admin access).
 - Outputs: `201`, data `{ session: { session_id, started_at, expires_at }, user: TargetProfileDto }`.
 - Errors: `400` invalid body; `403` non-admin; `404` target not found or inactive; `409` target is a System Admin or is the actor; `409` when the request carries a session header (nested).
@@ -156,7 +156,7 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 - **So that** I can never be left silently acting as someone else
 
 **Details:**
-- Inputs: `POST /api/v1/impersonation/end` (body empty; session identified by the header); `GET /api/v1/impersonation/current` (header optional).
+- Inputs: `POST /api/impersonation/end` (body empty; session identified by the header); `GET /api/impersonation/current` (header optional).
 - Behavior:
   - `/end`: sets `ended_at=now, end_reason='manual'`; idempotent (`200` even if already ended); callable by the actor only.
   - `/current`: returns `{ active: false }` without a header, or `{ active: true, session, actor: {sec_user_id, first_name, last_name, email}, user: TargetProfileDto }` with a valid one — used by the client to rehydrate after reload.
@@ -196,7 +196,7 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 
 #### Scenario: Mutation logged
 - GIVEN an active session
-- WHEN `PATCH /api/v1/results/123/general-information` returns `200`
+- WHEN `PATCH /api/results/123/general-information` returns `200`
 - THEN one `impersonation_actions` row exists with `method='PATCH'`, `status_code=200`, `result_official_code=123`
 - AND a mutation that throws `409` logs `status_code=409`
 - BUT it must NOT log `GET` requests
@@ -380,10 +380,10 @@ Numbering: `R-IMP-NNN`. Server first (foundational), then client.
 
 | Method + URL | Roles / guards | Notes |
 | --- | --- | --- |
-| `GET /api/v1/impersonation/users?search=` | `@Roles(SYSTEM_ADMIN)`, `RolesGuard`; rejected with a session header | R-IMP-001 |
-| `POST /api/v1/impersonation/start` | same; `409` with a session header | R-IMP-002 |
-| `POST /api/v1/impersonation/end` | header required; actor only | R-IMP-004 |
-| `GET /api/v1/impersonation/current` | any authenticated JWT user | R-IMP-004 |
+| `GET /api/impersonation/users?search=` | `@Roles(SYSTEM_ADMIN)`, `RolesGuard`; rejected with a session header | R-IMP-001 |
+| `POST /api/impersonation/start` | same; `409` with a session header | R-IMP-002 |
+| `POST /api/impersonation/end` | header required; actor only | R-IMP-004 |
+| `GET /api/impersonation/current` | any authenticated JWT user | R-IMP-004 |
 
 All four: Swagger `@ApiTags('Impersonation')`, `@ApiBearerAuth`, `@ApiOperation`, `@ApiQuery/@ApiBody`, plus `@ApiHeader({name: 'X-Impersonation-Session'})` where relevant. Machine tokens (`client_id/client_secret`) are **not** accepted by any of them and may never carry the header.
 

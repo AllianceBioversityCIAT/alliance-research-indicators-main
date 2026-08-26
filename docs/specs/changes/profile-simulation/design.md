@@ -176,25 +176,25 @@ No FK to `sec_users` (ROAR-owned). No OpenSearch decoration. Migration `createIm
 
 Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `GlobalExceptions`); machine-readable codes travel in the response header `X-Impersonation-Error` (values in `ImpersonationErrorCode`: `NOT_ALLOWED`, `NESTED`, `SESSION_INVALID`, `SESSION_HEADER_REQUIRED`, `TARGET_NOT_FOUND`, `TARGET_IS_ADMIN`, `TARGET_IS_SELF`).
 
-### GET /api/v1/impersonation/users
+### GET /api/impersonation/users
 - **Controller:** `impersonation.controller.ts` · **Roles/Guards:** `@UseGuards(RolesGuard)` `@Roles(SYSTEM_ADMIN)` · **Interceptors:** global only
 - **Query DTO:** `SearchUsersDto { search: string (3–100, trimmed) }`
 - **Response data:** `ImpersonationUserDto[]` = `{ sec_user_id, first_name, last_name, email, is_active, roles: {role_id, name}[], simulable, blocked_reason? }`
 - **Errors:** `400` (DTO) · `403` non-admin · `403` + `X-Impersonation-Error: NESTED` when a session header is present (middleware)
 - **Notes:** ≤ 20 rows, ordered by email.
 
-### POST /api/v1/impersonation/start
+### POST /api/impersonation/start
 - **Roles/Guards:** `@UseGuards(RolesGuard)` `@Roles(SYSTEM_ADMIN)` · **Body DTO:** `StartImpersonationDto { target_user_id: positive int; reason?: ≤ 500 }`
 - **Response data:** `{ session: {session_id, started_at, expires_at}, user: TargetProfileDto }`
 - **`TargetProfileDto`** = the client `UserCache` shape (minus `roleName`, which the client computes — §5 step 2; D-imp-16): `sec_user_id, first_name, last_name, email, is_active, status_id, user_role_list: [{ is_active, user_id, role_id, role: { role_id, sec_role_id, focus_id, name, is_active, justification_update } }]` — sourced from `sec_user_roles` + `sec_roles`. **OQ-5 resolved (T-01, `DESCRIBE` on dev 2026-08-25):** `sec_roles` has `sec_role_id (PK), name varchar(60), focus_id bigint NOT NULL, is_active, justification_update text, description, is_internal`; `sec_user_roles` has `sec_user_role_id (PK), user_id, role_id, is_active`; `sec_users` has `sec_user_id, first_name, last_name, email, status_id, is_active, deleted_at, last_login_at, carnet`. Every field the client `Role` reads exists — no `null` fallback needed. Role names come only via `sec_user_roles.role_id → sec_roles.sec_role_id`. `RolesService.userHasCenterAdminAccess` is exercised in the e2e with a real Center Admin target.
 - **Errors:** `400` · `403` non-admin · `404` `TARGET_NOT_FOUND` (missing/inactive) · `409` `TARGET_IS_ADMIN` / `TARGET_IS_SELF` · `409` `NESTED` (middleware)
 
-### POST /api/v1/impersonation/end
+### POST /api/impersonation/end
 - **Roles/Guards:** none beyond authentication · **Header:** `X-Impersonation-Session` required → `400 SESSION_HEADER_REQUIRED`
 - **Response data:** `{ session_id, ended_at, end_reason }`; idempotent `200` for the actor's own already-ended session
 - **Errors:** `403 SESSION_INVALID` for unknown or **foreign** sessions (middleware — never tolerated)
 
-### GET /api/v1/impersonation/current
+### GET /api/impersonation/current
 - **Roles/Guards:** none beyond authentication
 - **Response data:** `{ active: false }` | `{ active: true, session, actor: {sec_user_id, first_name, last_name, email}, user: TargetProfileDto }`
 - **Errors:** `403 SESSION_INVALID` for unknown/foreign; the actor's own ended/expired session → `{ active: false }`.
@@ -301,6 +301,7 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 | D-imp-12 | 2026-08-25 | Impersonation header gated on the `X-Ari-Auth-Call` marker, not on host strings | `mainApiUrl` may equal `managementApiUrl` (J-17) |
 | D-imp-13 | 2026-08-25 | `ImpersonationService` depends only on cache/api/router; side effects by callers | Break DI cycle (J-09) |
 | D-imp-14 | 2026-08-25 | Banner inside the navbar component; platform padding bound to `navbarHeight()` | Only measured path (J-04) |
+| D-imp-17 | 2026-08-25 | Endpoint paths are `/api/impersonation/*` — this app enables URI versioning but registers **no** version segment (`main.ts` `setGlobalPrefix('api')`, no `@Controller({version})`, no version node in `main.routes.ts`; client `mainApiUrl` ends in `/api`). The `/api/v1` wording in the baseline TRD §6.2 is drift — flagged for T-13/archive | T-04 review; root guide §5: fix the doc, never let docs and code drift |
 | D-imp-16 | 2026-08-25 | `TargetProfileDto` omits `roleName` (client computes it) and carries no `roles[]`; the middleware derives `req.user.roles` from active `user_role_list` and rejects a null target | T-02 review: `RolesGuard`/`ResultOwnerGuard` read `user.roles`; keeping one source (`user_role_list`) avoids two role lists drifting |
 | D-imp-15 | 2026-08-25 | `ImpersonationAction` does **not** extend `AuditableEntity` (append-only, `created_at` only) — a deliberate exception to `src/CLAUDE.md` §7; FK named readably `fk_impersonation_actions_session` and declared on the entity | An audit row is immutable by definition; a derived sha1 FK name would drift on the next `migration:generate` (T-01 review advisories) |
 

@@ -131,9 +131,9 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
 - **Acceptance / done check:**
   - [ ] Spec matrix (11 cases × where relevant the 3 branches): no header; machine+header → 403 `NOT_ALLOWED`; non-admin → 403; `/start` nested → 409; `/users` nested → 403; unknown → 403; foreign → 403 (also on `/end`); owned-ended on `/end` → passes with `invalid:'ended'` and `req.actor` set; owned-ended on `/results` → 403; expired → 403 after marking; valid → `req.user` = target, `req.actor` = admin. Every 4xx asserts the header value.
   - [ ] `npx eslint src/domain/shared/middlewares src/main.ts` clean.
-- **Verification — failing input:** feed a session whose `actor_user_id` is `admin+1` on route `/api/v1/impersonation/end` — must be 403; make the middleware skip the ownership check for `/end` → red.
+- **Verification — failing input:** feed a session whose `actor_user_id` is `admin+1` on route `/api/impersonation/end` — must be 403; make the middleware skip the ownership check for `/end` → red.
 - **Disqualifier:** a matrix that mocks `resolve()` to return `'valid'` for every case cannot discriminate — each case must stub its own `resolve` result.
-- **Dependencies:** T-02 · **Effort:** M · **Skills:** `nestjs-expert`, `error-handling-patterns` · **Status:** todo
+- **Dependencies:** T-02 · **Effort:** M · **Skills:** `nestjs-expert`, `error-handling-patterns` · **Status:** done (PASS attempt 3, execution.md T-03)
 
 ### T-04 — Controller, DTOs, module wiring, Swagger
 
@@ -145,10 +145,10 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
 - **Description:** Four handlers; `@UseGuards(RolesGuard)` + `@Roles(SYSTEM_ADMIN)` on `users`/`start`; `/end` requires the header (400 otherwise) and calls `service.end` using `req.actor`; `/current` maps `invalid:'ended'` → `{active:false}`. Full Swagger incl. `@ApiHeader`.
 - **Acceptance / done check:**
   - [ ] Controller spec: `search='ro'` → 400 via `ValidationPipe`; `/end` without header → 400; `/current` with `invalid:'ended'` → `{active:false}`.
-  - [ ] `curl localhost:3000/swagger-json | jq '.paths | keys | map(select(startswith("/api/v1/impersonation")))'` lists 4 paths (K-014: check the total, don't `head`).
+  - [ ] `curl localhost:3000/swagger-json | jq '.paths | keys | map(select(startswith("/api/impersonation")))'` lists 4 paths (K-014: check the total, don't `head`).
   - [ ] `npx eslint src/domain/entities/impersonation` clean.
 - **Verification — failing input:** remove `@UseGuards(RolesGuard)` from `start` — the "Contributor → 403" spec must go red (it must exercise the guard, not just the decorator's presence — a presence assertion is not behavioural proof).
-- **Dependencies:** T-02 · **Effort:** M · **Skills:** `nestjs-expert`, `api-design-principles` · **Status:** todo
+- **Dependencies:** T-02 · **Effort:** M · **Skills:** `nestjs-expert`, `api-design-principles` · **Status:** done (PASS attempt 2, execution.md T-04)
 
 ### T-05 — Audit interceptor + log attribution + reader re-enumeration
 

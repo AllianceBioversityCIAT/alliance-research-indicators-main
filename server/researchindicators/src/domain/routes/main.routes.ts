@@ -69,6 +69,7 @@ import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
+import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
 
 const capSharingChildren: Routes = [
   {
@@ -407,6 +408,10 @@ const children: Routes = [
     // SYSTEM_ADMIN) on the controller. See execution.md Pivot Record #1.
     path: 'bilateral-project-mappings',
     module: BilateralProjectMappingModule,
+  },
+  {
+    path: 'impersonation',
+    module: ImpersonationModule,
   },
 ];
 
