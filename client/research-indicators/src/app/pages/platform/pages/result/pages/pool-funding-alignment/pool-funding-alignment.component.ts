@@ -142,6 +142,13 @@ export default class PoolFundingAlignmentComponent {
   // AC.3 — inline message naming what is missing; computed client-side (primaryRequiredMessage
   // below) so canSave() never relies on the server 400 for this.
   readonly PRIMARY_SP_REQUIRED_MESSAGE = 'Select a Primary Science Program before saving.';
+  // QA 2026-08-25 (Bug 2) — canSave()'s `hasMinimalSelection` clause blocks save
+  // on has_contribution === true with zero SPs, and `primaryRequiredMessage`
+  // returns null in exactly that case, so Save went grey with no explanation and
+  // no route out. Names both ways out, since answering "No" is as valid as
+  // picking an SP.
+  readonly SP_REQUIRED_MESSAGE =
+    "Select at least one Science Program, or answer 'No' if this result does not contribute to a Science Program.";
   readonly PRIMARY_ROLE_LABEL = 'Primary';
   readonly CONTRIBUTING_ROLE_LABEL = 'Contributing';
   readonly UNMAPPED_SP_MESSAGE =
@@ -163,6 +170,14 @@ export default class PoolFundingAlignmentComponent {
   // Read-only orphan tag (display-only) — reuses the stale tag's `.pf-stale-tag`
   // visual treatment verbatim (D-C2-10); only the copy differs.
   readonly ORPHANED_TOC_TAG = 'Not the current Primary — read-only';
+  // The tag above states WHAT the row is; this states WHY it is still on screen.
+  // R-BIL-129's own rationale — "data that is still stored — and still bound for
+  // PRMS — does not vanish from the screen" — was never surfaced in the UI, and
+  // three independent reviewers (QA Bug 1a, twice, and a product review
+  // 2026-08-25) each read the retained row as a defect. Copy only: the row, its
+  // retention, and OQ-3 are all untouched.
+  readonly ORPHANED_TOC_EXPLANATION =
+    'Retained for PRMS. This Science Program is submitted as Contributing, without Theory of Change mapping.';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16, applying T-15's
   // Reviewer finding (design.md §12.2, superseded-string record kept there). The
   // row this labels holds an explicit saved "No" answer — data that IS stored —
@@ -307,6 +322,16 @@ export default class PoolFundingAlignmentComponent {
     () => !this.editable() || this.isReadOnly() || this.versionLocked()
   );
 
+  // QA 2026-08-25 (Bug 2) — sibling of `primaryRequiredMessage` for the step
+  // before it: nothing selected at all. Same read-only/version-lock suppression,
+  // for the same reason (do not demand an action a disabled control forbids).
+  readonly spRequiredMessage = computed<string | null>(() => {
+    if (!this.editable() || this.isReadOnly() || this.versionLocked()) return null;
+    const form = this.formData();
+    if (form.has_contribution !== true) return null;
+    return form.selected_sps.length === 0 ? this.SP_REQUIRED_MESSAGE : null;
+  });
+
   // AC.3 — inline message naming what is missing, computed client-side so
   // canSave() never relies on the server 400 for it (design.md §6.1). Shown
   // whenever the Primary selector is visible, interactive, and unanswered —
@@ -417,7 +442,28 @@ export default class PoolFundingAlignmentComponent {
   // only one of the two, concat and union are indistinguishable — which is
   // exactly `tasks.md`'s stated disqualifier, and exactly why this is a Map,
   // not a list append.
+  //
+  // QA 2026-08-25 (Bug 1c) — BOTH source computeds read the SERVER snapshot
+  // (`alignment()?.toc_alignments`) and neither consults `formData()`, so a row
+  // whose SP the user has just DESELECTED kept rendering its read-only card
+  // until the next save. That contradicted the removal modal's promise
+  // ("Removing it will discard that alignment") and showed a card for an SP
+  // that no longer had a chip on screen.
+  //
+  // R-BIL-129 modelled only two reasons for a read-only row — not the current
+  // Primary, or stale — and "its SP is no longer selected" is a THIRD state it
+  // never considered. The selection gate lives here, at the single union point,
+  // rather than in each source computed: one filter cannot drift out of sync
+  // with itself, and `staleSnapshots` keeps its existing meaning for its own
+  // pinned assertion.
+  //
+  // This does NOT touch R-BIL-125/R-BIL-129's retain-on-DEMOTION behaviour
+  // (OQ-3, owned by the BA): a demoted SP is still selected, so it still
+  // renders. Only a deselected SP's card is withdrawn — and the server
+  // deactivates exactly those rows on the next PATCH (R-BIL-125 AC.3), so the
+  // screen now leads that cascade instead of contradicting it.
   readonly readOnlyTocSummaries = computed<ReadOnlyTocSummary[]>(() => {
+    const selected = new Set(this.formData().selected_sps.map(sp => sp.official_code || sp.code));
     const bySp = new Map<string, ReadOnlyTocSummary>();
     for (const row of this.orphanedTocAlignments()) {
       bySp.set(row.sp_code, { alignment: row, isOrphaned: true, isStale: false });
@@ -426,7 +472,7 @@ export default class PoolFundingAlignmentComponent {
       const existing = bySp.get(row.sp_code);
       bySp.set(row.sp_code, existing ? { ...existing, isStale: true } : { alignment: row, isOrphaned: false, isStale: true });
     }
-    return [...bySp.values()];
+    return [...bySp.values()].filter(row => selected.has(row.alignment.sp_code));
   });
 
   constructor() {
@@ -816,6 +862,33 @@ export default class PoolFundingAlignmentComponent {
 
   retryCatalog(): void {
     void this.bilateralService.getTocCatalog(this.resultCode());
+  }
+
+  // Wired explicitly instead of reusing the shared linear `saveData('back')`
+  // pattern, for two reasons:
+  //   1. Pool Funding Alignment is the sidebar's only OPTIONAL section and sits
+  //      last in `allOptions` (result-sidebar.component.ts), so "back" means the
+  //      section rendered immediately above it, not a step in the linear flow.
+  //   2. Back must not attempt a save: `canSave()` blocks on an unanswered ToC
+  //      question, so a save-then-navigate Back would silently do nothing — the
+  //      exact dead-button symptom this fixes. links-to-result makes the same
+  //      choice (navigate('back') never saves).
+  onBack(): void {
+    const version = this.route.snapshot.queryParamMap.get('version');
+    const queryParams = version ? { version } : undefined;
+    void this.router.navigate(['/result', this.resultCode(), this.previousSectionPath()], {
+      queryParams,
+      replaceUrl: true
+    });
+  }
+
+  // `ip-rights` renders only for indicator_id 1 and 2 (result-sidebar.component.ts
+  // `allOptions`); for every other indicator the section directly above Pool
+  // Funding Alignment is `evidence`, which is unconditional. indicator_id 5
+  // never reaches this page — the constructor redirects it out.
+  private previousSectionPath(): string {
+    const indicatorId = this.cache.currentMetadata()?.indicator_id;
+    return indicatorId === 1 || indicatorId === 2 ? 'ip-rights' : 'evidence';
   }
 
   async onSave(): Promise<void> {
