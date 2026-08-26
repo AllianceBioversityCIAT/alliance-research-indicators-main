@@ -1,9 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpErrorResponse } from '@angular/common/http';
+import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
+import { ImpersonationService } from '../services/impersonation.service';
 import { Router } from '@angular/router';
 import { httpErrorInterceptor } from './http-error.interceptor';
 import { fakeAsync, tick } from '@angular/core/testing';
@@ -14,6 +15,7 @@ describe('httpErrorInterceptor', () => {
   let mockActionsService: any;
   let mockCacheService: any;
   let mockApiService: any;
+  let mockImpersonationService: any;
   let mockRouter: any;
   let mockRequest: HttpRequest<any>;
   let mockHandler: HttpHandlerFn;
@@ -32,6 +34,11 @@ describe('httpErrorInterceptor', () => {
       saveErrors: jest.fn()
     };
 
+    mockImpersonationService = {
+      active: jest.fn().mockReturnValue(true),
+      end: jest.fn().mockResolvedValue({ actor: null })
+    };
+
     mockRouter = {
       url: '/test-route'
     };
@@ -41,6 +48,7 @@ describe('httpErrorInterceptor', () => {
         { provide: ActionsService, useValue: mockActionsService },
         { provide: CacheService, useValue: mockCacheService },
         { provide: ApiService, useValue: mockApiService },
+        { provide: ImpersonationService, useValue: mockImpersonationService },
         { provide: Router, useValue: mockRouter }
       ]
     });
@@ -725,6 +733,185 @@ describe('httpErrorInterceptor', () => {
         });
         done();
       }
+    });
+  });
+
+  // R-IMP-010 AC.3 — X-Impersonation-Error auto-ends the simulation locally, exactly one toast.
+  describe('X-Impersonation-Error handling (R-IMP-010 AC.3)', () => {
+    it('should end the simulation and show exactly ONE "Simulation expired" toast, suppressing the generic toast', done => {
+      const errorResponse = new HttpErrorResponse({
+        error: { errors: 'Not allowed' },
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new HttpHeaders().set('X-Impersonation-Error', 'SESSION_INVALID')
+      });
+
+      mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockCacheService.dataCache.mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      });
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+
+      interceptor(mockRequest, mockHandler).subscribe({
+        next: () => done.fail('Should have thrown an error'),
+        error: async error => {
+          expect(error).toBe(errorResponse);
+          // Let the `from(impersonation.end(...)).subscribe(...)` microtask settle.
+          await Promise.resolve();
+          await Promise.resolve();
+          expect(mockImpersonationService.end).toHaveBeenCalledWith('server-invalid');
+          expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+          expect(mockActionsService.showToast).toHaveBeenCalledWith(
+            expect.objectContaining({ summary: 'Simulation expired' })
+          );
+          done();
+        }
+      });
+    });
+
+    it('should NOT end the simulation or suppress the toast for a plain 403 without the header', done => {
+      const errorResponse = new HttpErrorResponse({
+        error: { errors: 'Forbidden' },
+        status: 403,
+        statusText: 'Forbidden'
+      });
+
+      mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockCacheService.dataCache.mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      });
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+
+      interceptor(mockRequest, mockHandler).subscribe({
+        next: () => done.fail('Should have thrown an error'),
+        error: error => {
+          expect(error).toBe(errorResponse);
+          expect(mockImpersonationService.end).not.toHaveBeenCalled();
+          expect(mockActionsService.showToast).toHaveBeenCalledWith({
+            detail: 'Forbidden',
+            severity: 'error',
+            summary: 'Error'
+          });
+          done();
+        }
+      });
+    });
+
+    // Leader-adopted item 1: value-matched auto-end (design §2.2). Only SESSION_INVALID
+    // ends the session; other values (e.g. NESTED) suppress the generic toast but do
+    // NOT end the session.
+    it('should NOT end the simulation for a NESTED impersonation-error value, and should suppress the generic toast', done => {
+      const errorResponse = new HttpErrorResponse({
+        error: { errors: 'Nested simulation not allowed' },
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new HttpHeaders().set('X-Impersonation-Error', 'NESTED')
+      });
+
+      mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockCacheService.dataCache.mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      });
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+
+      interceptor(mockRequest, mockHandler).subscribe({
+        next: () => done.fail('Should have thrown an error'),
+        error: error => {
+          expect(error).toBe(errorResponse);
+          expect(mockImpersonationService.end).not.toHaveBeenCalled();
+          expect(mockActionsService.showToast).not.toHaveBeenCalled();
+          done();
+        }
+      });
+    });
+
+    // Leader-adopted item 2: toast burst — N concurrent SESSION_INVALID responses must
+    // produce exactly ONE end() call and ONE toast, short-circuited on `impersonation.active()`.
+    it('should end the simulation and toast exactly ONCE across two concurrent SESSION_INVALID responses', async () => {
+      const errorResponse = new HttpErrorResponse({
+        error: { errors: 'Not allowed' },
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new HttpHeaders().set('X-Impersonation-Error', 'SESSION_INVALID')
+      });
+
+      mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockCacheService.dataCache.mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      });
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+
+      // First response ends the session; simulate `active()` flipping to false once
+      // `end()` resolves, mirroring the real ImpersonationService signal.
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.end.mockImplementationOnce(() => {
+        mockImpersonationService.active.mockReturnValue(false);
+        return Promise.resolve({ actor: null });
+      });
+
+      const results = await Promise.all([
+        new Promise<void>(resolve => {
+          interceptor(mockRequest, mockHandler).subscribe({ error: () => resolve() });
+        }),
+        new Promise<void>(resolve => {
+          interceptor(mockRequest, mockHandler).subscribe({ error: () => resolve() });
+        })
+      ]);
+
+      // Let both microtask chains (from(impersonation.end(...)).subscribe(...)) settle.
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(results.length).toBe(2);
+      expect(mockImpersonationService.end).toHaveBeenCalledTimes(1);
+      expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+      expect(mockActionsService.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ summary: 'Simulation expired' })
+      );
+    });
+
+    // Leader-adopted item 3: unhandled rejection — a rejected `end(...)` must be caught,
+    // not left as an unhandled promise rejection.
+    it('should log (not throw) when impersonation.end(...) rejects after SESSION_INVALID', done => {
+      const errorResponse = new HttpErrorResponse({
+        error: { errors: 'Not allowed' },
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new HttpHeaders().set('X-Impersonation-Error', 'SESSION_INVALID')
+      });
+
+      mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockCacheService.dataCache.mockReturnValue({
+        user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+      });
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.end.mockRejectedValueOnce(new Error('end failed'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      interceptor(mockRequest, mockHandler).subscribe({
+        next: () => done.fail('Should have thrown an error'),
+        error: async error => {
+          expect(error).toBe(errorResponse);
+          await Promise.resolve();
+          await Promise.resolve();
+          expect(consoleErrorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('Failed to end impersonation session'),
+            expect.any(Error)
+          );
+          expect(mockActionsService.showToast).not.toHaveBeenCalledWith(
+            expect.objectContaining({ summary: 'Simulation expired' })
+          );
+          consoleErrorSpy.mockRestore();
+          done();
+        }
+      });
     });
   });
 });

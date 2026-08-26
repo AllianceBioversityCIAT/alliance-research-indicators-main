@@ -42,6 +42,8 @@ export class ToPromiseService {
       headers = headers.set('X-Use-Year', 'true');
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.delete<T>(this.getEnv(config?.isAuth) + url, { headers }));
   };
 
@@ -69,6 +71,8 @@ export class ToPromiseService {
       });
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.post<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -78,6 +82,9 @@ export class ToPromiseService {
     if (config?.useResultInterceptor) {
       headers = headers.set('X-Use-Year', 'true');
     }
+
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.put<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -99,6 +106,8 @@ export class ToPromiseService {
         headers = headers.set(key, value);
       });
     }
+
+    headers = this.applyAuthMarker(headers, config);
 
     const fullUrl = this.getEnv(config?.isAuth) + url;
 
@@ -125,6 +134,8 @@ export class ToPromiseService {
       headers = headers.set('no-auth-interceptor', 'true');
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     const fullUrl = this.getEnv(config?.isAuth) + url;
 
     return firstValueFrom(
@@ -148,6 +159,8 @@ export class ToPromiseService {
       headers = headers.set('X-Use-Year', 'true');
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.patch<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -155,6 +168,20 @@ export class ToPromiseService {
     if (typeof isAuth === 'string') return isAuth;
     return isAuth ? environment.managementApiUrl : environment.mainApiUrl;
   };
+
+  /**
+   * // @akili-spec changes/profile-simulation
+   * Design §5 "Client start" / D-imp-12. `config.isAuth === true` (strict —
+   * not the string overrides used by unrelated external services like
+   * `saveErrorsUrl`) identifies a ROAR-bound call (login / refresh-token /
+   * current-user). `jWtInterceptor` reads this marker to decide never to
+   * attach `X-Impersonation-Session`, instead of comparing hosts — the
+   * local env has `mainApiUrl === managementApiUrl`, which makes a
+   * host-based check unfalsifiable (J-17).
+   */
+  private applyAuthMarker(headers: HttpHeaders, config?: Config): HttpHeaders {
+    return config?.isAuth === true ? headers.set('X-Ari-Auth-Call', '1') : headers;
+  }
 
   getGreenChecks = (): Promise<MainResponse<GreenChecks>> => {
     const url = () => `results/green-checks/${this.cacheService.getCurrentNumericResultId()}`;

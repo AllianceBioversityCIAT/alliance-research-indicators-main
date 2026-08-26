@@ -9,4 +9,6 @@ export type ModalName =
   | 'selectLinkedResults'
   | 'editEnvironmentVariable'
   | 'projectGroundingSetup'
-  | 'portfolioManagement';
+  | 'portfolioManagement'
+  // @akili-spec changes/profile-simulation — R-IMP-007, design §2.2/§6
+  | 'simulateProfile';

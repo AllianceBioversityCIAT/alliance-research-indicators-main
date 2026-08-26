@@ -185,3 +185,36 @@ Tests:       2518 passed, 2518 total
 **Leader client full-suite re-measure after T-07 (serial, after the server run):**
 Test Suites: 312 passed, 312 total
 Tests:       6545 passed, 6545 total
+
+---
+
+## T-08 — Client interceptors, auth plumbing, restore
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, security/correctness + reliability)
+- **Requirements covered:** R-IMP-009 (header MUST incl. post-401 retry, BUT not on ROAR calls, Reload), R-IMP-010 (`logOut` order, AC.3 one toast, AC.4), R-IMP-004 client use; D-imp-12; T-07 forward pointer (stale key on login) discharged
+- **Attempt 1 — FAIL:** the `X-Ari-Auth-Call` strip was host-gated (only inside the four-host branch), so with `managementApiUrl ≠ mainApiUrl` login/current-user would reach ROAR with the marker intact (CORS break); all attempt-1 marker tests ran at the equal-hosts case and could not see it.
+- **Attempt 2 — PASS:** capture+strip once at the top of the interceptor before any branching; new unequal-hosts test, red-first `Expected: false / Received: true` on `headers.has('X-Ari-Auth-Call')`, restored 27/27. Leader-adopted: auto-end value-matched to `SESSION_INVALID` only (design §2.2 reconciled with R-IMP-010; `NESTED` suppresses the generic toast without ending); `active()` short-circuit → one end+toast across concurrent 403s; rejection handlers on `end()`/bootstrap `restore()`; `applyAuthMarker` in `getBlob`.
+- Reviewer PASS: strip at the right layer; the short-circuit test models production faithfully (`end('server-invalid')` is synchronous to `active.set(false)`); J-10 retry clones the decorated request on both flows; refresh persists tokens only (payload-level assertion); `rolesGuard.decide()` byte-equivalent.
+- Per-file runs: 27/30/46/8/79/21 = **211 green** · eslint 0 errors (spec files + `to-promise.service.ts` are in eslint `ignores` — pre-existing scope gap, disclosed) · `tsc -p tsconfig.app.json` clean.
+- ADVISORY recorded: marker strip sits after the `no-auth-interceptor` early return (unreachable combination today — zero production `no-auth-interceptor` call sites; one-line hoist if that changes); env-restore tidiness in the new spec.
+
+---
+
+## T-09 — Modal registration + SimulateProfileModal + UserSearchStep
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, readability + reliability)
+- **Requirements covered:** R-IMP-007 (all clauses, six states, AC.1 KZ-015 transitions, AC.2), NFR-IMP-005 (Escape; focus trap = wrapper's Tab trap)
+- **Attempt 1 — FAIL (3):** envelope description read from `res?.description` (always undefined — lives in `errorDetail.description`) with a fixture the pipeline never emits; Escape asserted as wrapper-handled but `modal.component.ts` implements the Tab trap only (K-004 unseen assertion); tooltip on a `disabled` button (unreachable) with a `??`-tautology assertion.
+- **Attempt 2 — PASS:** all three fixed with red-first proofs (`Expected substring "Server unavailable"…`; `closeModal Number of calls: 0`; `aria-disabled Expected "true" / Received null`); five advisories adopted with their own red-firsts: reopen-reset gated on the `false→true` edge of `computed(isOpen)` (a write to ANY modal key no longer bounces the step), post-debounce current-query `filter`, monotonic stale-response guard, "20+ matches" cap label, duplicate title removed (D-imp-18).
+- Reviewer PASS: fixes at the root; the edge-gate fixture genuinely exercises the unrelated-key write; debounce contract preserved.
+- 22/22 green (both spec files) · eslint clean · `tsc -p tsconfig.app.json` clean · hex-grep 0 · scss ≤ 414 B.
+- **Forward pointers → T-12 (HITL/axe):** tooltip reachable by hover but not keyboard (span lacks `tabindex`; native `disabled` removes the button from tab order — add `tabindex="0"` or drop native disabled for `aria-disabled`); no `aria-live` region announcing loading→results/error; wrapper-title 16/500 vs mockup 18/600 visual delta (D-imp-18).
+- **Forward pointer → T-11:** navbar entry point opens `allModals.openModal('simulateProfile')`.
+
+**Leader client full-suite re-measure after T-08+T-09 (isolated):**
+Test Suites: 314 passed, 314 total
+Tests:       6593 passed, 6593 total

@@ -211,7 +211,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] `roles.guard.spec`: with `restoring()` true the guard awaits before deciding.
 - **Verification — failing input:** the retry test: assert `X-Impersonation-Session` on the **second** `next` call; revert to `req.clone` → red (J-10). The marker test: set `mainApiUrl === managementApiUrl` in the test environment stub and still expect no header on the auth call — a host-based implementation goes red.
 - **Disqualifier:** a host-string assertion with distinct URLs passes on both implementations and proves nothing.
-- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `error-handling-patterns` · **Status:** todo
+- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `error-handling-patterns` · **Status:** done (PASS attempt 2, execution.md T-08)
 
 ### T-09 — Modal registration + `SimulateProfileModal` + `UserSearchStep`
 
@@ -225,7 +225,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Spec drives the transition idle→loading→results with a deferred `ApiService` mock (KZ-015) and asserts each state's DOM; empty and error states; typing `ro` issues no request; blocked row button is `disabled`.
   - [ ] `closeAllModals()` compiles with the new key (build via `npx tsc -p tsconfig.app.json --noEmit` over the client — proven able to fail by temporarily removing the key).
 - **Verification — failing input:** type 3 chars, advance the fake timer 299 ms → no request; 300 ms → one request. Remove the debounce → red.
-- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** todo
+- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (PASS attempt 2, execution.md T-09)
 
 ### T-10 — `ConfirmStep`
 
@@ -252,7 +252,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Component style budget respected (`ng build` warning-free for these components).
 - **Verification — failing input:** role 1 with `active()` true must hide the option; drop the `!active()` condition → red.
 - **Disqualifier:** the offset (AC.3) **cannot** be measured in jsdom — this task records it as owed to T-12's human check, never as passed.
-- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** todo
+- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (PASS attempt 2, execution.md T-09)
 
 ### T-12 — Role-model specs, socket orchestration, HITL visual/a11y check
 

@@ -151,6 +151,15 @@ export class AllModalsService {
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
+    },
+    // @akili-spec changes/profile-simulation — R-IMP-007, D-imp-9. Cancel
+    // only at the wrapper level: `Select` / `Start simulation` live inside
+    // the hosted steps (SimulateProfileModalComponent), not the footer.
+    simulateProfile: {
+      isOpen: false,
+      title: 'Simulate another profile',
+      cancelText: 'Cancel',
+      cancelAction: () => this.toggleModal('simulateProfile')
     }
   });
 
@@ -269,7 +278,8 @@ export class AllModalsService {
       selectLinkedResults: { ...this.modalConfig().selectLinkedResults, isOpen: false, isWide: false },
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
-      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false }
+      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
+      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);
