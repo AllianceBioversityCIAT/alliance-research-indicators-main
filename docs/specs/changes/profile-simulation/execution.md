@@ -138,3 +138,50 @@ Tests:       2496 passed, 2496 total
 - Design §13 budget: ≈1,700 LOC, tripwire >2,200. Actual server-only at T-04: **3,413 insertions** (prod 1,541 / tests 1,872; `git diff 701821be..HEAD --numstat -- server/`).
 - Cause: test volume ~55% of insertions (T-03/T-04 security matrices, review-mandated proofs); no scope creep (all files within task lists).
 - User decision 2026-08-26: **continue** — budget revised in design §13 to ≈4,500 (trip >6,000), rounds unchanged.
+
+---
+
+## T-07 — Client foundation: token, interfaces, ApiService, ImpersonationService
+
+- **Status:** **PASS** (attempt 1) → `[x]` (client full-suite re-measure recorded below, after the concurrent server worker finished)
+- **Date:** 2026-08-26
+- **Attempts:** 1 (Implementer sonnet, high; Reviewer opus, full 4R)
+- **Requirements covered:** R-IMP-009 storage rule, R-IMP-010 (`BUT` tokens untouched, AC.4), NFR-IMP-005 token value; D-imp-8/13/16/17
+- **Files (6, +548):** `styles/colors.scss` (`--ac-orange-2 #b3561a` ×3 sites incl. `$colors` map → `.abc-/.atc-orange-2`), `shared/interfaces/impersonation.interface.ts`, `api.service.ts` (4 methods, no version segment), `shared/services/impersonation.service.ts` (+spec), `to-promise.service.ts` (additive `headers?` Config — Leader-delegated choice so T-07 is self-contained; isolation proven: spec-tsc baseline 936→934 with the change, no new error category)
+- **Implementer verification:** scoped jest 9/9 · mutation: removing `localStorage.setItem('data', …)` from `end()` → 5 red, restored 9/9 · bare eslint clean (3 files; `to-promise.service.ts` is in eslint's `ignores` by repo config — recorded as excluded-by-config, not lint-clean) · `tsc -p tsconfig.app.json --noEmit` clean
+- **Reviewer verdict:** PASS — contract checked against the built server DTOs; tokens structurally untouched (`{...prev, user}` only); 3 s race leak-free; JSON clone lossless for `UserCache`; **`restore()` retaining the full actor snapshot judged a refinement the spec text must adopt** (done — design §5 amended); `end('server-invalid')` skipping the API call judged correct (foreign/unknown `/end` would just 403 again).
+
+### ADVISORY (recorded)
+- **→ T-08:** stale `impersonation` key + different admin logs in → boot-restore's 403 path would write admin A's snapshot into admin B's `data.user` (server authority unaffected). Mitigate in T-08: clear the key on login, or drop (not apply) the snapshot when `/current` rejects as foreign.
+- `getBlob`/`getWithParams` ignore `config.headers` (unused by impersonation) — symmetry note.
+- Signals exported writable; `.asReadonly()` would harden ownership — style only.
+
+---
+
+## T-05 — Audit interceptor + log attribution + reader re-enumeration
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, reliability + risk)
+- **Requirements covered:** R-IMP-005 (all clauses), R-IMP-003 AC.4 (re-enumeration), NFR-IMP-004
+- **Files (13, +796/−27):** `Interceptors/impersonation-audit.interceptor.ts` (+spec), `app.module.ts` (APP_INTERCEPTOR + honest position comment), `logging/response` interceptors + `global.exception` (+specs — `actorId`/`impersonationSessionId` fields), `logger.util.ts` (DTO extension), `impersonation.service.ts` (+spec — NFR-IMP-004 warns for `end`/`expired`), `jwr.middleware.spec.ts` (rejection-warn spy)
+
+### Attempt 1 — FAIL (2 findings)
+- (1) `result_official_code` gated on route pattern containing `'results'` — a stale clause from the Leader's own brief (the corrected spec has no filter); reviewer found real mutating routes losing the code (`green-checks/new-reporting-cycle/:resultCode`, `result-user/author-contact/...:resultCode`), unrecoverable in an append-only table. (2) K-004 red was mechanical (`getResponse is not a function`), not a value-red.
+
+### Attempt 2 — PASS
+- Filter removed; `parseInt` + `Number.isSafeInteger`; red-first proof: flipped case + green-checks-pinned case → `Tests: 2 failed` on the old code, 13/13 after. Value-red for the mutation: `Expected {"status_code": 409} / Received {…"status_code": 200…}`, restored, green. Advisories adopted (non-string route.path guard, sync-throw wrap, honest comments).
+- Reviewer PASS: "both findings genuinely closed; other 11 files byte-identical; K-004 satisfied on its own terms."
+- **Enumeration (R-IMP-003 AC.4):** 43 literal hits / 0 in `test/`; literal grep undercounts optional-chained readers (design §2.4 updated with the widened pattern); new reader `impersonation.controller.ts` `actorId()` added to the table.
+- **Leader full-suite re-measure (isolated):**
+Test Suites: 344 passed, 344 total
+Tests:       2518 passed, 2518 total
+
+### ADVISORY (recorded)
+- **Design-level accepted gap (added to design §5):** guard-level denials (`RolesGuard`/`ResultStatusGuard`) produce no `impersonation_actions` row — Nest runs guards before interceptors; the audit trail records what reached a handler. Carried as OQ-6 for product.
+- `ResponseInterceptor.isError()` returned-not-thrown 500-rewrite records the DTO's pre-rewrite status — accepted, documented in the code comment.
+- Stored `route_pattern` carries the Express regex + global prefix — audit SQL should expect it.
+
+**Leader client full-suite re-measure after T-07 (serial, after the server run):**
+Test Suites: 312 passed, 312 total
+Tests:       6545 passed, 6545 total

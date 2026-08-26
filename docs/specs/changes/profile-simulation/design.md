@@ -110,7 +110,7 @@ sequenceDiagram
 ### 2.4 Identity readers enumeration (R-IMP-003 AC.4)
 Enumerated by *what reads the identity* (KZ-002), across `src/` **and** `test/` (no `req.user` reader under `test/` — re-confirm at T-05).
 
-**Server**
+**Server** — re-enumerated at T-05 (2026-08-26): 43 literal hits, 0 in `test/`. **The literal grep undercounts**: optional-chained sites (`request?.['user']`, `(request as any)?.user`) escape `req\.user|request\.user|request\['user'\]` — widen with `\?\.user\b` and `\?\.\['user'\]` on any future run (KZ-017).
 
 | Reader | Reads | After this design |
 | --- | --- | --- |
@@ -121,6 +121,7 @@ Enumerated by *what reads the identity* (KZ-002), across `src/` **and** `test/` 
 | `bilateral.controller.ts` (**6** sites), `bilateral-project-mapping.controller.ts` (3), `automapper.controller.ts` (1) | `request.user` param | effective ✔ |
 | `logging.interceptor.ts`, `response.interceptor.ts`, `global.exception.ts` | `request.user.sec_user_id` for `userId` log field | effective id **plus** new `actorId`/`impersonationSessionId` fields |
 | `app-secrets.service.validation` | builds `user` for machine tokens | header + machine → `403` |
+| `impersonation.controller.ts` (`actorId()`) | `request.actor ?? request.user` | by design — tolerated ended sessions leave only `user` set (added at T-04, enumerated at T-05) |
 | `server.gateway.ts` `by_user_id` | body field | client sends the effective id |
 
 **Client**
@@ -221,7 +222,7 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 8. Every throw above first does `res.setHeader('X-Impersonation-Error', code)`.
 `credential === 'bypass'` (local dev only) behaves like `'jwt'` with the hard-coded admin as actor.
 
-**Audit (R-IMP-005)** — `ImpersonationAuditInterceptor` (global). When `req.impersonation?.session_id && !invalid && method !== 'GET'`, pipe `tap({ next: dto => log(dto.status ?? 200), error: err => log(err instanceof HttpException ? err.getStatus() : 500) })`. The status comes from the handler's `ServerResponseDto` / the thrown exception — **not** from `res.statusCode` (which `GlobalExceptions` sets outside the chain). `logAction` is fire-and-forget; rejection → `LoggerUtil.error`, response unaffected. Registration order is therefore irrelevant.
+**Audit (R-IMP-005)** — *(accepted gap, T-05 review: guard-level denials produce no action row — guards run before interceptors; the trail records requests that reached a handler. OQ-6.)*  `ImpersonationAuditInterceptor` (global). When `req.impersonation?.session_id && !invalid && method !== 'GET'`, pipe `tap({ next: dto => log(dto.status ?? 200), error: err => log(err instanceof HttpException ? err.getStatus() : 500) })`. The status comes from the handler's `ServerResponseDto` / the thrown exception — **not** from `res.statusCode` (which `GlobalExceptions` sets outside the chain). `logAction` is fire-and-forget; rejection → `LoggerUtil.error`, response unaffected. Registration order is therefore irrelevant for thrown errors; the one exception is `ResponseInterceptor.isError()`'s returned-not-thrown 500-rewrite, which records the DTO's pre-rewrite status (accepted, T-05).
 
 **End (R-IMP-004)** — actor's own open session → `ended_at=now, end_reason ∈ {'manual','logout'}, updated_by=actor`; `invalid:'ended'` → return the existing row `200`. `LoggerUtil.warn('impersonation.end')`.
 
@@ -234,7 +235,7 @@ Common: `ServerResponseDto` envelope; `errors` **remains a string** (unchanged `
 
 **Client end (R-IMP-010)** — `impersonation.end(reason)`: best-effort `api.endImpersonation()` (3 s cap), restore `dataCache.user = actor`, rewrite `data`, clear `impersonation`, resolve `{ actor }`. Callers (banner, navbar, `httpErrorInterceptor`, `logOut`) then run `configUser(actor)`, navigate `/home`, toast. `logOut()` awaits it first when active.
 
-**Client restore** — `app.component` bootstrap: if `localStorage['impersonation']` exists, `restoring.set(true)`, call `/current` with the stored header; `active:true` → adopt returned `user`/`actor`; else run the local end path with toast "Simulation ended". `rolesGuard` waits on `restoring()` (returns a `UrlTree`-free promise) so no route resolves against a half-restored identity.
+**Client restore** — `app.component` bootstrap: if `localStorage['impersonation']` exists, `restoring.set(true)`, call `/current` with the stored header; `active:true` → adopt the returned `user`/`session`, **retaining the stored full actor snapshot** (the `/current` `actor` is a 4-field summary; adopting it would break R-IMP-010 AC.4); else run the local end path with toast "Simulation ended". `rolesGuard` waits on `restoring()` (returns a `UrlTree`-free promise) so no route resolves against a half-restored identity.
 
 ---
 

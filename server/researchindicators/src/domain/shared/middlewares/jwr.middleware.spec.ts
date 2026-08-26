@@ -1,4 +1,4 @@
-import { HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtMiddleware } from './jwr.middleware';
 import { AlianceManagementApp } from '../../tools/broker/aliance-management.app';
 import { ResultsUtil } from '../utils/results.util';
@@ -537,6 +537,38 @@ describe('JwtMiddleware', () => {
         expect.anything(),
       );
       expect(next).not.toHaveBeenCalled();
+    });
+
+    // @akili-spec changes/profile-simulation — T-03 review advisory: no test
+    // previously asserted the middleware's rejection `warn` line fires.
+    it('reject() logs a warn line with code, actor_user_id, session_id (failing input: unknown session -> reject())', async () => {
+      const req: any = {
+        headers: {
+          authorization: 'Bearer jwt-token',
+          'x-impersonation-session': 'unknown-sess',
+        },
+        originalUrl: '/api/v1/results',
+      };
+      const res = makeRes();
+      roarManagementService.validateToken.mockResolvedValue({
+        isValid: true,
+        user: adminUser,
+      });
+      impersonationService.resolve.mockResolvedValueOnce({ state: 'invalid' });
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      await expect(middleware.use(req, res, next)).rejects.toMatchObject({
+        code: ImpersonationErrorCodeEnum.SESSION_INVALID,
+      });
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `impersonation.reject code=${ImpersonationErrorCodeEnum.SESSION_INVALID} actor_user_id=${adminUser.sec_user_id} session_id=unknown-sess`,
+        ),
+      );
+      warnSpy.mockRestore();
     });
 
     it('LOCAL_AUTH_BYPASS branch without a session header -> unchanged, hardcoded admin user', async () => {

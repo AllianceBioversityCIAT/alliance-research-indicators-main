@@ -165,7 +165,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] design §2.4 updated with the grep total and any new reader.
 - **Verification — failing input:** make the handler throw a 409 and assert `status_code === 409`; read status from `res.statusCode` instead → the assertion goes red (that is the J-02 defect reintroduced).
 - **Disqualifier:** an enumeration grep restricted to `src` (or piped through `head`) does not cover the claim (KZ-017) — both trees, full output.
-- **Dependencies:** T-03, T-04 · **Effort:** M · **Skills:** `nestjs-expert` · **Status:** todo
+- **Dependencies:** T-03, T-04 · **Effort:** M · **Skills:** `nestjs-expert` · **Status:** done (PASS attempt 2, execution.md T-05)
 
 ### T-06 — Server e2e
 
@@ -192,7 +192,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Spec: after `start`, `localStorage['data'].user.sec_user_id === target` and `access_token` unchanged; after `end`, `localStorage['data'].user.sec_user_id === actor` and key removed; `end` when `/end` rejects still restores.
   - [ ] `npm run lint -- --quiet` clean for touched files.
 - **Verification — failing input:** in the `end` spec, seed `localStorage['data']` with the target and assert the admin is written back; drop the `localStorage.setItem('data', …)` line → red (J-11 reintroduced).
-- **Dependencies:** T-04 (contract) · **Effort:** M · **Skills:** `angular-developer` · **Status:** todo
+- **Dependencies:** T-04 (contract) · **Effort:** M · **Skills:** `angular-developer` · **Status:** done (PASS, execution.md T-07)
 
 ### T-08 — Client interceptors, auth plumbing, restore
 

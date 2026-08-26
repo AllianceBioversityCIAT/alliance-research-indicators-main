@@ -63,6 +63,12 @@ export class ToPromiseService {
       headers = headers.set('X-API-Key', environment.clarisaApiKey);
     }
 
+    if (config?.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        headers = headers.set(key, value);
+      });
+    }
+
     return this.TP(this.http.post<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -86,6 +92,12 @@ export class ToPromiseService {
     }
     if (config?.noAuthInterceptor) {
       headers = headers.set('no-auth-interceptor', 'true');
+    }
+
+    if (config?.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        headers = headers.set(key, value);
+      });
     }
 
     const fullUrl = this.getEnv(config?.isAuth) + url;
@@ -166,4 +178,6 @@ interface Config {
   noCache?: boolean;
   noAuthInterceptor?: boolean;
   clarisaApiKey?: boolean;
+  /** Extra raw headers to set on the request (e.g. `X-Impersonation-Session`). */
+  headers?: Record<string, string>;
 }

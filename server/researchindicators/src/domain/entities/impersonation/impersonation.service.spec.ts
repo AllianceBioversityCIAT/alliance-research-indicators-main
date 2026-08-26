@@ -352,6 +352,34 @@ describe('ImpersonationService', () => {
       expect(session.ended_at).toBeInstanceOf(Date);
     });
 
+    // @akili-spec changes/profile-simulation — NFR-IMP-004: lazy expiry
+    // marking warns {actor_user_id, target_user_id, session_id, reason}.
+    it('warns with actor_user_id, target_user_id, session_id, reason=expired on lazy expiry marking (failing input: session expired 241min > TTL 240)', async () => {
+      const now = Date.now();
+      const session = {
+        session_id: 's2',
+        actor_user_id: 10,
+        target_user_id: 20,
+        started_at: new Date(now - 241 * 60_000),
+        expires_at: new Date(now - 1 * 60_000),
+        ended_at: undefined,
+        end_reason: undefined,
+      };
+      sessionRepository.findOne.mockResolvedValue(session);
+      const warnSpy = jest
+        .spyOn((service as any).logger, '_warn')
+        .mockImplementation(() => undefined);
+
+      await service.resolve('s2', 10);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /actor_user_id=10.*target_user_id=20.*session_id=s2.*reason=expired/,
+        ),
+      );
+      warnSpy.mockRestore();
+    });
+
     it('returns state=valid with the target profile when the session is owned and not expired', async () => {
       const now = Date.now();
       sessionRepository.findOne.mockResolvedValue({
@@ -402,6 +430,33 @@ describe('ImpersonationService', () => {
       expect(session.end_reason).toBe(ImpersonationEndReasonEnum.MANUAL);
       expect(sessionRepository.save).toHaveBeenCalledWith(session);
       expect(result.session_id).toBe('s1');
+    });
+
+    // @akili-spec changes/profile-simulation — NFR-IMP-004: `end` warns
+    // {actor_user_id, target_user_id, session_id, reason} (was session_id only).
+    it('warns with actor_user_id, target_user_id, session_id, reason on end (failing input: reason="logout")', async () => {
+      const session = {
+        session_id: 's1',
+        actor_user_id: 10,
+        target_user_id: 20,
+        started_at: new Date(),
+        expires_at: new Date(Date.now() + 60_000),
+        ended_at: undefined,
+        end_reason: undefined,
+      };
+      sessionRepository.findOne.mockResolvedValue(session);
+      const warnSpy = jest
+        .spyOn((service as any).logger, '_warn')
+        .mockImplementation(() => undefined);
+
+      await service.end('s1', 10, 'logout');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /actor_user_id=10.*target_user_id=20.*session_id=s1.*reason=logout/,
+        ),
+      );
+      warnSpy.mockRestore();
     });
 
     it('is idempotent: calling end twice on the same already-ended row does not overwrite it and returns the same row', async () => {

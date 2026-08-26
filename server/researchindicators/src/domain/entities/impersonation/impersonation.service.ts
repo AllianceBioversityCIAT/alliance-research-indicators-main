@@ -206,6 +206,10 @@ export class ImpersonationService {
       session.end_reason = ImpersonationEndReasonEnum.EXPIRED;
       session.updated_by = actorId;
       await this.sessionRepository.save(session);
+      // NFR-IMP-004 — lazy expiry marking, logged as a rejection reason.
+      this.logger._warn(
+        `impersonation.expired actor_user_id=${actorId} target_user_id=${session.target_user_id} session_id=${sessionId} reason=expired`,
+      );
       return { state: 'expired', session: this.toSessionSummary(session) };
     }
 
@@ -245,7 +249,10 @@ export class ImpersonationService {
           : ImpersonationEndReasonEnum.MANUAL;
       session.updated_by = actorId;
       await this.sessionRepository.save(session);
-      this.logger._warn(`impersonation.end session_id=${sessionId}`);
+      // NFR-IMP-004 — full attribution on end (was session_id-only).
+      this.logger._warn(
+        `impersonation.end actor_user_id=${actorId} target_user_id=${session.target_user_id} session_id=${sessionId} reason=${reason}`,
+      );
     }
 
     return this.toSessionSummary(session);
