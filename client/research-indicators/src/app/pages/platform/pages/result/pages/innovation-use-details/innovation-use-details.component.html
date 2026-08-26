@@ -5,19 +5,83 @@
   @if (loadFailed()) {
     <div class="flex items-center rs-gap-[8] rs-p-[20] rs-mb-[25] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
       <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
-      <span class="fs-[14] text-[var(--ac-grey-700)]">The Innovation Use section could not be loaded. Please try again.</span>
+      <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Use section could not be loaded. Please try again.</span>
     </div>
   } @else {
     <!-- INNOVATION USE DETAILS -->
     <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
       <h2 class="section-title">INNOVATION USE DETAILS</h2>
 
-      <span class="label">Level of use of this innovation<span class="text-red-500">*</span></span>
+      <span class="label">How would you assess the current use level of the innovation?<span class="text-red-500">*</span></span>
+
+      <!-- GUIDANCE CALLOUT (R-IUP-020, Amendment 01 / T-14). Renders unconditionally — not gated on
+           showJustification() or isEditableStatus() (AC.5). Mirrors the ACTORS callout's bg-/border-l-/
+           rs-p-* shape (design.md §5.8) but NOT its color: --ac-grey-600 measures 2.91:1 and fails AA.
+           DD-17: body --ac-grey-800 (7.44:1), link --ac-light-blue-400 (6.35:1) on --ac-grey-100. -->
+      <div data-testid="use-level-guidance" class="bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
+        <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
+          <li class="fs-[14] text-[var(--ac-grey-800)]">
+            In case the innovation use level differs across countries or regions, we advise to assign the highest current
+            innovation use level that can be supported by the evidence provided.
+          </li>
+          <li class="fs-[14] text-[var(--ac-grey-800)]">
+            Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be
+            supported by evidence documentation.
+          </li>
+          <li class="fs-[14] text-[var(--ac-grey-800)]">The innovation use level will be quality assessed.</li>
+          <li class="fs-[14] text-[var(--ac-grey-800)]"
+            ><span class="font-semibold">YOUR USE LEVEL IN JUST 3 CLICKS:</span>{{ ' ' }}<a
+              [href]="calculatorUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-[var(--ac-light-blue-400)] underline"
+              >TRY THE NEW INNOVATION USE CALCULATOR</a
+            ></li
+          >
+        </ul>
+      </div>
+
       <app-innovation-use-level-stepper
         [levels]="levelsService.list()"
         [selectedLevelId]="body().innovation_use_level_id"
         [disabled]="!submission.isEditableStatus()"
         (levelSelected)="onLevelSelected($event)" />
+
+      <!-- DEFINITIONS LINK (R-IUP-020, Amendment 01 / T-14) — beneath the stepper's own definition
+           callout (`.description`, T-04). Renders unconditionally, same as the guidance callout above. -->
+      <p data-testid="use-level-definitions-link" class="fs-[14] text-[var(--ac-grey-800)] rs-mt-[12] rs-mb-[16]"
+        ><a
+          [href]="definitionsUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-[var(--ac-light-blue-400)] underline"
+          >Click here</a
+        >
+        to see the definition of all use levels</p
+      >
+
+      <!-- EVIDENCE CALLOUT (R-IUP-021, Amendment 01 / T-14). A sibling of the showJustification()
+           branch below — NOT nested inside it (c7 / R-IUP-021 scenario), so it renders at every
+           level and in a non-editable status. "Click here to go there" is a <button>, never a
+           document href (R-IUP-021 scenario) — it calls goToEvidence(), which issues a
+           Router.navigate carrying `version`/`from` forward (DD-16). -->
+      <div data-testid="evidence-callout" class="bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[16] rs-mb-[16]">
+        <p class="fs-[14] text-[var(--ac-grey-800)] rs-mb-[12]"
+          >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
+          necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
+          section of the form (<button
+            type="button"
+            class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
+            (click)="goToEvidence()"
+            >Click here to go there</button
+          >)</p
+        >
+        <p class="fs-[14] text-[var(--ac-grey-800)]"
+          >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data
+          paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication
+          materials that provide evidence of the current development/ maturity stage of the innovation.</p
+        >
+      </div>
 
       @if (showJustification()) {
         <div class="rs-mt-[20]">
@@ -62,7 +126,7 @@
 
       <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
         <i class="material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-300)]">info</i>
-        <span class="fs-[14] text-[var(--ac-grey-600)]">List every actor group using this innovation.</span>
+        <span class="fs-[14] text-[var(--ac-grey-800)]">List every actor group using this innovation.</span>
       </div>
 
       @if (body().actors.length === 0) {
@@ -89,7 +153,7 @@
           <button
             type="button"
             (click)="addActor()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other actor
             <i class="pi pi-plus !text-[12px]"></i>
           </button>
@@ -117,7 +181,7 @@
           <button
             type="button"
             (click)="addOrganization()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other organization
             <i class="pi pi-plus !text-[12px]"></i>
           </button>
@@ -148,7 +212,7 @@
           <button
             type="button"
             (click)="addQuantification()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other measure
             <i class="pi pi-plus !text-[12px]"></i>
           </button>

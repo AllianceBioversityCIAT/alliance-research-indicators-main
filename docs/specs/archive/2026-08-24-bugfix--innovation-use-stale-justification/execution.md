@@ -106,4 +106,4 @@ Time:        17.108 s
 
 ## Summary
 
-T-01 **PASS** on attempt 1. Spec has no further eligible tasks. Approval Mode `gated` — wait for the user before `/akili-archive`.
+T-01 **PASS** on attempt 1. Spec archived 2026-08-24.

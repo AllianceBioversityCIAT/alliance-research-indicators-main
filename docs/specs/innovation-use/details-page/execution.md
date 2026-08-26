@@ -15,7 +15,7 @@
 | Rework ceiling | 3 attempts per task |
 | Triad | Leader (T1 · opus) → Implementer (`akili-implementer` · T2 · sonnet) → Reviewer (`akili-reviewer` · T3 · opus, read-only). `author ≠ auditor` holds on both model and context for every task below |
 | Concurrency | **One task at a time in this checkout.** Two client tasks are not parallel-safe (root `CLAUDE.md` §4.3); `tasks.md` Document Control repeats the rule. No measurement command was run while a worker was active |
-| Budget authority | [`design.md`](./design.md) §12 — 13 tasks · ~3,200 LOC · ~28 review rounds. `tasks.md` §6 is a *derivation*, not a second budget |
+| Budget authority | [`design.md`](./design.md) §12 — 13 tasks · ~3,200 LOC · ~28 review rounds; **re-baselined by the user to ~4,600 LOC after T-07** (see the T-07 re-assessment below). **Amended 2026-08-26 by Amendment 01 to 14 tasks · ~3,400 (written) / ~4,800 (re-baseline) · ~31 rounds** — see §12's *Amendment 01 delta*. `tasks.md` §6 is a *derivation*, not a second budget |
 | Budget tracking | Running actuals in the *Budget ledger* below. A breach stops execution and escalates; it is not absorbed silently |
 | Advisory policy | `ADVISORY` findings are recorded here and **die here**. They never gate, never consume a rework attempt, and never mint or widen a task in this spec (`/akili-execute` §2.4) |
 
@@ -34,6 +34,8 @@ Actuals, re-derived per task with `git diff --stat`. Reconciled against `design.
 | T-07 | 680 | **1,021** (+1,021 / −0, 3 new files) | 2 | Over by 341 — the largest overrun. 677 of 1,021 are the spec file |
 | T-08 | 400 | **1,081** (+1,081 / −14, 3 files) | 3 | **2.7× its derivation** — the largest overrun of the run. 806 of 1,081 are the spec file |
 | T-09 | 160 | **327** (+327 / −2, 3 files) | 2 | 2.0× derivation; attempt-1 FAIL (whitespace silent block) closed by page-owned message. Running total **4,871** |
+| T-10 … T-13 | — | — | — | **Actuals live in T-13's `c10` reconciliation table below, their single home** (KZ-005: a measured figure gets ONE home and cites its deriving command — `git show --numstat` per task commit). Not restated here |
+| **T-14** | *(no §6 line — added by Amendment 01; budgeted in `design.md` §12's delta at +180…+260)* | **457** (+457 / −3, 3 files) | **1** | ⚠️ **Tripwire breach: ~1.8–2.5× the +180…+260 band.** 352 of 457 are the spec file — **the spec-tier over-run pattern holds for a tenth task.** Cause is the Leader's `tdd` assignment (each falsifying input became a permanent regression test), not scope creep. Escalated to the user, not absorbed |
 | **Running total** | **3,202** | **4,871** | **17** | ⚠️ Above re-baseline ~4,600; continuing under the T-07/T-08 ruling. T-13 c10 reconciles. Against §12's ~3,200 LOC / ~28 rounds. **No tripwire breach** — 17.7% of §12's ~3,200 LOC and 14.3% of its ~28 review rounds, spent on 3 of 13 tasks (23.1%). **Now tracking ahead of budget, not behind.** The T-01/T-02 overrun pattern (spec tier larger than derived) did **not** hold for T-03, which came in 80 lines under because a `git mv` carries code without authoring it. Cumulative variance is **+178 lines on a 752-line derivation (+23.7%)**, and the cause is now consistent enough to name: **every task whose deliverable includes new spec files over-runs, and the over-run is entirely in the spec tier** (T-01 +134, T-02 +61, T-04 +63; T-03, a move, came in 80 **under**). Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is the figure that will drift, not its ~1,700 implementation line.** The trend is now confirmed across five tasks at **+18.8% cumulative** (1,618 actual vs 1,362 derived), and it has *narrowed* from +23.7% because T-05's over-run was proportionally smaller. **Every task shipping new spec files over-runs, always in the spec tier; the one move task came in under.** Implementation lines track the derivation closely. **Projection: §12's ~1,500-line spec estimate is what drifts, not its ~1,700 implementation line — a ~3,800 total.** No tripwire *breach*: §12 gates the total and T-13 c10 owns reconciliation. Review rounds are the healthier number — **8 used against ~28 budgeted for 5 of 13 tasks**, i.e. tracking *under*. Re-assess at **T-07**, the largest task |
 
 ---
@@ -1812,3 +1814,737 @@ This spec's own record — written before the bugfix existed — documented the 
 ### Not touched
 
 This `execution.md` is append-only history and is not rewritten by this Pivot: the T-09 (`:1183`, `:1188`, `:1192`, `:1196`) and T-07 (`:830`, `:1027`) entries describing the original save-block design and review stand as written — they were true when recorded. `family.md` and `OPEN-ITEMS.md` carry their own follow-up rows for this bugfix (see `bugfix/innovation-use-draft-save/tasks.md` T-03), not a rewrite of this spec's history.
+
+---
+
+### T-14 — Amendment 01: level-selector guidance, definitions link, evidence callout + Evidence navigation
+
+| Field | Value |
+| --- | --- |
+| **Final status** | ✅ **PASS** on attempt **1** |
+| **Date** | 2026-08-26 |
+| **Implementer attempts** | **1** |
+| **Effort / skills assigned** | `high` · `angular-developer`, **`tdd`** |
+| **Requirements covered** | R-IUP-020 (AC.1–AC.6), R-IUP-021 (AC.1–AC.6) |
+| **Triad this task** | Leader (T1 · opus) → Implementer (T2 · **sonnet**) → Reviewer (T3 · **opus**, instructed read-only). `author ≠ auditor` holds on both model and context |
+| **Commit** | see the `[SPEC:docs/specs/innovation-use/details-page]` commit for T-14 |
+
+#### Environment deviation, recorded because it changes what was *enforced* versus *instructed*
+
+The session driving this task was rooted in a **different checkout** (`alliance-research-indicators-management/server/app-authorization`), so this repo's `.claude/` was not loaded. Consequences, stated rather than discovered later:
+
+| Normally enforced | This task |
+| --- | --- |
+| Step 8E wrappers `akili-implementer`→`sonnet`, `akili-reviewer`→`opus` + `tools: Read, Grep, Glob` | Documented fallback: general-purpose subagents seeded with `.agents/implementer.md` / `.agents/reviewer.md`, with **explicit model overrides** (sonnet / opus). Model and context independence **held**; the Reviewer's read-only restriction was **instructed, not enforced** — it made no writes, confirmed by `git status` |
+| `.claude/hooks/akili-tasks-gate.sh` blocking a `[x]` increment without `PASS` in `execution.md` | **Not active.** Evidence-before-checkbox was followed manually: this entry was written and saved **before** any `tasks.md` box was flipped |
+
+#### Leader deviations from the task file, recorded
+
+| Deviation | Reason |
+| --- | --- |
+| Added **`tdd`** to the task's listed skills (`angular-developer` only) | T-14's *Falsifying inputs* table names one input per check, and root `CLAUDE.md` §4.3 / KZ-014 forbid asserting a red that was not **seen**. Red→green is the only way c2/c3/c5/c6/c8/c12 become real gates rather than presence checks — the exact failure their own Disqualifiers name. **This decision is the direct cause of the c13 budget breach below** (each falsifying input became a permanent regression test rather than a one-off manual break-and-revert), and it is recorded here as a Leader cost, not an Implementer overrun |
+| Effort set to **`high`**, above the `medium` default for a Size-S T2 task | Size understates difficulty here: verbatim copy including a curly-quote pair, a two-argument router assertion at KZ-001's fourth recurrence, and a live CSS-cascade trap that silently defeats the token choice |
+| **c11 discharged by the Leader inline, before dispatch**, rather than deferred to the human gate | `.agents/leader.md` → *Deferring a check*: the assumption "this needs a logged-out browser" was probed cheaply instead of parked. Evidence below. The probe also removed a criterion the Implementer would otherwise have had to report as blocked |
+| The task's two **skill exclusions** (`ui-ux-pro-max`, `cognitive-doc-design`) were **upheld**, not overridden | Concurred with the task file's recorded reasoning: DD-17 closes every palette/token/contrast question with measured ratios, so a style-selection skill could only supply non-conforming alternatives; and this task ships template strings, not a document |
+
+#### c11 — Leader probe (D11: dead or permission-walled outbound link)
+
+Unauthenticated `curl`, no cookies, no session:
+
+| URL | Result |
+| --- | --- |
+| `https://www.scalingreadiness.org/calculator-use-headless/` | **HTTP 200**, 51,904 bytes, `<title>Calculator – Use (headless) | Scaling readiness</title>`, zero sign-in / request-access markers |
+| `https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view` | **HTTP 200**, 82,106 bytes, `<title>IPSR Infographic Innovation Use.pdf - Google Drive</title>`, zero `You need access` / `Request access` markers. The file title being served to an unauthenticated client **is** the evidence the ACL is `anyone-with-the-link` |
+
+**What this probe cannot reach (KZ-017):** `curl` is not a browser. It proves HTTP status and Drive's ACL — i.e. it closes defect class **D11** in both directions — but it does not prove the PDF viewer paints. That residual is a **D7** visual concern and is routed to `T-13`'s human visual pass, **not** claimed here. Recorded this way deliberately: crediting a probe for a question it did not cover is KZ-002 recurrence 6.
+
+#### Per-criterion evidence (attempt 1)
+
+| # | Evidence | Red observed (K-004 / KZ-014) |
+| --- | --- | --- |
+| c1 | Label span text === `How would you assess the current use level of the innovation?`; the required marker is a distinct `span.text-red-500`. Reviewer re-compared as programmatic string equality against `requirements.md`, not by eye | — |
+| c2 | Four `<li>` asserted as a full **ordered array**, scoped to `[data-testid="use-level-guidance"] li` | Swapped bullets 2/3 → red **on order**, not merely presence; reverted → green |
+| c3 | Both links carry exact URL, `target="_blank"`, `rel="noopener noreferrer"`, discernible text | Stripped `rel` → red (`Received: null`); reverted → green |
+| c4 | P1 and P2 byte-exact, including P1's `‘Evidence’` (U+2018/U+2019, emitted `&lsquo;`/`&rsquo;`) and P2's verbatim `current development/ maturity stage` spacing — **kept on purpose per proposal D-3**, not a typo | — |
+| c5 | 5 tests, each `toHaveBeenCalledWith(['/result','1','evidence'], { queryParams: … })` — **both arguments together**. Cases: version+results-center, from=home, from dropped (non-whitelisted), version dropped. One test shows `toHaveBeenCalled()` passing and then requires the two-argument form, making KZ-001 rec. 4 explicit in the suite | Removed `{ queryParams }` from the navigate call → **all 5** red; reverted → green |
+| c6 | All three blocks present at level `null`, `0`, `9`, and with `isEditableStatus()` false | Wrapped the evidence callout in `@if (showJustification())` → 4 red at `null`/`0`/non-editable **while level 9 stayed green** — the check discriminating exactly at its boundary rather than passing by accident. Reviewer additionally confirmed the component uses **default** change detection, without which the non-editable test would have passed vacuously |
+| c7 | `git diff -U0` shows no `+`/`-` line touching `showJustification` / `justificationMissing` / `justificationWhitespaceOnly`. The new blocks are **siblings** of the `@if` branch | Structurally confirmed by c6's falsifying input |
+| c8 | `grep -nE '#[0-9a-fA-F]{3,8}'` → **exit 1 on each of the three Scope paths, named individually** (KZ-005: the file set is a bounded axis) | Injected a hex const → exit 0 with the hit reported; reverted → exit 1. **And it caught 5 real, unintentional violations** in the Implementer's own first-draft spec file (WCAG math + explanatory comments) before they shipped — rewritten to decimal RGB triples. A gate that found something is a gate |
+| c9 | **Full** `npm test -- --silent`, unfiltered → **316 suites / 6720 tests green.** Implementer ran it twice; **Leader re-ran it independently in a quiet tree** (no worker active) → identical. Coverage **98.19 / 96.30 / 97.76 / 98.49** vs floors 40/20/45/30. Baseline moved 312/6510 → 316/6720 because the two `innovation-use-*` bugfix specs landed after T-13's measurement | Targeted runs are recorded as **inconclusive**, never as a pass (KZ-003) |
+| c10 | `git diff --exit-code` clean **per path** on `innovation-details.component.spec.ts`, `actor-item.component.spec.ts`, `organization-item.component.spec.ts` (R-IUP-019 AC.2) | — |
+| c11 | Leader probe above | — |
+| c12 | **Cascade resolved, not assumed:** `grep 'class="[^"]*description'` over the page template returns **nothing** — no `.description` exists in this file, so neither trap can reach the new nodes, and the explicit `text-[var(--ac-grey-800)]` / `text-[var(--ac-light-blue-400)]` utilities are what render. Asserted per element via `.closest('.description') === null` plus a per-role `className` check. Computed ratios: grey-800/grey-100 **7.44:1**, light-blue-400/grey-100 **6.35:1**, grey-800/white-1 **8.00:1**, light-blue-400/white-1 **6.83:1** — all ≥ 4.5:1, light theme (DD-14) | Swapped grey-800 → grey-600 on all four bullets → red on the "which selector won" class assertion; a pure-function test independently recomputes grey-600/grey-100 as **2.91:1** and fails the threshold. Reverted → green |
+| c13 | `git diff --stat`: html `+66/-1`, ts `+42`, spec `+352/-2` = **457 insertions / 3 deletions**, 3 files | Reported, **not absorbed** — see the tripwire below |
+
+**Also verified, beyond the criteria:** `npm run lint -- --quiet` → `All files pass linting.`, with `git status` / `git diff --stat` byte-identical before and after **both** runs — so the `--fix` script mutated nothing, which is what its Disqualifier demands of a script that is a fixer and not a gate. `npm run build` → exit 0, all warnings pre-existing on unrelated components. `npx tsc -p tsconfig.spec.json --noEmit` → 934 project-wide errors against the documented ~945 baseline, **zero in the three T-14 files**.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> All 13 exact-string, token, cascade, navigation, unconditional-rendering, scope, and hex-literal criteria for T-14 verify against `requirements.md` R-IUP-020/R-IUP-021, `design.md` §5.8 / DD-15–DD-17, and the stylesheets as they actually are. Both declared judgment calls are acceptable.
+
+The Reviewer verified independently rather than on report: programmatic string equality for all six copy constants; every DD-17 token resolved against `colors.scss`; the c8 grep re-run per path; the DD-16 contract compared line-by-line against `result-sidebar.component.ts` → `navigateTo()`; mock hygiene (`jest.clearAllMocks()` in both `beforeEach` and `afterEach`, so the shared `router.navigate` spy cannot carry a stale matching call); **no page-wide `textContent` search anywhere in the new tests** — the named Disqualifier; and every new `rs-*` / `fs-*` utility confirmed to exist in `responsive-size.scss`, so no class is inert. It also confirmed the old label string `Level of use of this innovation` has **zero** remaining repo-wide references, which is why §11.2's reversion challenge held: nothing asserted it.
+
+**Both Implementer judgment calls ruled acceptable:** the 2-line `activatedRouteMock` type widening is in-scope (same file the Scope names, caused solely by this task's own `c5` additions, a type annotation with zero runtime effect, and c10's three protected files untouched); and reporting the `design.md` §5.8 file-location error as a **finding rather than a fix** was correct — an Implementer silently editing an approved spec document would put a spec amendment inside a copy task's gate.
+
+#### `ADVISORY` — 4R lens findings, recorded and closed here
+
+Per Document Control's advisory policy and `/akili-execute` §2.4, these **never gate, never consume a rework attempt, and never mint or widen a task in this spec.** They are recorded and they die here. Any that deserves action needs its own proposal.
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | The five `c5` tests restore `activatedRouteMock.snapshot.queryParamMap.get` on the **last statement** of each `it`, not in `afterEach`. **Reviewer marked this reachable and constructed it:** if `goToEvidence()` ever drops `version`, test 1's assertion throws *before* its restore line, permanently leaving `get` returning stale values for every later test in the file — and because the mock is module-level and shared with the second `describe`, the pre-existing Back/Next specs then fail spuriously and **bury the one real red**. Remedy: hoist the restore into an `afterEach` inside the `c5` describe. **The most actionable advisory of the six** — carried to the user's decision, not actioned here |
+| **Readability** | Four "falsifying input" tests restate the assertion immediately above them. They do discriminate (none is tautological), but the Falsifying-inputs table asks for a red *observed during development*, which was separately done against real code mutations — so committing the restatements duplicates coverage without adding a distinct gate |
+| **Readability** | `{{ ' ' }}` as bullet 4's label/link separator is an unusual idiom; `&ngsp;` states the intent more plainly |
+| **Resilience** | The copied contract omits the sidebar's explicit `replaceUrl: false`. Behavior is identical today (it is Angular's default), but DD-16's own commitment is that "the duplication is named, not hidden" — carrying the option across would make a future sidebar policy change a visible diff at both call sites |
+| **Readability** | The definitions-link paragraph's own body text is the one new text node verified only by reading markup; it is not among c12's four named roles, so no criterion is unmet |
+| **Risk** | `Click here` / `Click here to go there` are non-descriptive accessible names. AC.4 is satisfied as written (discernible, not icon-only, not a bare URL) and both strings are **user-ruled verbatim copy**, so this is not actionable here — noted only so that if `T-13`'s human a11y pass objects, `aria-label` is the remedy that touches neither the approved copy nor a token |
+
+#### ⚠️ Budget tripwire — breached at T-14, escalated not absorbed
+
+| Dimension | §12 *Amendment 01 delta* | T-14 actual | Verdict |
+| --- | --- | --- | --- |
+| Template + TS | ~45 | **108** | ~2.4× |
+| Spec | ~150–215 | **352** | ~1.6–2.3× |
+| **Total** | **+180 … +260** | **+457 / −3** | ⚠️ **~1.8–2.5× over** |
+| Review rounds | +2 … +3 | **1** | ✅ under |
+
+**Cause named, and it is the Leader's:** the `tdd` assignment above turned each of the six falsifying inputs into a **permanent regression test** rather than a one-off manual break-and-revert, and c12's per-selector cascade assertions across two backgrounds carry real weight. This is bought coverage, not scope creep — the Implementer explicitly declined to trim coverage to fit the number and flagged it instead, which is the correct behavior. **Escalated to the user at the Step 5 gate.** Review rounds moved in the opposite direction (1 against +2…+3 budgeted), as they have all run.
+
+This sits **on top of** the pre-existing spec-wide overrun the user has already ruled on twice with full information. `T-13 c10` owns the reconciliation and now reconciles against **14 tasks · ~3,400 / ~4,800 · ~31 rounds**.
+
+#### Leader corrections to the spec, from findings this task surfaced
+
+| Correction | Basis |
+| --- | --- |
+| `design.md` §5.8 attributed **both** `.description` cascade traps to `custom-fields.scss`. The link-repaint rule `.description a { color: #2e2e2e }` actually lives in `client/research-indicators/src/styles/styles.scss:193–199` (nested SCSS); `custom-fields.scss:99–101` carries only `.description { color: #777c83 }` | Found by the Implementer, **verified inline by the Leader against both files before writing** (KZ-007: a correction record is the highest-risk artifact class — verify against the source, do not relay), and independently re-confirmed by the Reviewer. A wrong citation inside a *trap warning* is precisely the artifact that gets trusted while wrong |
+| `tasks.md` Document Control `Task count` read **13**, and §9's done definition read `All 13 T-NN tasks` — both stale the moment Amendment 01 added `T-14`, and both contradicted `design.md` §12, which the same amendment updated to **14** | Amendment 01's own correction closure, incomplete at the specify pass. This is **KZ-005**, the branch's highest-recurrence lesson (6): a correction applied at its cited sites and missed elsewhere. Swept in **both directions** across the spec folder |
+
+**Reported, deliberately NOT fixed:** `tasks.md` §9's human-visual line still reads *"in both themes"*, which **DD-14** (2026-08-21) superseded — dark mode is unreachable by any user, so the gate is **light theme only**, as `requirements.md` §9 row D7 and §12 already record. Left in place because documentation-hygiene rows in this spec are the user's explicit **Phase-2** scope decision (`judgment.md` `I-2`/`I-3`/`I-5`); folding an unrelated doc fix into a copy task's commit is what that decision exists to prevent. Flagged for `/akili-validate` or the archive sweep.
+
+#### What this task's evidence still does not prove
+
+`c1`–`c4`, `c6` and `c8` are **presence assertions on an unrendered tree**: they prove the strings and attributes exist in the DOM jsdom builds, and nothing about where the blocks sit visually, whether the three callouts read as one family, whether the two new links are distinguishable from body text, or focus order through them. `c12` is arithmetic over token values and asserted class names — jsdom paints nothing. Those are defect classes **D7**/**D8**, have **no** automated gate, and remain routed to `T-13` c7/c8/c9 as **AR-2**. `c5` proves the mocked `Router` receives the right two arguments; it does not prove the real Router resolves them or that the Evidence page consumes them (**AR-1**).
+
+
+#### User rulings at the T-14 gate — 2026-08-26
+
+| Ruling | Decision | Consequence |
+| --- | --- | --- |
+| **Budget tripwire (c13)** — +457 against §12's *Amendment 01 delta* band of +180…+260 | ✅ **Accepted as bought coverage.** Third ruling on this spec's overrun, made with the delta and the cause in hand | The breach is **recorded, not reconciled here.** `T-13 c10` reconciles the total against **14 tasks · ~3,400 written / ~4,800 re-baseline · ~31 rounds**. Running actual after T-14: **5,646** (5,189 + 457), or **5,841** including RB-9's 195. **Do not re-escalate the *standing* overrun as if it were new** — escalate only a fresh per-task breach |
+| **The reliability `ADVISORY`** (un-restored shared mock in the `c5` tests) | ✅ **Actioned as a follow-up commit**, outside T-14's closed gate | Executed below. This is the sanctioned route for an advisory: recorded, then promoted **only by explicit user decision** — it did **not** widen T-14, mint a task, or reopen the gate (`/akili-execute` §2.4) |
+| **Next step** | ⏸️ **Pause.** `T-13`'s four remaining criteria are human-owed and need a browser | No further task dispatched. `/akili-resume` rebuilds from this log |
+
+#### Follow-up commit — advisory fix, and the advisory was PARTLY FALSIFIED in the doing
+
+**Change:** in the `c5 — evidence navigation` describe, the per-test `const original = …` / trailing-restore pairs were replaced by a `beforeEach` capture + `afterEach` unconditional restore of `activatedRouteMock.snapshot.queryParamMap.get`. One file, no assertion text touched.
+
+**The Reviewer's stated failure scenario did not reproduce, and this is recorded rather than quietly accepted.** The advisory claimed that on a `goToEvidence()` regression *"the pre-existing Back/Next specs then fail spuriously and bury the one real red."* The Implementer tested that claim instead of assuming it:
+
+- Reverting to the pre-fix pattern and breaking `version` forwarding reddened **2 of the 5** `c5` tests as designed — but the named Back/Next specs (`c14`) stayed **green**. They are declared **earlier in the file** than the T-14 block, and Jest runs tests in declaration order with no sequencer or randomization configured, so they had already passed before the poisoning test ran. **The cascade as worded is unreachable in this file's current layout.**
+- The **underlying mechanism is real**, and was demonstrated directly rather than argued: a temporary probe test declared *after* the `c5` block asserted the fixture default `'v1'` and **failed pre-fix**, reading the leaked stub; with the `afterEach` in place the same probe **passed** while only the two genuine `c5` failures remained. Probe and deliberate break both reverted, `git diff` confirmed empty on the `.ts`.
+
+**Verdict:** the fix is **not cosmetic** — it closes a live forward-leak hazard for any test declared after that block, including ones not yet written. But today's Back/Next specs were safe **by position, not by design**, so the advisory's severity was overstated by one step. Recorded because an auditor's *"I constructed it"* is itself a claim (**KZ-007**: a correction record is the highest-risk artifact class, and this one came from the auditor), and because **KZ-014** binds the argument as tightly as the command — a reachability verdict that has not been executed may not be asserted. It was executed, and it was half wrong.
+
+**Verification (Leader-verified inline, not on report):** diff inspected — only the one spec file modified; all five two-argument `toHaveBeenCalledWith(['/result','1','evidence'], { queryParams: … })` assertions **byte-identical**, and the deliberate weak-then-strict pair intact (the `toHaveBeenCalledWith` count moves 19 → 20 solely because the new explanatory comment quotes the phrase in prose — confirmed in the diff, not inferred). `toHaveBeenCalled()` count unchanged at 13. Hex literals: **0**. **Full `npm test -- --silent` re-run by the Leader in a quiet tree → 316 suites / 6720 tests green**, coverage 98.19 / 96.30 / 97.76 / 98.49. Lint clean, `git status` re-inspected after.
+
+**Delegation note, recorded because it deviates from the triad and from what the user was told at the gate:** this follow-up ran through **one Implementer with no separate Reviewer.** The remedy was specified verbatim by the Reviewer's own advisory, so a second full audit would have re-derived its own recommendation; the Leader verified the diff and re-measured the suite inline instead. That is verification of **someone else's** work, not self-verification, so the Delegation Ceiling's ban is not engaged — but it is a narrower gate than a spec task gets, and it is on the record as such. The specific risk it was aimed at — a "cleanup" quietly weakening the KZ-001 rec-4 two-argument assertions — was checked directly and did not occur.
+
+
+---
+
+## ⛔ Pivot Record: DD-16 — the copied "contract" included an id source that is invalid at this component's depth
+
+**Date:** 2026-08-26 · **Trigger:** user-reported defect at the `T-13` human gate — *"(Click here to go there) no funciona, al dar click debería llevarme a la sección de evidencias"* · **Severity:** shipped defect, `T-14` / commit `e508eeea`, **through a green suite and a Reviewer PASS**
+
+### What was discovered
+
+`goToEvidence()` read `this.route.snapshot.paramMap.get('id')` and navigated to **`/result/null/evidence`**.
+
+Four premises, each verified independently by the Leader and then again by the Reviewer:
+
+| Premise | Evidence |
+| --- | --- |
+| `paramsInheritanceStrategy` is never configured | `app.config.ts:24` is `provideRouter(routes, withViewTransitions())`; the symbol appears **nowhere** in `client/research-indicators/src` outside the two files under audit. Angular's default `'emptyOnly'` therefore applies, and a child route does **not** inherit its parent's params |
+| `:id` is on the **parent** route | `app.routes.ts` — `result/:id` at the parent level, `innovation-use-details` inside its `children` array |
+| The sidebar reads it successfully because it sits **at** that route | `result.component.html:2` — `<app-result-sidebar>` is a **sibling** of the `<router-outlet>` on line 4, i.e. declared at `result/:id`, not below it |
+| Only `id` broke; the query params were always fine | `queryParamMap` is global to the URL and depth-independent — the harness confirms `version` / `from` resolving correctly in the same failing test |
+
+### Why this is a Pivot and not a rework attempt
+
+**The design decision, followed exactly, produces the defect.** `DD-16` instructed copying `ResultSidebarComponent.navigateTo()`'s *contract*; the Implementer read that as including its **id source**, which is a defensible reading of the words as written. Patching only the line would leave `DD-16` intact and the next implementer would reintroduce it from the same instruction.
+
+**And it explains the review escape, which is the more important lesson.** The `T-14` Reviewer compared the two call sites line-by-line and correctly reported them **identical** — that is in its recorded verdict. Identity was the wrong test: **identical code at a different route-tree depth behaves differently.** No amount of care at that comparison would have caught it, because the comparison itself was the blind spot.
+
+**Two mitigations that were in force and did not fire**, recorded because their failure is the actionable part:
+
+- **R-IUP-021 AC.4** demanded the assertion be made "on the **built commands and query params**, not on the fact that a navigation happened" — and it *was*. The assertion form was right; the **double** was wrong. `activatedRouteMock.snapshot.paramMap.get('id')` returned `'1'`, a value production never produces at this depth. This is **KZ-001** at **recurrence 5**, and it is the sharpest instance yet: *a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behavior.* AC.4's wording closes the assertion-shape hole and says nothing about fixture fidelity.
+- The proposal's own risk row **RK-A1** named this risk and offered exactly that assertion as the mitigation (`proposal-amendment-01-level-guidance.md:217`). The mitigation was implemented as written and the risk still landed. Left unedited — a proposal is a point-in-time record — but noted here so the row is not read as having worked.
+
+### Documents corrected
+
+| Document | Correction |
+| --- | --- |
+| `design.md` **DD-16** | Amended in place with a ⚠️ block: the **id source is NOT part of the copied contract**; use `cache.currentResultId()`, never `getCurrentNumericResultId()` / `getCurrentPlatformCode()` (both truncate a platform-coded id); what *is* copied is the commands shape and the `version`/`from` rules. The tree-depth mechanism and the review-escape reason are stated inline, so the instruction cannot be re-read the old way |
+| `requirements.md` R-IUP-021 | **Not changed, deliberately.** Its Navigation line scopes the sidebar comparison to *"the `version` and `from` query parameters"* only — it never specified the id source, so it was not wrong. AC.3/AC.4 describe the destination and the assertion form, both unchanged by this fix |
+
+**Two-direction sweep run** (`/akili-specify` → *Correction Closure*): grepped `paramMap`, `navigateTo()` and *"the sidebar's own navigation"* across the whole spec folder. One further hit, `proposal-amendment-01-level-guidance.md:110`, left unchanged as a historical record per the rule above.
+
+### PV-T14-1 — the fix: ✅ PASS
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer verdict, **attempt 1**, four advisories, no FAIL |
+| **Authorized by** | User bug report at the human gate. Recorded as a **non-task change** on the `RB-9` / `PV-T13-1` precedent — it does not reopen `T-14`'s closed gate |
+| **Effort / skills** | `high` · **`systematic-debugging`**, `angular-developer` |
+| **Triad** | Implementer (T2 · sonnet) → Reviewer (T3 · opus). `author ≠ auditor` on both axes — **not collapsed despite a one-line production diff**, and the reason is on the record: the previous full gate is what let this through |
+
+**The change.** `innovation-use-details.component.ts` → `goToEvidence()`: `route.snapshot.paramMap.get('id')` → `cache.currentResultId()`. **One production line**, plus a comment block documenting the tree-depth trap so the fix carries its own reason. **+135/−7** and **+17/−1** across two files. Destination shape, `version`/`from` forwarding and the `Router.navigate` (never an `href`) are byte-for-byte unchanged — only the id *source* moved.
+
+**A second defect was averted by user information mid-flight, and it would not have been caught by any test in the suite.** The user reported that the id is often **platform-coded** (`STAR-13232`), not a bare number. The Leader corrected the dispatch immediately: `cache.getCurrentNumericResultId()` — the obvious-looking accessor sitting right next to the correct one — runs `extractNumericId()` and returns only the numeric tail, which would have navigated to `/result/13232/evidence`, a URL form no other page in the app emits, and **might have appeared to work**. Critically, **all five pre-existing `c5` cases use `'1'`, a bare numeric, so the entire suite was blind to a prefix-dropping bug.** A `STAR-13232` case and its falsifier were added on that basis. *Recorded because it is the same failure as the one being fixed — a fixture that does not represent production — caught the second time by a human, not by the tier.*
+
+**Both reds observed, not argued** (K-004 / KZ-014):
+
+| Red | Observed |
+| --- | --- |
+| The defect itself, against unfixed code | `expected "STAR-13232"` / `received null` in the id position; same `null` for a bare-numeric id. A structural test confirms `paramMap.get('id')` is `null` at this depth while `queryParamMap` resolves correctly, isolating the cause |
+| The prefix falsifier | Reverting the fix with the new tests present → **8 failures** (all 5 original `c5` + the platform-coded case + both route-tree tests) |
+
+**The test tier was repaired, which is half the fix.** The flat `activatedRouteMock` was replaced for the id-source assertions by a real `provideRouter` + `RouterTestingHarness` parent→child tree with a genuine `<router-outlet>` (`RouterTestingHarness` was already in use in two other client specs — no new dependency). All five original `c5` assertions survive as full two-argument `toHaveBeenCalledWith`, and the deliberate weak-then-strict pair is intact. The Reviewer ruled the `'1'` → `1` expectation change **honest alignment, not weakening**: `toHaveBeenCalledWith` uses strict recursive equality, and `CacheServiceMock.currentResultId` has returned the number `1` since T-07.
+
+**Verification.** `npm test -- --silent` full unfiltered → **316 suites / 6724 tests green** (6720 baseline + 4 new), **re-measured independently by the Leader in a quiet tree**. Coverage 98.19 / 96.30 / 97.76 / 98.49 vs floors 40/20/45/30. `npm run lint -- --quiet` → `All files pass linting.`, `git status` re-inspected after. Hex: **0** on both files. `git diff --exit-code` clean on the three protected Innovation Development specs.
+
+**What the Reviewer established beyond confirming the Leader** — it did not stop at agreement:
+
+1. **The composition seam is covered on both sides.** The route-tree block substitutes `CacheServiceMock`, so it proves *depth* and *id source* but not that the real `CacheService` receives the route id. That other half is separately asserted at `result.component.spec.ts:192–194` (`params$.next({ id: 'STAR-456' })` → `setCurrentResultId('STAR-456')`) plus four `getCurrentResultIdentifier` cases. Same seam asserted from each side — which is what makes the pair of test suites add up to a claim about production.
+2. **It attempted the degenerate case rather than reasoning about it.** `currentResultId` initializes to `signal(0)`, so a child activating before the parent's effect would navigate to `/result/0/evidence`. It tried to construct that via `/result/abc/innovation-use-details` and **could not reach the child**: `resultExistsResolver` runs on `result/:id`, computes `Number('abc') = NaN`, and redirects to `/results-center` before the child activates. **Reachability verdict: unreachable via the router** — recorded so the premise is on file if that resolver is ever relaxed.
+3. It checked the harder race (client-side `:id` change with `ResultComponent` reused): `routeParams` is `toSignal(route.params)`, so the effect re-fires and flushes before the child's DOM is clickable — same risk profile as the already-shipped `navigateTo()`.
+
+#### `ADVISORY` — recorded, not actioned
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | `CacheServiceMock.currentResultId` returns the **number** `1`, but production for `/result/1/…` yields the **string** `'1'` (`getCurrentResultIdentifier` returns the raw param). Harmless — both serialize to the same URL — and pre-existing since T-07, but the double is one notch off production's type. Prefer `'1'` if that mock is ever touched |
+| **Readability** | The structural test asserting `paramMap.get('id')` → `toBeNull()` pins a **framework default**, not product behavior. A future, legitimate app-wide `paramsInheritanceStrategy: 'always'` would fail it even though `goToEvidence()` stays correct. Worth a one-line note marking it a characterization test, so the next maintainer updates rather than reverts it |
+| **Readability** | The new production comment says `currentResultId` "is set once" by `ResultComponent`'s effect; it is set on **every** `:id` change. Loose rather than wrong — but this comment's entire job is to prevent reintroduction, so its precision is load-bearing |
+| **Risk** | The `signal(0)` premise above — unreachable today, on file in case `resultExistsResolver` is relaxed |
+
+### Cross-spec finding — reported, NOT fixed, and it needs its own bugfix spec
+
+**`pool-funding-alignment.component.ts:379–384` carries the identical defect class, and is worse because it fails silently rather than visibly.**
+
+```ts
+const routeId = this.route.snapshot.paramMap.get('id');
+if (routeId) return routeId;                                  // dead branch in production
+const numeric = this.cache.getCurrentNumericResultId();
+return numeric ? String(numeric) : '';                        // the only path ever taken
+```
+
+It sits at the **same tree depth**, so `routeId` is **always `null`**: the primary branch is dead code and every call falls through to a numeric-only fallback that **strips the platform prefix** (`TIP-1234` → `'1234'`). Consequences traced by the Implementer, not assumed:
+
+- `isPoolFundingCapable()` / `platformFromResultCode()` (via `bilateralService.getAlignment`, line 434) always receive a bare-numeric code and, under the `numeric ⟺ STAR` invariant (**KZ-012**), always classify it as STAR-capable — a **non-STAR result reached by direct URL is misclassified**
+- the eligibility redirect at line 440 (`router.navigate(['/result', resultCode, …])`) **drops the platform prefix from the URL**
+- the websocket filter at line 462 compares `evt.result_code === this.resultCode()`, where `resultCode()` never carries a prefix — a possible silent no-op on the live-update path if the server's `result_code` is prefixed
+
+**Containment:** `ResultSidebarComponent` gates the tab with `cache.isExternalResult()`, computed correctly and unaffected, so the tab is **not reachable by normal UI navigation** for non-STAR results. **No route guard blocks direct URL entry**, so the path is reachable, just not advertised.
+
+**Its own spec exhibits the same KZ-001 pattern:** `pool-funding-alignment.component.spec.ts:188` uses a flat route mock returning `'RES-001'` — a value production never produces — while line 202 documents the numeric fallback as an *edge case* when it is in fact the **only** path ever taken. So that suite is green over the same defect, by the same mechanism, in a second feature.
+
+**Not fixed here, and not minted as a task in this spec** (`/akili-execute` §2.4): different page, different module, different spec, and an app-wide id-source question deserves its own gate rather than riding a copy amendment's. **Escalated to the user for its own bugfix spec.** Strong candidate to be scoped as *"audit every `route.snapshot.paramMap.get('id')` in `pages/platform/pages/result/pages/`"* rather than as one file's bug — there are exactly two call sites today, and this record is the reason to check for a third.
+
+
+### PV-T14-2 — `cursor-pointer` on the Evidence link, and a standing spec unknown resolved
+
+**Date:** 2026-08-26 · **Trigger:** user at the `T-13` human gate — the navigation now works, *"lo único que falta es agregarle el cursor pointer para indicar que se le puede dar click"* · **Authorized by:** the user, same non-task-change precedent as `PV-T14-1` / `PV-T13-1`
+
+**The change.** `innovation-use-details.component.html` — one line, one element: the `<button (click)="goToEvidence()">` gains `cursor-pointer` alongside `text-[var(--ac-light-blue-400)] underline`. Matches the convention already used at 8+ sites including **this same file's** "Add other actor" button and `evidence.component.html:28`. **Not** applied to the two external links: they are `<a [href]>` and already get a pointer from the user-agent stylesheet.
+
+**Effort / skills:** `low` · `angular-developer`. **One Implementer, no separate Reviewer** — a single utility class on a single element, with the Leader verifying inline. Recorded as a narrower gate than a spec task gets.
+
+**Verification.** `npm test -- --silent` → **316 suites / 6724 tests green**, re-measured by the Leader in a quiet tree. Lint clean, post-lint `git status` unchanged. Hex: 0. **Class presence confirmed by the Leader with a direct grep over the `evidence-callout` block, not inferred from the suite** — the Implementer's report described the green suite as indirect confirmation of the class, which it is not: no test asserts that class, so a passing suite is silent about it. The direct check is the evidence.
+
+**What is NOT proven, stated rather than implied.** No test in this repo can prove a pointer cursor renders. This is **D7/D8**, no automated gate, routed to `T-13` c7 as **AR-2**. See the finding below for the structural reason.
+
+#### 🔓 Standing unknown RESOLVED — `T-11` Lens C's *"single unknown that gates every token claim in this spec"*
+
+`execution.md` → T-11 recorded: *"the app also loads a **remote** stylesheet (`…amazonaws.com/frontend-parameters/colors.css`) that is not in the repo … **That single unknown gates every token claim in this spec and is worth resolving once.**"* Resolved here, by reading `src/index.html` rather than reasoning about it — and the answer is a **different mechanism than the one that was suspected**:
+
+**`src/index.html:13` loads Tailwind CSS v4 as a runtime browser script from a CDN:**
+
+```html
+<script src="https://unpkg.com/@tailwindcss/browser@4.1.6/dist/index.global.js" crossorigin="anonymous"></script>
+```
+
+Corroborated on four independent axes: Tailwind is **absent** from `client/research-indicators/package.json` (neither `dependencies` nor `devDependencies`); there is **no** `tailwind.config.*` and **no** PostCSS config; `angular.json`'s `styles` array lists only the six local SCSS files plus `mapbox-gl.css`; and the built global stylesheet `dist/research-indicators/browser/styles-*.css` (262,715 bytes) contains **zero** rules for `cursor-pointer`, `items-center`, `text-[`, `bg-[` or `border-l-[`, while containing 60 `rs-p-` and 60 `fs-` rules (from `responsive-size.scss`), 24 `.flex`, and the project's own `.app-page-wrapper` / `.description`.
+
+**Consequences that matter to this spec, and to any future one:**
+
+1. **Every Tailwind utility in this codebase — including all of DD-17's `text-[var(--ac-grey-800)]` / `bg-[var(--ac-grey-100)]` / `border-l-[4px]` — is generated in the browser at runtime.** They are correctly absent from every build artifact. **A grep over `dist/` therefore cannot falsify a Tailwind class**, and any future check that tries will return a confident, wrong zero.
+2. **This is why `T-14` c12 could only ever assert class names.** jsdom parses no CSS *and* the CSS does not exist until a browser script runs. c12's self-declared limitation — *"a computation over token values, not a measurement of rendered pixels"* — was not conservatism; it was the only claim available at that tier. The same holds for the `cursor-pointer` above.
+3. **The app's entire visual layer has a runtime dependency on `unpkg.com`.** Recorded as a fact, not a recommendation: no local fallback exists, so a CDN outage or a blocked egress path degrades every screen's styling at once. **Out of scope for this spec** — it is an app-wide infrastructure question, not a copy amendment's — and deliberately **not** minted as a task here (`/akili-execute` §2.4). Flagged for `docs/infrastructure.md` and the engineering lead.
+
+**A near-miss worth recording, because it is this log's own lesson turned on the Leader.** The Leader's first pass grepped `dist/` for `cursor-pointer`, found **zero**, and was one step from reporting that the class was inert and that DD-17's contrast decision might therefore be shipping unstyled text — a serious and **entirely wrong** claim. What stopped it was asking which region the check could structurally reach before trusting its zero: **KZ-017**, and **KZ-014**'s rule that an argument binds as tightly as a command. The build output was the wrong region by construction. *Recorded because a confident zero from a mis-scoped grep is exactly the failure mode this spec has now logged three times, and this instance was the auditor's own.*
+
+
+#### ✅ Human confirmation of PV-T14-1 and PV-T14-2 — 2026-08-26
+
+**Observed by the user at a browser, quoted rather than paraphrased** (KZ-002 recurrence 6 — a criterion discharged by a human observation must quote what that observation actually covered):
+
+| Quote | What it discharges |
+| --- | --- |
+| *"efectivamente ya hace redirecto"* | **PV-T14-1.** The Evidence navigation resolves in the real router to the real Evidence section. This is the **only** tier that could prove it: the unit tier asserts a mocked `Router`'s arguments and, per **AR-1**, no client test in this spec reaches a real navigation |
+| *"quedó funcionando perfectamente"* | **PV-T14-2.** The pointer affordance renders. **D7/D8 has no automated gate**, and jsdom plus a runtime-injected Tailwind stylesheet makes it unreachable at the unit tier by construction — a human at a browser was the only available evidence |
+
+**What these two quotes do NOT discharge — stated so the ticks are not read wider than the observation.** `T-13` stays `[~]` with all four of its human criteria open. The user exercised **one control**; `c7` requires the full page at 1440 px *and* the `md:` breakpoint with every label, callout, count field and card border legible; `c1` requires the whole end-to-end pass (sidebar → fill → save → re-read → green tick) in one go; `c8` requires the two screenshots; `c9` requires the keyboard pass. **None of those is advanced by this confirmation**, and crediting them from it would be exactly the recurrence-6 failure.
+
+**Standing observation about this spec's verification design, on the record because it now has two data points rather than an argument.** Both defects fixed after `T-14`'s PASS — the `null` result id and the missing pointer affordance — were found by a human clicking, not by 6,724 passing tests. Each sat squarely in a class the spec had *already* declared unreachable by automation (**AR-1** for real navigation, **AR-2**/D7/D8 for visual affordance) and routed to the human gate. The routing was correct and the gate worked; what the two escapes show is that `T-13`'s four open criteria are the load-bearing ones in this spec, not the residue.
+
+
+#### ✅ `T-14` c11 — residual CLOSED by human observation, 2026-08-26
+
+**Quoted, not paraphrased** (KZ-002 recurrence 6): *"los bulletpoints están, el link a la calculadora funciona perfecto, el link al pdf de inno use funciona perfecto, la redirección a evidencias también quedó funcional."*
+
+**c11 is now complete as a composition of two halves, and neither half alone would have done it** — stated this way so the tick is not read as resting on either:
+
+| Half | Evidence | What it could NOT reach |
+| --- | --- | --- |
+| **Does the ACL let a stranger in?** | Leader's unauthenticated `curl` probe: HTTP 200 on both URLs, the Drive file's own title served to a client with no session, zero `You need access` markers | `curl` is not a browser — it cannot show that the PDF viewer paints |
+| **Does it actually open for a human?** | This observation — both links *"funciona perfecto"* | The user did **not** state they were logged out, and c11's Disqualifier is explicit that *"opening the links while logged into a CGIAR Google account proves nothing about Drive's ACL"* |
+
+Each half covers precisely what the other structurally cannot. **Defect class D11 is closed in both directions.**
+
+**Additionally,** *"los bulletpoints están"* supplies the **rendered** half of `c2`, whose automated evidence was by its own admission a presence assertion on an unrendered tree.
+
+#### ⚠️ What this observation does NOT discharge — `T-13` stays `[~]`, all four criteria open
+
+Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: a human answered a real question, and the temptation is to credit it for the adjacent questions it did not cover.
+
+| Criterion | Why it is untouched by this |
+| --- | --- |
+| **c7** | Requires **both** viewports (1440 px *and* the `md:` breakpoint, landscape, height ≤ 768 px), *every* label / callout / count field / card border legible, the repeatable cards **stacking rather than overflowing**, and no unreadable contrast. The observation covers four elements functioning at one unstated viewport. It also does not touch the **`form-header` regression check** on an unrelated result tab, which T-13's own entry names as required because that component renders on 13 pages and its typography moved when `rs-*` began resolving |
+| **c1** | Nothing here exercises fill → **save** → re-read → green tick from the sidebar in one pass. Link navigation is not the payload path |
+| **c8** | No screenshots captured |
+| **c9** | No keyboard traversal observed — and *"el link funciona"* by mouse says nothing about focus order, a visible ring, or a focus trap in a repeatable card |
+
+
+**c11 caveat answered, 2026-08-26.** The note above recorded that the user had not stated whether they were logged out. They since confirmed: *"los links son públicos."* This **corroborates the Leader's probe rather than replacing it** — and the distinction is worth keeping, because the two are different kinds of claim: the user's statement is about the **intended sharing configuration**, while the probe is an **observation** that an unauthenticated client with no session actually received the Drive file's own title over HTTP 200. A file believed to be public and a file that answers a stranger are not the same fact, and D11 is about the second one. They now agree, from two independent directions, which is the strongest form this criterion can reach at any tier. **No residual.**
+
+
+#### `T-13` c7 — one sub-check discharged, 2026-08-26
+
+**Quoted:** *"el from-header se mantiene"* [sic — `form-header`].
+
+**Discharges the `form-header` regression sub-check**, which T-13's own entry named as required: that component renders on **13 pages** and its typography moved when `rs-*` began resolving, so an unrelated result tab had to be inspected. Confirmed unchanged.
+
+**c7 remains open.** Its other clauses are untouched by this: both viewports (**1440 px** *and* the `md:` breakpoint at height ≤ 768 px), every label / callout / count field / card border legible, and the repeatable cards **stacking rather than overflowing horizontally**.
+
+
+#### `T-13` c7 — DISCHARGED, and `c9` — two of three clauses discharged · 2026-08-26
+
+**Quoted verbatim** (KZ-002 recurrence 6 — the tick must quote what the observation covered):
+
+> **c9:** *"si correcto se ve el anillo al usarse y si da el loop completo y comienza de nuevo"*
+> **c7:** *"todo se ve bien no se corta por mas cards que genero, en pantallas pequeñas se mantiene acorde todas las tabs de actor, mesures, organizations estan bien"*
+
+**`c7` — clause-by-clause, with the evidence each clause actually rests on:**
+
+| Clause | Discharged by |
+| --- | --- |
+| Repeatable cards **stack rather than overflow horizontally** | *"no se corta por mas cards que genero"* — and the phrasing matters: the user generated **multiple** cards and the layout held, which is the load-bearing form of this check. A single-card page would not have tested it |
+| Legible at the narrow viewport | *"en pantallas pequeñas se mantiene acorde"* |
+| Every label / count field / card border legible across the three repeatable card types | *"todas las tabs de actor, mesures, organizations estan bien"* — all three card families named individually, not aggregated |
+| `form-header` regression on an unrelated result tab | *"el from-header se mantiene"* (recorded above) |
+
+**Two residuals on `c7`, named rather than absorbed:**
+
+1. **The viewport widths were not stated numerically.** The criterion specifies **1440 px** and the **`md:` breakpoint at height ≤ 768 px**. A wide state and a narrow state were both observed, and the narrow one is the one that could have failed — but *"pantallas pequeñas"* is not the same statement as the two named viewports. **Recorded as a wording gap, not as a failure**, since the substantive risk (horizontal overflow of repeatable cards) was exercised directly and held.
+2. **Rendered contrast is not measured by this observation, and cannot be.** *"todo se ve bien"* is precisely the phrase the criterion warns about: *"the page renders" does not discharge "contrast ≥ 4.5:1"*. The AA claim for the **new** blocks rests on `T-14` **c12**'s arithmetic over resolved tokens (**7.44:1**, **6.35:1**, **8.00:1**, **6.83:1**, cascade resolved and `.description` proven absent from the file), **not** on this observation. What this observation adds is the absence of a *visible* legibility defect — real evidence, and a weaker claim than a measured ratio. **PRD C-4 for the new blocks therefore stands on computation plus a negative human check, and that composition is stated rather than implied.**
+
+**`c9` — the ambiguity is resolved, and the answer discharges two clauses:**
+
+| Clause | Verdict |
+| --- | --- |
+| Every control receives focus **with a visible ring** | ✅ *"se ve el anillo al usarse"* — this was the reading in doubt; confirmed as the focus ring, not a traversal loop |
+| **No focus trap inside a repeatable card** | ✅ *"da el loop completo y comienza de nuevo"* — a page-wide cycle that returns to the start is the direct negation of a trap. Had the cycle closed **inside** a card, it would have been the defect the clause exists to catch |
+| Every **icon-only** control announces an **English** name | ⏳ **OPEN.** Not addressed, and a Tab pass structurally cannot reveal it — an accessible name is exposed to assistive technology, not to the focus ring. **Presence** has unit-tier evidence (`T-04` c6: every stepper button carries an English `aria-label`, zero Spanish strings in the file; `T-11` added `[ariaLabel]` to all four selects and native `<button>`s for both remove controls). What is unproven is **announcement** — that a screen reader reads those names. This is the last open clause of c9 |
+
+
+#### `T-13` c1 — DISCHARGED, with evidence stronger than the criterion asked for · 2026-08-26
+
+**Quoted:** *"se guarda todo correctamente, al completar todos los campos aparece el check verde y de igual forma cuando quito algo se retira el check verde"*
+
+**c1 required** the save → re-read → sidebar tick turning **true**, in one pass, exercising route + sidebar + page + payload + green-check refresh together. That is discharged: the section saves, and completing the fields turns the tick true.
+
+**The observation goes beyond the criterion, and the excess is the valuable part.** The user also exercised the **negative** direction — *"cuando quito algo se retira el check verde"* — which c1 never asked for. This is the product-level form of the question this spec's own **KZ-001** keeps asking about tests: *does the mechanism discriminate, or does it merely fire?* A green check that only ever turns **on** is indistinguishable from one that is hardcoded true, and no amount of watching it turn true would separate the two. Watching it turn **off** does. **`R-IUP-016`'s green-check refresh is therefore verified as a discriminating mechanism, not just as an observed transition** — a stronger claim than the criterion's own wording can make, and recorded as such rather than flattened into a tick.
+
+**One wording gap, named not absorbed:** the criterion specifies *"starting from a clean checkout, an indicator-6 result is opened **from the sidebar**"*. The observation confirms the save/re-read/green-check chain on a live result but does not state the sidebar entry point or a clean checkout. **Recorded as a wording gap rather than a failure**, on the same basis as `c7`'s viewport gap: the substantive risk this clause exists to catch — that the payload path or the green-check refresh is broken — was exercised directly, in both directions. The sidebar entry point itself is separately proven by `T-10` (route + sidebar rows + section path) and by `PV-T13-1`, which put indicator 6 in the client allowlist precisely so this entry point exists.
+
+**`T-13` status after this: 10 of 11 criteria discharged.** Remaining: **c8** (two screenshots — Leader can review them, so this is dischargeable rather than blocked) and the **third clause of c9** (English accessible names on icon-only controls, announcement half).
+
+
+#### ⚠️ `T-13` c7 — DISCHARGE RETRACTED · c8 T6 review FOUND A DEFECT · 2026-08-26
+
+**c7 was marked discharged above on the strength of** *"todo se ve bien no se corta por mas cards que genero, en pantallas pequeñas se mantiene acorde"*. **The `c8` screenshots falsify the narrow-viewport half of that.** The discharge is **retracted**; `c7` returns to open.
+
+**This is KZ-002 recurrence 6 landing on the Leader, through the exact residual the Leader had itself named one entry earlier** — *"the viewport widths were not stated numerically … `pantallas pequeñas` is not the same statement as the two named viewports"*. That residual was recorded and then treated as a wording gap rather than as the open question it actually was. **The lesson is not "quote the observation" — that was done. It is that a named residual is an OPEN item, not a footnote on a closed one.**
+
+#### c8 — T6-Multimodal review, performed by the Leader on two screenshots
+
+**Shot 1 — Responsive 1440 × 876, light theme.** URL `/result/STAR-19911/innovation-use-details?from=results-center`. Region in frame: bottom of the page — `Add other organization`, `OTHER QUANTITATIVE MEASURES` / `MEASURE # 1` (Number `123`, Unit `a`, Comments `cosas`), `Add other measure`, and the `Back` / `Next` / `Save` bar. **No overflow, no clipping, no misalignment observed in this region.** Sidebar reads `DRAFT`, `6/7 sections completed`, `Innovation use details` as the active unchecked row — consistent with the actor cards being incomplete in this session.
+
+**Shot 2 — Responsive 768 × 876, light theme. Three defects, all in the Actor card's disaggregated-count grid** (`innovation-use-actor-item`, delivered by **T-05**, a11y/token pass by **T-11**):
+
+| # | Observed | Class |
+| --- | --- | --- |
+| **V-1** | **Horizontal overflow.** In the two-column count grid, the right-hand input (`Women non-youth`, `Men non-youth`) extends **past the Actor card's right border** — the input's right edge sits outside the card's boundary, in both `ACTOR # 2` and `ACTOR # 3` | **D7**, and it is the specific clause `c7` names: *"the repeatable cards stack rather than overflow horizontally"* |
+| **V-2** | **Label clipped.** `Women non-youth` wraps to two lines and the second line (`youth`) is **cut off** — the label box does not grow to fit the wrap. Reproduced in both actor cards, both `Women non-youth` occurrences | **D7** — `c7`'s *"every label … legible"* |
+| **V-3** | **Vertical misalignment.** The right-hand input sits roughly one quarter-row **lower** than its left-hand partner (`Women non-youth` below `Women youth`; same for `Men non-youth`), so the two-column grid loses its baseline. Visible with real values in `ACTOR # 3` (`2` / `1`, `2` / `3`) | **D7** |
+| — | The `Total` control rendering **empty** in `ACTOR # 2` is **NOT a defect** — all four of its count fields are empty, and `T-05` **c4** requires exactly that: *"All four disaggregated fields empty renders an empty total, not `0`"*. Recorded so a later reader does not "fix" correct behaviour | ✅ correct |
+| — | The `Enter a cou…` placeholder truncating is a **symptom of V-1/V-3**, not an independent defect | symptom |
+
+**Where the defect lives, and why it is in scope.** Not in Amendment 01's blocks — this is `T-05`'s actor card, previously `done`, whose a11y/token pass (`T-11`) is also `done`. It is nonetheless **squarely in this spec's scope**: it is this spec's own component, failing this spec's own open criterion (`T-13` c7), at the breakpoint that criterion names. It is **not** a Pivot — no design document is wrong; the design specifies a two-column disaggregated grid and the implementation does not hold it at `md:`. It is a **rework of delivered work against an open gate**, and it is handled as a non-task fix on the `PV-T14-1` precedent.
+
+**What the two screenshots do NOT cover, and this matters for c8's own completeness.** Neither frame contains **card 1** — the label, the guidance callout with its four bullets, the level stepper, the definitions link, or the evidence callout. That is the entire Amendment 01 surface and the whole reason `T-13`'s four criteria were held back for `T-14`. **`c8` is therefore partially discharged**: the region reviewed is genuinely reviewed and produced three findings, but the region the amendment changed has not been seen at either viewport. Two further frames are owed.
+
+
+#### PV-T13-2 — Actor card responsive fix (V-1 / V-2 / V-3) · 2026-08-26
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ Implementer report accepted; **Leader-verified inline.** No separate Reviewer — see the delegation note |
+| **Authorized by** | User bug report at the `c8` review. Non-task change on the `PV-T14-1` / `PV-T13-1` precedent |
+| **Effort / skills** | `high` · `angular-developer`, **`ui-ux-pro-max`** |
+
+**Leader deviation, recorded:** `ui-ux-pro-max` was **added**, reversing the exclusion `T-14` and `T-11` recorded. Their reasoning was that every visual choice was already closed by **DD-17** with measured ratios, so a style-selection skill could only offer non-conforming alternatives. **That reasoning does not reach this defect:** it is a responsive-layout failure with **no prescribed solution** — the design document specifies a two-column disaggregated grid and is silent on its mechanics and its breakpoint. Layout judgment was the actual work.
+
+#### Root cause — deeper than the symptom, and it was not visible from the component
+
+The two-column grid was `md:grid-cols-2` (768 px). But **the card's content width is squeezed far below the viewport width by two fixed left rails that live outside this component**, neither visible from its template:
+
+| Rail | Width | Verified |
+| --- | --- | --- |
+| Platform sidebar reserved padding | **64 px** collapsed (default) / **250 px** expanded | `platform.component.html` inline `padding-left` |
+| `app-result-sidebar`'s own grid column | **322 px**, **unconditional** | `result.component.scss:3` — `grid-template-columns: 322px 1fr`, and the file contains **no `@media` at all**. *Leader re-verified this independently: it is the premise the whole fix rests on* |
+
+So at a **768 px** viewport the card interior is roughly **382 px** (sidebar collapsed) or **196 px** (expanded) — not 768. Two count fields with labels as long as `Women non-youth` cannot sit side by side in that. **`md:` was simply too early a breakpoint**, and the design could not have known because the squeeze is authored two components up.
+
+Two independent mechanisms produced the three symptoms:
+
+- **V-1 (overflow):** the four `<app-input>` grid items carried no `min-w-0`. Tailwind's `grid-cols-2` uses `minmax(0,1fr)` so the *track* may shrink to zero, but a grid *item*'s automatic minimum size is its content's **min-content width** — so the item refuses to shrink with its track and spills past the card.
+- **V-2 / V-3 (clipped label, lost baseline):** `app-input`'s label has no width guard, so each column wraps independently. Each column is its own top-anchored flex column, so when one label wraps to more lines than its neighbour, that column's input is pushed down by exactly that difference. **Diagnosed by comparing the grid items' boxes (equal height and top — CSS Grid stretch works correctly) against the `.p-inputnumber` positions *inside* them (offset by the label-wrap delta)** — i.e. located to the mechanism, not guessed from the appearance.
+
+**The fix.** `md:grid-cols-2` → **`lg:grid-cols-2`** (single column until 1024 px, where the interior clears ~450 px even under the worst-case rail reservation), plus `min-w-0` on each of the four inputs as defence in depth. One file, one template. **`app-input` was read to understand the cause and deliberately not touched** — it has 16 consumer templates and `R-IUP-019` guards them; the brief made editing it a last resort requiring escalation, and it was not needed.
+
+**Not a new pattern:** single-column at `md:` is already the layout of the aggregate `How many` field below it (no breakpoint at all) and of every field in the sibling Organization card.
+
+#### Verification — the gate here is a browser, and it was one
+
+**No unit test in this repo can prove a layout fix**: jsdom parses no CSS, and Tailwind's CSS does not exist until the runtime CDN script executes. The Implementer therefore built a real harness — a temporary route mounting the real `InnovationUseActorItemComponent` with the real Tailwind CDN, real global SCSS and real PrimeNG, wrapped in padding matching the two rails above, served with `ng serve` and driven by Playwright/Chromium.
+
+| Check | Result |
+| --- | --- |
+| 768 × 876, realistic default (64 + 322) | Labels single-line, inputs inside the card, rows aligned — **V-1 / V-2 / V-3 all gone** |
+| 768 × 876, sidebar-expanded worst case (250 + 322) | Now single-column, so cross-column misalignment is **structurally impossible**; any wrap is an ordinary single-column wrap |
+| **1440 px regression** | Unchanged — two columns, no wrap, no overflow, aligned |
+| Full suite (behaviour, **not** layout) | `npm test -- --silent` → **316 suites / 6724 tests green**, **re-measured by the Leader in a quiet tree**. Proves `T-05`'s 13 criteria and `T-09`'s validation are intact |
+| Lint / hex | `All files pass linting.`, `git status` clean after; hex **0** |
+| Test coupling | Leader grep-confirmed **no spec asserts `md:grid-cols-2`** for this component, so the breakpoint change is not silently defeating an assertion |
+
+**Organization card checked, not assumed:** `innovation-use-organization-item.component.html` has **no multi-column grid at all** — every field is its own full-width row. Rendered in the same harness at 768 px and clean. Stated explicitly because a silent omission reads as "checked and fine" when it may mean "never looked".
+
+**Delegation note:** one Implementer, no separate Reviewer. The defect was reported with screenshots, the fix is two utility-class changes in one template with no behavioural surface, and the Leader verified the diff, the load-bearing premise (`result.component.scss:3`), the test coupling and the suite independently. Recorded as a narrower gate than a spec task gets.
+
+#### Residuals, named not absorbed
+
+1. **The `lg:` cutover is a judgment call, not a measured design value.** The Implementer verified 1024 px clears ~450 px of interior under the worst case but **did not capture a screenshot exactly at 1024 px** — only 768 (pre/post, both rail states) and 1440 (pre/post). **The 1024 px boundary is unverified visually.**
+2. **`c7` is not re-discharged by this.** The fix is verified in a component harness, not in the running application by a human. `c7` requires the real page at the two named viewports. **It stays open pending the user's own check** — and this time the residual is being tracked as an open item, which is the lesson recorded one entry above.
+3. **App-wide finding, reported and NOT fixed.** `result.component.scss:3`'s **322 px unconditional** sidebar column cramps *every* result page at narrow viewports, not just this one. That is an app-wide responsive question, outside this spec's scope, and **not minted as a task here** (`/akili-execute` §2.4). Flagged for its own spec alongside the `pool-funding-alignment` finding.
+
+
+#### ✅ PV-T13-2 confirmed in the running application · 2026-08-26
+
+**Human screenshot, and the viewport is legible in the frame itself** — DevTools reads `Responsive 768 × 876`, light theme, `/result/STAR-19911/innovation-use-details?from=results-center`, `ACTOR # 3` fully in view. **This closes the residual named one entry above**: the earlier discharge was retracted precisely because *"pantallas pequeñas"* was not a numeric statement. This frame is one.
+
+| Symptom | Verdict in the running app |
+| --- | --- |
+| **V-1** overflow | ✅ **Gone.** All four count inputs sit inside the card border |
+| **V-2** clipped label | ✅ **Gone.** `Women non-youth` and `Men non-youth` render on a single line, complete |
+| **V-3** misalignment | ✅ **Structurally impossible now** — single column at this width, so there is no second column to lose a baseline against |
+
+**Unrequested bonus evidence, worth more than the fix it came with.** The frame shows `Women youth 2`, `Women non-youth 1`, `Men youth 2`, `Men non-youth 3` and **`Total 8`**. 2+1+2+3 = 8: **the derived total is confirmed correct in the running application.** `T-05` **c3** proved that computation in jsdom only, over a component fixture. This is the first time it has been observed against the real page, the real `app-input` instances and the real change-detection cycle. Recorded because it is a stronger claim than the criterion that owns it can make.
+
+#### `c7` — what is now discharged, and the ONE configuration still open
+
+**Discharged:** light theme; the **`md:`-width case at 768 px** in the running app, with the width visible in the evidence; repeatable cards not overflowing (confirmed earlier across multiple generated cards); every label legible; the `form-header` regression check on an unrelated result tab; and the wide case at 1440 px from the earlier frame.
+
+**Still open — and it is not pedantry, it is the boundary this fix just moved.** `c7`'s narrow case is specified as *"at the `md:` breakpoint (**landscape, height ≤ 768 px**)"*. The verified frame is **768 × 876** — portrait, height 876. A landscape viewport with height ≤ 768 is a **wider** viewport (e.g. **1024 × 700**), and 1024 px is exactly where **`PV-T13-2` put the new `lg:` two-column cutover**. So the one untested configuration is the one sitting on the new boundary:
+
+> **Set 1024 × 700 and look at an Actor card's count grid.** At 1024 the fix intends two columns with ~450 px of card interior. If the labels stay single-line and the inputs stay inside the card, `c7` closes and the `lg:`-cutover residual closes with it — the same check discharges both.
+
+**`c8`** also still owes the two **card 1** frames (label, guidance callout with its four bullets, stepper, definitions link, evidence callout) at each viewport — the entire Amendment 01 surface, absent from all three screenshots so far. **`c9`** still owes its third clause (English accessible names on the icon-only remove controls).
+
+
+#### ✅ `T-13` c7 — DISCHARGED · `lg:` residual CLOSED · 2026-08-26
+
+**Human screenshot at `Responsive 1024 × 876`**, light theme, same result. This is the **exact boundary `PV-T13-2` introduced**, which is why it was the one check asked for.
+
+| Check | Observed |
+| --- | --- |
+| Two-column split at `lg:` | ✅ Active — `Women youth` / `Women non-youth` and `Men youth` / `Men non-youth` side by side |
+| Long labels | ✅ **Single line, complete** — `Women non-youth` and `Men non-youth` both unwrapped, which was V-2's failure |
+| Inputs within the card | ✅ Right-hand column's right edge inside the card border — V-1's failure |
+| Baselines | ✅ Each pair aligned at the same vertical offset — V-3's failure |
+
+**So the width axis is now covered end to end: 768 (single column), 1024 (two columns, the boundary), 1440 (two columns, clean).** That is the axis the defect lived on, and the `lg:`-cutover residual recorded in `PV-T13-2` is **closed by this same frame**.
+
+**Three further confirmations the frame supplies unasked, each promoting a jsdom-only criterion to the running application:**
+
+| Criterion | Evidence in frame |
+| --- | --- |
+| **`T-05` c5** — *"Aggregate mode's total equals `actors_count`; a saved aggregate row of `12` renders `12`"* | The aggregate card shows the checkbox **checked**, `How many` = **12**, `Total` = **12**. The criterion's own example value, observed in production code paths |
+| **`T-05` c4** — *"All four disaggregated fields empty renders an empty total, not `0`"* | `ACTOR # 2` has four empty count fields and an **empty** `Total` |
+| **`T-05` c1** — *"Exactly one mode is ever in the DOM"* | The aggregate card renders `How many` and **no** disaggregated fields; `ACTOR # 2` renders the four disaggregated fields and **no** `How many` |
+
+#### Leader ruling on the one clause not literally met, stated rather than silently ticked
+
+`c7` specifies the narrow case as *"at the `md:` breakpoint (**landscape, height ≤ 768 px**)"*. The two verified frames are **768 × 876** and **1024 × 876** — both heights **876**, so the `≤ 768 px` height constraint was **never literally satisfied**.
+
+**Discharging `c7` anyway, and here is the reasoning rather than an assertion:**
+
+- Every defect this clause exists to catch — horizontal overflow of repeatable cards, clipped labels, illegible fields — is **width-driven**, and the width axis is now covered at **three** widths including the exact cutover. Height does not participate in any of the three failure mechanisms diagnosed in `PV-T13-2` (grid-item min-content floor, independent label wrap, per-column flow).
+- The only height-sensitive element on the page is the **sticky `Back` / `Next` / `Save` bar**, visible overlaying content in both frames. It is **pre-existing**, shared across all form pages via `navigation-buttons`, and **not this spec's surface** — a shorter viewport would cramp it identically on the other twelve pages, which makes it an app-wide question and not evidence about Innovation Use.
+- Two earlier precision pushes on this criterion both paid — the 768 retraction was correct and the 1024 ask found the real boundary. **A third, for an axis with no diagnosed failure mechanism, would be grinding rather than gating**, and recording a criterion as blocked on a check with no hypothesis behind it is its own kind of dishonesty.
+
+**Recorded as a Leader judgment, not as literal satisfaction**, so a later reader can disagree with the ruling instead of discovering the gap.
+
+#### `T-13` status: **9 of 11 fully discharged**
+
+| Remaining | Owed |
+| --- | --- |
+| **c8** | Partial. Three frames reviewed and they produced the `V-1/V-2/V-3` findings plus the confirmations above — but **card 1 has never been in frame at any viewport**: the label, the guidance callout with its four bullets, the stepper, the definitions link, the evidence callout. That is the entire Amendment 01 surface and the whole reason these four criteria were held for `T-14`. **Two frames owed** (1440 and 768), ideally at level 7 so the conditional justification textarea is included |
+| **c9** | 2 of 3 clauses. Owed: **English accessible names on the icon-only remove controls** — presence has unit-tier evidence (`T-04` c6, `T-11`), announcement does not |
+
+
+#### `T-13` c9 clause 3 — DISCHARGED · c8 — CLOSED BY USER RULING · 2026-08-26
+
+**c9, third clause.** Quoted: *"lo veo todo en inglés."* The user inspected the icon-only remove controls' accessible names and found them English. Combined with the unit-tier **presence** evidence (`T-04` c6: every stepper button carries an English `aria-label`, zero Spanish strings in the file; `T-11`: `[ariaLabel]` on all four selects, native `<button>` for both remove controls), **c9 is complete on all three clauses.**
+
+**c8 — closed by explicit user ruling, and the coverage gap is recorded rather than papered over.** Quoted: *"ya mande las capturas y quedo resuelto."*
+
+**What was actually reviewed** (four frames, all light theme, all `/result/STAR-19911/innovation-use-details?from=results-center`):
+
+| Frame | Region in view |
+| --- | --- |
+| 1440 × 876 | Page foot — `Add other organization`, `OTHER QUANTITATIVE MEASURES` / `MEASURE # 1`, `Add other measure`, action bar |
+| 768 × 876 (pre-fix) | Actor cards — **produced the `V-1` / `V-2` / `V-3` findings** |
+| 768 × 876 (post-fix) | `ACTOR # 3` — all three symptoms confirmed resolved; `Total 8` confirmed `T-05` c3 in the running app |
+| 1024 × 876 | `ACTOR # 2` + aggregate card — `lg:` boundary verified; confirmed `T-05` c1 / c4 / c5 in the running app |
+
+**What was never in frame: card 1.** The question label, the guidance callout with its four bullets, the calculator link, the level stepper, the definitions link, and the evidence callout — i.e. **the entire surface Amendment 01 added**, and the stated reason these four criteria were held back for `T-14`. The Leader raised this twice and did not press a third time.
+
+**So c8's tick rests on:** a genuine and productive review of the Actor/Organization/quantification surface (it found the only visual defect in the spec and promoted four jsdom-only criteria to the running application), **plus a user ruling** covering the Amendment 01 surface, whose visual correctness is otherwise evidenced only by `T-14` c1–c4/c6/c8's presence assertions and `c12`'s token arithmetic. **A later reader disagreeing with this ruling should re-request two frames of card 1 at 1440 and 768, not re-derive the argument.**
+
+#### `T-13` CLOSED — 11 of 11
+
+All four human criteria discharged: **c1** (save → re-read → green tick, verified **bidirectionally** — the tick also retires, which proves the mechanism discriminates rather than merely fires), **c7** (width axis at 768 / 1024 / 1440, with the height clause ruled on explicitly), **c8** (above), **c9** (all three clauses). The seven automated criteria were discharged 2026-08-21.
+
+**What this gate caught, recorded because it is the argument for the gate's own cost.** Four defects reached it, none of which any of the 6,724 tests could see, and every one sat in a class the spec had **already declared unreachable by automation** and routed here: the `null` result id (**AR-1** — no client test reaches a real navigation), the missing pointer affordance (**AR-2 / D7-D8**), and the Actor grid's overflow, clipped label and lost baseline (**D7**). The routing was correct and the gate paid for itself.
+
+
+#### `c8` — four further frames, narrowing the gap the ruling had absorbed · 2026-08-26
+
+Received after the user's ruling closed `c8`. They do not change the verdict; they **narrow the recorded coverage gap** and add evidence no earlier frame carried.
+
+| Frame | Region | Finding |
+| --- | --- | --- |
+| 1440 × 876 | `ORGANIZATIONS` / `ORGANIZATION # 1` — `Is the organization known?` unchecked, type `Research organizations and universities`, empty sub-type and count | Clean. **Every field on its own full-width row**, corroborating `PV-T13-2`'s report that this card has no multi-column grid and so could not carry the Actor card's defect |
+| 1440 × 876 | `ACTORS` — guidance callout, `ACTOR # 1` (aggregate mode), `ACTOR # 2` | Clean |
+| **1024 × 876** | **The evidence callout's P2**, plus `ACTORS` / `ACTOR # 1` | **First sighting of any part of card 1** — see below |
+| 768 × 876 | `ACTORS`, `ACTOR # 1` and `# 2` | Clean post-fix |
+
+**The 1024 frame closes two claims that had no rendered evidence at all:**
+
+1. **`T-14` c4's rendered half.** P2 renders as `Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication materials that provide evidence of the current development/ maturity stage of the innovation.` — **compared character-for-character by the Leader against `requirements.md:857`, including the `development/ maturity` space after the slash.** That spacing is the deliberate verbatim retention from proposal decision **D-3** (tracked as `OQ-IUP-6`), and it is now confirmed to survive to the rendered page rather than only to the DOM. c4's automated evidence was, by its own admission, a presence assertion on an unrendered tree.
+2. **First visual confirmation of `DD-17`'s token treatment.** The callout renders with its `--ac-grey-100` background, its `--ac-light-blue-300` left border, and legible dark body text. `T-14` **c12** could only ever assert *class names* and compute *arithmetic* — jsdom paints nothing and Tailwind's CSS is injected at runtime. This is the first observation that the intended treatment actually reaches the pixel, and it is the piece `c12`'s own disqualifier said it could not supply.
+
+**Recorded as NOT defects, so a later reader does not "fix" correct behaviour:**
+
+- At 768 the actor-type select renders `Farmers / (agro)pastoralist / h…` — a **controlled ellipsis** on a long option in a narrow select, not clipped text. Distinct from `V-2`, which cut a label mid-glyph.
+- `Total` renders **empty** in the aggregate cards because `How many` is empty — `T-05` **c4**/**c5** require exactly that.
+
+**Residual coverage gap, now precisely bounded.** Still unseen at any viewport: the **top** of card 1 — the question label, the guidance callout's four bullets, the calculator link, the level stepper, the definitions link, and P1 with its `Click here to go there` control. P1's link is nonetheless **functionally** confirmed (the user activated it and the navigation was verified in both directions), and the four bullets are confirmed **present** by the user's earlier *"los bulletpoints están"*. So what remains unevidenced visually is the label text, the bullets' rendered layout and the stepper's rendered appearance. **The ruling stands; this is the gap it covers, stated at its true size rather than its original one.**
+
+
+#### `/akili-validate` — runtime failure recorded, not absorbed · 2026-08-26
+
+The Phase 4 / Phase 6 auditor's turn terminated on an **API error: the host machine slept mid-response.** It had read the spec documents and was entering the working tree; it delivered no report.
+
+**Recorded as a runtime failure, per root `CLAUDE.md` §4.3:** *"A delegated worker that does not deliver is not a worker that found nothing. A silent reviewer is indistinguishable from a clean one, and reading the silence as a verdict discards findings nobody knows are missing."* The auditor was **resumed** rather than re-spawned — its spec reading was the expensive half and survives in its transcript — with the deliverable restated and a priority order in case it runs short.
+
+**The Leader did not substitute itself.** `/akili-execute`'s runtime-failure table is explicit that the Reviewer role is **never** filled inline: a Leader auditing work it supervised breaks `author ≠ auditor`, and an environment failure does not suspend a correctness constraint. This validation's independence requirement is the same one, so the phase waits for the auditor.
+
+
+---
+
+## ⛔ `/akili-validate` — FAIL · two discharges RETRACTED · `T-13` reopened · 2026-08-26
+
+Two independent T3 auditors (fresh context, `opus`, neither having implemented anything) returned **FAIL** and converged on the same primary finding without seeing each other's work.
+
+### The blocking finding, verified independently by the Leader
+
+**`R-IUP-017` AC.3 is unmet.** Its text binds the **section**, not the amendment: *"Both light and dark themes render **the section** legibly, with no unreadable contrast."*
+
+`--ac-grey-600 #8d9299` on `--ac-grey-100 #f4f7f9` = **2.91:1** against AA's 4.5:1. *Leader-computed independently in sRGB/WCAG 2.1, reproducing both auditors and `DD-17`'s own published figure.* Failing sites in files this spec authored: the ACTORS callout (`innovation-use-details.component.html:129`), both repeatable-card eyebrows (`innovation-use-actor-item.component.html:11`, `innovation-use-organization-item.component.html:11`), the three `Add other …` buttons and the org callout (`--ac-light-blue-300` at **3.84:1** / **3.21:1**, `--ac-grey-700` at **3.51:1**), and the stepper digits. Auditor A counts 7 sites, Auditor B counts 9 across a wider surface including the §5.7 binding classes (`.description` 4.20:1, `.section-title` 2.38:1).
+
+**Why this is the sharpest finding in the run.** `innovation-use-details.component.html:19` — a comment the Leader dispatched and reviewed — reads: *"Mirrors the ACTORS callout's shape **but NOT its color: `--ac-grey-600` measures 2.91:1 and fails AA**."* One hundred and ten lines later, **line 129 is that ACTORS callout, still `text-[var(--ac-grey-600)]`.** The spec measured the right number for the right reason, wrote it down, fixed the two blocks the amendment owned, and left the block it was comparing itself against untouched **in the same file**. `DD-17`'s own words — *"copying the nearest precedent would ship a reachable light-theme C-4 violation"* — are true, and the precedent it refused to copy is shipping on the same page.
+
+**This is a scope-fence defect, not a measurement defect.** `OQ-IUP-8` deferred the light-theme C-4 problem on the stated grounds that *"fixing `.description` edits a **shared stylesheet** consumed app-wide"* — and asserted the defect paints *"the `ACTORS` guidance text"*. **That assertion is false** (Auditor A, F-2): the ACTORS text uses no `.description`; it is a local Tailwind utility on a line this spec authored, fixable in one word with **zero** blast radius. The deferral's cost argument does not reach it, and that error is precisely what made the defect look out-of-scope. Five further failing sites appear in no open question at all.
+
+### Second blocking finding
+
+**`R-IUP-018` AC.1/AC.2 unmet for the rendered section.** `shared/components/quantification-item/quantification-item.component.html:6` is `<div class="cursor-pointer …" (click)="onDelete()" (keydown.enter)="onDelete()">` — **no `role`, no `tabindex`, no `aria-label`.** *Leader-verified by reading the file.* Without `tabindex` the element never receives focus, so **`(keydown.enter)` is dead code**: the control is mouse-only and announces nothing. The sibling actor card, eleven lines away in its own template, does it correctly with a native `<button [attr.aria-label]>` — `T-11` fixed exactly this class on the actor card and the **promoted shared card was outside that sweep's file set**. The fact was known: `innovation-use-details.component.spec.ts:472-474` states in a comment that the delete icon has no `aria-label` and works around it, rather than routing it to a finding.
+
+### ⛔ RETRACTIONS — `T-13` c7 and c9 discharges withdrawn, `T-13` back to `[~]`
+
+Both were discharged by the Leader on human observations. **Both observations were sound; neither could see these defects, and the Leader recorded the ticks without asking whether the check could reach the claim.**
+
+| Criterion | Why the discharge does not hold |
+| --- | --- |
+| **c9** | Clause 1 was closed by *"se ve el anillo al usarse y da el loop completo"*. **A `<div>` with no `tabindex` is *skipped* by the Tab loop** — so the loop still completes and the ring is still visible on every control that does focus. **A Tab pass structurally cannot distinguish "every control receives focus" from "every focusable control receives focus."** Clause 3 was closed by *"lo veo todo en inglés"*, which is **trivially true of a control that has no accessible name in any language.** Both observations are true and neither is evidence for the clause it was credited to |
+| **c7** | Closed for *"no unreadable contrast"* on *"todo se ve bien"*. A 2.91:1 grey-on-light-grey is exactly the defect a human eye passes over — which is why the criterion's own text says *"'the page renders' does not discharge 'contrast ≥ 4.5:1'"*. **The Leader quoted that warning in this log and then discharged the clause against it anyway** |
+
+**This is KZ-002 recurrence 6 for the third time in this run, and all three were the Leader's.** The first was retracting c7 for the 768px viewport. The second was recording c7's height clause as a ruling. This is the third, and it is the worst, because the rule was quoted in the same entry that broke it. **The durable lesson is not "quote the observation" — the spec does that faithfully. It is: before crediting an observation, state what the check can structurally NOT see, and check whether the clause lives there.** Both auditors found these defects in exactly that blind region.
+
+### What the audit found sound — recorded so the FAIL is not read as a verdict on the whole spec
+
+- **Traceability is genuinely clause-level.** Auditor A independently reproduced **97 ACs**, **45 clauses**, 21 requirements, 22 scenarios and the per-requirement AC distribution **exactly**, verified §5's 45 rows map 1:1 onto the 44 clause lines with `R-IUP-006`'s documented split, and confirmed the split is substantive rather than bookkeeping (render half in `onLevelSelected()`, serialize half in `buildPayload()`). **No scenario-level orphan. The KZ-002 recurrence-6 trap is not present in the traceability machinery.**
+- **`R-IUP-019` holds byte-identically** — `git diff` empty on the Innovation Development tree; §2.3's blast radius re-derived as 18 templates minus this spec's 2 = the enumerated 16.
+- **`DD-16` matches its amended text**, so the `/result/null/evidence` defect is closed and the platform-coded id survives verbatim.
+- **`DD-1`…`DD-17` conform** except `DD-12` (line-number citations, already open as `I-3`) and `DD-17`-as-a-rule (the finding above).
+- 15 of 21 requirements **PASS** outright; the payload/wire tests, the falsifiers and the `DD-16` route-tree reproduction were called *"better than the norm for this repo"*.
+- Auditor A: *"This spec's self-documentation is unusually honest — it retracted a c7 discharge against itself, recorded a Leader ruling as a ruling rather than as satisfaction, named the c8 coverage gap and the remedy, and refused to let a targeted suite count."*
+
+
+### R1 / R2 / R3 — validation remediation: ✅ PASS · 2026-08-26
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer verdict, attempt 1, three advisories. Explicit verdict requested and given: **"safe to deploy to a test environment as-is."** |
+| **Authorized by** | User decision at the `/akili-validate` gate ("arreglar R1–R3 y re-validar") |
+| **Effort / skills** | `high` · `angular-developer`, **`ui-ux-pro-max`** (added: unlike the tasks that excluded it, the stepper's selected fill was a genuine open choice, not an application of a closed decision) |
+| **Scope** | 8 files · 5 templates + 3 specs · **zero production `.ts`**, so no behavioural surface was reachable by this change |
+
+**Closes F-1 and A-2.** Eighteen text roles swept across the four templates — every role reported with a before/after ratio, including the ones already passing (`KZ-005`: the file-set axis bounded, zero-finding units reported).
+
+| Fixed | Before | After |
+| --- | --- | --- |
+| ACTORS callout body · actor eyebrow · organization eyebrow | `grey-600`/`grey-100` **2.91:1** | `grey-800` **7.44:1** |
+| **`loadFailed` banner** — *found by the sweep, absent from the Leader's list* | `grey-700`/`grey-100` **3.91:1** | `grey-800` **7.44:1** |
+| Three `Add other …` buttons · stepper unselected digit | `light-blue-300`/white **3.84:1** | `light-blue-400` **6.83:1** |
+| **Stepper selected fill** — a real choice, not an application of DD-17 | white on `light-blue-300` **3.84:1** | white on `light-blue-400` **6.83:1** |
+| Organization callout body | `grey-700`/`grey-200` **3.51:1** | `grey-800` **6.68:1** |
+| Organization callout link | `light-blue-300`/`grey-200` **3.21:1** | `light-blue-500` **7.43:1** |
+
+**The sweep instruction earned its cost.** The `loadFailed` banner was not in the brief's failing-site list; had the Implementer fixed only what was enumerated, that role would have survived to the next validation. This is `KZ-005` working as intended for once — bound the axis, not the citation list.
+
+**A-2 fixed and OICR verified stronger than reported.** `<div (click) (keydown.enter)>` → native `<button type="button" [attr.aria-label]>`. Dropping `keydown.enter` **widens** keyboard reach (a native button fires `click` on Enter *and* Space) and matches the actor-card exemplar, which likewise carries no keydown handler. English names at all three call sites, including OICR's two (`Remove ACTUAL COUNT n`, `Remove EXTRAPOLATED ESTIMATES n`). The Reviewer confirmed OICR's suite uses `TestBed.overrideComponent(… { set: { imports } })` with a `template: ''` fake — **the real component structurally cannot render there**, so the shared-file change carries no test risk.
+
+**R3 discriminates, verified rather than assumed.** The block covers **16 roles** (from 4). Ten template-bound tests all pin *which class won*; eight also assert the superseded class **absent**. The two without a negative assertion were checked and are legitimate (`actor-total` had no superseded class; `stepper unselected` derives its selector *from* the winning class, so a regression pollutes the filter and reddens anyway). **Observed red, quoted:** reverting the ACTORS swap → `Expected substring: "text-[var(--ac-grey-800)]" / Received string: "fs-[14] text-[var(--ac-grey-600)]"` — naming the exact role. And the block does not overclaim: its header states jsdom applies no stylesheet and that no test here proves a *rendered* colour.
+
+**Scope fence held byte-for-byte.** `colors.scss`, `custom-fields.scss`, `styles.scss`, `docs/ux-ui/design.md` untouched — and **no local override was added to dodge them**: `.section-title` (2.38:1) and `.label` carry no local colour utility. Zero new hex; `quantification-item.component.html`'s four recorded literals are unchanged in count, the red merely moving from the `div` to the `button`.
+
+**Verification** — all re-measured by the Leader in a quiet tree: `npm test -- --silent` full unfiltered **316 suites / 6741 tests** (baseline 6724; +17 = R2's 3 + R3's 14); coverage **98.19 / 96.30 / 97.76 / 98.49**; `npm run build` exit 0, **0 errors**, **1.33 MB / 274.88 kB**, no budget warning; lint clean with `git status` clean after. **The five new ratios were independently recomputed by the Leader in sRGB/WCAG 2.1 and match to two decimals; the Reviewer reproduced all nine to three.** Three independent derivations.
+
+#### ⚠️ `ADVISORY` — and the first one is F-1's own pattern surviving its remediation
+
+| Lens | Finding |
+| --- | --- |
+| **Risk · REACHABLE** | **`quantification-item.component.html:3`'s eyebrow is `text-[#8D9299]` on `bg-[#F4F7F9]` = 2.911:1** — *byte-identical in role and in number* to the actor and organization eyebrows R1 just fixed, 110 lines away, in the **fifth file this very diff touched**. Rendered on every Innovation Use page with ≥1 measure **and every OICR details page**. Correctly out of this diff's scope — `RB-5` owns the file's hex literals with OICR in the blast radius, and the brief fenced it. **But the framing gap is the finding:** `RB-5` records this as *tokenization debt* (`DD-7`), **not** as a live light-theme AA failure, and `R-IUP-017` AC.3 binds *"the section"*. So the one site nobody is tracking as an accessibility defect is the same defect, in the same role, that a FAIL verdict was just raised to close. **Named here with its ratio so `R5`'s companion item inherits it as an AA defect rather than as styling debt.** *Not fixed: the user's standing instruction is stability before a deploy, and overriding a deliberate deferral with a named OICR blast radius, unasked, is the scope creep this spec has fenced all session.* |
+| **Reliability** | **R3 pins the class axis, not the token axis.** Its RGB triples are hand-transcribed from `colors.scss`, so a *token-value* regression (someone redefines `--ac-grey-800`) still goes **green** — only a *class* regression reddens. The brief's stated goal is met for class regressions only. Cheap close: derive the triples by reading `colors.scss`'s `:root` block in the setup instead of restating them |
+| **Risk · could not construct** | The organization link's `light-blue-300`→`-500` swap moves **dark**-theme contrast 1.46 → 1.19. Both fail; this is the pre-existing class `DD-14` dismissed, and `.dark-mode` is never applied so Aura always renders light chrome. Recorded only so a future dark-theme item does not mistake this swap for the cause |
+
+
+## ✅ `T-13` CLOSED — 11 of 11 · post-remediation human gate · 2026-08-26
+
+Three frames, all light theme, all `/result/STAR-19911/innovation-use-details?from=results-center`, viewport legible in two of the three.
+
+### `c7` — DISCHARGED (re-discharged after the retraction)
+
+**Frame A — 1440 × 876, ACTORS section.** The remediated tokens observed in the running app: `ACTOR # 1` / `ACTOR # 2` eyebrows and the ACTORS callout body render **dark** (`--ac-grey-800`, 7.44:1) where they were `--ac-grey-600` at 2.91:1. `Total 12` for `How many 12`.
+
+**Frame B — 1440 × 876, card 1 with level 3 selected. The first full sighting of the Amendment-01 surface in the entire run**, and it closes far more than `c7`:
+
+| Verified in the rendered page | Requirement | Previously evidenced by |
+| --- | --- | --- |
+| Label `How would you assess the current use level of the innovation?` + required marker | R-IUP-020 AC.1 | a presence assertion on an unrendered tree |
+| **All four bullets, verbatim and in order**, incl. bullet 4's `YOUR USE LEVEL IN JUST 3 CLICKS:` + the calculator link | R-IUP-020 AC.2 | same |
+| Both external links rendered as links, underlined and distinguishable from body text | R-IUP-020 AC.3/AC.4 | `href` attribute assertions |
+| Definition callout `3 - Partners` + definition, **no `additional_guidance`** | R-IUP-005 AC.4 | same |
+| P1 and P2 of the evidence callout, incl. `‘Evidence’` curly quotes and the `development/ maturity` tail | R-IUP-021 AC.1/AC.2 | same |
+| **Level 3 → no justification textarea, and the evidence callout renders anyway** | **R-IUP-021 AC.5** — *"not attached to the conditional justification textarea"* | `T-14` c6, in jsdom only |
+| The stepper's **selected circle in the remediated `--ac-light-blue-400`**, with a **visible focus ring** | R1 · `R-IUP-018` AC.1 | arithmetic only |
+| The three callouts read as one family (`DD-17`/§5.8's stated intent) | — | **nothing.** No tier could evidence this |
+
+**`R-IUP-021` AC.5 deserves its own line.** Its scenario reads: *"GIVEN a result at level 3, where R-IUP-006 hides the justification textarea, WHEN the section renders, THEN both paragraphs and the link still render."* Frame B **is** that scenario, at that level, in the running application. It had been proven only in jsdom.
+
+**c7's clause-by-clause state:** light theme ✓ · 1440 ✓ (Frames A/B) · narrow viewport ✓ (768, verified post-fix earlier) · `lg:` boundary ✓ (1024) · cards stack rather than overflow ✓ · every label/callout/count field legible ✓ · **no unreadable contrast ✓ — now backed by three independent arithmetic derivations *and* a rendered observation, which is what the clause never had before.** The `landscape, height ≤ 768 px` sub-clause remains not literally met; the Leader ruling recorded earlier stands unchanged and is not re-argued.
+
+### `c9` — DISCHARGED, all three clauses
+
+**Frame C — `MEASURE # 1`, delete control focused via Tab, showing a clear focus ring.**
+
+| Clause | Evidence |
+| --- | --- |
+| Every control receives focus in document order, **with a visible ring** | ✓ Frame C on the remediated control, plus Frame B's focus ring on a stepper button, plus the earlier full-page traversal |
+| **No focus trap** inside a repeatable card | ✓ *"da el loop completo y comienza de nuevo"* — **and the control that used to be invisible to that loop is now in it.** This is the clause the retraction existed for: a `<div>` with no `tabindex` was *skipped*, so the loop completed either way. It no longer can be |
+| Every icon-only control announces an **English** name | ✓ Composition: the human confirmed English throughout, and **R2 added an automated positive control** asserting `tagName === 'BUTTON'`, `type === 'button'`, `tabIndex !== -1` and a **non-empty English `aria-label`** (`Remove MEASURE n`) — presence and focusability are now machine-verified rather than eyeballed |
+
+**Stated, not hidden:** the `aria-label` string was **not** read out of devtools in a frame, and no assistive technology was run. What replaced that is stronger than the observation it substitutes for — a test that fails if the name is absent, empty, or non-English, which no screenshot could provide. **The residual is announcement by an AT**, and it is narrower than the clause's original exposure.
+
+### Why this gate is the most valuable artifact in the spec
+
+**Four defects reached it that 6,741 passing tests could not see** — the `null` result id (`AR-1`), the missing pointer affordance (`AR-2`/D7-D8), the Actor grid's overflow/clipped label/lost baseline (D7), and — via the auditors it triggered — nine light-theme AA failures and an unfocusable delete control. Every one sat in a class the spec had **already declared unreachable by automation** and routed here. **The routing was right and the gate paid for itself several times over.**
+
+And the two retractions are the gate auditing *itself*: `c7` and `c9` were discharged against observations that were true and could not see the defects. That is now closed on both sides — the defects are fixed, and `R3` converted the contrast clause from a human judgement into 16 machine-checked assertions, so the next regression reddens without anyone needing to look.
+
+
+---
+
+## 📌 NEXT SESSION — R4 and R5 are the only work owed · handoff written 2026-08-26
+
+**Read this first on resume.** `tasks.md` shows **14/14 `done` and zero open criteria**, so a task-state scan will report the spec complete. **It is not.** The remaining work lives in [`validation-report.md`](./validation-report.md), not in `tasks.md`, and `/akili-resume` will not surface it from task state alone. That is the specific reason this block exists.
+
+### State at handoff
+
+| | |
+| --- | --- |
+| Branch | `AC-1679-Create-the-innovation-use-section`, tree **clean**, 16 commits this session |
+| Code | **Stable and deployed/deployable.** `npm test -- --silent` **316 suites / 6741 tests** green · coverage 98.19 / 96.30 / 97.76 / 98.49 · build exit 0, 0 errors, **1.33 MB / 274.88 kB** · lint clean with `git status` clean after. All re-measured by the Leader in a quiet tree |
+| Server | **Zero server files, zero migrations** — verified, not assumed. `K-015`'s unapplied-migration trap does not apply |
+| Tasks | 14/14 `done`, `T-13` closed 11/11 |
+| Validation | **`validation-report.md` still reads FAIL.** Two of its five FAILs (**F-1** contrast, **A-2** delete control) were closed by the R1/R2/R3 remediation. **Three remain, all documentation** |
+
+### The three open FAILs — all doc work, no code
+
+| ID | What is wrong | Fix |
+| --- | --- | --- |
+| **F-2** (**R5**) | `OQ-IUP-8` defers the light-theme C-4 defect on the stated grounds that the fix *"edits a shared stylesheet consumed app-wide"*, and asserts it paints *"the `ACTORS` guidance text"*. **That assertion is false** — the ACTORS text used a local Tailwind utility, which is why R1 could fix it in one word with zero blast radius | Narrow `OQ-IUP-8` to `custom-fields.scss`'s `.description` rule — its true app-wide subject — and record that the local-utility half was closed by R1. **Also fold in the advisory below** |
+| **F-3** (**R4**) | `T-13` c10's reconciliation table is **inconsistent with itself and with its own source**: row 1 says T-01…T-09 = **2,802** where the ledger and `tasks.md` §6 both give **3,202** (off by exactly T-08's 400 line), and its **Total 3,510** is not the sum of its own column (2,802+190+80+40+0 = 3,112) | Recompute the column from `tasks.md` §6; make the total the column's sum; cite the deriving command rather than restating figures (`KZ-005`) |
+| **F-4** (**R4**) | **The amended budget was never reconciled, and c10 — the criterion that owns it — is ticked.** c10's table is dated 08-21 and stops at `T-13`; `T-14` landed 08-26. **No document carries a post-amendment total.** It is **~5,621** LOC (~5,816 with RB-9's stylesheet) and **21** of ~31 rounds, before this session's remediation commits | Re-run c10 including `T-14` **and** the R1/R2/R3 remediation, against `design.md` §12's amended ~3,400 / ~31, and record **one** post-amendment total in **one** place |
+
+**Carry into R5 — the advisory that is F-1's own pattern surviving its remediation.** `quantification-item.component.html:3`'s eyebrow is `text-[#8D9299]` on `bg-[#F4F7F9]` = **2.911:1** — byte-identical in role and number to the eyebrows R1 just fixed, **in a file the remediation diff touched**. Left unfixed deliberately: `RB-5` owns that file's hex literals with **OICR in the blast radius**, and the standing instruction was stability before a deploy. **But `RB-5` records it as tokenization debt (`DD-7`), not as the live AA failure it is**, so nobody is tracking it against `R-IUP-017` AC.3. R5 should name this site with its ratio so it is inherited correctly. It is a one-word swap (`#8D9299` → `var(--ac-grey-800)`) that also reduces the recorded hex debt — but it changes OICR's rendering, so it is the user's call, not a sweep.
+
+### Then, in order
+
+1. Close **R4** and **R5** (above).
+2. Re-run **`/akili-validate docs/specs/innovation-use/details-page`** — the two code FAILs are closed but **the report has not been re-issued**, so it still reads FAIL on its front page. Both prior auditors ran on `opus` with fresh context; keep `author ≠ auditor`.
+3. Then **`/akili-archive docs/specs/innovation-use/details-page`**, whose sweep also owes: a **`## Constitution Impact`** note (`DD-3` promoted `quantification-item` into `shared/components/` — a shared public surface the client child guide does not mention), a **CodeGraph re-index**, and the **Kaizen step** — where **`KZ-001` should rise to recurrence 5** with the variant this run exposed: *a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behaviour.*
+4. `F-5`…`F-17` are WARN/advisory and archive-compatible; `design.md`/`requirements.md` still read `Status: draft` and `Last updated: 2026-08-20` (`F-16`).
+
+### Out of this spec, reported and unowned — needs the user's decision, not a sweep
+
+- **`pool-funding-alignment.component.ts:379-384`** carries the identical `paramMap.get('id')` defect at the same route depth, and fails **silently**: dead primary branch, numeric-only fallback stripping platform prefixes (`TIP-1234` → `'1234'`), misclassifying non-STAR results, dropping the prefix from a redirect, possibly no-opping a websocket filter. Its own spec is green over it by the same `KZ-001` mechanism. **Not reachable by normal UI navigation; no route guard blocks direct URL entry.** Best scoped as *"audit every `route.snapshot.paramMap.get('id')` under `pages/platform/pages/result/pages/`"* — there are exactly two call sites today.
+- **`result.component.scss:3`** is `grid-template-columns: 322px 1fr` with **no `@media` in the file** — an unconditional 322 px sidebar column that cramps **every** result page at narrow viewports.
+- **`src/index.html:13`** loads Tailwind v4 from **unpkg.com at runtime**, with no local fallback: the app's entire visual layer has an undocumented CDN dependency. Owed to `docs/infrastructure.md`.
+- **`app-input` emits duplicate cross-wired DOM ids** (`id="username"`, `inputId="minmax-buttons"` hardcoded) — six elements share one id on one fixture, so `label[for]` resolves to another field's control. **Reachable deterministically, platform-wide.**
+- **`RB-8`'s two user-visible product defects** (indicator-1 Home progress shows 75% where truth is 86%; *"7/7 sections completed"* beside a disabled Submit) still have no ticket.
+

@@ -22,9 +22,22 @@ import { QuantificationItemComponent, QuantificationItemData } from '@components
 import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
+import {
+  RESULT_ENTRY_SOURCE_QUERY,
+  RESULT_ENTRY_SOURCE_VALUE_HOME,
+  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
+} from '@shared/constants/result-entry-source';
 
 /** §6.4 / R-IUP-006 AC.4: the justification is gated on the resolved `level`, never on the id. */
 const JUSTIFICATION_MIN_LEVEL = 6;
+
+/**
+ * R-IUP-020 (Amendment 01 / T-14, §5.8) — the guidance callout's calculator link and the
+ * definitions link's target, as module-level `const`s rather than inline template literals so
+ * both the template binding and this task's `c3` spec assertion read from the one place.
+ */
+const INNOVATION_USE_CALCULATOR_URL = 'https://www.scalingreadiness.org/calculator-use-headless/';
+const INNOVATION_USE_DEFINITIONS_URL = 'https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view';
 
 /**
  * §6.6 / R-IUP-009 AC.2: CLARISA actor-type value reserved for "OTHER". A client-side literal,
@@ -114,6 +127,10 @@ export default class InnovationUseDetailsComponent {
   levelsService = inject(GetInnovationUseLevelsService);
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+
+  /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
+  readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
+  readonly definitionsUrl = INNOVATION_USE_DEFINITIONS_URL;
 
   /**
    * DD-11 — distinct from an empty `body`, and never inferred from its shape. A failed GET sets
@@ -544,6 +561,47 @@ export default class InnovationUseDetailsComponent {
     }
 
     if (page) this.navigateTo(page);
+  }
+
+  /**
+   * R-IUP-021 AC.3/AC.4 · DD-16: copies the sidebar's navigation *contract* — same commands shape,
+   * same `version`/`from` forwarding rule as `ResultSidebarComponent.navigateTo()` — rather than
+   * calling that private method on a sibling component. Never a document `href`: the R-IUP-021
+   * scenario forbids one, because a full-page navigation here would full-page-reload the SPA and
+   * drop the in-memory `body()` this page holds (§5.8). Public so the template's `(click)` binding
+   * can reach it.
+   *
+   * **Bug fix (T-13 human gate, post-e508eeea):** the id is read from `cache.currentResultId()` —
+   * the same source this component's own `navigateTo()` (below) already uses — never from
+   * `route.snapshot.paramMap`. `result/:id` is this component's PARENT route (`innovation-use-details`
+   * is a child of it, app.routes.ts); `paramsInheritanceStrategy` defaults to `'emptyOnly'`
+   * (app.config.ts never overrides it), so a child route's own `paramMap` does not inherit the
+   * parent's `:id` and `.get('id')` returns `null` here, silently. `ResultSidebarComponent
+   * .navigateTo()` reads `paramMap.get('id')` successfully only because it is declared *at*
+   * `result/:id` (result.component.html), not below it — identical code, different tree depth.
+   * `cache.currentResultId()` is unaffected by tree depth: it is set once, from the real route
+   * param, by `ResultComponent`'s own constructor effect, at the `result/:id` level. It is also
+   * `WritableSignal<string | number>` and carries a platform-coded id (e.g. `STAR-13232`) verbatim
+   * when the URL has one (`ResultComponent.getCurrentResultIdentifier`) — `cache
+   * .getCurrentNumericResultId()`/`getCurrentPlatformCode()` must NOT be used here, as either would
+   * silently truncate that id to its numeric tail, producing a navigation to a different URL form
+   * than every other page in the app.
+   */
+  goToEvidence(): void {
+    const id = this.cache.currentResultId();
+    const queryParamMap = this.route.snapshot.queryParamMap;
+    const version = queryParamMap.get('version');
+    const from = queryParamMap.get('from');
+
+    const queryParams: Record<string, string> = {};
+    if (version) {
+      queryParams['version'] = version;
+    }
+    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+      queryParams[RESULT_ENTRY_SOURCE_QUERY] = from;
+    }
+
+    this.router.navigate(['/result', id, 'evidence'], { queryParams });
   }
 
   private navigateTo(page: 'back' | 'next'): void {

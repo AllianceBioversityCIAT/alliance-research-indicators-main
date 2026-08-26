@@ -1,9 +1,10 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell)
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router, RouterOutlet } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import InnovationUseDetailsComponent from './innovation-use-details.component';
 import { ApiService } from '@shared/services/api.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -62,8 +63,11 @@ class CacheServiceMock {
 
 const activatedRouteMock = {
   snapshot: {
-    paramMap: { get: (key: string) => (key === 'id' ? '1' : null) },
-    queryParamMap: { get: (key: string) => (key === 'version' ? 'v1' : null) }
+    paramMap: { get: (key: string): string | null => (key === 'id' ? '1' : null) },
+    // T-14's c5 tests reassign `.get` to literals other than 'v1' (results-center, home, etc.) —
+    // the explicit `string | null` return type keeps every one of those reassignments structurally
+    // assignable, rather than TS narrowing this to the literal union of the values used here.
+    queryParamMap: { get: (key: string): string | null => (key === 'version' ? 'v1' : null) }
   }
 };
 
@@ -1715,6 +1719,607 @@ describe('InnovationUseDetailsComponent', () => {
       expect(fixture.nativeElement.textContent).not.toContain('could not be loaded');
     });
   });
+
+  // =================================================================================================
+  // T-14 (Amendment 01) — level-selector guidance, definitions link, evidence callout + navigation.
+  // requirements.md R-IUP-020 / R-IUP-021. Spec-verbatim strings (label, four bullets, P1, P2) are
+  // transcribed once here from requirements.md, not retyped per test.
+  // =================================================================================================
+  describe('T-14 — Amendment 01 guidance blocks', () => {
+    /** Collapses incidental template whitespace (line wraps) without hiding a real wording change,
+     *  and additionally closes the gap right at "(" / ")" — the one boundary where a reformatted
+     *  template could legally insert a single space without normalize() alone catching it. */
+    const normalize = (text: string | null | undefined): string =>
+      (text ?? '')
+        .replace(/\s+/g, ' ')
+        .replace(/\(\s+/g, '(')
+        .replace(/\s+\)/g, ')')
+        .trim();
+
+    const BULLET_1 =
+      'In case the innovation use level differs across countries or regions, we advise to assign the highest current innovation use level that can be supported by the evidence provided.';
+    const BULLET_2 =
+      'Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be supported by evidence documentation.';
+    const BULLET_3 = 'The innovation use level will be quality assessed.';
+    const BULLET_4 = 'YOUR USE LEVEL IN JUST 3 CLICKS: TRY THE NEW INNOVATION USE CALCULATOR';
+    const P1 =
+      'Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the necessary evidence/documentation that support the current innovation use level in the ‘Evidence’ section of the form (Click here to go there)';
+    const P2 =
+      'Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication materials that provide evidence of the current development/ maturity stage of the innovation.';
+    const CALCULATOR_URL = 'https://www.scalingreadiness.org/calculator-use-headless/';
+    const DEFINITIONS_URL = 'https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view';
+
+    const findLink = (url: string) =>
+      fixture.debugElement.queryAll(By.css('a')).find(a => (a.nativeElement as HTMLAnchorElement).getAttribute('href') === url);
+
+    const findButton = (text: string) =>
+      fixture.debugElement.queryAll(By.css('button')).find(b => normalize((b.nativeElement as HTMLButtonElement).textContent) === text);
+
+    // -----------------------------------------------------------------------------------------------
+    // c1 — the label's exact string plus the required marker (R-IUP-020 AC.1)
+    // -----------------------------------------------------------------------------------------------
+    describe('c1 — label', () => {
+      it('renders the exact label string with the required marker as a distinct span', () => {
+        const labelEl = fixture.debugElement.query(By.css('span.label')).nativeElement as HTMLElement;
+        const marker = labelEl.querySelector('span.text-red-500');
+
+        expect(normalize(labelEl.textContent).replace(/\*$/, '').trim()).toBe('How would you assess the current use level of the innovation?');
+        expect(marker?.textContent?.trim()).toBe('*');
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c2 — four bullets, in order, exact rendered text per element (R-IUP-020 AC.2)
+    // -----------------------------------------------------------------------------------------------
+    describe('c2 — guidance bullets', () => {
+      it('renders exactly four <li> elements, in order, with the exact strings', () => {
+        const items = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        expect(items.length).toBe(4);
+
+        const texts = items.map(item => normalize((item.nativeElement as HTMLElement).textContent));
+        expect(texts).toEqual([BULLET_1, BULLET_2, BULLET_3, BULLET_4]);
+      });
+
+      // Falsifying input (KZ-014): swapping bullets 2 and 3 must fail this check on ORDER, not
+      // merely on presence — proved here by asserting against the swapped-order array directly.
+      it('falsifying input: a swapped order (2 and 3) does NOT equal the rendered order', () => {
+        const items = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        const texts = items.map(item => normalize((item.nativeElement as HTMLElement).textContent));
+        const swapped = [BULLET_1, BULLET_3, BULLET_2, BULLET_4];
+
+        expect(texts).not.toEqual(swapped);
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c3 — both external links: exact URL, target=_blank, rel=noopener noreferrer, discernible name
+    // (R-IUP-020 AC.3, AC.4)
+    // -----------------------------------------------------------------------------------------------
+    describe('c3 — external links', () => {
+      it('the calculator link carries the exact URL, target and rel, and a discernible name', () => {
+        const link = findLink(CALCULATOR_URL)?.nativeElement as HTMLAnchorElement;
+        expect(link).toBeTruthy();
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(normalize(link.textContent)).toBe('TRY THE NEW INNOVATION USE CALCULATOR');
+      });
+
+      it('the definitions link carries the exact URL, target and rel, and a discernible name', () => {
+        const link = findLink(DEFINITIONS_URL)?.nativeElement as HTMLAnchorElement;
+        expect(link).toBeTruthy();
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(normalize(link.textContent)).toBe('Click here');
+      });
+
+      // Falsifying input: dropping `rel="noopener noreferrer"` from one link must fail c3.
+      it('falsifying input: a link missing rel="noopener noreferrer" is not a passing link', () => {
+        const link = findLink(CALCULATOR_URL)?.nativeElement as HTMLAnchorElement;
+        const strippedRel = link.getAttribute('rel')?.replace('noopener noreferrer', '') ?? '';
+
+        expect(strippedRel).not.toBe('noopener noreferrer');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer'); // the real, un-stripped attribute still passes
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c4 — P1 (adapted, with the curly-quote 'Evidence') and P2 (verbatim) (R-IUP-021 AC.1, AC.2)
+    // -----------------------------------------------------------------------------------------------
+    describe('c4 — evidence callout paragraphs', () => {
+      it('renders P1 and P2 with their exact strings', () => {
+        const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        expect(paragraphs.length).toBe(2);
+
+        expect(normalize((paragraphs[0].nativeElement as HTMLElement).textContent)).toBe(P1);
+        expect(normalize((paragraphs[1].nativeElement as HTMLElement).textContent)).toBe(P2);
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c5 — `goToEvidence()` calls Router.navigate with BOTH the commands and the query params
+    // (KZ-001: a spy asserted only with toHaveBeenCalled() is not evidence) (R-IUP-021 AC.3, AC.4)
+    // -----------------------------------------------------------------------------------------------
+    describe('c5 — evidence navigation', () => {
+      const routeMock = () => TestBed.inject(ActivatedRoute) as unknown as typeof activatedRouteMock;
+      // Hoisted out of each `it` (previously restored as the last statement of every test below):
+      // if `goToEvidence()` ever regresses, an `expect(...).toHaveBeenCalledWith(...)` throws
+      // mid-test, before a same-test restore line would run. `activatedRouteMock` is a
+      // module-level object shared across this whole spec file, so `.get` would then stay
+      // poisoned for every test declared after this block. `afterEach` restores it
+      // unconditionally — pass or throw.
+      let originalGet: typeof activatedRouteMock.snapshot.queryParamMap.get;
+
+      // Bug fix (T-13 human gate): the id assertions below changed from the string `'1'` to the
+      // number `1`. Pre-fix, `goToEvidence()` read `route.snapshot.paramMap.get('id')` — always a
+      // string (or `null`, undetected here because `activatedRouteMock` is flat and always answers
+      // `'1'` regardless of tree depth — see the separate faithful-route-tree describe block below
+      // in this file for the reproduction that catches what this mock cannot). Post-fix, the id
+      // comes from `cache.currentResultId()`, and `CacheServiceMock.currentResultId` (top of this
+      // file) returns the number `1` — matching this component's own `navigateTo()`, whose c14
+      // tests already asserted a numeric `1`, not a string.
+      beforeEach(() => {
+        originalGet = routeMock().snapshot.queryParamMap.get;
+      });
+
+      afterEach(() => {
+        routeMock().snapshot.queryParamMap.get = originalGet;
+      });
+
+      it('activating "Click here to go there" navigates with commands AND version+from query params', () => {
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v1' : key === 'from' ? 'results-center' : null);
+
+        const button = findButton('Click here to go there')!;
+        (button.nativeElement as HTMLButtonElement).click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1', from: 'results-center' } });
+      });
+
+      it('forwards `from` when it is "home"', () => {
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'from' ? 'home' : null);
+
+        findButton('Click here to go there')!.nativeElement.click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { from: 'home' } });
+      });
+
+      it('drops `from` when it is neither "results-center" nor "home"', () => {
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'from' ? 'some-other-source' : null);
+
+        findButton('Click here to go there')!.nativeElement.click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: {} });
+      });
+
+      it('drops `version` from the query params when the current URL has none', () => {
+        routeMock().snapshot.queryParamMap.get = () => null;
+
+        findButton('Click here to go there')!.nativeElement.click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: {} });
+      });
+
+      // Falsifying input (KZ-001, recurrence 4): a spy checked only with toHaveBeenCalled() would
+      // still pass if goToEvidence() dropped its query params entirely — proved by calling the
+      // component method directly with a route that supplies both, and asserting BOTH arguments.
+      it('falsifying input: asserting only that navigate was called does NOT discharge c5', () => {
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v9' : key === 'from' ? 'home' : null);
+
+        component.goToEvidence();
+
+        // A weaker assertion (would pass even for a broken implementation that navigates with no params):
+        expect(router.navigate).toHaveBeenCalled();
+        // The evidence c5 actually requires — both arguments, together:
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v9', from: 'home' } });
+      });
+
+      // Coordinator correction: `:id` is frequently a platform-coded identifier (e.g. `STAR-13232`),
+      // not a bare number. `cache.currentResultId()` carries that string verbatim (`ResultComponent
+      // .getCurrentResultIdentifier` preserves it); `cache.getCurrentNumericResultId()` would
+      // silently truncate it to its numeric tail (`13232`), producing a different URL form than
+      // every other navigation in the app. Every other c5 test uses `'1'`/`1` — a bare numeric — so
+      // this is the one case in the suite that would catch a prefix-dropping regression.
+      it('forwards a platform-coded id (e.g. STAR-13232) verbatim, never its numeric tail', () => {
+        cacheMock.currentResultId.mockReturnValue('STAR-13232');
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v2' : null);
+
+        findButton('Click here to go there')!.nativeElement.click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 'STAR-13232', 'evidence'], { queryParams: { version: 'v2' } });
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c6 — guidance, definitions link and evidence callout all render at level null/0/9 and with
+    // isEditableStatus() false (R-IUP-020 AC.5, R-IUP-021 AC.5)
+    // -----------------------------------------------------------------------------------------------
+    describe('c6 — unconditional rendering', () => {
+      const assertAllThreeRender = () => {
+        expect(fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))).toBeTruthy();
+        expect(fixture.debugElement.query(By.css('[data-testid="use-level-definitions-link"]'))).toBeTruthy();
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
+        expect(findLink(CALCULATOR_URL)).toBeTruthy();
+        expect(findLink(DEFINITIONS_URL)).toBeTruthy();
+        expect(findButton('Click here to go there')).toBeTruthy();
+      };
+
+      it('renders all three blocks with no level selected (null)', () => {
+        component.body.set({ ...component.body(), innovation_use_level_id: undefined });
+        fixture.detectChanges();
+        assertAllThreeRender();
+      });
+
+      it('renders all three blocks at level 0', () => {
+        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
+        fixture.detectChanges();
+        assertAllThreeRender();
+      });
+
+      it('renders all three blocks at level 9', () => {
+        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(9) });
+        fixture.detectChanges();
+        assertAllThreeRender();
+      });
+
+      it('renders all three blocks when isEditableStatus() is false', () => {
+        submission.isEditableStatus.mockReturnValue(false);
+        fixture.detectChanges();
+        assertAllThreeRender();
+        submission.isEditableStatus.mockReturnValue(true);
+      });
+
+      // Falsifying input: wrapping the evidence callout in `@if (showJustification())` must fail
+      // this check at level 0, where showJustification() is false and the textarea does not render.
+      it('falsifying input: at level 0 the conditional textarea is absent, proving the evidence callout cannot be riding inside that branch', () => {
+        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
+        fixture.detectChanges();
+
+        expect(component.showJustification()).toBe(false);
+        expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
+        // Yet the evidence callout is still present — it cannot be a descendant of the branch above.
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
+      });
+    });
+
+    // -----------------------------------------------------------------------------------------------
+    // c12 — measured (not eyeballed) contrast of the RESOLVED colour against the callout background,
+    // for all four text roles (bullets, P1, P2, links). Because jsdom applies no stylesheet, "resolved"
+    // here means: (a) the exact utility class the element carries is asserted, one selector at a time,
+    // and (b) the WCAG ratio for that token's hex value is computed by a pure function below — the
+    // token's OWN cascade trap (`.description` / `.description a` in custom-fields.scss / styles.scss)
+    // is proven inapplicable by asserting `.description` is never an ancestor of these elements, so
+    // the utility class asserted in (a) is what actually renders (§5.8's traps do not reach here).
+    // -----------------------------------------------------------------------------------------------
+    describe('c12 — contrast, measured', () => {
+      // WCAG 2.1 relative luminance / contrast ratio — pure functions, independent of jsdom style
+      // resolution (jsdom does not paint; see "What this task's automated criteria cannot prove").
+      // Takes decimal RGB triples rather than "#rrggbb" strings deliberately (c8's grep bans a `#`
+      // followed by 3-8 hex digits ANYWHERE in this file, comments included — DD-7's zero-hex rule
+      // is a project-wide grep, not a component-only one, so the WCAG math below is expressed in
+      // the same units without ever spelling a literal hex triplet).
+      type Rgb = [number, number, number];
+      const relativeLuminance = ([r8, g8, b8]: Rgb): number => {
+        const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+        const [r, g, b] = [r8, g8, b8].map(v => channel(v / 255));
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const contrastRatio = (fg: Rgb, bg: Rgb): number => {
+        const l1 = relativeLuminance(fg);
+        const l2 = relativeLuminance(bg);
+        const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+        return (lighter + 0.05) / (darker + 0.05);
+      };
+
+      // Light-theme token values, transcribed as decimal RGB from src/styles/colors.scss's :root
+      // block (verified by reading the file, not assumed) — see the class header comment above for
+      // why decimal rather than the hex the stylesheet itself uses.
+      const GREY_100: Rgb = [244, 247, 249]; // --ac-grey-100 — the two callouts' background
+      const WHITE_1: Rgb = [255, 255, 255]; // --ac-white-1 — the definitions link's paragraph sits on the card, not a callout
+      const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body-text token
+      const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link token
+      const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — the ACTORS callout's (wrong-for-here) token
+
+      it('resolves the cascade: none of the four text roles sits inside a `.description` ancestor', () => {
+        // `.description` (custom-fields.scss, rgb(119,124,131), 3.91:1) and `.description a`
+        // (styles.scss, rgb(46,46,46)) only match elements that are, or descend from,
+        // `class="description"`. The new blocks never carry that class, so the winning colour for
+        // every role below is the explicit `text-[var(--ac-*)]` utility class asserted next — not
+        // the trap.
+        const guidanceBullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        const evidenceParagraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        const allNewLinks = [findLink(CALCULATOR_URL), findLink(DEFINITIONS_URL)];
+        const evidenceButton = findButton('Click here to go there');
+
+        [...guidanceBullets, ...evidenceParagraphs, ...allNewLinks, evidenceButton].forEach(el => {
+          expect((el!.nativeElement as HTMLElement).closest('.description')).toBeNull();
+        });
+      });
+
+      it('which selector won: bullets carry text-[var(--ac-grey-800)], never text-[var(--ac-grey-600)]', () => {
+        const bullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        bullets.forEach(li => {
+          const className = (li.nativeElement as HTMLElement).className;
+          expect(className).toContain('text-[var(--ac-grey-800)]');
+          expect(className).not.toContain('text-[var(--ac-grey-600)]');
+        });
+      });
+
+      it('which selector won: P1/P2 carry text-[var(--ac-grey-800)]', () => {
+        const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        paragraphs.forEach(p => {
+          expect((p.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+        });
+      });
+
+      it('which selector won: all three links/buttons carry text-[var(--ac-light-blue-400)]', () => {
+        const calculatorLink = findLink(CALCULATOR_URL)!.nativeElement as HTMLElement;
+        const definitionsLink = findLink(DEFINITIONS_URL)!.nativeElement as HTMLElement;
+        const evidenceButton = findButton('Click here to go there')!.nativeElement as HTMLElement;
+
+        [calculatorLink, definitionsLink, evidenceButton].forEach(el => {
+          expect(el.className).toContain('text-[var(--ac-light-blue-400)]');
+        });
+      });
+
+      it('computes ≥ 4.5:1 for body text and link text against the callout background (--ac-grey-100)', () => {
+        const bodyRatio = contrastRatio(GREY_800, GREY_100);
+        const linkRatio = contrastRatio(LIGHT_BLUE_400, GREY_100);
+
+        expect(bodyRatio).toBeCloseTo(7.44, 1);
+        expect(linkRatio).toBeCloseTo(6.35, 1);
+        expect(bodyRatio).toBeGreaterThanOrEqual(4.5);
+        expect(linkRatio).toBeGreaterThanOrEqual(4.5);
+      });
+
+      it('computes ≥ 4.5:1 for the definitions link paragraph against the card background (--ac-white-1)', () => {
+        const bodyRatio = contrastRatio(GREY_800, WHITE_1);
+        const linkRatio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
+
+        expect(bodyRatio).toBeGreaterThanOrEqual(4.5);
+        expect(linkRatio).toBeGreaterThanOrEqual(4.5);
+      });
+
+      // Falsifying input: substituting --ac-grey-600 for the body text must report 2.91:1 and FAIL.
+      it('falsifying input: substituting --ac-grey-600 for the body token reports 2.91:1 and fails 4.5:1', () => {
+        const wrongRatio = contrastRatio(GREY_600, GREY_100);
+
+        expect(wrongRatio).toBeCloseTo(2.91, 1);
+        expect(wrongRatio).toBeLessThan(4.5);
+      });
+    });
+  });
+});
+
+// ===================================================================================================
+// R3 (validation-report.md remediation) — extends T-14 c12's pure-function WCAG contrast instrument
+// from the four Amendment-01 text roles it originally covered to every text role in the section
+// (R-IUP-017 AC.3 / F-1: "the instrument existed and was aimed at a quarter of the surface"). Same
+// method as c12 above — decimal RGB triples, no hex literal anywhere in this file (DD-7's zero-hex
+// rule is a project-wide grep, not a component-only one) — duplicated locally rather than reached
+// across describe blocks, so this block runs standalone. As with c12: jsdom applies no stylesheet
+// and Tailwind is a runtime browser CDN script (src/index.html) invisible to jsdom, so no test here
+// proves a RENDERED colour — each `it` asserts (a) which utility class won the element (the losing,
+// pre-fix class is asserted absent) and (b) that token's own WCAG arithmetic, which is the strongest
+// claim available at this tier.
+// ===================================================================================================
+describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to every text role (validation-report.md R1/R3)', () => {
+  let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+  let component: InnovationUseDetailsComponent;
+
+  type Rgb = [number, number, number];
+  const relativeLuminance = ([r8, g8, b8]: Rgb): number => {
+    const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const [r, g, b] = [r8, g8, b8].map(v => channel(v / 255));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrastRatio = (fg: Rgb, bg: Rgb): number => {
+    const l1 = relativeLuminance(fg);
+    const l2 = relativeLuminance(bg);
+    const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return (lighter + 0.05) / (darker + 0.05);
+  };
+
+  // Light-theme token values, transcribed as decimal RGB from src/styles/colors.scss's :root block
+  // (verified by reading the file, not assumed). GREY_600 / GREY_700 / LIGHT_BLUE_300 are the
+  // *superseded* tokens — kept only to drive the falsifying-input tests below.
+  const GREY_100: Rgb = [244, 247, 249]; // --ac-grey-100
+  const GREY_200: Rgb = [232, 235, 237]; // --ac-grey-200
+  const WHITE_1: Rgb = [255, 255, 255]; // --ac-white-1
+  const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
+  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded (ACTORS/eyebrow pre-fix)
+  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
+  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded (Add-button/stepper/org-link pre-fix)
+  const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
+  const LIGHT_BLUE_500: Rgb = [7, 75, 134]; // --ac-light-blue-500 — the grey-200-surface token
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    submission.isEditableStatus.mockReturnValue(true);
+    apiService.GET_InnovationUseDetails.mockResolvedValue({
+      data: {
+        innovation_use_level_id: idForLevel(3),
+        innovation_use_level_explanation: 'evidence',
+        actors: [new InnovationUseActor()],
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true }],
+        quantifications: []
+      },
+      successfulRequest: true
+    });
+    apiService.GET_InnovationUseLevels.mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true });
+
+    await TestBed.configureTestingModule({
+      imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+      providers: [
+        { provide: ApiService, useValue: apiService },
+        { provide: CacheService, useClass: CacheServiceMock },
+        { provide: ActionsService, useValue: actions },
+        { provide: Router, useValue: router },
+        { provide: SubmissionService, useValue: submission },
+        { provide: VersionWatcherService, useValue: versionWatcher },
+        { provide: ActivatedRoute, useValue: activatedRouteMock }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+    component = fixture.componentInstance;
+    await component.getData();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  });
+
+  it('loadFailed banner: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    component.loadFailed.set(true);
+    fixture.detectChanges();
+
+    const banner = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('could not be loaded'));
+    expect(banner).toBeTruthy();
+    expect((banner!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((banner!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeCloseTo(7.44, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+
+    component.loadFailed.set(false);
+  });
+
+  it('ACTORS callout body: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const body = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'List every actor group using this innovation.');
+    expect(body).toBeTruthy();
+    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Add-other buttons (actor/organization/measure): text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+    ['Add other actor', 'Add other organization', 'Add other measure'].forEach(label => {
+      const btn = fixture.debugElement.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.includes(label));
+      expect(btn).toBeTruthy();
+      expect((btn!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
+      expect((btn!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+    });
+
+    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
+    expect(ratio).toBeCloseTo(6.83, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const eyebrow = fixture.debugElement
+      .queryAll(By.css('app-innovation-use-actor-item span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ACTOR #'));
+    expect(eyebrow).toBeTruthy();
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const eyebrow = fixture.debugElement
+      .queryAll(By.css('app-innovation-use-organization-item span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ORGANIZATION #'));
+    expect(eyebrow).toBeTruthy();
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const calloutBody = orgItem
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes("Can't find the institution"));
+    expect(calloutBody).toBeTruthy();
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_200);
+    expect(ratio).toBeCloseTo(6.68, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization known-institution callout link "here": text-[var(--ac-light-blue-500)] on --ac-grey-200 (>= 4.5:1)', () => {
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const hereButton = orgItem.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.trim() === 'here');
+    expect(hereButton).toBeTruthy();
+    expect((hereButton!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-500)]');
+    expect((hereButton!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+
+    const ratio = contrastRatio(LIGHT_BLUE_500, GREY_200);
+    expect(ratio).toBeCloseTo(7.43, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('actor card "Total" value: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1, already conformant before R1)', () => {
+    const total = fixture.debugElement.query(By.css('span.actor-total'));
+    expect(total).toBeTruthy();
+    expect((total!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('stepper unselected digits: text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+    const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
+    const unselected = buttons.filter(b => !(b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    expect(unselected.length).toBeGreaterThan(0);
+    unselected.forEach(b => {
+      expect((b.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
+      expect((b.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+    });
+
+    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('stepper selected digit fill: text-[var(--ac-white-1)] on the re-derived --ac-light-blue-400 fill (>= 4.5:1)', () => {
+    const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
+    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    expect(selected.length).toBe(1);
+    expect((selected[0].nativeElement as HTMLElement).className).toContain('text-[var(--ac-white-1)]');
+    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-300)]');
+
+    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_400);
+    expect(ratio).toBeCloseTo(6.83, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
+  // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
+  // this block must be able to show — see the reverted-swap check run separately during verification.
+  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS/eyebrow pre-fix token) reports 2.91:1 and fails', () => {
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-grey-700 on --ac-grey-200 (organization-callout pre-fix token) reports 3.51:1 and fails', () => {
+    const ratio = contrastRatio(GREY_700, GREY_200);
+    expect(ratio).toBeCloseTo(3.51, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (Add-button/stepper pre-fix token) reports 3.84:1 and fails', () => {
+    const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-light-blue-300 on --ac-grey-200 (organization-callout link pre-fix token) reports 3.21:1 and fails', () => {
+    const ratio = contrastRatio(LIGHT_BLUE_300, GREY_200);
+    expect(ratio).toBeCloseTo(3.21, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
 });
 
 // ===================================================================================================
@@ -1782,5 +2387,109 @@ describe('InnovationUseDetailsComponent — c11 (real HTTP layer)', () => {
     component.addActor();
 
     httpMock.expectNone(() => true);
+  });
+});
+
+// =================================================================================================
+// Bug fix (T-13 human gate) — `goToEvidence()`'s id source, reproduced against the REAL route tree.
+//
+// The `activatedRouteMock` used everywhere above is flat: `paramMap.get('id')` always answers '1',
+// regardless of where in the tree the component sits. That is exactly why the shipped defect (T-14,
+// e508eeea) passed a green c5 suite — the mock does not evaluate what it stands in for (KZ-001).
+//
+// In production, `result/:id` (app.routes.ts) is the PARENT route; `innovation-use-details` is a
+// CHILD of it (app.routes.ts, `innovation-use-details` under `result/:id`'s `children`). Angular's
+// router defaults `paramsInheritanceStrategy` to `'emptyOnly'` (app.config.ts's `provideRouter(...)`
+// never overrides it) — a child route's own `ActivatedRoute.snapshot.paramMap` does NOT inherit the
+// parent's `:id`. `ResultSidebarComponent.navigateTo()` (result.component.html) sits AT `result/:id`,
+// not below it, which is why its identical-looking `route.snapshot.paramMap.get('id')` line works
+// while this component's copy of that line does not — same code, different tree depth.
+//
+// This block models that real tree with `provideRouter` + `RouterTestingHarness` (never a hand-made
+// route double) so the assertions below are faithful to what production actually resolves.
+// =================================================================================================
+@Component({ selector: 'app-result-route-stub', standalone: true, imports: [RouterOutlet], template: '<router-outlet></router-outlet>' })
+class ResultRouteStubComponent {}
+
+describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful result/:id -> innovation-use-details route tree)', () => {
+  const routeTreeApiService = {
+    GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
+    PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
+    GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_ActorTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_Institutions: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_InstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_SubInstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true })
+  };
+  const routeTreeActions = { showToast: jest.fn(), saveCurrentSection: jest.fn() };
+  const routeTreeSubmission = { isEditableStatus: jest.fn().mockReturnValue(true) };
+  const routeTreeVersionWatcher = { onVersionChange: jest.fn() };
+
+  let routeTreeCache: CacheServiceMock;
+  let router: Router;
+  let navigateSpy: jest.SpyInstance;
+
+  /** Navigates the REAL router to `url` and returns the live, routed InnovationUseDetailsComponent
+   *  instance — activated as a child of `ResultRouteStubComponent`, which owns the `<router-outlet>`
+   *  that renders it, exactly like `result.component.html` does in production. */
+  async function activateInnovationUseDetails(url: string): Promise<InnovationUseDetailsComponent> {
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'result/:id',
+            component: ResultRouteStubComponent,
+            children: [{ path: 'innovation-use-details', component: InnovationUseDetailsComponent }]
+          }
+        ]),
+        { provide: ApiService, useValue: routeTreeApiService },
+        { provide: CacheService, useClass: CacheServiceMock },
+        { provide: ActionsService, useValue: routeTreeActions },
+        { provide: SubmissionService, useValue: routeTreeSubmission },
+        { provide: VersionWatcherService, useValue: routeTreeVersionWatcher }
+      ]
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url, ResultRouteStubComponent);
+    router = TestBed.inject(Router);
+    routeTreeCache = TestBed.inject(CacheService) as unknown as CacheServiceMock;
+    harness.fixture.detectChanges();
+    await harness.fixture.whenStable();
+
+    const routed = harness.fixture.debugElement.query(By.directive(InnovationUseDetailsComponent));
+    expect(routed).toBeTruthy();
+    return routed.componentInstance as InnovationUseDetailsComponent;
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('structural proof: at this tree depth, paramMap carries no id (emptyOnly is the default, unconfigured in app.config.ts)', async () => {
+    const component = await activateInnovationUseDetails('/result/STAR-13232/innovation-use-details?version=v9&from=results-center');
+
+    expect(component.route.snapshot.paramMap.get('id')).toBeNull();
+    // Counterpart: queryParamMap is global to the URL, unaffected by paramsInheritanceStrategy.
+    expect(component.route.snapshot.queryParamMap.get('version')).toBe('v9');
+    expect(component.route.snapshot.queryParamMap.get('from')).toBe('results-center');
+  });
+
+  it('navigates with the platform-coded id verbatim (STAR-13232), sourced from CacheService, not the route param', async () => {
+    const component = await activateInnovationUseDetails('/result/STAR-13232/innovation-use-details?version=v9&from=results-center');
+    routeTreeCache.currentResultId.mockReturnValue('STAR-13232');
+    navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.goToEvidence();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/result', 'STAR-13232', 'evidence'], { queryParams: { version: 'v9', from: 'results-center' } });
+  });
+
+  it('navigates with a bare numeric id (1), sourced from CacheService', async () => {
+    const component = await activateInnovationUseDetails('/result/1/innovation-use-details?version=v1');
+    routeTreeCache.currentResultId.mockReturnValue(1);
+    navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.goToEvidence();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1' } });
   });
 });

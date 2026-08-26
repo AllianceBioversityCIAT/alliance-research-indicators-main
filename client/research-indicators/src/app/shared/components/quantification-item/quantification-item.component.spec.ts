@@ -395,6 +395,50 @@ describe('QuantificationItemComponent', () => {
     });
   });
 
+  // @akili-spec docs/specs/innovation-use/details-page (R2 — remediation of validation-report.md A-2:
+  // the delete control was a <div> with no role/tabindex/aria-label — unfocusable and unnamed,
+  // R-IUP-018 AC.1/AC.2. Positive control: assert the control IS focusable and IS named, not merely
+  // that it renders.)
+  describe('delete control accessibility (R-IUP-018 AC.1/AC.2)', () => {
+    it('renders the delete control as a native, focusable button carrying a non-empty English accessible name', () => {
+      component.quantNumber = 2;
+      component.headerLabel = 'MEASURE';
+      fixture.detectChanges();
+
+      const deleteButton: HTMLButtonElement = fixture.debugElement.query(By.css('button[aria-label]')).nativeElement;
+
+      // Focusable: a native <button> (unlike a plain <div>) is a member of the default tab order —
+      // no [tabindex] is required to receive focus, and none is added defensively.
+      expect(deleteButton.tagName).toBe('BUTTON');
+      expect(deleteButton.type).toBe('button');
+      expect(deleteButton.tabIndex).not.toBe(-1);
+
+      // Named: the accessible name is non-empty and in English, deriving from the two inputs that
+      // vary per row so screen-reader users can tell rows apart ("Remove MEASURE 2").
+      const accessibleName = deleteButton.getAttribute('aria-label');
+      expect(accessibleName).toBe('Remove MEASURE 2');
+      expect(accessibleName?.trim().length).toBeGreaterThan(0);
+    });
+
+    it('fires onDelete() on click, still reachable from the native button', () => {
+      fixture.detectChanges();
+      jest.spyOn(component, 'onDelete');
+
+      const deleteButton: HTMLButtonElement = fixture.debugElement.query(By.css('button[aria-label]')).nativeElement;
+      deleteButton.click();
+
+      expect(component.onDelete).toHaveBeenCalled();
+    });
+
+    it('omits the delete control entirely when not editable, matching the surrounding disabled-state pattern', () => {
+      submissionServiceMock.isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+
+      const deleteButton = fixture.debugElement.query(By.css('button[aria-label]'));
+      expect(deleteButton).toBeNull();
+    });
+  });
+
   describe('onDelete', () => {
     it('should emit delete when status is editable', () => {
       submissionServiceMock.isEditableStatus.mockReturnValue(true);

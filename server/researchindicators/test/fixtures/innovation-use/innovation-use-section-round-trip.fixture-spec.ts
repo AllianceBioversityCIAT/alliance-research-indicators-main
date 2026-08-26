@@ -1016,7 +1016,7 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
 
   // -----------------------------------------------------------------------
   // R-IUJ-001 — stale justification on level drop
-  // (`docs/specs/bugfix/innovation-use-stale-justification`). Same resultId
+  // (`docs/specs/archive/2026-08-24-bugfix--innovation-use-stale-justification`). Same resultId
   // as Hole 1: catalog id 7 + sentinel explanation, actor A count left at
   // 241 by the DD-14 `it` above. Each case restores that precondition.
   // Do not rewrite the Hole 1 `it`s (F4 / `''` / `'   '`).

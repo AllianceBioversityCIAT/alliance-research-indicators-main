@@ -28,6 +28,8 @@
 | Visual design context | Yes — PRMS screenshot (field inventory only) + the live STAR `innovation-details` page (binding style reference). No Figma, no generated mockup. UI-state and responsive requirements are therefore **explicit** below (R-IUP-017, R-IUP-018) |
 | Dependency warning | none — both `Depends on` chunks are `Status: done` |
 | Inherited open gate | family **FR-7** ([AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718)) is **OPEN** and owned by its own spec. It is **not** a blocker for this chunk and **must not** be closed by it |
+| **Amendment 01** | **2026-08-26 · depth Lite · gated.** Level-selector guidance copy, calculator + definitions links, evidence callout with in-app Evidence navigation. Adds **R-IUP-020**, **R-IUP-021** and **T-14**; **amends no existing requirement**. Intent: [`proposal-amendment-01-level-guidance.md`](./proposal-amendment-01-level-guidance.md), whose §correction box records four claims this specify pass falsified. Visual design context: user-supplied reference screenshots (**not persisted** — see **OQ-A1**) transcribed into [`mockup/level-guidance-target.html`](./mockup/level-guidance-target.html) |
+| **Amendment 01 — new visual context caveat** | The mockup is a faithful transcription of the **copy**, and is **not** evidence of the reference UI's layout, spacing or emphasis. Requirements derived from it are therefore **copy and behaviour requirements only**; nothing below asserts a spacing or size value taken from it |
 
 ---
 
@@ -801,6 +803,92 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 
 ---
 
+### R-IUP-020 — The use-level question carries reference guidance above the stepper
+
+> **Added 2026-08-26 — Amendment 01** ([`proposal-amendment-01-level-guidance.md`](./proposal-amendment-01-level-guidance.md)). Copy-only surface plus two external links. Nothing in R-IUP-005 changes: the label string was **never specified** by this spec — `Level of use of this innovation` was a T-07 implementation choice asserted by no requirement and no test — so this requirement is the label's first owner, not an amendment of another.
+
+- **As a** Result Contributor
+- **I want** to know how to choose a use level before I choose one
+- **So that** I report a level I can defend with evidence, instead of guessing and being corrected at quality assessment
+
+**Details**
+
+- Behavior: the question label reads `How would you assess the current use level of the innovation?` with the standard required marker. Directly beneath it, a guidance callout renders four bullets in a fixed order; the fourth carries the label `YOUR USE LEVEL IN JUST 3 CLICKS:` followed by a link. Beneath the stepper's definition callout, a `Click here` link opens the full use-level definitions.
+- The four bullets, verbatim and in order:
+  1. `In case the innovation use level differs across countries or regions, we advise to assign the highest current innovation use level that can be supported by the evidence provided.`
+  2. `Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be supported by evidence documentation.`
+  3. `The innovation use level will be quality assessed.`
+  4. `YOUR USE LEVEL IN JUST 3 CLICKS: TRY THE NEW INNOVATION USE CALCULATOR`
+- Link targets: calculator → `https://www.scalingreadiness.org/calculator-use-headless/`; definitions → `https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view`.
+- Outputs: none. This requirement adds **no** field, **no** payload key, and **no** validation.
+
+**Acceptance criteria**
+
+- [ ] AC.1 — The label renders exactly `How would you assess the current use level of the innovation?` plus the required marker.
+- [ ] AC.2 — Four bullets render, in the order above, with the exact strings above.
+- [ ] AC.3 — The calculator link and the definitions link each carry the target URL above, `target="_blank"`, and `rel="noopener noreferrer"`.
+- [ ] AC.4 — Both links have a discernible accessible name; neither is an icon-only or bare-URL link.
+- [ ] AC.5 — The guidance callout and the definitions link render at **every** level state — none selected, `0`, and `9` — and are **not** gated on `submission.isEditableStatus()`.
+- [ ] AC.6 — Body text and link text meet **WCAG 2.1 AA (≥ 4.5:1)** against the callout background in the light theme (PRD **C-4**; the dark half stays lifted per **DD-14**).
+
+#### Scenario: Guidance is present before the choice is made, and in read-only
+
+- GIVEN an Innovation Use section with **no** level selected
+- WHEN the section renders
+- THEN the label, the four bullets, both links, and the required message all render
+- AND the same guidance still renders for a result in a non-editable status
+- BUT it must NOT be hidden, collapsed, or disabled when `submission.isEditableStatus()` is false — it is guidance, not an input
+- AND IT MUST NOT depend on `innovation_use_level_id` being set, because guidance that appears only after the choice cannot inform the choice.
+
+---
+
+### R-IUP-021 — Evidence guidance renders below the stepper and links into the Evidence section
+
+> **Added 2026-08-26 — Amendment 01.** The `Click here to go there` link is the only **behavioral** half of this amendment; everything else is copy.
+
+- **As a** Result Contributor
+- **I want** to be told at the field that the level needs evidence, and be taken to where I enter it
+- **So that** I learn the requirement while filling the form instead of at a failed submit
+
+**Details**
+
+- Behavior: a two-paragraph callout renders below the stepper's definition callout and above the conditional justification textarea.
+  - **P1** — `Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the necessary evidence/documentation that support the current innovation use level in the ‘Evidence’ section of the form (Click here to go there)`. `Click here to go there` is an **in-app** link.
+  - **P2** — `Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication materials that provide evidence of the current development/ maturity stage of the innovation.`
+- Navigation: `Click here to go there` navigates to the current result's `evidence` section, **preserving the `version` and `from` query parameters** exactly as the sidebar's own navigation does. It is an Angular router navigation, never a document `href`.
+- Outputs: none. No field, no payload key, no validation.
+
+> **Two recorded copy decisions, both deliberate, so a reviewer does not read either as a missed sweep.**
+> **(1)** The text supplied in the invocation said *"Innovation Readiness Level"* and *"innovation development level"* — Innovation **Development** vocabulary on a **Use** page. Adapted to Use terminology by user ruling (proposal **D-2**).
+> **(2)** P2 is kept **verbatim** from the reference UI by user ruling (proposal **D-3**), including its `current development/ maturity stage of the innovation` tail — so P1 and P2 use different vocabulary **on purpose**. Tracked as **OQ-IUP-6**.
+
+**Acceptance criteria**
+
+- [ ] AC.1 — P1 renders with the exact adapted string above, including the `‘Evidence’` quotes.
+- [ ] AC.2 — P2 renders with the exact verbatim string above.
+- [ ] AC.3 — Activating `Click here to go there` issues a router navigation to `['/result', <id>, 'evidence']`.
+- [ ] AC.4 — That navigation carries `version` forward when the current URL has one, and `from` forward when it is `results-center` or `home` — asserted on the **built commands and query params**, not on the fact that a navigation happened.
+- [ ] AC.5 — The block renders at **every** level state (none, `0`, `9`) and in a non-editable status; it is **not** attached to the conditional justification textarea.
+- [ ] AC.6 — Body text and link text meet **WCAG 2.1 AA (≥ 4.5:1)** against the callout background in the light theme.
+
+#### Scenario: The evidence link preserves version context
+
+- GIVEN a result open at `/result/19911/innovation-use-details?version=3&from=results-center`
+- WHEN the user activates `Click here to go there`
+- THEN the app navigates to `/result/19911/evidence` with `version=3` and `from=results-center` intact
+- BUT it must NOT be a document `href` — that would full-page-reload the SPA and drop the session's in-memory body
+- AND IT MUST NOT drop `version`, because landing on the live version from a historical one silently changes which record the user is editing.
+
+#### Scenario: Evidence guidance is not gated on the justification's condition
+
+- GIVEN a result at level `3`, where R-IUP-006 hides the justification textarea
+- WHEN the section renders
+- THEN both paragraphs and the link still render
+- BUT it must NOT be placed inside the `showJustification()` branch, or the copy would vanish at exactly the levels where the reporter is least likely to know evidence is required
+- AND IT MUST NOT alter `showJustification()`, `justificationMissing()`, or `justificationWhitespaceOnly()` in any way.
+
+---
+
 ## 8. Non-functional requirements
 
 ### NFR-IUP-001 — Accessibility
@@ -857,6 +945,7 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 | D8 | Accessibility defect — missing accessible name, focus trap, color-only error | Partially automatable: a spec can assert `aria-label` presence and `<label for>` association | ⚠️ Presence only. Focus order, visible focus ring, and contrast are **not** provable in jsdom → same substitute as D7 |
 | D9 | Bundle-budget regression | `npm run build`, budget output | ✅ Yes. **Disqualifier:** a build run concurrently with a delegated agent is not evidence — re-run in a quiet window |
 | D10 | Stale documentation claim (a count, a path, a line citation) | the Correction Closure sweep on every Adjust round; prefer **anchors over line numbers** (chunk 2's citations rotted when its own edits moved the lines) | ✅ Yes, by `grep` |
+| **D11** | **Dead or permission-walled outbound link** (Amendment 01) — the calculator page moves, or the definitions PDF is not shared `anyone-with-the-link`, so every reporter outside the owning Drive account hits a permission wall | **No automated gate exists in this tier.** A unit spec asserts the `href` *string*, which is a presence assertion: it proves the attribute, never that the URL resolves for the user. CI has no network and cannot see Drive's ACL at all | ❌ **No.** Substituted by a **human check at `T-14`**: open both URLs in a logged-out browser and quote the HTTP status and the rendered page. A link asserted only in a spec is **not** verified |
 
 **Accepted risks, recorded rather than substituted:**
 
@@ -910,6 +999,12 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 | OQ-IUP-2 | Is indicator 6 `is_active` in the deployed environment today (family **FR-5**)? If yes, users can already reach the dead end and this chunk is a fix, not an addition. | Product owner / DevOps | ~~nothing — informs release comms and urgency only~~ → **blocked `T-13` c1/c7/c8/c9** | ✅ **RESOLVED 2026-08-21 at the T-13 Pivot — and it was the wrong question.** The blocking fact was never `is_active`; it was `indicators.service.ts:34`'s allowlist `[1, 2, 4, 5]`, **answerable from the repo all along.** The server's `is_active` value is now moot for reachability. The remaining half — whether indicator-6 results already exist in production — stays a genuine deployment fact and still informs release comms |
 | OQ-IUP-3 | Should the `Other quantitative measures` block reuse the OICR page's `quantification-item` component (shape `{number, unit, comments}`) or use the Innovation Use wire shape (`{id, quantification_number, unit, description}`) directly? | Engineering lead | one task's file set | Phase 2 approval gate |
 
+| **OQ-IUP-5** | Is a Google Drive PDF the long-term home for the use-level definitions, or a stopgap until an in-app definitions view exists? **Amendment 01.** | Product owner | nothing — `T-14` ships the link either way | Before archive |
+| **OQ-IUP-6** | Amendment 01 keeps **P2 verbatim** (proposal **D-3**) while **P1 is adapted to Use terminology** (proposal **D-2**), so the two paragraphs use different vocabulary on purpose. Confirm, or adapt P2's `current development/ maturity stage of the innovation` tail to `current use level of the innovation`. | Product owner | nothing — flagged because a reviewer will read it as an incomplete sweep | Before archive |
+| **OQ-IUP-7** | Should the label change of **R-IUP-020 AC.1** be mirrored on the Innovation **Development** page, whose question reads `How would you assess the current readiness of this innovation?` and whose callout hardcodes hex? **Out of scope here** — R-IUP-019 forbids touching that page in this spec. | Product owner | nothing | A separate spec |
+
+| **OQ-IUP-8** | **A live PRD C-4 defect found at Amendment 01's specify gate, and deliberately NOT fixed here.** `src/styles/custom-fields.scss`'s `.description { color: #777c83 }` renders at **4.20:1** on white and **2.91:1–3.91:1** on `--ac-grey-100` — below AA's 4.5:1 — and it is **reachable in the light theme on the default route** (it paints this page's own stepper definition callout and the `ACTORS` guidance text, both shipped by `T-04`/`T-07`). **Reachability verdict: REACHABLE, shipped.** Out of scope here because the fix edits a **shared stylesheet consumed app-wide**, and an app-wide style change must not ride a copy amendment's gate. Owed: its own spec. | Engineering lead | nothing in this spec — `T-14` sidesteps it by not using `.description` for colour (`design.md` §5.8) | Its own spec |
+
 ### Resolved at specify time
 
 | # | Decision | Rationale |
@@ -949,9 +1044,11 @@ Behavior — the payload rules, each of which prevents a specific chunk-2 `400`:
 | R-IUP-017 | STAR visual language, both themes | 1 | 4 |
 | R-IUP-018 | Accessible and within budget | 1 | 5 |
 | R-IUP-019 | Innovation Dev unchanged | 1 | 4 |
+| **R-IUP-020** | **Reference guidance above the stepper** (Amendment 01) | **1** | **6** |
+| **R-IUP-021** | **Evidence guidance + in-app Evidence link** (Amendment 01) | **2** | **6** |
 | NFR-IUP-001…006 | a11y · theming · bundle · coverage · vocabularies · architecture | — | — |
 
-**19 functional requirements · 19 scenarios · 85 acceptance criteria · 6 NFRs.** Every scenario carries at least one `BUT it must NOT` and one `AND IT MUST` clause; `tasks.md` must own each of those clauses by name, not by requirement ID.
+**21 functional requirements · 22 scenarios · 97 acceptance criteria · 6 NFRs.** *(Was 19 · 19 · 85 before Amendment 01, 2026-08-26: +2 requirements, +3 scenarios, +12 ACs. Re-derive with `grep -cE '^### R-IUP-' requirements.md`, `grep -cE '^#### Scenario:' requirements.md` and `grep -cE '^- \[[ x]\] AC\.' requirements.md` rather than restating these figures — **the AC pattern must accept `[x]`**, since one AC is already ticked and a `[ ]`-only grep undercounts by exactly that one — KZ-005: one home per measured figure.)* Every scenario carries at least one `BUT it must NOT` and one `AND IT MUST` clause; `tasks.md` must own each of those clauses by name, not by requirement ID.
 
 ---
 
