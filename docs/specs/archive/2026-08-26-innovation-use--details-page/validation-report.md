@@ -174,12 +174,12 @@ No `test-report.md` exists (`/akili-test` was never run as a separate phase); co
 
 ## 12. Archive Readiness Recommendation
 
-**Archive-ready once the user accepts two things**, both stated plainly rather than buried:
+✅ **ARCHIVE-READY — both acceptances given by the user, 2026-08-26.** Recorded here rather than assumed, because each one leaves something open on purpose.
 
-| # | Acceptance |
-| --- | --- |
-| 1 | **The remediation of the 8 audit findings has no independent review.** The auditor found them; the Leader fixed them. Accept it, or spend one more audit pass on the fixes |
-| 2 | **Two live light-theme AA defects ship** — `RB-5`'s 2.9115:1 and `OQ-IUP-8`'s 2.378:1. Both deliberately deferred, both now tracked as accessibility defects rather than as styling debt, neither owned by a ticket |
+| # | Acceptance | User ruling |
+| --- | --- | --- |
+| 1 | **The remediation of the 8 audit findings has no independent review.** The auditor found them; the Leader fixed them | ✅ **Accepted.** The gap is real and is not closed by this archive. It stands on the record as the cost of a session run without the `akili-*` wrappers loaded |
+| 2 | **Two live light-theme AA defects ship** — `RB-5`'s **2.9115:1** and `OQ-IUP-8`'s **2.378:1** | ✅ **Accepted as deferred.** Neither is fixed here. Both are now carried as **accessibility defects with ratios and sites**, not as styling debt — which was the point of `R5`. **Neither has a ticket, and archiving does not create one** |
 
 `/akili-archive` additionally owes the **`## Constitution Impact`** note, a **CodeGraph re-index**, the document-status refresh (`F-16`), `§9`'s Done definition, and the **Kaizen** step — where **`KZ-001` rises to recurrence 5** and the `KZ-005` variant named in §8 is recorded.
 

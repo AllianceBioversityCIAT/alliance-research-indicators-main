@@ -7,7 +7,7 @@
 - **Linked PRD sections:** [`docs/prd.md`](../../../prd.md) §3.1 (Result Contributor), §4.1 G6/G7/G8, §6 (US-RC-1, US-RC-2, R-2, R-5), §7 (AC-Controlled-Lists, AC-Role-Correctness, AC-Theming, AC-Accessibility, AC-Performance, AC-Testing)
 - **Linked UX/UI sections:** [`docs/ux-ui/design.md`](../../../ux-ui/design.md) §1.1, §2.1, §5.1, §6.1, §7.1, §10.1, §11
 - **Linked TRD sections:** [`docs/trd/trd.md`](../../../trd/trd.md) §4.2, §5.3, §6.3, §7.5, §8.1–8.5, §12, §13.2
-- **Parent spec:** [`../family.md`](../family.md) — **chunk 3 of 3**
+- **Parent spec:** [`../family.md`](../../innovation-use/family.md) — **chunk 3 of 3**
 - **Proposal:** [`./proposal.md`](./proposal.md)
 - **Extends:** [`docs/specs/archive/2026-08-20-innovation-use--details-api/`](../../archive/2026-08-20-innovation-use--details-api/) (chunk 2, archived — its `design.md` §4 is this spec's wire contract)
 - **Depends on:** chunk 2 (`done`, archived 2026-08-20) and chunk 1 (`done`, archived 2026-08-19)

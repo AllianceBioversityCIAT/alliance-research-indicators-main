@@ -7,7 +7,7 @@
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked TRD sections:** [`docs/trd/trd.md`](../../../trd/trd.md) §4.2, §5.3, §6.3, §7.5, §8.1–8.5, §12, §13.2
 - **Linked UX/UI sections:** [`docs/ux-ui/design.md`](../../../ux-ui/design.md) §6.1, §7.1, §8.1, §10.1, §11
-- **Parent spec:** [`../family.md`](../family.md) — chunk 3 of 3
+- **Parent spec:** [`../family.md`](../../innovation-use/family.md) — chunk 3 of 3
 - **Frozen upstream contract:** [`docs/specs/archive/2026-08-20-innovation-use--details-api/design.md`](../../archive/2026-08-20-innovation-use--details-api/design.md) §4
 - **Depth:** Full
 - **Last updated:** 2026-08-20
@@ -650,7 +650,7 @@ Contract layer → shared additive edits → child components → page → wirin
 ## 15. References
 
 - [`./requirements.md`](./requirements.md) — R-IUP-001…019, NFR-IUP-001…006, §6 binding contracts, §9 defect-class gate table
-- [`../family.md`](../family.md) — family decisions **D-1** (`id = level + 1`, non-unique `name`), **D-2** (unit is free text), **D-3** (story governs over the screenshot), **D-4** (aggregate mode is the total), **D-8** (no OpenSearch decoration), **D-9** (four lifecycle routines), **D-10** (transcribe SQL); risks **FR-1**, **FR-4**, **FR-5**, **FR-7**
+- [`../family.md`](../../innovation-use/family.md) — family decisions **D-1** (`id = level + 1`, non-unique `name`), **D-2** (unit is free text), **D-3** (story governs over the screenshot), **D-4** (aggregate mode is the total), **D-8** (no OpenSearch decoration), **D-9** (four lifecycle routines), **D-10** (transcribe SQL); risks **FR-1**, **FR-4**, **FR-5**, **FR-7**
 - [`docs/specs/archive/2026-08-20-innovation-use--details-api/design.md`](../../archive/2026-08-20-innovation-use--details-api/design.md) — §4 the frozen wire contract and its full `400` table, §5.1 the write transaction, §5.5 total derivation, §5.6 catalog ordering
 - [`docs/specs/archive/2026-08-19-innovation-use--data-model-and-catalog/`](../../archive/2026-08-19-innovation-use--data-model-and-catalog/) — the schema, the seeded catalog, `innovation_use_validation`
 - [`docs/ux-ui/design.md`](../../../ux-ui/design.md) §7.1 — the form-label and token binding contract; §8.1 — the component inventory this spec must register into

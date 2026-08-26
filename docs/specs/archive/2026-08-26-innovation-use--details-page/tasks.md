@@ -7,7 +7,7 @@
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
 - **Judgment ledger:** [`./judgment.md`](./judgment.md) — `JUDGMENT: APPROVED`, six findings open by explicit user decision
-- **Parent spec:** [`../family.md`](../family.md) — chunk 3 of 3
+- **Parent spec:** [`../family.md`](../../innovation-use/family.md) — chunk 3 of 3
 - **Depth:** Full
 - **Last updated:** 2026-08-20
 
