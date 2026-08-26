@@ -2051,3 +2051,36 @@ It sits at the **same tree depth**, so `routeId` is **always `null`**: the prima
 
 **Not fixed here, and not minted as a task in this spec** (`/akili-execute` §2.4): different page, different module, different spec, and an app-wide id-source question deserves its own gate rather than riding a copy amendment's. **Escalated to the user for its own bugfix spec.** Strong candidate to be scoped as *"audit every `route.snapshot.paramMap.get('id')` in `pages/platform/pages/result/pages/`"* rather than as one file's bug — there are exactly two call sites today, and this record is the reason to check for a third.
 
+
+### PV-T14-2 — `cursor-pointer` on the Evidence link, and a standing spec unknown resolved
+
+**Date:** 2026-08-26 · **Trigger:** user at the `T-13` human gate — the navigation now works, *"lo único que falta es agregarle el cursor pointer para indicar que se le puede dar click"* · **Authorized by:** the user, same non-task-change precedent as `PV-T14-1` / `PV-T13-1`
+
+**The change.** `innovation-use-details.component.html` — one line, one element: the `<button (click)="goToEvidence()">` gains `cursor-pointer` alongside `text-[var(--ac-light-blue-400)] underline`. Matches the convention already used at 8+ sites including **this same file's** "Add other actor" button and `evidence.component.html:28`. **Not** applied to the two external links: they are `<a [href]>` and already get a pointer from the user-agent stylesheet.
+
+**Effort / skills:** `low` · `angular-developer`. **One Implementer, no separate Reviewer** — a single utility class on a single element, with the Leader verifying inline. Recorded as a narrower gate than a spec task gets.
+
+**Verification.** `npm test -- --silent` → **316 suites / 6724 tests green**, re-measured by the Leader in a quiet tree. Lint clean, post-lint `git status` unchanged. Hex: 0. **Class presence confirmed by the Leader with a direct grep over the `evidence-callout` block, not inferred from the suite** — the Implementer's report described the green suite as indirect confirmation of the class, which it is not: no test asserts that class, so a passing suite is silent about it. The direct check is the evidence.
+
+**What is NOT proven, stated rather than implied.** No test in this repo can prove a pointer cursor renders. This is **D7/D8**, no automated gate, routed to `T-13` c7 as **AR-2**. See the finding below for the structural reason.
+
+#### 🔓 Standing unknown RESOLVED — `T-11` Lens C's *"single unknown that gates every token claim in this spec"*
+
+`execution.md` → T-11 recorded: *"the app also loads a **remote** stylesheet (`…amazonaws.com/frontend-parameters/colors.css`) that is not in the repo … **That single unknown gates every token claim in this spec and is worth resolving once.**"* Resolved here, by reading `src/index.html` rather than reasoning about it — and the answer is a **different mechanism than the one that was suspected**:
+
+**`src/index.html:13` loads Tailwind CSS v4 as a runtime browser script from a CDN:**
+
+```html
+<script src="https://unpkg.com/@tailwindcss/browser@4.1.6/dist/index.global.js" crossorigin="anonymous"></script>
+```
+
+Corroborated on four independent axes: Tailwind is **absent** from `client/research-indicators/package.json` (neither `dependencies` nor `devDependencies`); there is **no** `tailwind.config.*` and **no** PostCSS config; `angular.json`'s `styles` array lists only the six local SCSS files plus `mapbox-gl.css`; and the built global stylesheet `dist/research-indicators/browser/styles-*.css` (262,715 bytes) contains **zero** rules for `cursor-pointer`, `items-center`, `text-[`, `bg-[` or `border-l-[`, while containing 60 `rs-p-` and 60 `fs-` rules (from `responsive-size.scss`), 24 `.flex`, and the project's own `.app-page-wrapper` / `.description`.
+
+**Consequences that matter to this spec, and to any future one:**
+
+1. **Every Tailwind utility in this codebase — including all of DD-17's `text-[var(--ac-grey-800)]` / `bg-[var(--ac-grey-100)]` / `border-l-[4px]` — is generated in the browser at runtime.** They are correctly absent from every build artifact. **A grep over `dist/` therefore cannot falsify a Tailwind class**, and any future check that tries will return a confident, wrong zero.
+2. **This is why `T-14` c12 could only ever assert class names.** jsdom parses no CSS *and* the CSS does not exist until a browser script runs. c12's self-declared limitation — *"a computation over token values, not a measurement of rendered pixels"* — was not conservatism; it was the only claim available at that tier. The same holds for the `cursor-pointer` above.
+3. **The app's entire visual layer has a runtime dependency on `unpkg.com`.** Recorded as a fact, not a recommendation: no local fallback exists, so a CDN outage or a blocked egress path degrades every screen's styling at once. **Out of scope for this spec** — it is an app-wide infrastructure question, not a copy amendment's — and deliberately **not** minted as a task here (`/akili-execute` §2.4). Flagged for `docs/infrastructure.md` and the engineering lead.
+
+**A near-miss worth recording, because it is this log's own lesson turned on the Leader.** The Leader's first pass grepped `dist/` for `cursor-pointer`, found **zero**, and was one step from reporting that the class was inert and that DD-17's contrast decision might therefore be shipping unstyled text — a serious and **entirely wrong** claim. What stopped it was asking which region the check could structurally reach before trusting its zero: **KZ-017**, and **KZ-014**'s rule that an argument binds as tightly as a command. The build output was the wrong region by construction. *Recorded because a confident zero from a mis-scoped grep is exactly the failure mode this spec has now logged three times, and this instance was the auditor's own.*
+
