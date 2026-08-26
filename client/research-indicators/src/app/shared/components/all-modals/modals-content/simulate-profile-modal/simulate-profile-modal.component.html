@@ -13,10 +13,8 @@
         <app-user-search-step (userSelected)="onUserSelected($event)" />
       }
       @case ('confirm') {
-        <!-- TODO(T-10): render <app-confirm-step [user]="selectedUser()" /> here once
-             ConfirmStepComponent (R-IMP-008) lands. Kept as a bare switch branch so this
-             component's step transition stays testable without depending on T-10. -->
-        <ng-container></ng-container>
+        <!-- Cancel closes the modal (mockup artboard 3 has no step to go "back" to). -->
+        <app-confirm-step [user]="selectedUser()!" (back)="allModals.closeModal('simulateProfile')" />
       }
     }
   </div>

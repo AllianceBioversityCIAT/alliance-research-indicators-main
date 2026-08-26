@@ -2,6 +2,7 @@
 import { ChangeDetectionStrategy, Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { UserSearchStepComponent } from './user-search-step/user-search-step.component';
+import { ConfirmStepComponent } from './confirm-step/confirm-step.component';
 import { ImpersonationUserRow } from '@interfaces/impersonation.interface';
 
 export type SimulateProfileModalStep = 'search' | 'confirm';
@@ -9,8 +10,11 @@ export type SimulateProfileModalStep = 'search' | 'confirm';
 /**
  * Content of the `simulateProfile` modal, rendered inside the shared
  * `app-modal` wrapper (no `p-dialog`, D-imp-9). Hosts the two-step flow:
- * `UserSearchStepComponent` (R-IMP-007, this task) picks a target user,
- * then `ConfirmStepComponent` (R-IMP-008, T-10) confirms the start.
+ * `UserSearchStepComponent` (R-IMP-007) picks a target user, then
+ * `ConfirmStepComponent` (R-IMP-008, T-10) confirms the start. `Cancel` on
+ * the confirm step emits `back` (mirrors `userSelected`'s "child reports
+ * intent, parent decides" shape) — per the mockup there is no third step to
+ * return to, so `back` here just closes the whole modal.
  *
  * Focus trap is the wrapper's job (`modal.component.ts`'s `onKeydown`
  * handles `Tab`/`Shift+Tab` only — verified by reading the file, not
@@ -22,7 +26,7 @@ export type SimulateProfileModalStep = 'search' | 'confirm';
 @Component({
   selector: 'app-simulate-profile-modal',
   standalone: true,
-  imports: [UserSearchStepComponent],
+  imports: [UserSearchStepComponent, ConfirmStepComponent],
   templateUrl: './simulate-profile-modal.component.html',
   styleUrl: './simulate-profile-modal.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

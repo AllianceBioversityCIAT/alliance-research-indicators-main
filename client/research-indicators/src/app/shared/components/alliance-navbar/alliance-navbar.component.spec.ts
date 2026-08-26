@@ -10,6 +10,10 @@ import { AllModalsService } from '@services/cache/all-modals.service';
 import { DropdownsCacheService } from '../../services/cache/dropdowns-cache.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
 import { Router } from '@angular/router';
+// @akili-spec changes/profile-simulation
+import { ImpersonationService } from '@services/impersonation.service';
+import { RolesService } from '@services/cache/roles.service';
+import { WebsocketService } from '@sockets/websocket.service';
 
 // Mock environment
 jest.mock('../../../../environments/environment', () => ({
@@ -45,6 +49,15 @@ describe('AllianceNavbarComponent', () => {
   let mockAllModalsService: jest.Mocked<AllModalsService>;
   let mockServiceLocator: jest.Mocked<ServiceLocatorService>;
   let mockRenderer: jest.Mocked<Renderer2>;
+  // @akili-spec changes/profile-simulation
+  let mockRolesService: { isSystemAdmin: jest.Mock };
+  let mockImpersonationService: {
+    active: ReturnType<typeof signal>;
+    actor: ReturnType<typeof signal>;
+    session: ReturnType<typeof signal>;
+    end: jest.Mock;
+  };
+  let mockWebsocketService: { configUser: jest.Mock };
 
   const mockCacheService = {
     dataCache: signal({
@@ -74,7 +87,8 @@ describe('AllianceNavbarComponent', () => {
   beforeEach(async () => {
     mockActionsService = {
       getInitials: jest.fn().mockReturnValue('TU'),
-      logOut: jest.fn()
+      logOut: jest.fn(),
+      showToast: jest.fn()
     } as any;
 
     mockAllModalsService = {
@@ -89,6 +103,18 @@ describe('AllianceNavbarComponent', () => {
       listen: jest.fn()
     } as any;
 
+    // @akili-spec changes/profile-simulation — R-IMP-006/009/010 doubles, isolated from the
+    // pre-existing `mockCacheService` (which has no `user_role_list`) so RolesService's real
+    // computed is never exercised through it.
+    mockRolesService = { isSystemAdmin: jest.fn().mockReturnValue(false) };
+    mockImpersonationService = {
+      active: signal(false),
+      actor: signal(null),
+      session: signal(null),
+      end: jest.fn().mockResolvedValue({ actor: null })
+    };
+    mockWebsocketService = { configUser: jest.fn().mockResolvedValue(undefined) };
+
     await TestBed.configureTestingModule({
       imports: [AllianceNavbarComponent, HttpClientTestingModule, RouterTestingModule.withRoutes([])],
       schemas: [NO_ERRORS_SCHEMA],
@@ -99,7 +125,10 @@ describe('AllianceNavbarComponent', () => {
         { provide: AllModalsService, useValue: mockAllModalsService },
         { provide: DropdownsCacheService, useValue: {} },
         { provide: ServiceLocatorService, useValue: mockServiceLocator },
-        { provide: Renderer2, useValue: mockRenderer }
+        { provide: Renderer2, useValue: mockRenderer },
+        { provide: RolesService, useValue: mockRolesService },
+        { provide: ImpersonationService, useValue: mockImpersonationService },
+        { provide: WebsocketService, useValue: mockWebsocketService }
       ]
     }).compileComponents();
 
@@ -1633,4 +1662,163 @@ describe('AllianceNavbarComponent', () => {
     expect(comp.showDropdown).toBe(false);
   });
 
+  // @akili-spec changes/profile-simulation — R-IMP-006/009/010
+  describe('Profile simulation', () => {
+    function openDropdown(): void {
+      // Clicking the real toggle (rather than assigning `component.showDropdown`
+      // directly) routes through Angular's own event binding, which is what
+      // actually marks this OnPush component dirty for the next check — a plain
+      // property assignment from outside the component doesn't, and a bare
+      // `fixture.detectChanges()` after one is a no-op for the `@if` blocks below.
+      const toggle = fixture.nativeElement.querySelector('[dropdown-button]') as HTMLElement;
+      toggle.click();
+      fixture.detectChanges();
+    }
+
+    function findByText(selector: string, text: string): HTMLElement | undefined {
+      return (Array.from(fixture.nativeElement.querySelectorAll(selector)) as HTMLElement[]).find(el =>
+        el.textContent?.includes(text)
+      );
+    }
+
+    it('R-IMP-006 AC.1: hides "Simulate another profile" for a non-admin (role 3)', () => {
+      mockRolesService.isSystemAdmin.mockReturnValue(false);
+      mockImpersonationService.active.set(false);
+      openDropdown();
+
+      expect(findByText('button', 'Simulate another profile')).toBeUndefined();
+    });
+
+    it('R-IMP-006 AC.1: shows "Simulate another profile" for a System Admin (role 1) with no active simulation', () => {
+      mockRolesService.isSystemAdmin.mockReturnValue(true);
+      mockImpersonationService.active.set(false);
+      openDropdown();
+
+      expect(findByText('button', 'Simulate another profile')).toBeDefined();
+    });
+
+    it('opens the simulate-profile modal and closes the dropdown on click', () => {
+      mockRolesService.isSystemAdmin.mockReturnValue(true);
+      mockImpersonationService.active.set(false);
+      openDropdown();
+
+      findByText('button', 'Simulate another profile')?.click();
+
+      expect(mockAllModalsService.openModal).toHaveBeenCalledWith('simulateProfile');
+      expect(component.showDropdown).toBe(false);
+    });
+
+    it('R-IMP-006 AC.1 — failing input: hides "Simulate another profile" for a System Admin while a simulation is active (nested prevention)', () => {
+      // KZ-015 / K-004: dropping the `!impersonation.active()` clause from the template's @if
+      // guard for this button turns this assertion red — re-confirmed 2026-08-26 (worker
+      // impl-t11-b) by editing the template to `@if (this.roles.isSystemAdmin())`, observing
+      // this exact assertion fail with the button present in the DOM, then restoring it.
+      mockRolesService.isSystemAdmin.mockReturnValue(true);
+      mockImpersonationService.active.set(true);
+      openDropdown();
+
+      expect(findByText('button', 'Simulate another profile')).toBeUndefined();
+    });
+
+    it('applies the orange simulation ring to both avatars only while a simulation is active', () => {
+      mockImpersonationService.active.set(false);
+      openDropdown();
+      let avatars: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('p-avatar'));
+      expect(avatars.length).toBeGreaterThan(0);
+      avatars.forEach(el => expect(el.classList.contains('simulation-ring')).toBe(false));
+
+      mockImpersonationService.active.set(true);
+      fixture.detectChanges();
+      avatars = Array.from(fixture.nativeElement.querySelectorAll('p-avatar'));
+      expect(avatars.length).toBeGreaterThan(0);
+      avatars.forEach(el => expect(el.classList.contains('simulation-ring')).toBe(true));
+    });
+
+    it('swaps the avatar initials from the admin\'s to the target\'s once a simulation starts (R-IMP-009 identity swap)', () => {
+      // The navbar avatar always renders `actions.getInitials()`; the "swap" itself is
+      // `dataCache().user` being replaced by the target (design §5, owned by
+      // ImpersonationService/ActionsService, out of this component's scope) — this proves
+      // the navbar's `[label]` binding tracks that source rather than caching a stale value.
+      mockImpersonationService.active.set(false);
+      mockActionsService.getInitials.mockReturnValue('AD');
+      openDropdown();
+
+      let avatarText = fixture.nativeElement.querySelector('p-avatar .p-avatar-text') as HTMLElement;
+      expect(avatarText.textContent).toBe('AD');
+
+      mockActionsService.getInitials.mockReturnValue('TG');
+      mockImpersonationService.active.set(true);
+      fixture.detectChanges();
+
+      avatarText = fixture.nativeElement.querySelector('p-avatar .p-avatar-text') as HTMLElement;
+      expect(avatarText.textContent).toBe('TG');
+    });
+
+    it('renders the "Account · Simulated" panel: header, note, End simulation and "Log out (ends simulation)"', () => {
+      mockImpersonationService.active.set(true);
+      mockImpersonationService.actor.set({
+        sec_user_id: 1,
+        first_name: 'Ana',
+        last_name: 'Sandoval',
+        email: 'a.sandoval@cgiar.org',
+        roleName: 'System Admin',
+        is_active: true,
+        status_id: 1,
+        user_role_list: []
+      });
+      openDropdown();
+
+      const panelText = fixture.nativeElement.textContent as string;
+      expect(panelText).toContain('Account · Simulated');
+      expect(panelText).toContain('Simulated by');
+      expect(panelText).toContain('Ana Sandoval');
+      expect(panelText).toContain('(System Admin)');
+      expect(panelText).toContain('Log out (ends simulation)');
+      expect(fixture.nativeElement.querySelector('.simulation-panel-end-btn')).not.toBeNull();
+    });
+
+    it('shows plain "Log out" (no simulation) when no simulation is active', () => {
+      mockImpersonationService.active.set(false);
+      openDropdown();
+
+      expect(findByText('button', 'Log out (ends simulation)')).toBeUndefined();
+      expect(findByText('button', 'Log out')).toBeDefined();
+    });
+
+    it('the panel "End simulation" ends the session, re-runs configUser, navigates home and toasts', async () => {
+      mockImpersonationService.active.set(true);
+      mockImpersonationService.end.mockResolvedValue({
+        actor: {
+          sec_user_id: 1,
+          first_name: 'Ana',
+          last_name: 'Sandoval',
+          email: 'a.sandoval@cgiar.org',
+          roleName: 'System Admin',
+          is_active: true,
+          status_id: 1,
+          user_role_list: []
+        }
+      });
+      jest.spyOn(component.router, 'navigate').mockResolvedValue(true);
+      openDropdown();
+
+      const endBtn = fixture.nativeElement.querySelector('.simulation-panel-end-btn') as HTMLButtonElement;
+      expect(endBtn).not.toBeNull();
+      endBtn.click();
+      // The endSimulation() chain (end -> configUser -> navigate -> toast) is four
+      // real-Promise hops; a macrotask tick guarantees the whole microtask queue
+      // drains before assertions run (a single whenStable() only flushes one hop).
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(mockImpersonationService.end).toHaveBeenCalledWith('manual');
+      expect(mockWebsocketService.configUser).toHaveBeenCalledWith('Ana', 1);
+      expect(component.router.navigate).toHaveBeenCalledWith(['/home']);
+      expect(mockActionsService.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Simulation ended',
+        detail: 'Simulation ended — you are back as Ana'
+      });
+      expect(component.showDropdown).toBe(false);
+    });
+  });
 });

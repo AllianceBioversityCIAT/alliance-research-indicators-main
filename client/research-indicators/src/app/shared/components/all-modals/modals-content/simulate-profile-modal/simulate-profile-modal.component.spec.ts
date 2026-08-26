@@ -1,12 +1,35 @@
-// @akili-spec changes/profile-simulation — T-09, R-IMP-007
+// @akili-spec changes/profile-simulation — T-09, T-10, R-IMP-007, R-IMP-008
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { By } from '@angular/platform-browser';
+import { Router } from '@angular/router';
 import { SimulateProfileModalComponent } from './simulate-profile-modal.component';
 import { UserSearchStepComponent } from './user-search-step/user-search-step.component';
+import { ConfirmStepComponent } from './confirm-step/confirm-step.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { ApiService } from '@shared/services/api.service';
+import { ImpersonationService } from '@services/impersonation.service';
+import { ActionsService } from '@services/actions.service';
+import { WebsocketService } from '@sockets/websocket.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { ImpersonationUserRow } from '@interfaces/impersonation.interface';
+
+/**
+ * T-10: once `step()` reaches `'confirm'`, this component's template
+ * instantiates the REAL `ConfirmStepComponent` (standalone composition, not
+ * DI substitution — same pattern as `UserSearchStepComponent` above), which
+ * injects `ImpersonationService`/`WebsocketService`/`ActionsService`/`Router`/
+ * `CacheService`. None of the tests below drive the confirm step's own
+ * `start()` call (that behaviour is `confirm-step.component.spec.ts`'s
+ * job) — these are inert stubs so change detection can resolve DI.
+ */
+const confirmStepDiStubs = [
+  { provide: ImpersonationService, useValue: { start: jest.fn() } },
+  { provide: WebsocketService, useValue: { configUser: jest.fn() } },
+  { provide: ActionsService, useValue: { showToast: jest.fn() } },
+  { provide: Router, useValue: { navigate: jest.fn() } },
+  { provide: CacheService, useValue: { dataCache: () => ({ user: { first_name: 'Ana', last_name: 'Sandoval' } }) } }
+];
 
 /**
  * Advisory-1 fixture: a fake `AllModalsService` backed by a REAL signal,
@@ -60,8 +83,11 @@ describe('SimulateProfileModalComponent', () => {
         },
         // UserSearchStepComponent is a real, directly-imported child
         // (standalone composition, not DI) — it needs ApiService resolved
-        // even though these tests never trigger a search.
-        { provide: ApiService, useValue: { searchImpersonationUsers: jest.fn() } }
+        // even though these tests never trigger a search. `startImpersonation`
+        // is included so the "Finding 2" Escape test below can assert it was
+        // never called — a real seam, not a placeholder (Reviewer, attempt-2).
+        { provide: ApiService, useValue: { searchImpersonationUsers: jest.fn(), startImpersonation: jest.fn() } },
+        ...confirmStepDiStubs
       ]
     }).compileComponents();
 
@@ -97,9 +123,24 @@ describe('SimulateProfileModalComponent', () => {
 
     expect(component.step()).toBe('confirm');
     expect(component.selectedUser()).toEqual(testUser);
-    // T-10's ConfirmStepComponent is not built yet — the search step must
-    // no longer be rendered once the switch has moved past it.
+    // The search step must no longer be rendered once the switch has moved
+    // past it — the confirm step (T-10) takes its place.
     expect(fixture.debugElement.query(By.directive(UserSearchStepComponent))).toBeNull();
+    expect(fixture.debugElement.query(By.directive(ConfirmStepComponent))).toBeTruthy();
+  });
+
+  it('T-10 wiring — closes the modal (does not go back to search) when the confirm step emits back', () => {
+    fixture.detectChanges();
+    isOpen.set(true);
+    fixture.detectChanges();
+    component.onUserSelected(testUser);
+    fixture.detectChanges();
+
+    const allModals = TestBed.inject(AllModalsService) as unknown as { closeModal: jest.Mock };
+    const confirmStep = fixture.debugElement.query(By.directive(ConfirmStepComponent)).componentInstance as ConfirmStepComponent;
+    confirmStep.back.emit();
+
+    expect(allModals.closeModal).toHaveBeenCalledWith('simulateProfile');
   });
 
   it('onUserSelected switches the step and sets selectedUser directly', () => {
@@ -131,7 +172,7 @@ describe('SimulateProfileModalComponent', () => {
   });
 
   describe('Finding 2 — Escape-to-close (the wrapper only implements the Tab trap)', () => {
-    it('closes the modal via allModals.closeModal, with no other side effect, when the modal is open', () => {
+    it('closes the modal via allModals.closeModal, with no other side effect, when the modal is open — and R-IMP-008 BUT: Escape never calls startImpersonation', () => {
       fixture.detectChanges();
       isOpen.set(true);
       fixture.detectChanges();
@@ -140,10 +181,16 @@ describe('SimulateProfileModalComponent', () => {
       expect(component.step()).toBe('confirm');
 
       const allModals = TestBed.inject(AllModalsService) as unknown as { closeModal: jest.Mock };
+      // Reviewer (attempt-2): this drives Escape against the REAL, rendered
+      // ConfirmStepComponent (step() is already 'confirm' above), so a
+      // regression that wires Escape into a call — or into confirming rather
+      // than closing — makes THIS assertion fail, not just the closeModal one.
+      const api = TestBed.inject(ApiService) as unknown as { startImpersonation: jest.Mock };
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 
       expect(allModals.closeModal).toHaveBeenCalledWith('simulateProfile');
       expect(allModals.closeModal).toHaveBeenCalledTimes(1);
+      expect(api.startImpersonation).not.toHaveBeenCalled();
       // The Escape handler itself has no side effect beyond the close call —
       // it does not also mutate step/selectedUser.
       expect(component.step()).toBe('confirm');
@@ -179,7 +226,8 @@ describe('SimulateProfileModalComponent — advisory 1: reopen-reset gates on th
       imports: [SimulateProfileModalComponent],
       providers: [
         { provide: AllModalsService, useValue: fakeAllModals },
-        { provide: ApiService, useValue: { searchImpersonationUsers: jest.fn() } }
+        { provide: ApiService, useValue: { searchImpersonationUsers: jest.fn() } },
+        ...confirmStepDiStubs
       ]
     }).compileComponents();
 

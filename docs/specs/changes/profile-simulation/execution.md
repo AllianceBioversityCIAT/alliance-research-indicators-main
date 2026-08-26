@@ -218,3 +218,43 @@ Tests:       6545 passed, 6545 total
 **Leader client full-suite re-measure after T-08+T-09 (isolated):**
 Test Suites: 314 passed, 314 total
 Tests:       6593 passed, 6593 total
+
+---
+
+## T-10 — ConfirmStepComponent
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet medium→high; Reviewer opus, reliability + correctness)
+- **Requirements covered:** R-IMP-008 (all clauses + AC.1), design §5 client-start orchestration (D-imp-13 caller side)
+- **Files (7, ≈500):** `confirm-step/` (4 files) + wiring in `simulate-profile-modal.component.{ts,html,spec}`
+- **Attempt 1 — FAIL (evidence-only):** the "zero `/start` calls on Escape" test never dispatched Escape (construction-only placebo, K-004). Everything else verified clean on attempt 1, incl. the critical `successfulRequest:false` guard (a 409 lands on the error path, `res.data` never dereferenced) and the real call-order log (`impersonation.start → closeModal → configUser → navigate → toast`).
+- **Attempt 2 — PASS:** Escape assertion moved to the parent spec's real Escape test (rendered ConfirmStep, genuine document keydown) — red proof via a temp Escape→`start()` HostListener: `Expected 0 / Received 1 — {"target_user_id": 1042}` at spec:193, byte-identical restore; placeholder test deleted (32→31). Advisories adopted: `try/finally` pending reset (also fixes a stuck-pending on a rejecting promise), class-doc sentence on in-flight-close semantics (continuation completes deliberately — dropping it would orphan the server session).
+- Reviewer PASS — verified the red-proof line arithmetic against the hunk headers; `try/finally` regression-checked (double-click mutation still red).
+- **Decisions:** Cancel closes the modal (mockup has no third step; `back` output kept, parent wires to `closeModal`) · callout copy names admin AND target (deliberate mockup deviation, R-IMP-008 requires the names) · `reason?` not collected (optional per R-IMP-002, recorded).
+- **Forward pointers → T-12:** `role="alert"`/`aria-live` on the error line + `aria-busy` on the pending button (axe/HITL); in-flight-close behaviour worth a manual sanity check.
+
+---
+
+## T-11 — SimulationBanner, navbar changes, platform offset
+
+- **Status:** **PASS** → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 1 implementer run + 1 resume (the first worker died mid-task on a session limit — runtime failure per K-009, NOT a work FAIL; a resume worker verified the inherited tree per K-011 and completed it); Reviewer opus (reliability + risk) PASS
+- **Requirements covered:** R-IMP-006 (three clauses + AC.1), R-IMP-009 banner/avatar/panel/responsive/a11y + AC.3 unit half (pixel measurement owed to T-12), R-IMP-010 AC.1; D-imp-14/16/18
+- **Files (9, +727/−16):** `simulation-banner/` (new ×4), `alliance-navbar/` (×4), `platform.component.html`
+- **Resume findings (recorded):** two false-passing tests in the inherited spec fixed — an undrained 4-hop chained-await under `fakeAsync`+`tick` (→ real macrotask hop) and an OnPush dirty-marking no-op in `openDropdown()` that made three dropdown assertions vacuous (→ click the real `[dropdown-button]`); avatar-swap case added; K-004 mutation re-run first-hand (dropping `!active()` → RED with the button rendered, restored). Also surfaced a Leader bookkeeping bug: a bulk status edit had collided T-09's and T-11's identical status lines (corrected in tasks.md).
+- **Verification:** 66/66 green (both suites) · eslint clean · `tsc -p tsconfig.app.json` clean · `ng build --configuration production` exit 0, no warnings naming these components (navbar css under budget minified) · no new hex literals · both `pt-*` constants gone.
+- **Reviewer PASS** — verbatim copy match vs requirements + mockups; `navbarHeight`'s four consumers verified conceptually sound with the banner included; both resume fixes judged sound ("the vacuity is proven gone, not argued").
+
+### ADVISORY (recorded; #1–#3 join T-12's HITL checklist)
+1. New stacking context: navbar `:host` z-index 3 caps the dropdown's `z-[9999]` — check dropdown over sidebar/popovers in the browser (T-12).
+2. `:host { display: block }` missing on the banner — measure the host height in the browser (T-12); one line if it misbehaves.
+3. Cold-load offset flash (padding-top 0 for ~1 frame until the first ResizeObserver delivery) — eyeball at T-12.
+4. No double-submit guard on `endSimulation()` — harmless today (`/end` is idempotent 200).
+5. Focus effect re-fires when `hasSmallScreen()` flips while active (focus steal on resize) — recorded.
+6. TZ-fragile started-time assertion (`/^\d{2}:32$/` vs UTC fixture) — breaks under half-hour offsets; pin TZ if CI ever moves.
+7–10. Readability notes (unreachable fallback, test title overstatement, duplicated `endSimulation` helper — spec-conformant per §5 caller rule, pre-existing platform ternary).
+
+**Leader client full-suite re-measure after T-10+T-11 (isolated):**
+Tests: 6620 passed, 6620 total (all suites green)

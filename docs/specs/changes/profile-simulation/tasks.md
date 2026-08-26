@@ -235,7 +235,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
 - **Acceptance / done check:**
   - [ ] Spec: one `startImpersonation` call on confirm; zero on Cancel and on Escape; rejected call keeps the dialog open with the message; buttons disabled while pending.
 - **Verification — failing input:** double-click `Start simulation` during pending → still exactly one call; remove the disabled guard → red.
-- **Dependencies:** T-09 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** todo
+- **Dependencies:** T-09 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (PASS attempt 2, execution.md T-10)
 
 ### T-11 — `SimulationBanner`, navbar changes, platform offset
 
@@ -252,7 +252,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Component style budget respected (`ng build` warning-free for these components).
 - **Verification — failing input:** role 1 with `active()` true must hide the option; drop the `!active()` condition → red.
 - **Disqualifier:** the offset (AC.3) **cannot** be measured in jsdom — this task records it as owed to T-12's human check, never as passed.
-- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (PASS attempt 2, execution.md T-09)
+- **Dependencies:** T-07 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (PASS, execution.md T-11 — first worker died on a session limit; resume worker completed and re-proved)
 
 ### T-12 — Role-model specs, socket orchestration, HITL visual/a11y check
 

@@ -32,10 +32,26 @@ import { CreateResultManagementService } from '../all-modals/modals-content/crea
 import { environment } from '../../../../environments/environment';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
 import { TooltipModule } from 'primeng/tooltip';
+// @akili-spec changes/profile-simulation
+import { ImpersonationService } from '@services/impersonation.service';
+import { RolesService } from '@services/cache/roles.service';
+import { WebsocketService } from '@sockets/websocket.service';
+import { SimulationBannerComponent } from '../simulation-banner/simulation-banner.component';
 
 @Component({
   selector: 'alliance-navbar',
-  imports: [ButtonModule, BadgeModule, ChipModule, RouterLink, RouterLinkActive, AvatarModule, AvatarGroupModule, S3ImageUrlPipe, TooltipModule],
+  imports: [
+    ButtonModule,
+    BadgeModule,
+    ChipModule,
+    RouterLink,
+    RouterLinkActive,
+    AvatarModule,
+    AvatarGroupModule,
+    S3ImageUrlPipe,
+    TooltipModule,
+    SimulationBannerComponent
+  ],
   templateUrl: './alliance-navbar.component.html',
   styleUrl: './alliance-navbar.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -61,6 +77,20 @@ export class AllianceNavbarComponent implements OnInit, AfterViewInit, OnDestroy
   whatsNewService = inject(WhatsNewService);
   private readonly cdr = inject(ChangeDetectorRef);
   private isProjectsOrDetailActiveFlag = false;
+  // @akili-spec changes/profile-simulation — R-IMP-006/009/010
+  impersonation = inject(ImpersonationService);
+  roles = inject(RolesService);
+  // Defensive: WebsocketService depends on ngx-socket-io's `Socket`, which is not
+  // provided in every test/host environment (precedent: PoolFundingAlignmentComponent).
+  // `configUser` re-run on end is best-effort UX, never a blocker for R-IMP-010.
+  private readonly websocket: WebsocketService | null = (() => {
+    try {
+      const service = inject(WebsocketService);
+      return typeof service?.configUser === 'function' ? service : null;
+    } catch {
+      return null;
+    }
+  })();
 
   options: AllianceNavOptions[] = [
     { label: 'Home', path: '/home', underConstruction: false },
@@ -97,15 +127,18 @@ export class AllianceNavbarComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   ngAfterViewInit(): void {
-    const navbar = this.elementRef.nativeElement.querySelector('#navbar');
-    if (navbar) {
+    // D-imp-14: observe the component HOST (not just `#navbar`) so the
+    // measured height includes the simulation banner rendered above it —
+    // falls back to `#navbar` itself if the host element is unavailable.
+    const target: Element | undefined = this.elementRef?.nativeElement ?? this.navbarElement?.nativeElement;
+    if (target) {
       this.resizeObserver = new ResizeObserver(entries => {
         for (const entry of entries) {
           this.cache.navbarHeight.set(entry.contentRect.height);
         }
       });
 
-      this.resizeObserver.observe(navbar);
+      this.resizeObserver.observe(target);
     }
 
     this.renderer.listen('document', 'click', (event: Event) => {
@@ -131,5 +164,26 @@ export class AllianceNavbarComponent implements OnInit, AfterViewInit, OnDestroy
     this.searchDebounceTimeout = setTimeout(async () => {
       await this.service.update(this.cache.searchAResultValue(), 100);
     }, 500);
+  }
+
+  /** R-IMP-006: entry point in the account dropdown, System Admin + no active simulation only (template guard). */
+  openSimulateProfile(): void {
+    this.showDropdown = false;
+    this.allModalsService.openModal('simulateProfile');
+  }
+
+  /** R-IMP-010 client end flow (design §5 "Client end"), triggered from the "Account · Simulated" panel. */
+  async endSimulation(): Promise<void> {
+    this.showDropdown = false;
+    const { actor } = await this.impersonation.end('manual');
+    if (actor && this.websocket) {
+      await this.websocket.configUser(actor.first_name, actor.sec_user_id);
+    }
+    await this.router.navigate(['/home']);
+    this.actions.showToast({
+      severity: 'success',
+      summary: 'Simulation ended',
+      detail: `Simulation ended — you are back as ${actor?.first_name ?? ''}`
+    });
   }
 }
