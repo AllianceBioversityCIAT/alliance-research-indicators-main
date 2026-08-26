@@ -1840,57 +1840,59 @@ describe('InnovationUseDetailsComponent', () => {
     // -----------------------------------------------------------------------------------------------
     describe('c5 — evidence navigation', () => {
       const routeMock = () => TestBed.inject(ActivatedRoute) as unknown as typeof activatedRouteMock;
+      // Hoisted out of each `it` (previously restored as the last statement of every test below):
+      // if `goToEvidence()` ever regresses, an `expect(...).toHaveBeenCalledWith(...)` throws
+      // mid-test, before a same-test restore line would run. `activatedRouteMock` is a
+      // module-level object shared across this whole spec file, so `.get` would then stay
+      // poisoned for every test declared after this block. `afterEach` restores it
+      // unconditionally — pass or throw.
+      let originalGet: typeof activatedRouteMock.snapshot.queryParamMap.get;
+
+      beforeEach(() => {
+        originalGet = routeMock().snapshot.queryParamMap.get;
+      });
+
+      afterEach(() => {
+        routeMock().snapshot.queryParamMap.get = originalGet;
+      });
 
       it('activating "Click here to go there" navigates with commands AND version+from query params', () => {
-        const original = routeMock().snapshot.queryParamMap.get;
         routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v1' : key === 'from' ? 'results-center' : null);
 
         const button = findButton('Click here to go there')!;
         (button.nativeElement as HTMLButtonElement).click();
 
         expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { version: 'v1', from: 'results-center' } });
-
-        routeMock().snapshot.queryParamMap.get = original;
       });
 
       it('forwards `from` when it is "home"', () => {
-        const original = routeMock().snapshot.queryParamMap.get;
         routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'from' ? 'home' : null);
 
         findButton('Click here to go there')!.nativeElement.click();
 
         expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { from: 'home' } });
-
-        routeMock().snapshot.queryParamMap.get = original;
       });
 
       it('drops `from` when it is neither "results-center" nor "home"', () => {
-        const original = routeMock().snapshot.queryParamMap.get;
         routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'from' ? 'some-other-source' : null);
 
         findButton('Click here to go there')!.nativeElement.click();
 
         expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: {} });
-
-        routeMock().snapshot.queryParamMap.get = original;
       });
 
       it('drops `version` from the query params when the current URL has none', () => {
-        const original = routeMock().snapshot.queryParamMap.get;
         routeMock().snapshot.queryParamMap.get = () => null;
 
         findButton('Click here to go there')!.nativeElement.click();
 
         expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: {} });
-
-        routeMock().snapshot.queryParamMap.get = original;
       });
 
       // Falsifying input (KZ-001, recurrence 4): a spy checked only with toHaveBeenCalled() would
       // still pass if goToEvidence() dropped its query params entirely — proved by calling the
       // component method directly with a route that supplies both, and asserting BOTH arguments.
       it('falsifying input: asserting only that navigate was called does NOT discharge c5', () => {
-        const original = routeMock().snapshot.queryParamMap.get;
         routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v9' : key === 'from' ? 'home' : null);
 
         component.goToEvidence();
@@ -1899,8 +1901,6 @@ describe('InnovationUseDetailsComponent', () => {
         expect(router.navigate).toHaveBeenCalled();
         // The evidence c5 actually requires — both arguments, together:
         expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { version: 'v9', from: 'home' } });
-
-        routeMock().snapshot.queryParamMap.get = original;
       });
     });
 
