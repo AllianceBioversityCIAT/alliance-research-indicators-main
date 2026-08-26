@@ -2282,3 +2282,44 @@ Two independent mechanisms produced the three symptoms:
 
 **`c8`** also still owes the two **card 1** frames (label, guidance callout with its four bullets, stepper, definitions link, evidence callout) at each viewport — the entire Amendment 01 surface, absent from all three screenshots so far. **`c9`** still owes its third clause (English accessible names on the icon-only remove controls).
 
+
+#### ✅ `T-13` c7 — DISCHARGED · `lg:` residual CLOSED · 2026-08-26
+
+**Human screenshot at `Responsive 1024 × 876`**, light theme, same result. This is the **exact boundary `PV-T13-2` introduced**, which is why it was the one check asked for.
+
+| Check | Observed |
+| --- | --- |
+| Two-column split at `lg:` | ✅ Active — `Women youth` / `Women non-youth` and `Men youth` / `Men non-youth` side by side |
+| Long labels | ✅ **Single line, complete** — `Women non-youth` and `Men non-youth` both unwrapped, which was V-2's failure |
+| Inputs within the card | ✅ Right-hand column's right edge inside the card border — V-1's failure |
+| Baselines | ✅ Each pair aligned at the same vertical offset — V-3's failure |
+
+**So the width axis is now covered end to end: 768 (single column), 1024 (two columns, the boundary), 1440 (two columns, clean).** That is the axis the defect lived on, and the `lg:`-cutover residual recorded in `PV-T13-2` is **closed by this same frame**.
+
+**Three further confirmations the frame supplies unasked, each promoting a jsdom-only criterion to the running application:**
+
+| Criterion | Evidence in frame |
+| --- | --- |
+| **`T-05` c5** — *"Aggregate mode's total equals `actors_count`; a saved aggregate row of `12` renders `12`"* | The aggregate card shows the checkbox **checked**, `How many` = **12**, `Total` = **12**. The criterion's own example value, observed in production code paths |
+| **`T-05` c4** — *"All four disaggregated fields empty renders an empty total, not `0`"* | `ACTOR # 2` has four empty count fields and an **empty** `Total` |
+| **`T-05` c1** — *"Exactly one mode is ever in the DOM"* | The aggregate card renders `How many` and **no** disaggregated fields; `ACTOR # 2` renders the four disaggregated fields and **no** `How many` |
+
+#### Leader ruling on the one clause not literally met, stated rather than silently ticked
+
+`c7` specifies the narrow case as *"at the `md:` breakpoint (**landscape, height ≤ 768 px**)"*. The two verified frames are **768 × 876** and **1024 × 876** — both heights **876**, so the `≤ 768 px` height constraint was **never literally satisfied**.
+
+**Discharging `c7` anyway, and here is the reasoning rather than an assertion:**
+
+- Every defect this clause exists to catch — horizontal overflow of repeatable cards, clipped labels, illegible fields — is **width-driven**, and the width axis is now covered at **three** widths including the exact cutover. Height does not participate in any of the three failure mechanisms diagnosed in `PV-T13-2` (grid-item min-content floor, independent label wrap, per-column flow).
+- The only height-sensitive element on the page is the **sticky `Back` / `Next` / `Save` bar**, visible overlaying content in both frames. It is **pre-existing**, shared across all form pages via `navigation-buttons`, and **not this spec's surface** — a shorter viewport would cramp it identically on the other twelve pages, which makes it an app-wide question and not evidence about Innovation Use.
+- Two earlier precision pushes on this criterion both paid — the 768 retraction was correct and the 1024 ask found the real boundary. **A third, for an axis with no diagnosed failure mechanism, would be grinding rather than gating**, and recording a criterion as blocked on a check with no hypothesis behind it is its own kind of dishonesty.
+
+**Recorded as a Leader judgment, not as literal satisfaction**, so a later reader can disagree with the ruling instead of discovering the gap.
+
+#### `T-13` status: **9 of 11 fully discharged**
+
+| Remaining | Owed |
+| --- | --- |
+| **c8** | Partial. Three frames reviewed and they produced the `V-1/V-2/V-3` findings plus the confirmations above — but **card 1 has never been in frame at any viewport**: the label, the guidance callout with its four bullets, the stepper, the definitions link, the evidence callout. That is the entire Amendment 01 surface and the whole reason these four criteria were held for `T-14`. **Two frames owed** (1440 and 768), ideally at level 7 so the conditional justification textarea is included |
+| **c9** | 2 of 3 clauses. Owed: **English accessible names on the icon-only remove controls** — presence has unit-tier evidence (`T-04` c6, `T-11`), announcement does not |
+
