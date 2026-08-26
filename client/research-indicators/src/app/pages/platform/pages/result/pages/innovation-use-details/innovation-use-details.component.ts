@@ -570,9 +570,25 @@ export default class InnovationUseDetailsComponent {
    * scenario forbids one, because a full-page navigation here would full-page-reload the SPA and
    * drop the in-memory `body()` this page holds (§5.8). Public so the template's `(click)` binding
    * can reach it.
+   *
+   * **Bug fix (T-13 human gate, post-e508eeea):** the id is read from `cache.currentResultId()` —
+   * the same source this component's own `navigateTo()` (below) already uses — never from
+   * `route.snapshot.paramMap`. `result/:id` is this component's PARENT route (`innovation-use-details`
+   * is a child of it, app.routes.ts); `paramsInheritanceStrategy` defaults to `'emptyOnly'`
+   * (app.config.ts never overrides it), so a child route's own `paramMap` does not inherit the
+   * parent's `:id` and `.get('id')` returns `null` here, silently. `ResultSidebarComponent
+   * .navigateTo()` reads `paramMap.get('id')` successfully only because it is declared *at*
+   * `result/:id` (result.component.html), not below it — identical code, different tree depth.
+   * `cache.currentResultId()` is unaffected by tree depth: it is set once, from the real route
+   * param, by `ResultComponent`'s own constructor effect, at the `result/:id` level. It is also
+   * `WritableSignal<string | number>` and carries a platform-coded id (e.g. `STAR-13232`) verbatim
+   * when the URL has one (`ResultComponent.getCurrentResultIdentifier`) — `cache
+   * .getCurrentNumericResultId()`/`getCurrentPlatformCode()` must NOT be used here, as either would
+   * silently truncate that id to its numeric tail, producing a navigation to a different URL form
+   * than every other page in the app.
    */
   goToEvidence(): void {
-    const id = this.route.snapshot.paramMap.get('id');
+    const id = this.cache.currentResultId();
     const queryParamMap = this.route.snapshot.queryParamMap;
     const version = queryParamMap.get('version');
     const from = queryParamMap.get('from');

@@ -1,9 +1,10 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell)
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, provideRouter, Router, RouterOutlet } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import InnovationUseDetailsComponent from './innovation-use-details.component';
 import { ApiService } from '@shared/services/api.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -1848,6 +1849,14 @@ describe('InnovationUseDetailsComponent', () => {
       // unconditionally — pass or throw.
       let originalGet: typeof activatedRouteMock.snapshot.queryParamMap.get;
 
+      // Bug fix (T-13 human gate): the id assertions below changed from the string `'1'` to the
+      // number `1`. Pre-fix, `goToEvidence()` read `route.snapshot.paramMap.get('id')` — always a
+      // string (or `null`, undetected here because `activatedRouteMock` is flat and always answers
+      // `'1'` regardless of tree depth — see the separate faithful-route-tree describe block below
+      // in this file for the reproduction that catches what this mock cannot). Post-fix, the id
+      // comes from `cache.currentResultId()`, and `CacheServiceMock.currentResultId` (top of this
+      // file) returns the number `1` — matching this component's own `navigateTo()`, whose c14
+      // tests already asserted a numeric `1`, not a string.
       beforeEach(() => {
         originalGet = routeMock().snapshot.queryParamMap.get;
       });
@@ -1862,7 +1871,7 @@ describe('InnovationUseDetailsComponent', () => {
         const button = findButton('Click here to go there')!;
         (button.nativeElement as HTMLButtonElement).click();
 
-        expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { version: 'v1', from: 'results-center' } });
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1', from: 'results-center' } });
       });
 
       it('forwards `from` when it is "home"', () => {
@@ -1870,7 +1879,7 @@ describe('InnovationUseDetailsComponent', () => {
 
         findButton('Click here to go there')!.nativeElement.click();
 
-        expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { from: 'home' } });
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { from: 'home' } });
       });
 
       it('drops `from` when it is neither "results-center" nor "home"', () => {
@@ -1878,7 +1887,7 @@ describe('InnovationUseDetailsComponent', () => {
 
         findButton('Click here to go there')!.nativeElement.click();
 
-        expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: {} });
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: {} });
       });
 
       it('drops `version` from the query params when the current URL has none', () => {
@@ -1886,7 +1895,7 @@ describe('InnovationUseDetailsComponent', () => {
 
         findButton('Click here to go there')!.nativeElement.click();
 
-        expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: {} });
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: {} });
       });
 
       // Falsifying input (KZ-001, recurrence 4): a spy checked only with toHaveBeenCalled() would
@@ -1900,7 +1909,22 @@ describe('InnovationUseDetailsComponent', () => {
         // A weaker assertion (would pass even for a broken implementation that navigates with no params):
         expect(router.navigate).toHaveBeenCalled();
         // The evidence c5 actually requires — both arguments, together:
-        expect(router.navigate).toHaveBeenCalledWith(['/result', '1', 'evidence'], { queryParams: { version: 'v9', from: 'home' } });
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v9', from: 'home' } });
+      });
+
+      // Coordinator correction: `:id` is frequently a platform-coded identifier (e.g. `STAR-13232`),
+      // not a bare number. `cache.currentResultId()` carries that string verbatim (`ResultComponent
+      // .getCurrentResultIdentifier` preserves it); `cache.getCurrentNumericResultId()` would
+      // silently truncate it to its numeric tail (`13232`), producing a different URL form than
+      // every other navigation in the app. Every other c5 test uses `'1'`/`1` — a bare numeric — so
+      // this is the one case in the suite that would catch a prefix-dropping regression.
+      it('forwards a platform-coded id (e.g. STAR-13232) verbatim, never its numeric tail', () => {
+        cacheMock.currentResultId.mockReturnValue('STAR-13232');
+        routeMock().snapshot.queryParamMap.get = (key: string) => (key === 'version' ? 'v2' : null);
+
+        findButton('Click here to go there')!.nativeElement.click();
+
+        expect(router.navigate).toHaveBeenCalledWith(['/result', 'STAR-13232', 'evidence'], { queryParams: { version: 'v2' } });
       });
     });
 
@@ -2130,5 +2154,109 @@ describe('InnovationUseDetailsComponent — c11 (real HTTP layer)', () => {
     component.addActor();
 
     httpMock.expectNone(() => true);
+  });
+});
+
+// =================================================================================================
+// Bug fix (T-13 human gate) — `goToEvidence()`'s id source, reproduced against the REAL route tree.
+//
+// The `activatedRouteMock` used everywhere above is flat: `paramMap.get('id')` always answers '1',
+// regardless of where in the tree the component sits. That is exactly why the shipped defect (T-14,
+// e508eeea) passed a green c5 suite — the mock does not evaluate what it stands in for (KZ-001).
+//
+// In production, `result/:id` (app.routes.ts) is the PARENT route; `innovation-use-details` is a
+// CHILD of it (app.routes.ts, `innovation-use-details` under `result/:id`'s `children`). Angular's
+// router defaults `paramsInheritanceStrategy` to `'emptyOnly'` (app.config.ts's `provideRouter(...)`
+// never overrides it) — a child route's own `ActivatedRoute.snapshot.paramMap` does NOT inherit the
+// parent's `:id`. `ResultSidebarComponent.navigateTo()` (result.component.html) sits AT `result/:id`,
+// not below it, which is why its identical-looking `route.snapshot.paramMap.get('id')` line works
+// while this component's copy of that line does not — same code, different tree depth.
+//
+// This block models that real tree with `provideRouter` + `RouterTestingHarness` (never a hand-made
+// route double) so the assertions below are faithful to what production actually resolves.
+// =================================================================================================
+@Component({ selector: 'app-result-route-stub', standalone: true, imports: [RouterOutlet], template: '<router-outlet></router-outlet>' })
+class ResultRouteStubComponent {}
+
+describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful result/:id -> innovation-use-details route tree)', () => {
+  const routeTreeApiService = {
+    GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
+    PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
+    GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_ActorTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_Institutions: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_InstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_SubInstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true })
+  };
+  const routeTreeActions = { showToast: jest.fn(), saveCurrentSection: jest.fn() };
+  const routeTreeSubmission = { isEditableStatus: jest.fn().mockReturnValue(true) };
+  const routeTreeVersionWatcher = { onVersionChange: jest.fn() };
+
+  let routeTreeCache: CacheServiceMock;
+  let router: Router;
+  let navigateSpy: jest.SpyInstance;
+
+  /** Navigates the REAL router to `url` and returns the live, routed InnovationUseDetailsComponent
+   *  instance — activated as a child of `ResultRouteStubComponent`, which owns the `<router-outlet>`
+   *  that renders it, exactly like `result.component.html` does in production. */
+  async function activateInnovationUseDetails(url: string): Promise<InnovationUseDetailsComponent> {
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          {
+            path: 'result/:id',
+            component: ResultRouteStubComponent,
+            children: [{ path: 'innovation-use-details', component: InnovationUseDetailsComponent }]
+          }
+        ]),
+        { provide: ApiService, useValue: routeTreeApiService },
+        { provide: CacheService, useClass: CacheServiceMock },
+        { provide: ActionsService, useValue: routeTreeActions },
+        { provide: SubmissionService, useValue: routeTreeSubmission },
+        { provide: VersionWatcherService, useValue: routeTreeVersionWatcher }
+      ]
+    }).compileComponents();
+
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl(url, ResultRouteStubComponent);
+    router = TestBed.inject(Router);
+    routeTreeCache = TestBed.inject(CacheService) as unknown as CacheServiceMock;
+    harness.fixture.detectChanges();
+    await harness.fixture.whenStable();
+
+    const routed = harness.fixture.debugElement.query(By.directive(InnovationUseDetailsComponent));
+    expect(routed).toBeTruthy();
+    return routed.componentInstance as InnovationUseDetailsComponent;
+  }
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('structural proof: at this tree depth, paramMap carries no id (emptyOnly is the default, unconfigured in app.config.ts)', async () => {
+    const component = await activateInnovationUseDetails('/result/STAR-13232/innovation-use-details?version=v9&from=results-center');
+
+    expect(component.route.snapshot.paramMap.get('id')).toBeNull();
+    // Counterpart: queryParamMap is global to the URL, unaffected by paramsInheritanceStrategy.
+    expect(component.route.snapshot.queryParamMap.get('version')).toBe('v9');
+    expect(component.route.snapshot.queryParamMap.get('from')).toBe('results-center');
+  });
+
+  it('navigates with the platform-coded id verbatim (STAR-13232), sourced from CacheService, not the route param', async () => {
+    const component = await activateInnovationUseDetails('/result/STAR-13232/innovation-use-details?version=v9&from=results-center');
+    routeTreeCache.currentResultId.mockReturnValue('STAR-13232');
+    navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.goToEvidence();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/result', 'STAR-13232', 'evidence'], { queryParams: { version: 'v9', from: 'results-center' } });
+  });
+
+  it('navigates with a bare numeric id (1), sourced from CacheService', async () => {
+    const component = await activateInnovationUseDetails('/result/1/innovation-use-details?version=v1');
+    routeTreeCache.currentResultId.mockReturnValue(1);
+    navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    component.goToEvidence();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1' } });
   });
 });

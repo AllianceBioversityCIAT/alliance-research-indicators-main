@@ -1949,3 +1949,105 @@ This sits **on top of** the pre-existing spec-wide overrun the user has already 
 
 **Delegation note, recorded because it deviates from the triad and from what the user was told at the gate:** this follow-up ran through **one Implementer with no separate Reviewer.** The remedy was specified verbatim by the Reviewer's own advisory, so a second full audit would have re-derived its own recommendation; the Leader verified the diff and re-measured the suite inline instead. That is verification of **someone else's** work, not self-verification, so the Delegation Ceiling's ban is not engaged — but it is a narrower gate than a spec task gets, and it is on the record as such. The specific risk it was aimed at — a "cleanup" quietly weakening the KZ-001 rec-4 two-argument assertions — was checked directly and did not occur.
 
+
+---
+
+## ⛔ Pivot Record: DD-16 — the copied "contract" included an id source that is invalid at this component's depth
+
+**Date:** 2026-08-26 · **Trigger:** user-reported defect at the `T-13` human gate — *"(Click here to go there) no funciona, al dar click debería llevarme a la sección de evidencias"* · **Severity:** shipped defect, `T-14` / commit `e508eeea`, **through a green suite and a Reviewer PASS**
+
+### What was discovered
+
+`goToEvidence()` read `this.route.snapshot.paramMap.get('id')` and navigated to **`/result/null/evidence`**.
+
+Four premises, each verified independently by the Leader and then again by the Reviewer:
+
+| Premise | Evidence |
+| --- | --- |
+| `paramsInheritanceStrategy` is never configured | `app.config.ts:24` is `provideRouter(routes, withViewTransitions())`; the symbol appears **nowhere** in `client/research-indicators/src` outside the two files under audit. Angular's default `'emptyOnly'` therefore applies, and a child route does **not** inherit its parent's params |
+| `:id` is on the **parent** route | `app.routes.ts` — `result/:id` at the parent level, `innovation-use-details` inside its `children` array |
+| The sidebar reads it successfully because it sits **at** that route | `result.component.html:2` — `<app-result-sidebar>` is a **sibling** of the `<router-outlet>` on line 4, i.e. declared at `result/:id`, not below it |
+| Only `id` broke; the query params were always fine | `queryParamMap` is global to the URL and depth-independent — the harness confirms `version` / `from` resolving correctly in the same failing test |
+
+### Why this is a Pivot and not a rework attempt
+
+**The design decision, followed exactly, produces the defect.** `DD-16` instructed copying `ResultSidebarComponent.navigateTo()`'s *contract*; the Implementer read that as including its **id source**, which is a defensible reading of the words as written. Patching only the line would leave `DD-16` intact and the next implementer would reintroduce it from the same instruction.
+
+**And it explains the review escape, which is the more important lesson.** The `T-14` Reviewer compared the two call sites line-by-line and correctly reported them **identical** — that is in its recorded verdict. Identity was the wrong test: **identical code at a different route-tree depth behaves differently.** No amount of care at that comparison would have caught it, because the comparison itself was the blind spot.
+
+**Two mitigations that were in force and did not fire**, recorded because their failure is the actionable part:
+
+- **R-IUP-021 AC.4** demanded the assertion be made "on the **built commands and query params**, not on the fact that a navigation happened" — and it *was*. The assertion form was right; the **double** was wrong. `activatedRouteMock.snapshot.paramMap.get('id')` returned `'1'`, a value production never produces at this depth. This is **KZ-001** at **recurrence 5**, and it is the sharpest instance yet: *a correctly-formed two-argument assertion over an unfaithful double is still a green suite over broken behavior.* AC.4's wording closes the assertion-shape hole and says nothing about fixture fidelity.
+- The proposal's own risk row **RK-A1** named this risk and offered exactly that assertion as the mitigation (`proposal-amendment-01-level-guidance.md:217`). The mitigation was implemented as written and the risk still landed. Left unedited — a proposal is a point-in-time record — but noted here so the row is not read as having worked.
+
+### Documents corrected
+
+| Document | Correction |
+| --- | --- |
+| `design.md` **DD-16** | Amended in place with a ⚠️ block: the **id source is NOT part of the copied contract**; use `cache.currentResultId()`, never `getCurrentNumericResultId()` / `getCurrentPlatformCode()` (both truncate a platform-coded id); what *is* copied is the commands shape and the `version`/`from` rules. The tree-depth mechanism and the review-escape reason are stated inline, so the instruction cannot be re-read the old way |
+| `requirements.md` R-IUP-021 | **Not changed, deliberately.** Its Navigation line scopes the sidebar comparison to *"the `version` and `from` query parameters"* only — it never specified the id source, so it was not wrong. AC.3/AC.4 describe the destination and the assertion form, both unchanged by this fix |
+
+**Two-direction sweep run** (`/akili-specify` → *Correction Closure*): grepped `paramMap`, `navigateTo()` and *"the sidebar's own navigation"* across the whole spec folder. One further hit, `proposal-amendment-01-level-guidance.md:110`, left unchanged as a historical record per the rule above.
+
+### PV-T14-1 — the fix: ✅ PASS
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer verdict, **attempt 1**, four advisories, no FAIL |
+| **Authorized by** | User bug report at the human gate. Recorded as a **non-task change** on the `RB-9` / `PV-T13-1` precedent — it does not reopen `T-14`'s closed gate |
+| **Effort / skills** | `high` · **`systematic-debugging`**, `angular-developer` |
+| **Triad** | Implementer (T2 · sonnet) → Reviewer (T3 · opus). `author ≠ auditor` on both axes — **not collapsed despite a one-line production diff**, and the reason is on the record: the previous full gate is what let this through |
+
+**The change.** `innovation-use-details.component.ts` → `goToEvidence()`: `route.snapshot.paramMap.get('id')` → `cache.currentResultId()`. **One production line**, plus a comment block documenting the tree-depth trap so the fix carries its own reason. **+135/−7** and **+17/−1** across two files. Destination shape, `version`/`from` forwarding and the `Router.navigate` (never an `href`) are byte-for-byte unchanged — only the id *source* moved.
+
+**A second defect was averted by user information mid-flight, and it would not have been caught by any test in the suite.** The user reported that the id is often **platform-coded** (`STAR-13232`), not a bare number. The Leader corrected the dispatch immediately: `cache.getCurrentNumericResultId()` — the obvious-looking accessor sitting right next to the correct one — runs `extractNumericId()` and returns only the numeric tail, which would have navigated to `/result/13232/evidence`, a URL form no other page in the app emits, and **might have appeared to work**. Critically, **all five pre-existing `c5` cases use `'1'`, a bare numeric, so the entire suite was blind to a prefix-dropping bug.** A `STAR-13232` case and its falsifier were added on that basis. *Recorded because it is the same failure as the one being fixed — a fixture that does not represent production — caught the second time by a human, not by the tier.*
+
+**Both reds observed, not argued** (K-004 / KZ-014):
+
+| Red | Observed |
+| --- | --- |
+| The defect itself, against unfixed code | `expected "STAR-13232"` / `received null` in the id position; same `null` for a bare-numeric id. A structural test confirms `paramMap.get('id')` is `null` at this depth while `queryParamMap` resolves correctly, isolating the cause |
+| The prefix falsifier | Reverting the fix with the new tests present → **8 failures** (all 5 original `c5` + the platform-coded case + both route-tree tests) |
+
+**The test tier was repaired, which is half the fix.** The flat `activatedRouteMock` was replaced for the id-source assertions by a real `provideRouter` + `RouterTestingHarness` parent→child tree with a genuine `<router-outlet>` (`RouterTestingHarness` was already in use in two other client specs — no new dependency). All five original `c5` assertions survive as full two-argument `toHaveBeenCalledWith`, and the deliberate weak-then-strict pair is intact. The Reviewer ruled the `'1'` → `1` expectation change **honest alignment, not weakening**: `toHaveBeenCalledWith` uses strict recursive equality, and `CacheServiceMock.currentResultId` has returned the number `1` since T-07.
+
+**Verification.** `npm test -- --silent` full unfiltered → **316 suites / 6724 tests green** (6720 baseline + 4 new), **re-measured independently by the Leader in a quiet tree**. Coverage 98.19 / 96.30 / 97.76 / 98.49 vs floors 40/20/45/30. `npm run lint -- --quiet` → `All files pass linting.`, `git status` re-inspected after. Hex: **0** on both files. `git diff --exit-code` clean on the three protected Innovation Development specs.
+
+**What the Reviewer established beyond confirming the Leader** — it did not stop at agreement:
+
+1. **The composition seam is covered on both sides.** The route-tree block substitutes `CacheServiceMock`, so it proves *depth* and *id source* but not that the real `CacheService` receives the route id. That other half is separately asserted at `result.component.spec.ts:192–194` (`params$.next({ id: 'STAR-456' })` → `setCurrentResultId('STAR-456')`) plus four `getCurrentResultIdentifier` cases. Same seam asserted from each side — which is what makes the pair of test suites add up to a claim about production.
+2. **It attempted the degenerate case rather than reasoning about it.** `currentResultId` initializes to `signal(0)`, so a child activating before the parent's effect would navigate to `/result/0/evidence`. It tried to construct that via `/result/abc/innovation-use-details` and **could not reach the child**: `resultExistsResolver` runs on `result/:id`, computes `Number('abc') = NaN`, and redirects to `/results-center` before the child activates. **Reachability verdict: unreachable via the router** — recorded so the premise is on file if that resolver is ever relaxed.
+3. It checked the harder race (client-side `:id` change with `ResultComponent` reused): `routeParams` is `toSignal(route.params)`, so the effect re-fires and flushes before the child's DOM is clickable — same risk profile as the already-shipped `navigateTo()`.
+
+#### `ADVISORY` — recorded, not actioned
+
+| Lens | Finding |
+| --- | --- |
+| **Reliability** | `CacheServiceMock.currentResultId` returns the **number** `1`, but production for `/result/1/…` yields the **string** `'1'` (`getCurrentResultIdentifier` returns the raw param). Harmless — both serialize to the same URL — and pre-existing since T-07, but the double is one notch off production's type. Prefer `'1'` if that mock is ever touched |
+| **Readability** | The structural test asserting `paramMap.get('id')` → `toBeNull()` pins a **framework default**, not product behavior. A future, legitimate app-wide `paramsInheritanceStrategy: 'always'` would fail it even though `goToEvidence()` stays correct. Worth a one-line note marking it a characterization test, so the next maintainer updates rather than reverts it |
+| **Readability** | The new production comment says `currentResultId` "is set once" by `ResultComponent`'s effect; it is set on **every** `:id` change. Loose rather than wrong — but this comment's entire job is to prevent reintroduction, so its precision is load-bearing |
+| **Risk** | The `signal(0)` premise above — unreachable today, on file in case `resultExistsResolver` is relaxed |
+
+### Cross-spec finding — reported, NOT fixed, and it needs its own bugfix spec
+
+**`pool-funding-alignment.component.ts:379–384` carries the identical defect class, and is worse because it fails silently rather than visibly.**
+
+```ts
+const routeId = this.route.snapshot.paramMap.get('id');
+if (routeId) return routeId;                                  // dead branch in production
+const numeric = this.cache.getCurrentNumericResultId();
+return numeric ? String(numeric) : '';                        // the only path ever taken
+```
+
+It sits at the **same tree depth**, so `routeId` is **always `null`**: the primary branch is dead code and every call falls through to a numeric-only fallback that **strips the platform prefix** (`TIP-1234` → `'1234'`). Consequences traced by the Implementer, not assumed:
+
+- `isPoolFundingCapable()` / `platformFromResultCode()` (via `bilateralService.getAlignment`, line 434) always receive a bare-numeric code and, under the `numeric ⟺ STAR` invariant (**KZ-012**), always classify it as STAR-capable — a **non-STAR result reached by direct URL is misclassified**
+- the eligibility redirect at line 440 (`router.navigate(['/result', resultCode, …])`) **drops the platform prefix from the URL**
+- the websocket filter at line 462 compares `evt.result_code === this.resultCode()`, where `resultCode()` never carries a prefix — a possible silent no-op on the live-update path if the server's `result_code` is prefixed
+
+**Containment:** `ResultSidebarComponent` gates the tab with `cache.isExternalResult()`, computed correctly and unaffected, so the tab is **not reachable by normal UI navigation** for non-STAR results. **No route guard blocks direct URL entry**, so the path is reachable, just not advertised.
+
+**Its own spec exhibits the same KZ-001 pattern:** `pool-funding-alignment.component.spec.ts:188` uses a flat route mock returning `'RES-001'` — a value production never produces — while line 202 documents the numeric fallback as an *edge case* when it is in fact the **only** path ever taken. So that suite is green over the same defect, by the same mechanism, in a second feature.
+
+**Not fixed here, and not minted as a task in this spec** (`/akili-execute` §2.4): different page, different module, different spec, and an app-wide id-source question deserves its own gate rather than riding a copy amendment's. **Escalated to the user for its own bugfix spec.** Strong candidate to be scoped as *"audit every `route.snapshot.paramMap.get('id')` in `pages/platform/pages/result/pages/`"* rather than as one file's bug — there are exactly two call sites today, and this record is the reason to check for a third.
+
