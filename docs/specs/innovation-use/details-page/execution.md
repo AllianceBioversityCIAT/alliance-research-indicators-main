@@ -2125,3 +2125,6 @@ Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: 
 | **c8** | No screenshots captured |
 | **c9** | No keyboard traversal observed — and *"el link funciona"* by mouse says nothing about focus order, a visible ring, or a focus trap in a repeatable card |
 
+
+**c11 caveat answered, 2026-08-26.** The note above recorded that the user had not stated whether they were logged out. They since confirmed: *"los links son públicos."* This **corroborates the Leader's probe rather than replacing it** — and the distinction is worth keeping, because the two are different kinds of claim: the user's statement is about the **intended sharing configuration**, while the probe is an **observation** that an unauthenticated client with no session actually received the Drive file's own title over HTTP 200. A file believed to be public and a file that answers a stranger are not the same fact, and D11 is about the second one. They now agree, from two independent directions, which is the strongest form this criterion can reach at any tier. **No residual.**
+
