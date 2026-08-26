@@ -3,9 +3,10 @@
     <span class="text-[13px] text-[#8D9299] font-['Space_Grotesk'] tracking-widest">{{ headerLabel }} # {{ quantNumber
       }}</span>
     @if (submission.isEditableStatus()) {
-    <div class="cursor-pointer text-[#CF0808]" (click)="onDelete()" (keydown.enter)="onDelete()">
+    <button type="button" class="cursor-pointer text-[#CF0808] bg-transparent border-0 p-0"
+      [attr.aria-label]="'Remove ' + headerLabel + ' ' + quantNumber" (click)="onDelete()">
       <i class="pi pi-times-circle !text-[16px] pr-1"></i>
-    </div>
+    </button>
     }
   </div>
 

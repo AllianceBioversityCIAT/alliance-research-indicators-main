@@ -5,7 +5,7 @@
   @if (loadFailed()) {
     <div class="flex items-center rs-gap-[8] rs-p-[20] rs-mb-[25] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
       <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
-      <span class="fs-[14] text-[var(--ac-grey-700)]">The Innovation Use section could not be loaded. Please try again.</span>
+      <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Use section could not be loaded. Please try again.</span>
     </div>
   } @else {
     <!-- INNOVATION USE DETAILS -->
@@ -126,7 +126,7 @@
 
       <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
         <i class="material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-300)]">info</i>
-        <span class="fs-[14] text-[var(--ac-grey-600)]">List every actor group using this innovation.</span>
+        <span class="fs-[14] text-[var(--ac-grey-800)]">List every actor group using this innovation.</span>
       </div>
 
       @if (body().actors.length === 0) {
@@ -153,7 +153,7 @@
           <button
             type="button"
             (click)="addActor()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other actor
             <i class="pi pi-plus !text-[12px]"></i>
           </button>
@@ -181,7 +181,7 @@
           <button
             type="button"
             (click)="addOrganization()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other organization
             <i class="pi pi-plus !text-[12px]"></i>
           </button>
@@ -212,7 +212,7 @@
           <button
             type="button"
             (click)="addQuantification()"
-            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15]">
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-400)] rs-p-[12] fs-[15]">
             Add other measure
             <i class="pi pi-plus !text-[12px]"></i>
           </button>

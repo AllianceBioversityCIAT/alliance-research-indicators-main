@@ -135,7 +135,10 @@ describe('InnovationUseLevelStepperComponent', () => {
       const level6Button = fixture.debugElement.queryAll(By.css('button')).find(btn => btn.nativeElement.textContent.trim() === '6')!;
       expect(component.isSelected(CATALOG[6])).toBe(true); // CATALOG[6] = { id: 7, level: 6, ... }
       expect(component.isSelected(CATALOG[7])).toBe(false); // CATALOG[7] = { id: 8, level: 7, ... } — adjacent id must NOT match
-      expect(level6Button.nativeElement.className).toContain('bg-[var(--ac-light-blue-300)]');
+      // R3 remediation (validation-report.md F-1): the selected fill was re-derived from
+      // --ac-light-blue-300 (white-on-fill measured 3.84:1, fails AA) to --ac-light-blue-400
+      // (6.83:1) — asserting the winning class here, not the superseded one.
+      expect(level6Button.nativeElement.className).toContain('bg-[var(--ac-light-blue-400)]');
 
       const calloutText = fixture.nativeElement.textContent as string;
       expect(calloutText).toContain('6 - Unconnected next-user');

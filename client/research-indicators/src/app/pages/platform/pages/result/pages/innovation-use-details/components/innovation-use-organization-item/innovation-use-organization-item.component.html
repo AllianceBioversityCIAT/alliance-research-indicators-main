@@ -8,7 +8,7 @@
 
 <div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
   <div class="flex justify-between items-center rs-gap-[4]">
-    <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber }}</span>
+    <span class="fs-[13] text-[var(--ac-grey-800)] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber }}</span>
 
     @if (!disabled) {
       <button
@@ -36,11 +36,11 @@
     @if (body().is_organization_known) {
       <div class="flex items-center bg-[var(--ac-grey-200)] border-l-4 border-l-[var(--ac-light-blue-500)] rs-gap-[8] rs-p-[12] rs-mt-[12]">
         <i class="text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
-        <span class="fs-[14] text-[var(--ac-grey-700)]">
+        <span class="fs-[14] text-[var(--ac-grey-800)]">
           Can't find the institution you need? Request to add it
           <button
             type="button"
-            class="text-[var(--ac-light-blue-300)] underline bg-transparent border-0 p-0 cursor-pointer"
+            class="text-[var(--ac-light-blue-500)] underline bg-transparent border-0 p-0 cursor-pointer"
             aria-label="Request to add a new institution"
             [disabled]="disabled"
             (click)="onRequestPartner()">

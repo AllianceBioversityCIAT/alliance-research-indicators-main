@@ -2090,6 +2090,239 @@ describe('InnovationUseDetailsComponent', () => {
 });
 
 // ===================================================================================================
+// R3 (validation-report.md remediation) — extends T-14 c12's pure-function WCAG contrast instrument
+// from the four Amendment-01 text roles it originally covered to every text role in the section
+// (R-IUP-017 AC.3 / F-1: "the instrument existed and was aimed at a quarter of the surface"). Same
+// method as c12 above — decimal RGB triples, no hex literal anywhere in this file (DD-7's zero-hex
+// rule is a project-wide grep, not a component-only one) — duplicated locally rather than reached
+// across describe blocks, so this block runs standalone. As with c12: jsdom applies no stylesheet
+// and Tailwind is a runtime browser CDN script (src/index.html) invisible to jsdom, so no test here
+// proves a RENDERED colour — each `it` asserts (a) which utility class won the element (the losing,
+// pre-fix class is asserted absent) and (b) that token's own WCAG arithmetic, which is the strongest
+// claim available at this tier.
+// ===================================================================================================
+describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to every text role (validation-report.md R1/R3)', () => {
+  let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+  let component: InnovationUseDetailsComponent;
+
+  type Rgb = [number, number, number];
+  const relativeLuminance = ([r8, g8, b8]: Rgb): number => {
+    const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+    const [r, g, b] = [r8, g8, b8].map(v => channel(v / 255));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrastRatio = (fg: Rgb, bg: Rgb): number => {
+    const l1 = relativeLuminance(fg);
+    const l2 = relativeLuminance(bg);
+    const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+    return (lighter + 0.05) / (darker + 0.05);
+  };
+
+  // Light-theme token values, transcribed as decimal RGB from src/styles/colors.scss's :root block
+  // (verified by reading the file, not assumed). GREY_600 / GREY_700 / LIGHT_BLUE_300 are the
+  // *superseded* tokens — kept only to drive the falsifying-input tests below.
+  const GREY_100: Rgb = [244, 247, 249]; // --ac-grey-100
+  const GREY_200: Rgb = [232, 235, 237]; // --ac-grey-200
+  const WHITE_1: Rgb = [255, 255, 255]; // --ac-white-1
+  const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
+  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded (ACTORS/eyebrow pre-fix)
+  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
+  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded (Add-button/stepper/org-link pre-fix)
+  const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
+  const LIGHT_BLUE_500: Rgb = [7, 75, 134]; // --ac-light-blue-500 — the grey-200-surface token
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    submission.isEditableStatus.mockReturnValue(true);
+    apiService.GET_InnovationUseDetails.mockResolvedValue({
+      data: {
+        innovation_use_level_id: idForLevel(3),
+        innovation_use_level_explanation: 'evidence',
+        actors: [new InnovationUseActor()],
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true }],
+        quantifications: []
+      },
+      successfulRequest: true
+    });
+    apiService.GET_InnovationUseLevels.mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true });
+
+    await TestBed.configureTestingModule({
+      imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+      providers: [
+        { provide: ApiService, useValue: apiService },
+        { provide: CacheService, useClass: CacheServiceMock },
+        { provide: ActionsService, useValue: actions },
+        { provide: Router, useValue: router },
+        { provide: SubmissionService, useValue: submission },
+        { provide: VersionWatcherService, useValue: versionWatcher },
+        { provide: ActivatedRoute, useValue: activatedRouteMock }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+    component = fixture.componentInstance;
+    await component.getData();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  });
+
+  it('loadFailed banner: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    component.loadFailed.set(true);
+    fixture.detectChanges();
+
+    const banner = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('could not be loaded'));
+    expect(banner).toBeTruthy();
+    expect((banner!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((banner!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeCloseTo(7.44, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+
+    component.loadFailed.set(false);
+  });
+
+  it('ACTORS callout body: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const body = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'List every actor group using this innovation.');
+    expect(body).toBeTruthy();
+    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Add-other buttons (actor/organization/measure): text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+    ['Add other actor', 'Add other organization', 'Add other measure'].forEach(label => {
+      const btn = fixture.debugElement.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.includes(label));
+      expect(btn).toBeTruthy();
+      expect((btn!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
+      expect((btn!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+    });
+
+    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
+    expect(ratio).toBeCloseTo(6.83, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const eyebrow = fixture.debugElement
+      .queryAll(By.css('app-innovation-use-actor-item span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ACTOR #'));
+    expect(eyebrow).toBeTruthy();
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+    const eyebrow = fixture.debugElement
+      .queryAll(By.css('app-innovation-use-organization-item span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ORGANIZATION #'));
+    expect(eyebrow).toBeTruthy();
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const calloutBody = orgItem
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent?.includes("Can't find the institution"));
+    expect(calloutBody).toBeTruthy();
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_200);
+    expect(ratio).toBeCloseTo(6.68, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('organization known-institution callout link "here": text-[var(--ac-light-blue-500)] on --ac-grey-200 (>= 4.5:1)', () => {
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const hereButton = orgItem.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.trim() === 'here');
+    expect(hereButton).toBeTruthy();
+    expect((hereButton!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-500)]');
+    expect((hereButton!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+
+    const ratio = contrastRatio(LIGHT_BLUE_500, GREY_200);
+    expect(ratio).toBeCloseTo(7.43, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('actor card "Total" value: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1, already conformant before R1)', () => {
+    const total = fixture.debugElement.query(By.css('span.actor-total'));
+    expect(total).toBeTruthy();
+    expect((total!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+
+    const ratio = contrastRatio(GREY_800, GREY_100);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('stepper unselected digits: text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+    const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
+    const unselected = buttons.filter(b => !(b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    expect(unselected.length).toBeGreaterThan(0);
+    unselected.forEach(b => {
+      expect((b.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
+      expect((b.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+    });
+
+    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('stepper selected digit fill: text-[var(--ac-white-1)] on the re-derived --ac-light-blue-400 fill (>= 4.5:1)', () => {
+    const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
+    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    expect(selected.length).toBe(1);
+    expect((selected[0].nativeElement as HTMLElement).className).toContain('text-[var(--ac-white-1)]');
+    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-300)]');
+
+    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_400);
+    expect(ratio).toBeCloseTo(6.83, 1);
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
+  // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
+  // this block must be able to show — see the reverted-swap check run separately during verification.
+  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS/eyebrow pre-fix token) reports 2.91:1 and fails', () => {
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-grey-700 on --ac-grey-200 (organization-callout pre-fix token) reports 3.51:1 and fails', () => {
+    const ratio = contrastRatio(GREY_700, GREY_200);
+    expect(ratio).toBeCloseTo(3.51, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (Add-button/stepper pre-fix token) reports 3.84:1 and fails', () => {
+    const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+
+  it('falsifying input: --ac-light-blue-300 on --ac-grey-200 (organization-callout link pre-fix token) reports 3.21:1 and fails', () => {
+    const ratio = contrastRatio(LIGHT_BLUE_300, GREY_200);
+    expect(ratio).toBeCloseTo(3.21, 1);
+    expect(ratio).toBeLessThan(4.5);
+  });
+});
+
+// ===================================================================================================
 // c11 — `Add other actor` issues no HTTP request. Uses the REAL ApiService (backed by
 // HttpClientTestingModule) rather than a mocked one, so the assertion is on HttpTestingController
 // itself (the disqualifier requires this — a mocked-ApiService "not called" check is not the same

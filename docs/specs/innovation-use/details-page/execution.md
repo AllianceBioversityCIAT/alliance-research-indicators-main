@@ -2423,3 +2423,42 @@ Both were discharged by the Leader on human observations. **Both observations we
 - 15 of 21 requirements **PASS** outright; the payload/wire tests, the falsifiers and the `DD-16` route-tree reproduction were called *"better than the norm for this repo"*.
 - Auditor A: *"This spec's self-documentation is unusually honest — it retracted a c7 discharge against itself, recorded a Leader ruling as a ruling rather than as satisfaction, named the c8 coverage gap and the remedy, and refused to let a targeted suite count."*
 
+
+### R1 / R2 / R3 — validation remediation: ✅ PASS · 2026-08-26
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ **PASS** — Reviewer verdict, attempt 1, three advisories. Explicit verdict requested and given: **"safe to deploy to a test environment as-is."** |
+| **Authorized by** | User decision at the `/akili-validate` gate ("arreglar R1–R3 y re-validar") |
+| **Effort / skills** | `high` · `angular-developer`, **`ui-ux-pro-max`** (added: unlike the tasks that excluded it, the stepper's selected fill was a genuine open choice, not an application of a closed decision) |
+| **Scope** | 8 files · 5 templates + 3 specs · **zero production `.ts`**, so no behavioural surface was reachable by this change |
+
+**Closes F-1 and A-2.** Eighteen text roles swept across the four templates — every role reported with a before/after ratio, including the ones already passing (`KZ-005`: the file-set axis bounded, zero-finding units reported).
+
+| Fixed | Before | After |
+| --- | --- | --- |
+| ACTORS callout body · actor eyebrow · organization eyebrow | `grey-600`/`grey-100` **2.91:1** | `grey-800` **7.44:1** |
+| **`loadFailed` banner** — *found by the sweep, absent from the Leader's list* | `grey-700`/`grey-100` **3.91:1** | `grey-800` **7.44:1** |
+| Three `Add other …` buttons · stepper unselected digit | `light-blue-300`/white **3.84:1** | `light-blue-400` **6.83:1** |
+| **Stepper selected fill** — a real choice, not an application of DD-17 | white on `light-blue-300` **3.84:1** | white on `light-blue-400` **6.83:1** |
+| Organization callout body | `grey-700`/`grey-200` **3.51:1** | `grey-800` **6.68:1** |
+| Organization callout link | `light-blue-300`/`grey-200` **3.21:1** | `light-blue-500` **7.43:1** |
+
+**The sweep instruction earned its cost.** The `loadFailed` banner was not in the brief's failing-site list; had the Implementer fixed only what was enumerated, that role would have survived to the next validation. This is `KZ-005` working as intended for once — bound the axis, not the citation list.
+
+**A-2 fixed and OICR verified stronger than reported.** `<div (click) (keydown.enter)>` → native `<button type="button" [attr.aria-label]>`. Dropping `keydown.enter` **widens** keyboard reach (a native button fires `click` on Enter *and* Space) and matches the actor-card exemplar, which likewise carries no keydown handler. English names at all three call sites, including OICR's two (`Remove ACTUAL COUNT n`, `Remove EXTRAPOLATED ESTIMATES n`). The Reviewer confirmed OICR's suite uses `TestBed.overrideComponent(… { set: { imports } })` with a `template: ''` fake — **the real component structurally cannot render there**, so the shared-file change carries no test risk.
+
+**R3 discriminates, verified rather than assumed.** The block covers **16 roles** (from 4). Ten template-bound tests all pin *which class won*; eight also assert the superseded class **absent**. The two without a negative assertion were checked and are legitimate (`actor-total` had no superseded class; `stepper unselected` derives its selector *from* the winning class, so a regression pollutes the filter and reddens anyway). **Observed red, quoted:** reverting the ACTORS swap → `Expected substring: "text-[var(--ac-grey-800)]" / Received string: "fs-[14] text-[var(--ac-grey-600)]"` — naming the exact role. And the block does not overclaim: its header states jsdom applies no stylesheet and that no test here proves a *rendered* colour.
+
+**Scope fence held byte-for-byte.** `colors.scss`, `custom-fields.scss`, `styles.scss`, `docs/ux-ui/design.md` untouched — and **no local override was added to dodge them**: `.section-title` (2.38:1) and `.label` carry no local colour utility. Zero new hex; `quantification-item.component.html`'s four recorded literals are unchanged in count, the red merely moving from the `div` to the `button`.
+
+**Verification** — all re-measured by the Leader in a quiet tree: `npm test -- --silent` full unfiltered **316 suites / 6741 tests** (baseline 6724; +17 = R2's 3 + R3's 14); coverage **98.19 / 96.30 / 97.76 / 98.49**; `npm run build` exit 0, **0 errors**, **1.33 MB / 274.88 kB**, no budget warning; lint clean with `git status` clean after. **The five new ratios were independently recomputed by the Leader in sRGB/WCAG 2.1 and match to two decimals; the Reviewer reproduced all nine to three.** Three independent derivations.
+
+#### ⚠️ `ADVISORY` — and the first one is F-1's own pattern surviving its remediation
+
+| Lens | Finding |
+| --- | --- |
+| **Risk · REACHABLE** | **`quantification-item.component.html:3`'s eyebrow is `text-[#8D9299]` on `bg-[#F4F7F9]` = 2.911:1** — *byte-identical in role and in number* to the actor and organization eyebrows R1 just fixed, 110 lines away, in the **fifth file this very diff touched**. Rendered on every Innovation Use page with ≥1 measure **and every OICR details page**. Correctly out of this diff's scope — `RB-5` owns the file's hex literals with OICR in the blast radius, and the brief fenced it. **But the framing gap is the finding:** `RB-5` records this as *tokenization debt* (`DD-7`), **not** as a live light-theme AA failure, and `R-IUP-017` AC.3 binds *"the section"*. So the one site nobody is tracking as an accessibility defect is the same defect, in the same role, that a FAIL verdict was just raised to close. **Named here with its ratio so `R5`'s companion item inherits it as an AA defect rather than as styling debt.** *Not fixed: the user's standing instruction is stability before a deploy, and overriding a deliberate deferral with a named OICR blast radius, unasked, is the scope creep this spec has fenced all session.* |
+| **Reliability** | **R3 pins the class axis, not the token axis.** Its RGB triples are hand-transcribed from `colors.scss`, so a *token-value* regression (someone redefines `--ac-grey-800`) still goes **green** — only a *class* regression reddens. The brief's stated goal is met for class regressions only. Cheap close: derive the triples by reading `colors.scss`'s `:root` block in the setup instead of restating them |
+| **Risk · could not construct** | The organization link's `light-blue-300`→`-500` swap moves **dark**-theme contrast 1.46 → 1.19. Both fail; this is the pre-existing class `DD-14` dismissed, and `.dark-mode` is never applied so Aura always renders light chrome. Recorded only so a future dark-theme item does not mistake this swap for the cause |
+
