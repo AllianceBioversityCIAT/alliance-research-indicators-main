@@ -2,11 +2,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import {
   CapdevBulkNotificationRepository,
+  ELIGIBLE_RESULT_STATUSES,
   mapCapdevBulkCountriesRow,
   mapCapdevBulkGroupRows,
   mapCapdevBulkMetricsRow,
 } from './capdev-bulk-notification.repository';
 import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
+import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
+import { Result } from '../../results/entities/result.entity';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { NotificationStatus } from './enum/notification-status.enum';
 import { CapdevBulkGroupRawRow } from './dto/capdev-bulk-group.dto';
@@ -33,6 +37,26 @@ function createMockQueryBuilder() {
   qb.getRawMany = jest.fn().mockResolvedValue([]);
   qb.getRawOne = jest.fn().mockResolvedValue({ count: '0' });
   return qb;
+}
+
+/** Asserts live-status eligibility filter on a mocked QueryBuilder (design §9.1). */
+function expectEligibleResultStatusFilter(
+  qb: ReturnType<typeof createMockQueryBuilder>,
+) {
+  const resultInnerJoin = qb.innerJoin.mock.calls.find(
+    ([entity, alias]) => entity === Result && alias === 'r',
+  );
+  expect(resultInnerJoin).toBeDefined();
+  expect(resultInnerJoin![2]).toBe('r.result_id = bur.result_id');
+
+  expect(qb.andWhere).toHaveBeenCalledWith(
+    'r.result_status_id IN (:...eligibleStatuses)',
+    { eligibleStatuses: ELIGIBLE_RESULT_STATUSES },
+  );
+  expect(ELIGIBLE_RESULT_STATUSES).toEqual([
+    ResultStatusEnum.SUBMITTED,
+    ResultStatusEnum.APPROVED,
+  ]);
 }
 
 describe('CapdevBulkNotificationRepository', () => {
@@ -196,9 +220,30 @@ describe('CapdevBulkNotificationRepository', () => {
 
     it('STRUCTURAL — the tie-break join picks the lowest result_contract_id among active primary contracts', async () => {
       await repository.findGroups(1);
-      const [, , joinCondition] = mockQueryBuilder.innerJoin.mock.calls[0];
+      const rcJoin = mockQueryBuilder.innerJoin.mock.calls.find(
+        ([entity]) =>
+          entity.name === 'ResultContract' || entity === ResultContract,
+      );
+      expect(rcJoin).toBeDefined();
+      const joinCondition = rcJoin![2] as string;
       expect(joinCondition).toContain('MIN(rc2.result_contract_id)');
       expect(joinCondition).toContain('rc2.is_primary = :isPrimary');
+    });
+
+    it('STRUCTURAL — innerJoins Result on live result_status_id IN Submitted/Approved (R-CESF-001/005)', async () => {
+      await repository.findGroups(1);
+      expectEligibleResultStatusFilter(mockQueryBuilder);
+    });
+
+    it('STRUCTURAL — does not filter eligibility via bur.final_status or suggested_status', async () => {
+      await repository.findGroups(1);
+      const whereCalls = mockQueryBuilder.andWhere.mock.calls.map(([clause]) =>
+        String(clause),
+      );
+      expect(whereCalls.some((c) => c.includes('final_status'))).toBe(false);
+      expect(whereCalls.some((c) => c.includes('suggested_status'))).toBe(
+        false,
+      );
     });
 
     it('query count is O(groups): exactly one getRawMany call regardless of row count', async () => {
@@ -357,6 +402,11 @@ describe('CapdevBulkNotificationRepository', () => {
       expect(mockQueryBuilder.groupBy).toHaveBeenCalledWith('ac.agreement_id');
     });
 
+    it('STRUCTURAL — inherits eligible live result_status filter from capdevSpineQuery', async () => {
+      await repository.findMetrics(1);
+      expectEligibleResultStatusFilter(mockQueryBuilder);
+    });
+
     it('STRUCTURAL — the result_capacity_sharing join filters is_active = TRUE, so a soft-deleted row cannot inflate the sums or widen the date bounds', async () => {
       await repository.findMetrics(1);
       const rcsJoinCall = mockQueryBuilder.leftJoin.mock.calls.find(
@@ -421,6 +471,11 @@ describe('CapdevBulkNotificationRepository', () => {
       await repository.findCountries(1);
       expect(mockQueryBuilder.groupBy).toHaveBeenCalledWith('ac.agreement_id');
     });
+
+    it('STRUCTURAL — inherits eligible live result_status filter from capdevSpineQuery', async () => {
+      await repository.findCountries(1);
+      expectEligibleResultStatusFilter(mockQueryBuilder);
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -455,6 +510,11 @@ describe('CapdevBulkNotificationRepository', () => {
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
         'rc.result_contract_id IS NULL',
       );
+    });
+
+    it('STRUCTURAL — applies eligible live result_status filter (R-CESF-002 AC.4)', async () => {
+      await repository.findUnattributedResultIds(1);
+      expectEligibleResultStatusFilter(mockQueryBuilder);
     });
 
     it('query count is O(1): exactly one getRawMany call regardless of batch size', async () => {
@@ -500,6 +560,10 @@ describe('CapdevBulkNotificationRepository', () => {
       );
       expect(mockQueryBuilder.innerJoin).not.toHaveBeenCalled();
       expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalled();
+      expect(mockQueryBuilder.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining('result_status_id'),
+        expect.anything(),
+      );
     });
 
     it('STRUCTURAL — selects COUNT(*), never a row list', async () => {

@@ -621,7 +621,7 @@ describe('CapdevBulkNotificationService', () => {
   // dispatch() — orchestration (T-09)
   // -----------------------------------------------------------------------
   describe('dispatch', () => {
-    it('zero CapDev results: metrics are still written (a zero CapDev aggregate, but a real batch-wide total_results) and status is SKIPPED with a null sent_at, no email, flag never read', async () => {
+    it('zero eligible attributed CapDev (e.g. draft-only batch): metrics still written with zero CapDev aggregates, batch-wide total_results preserved, SKIPPED, no email', async () => {
       const repository = createRepositoryMock();
       // total_results is genuinely batch-wide (unfiltered by indicator or
       // contract) — a batch that produced zero CapDev groups can still have
@@ -1017,6 +1017,76 @@ describe('CapdevBulkNotificationService', () => {
             (msg as string).includes('bulk_upload_process_id=9'),
         ),
       ).toBe(true);
+    });
+
+    it('R-CESF-004 scenario — eligible but unattributed only: zero groups, warn lists ids, CapDev metrics zero, SKIPPED, no email', async () => {
+      const repository = createRepositoryMock();
+      repository.findUnattributedResultIds.mockResolvedValue([101, 102]);
+      repository.countTotalResults.mockResolvedValue(2);
+      const { service } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+      const sendSpy = jest.spyOn(service, 'sendGroupNotification');
+      const warnSpy = jest.spyOn(
+        (service as unknown as { logger: { _warn: jest.Mock } }).logger,
+        '_warn',
+      );
+
+      await service.dispatch(42);
+
+      expect(repository.persistProcessMetrics).toHaveBeenCalledWith(42, {
+        total_results: 2,
+        total_capdev_results: 0,
+        total_participants: 0,
+        total_female_participants: 0,
+        activity_start_date: null,
+        activity_end_date: null,
+        countries: [],
+      });
+      expect(repository.updateNotificationStatus).toHaveBeenCalledWith(
+        42,
+        NotificationStatus.SKIPPED,
+        null,
+      );
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(
+        warnSpy.mock.calls.some(([msg]) =>
+          (msg as string).includes('result_id=[101, 102]'),
+        ),
+      ).toBe(true);
+    });
+
+    it('R-CESF-002/004 — pre-filtered repository mocks: CapDev persist reflects eligible-only metrics while total_results stays batch-wide', async () => {
+      const repository = createRepositoryMock();
+      repository.findGroups.mockResolvedValue({
+        groups: [makeGroup({ agreement_id: 'ABC-123' })],
+        multiPrimaryWarnings: [],
+      });
+      repository.findMetrics.mockResolvedValue([
+        makeMetricsRow('ABC-123', {
+          trainings_count: 2,
+          participants_total: 20,
+          female_participants_total: 8,
+        }),
+      ]);
+      repository.countTotalResults.mockResolvedValue(5);
+      const { service } = await createService(
+        { template: REAL_TEMPLATE_HTML },
+        { repository },
+      );
+
+      await service.dispatch(11);
+
+      expect(repository.persistProcessMetrics).toHaveBeenCalledWith(
+        11,
+        expect.objectContaining({
+          total_capdev_results: 2,
+          total_participants: 20,
+          total_female_participants: 8,
+          total_results: 5,
+        }),
+      );
     });
 
     it('passes fileContacts through to the recipients builder (contract-scoped CC reaches only its group)', async () => {
