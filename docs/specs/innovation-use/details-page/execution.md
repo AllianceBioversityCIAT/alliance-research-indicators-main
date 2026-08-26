@@ -2098,3 +2098,30 @@ Corroborated on four independent axes: Tailwind is **absent** from `client/resea
 
 **Standing observation about this spec's verification design, on the record because it now has two data points rather than an argument.** Both defects fixed after `T-14`'s PASS — the `null` result id and the missing pointer affordance — were found by a human clicking, not by 6,724 passing tests. Each sat squarely in a class the spec had *already* declared unreachable by automation (**AR-1** for real navigation, **AR-2**/D7/D8 for visual affordance) and routed to the human gate. The routing was correct and the gate worked; what the two escapes show is that `T-13`'s four open criteria are the load-bearing ones in this spec, not the residue.
 
+
+#### ✅ `T-14` c11 — residual CLOSED by human observation, 2026-08-26
+
+**Quoted, not paraphrased** (KZ-002 recurrence 6): *"los bulletpoints están, el link a la calculadora funciona perfecto, el link al pdf de inno use funciona perfecto, la redirección a evidencias también quedó funcional."*
+
+**c11 is now complete as a composition of two halves, and neither half alone would have done it** — stated this way so the tick is not read as resting on either:
+
+| Half | Evidence | What it could NOT reach |
+| --- | --- | --- |
+| **Does the ACL let a stranger in?** | Leader's unauthenticated `curl` probe: HTTP 200 on both URLs, the Drive file's own title served to a client with no session, zero `You need access` markers | `curl` is not a browser — it cannot show that the PDF viewer paints |
+| **Does it actually open for a human?** | This observation — both links *"funciona perfecto"* | The user did **not** state they were logged out, and c11's Disqualifier is explicit that *"opening the links while logged into a CGIAR Google account proves nothing about Drive's ACL"* |
+
+Each half covers precisely what the other structurally cannot. **Defect class D11 is closed in both directions.**
+
+**Additionally,** *"los bulletpoints están"* supplies the **rendered** half of `c2`, whose automated evidence was by its own admission a presence assertion on an unrendered tree.
+
+#### ⚠️ What this observation does NOT discharge — `T-13` stays `[~]`, all four criteria open
+
+Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: a human answered a real question, and the temptation is to credit it for the adjacent questions it did not cover.
+
+| Criterion | Why it is untouched by this |
+| --- | --- |
+| **c7** | Requires **both** viewports (1440 px *and* the `md:` breakpoint, landscape, height ≤ 768 px), *every* label / callout / count field / card border legible, the repeatable cards **stacking rather than overflowing**, and no unreadable contrast. The observation covers four elements functioning at one unstated viewport. It also does not touch the **`form-header` regression check** on an unrelated result tab, which T-13's own entry names as required because that component renders on 13 pages and its typography moved when `rs-*` began resolving |
+| **c1** | Nothing here exercises fill → **save** → re-read → green tick from the sidebar in one pass. Link navigation is not the payload path |
+| **c8** | No screenshots captured |
+| **c9** | No keyboard traversal observed — and *"el link funciona"* by mouse says nothing about focus order, a visible ring, or a focus trap in a repeatable card |
+
