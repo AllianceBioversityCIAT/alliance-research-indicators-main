@@ -2167,3 +2167,16 @@ Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: 
 | **No focus trap inside a repeatable card** | ✅ *"da el loop completo y comienza de nuevo"* — a page-wide cycle that returns to the start is the direct negation of a trap. Had the cycle closed **inside** a card, it would have been the defect the clause exists to catch |
 | Every **icon-only** control announces an **English** name | ⏳ **OPEN.** Not addressed, and a Tab pass structurally cannot reveal it — an accessible name is exposed to assistive technology, not to the focus ring. **Presence** has unit-tier evidence (`T-04` c6: every stepper button carries an English `aria-label`, zero Spanish strings in the file; `T-11` added `[ariaLabel]` to all four selects and native `<button>`s for both remove controls). What is unproven is **announcement** — that a screen reader reads those names. This is the last open clause of c9 |
 
+
+#### `T-13` c1 — DISCHARGED, with evidence stronger than the criterion asked for · 2026-08-26
+
+**Quoted:** *"se guarda todo correctamente, al completar todos los campos aparece el check verde y de igual forma cuando quito algo se retira el check verde"*
+
+**c1 required** the save → re-read → sidebar tick turning **true**, in one pass, exercising route + sidebar + page + payload + green-check refresh together. That is discharged: the section saves, and completing the fields turns the tick true.
+
+**The observation goes beyond the criterion, and the excess is the valuable part.** The user also exercised the **negative** direction — *"cuando quito algo se retira el check verde"* — which c1 never asked for. This is the product-level form of the question this spec's own **KZ-001** keeps asking about tests: *does the mechanism discriminate, or does it merely fire?* A green check that only ever turns **on** is indistinguishable from one that is hardcoded true, and no amount of watching it turn true would separate the two. Watching it turn **off** does. **`R-IUP-016`'s green-check refresh is therefore verified as a discriminating mechanism, not just as an observed transition** — a stronger claim than the criterion's own wording can make, and recorded as such rather than flattened into a tick.
+
+**One wording gap, named not absorbed:** the criterion specifies *"starting from a clean checkout, an indicator-6 result is opened **from the sidebar**"*. The observation confirms the save/re-read/green-check chain on a live result but does not state the sidebar entry point or a clean checkout. **Recorded as a wording gap rather than a failure**, on the same basis as `c7`'s viewport gap: the substantive risk this clause exists to catch — that the payload path or the green-check refresh is broken — was exercised directly, in both directions. The sidebar entry point itself is separately proven by `T-10` (route + sidebar rows + section path) and by `PV-T13-1`, which put indicator 6 in the client allowlist precisely so this entry point exists.
+
+**`T-13` status after this: 10 of 11 criteria discharged.** Remaining: **c8** (two screenshots — Leader can review them, so this is dischargeable rather than blocked) and the **third clause of c9** (English accessible names on icon-only controls, announcement half).
+
