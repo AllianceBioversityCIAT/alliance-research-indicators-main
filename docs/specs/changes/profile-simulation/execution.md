@@ -258,3 +258,20 @@ Tests:       6593 passed, 6593 total
 
 **Leader client full-suite re-measure after T-10+T-11 (isolated):**
 Tests: 6620 passed, 6620 total (all suites green)
+
+---
+
+## T-12 — Role-model specs + socket orchestration + HITL visual check
+
+- **Status:** unit half **PASS** (attempt 2) · task **`[~]`** — HITL browser half (screenshots, measured padding, real-browser axe, tab order) still owed
+- **Date:** 2026-08-26
+- **Attempts (unit half):** 2 (Implementer sonnet medium→high; Reviewer opus)
+- **Files:** `roles.service.spec.ts` only (+23/−1); socket/nav/toast orchestration was delivered under T-10/T-11
+- **Attempt 1 — FAIL (evidence):** the mutation run (`if (false && …)`) only loosens the guard — the new positive case could never redden; acceptance names the DTO-drop mutation.
+- **Attempt 2 — PASS:** DTO-drop mutation on the new fixture → red at spec:141 (`Expected: true / Received: false`), byte-identical restore, 24/24. **1 red, not the Reviewer's predicted 2 — worker reported the deviation honestly; Reviewer confirmed the 2-red prediction was its own K-004 error** (a predicted, unobserved count carried from a different mutation) — logged here against the reviewer, per its own request. Case-3 comment trimmed (null-vs-absent claim removed).
+- Three cases: simulated Contributor → `isSystemAdmin()`/`canAccessCenterAdmin()` false · simulated Center Admin (full role shape) → true · `focus_id: null` input-shape guard.
+
+### Owed before `[x]` (HITL half — Leader + human, real browser)
+- [ ] App running THIS worktree's code (docker decision pending: the running `ari_*` containers belong to `bilateral-visual-improvements`)
+- [ ] Two screenshots vs mockup artboards 1/4 · measured `#content` padding = navbar+banner host height · axe: 0 contrast violations on banner + both dialog steps · tab-order + Escape note
+- [ ] T-11 advisories #1–3 (dropdown z-index over sidebar/popovers; banner `:host` display; cold-load offset flash) · T-09/T-10 aria advisories eyeballed
