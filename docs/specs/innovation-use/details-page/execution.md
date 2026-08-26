@@ -2259,3 +2259,26 @@ Two independent mechanisms produced the three symptoms:
 2. **`c7` is not re-discharged by this.** The fix is verified in a component harness, not in the running application by a human. `c7` requires the real page at the two named viewports. **It stays open pending the user's own check** — and this time the residual is being tracked as an open item, which is the lesson recorded one entry above.
 3. **App-wide finding, reported and NOT fixed.** `result.component.scss:3`'s **322 px unconditional** sidebar column cramps *every* result page at narrow viewports, not just this one. That is an app-wide responsive question, outside this spec's scope, and **not minted as a task here** (`/akili-execute` §2.4). Flagged for its own spec alongside the `pool-funding-alignment` finding.
 
+
+#### ✅ PV-T13-2 confirmed in the running application · 2026-08-26
+
+**Human screenshot, and the viewport is legible in the frame itself** — DevTools reads `Responsive 768 × 876`, light theme, `/result/STAR-19911/innovation-use-details?from=results-center`, `ACTOR # 3` fully in view. **This closes the residual named one entry above**: the earlier discharge was retracted precisely because *"pantallas pequeñas"* was not a numeric statement. This frame is one.
+
+| Symptom | Verdict in the running app |
+| --- | --- |
+| **V-1** overflow | ✅ **Gone.** All four count inputs sit inside the card border |
+| **V-2** clipped label | ✅ **Gone.** `Women non-youth` and `Men non-youth` render on a single line, complete |
+| **V-3** misalignment | ✅ **Structurally impossible now** — single column at this width, so there is no second column to lose a baseline against |
+
+**Unrequested bonus evidence, worth more than the fix it came with.** The frame shows `Women youth 2`, `Women non-youth 1`, `Men youth 2`, `Men non-youth 3` and **`Total 8`**. 2+1+2+3 = 8: **the derived total is confirmed correct in the running application.** `T-05` **c3** proved that computation in jsdom only, over a component fixture. This is the first time it has been observed against the real page, the real `app-input` instances and the real change-detection cycle. Recorded because it is a stronger claim than the criterion that owns it can make.
+
+#### `c7` — what is now discharged, and the ONE configuration still open
+
+**Discharged:** light theme; the **`md:`-width case at 768 px** in the running app, with the width visible in the evidence; repeatable cards not overflowing (confirmed earlier across multiple generated cards); every label legible; the `form-header` regression check on an unrelated result tab; and the wide case at 1440 px from the earlier frame.
+
+**Still open — and it is not pedantry, it is the boundary this fix just moved.** `c7`'s narrow case is specified as *"at the `md:` breakpoint (**landscape, height ≤ 768 px**)"*. The verified frame is **768 × 876** — portrait, height 876. A landscape viewport with height ≤ 768 is a **wider** viewport (e.g. **1024 × 700**), and 1024 px is exactly where **`PV-T13-2` put the new `lg:` two-column cutover**. So the one untested configuration is the one sitting on the new boundary:
+
+> **Set 1024 × 700 and look at an Actor card's count grid.** At 1024 the fix intends two columns with ~450 px of card interior. If the labels stay single-line and the inputs stay inside the card, `c7` closes and the `lg:`-cutover residual closes with it — the same check discharges both.
+
+**`c8`** also still owes the two **card 1** frames (label, guidance callout with its four bullets, stepper, definitions link, evidence callout) at each viewport — the entire Amendment 01 surface, absent from all three screenshots so far. **`c9`** still owes its third clause (English accessible names on the icon-only remove controls).
+
