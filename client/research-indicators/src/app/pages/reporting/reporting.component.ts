@@ -203,6 +203,13 @@ export default class ReportingComponent {
   /** Which quick-access platform cards are expanded ("View more"). */
   private readonly expandedPlatforms = signal<ReadonlySet<string>>(new Set());
 
+  /** "Why reporting matters" intro collapsed/expanded (mobile only). */
+  readonly whyExpanded = signal(false);
+
+  toggleWhy(): void {
+    this.whyExpanded.set(!this.whyExpanded());
+  }
+
   isPlatformExpanded(name: string): boolean {
     return this.expandedPlatforms().has(name);
   }

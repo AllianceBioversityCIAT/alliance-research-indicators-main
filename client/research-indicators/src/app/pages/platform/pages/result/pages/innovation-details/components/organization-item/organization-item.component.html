@@ -69,6 +69,16 @@
       [(ngModel)]="body().institution_type_id"
       [style]="organizationMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
       [optionValue]="'code'" (onChange)="onInstitutionTypeChange($event.value)" [options]="institutionService.list()">
+      <ng-template pTemplate="item" let-opt>
+        <div class="whitespace-normal break-words">
+          <span class="font-[600] text-[#4C5158]">{{ opt.name }}</span>@if (opt.description?.trim()) {<span class="font-[600] text-[#4C5158]">:</span><span class="font-normal text-[#4C5158]"> {{ opt.description.trim() }}</span>}
+        </div>
+      </ng-template>
+      <ng-template pTemplate="selectedItem" let-opt>
+        <div class="whitespace-normal break-words">
+          <span class="font-[600] text-[#4C5158]">{{ opt.name }}</span>@if (opt.description?.trim()) {<span class="font-[600] text-[#4C5158]">:</span><span class="font-normal text-[#4C5158]"> {{ opt.description.trim() }}</span>}
+        </div>
+      </ng-template>
     </p-select>
 
     @if (organizationMissing) {
@@ -82,6 +92,16 @@
       [scrollHeight]="'218px'" class="text-[14px]" [optionLabel]="'name'" [(ngModel)]="body().sub_institution_type_id"
       [style]="subTypeMissing ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
       [optionValue]="'code'" [options]="subTypesService.list(body().institution_type_id ?? undefined)">
+      <ng-template pTemplate="item" let-opt>
+        <div class="whitespace-normal break-words">
+          <span class="font-[600] text-[#4C5158]">{{ opt.name }}</span>@if (opt.description?.trim()) {<span class="font-[600] text-[#4C5158]">:</span><span class="font-normal text-[#4C5158]"> {{ opt.description.trim() }}</span>}
+        </div>
+      </ng-template>
+      <ng-template pTemplate="selectedItem" let-opt>
+        <div class="whitespace-normal break-words">
+          <span class="font-[600] text-[#4C5158]">{{ opt.name }}</span>@if (opt.description?.trim()) {<span class="font-[600] text-[#4C5158]">:</span><span class="font-normal text-[#4C5158]"> {{ opt.description.trim() }}</span>}
+        </div>
+      </ng-template>
     </p-select>
 
     @if (subTypeMissing) {
