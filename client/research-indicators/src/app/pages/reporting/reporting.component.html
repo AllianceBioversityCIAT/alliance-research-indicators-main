@@ -1,19 +1,21 @@
 <div class="flex min-h-screen flex-col pb-14">
+  <div class="max-sm:sticky max-sm:top-0 max-sm:z-30">
   <header class="bg-[#173F6F] text-white">
-    <div class="flex h-[74px] items-center gap-3.5 px-6">
-      <img class="h-9 w-auto object-contain" [src]="'images/alliance-logo-white.svg' | s3ImageUrl" alt="Alliance of Bioversity International &amp; CIAT" />
-      <span aria-hidden="true" class="h-8 w-px bg-white/30"></span>
-      <div class="text-[13.5px] leading-[1.35] tracking-[0.03em] text-[#DCE8D8]">
-        <span class="block font-semibold uppercase tracking-[0.05em] text-white">Alliance of Bioversity International &amp; CIAT | Reporting Pathfinder</span>
-        One entry point for research results reporting
+    <div class="flex h-[74px] items-center gap-3.5 px-6 max-sm:h-auto max-sm:min-h-[64px] max-sm:gap-2.5 max-sm:px-4 max-sm:py-2.5">
+      <img class="h-9 w-auto object-contain max-sm:h-7" [src]="'images/alliance-logo-white.svg' | s3ImageUrl" alt="Alliance of Bioversity International &amp; CIAT" />
+      <span aria-hidden="true" class="h-8 w-px bg-white/30 max-sm:h-10"></span>
+      <div class="text-[13.5px] leading-[1.35] tracking-[0.03em] text-[#DCE8D8] max-sm:text-[11px] max-sm:leading-[1.3]">
+        <span class="block font-semibold uppercase tracking-[0.05em] text-white"><span class="max-sm:hidden">Alliance of Bioversity International &amp; CIAT | </span>Reporting Pathfinder</span>
+        <span class="max-sm:hidden">One entry point for research results reporting</span>
       </div>
     </div>
   </header>
 
   <div aria-hidden="true" class="h-[5px] bg-[linear-gradient(90deg,#358540_0%,#358540_34%,#CAC92D_34%,#CAC92D_67%,#FFCF01_67%)]"></div>
+  </div>
 
-  <main class="mx-auto w-full max-w-[1250px] flex-1 px-7">
-    <section class=" pt-[50px] flex flex-col items-start pb-10">
+  <main class="mx-auto w-full max-w-[1250px] flex-1 px-7 max-sm:px-4">
+    <section class=" pt-[50px] flex flex-col items-start pb-10 max-sm:pt-6 max-sm:pb-6">
       <p class="mb-1 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#1689CA]">Indicator guidance</p>
       <span class="max-w-[22ch] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-[#173F6F] [text-wrap:balance]">
         Where do I report?
@@ -23,22 +25,26 @@
 
     </section>
 
-    <section aria-label="Why reporting matters" class="mb-[26px] border border-l-4 border-[#DCE8D8] border-l-[#173F6F] bg-white px-8 py-[28px]">
-      <p class="mb-5 text-[15px] leading-[1.5] text-[#63605F]">With the launch of the Alliance 2026–2030 Strategy, research results reporting has evolved from a distinct reporting exercise into a key component of the Alliance’s institutional performance monitoring framework. Research result indicators are now used as dimensions for measuring contribution to selected institutional performance areas and objectives.</p>
-      <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-x-6 gap-y-2.5">
+    <section aria-label="Why reporting matters" class="mb-[26px] border border-l-4 border-[#DCE8D8] border-l-[#173F6F] bg-white px-8 py-[28px] max-sm:px-4 max-sm:py-5">
+      <p class="mb-5 text-[15px] leading-[1.5] text-[#63605F]" [ngClass]="{ 'max-sm:line-clamp-4 max-sm:mb-0': !whyExpanded() }">With the launch of the Alliance 2026–2030 Strategy, research results reporting has evolved from a distinct reporting exercise into a key component of the Alliance’s institutional performance monitoring framework. Research result indicators are now used as dimensions for measuring contribution to selected institutional performance areas and objectives.</p>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-x-6 gap-y-2.5" [ngClass]="{ 'max-sm:hidden': !whyExpanded() }">
         <p class="text-[15px] leading-normal text-[14px] leading-snug text-[#63605F]"><strong class="font-semibold text-[#173F6F]">Scientific Excellence</strong><br />Knowledge Products · Capacity Sharing · Innovation Development</p>
         <p class="text-[15px] leading-normal text-[14px] leading-snug text-[#63605F]"><strong class="font-semibold text-[#173F6F]">Enabling System Change</strong><br />Innovation Use · Policy Change · OICRs</p>
       </div>
-      <p class="-mt-3.5 text-right">
+      <p class="-mt-3.5 text-right max-sm:mt-3" [ngClass]="{ 'max-sm:hidden': !whyExpanded() }">
         <a href="https://cgiar.sharepoint.com/sites/Bioversity_CIAT_Alliance/Available%20information%20about%20the%20Alliance/Forms/AllItems.aspx?id=%2Fsites%2FBioversity%5FCIAT%5FAlliance%2FAvailable%20information%20about%20the%20Alliance%2F2025%2D2026%20Objectives%2FENG%2F2026%5FInstitutional%2DObjectives%5FENG%2Epdf&parent=%2Fsites%2FBioversity%5FCIAT%5FAlliance%2FAvailable%20information%20about%20the%20Alliance%2F2025%2D2026%20Objectives%2FENG" target="_blank" rel="noopener" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#173F6F] px-3 py-1 text-[15px] font-medium text-[#173F6F] no-underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
           See diagram
         </a>
       </p>
+      <button type="button" (click)="toggleWhy()" class="mt-2 hidden cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-[#173F6F] max-sm:inline-flex">
+        {{ whyExpanded() ? 'View less' : 'View more' }}
+        <i class="pi pi-chevron-down !text-[11px]" [class.rotate-180]="whyExpanded()"></i>
+      </button>
     </section>
 
     <section aria-label="Reporting pathway selector" class="border border-[#DCE8D8] bg-white">
       @if (showTrail()) {
-        <nav aria-label="Breadcrumb" class="flex items-center px-7 pb-3 pt-3.5 text-[14px] text-slate-600">
+        <nav aria-label="Breadcrumb" class="flex flex-wrap items-center px-7 pb-3 pt-3.5 text-[14px] text-slate-600 max-sm:px-4 max-sm:text-[12px]">
           @for (item of chips(); track item.label; let i = $index) {
             @if (i > 0) {
               <i class="pi pi-chevron-right mx-2 !text-[12px] text-[#777C83]"></i>
@@ -56,24 +62,24 @@
         </nav>
       }
       @if (showQ1()) {
-        <div class="p-8">
+        <div class="p-8 max-sm:p-4">
           <div class="mb-[22px] flex flex-wrap items-baseline gap-3">
             <h2 class="text-[20px] font-bold text-[#173F6F]"> What are you reporting?</h2>
-            <span class="text-[15px] text-[#63605F]">Hover a card for more details.</span>
+            <span class="text-[15px] text-[#63605F] max-sm:-mt-3">Hover a card for more details.</span>
           </div>
 
-          <div class="mb-2.5 flex items-baseline gap-1">
+          <div class="mb-2.5 flex items-baseline gap-1 max-sm:flex-col max-sm:items-start max-sm:gap-0.5">
             <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#1689CA]">Outputs:</h3>
             <span class="text-[14px] text-[#63605F]">what we produce</span>
           </div>
           <div role="group" aria-label="Output indicators" class="mb-6 grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('kp')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-7 pb-7 pt-6 text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('kp')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-7 pb-7 pt-6 text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F] max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-lightbulb !text-[24px]"></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Knowledge Product</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Research outputs that generate, preserve, or share knowledge.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Research outputs that generate, preserve, or share knowledge.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> When formally published or officially released.</p>
@@ -82,12 +88,12 @@
               </div>
             </div>
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('cap')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('cap')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-users !text-[26px]"></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Capacity Sharing for Development</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Structured activities that strengthen knowledge, skills, or capacities.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Structured activities that strengthen knowledge, skills, or capacities.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> After delivery; multi-session programmes count as one.</p>
@@ -96,12 +102,12 @@
               </div>
             </div>
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('innovDev')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('innovDev')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-flag !text-[22px]"></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Innovation Development</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Development and maturation of innovations using readiness levels.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Development and maturation of innovations using readiness levels.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> When an innovation reaches a documented readiness level.</p>
@@ -111,18 +117,18 @@
             </div>
           </div>
 
-          <div class="mb-2.5 flex items-baseline gap-1">
+          <div class="mb-2.5 flex items-baseline gap-1 max-sm:flex-col max-sm:items-start max-sm:gap-0.5">
             <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#1689CA]">Outcomes:</h3>
             <span class="text-[14px] text-[#63605F]">the change that follows when others use it</span>
           </div>
           <div role="group" aria-label="Outcome indicators" class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('innovUse')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('innovUse')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-sun !text-[26px]"></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Innovation Use</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Evidence that an innovation is being actively used.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Evidence that an innovation is being actively used.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> When identified users actively apply the innovation.</p>
@@ -131,12 +137,12 @@
               </div>
             </div>
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('policy')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('policy')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-folder-open !text-[24px] -mr-1 "></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Policy Change</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Policy decisions or investments informed by Alliance research.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Policy decisions or investments informed by Alliance research.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> When research uptake, enactment, or impacts are evidenced.</p>
@@ -145,12 +151,12 @@
               </div>
             </div>
             <div class="group relative flex">
-              <button type="button" (click)="setIndicator('oicr')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
-                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F]">
+              <button type="button" (click)="setIndicator('oicr')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
                   <i class="pi pi-chart-pie !text-[22px]"></i>
                 </span>
                 <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Outcome Impact Case Report</span>
-                <span class="text-justify text-[15px] leading-snug text-[#63605F]">Significant outcomes or impacts influenced by Alliance research.</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Significant outcomes or impacts influenced by Alliance research.</span>
               </button>
               <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
                 <p class="m-0"><strong class="font-semibold text-white">When:</strong> When research contributed to measurable change.</p>
@@ -163,7 +169,7 @@
       }
 
       @if (showQ2()) {
-        <div class="pt-2 p-8">
+        <div class="pt-2 p-8 max-sm:p-4">
           <h2 class=" text-[18px] font-semibold text-[#173F6F]">What was the primary funding source?</h2>
           <p class="mb-4 text-[15px] text-[#63605F]">The stream that financed most of the activities, resources and staff time behind the result.</p>
 
@@ -220,7 +226,7 @@
       }
 
       @if (showResult()) {
-        <div aria-live="polite" class="border-t-4 px-7 pb-[26px] pt-[30px]" [ngClass]="resultTopBorder()">
+        <div aria-live="polite" class="border-t-4 px-7 pb-[26px] pt-[30px] max-sm:px-4 max-sm:pb-5 max-sm:pt-6" [ngClass]="resultTopBorder()">
           <div class="text-[12.5px] mb-4 font-semibold uppercase tracking-[0.1em] text-[#63605F]">Report this result in</div>
           <div class="my-2 flex items-center gap-3">
             <img class="h-[34px] w-[34px] object-contain" [src]="resultLogo() | s3ImageUrl" [alt]="resultName()" />
@@ -233,7 +239,7 @@
               [href]="resultUrl()"
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-[9px] rounded-[13px] px-[26px] py-[15px] text-[14px] font-semibold uppercase tracking-[0.08em] text-white no-underline transition-colors hover:text-white hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F] motion-reduce:transition-none"
+              class="inline-flex items-center gap-[9px] rounded-[13px] px-[26px] py-[15px] text-[14px] font-semibold uppercase tracking-[0.08em] text-white no-underline transition-colors hover:text-white hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F] motion-reduce:transition-none max-sm:w-full max-sm:justify-center"
               [ngClass]="resultBtn()">
               Open {{ resultName() }}
  
@@ -254,12 +260,12 @@
     <section id="platforms" class="mt-11 scroll-mt-[70px]">
       <h2 class="mb-3.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Already know where to report?</h2>
       <div class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] items-start gap-3 ">
-        <div class="flex min-h-[248px] flex-col border border-t-4 border-[#DCE8D8] border-t-[#3C8DC8] bg-white px-6 pb-6 pt-5">
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#3C8DC8] bg-white px-6 pb-6 pt-5">
           <div class="flex items-center gap-[9px]">
             <img class="h-9 w-9 object-contain" [src]="'images/star.svg' | s3ImageUrl" alt="" />
             <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">STAR</span>
           </div>
-          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]">Alliance results reporting system for W3 and bilateral results.</p>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('STAR') }">Alliance results reporting system for W3 and bilateral results.</p>
           <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
             <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
             <p class="mb-0 mt-0.5 text-[15px] font-semibold text-[#231F20]">MELP</p>
@@ -289,12 +295,12 @@
           </div>
         </div>
 
-        <div class="flex min-h-[248px] flex-col border border-t-4 border-[#DCE8D8] border-t-[#E8862A] bg-white px-6 pb-6 pt-5">
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#E8862A] bg-white px-6 pb-6 pt-5">
           <div class="flex items-center gap-[9px]">
             <img class="h-8 w-8 object-contain" [src]="'images/tracking.svg' | s3ImageUrl" alt="" />
             <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">TIP</span>
           </div>
-          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]">Alliance platform for tracking and curating information products.</p>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('TIP') }">Alliance platform for tracking and curating information products.</p>
           <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
             <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
             <p class="mb-0 mt-0.5 text-[15px] font-semibold text-[#231F20]">DMOS</p>
@@ -324,12 +330,12 @@
           </div>
         </div>
 
-        <div class="flex min-h-[248px] flex-col border border-t-4 border-[#DCE8D8] border-t-[#5569DD] bg-white px-6 pb-6 pt-5">
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#5569DD] bg-white px-6 pb-6 pt-5">
           <div class="flex items-center gap-[9px]">
             <img class="h-8 w-8 object-contain" [src]="'images/prms-reporting-tool.svg' | s3ImageUrl" alt="" />
             <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">PRMS</span>
           </div>
-          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]">CGIAR Program Results Management System for pooled-funded results.</p>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('PRMS') }">CGIAR Program Results Management System for pooled-funded results.</p>
           <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
             <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
             <p class="mb-0 mt-0.5 text-[15px] font-semibold text-[#231F20]">CGIAR Reporting Support Team</p>

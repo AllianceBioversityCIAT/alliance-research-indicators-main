@@ -263,6 +263,31 @@
                 }
               }
             }
+            <!--
+              QA 2026-08-25 (Bug 2) — nothing selected yet: Save is disabled by
+              canSave()'s `hasMinimalSelection` clause, so say why and name both ways
+              out.
+              QA 2026-08-25 (Bug 3) — `primaryRequiredMessage` existed and was unit
+              tested but was rendered NOWHERE, so R-BIL-127 AC.3 ("inline message
+              naming what is missing") was unmet in the UI. Rendering it is the whole
+              fix; the computed itself is unchanged.
+              Placed AFTER the picker's branch chain, gated on `showSpPicker()`, so
+              one copy serves both the single-SP and multi-SP branches while staying
+              silent on unmapped / stale / no-SPs — where demanding a selection would
+              name an action the screen cannot offer.
+              Mutually exclusive by construction: spRequiredMessage needs zero
+              selected SPs, primaryRequiredMessage needs at least one.
+            -->
+            @if (showSpPicker()) {
+              @if (spRequiredMessage(); as msg) {
+                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                       data-testid="pf-alignment-sp-required">{{ msg }}</small>
+              }
+              @if (primaryRequiredMessage(); as msg) {
+                <small role="alert" aria-live="polite" class="block mt-1 text-red-700"
+                       data-testid="pf-alignment-primary-required">{{ msg }}</small>
+              }
+            }
           </section>
 
           @if (showHloSection() && hloSectionVisible()) {
@@ -362,6 +387,12 @@
                       <span>{{ NO_TOC_ALIGNMENT_MESSAGE }}</span>
                     }
                   </div>
+                  @if (row.isOrphaned) {
+                    <span class="text-[12px] text-[var(--ac-grey-600)]"
+                          [attr.data-testid]="'pf-alignment-orphaned-explanation-' + row.alignment.sp_code">
+                      {{ ORPHANED_TOC_EXPLANATION }}
+                    </span>
+                  }
                 </div>
               }
 
