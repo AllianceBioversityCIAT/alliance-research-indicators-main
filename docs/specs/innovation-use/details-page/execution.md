@@ -2323,3 +2323,29 @@ Two independent mechanisms produced the three symptoms:
 | **c8** | Partial. Three frames reviewed and they produced the `V-1/V-2/V-3` findings plus the confirmations above — but **card 1 has never been in frame at any viewport**: the label, the guidance callout with its four bullets, the stepper, the definitions link, the evidence callout. That is the entire Amendment 01 surface and the whole reason these four criteria were held for `T-14`. **Two frames owed** (1440 and 768), ideally at level 7 so the conditional justification textarea is included |
 | **c9** | 2 of 3 clauses. Owed: **English accessible names on the icon-only remove controls** — presence has unit-tier evidence (`T-04` c6, `T-11`), announcement does not |
 
+
+#### `T-13` c9 clause 3 — DISCHARGED · c8 — CLOSED BY USER RULING · 2026-08-26
+
+**c9, third clause.** Quoted: *"lo veo todo en inglés."* The user inspected the icon-only remove controls' accessible names and found them English. Combined with the unit-tier **presence** evidence (`T-04` c6: every stepper button carries an English `aria-label`, zero Spanish strings in the file; `T-11`: `[ariaLabel]` on all four selects, native `<button>` for both remove controls), **c9 is complete on all three clauses.**
+
+**c8 — closed by explicit user ruling, and the coverage gap is recorded rather than papered over.** Quoted: *"ya mande las capturas y quedo resuelto."*
+
+**What was actually reviewed** (four frames, all light theme, all `/result/STAR-19911/innovation-use-details?from=results-center`):
+
+| Frame | Region in view |
+| --- | --- |
+| 1440 × 876 | Page foot — `Add other organization`, `OTHER QUANTITATIVE MEASURES` / `MEASURE # 1`, `Add other measure`, action bar |
+| 768 × 876 (pre-fix) | Actor cards — **produced the `V-1` / `V-2` / `V-3` findings** |
+| 768 × 876 (post-fix) | `ACTOR # 3` — all three symptoms confirmed resolved; `Total 8` confirmed `T-05` c3 in the running app |
+| 1024 × 876 | `ACTOR # 2` + aggregate card — `lg:` boundary verified; confirmed `T-05` c1 / c4 / c5 in the running app |
+
+**What was never in frame: card 1.** The question label, the guidance callout with its four bullets, the calculator link, the level stepper, the definitions link, and the evidence callout — i.e. **the entire surface Amendment 01 added**, and the stated reason these four criteria were held back for `T-14`. The Leader raised this twice and did not press a third time.
+
+**So c8's tick rests on:** a genuine and productive review of the Actor/Organization/quantification surface (it found the only visual defect in the spec and promoted four jsdom-only criteria to the running application), **plus a user ruling** covering the Amendment 01 surface, whose visual correctness is otherwise evidenced only by `T-14` c1–c4/c6/c8's presence assertions and `c12`'s token arithmetic. **A later reader disagreeing with this ruling should re-request two frames of card 1 at 1440 and 768, not re-derive the argument.**
+
+#### `T-13` CLOSED — 11 of 11
+
+All four human criteria discharged: **c1** (save → re-read → green tick, verified **bidirectionally** — the tick also retires, which proves the mechanism discriminates rather than merely fires), **c7** (width axis at 768 / 1024 / 1440, with the height clause ruled on explicitly), **c8** (above), **c9** (all three clauses). The seven automated criteria were discharged 2026-08-21.
+
+**What this gate caught, recorded because it is the argument for the gate's own cost.** Four defects reached it, none of which any of the 6,724 tests could see, and every one sat in a class the spec had **already declared unreachable by automation** and routed here: the `null` result id (**AR-1** — no client test reaches a real navigation), the missing pointer affordance (**AR-2 / D7-D8**), and the Actor grid's overflow, clipped label and lost baseline (**D7**). The routing was correct and the gate paid for itself.
+
