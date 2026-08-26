@@ -2180,3 +2180,82 @@ Recorded explicitly because this is the exact shape of **KZ-002 recurrence 6**: 
 
 **`T-13` status after this: 10 of 11 criteria discharged.** Remaining: **c8** (two screenshots — Leader can review them, so this is dischargeable rather than blocked) and the **third clause of c9** (English accessible names on icon-only controls, announcement half).
 
+
+#### ⚠️ `T-13` c7 — DISCHARGE RETRACTED · c8 T6 review FOUND A DEFECT · 2026-08-26
+
+**c7 was marked discharged above on the strength of** *"todo se ve bien no se corta por mas cards que genero, en pantallas pequeñas se mantiene acorde"*. **The `c8` screenshots falsify the narrow-viewport half of that.** The discharge is **retracted**; `c7` returns to open.
+
+**This is KZ-002 recurrence 6 landing on the Leader, through the exact residual the Leader had itself named one entry earlier** — *"the viewport widths were not stated numerically … `pantallas pequeñas` is not the same statement as the two named viewports"*. That residual was recorded and then treated as a wording gap rather than as the open question it actually was. **The lesson is not "quote the observation" — that was done. It is that a named residual is an OPEN item, not a footnote on a closed one.**
+
+#### c8 — T6-Multimodal review, performed by the Leader on two screenshots
+
+**Shot 1 — Responsive 1440 × 876, light theme.** URL `/result/STAR-19911/innovation-use-details?from=results-center`. Region in frame: bottom of the page — `Add other organization`, `OTHER QUANTITATIVE MEASURES` / `MEASURE # 1` (Number `123`, Unit `a`, Comments `cosas`), `Add other measure`, and the `Back` / `Next` / `Save` bar. **No overflow, no clipping, no misalignment observed in this region.** Sidebar reads `DRAFT`, `6/7 sections completed`, `Innovation use details` as the active unchecked row — consistent with the actor cards being incomplete in this session.
+
+**Shot 2 — Responsive 768 × 876, light theme. Three defects, all in the Actor card's disaggregated-count grid** (`innovation-use-actor-item`, delivered by **T-05**, a11y/token pass by **T-11**):
+
+| # | Observed | Class |
+| --- | --- | --- |
+| **V-1** | **Horizontal overflow.** In the two-column count grid, the right-hand input (`Women non-youth`, `Men non-youth`) extends **past the Actor card's right border** — the input's right edge sits outside the card's boundary, in both `ACTOR # 2` and `ACTOR # 3` | **D7**, and it is the specific clause `c7` names: *"the repeatable cards stack rather than overflow horizontally"* |
+| **V-2** | **Label clipped.** `Women non-youth` wraps to two lines and the second line (`youth`) is **cut off** — the label box does not grow to fit the wrap. Reproduced in both actor cards, both `Women non-youth` occurrences | **D7** — `c7`'s *"every label … legible"* |
+| **V-3** | **Vertical misalignment.** The right-hand input sits roughly one quarter-row **lower** than its left-hand partner (`Women non-youth` below `Women youth`; same for `Men non-youth`), so the two-column grid loses its baseline. Visible with real values in `ACTOR # 3` (`2` / `1`, `2` / `3`) | **D7** |
+| — | The `Total` control rendering **empty** in `ACTOR # 2` is **NOT a defect** — all four of its count fields are empty, and `T-05` **c4** requires exactly that: *"All four disaggregated fields empty renders an empty total, not `0`"*. Recorded so a later reader does not "fix" correct behaviour | ✅ correct |
+| — | The `Enter a cou…` placeholder truncating is a **symptom of V-1/V-3**, not an independent defect | symptom |
+
+**Where the defect lives, and why it is in scope.** Not in Amendment 01's blocks — this is `T-05`'s actor card, previously `done`, whose a11y/token pass (`T-11`) is also `done`. It is nonetheless **squarely in this spec's scope**: it is this spec's own component, failing this spec's own open criterion (`T-13` c7), at the breakpoint that criterion names. It is **not** a Pivot — no design document is wrong; the design specifies a two-column disaggregated grid and the implementation does not hold it at `md:`. It is a **rework of delivered work against an open gate**, and it is handled as a non-task fix on the `PV-T14-1` precedent.
+
+**What the two screenshots do NOT cover, and this matters for c8's own completeness.** Neither frame contains **card 1** — the label, the guidance callout with its four bullets, the level stepper, the definitions link, or the evidence callout. That is the entire Amendment 01 surface and the whole reason `T-13`'s four criteria were held back for `T-14`. **`c8` is therefore partially discharged**: the region reviewed is genuinely reviewed and produced three findings, but the region the amendment changed has not been seen at either viewport. Two further frames are owed.
+
+
+#### PV-T13-2 — Actor card responsive fix (V-1 / V-2 / V-3) · 2026-08-26
+
+| Field | Value |
+| --- | --- |
+| **Status** | ✅ Implementer report accepted; **Leader-verified inline.** No separate Reviewer — see the delegation note |
+| **Authorized by** | User bug report at the `c8` review. Non-task change on the `PV-T14-1` / `PV-T13-1` precedent |
+| **Effort / skills** | `high` · `angular-developer`, **`ui-ux-pro-max`** |
+
+**Leader deviation, recorded:** `ui-ux-pro-max` was **added**, reversing the exclusion `T-14` and `T-11` recorded. Their reasoning was that every visual choice was already closed by **DD-17** with measured ratios, so a style-selection skill could only offer non-conforming alternatives. **That reasoning does not reach this defect:** it is a responsive-layout failure with **no prescribed solution** — the design document specifies a two-column disaggregated grid and is silent on its mechanics and its breakpoint. Layout judgment was the actual work.
+
+#### Root cause — deeper than the symptom, and it was not visible from the component
+
+The two-column grid was `md:grid-cols-2` (768 px). But **the card's content width is squeezed far below the viewport width by two fixed left rails that live outside this component**, neither visible from its template:
+
+| Rail | Width | Verified |
+| --- | --- | --- |
+| Platform sidebar reserved padding | **64 px** collapsed (default) / **250 px** expanded | `platform.component.html` inline `padding-left` |
+| `app-result-sidebar`'s own grid column | **322 px**, **unconditional** | `result.component.scss:3` — `grid-template-columns: 322px 1fr`, and the file contains **no `@media` at all**. *Leader re-verified this independently: it is the premise the whole fix rests on* |
+
+So at a **768 px** viewport the card interior is roughly **382 px** (sidebar collapsed) or **196 px** (expanded) — not 768. Two count fields with labels as long as `Women non-youth` cannot sit side by side in that. **`md:` was simply too early a breakpoint**, and the design could not have known because the squeeze is authored two components up.
+
+Two independent mechanisms produced the three symptoms:
+
+- **V-1 (overflow):** the four `<app-input>` grid items carried no `min-w-0`. Tailwind's `grid-cols-2` uses `minmax(0,1fr)` so the *track* may shrink to zero, but a grid *item*'s automatic minimum size is its content's **min-content width** — so the item refuses to shrink with its track and spills past the card.
+- **V-2 / V-3 (clipped label, lost baseline):** `app-input`'s label has no width guard, so each column wraps independently. Each column is its own top-anchored flex column, so when one label wraps to more lines than its neighbour, that column's input is pushed down by exactly that difference. **Diagnosed by comparing the grid items' boxes (equal height and top — CSS Grid stretch works correctly) against the `.p-inputnumber` positions *inside* them (offset by the label-wrap delta)** — i.e. located to the mechanism, not guessed from the appearance.
+
+**The fix.** `md:grid-cols-2` → **`lg:grid-cols-2`** (single column until 1024 px, where the interior clears ~450 px even under the worst-case rail reservation), plus `min-w-0` on each of the four inputs as defence in depth. One file, one template. **`app-input` was read to understand the cause and deliberately not touched** — it has 16 consumer templates and `R-IUP-019` guards them; the brief made editing it a last resort requiring escalation, and it was not needed.
+
+**Not a new pattern:** single-column at `md:` is already the layout of the aggregate `How many` field below it (no breakpoint at all) and of every field in the sibling Organization card.
+
+#### Verification — the gate here is a browser, and it was one
+
+**No unit test in this repo can prove a layout fix**: jsdom parses no CSS, and Tailwind's CSS does not exist until the runtime CDN script executes. The Implementer therefore built a real harness — a temporary route mounting the real `InnovationUseActorItemComponent` with the real Tailwind CDN, real global SCSS and real PrimeNG, wrapped in padding matching the two rails above, served with `ng serve` and driven by Playwright/Chromium.
+
+| Check | Result |
+| --- | --- |
+| 768 × 876, realistic default (64 + 322) | Labels single-line, inputs inside the card, rows aligned — **V-1 / V-2 / V-3 all gone** |
+| 768 × 876, sidebar-expanded worst case (250 + 322) | Now single-column, so cross-column misalignment is **structurally impossible**; any wrap is an ordinary single-column wrap |
+| **1440 px regression** | Unchanged — two columns, no wrap, no overflow, aligned |
+| Full suite (behaviour, **not** layout) | `npm test -- --silent` → **316 suites / 6724 tests green**, **re-measured by the Leader in a quiet tree**. Proves `T-05`'s 13 criteria and `T-09`'s validation are intact |
+| Lint / hex | `All files pass linting.`, `git status` clean after; hex **0** |
+| Test coupling | Leader grep-confirmed **no spec asserts `md:grid-cols-2`** for this component, so the breakpoint change is not silently defeating an assertion |
+
+**Organization card checked, not assumed:** `innovation-use-organization-item.component.html` has **no multi-column grid at all** — every field is its own full-width row. Rendered in the same harness at 768 px and clean. Stated explicitly because a silent omission reads as "checked and fine" when it may mean "never looked".
+
+**Delegation note:** one Implementer, no separate Reviewer. The defect was reported with screenshots, the fix is two utility-class changes in one template with no behavioural surface, and the Leader verified the diff, the load-bearing premise (`result.component.scss:3`), the test coupling and the suite independently. Recorded as a narrower gate than a spec task gets.
+
+#### Residuals, named not absorbed
+
+1. **The `lg:` cutover is a judgment call, not a measured design value.** The Implementer verified 1024 px clears ~450 px of interior under the worst case but **did not capture a screenshot exactly at 1024 px** — only 768 (pre/post, both rail states) and 1440 (pre/post). **The 1024 px boundary is unverified visually.**
+2. **`c7` is not re-discharged by this.** The fix is verified in a component harness, not in the running application by a human. `c7` requires the real page at the two named viewports. **It stays open pending the user's own check** — and this time the residual is being tracked as an open item, which is the lesson recorded one entry above.
+3. **App-wide finding, reported and NOT fixed.** `result.component.scss:3`'s **322 px unconditional** sidebar column cramps *every* result page at narrow viewports, not just this one. That is an app-wide responsive question, outside this spec's scope, and **not minted as a task here** (`/akili-execute` §2.4). Flagged for its own spec alongside the `pool-funding-alignment` finding.
+
