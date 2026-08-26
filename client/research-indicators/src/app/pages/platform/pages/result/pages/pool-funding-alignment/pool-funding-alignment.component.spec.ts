@@ -1288,6 +1288,147 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  // QA 2026-08-25 — Bug 1c. `readOnlyTocSummaries` fed off the SERVER snapshot
+  // only, so a DESELECTED SP kept its read-only card until the next save, which
+  // contradicted the removal modal ("Removing it will discard that alignment").
+  // The pair below is the point of these tests: the deselected card must go, and
+  // the DEMOTED card must stay (R-BIL-129 / R-BIL-125, OQ-3 — the BA's call, not
+  // ours). A fix that dropped both would pass the first test and fail the second.
+  describe('QA Bug 1c — a deselected SP withdraws its read-only card immediately', () => {
+    const savedRow = (spCode: string): SavedTocAlignment => ({
+      sp_code: spCode,
+      aligns_with_toc: true,
+      level: 'OUTPUT',
+      toc_result_id: 5187,
+      indicator_id: 5973,
+      quantitative_contribution: 3,
+      toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+      indicator_description: 'An indicator',
+      unit_of_measurement: 'Number',
+      target_value: '10',
+      target_year: 2026
+    });
+
+    const seedTwoSpsWithSavedRowForSp03 = (): void => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'A', role: 'PRIMARY' },
+          { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }
+        ],
+        toc_alignments: [savedRow('SP03')]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+    };
+
+    it('withdraws the card as soon as the removal is confirmed — no save, no reload', async () => {
+      seedTwoSpsWithSavedRowForSp03();
+      const root: HTMLElement = fixture.nativeElement;
+      // Pin the pre-condition: without it a fix that hid the card unconditionally
+      // would pass this test for the wrong reason.
+      expect(root.querySelector('[data-orphaned="true"]')).not.toBeNull();
+
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.onSpSelectionChange();
+      await Promise.resolve();
+      showGlobalAlertMock.mock.calls[0][0].confirmCallback.event();
+      fixture.detectChanges();
+
+      expect(component.readOnlyTocSummaries()).toEqual([]);
+      expect(root.querySelector('[data-orphaned="true"]')).toBeNull();
+    });
+
+    it('keeps the card for a merely DEMOTED SP — R-BIL-129 / OQ-3 is untouched', () => {
+      seedTwoSpsWithSavedRowForSp03();
+
+      // SP03 stays selected; only the Primary moves. This is the case the spec
+      // mandates keeping, and the case QA asked to delete (deferred to the BA).
+      component.onPrimaryChange('SP03');
+      component.onPrimaryChange('SP01');
+      fixture.detectChanges();
+
+      expect(component.readOnlyTocSummaries().map(r => r.alignment.sp_code)).toEqual(['SP03']);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-orphaned="true"]')).not.toBeNull();
+    });
+  });
+
+  // QA 2026-08-25 — Bugs 2 and 3. Both are the same user-facing failure: Save
+  // goes grey with no stated reason. Asserted in the DOM, not on the computed —
+  // Bug 3 existed precisely because `primaryRequiredMessage` was unit-tested as
+  // a computed while being rendered nowhere.
+  describe('QA Bugs 2 & 3 — the disabled Save states name what is missing', () => {
+    const twoSpOptions: PoolFundingScienceProgram[] = [
+      { code: 'SP01', name: 'A', category: null, color: '#000000', allocation: 50, icon_key: null },
+      { code: 'SP03', name: 'B', category: null, color: '#000000', allocation: 50, icon_key: null }
+    ];
+
+    it('Bug 2 — "Yes" with zero SPs selected renders the select-an-SP message', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, selected_science_programs: [] });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.canSave()).toBe(false);
+      const el = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-sp-required"]');
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toContain(component.SP_REQUIRED_MESSAGE);
+    });
+
+    it('Bug 3 — an SP selected with no Primary renders the Primary-required message', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        // No role: 'PRIMARY' anywhere ⇒ primary_sp_code seeds to null (R-BIL-126).
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: null } as never]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.canSave()).toBe(false);
+      const el = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-primary-required"]');
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toContain(component.PRIMARY_SP_REQUIRED_MESSAGE);
+    });
+
+    it('neither message renders once an SP and a Primary are both chosen', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-sp-required"]')).toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-primary-required"]')).toBeNull();
+    });
+
+    it('stays silent when the section is read-only — no action to demand', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        is_read_only: true,
+        selected_science_programs: []
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-sp-required"]')).toBeNull();
+    });
+  });
+
   // R-BIL-115 — regression (already implemented): the selected-SP chip renders
   // through the `#rows` ng-template of `app-multiselect` (pool-funding-alignment
   // .component.html :151), driven by `findScienceProgram()` resolving the chip's
