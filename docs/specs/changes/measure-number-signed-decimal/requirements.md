@@ -352,7 +352,27 @@ The cap is enforced independently at three tiers — a UI clamp (`[min]="0"` + `
 - [ ] AC.1 — A fifth fractional digit does not reach the body — by prevention at the control, asserted on the rendered value.
 - [ ] AC.2 — **No message is required, and none is added.** *(Was "the message names the limit" — **withdrawn**: `L-07`/`K-10` established there is no client state in which an over-scale value exists to report, because `p-inputNumber` prevents the keystroke and rounds a paste. `DD-16` is withdrawn; `app-input`'s existing messages are untouched.)*
 - [ ] AC.6 — **`max` is a clamp, not a prevention, and the spec says so.** `L-07`: PrimeNG checks `max` only on blur/Tab/Enter/spinner, then silently clamps. Only `maxFractionDigits` is enforced per keystroke. This AC exists so no test asserts prevention where the control clamps.
-- [ ] AC.3 — **No value within the scale-derived bound raises `Maximum reached` at scales 0–2, and the scale-3/4 exception is asserted rather than denied.** ⚠️ **Rewritten at Round 4 — the previous universal form ("at any configured scale") was UNSATISFIABLE and both judges proved it by execution.** With `DD-7` withdrawn the guard still counts characters at a threshold of 18, so an in-bound signed 4-decimal value such as `-549755813886.9999` (18 chars) *does* raise the warning. An AC that quantifies over "any configured scale" could never go green against the design that ships. What is required instead: assert the true boundary — the warning is absent for every in-bound value at scales 0–2, and **present** for the known 18-character signed values at scales 3–4, so the false positive is *pinned by a test* rather than discovered later by a user.
+- [ ] AC.3 — **The `Maximum reached` false positive is PINNED, not denied. It fires at scales 1–4; only scale 0 is clean.** ⚠️ **AMENDED 2026-08-27 (measured at `T-09`) — this is the SECOND correction of this AC, and the first one was still wrong.**
+
+  **History, because it matters:** the original universal form (*"no in-bound value raises `Maximum reached` at any configured scale"*) was **UNSATISFIABLE**, and both Round-4 judges proved it by execution. Round 4 rewrote it to confine the exception to **scales 3–4**. **That rewrite fixed the direction of the claim but not its extent, and was itself false.**
+
+  **Measured at `T-09`.** The guard is `value.toString().length >= 18` (`input.component.ts:167`, threshold at `:48` — a constant confusingly *named* `MAX_SAFE_INTEGER` while equalling `18`). Executed against `DD-14`'s bounds:
+
+  | scale | largest in-bound signed rendering | `toString()` length | warns? |
+  | --- | --- | --- | --- |
+  | 0 | `-9007199254740990` | 17 | **no** |
+  | 1 | `-562949953421310.5` | 18 | **YES** |
+  | 2 | `-70368744177662.99` | 18 | **YES** |
+  | 3 | `-8796093022206.999` | 18 | **YES** |
+  | 4 | `-549755813886.9999` | 18 | **YES** |
+
+  **So the false positive is not a scale-3/4 edge case — it fires on any in-bound value whose rendering reaches 18 characters, which is reachable at every scale except 0.** Scale 0 is clean not by design but by arithmetic: its bound is 16 digits, so with a sign it cannot exceed 17 characters.
+
+  **What is required:** assert the warning is **absent** for in-bound values at **scale 0**, and **present** for the 18-character in-bound signed values at **scales 1–4**. Pin the defect where it actually is.
+
+  ⚠️ **This widens `RK-16`.** The `Maximum reached` false positive has been treated throughout this spec as a narrow scale-3/4 artifact. It is a property of *character length versus a fixed threshold of 18*, and the affected surface is correspondingly larger. `RK-16` remains **declared and unfixed** — `DD-7` was withdrawn after three failed attempts because the guard's signal is shared with the `type === 'text'` 40,000-character paste path (`L-02`), and removing it would delete that feedback on every `app-input` in the application.
+
+  **`T-09`'s tests are correct and are not invalidated by this amendment.** They pinned the representative values Round 4 named, and their `KZ-017` declaration explicitly disclaimed the universal quantifier — which is how this error was found. Extending the pin to scales 1–2 is a follow-up, routed to `T-12`, not a `T-09` defect.
 - [ ] AC.5 — **The digit guard is asserted UNCHANGED** — same threshold, same unit (characters), same `type === 'number'` branch, and the `type === 'text'` paste-feedback path it shares is untouched. *(Round 4: this AC previously mandated *"the code that produced it is gone rather than merely unreachable"* — it required the very edit `DD-7`'s withdrawal removed, making it unsatisfiable by construction. `L-02` is the reason the edit was withdrawn: the signal is shared with the text branch, and deleting it removes 40,000-character paste feedback on **every** `app-input` in the app.)*
 - [ ] AC.4 — The client rule is a mirror, not a replacement — the server's `400` path (`R-MSD-003` AC.3) still exists and is still exercised.
 

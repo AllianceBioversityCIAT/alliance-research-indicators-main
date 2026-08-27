@@ -1518,3 +1518,136 @@ One detail worth crediting: `SHOW WARNINGS` reads the **previous statement's** d
 | **A Leader briefing error, corrected by the worker's measurement** | I instructed the direct `ALTER`, citing `T-06`'s precedent | **The instruction was wrong in a fixture context** — `T-06` ran solo, fixtures run in parallel. The worker followed it, **measured `test:fixtures` five times, saw 4/5 fail**, diagnosed the sibling collision and redesigned. It improved on its instructions rather than following them into a defect, and disclosed the trade instead of hiding it |
 | Stability re-measured by the Leader | 3 consecutive runs | `17 suites / 90 tests`, exit 0, **zero `1412`** each. With the worker's 5, **eight clean runs** of a suite that was failing 4-in-5 before the redesign |
 | Advisories **not** actioned by reopening | Role-2 coverage, string pinning, the dangling anchor | The task PASSed; reopening costs rounds a 40%-over budget cannot spare. Two routed to `T-12`, the two substantive gaps escalated to the user |
+
+---
+
+### T-09 — `app-input`: `max` becomes an `@Input()`; the character guard is asserted UNCHANGED
+
+- **Status:** ✅ **PASS on attempt 2** (`T-09` — Reviewer: **PASS**). **First client task in this spec.**
+- **Date:** 2026-08-27
+- **Implementer attempts:** 2 (`akili-implementer`, T2 `sonnet`, effort `xhigh` then `high`)
+- **Reviewer:** one `akili-reviewer`, **single merged lens** (the user-approved budget mode)
+- **Requirements covered:** `R-MSD-012` (AC.2, AC.4 — **not AC.1**, see carries), `R-MSD-006` (`:362`, `:363`, **AC.3 partially**, AC.5, AC.6)
+
+#### The production change is one line
+
+`input.component.ts:52` — `max = Number.MAX_SAFE_INTEGER;` → `@Input() max = Number.MAX_SAFE_INTEGER;`. Plus a spec-pointer comment. **Everything else in the diff is test code.**
+
+**Inert by construction, Leader-verified:** `[max]` is bound at exactly **one** place in the whole client (`input.component.html:47`), and the reviewer additionally confirmed **no static `max=` attribute exists on any `app-input` anywhere** — so no call site's behaviour can change.
+
+#### ⚠️ A naming trap in this file, flagged in the brief before work began
+
+`input.component.ts:48` declares `MAX_SAFE_INTEGER = 18` — a constant **named** for the JS limit while **equalling** the guard's character threshold. The real `Number.MAX_SAFE_INTEGER` sits four lines below at `:52`. The falsifier says *"change the guard's threshold from 18 to 19"*; aimed at `:52` it would have reddened nothing. **`:48` was not touched** — confirmed by the reviewer.
+
+#### `DD-14`'s scale table — Leader-computed and handed over, so it could not be derived wrong
+
+| scale | ⌈log₂(10^s)⌉ | max |
+| --- | --- | --- |
+| 0 | 0 | **9,007,199,254,740,991** (= `Number.MAX_SAFE_INTEGER`) |
+| 1 | 4 | 562,949,953,421,311 |
+| 2 | 7 | 70,368,744,177,663 |
+| 3 | 10 | 8,796,093,022,207 |
+| 4 | 14 | **549,755,813,887** |
+
+Scale 0 equals `MAX_SAFE_INTEGER` **as a consequence of the formula**, which is what AC.2 requires demonstrated — and the test proves it *through the same code path*, with no `scale === 0` branch.
+
+#### 📌 `R-MSD-006` AC.3 was AMENDED mid-task, and the error was found by the Implementer's own honesty
+
+The Implementer's `KZ-017` declaration disclaimed AC.3's universal quantifier and noted other in-bound 18-character renderings were *"constructible in principle."* **The Leader constructed them and measured the guard** (`value.toString().length >= 18`, `:167`):
+
+```
+scale 0: "-9007199254740990"   len=17  inBound=true  -> no warning
+scale 1: "-562949953421310.5"  len=18  inBound=true  -> WARNS
+scale 2: "-70368744177662.99"  len=18  inBound=true  -> WARNS
+scale 3: "-8796093022206.999"  len=18  inBound=true  -> WARNS
+scale 4: "-549755813886.9999"  len=18  inBound=true  -> WARNS
+```
+
+**AC.3's Round-4 rewrite — which confined the false positive to scales 3–4 — was itself false.** The defect fires at **scales 1–4**; only scale 0 is clean, and clean **by arithmetic** (16-digit bound + sign ≤ 17 chars), not by design.
+
+> **This is the SECOND correction of AC.3, and the first one was still wrong.** Round 4 proved the original universal form unsatisfiable and fixed the *direction* of the claim but not its *extent*. Same shape as `T-04`, where the repair for one inverted claim introduced another. **`requirements.md` AC.3 amended**, and it records that this **widens `RK-16`**: the false positive is a property of *character length against a fixed threshold of 18*, not a scale-3/4 edge case.
+
+**`T-09`'s tests are correct and are NOT invalidated.** The reviewer re-derived every literal independently and confirmed each assertion is a true statement about the value it names, with the length re-asserted in-test so a mis-transcribed literal reddens.
+
+**A property the tests prove that nobody claimed:** scale 0's value and scale 3's value **both have 16 digits**, and one warns while the other does not — *"a behavioural proof that the guard counts characters, not digits, which is exactly the premise `K-09` got wrong twice."*
+
+#### Attempt 1 → the Reviewer PASSed, and the Leader reopened it on the Reviewer's own finding
+
+The reviewer flagged that **a gate the client child guide mandates was missing from the Leader's brief**: `npx tsc -p tsconfig.spec.json --noEmit`. Nothing the Leader asked for type-checks spec code — `eslint` ignores `*.spec.ts`, `ts-jest` runs `isolatedModules: true`, and `tsconfig.app.json` has `files: [src/main.ts]`. **~245 lines of new spec code were checked by nothing.**
+
+**The Leader ran it. Four real errors, all in T-09's new code:**
+
+```
+input.component.spec.ts(947,20): error TS7031: Binding element 'max' implicitly has an 'any' type.
+input.component.spec.ts(947,25): error TS7031: Binding element 'value' implicitly has an 'any' type.
+input.component.spec.ts(962,20): …
+input.component.spec.ts(962,25): …
+```
+
+**Mechanism, confirmed from source by the reviewer:** `fakeAsync(fn: Function)` contextually types its argument as `Function`, which supplies **no** parameter types, so the destructured bindings fall to `noImplicitAny`. The sibling `it.each` at `:901` destructures `{ scale, expectedMax }` with no annotation and is **error-free** — because it is not `fakeAsync`-wrapped.
+
+**This was the Leader's second briefing omission of the run**, after instructing T-08 to use a shared-table `ALTER` that broke sibling fixtures. Both were caught downstream.
+
+#### Attempt 2 — three fixes, plus a fourth the Implementer found itself
+
+1. **The four type errors, fixed at the root.** A declared `type SignedBoundaryCase` shared by the case arrays *and* both callbacks — sidestepping the inference loss rather than suppressing it. **No `any`, no `@ts-ignore`.** Leader-verified: total `938 → 934`, file-scoped grep **EMPTY**.
+2. **The `KZ-014` titles, reshaped better than the retitle asked for.** The reviewer had flagged `'scale $scale — an in-bound signed value renders NO "Maximum reached" warning'` as a universal now measured false. Rather than renaming, the Implementer made the title **self-verifying**: `'scale $scale — a $chars-character in-bound value stays under the 18-character guard'`, with a `chars` field (17/16/15) per row **asserted in-body** as `toBe(chars)`, replacing the looser `toBeLessThan(18)`. Reviewer: *"the predicate can no longer be generalised… stronger than the retitle I proposed."*
+3. **A comment that disclaimed the assertion it then made** — the `MAX_SAFE_TEXT === 40000` class read was dropped. **The reviewer checked what that removal cost and found it costs nothing:** the 40,000 threshold is still pinned **behaviourally, by a literal**, at `:274-286` (`'a'.repeat(40000)` → `shouldPreventTextInput` true). *"`R-MSD-006` AC.5's 'text path untouched' is better covered now than before."*
+4. **Unprompted, the Implementer found a fresh instance of the same defect class in the adjacent sentence** — the disclaimer's tail asserted a production-code **structure** fact (*"still two `if`/`else if` arms of ONE effect … neither was split apart or duplicated"*) that the test does not inspect. It rewrote that too and **disclosed it as a judgment call.** Reviewer: *"the right call on all four axes… leaving a fresh instance standing beside the one being fixed would have been incoherent."*
+
+#### The falsifiers, and why their evidence is unusually well corroborated
+
+| Falsifier | Result |
+| --- | --- |
+| Guard threshold `18 → 19` (`:48`) | **4 tests red**, including both pinned scale-3/4 assertions |
+| `[max]` template binding removed | **7 tests red** — the AC.4 default, all five scale-table rows, and the clamp-on-blur |
+
+**The reviewer could not execute anything, so it corroborated statically** — independently enumerating which assertions depend on each mutated artifact and predicting **exactly 4** and **exactly 7**. Its framing: *"two independently predicted counts hitting the reported numbers exactly is real corroboration that the reds were observed and not narrated."* It then re-derived both counts **after** attempt 2's edits and confirmed they still hold, and noted the **unchanged test total (6758)** independently corroborates that attempt 2 added and removed no case.
+
+It also verified against the installed `primeng@19` typings that **`max: number | undefined`** (`inputnumber.d.ts:113`) — so removing the binding leaves `undefined` and the assertion *cannot* survive by coincidence.
+
+#### A Leader correction of the Implementer's report
+
+The Implementer explained the `938 → 934` change as *"baselines drift slightly run to run."* **That is wrong, and it is the same defect class this spec keeps paying for.** `938 − 934 = 4` — exactly the four errors it fixed. The check is deterministic. Reviewer: *"you are right and the worker was wrong."* **Twelfth prose defect in this spec.**
+
+#### Verification
+
+| Gate | Result |
+| --- | --- |
+| **`npx tsc -p tsconfig.spec.json --noEmit`** | 934 total (pre-existing baseline); **file-scoped grep EMPTY** — Leader-confirmed. **Observed RED on this exact file first** (4 × `TS7031`), so `K-004` is satisfied *for this gate on this diff*, not merely cited |
+| `npm test` | **316 suites / 6758 tests**, exit 0 |
+| `npm run lint -- --quiet` | *All files pass linting*; **`git status` after shows no `--fix` mutation** (the client lint mutates, so this check is mandatory) |
+| `npm run build` | exit 0, only pre-existing unrelated warnings |
+| Coverage floors (client: 40/20/45/30) | Held. Per `K-020`, `jest.config.ts`'s global thresholds gate the exit code, so **exit 0 *is* the floor check** |
+
+#### 📌 Constitution edit made on this verdict
+
+The child guide's `K-002` section instructed *"gate against the **945** baseline."* Measured **938**. A stale total reads as either a regression or a free win, and **both readings are wrong**. Replaced with the drift-proof form actually used here — *grep the changed file's path in the output; it must come back **empty*** — plus the measured `fakeAsync` mechanism and an explicit statement that **`npm test`, `lint` and `build` type-check no spec code at all**, since that is why the gate gets skipped.
+
+#### 🔻 FOUR carries — blocking their owners, NOT covered here
+
+| # | Carry | Owner |
+| --- | --- | --- |
+| 1 | **`R-MSD-006` AC.3 is PARTIALLY discharged.** Scale-0 absence + scale-3/4 presence proven; **scales 1–2 presence missing.** The checkbox may **not** be ticked on T-09's evidence | **`T-12`** |
+| 2 | **`R-MSD-012` AC.1 is NOT discharged by production behaviour at all.** `expect(() => deriveMaxForScale(5)).toThrow()` is **test code testing test code**; `input.component.ts` contains no scale rejection, and adding one would be drift — `design.md` §6.1 assigns the guard to `QuantificationItemComponent`. **Must be re-proved against the card's real guard, and T-09's green must not be cited** | **`T-10`** |
+| 3 | **AC.2's second half is proven only about a test-side reimplementation.** The five bounds *reaching the rendered instance* is behaviourally proven; *"scale 0 falls out of the formula"* is a spec-internal cross-check. **After `T-11`, two independent implementations of `DD-14`'s formula will exist with nothing pinning them — both can be green while disagreeing.** Same shape as `T-08`'s open "fixture SQL pinned by nothing" gap. Fix: import the production derivation, or drop the test-side copy for the five literals | **`T-11`** |
+| 4 | **NEW — the enclosing block still asserts the superseded extent.** The comment at `:924-925` and the `describe` title at `:933` both say *"the scale-3/4 false positive is pinned"*, which the AC.3 amendment falsified — and **a `describe` title is what a reader sees in reporter output**, four lines above the corrected comment. The reviewer declined to fail on it *because `T-12` cannot add the scale-1/2 cases without editing this exact block* | **`T-12`**, same edit window as carry 1 |
+
+#### `ADVISORY` — recorded, non-gating
+
+| Finding | Note |
+| --- | --- |
+| Locale fragility | `expect(inputNumber.input.nativeElement.value).toBe('1.23')` depends on the ambient ICU locale using `.` as the decimal separator; under a comma-decimal locale it reddens **for an environmental reason**. One env var away; not constructible read-only |
+| jsdom limits | Nothing here covers **`DC-11`** (layout, contrast, dark mode) → `T-11`'s HITL gate. The reviewer added four more: **event wiring** (the enforcement tests call `onInputKeyPress`/`insert`/`onPaste`/`onInputBlur` **directly** with synthesized events, so PrimeNG's own DOM bindings and the template's `(keydown)` chain are unexercised), real keyboard/IME/clipboard, and **spinner press-and-hold** (`showButtons` is true; the repeat timer is untested — `max`'s spinner clamp is asserted only via blur) |
+| Comment hygiene | `:995-1000`'s rewritten tail still ends *"unmodified by this task's change"* — a **diff** property, not something the test evaluates. True and Leader-verified. The reviewer's note: this is the **third** sentence in that one comment to attribute an unasserted claim to the test, *"which suggests trimming the comment rather than editing it again"* |
+| Pre-existing token violation | `input.component.html` carries raw hex literals `#E69F00` at `:30`, `:49`, `:55`, `:65`, `:71` — a standing root `CLAUDE.md` §4.2 violation in the component this task touches. `design.md` §6.5 declares no token changes, so correctly **out of scope**; worth a separate ticket rather than silent inheritance |
+| `@Input() max` placement | Now sits among the internal signals (`:52`) rather than with the other `@Input`s at `:27-44`. Keeping it in place **minimises the diff, which is the right trade** — but a future reader will not find it where inputs live |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Package switch handled explicitly | Client child guide + client gates named in the brief | First client task after eight server tasks. The client lint **carries `--fix` and mutates**, so `git status` after linting was made a required report line |
+| Scale table + `[max]` grep + naming trap **scouted before dispatch** | All three verified by the Leader | The naming trap in particular would have aimed the falsifier at the wrong line and reddened nothing |
+| **Reopened after a PASS** | On the reviewer's own gate-gap finding | The verdict was correct on what it could see; the gap was in the Leader's brief. Reopening was cheaper than shipping four type errors that no configured gate would ever surface |
+| AC.3 amended mid-task | On measured evidence | The Implementer's honest `KZ-017` disclaimer is what exposed a false acceptance criterion. **The lesson: a worker declaring what it has *not* proven is worth more than one asserting what it has** |

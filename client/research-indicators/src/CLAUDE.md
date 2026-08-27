@@ -195,7 +195,13 @@ A spec once shipped **6,239 passing tests over a tree that failed `npm run build
 **Two gates, and you need both:**
 
 - **`npm run build`** — the gate for **app** code. `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), and with `strictTemplates` on it type-checks templates too. It does **not** see `*.spec.ts`.
-- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. **Gate against the 945 baseline — it will not be "clean", and expecting clean makes it useless again.**
+- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. ⚠️ **Do NOT gate on a total.** The old instruction here said *"gate against the 945 baseline"*; measured **938** on 2026-08-27, and the total moves whenever anyone fixes or adds a spec error — so a stale figure reads as either a regression or a free win, and both readings are wrong.
+  **Gate on your own files instead, which is drift-proof:**
+  ```bash
+  npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E '<path/of/each/file/you/touched>'
+  ```
+  **That grep must come back EMPTY.** The total will not be clean and does not need to be.
+  **This gate is not optional and nothing else substitutes for it** — `eslint` ignores `*.spec.ts`, `ts-jest` runs `isolatedModules: true`, and `tsconfig.app.json` has `files: [src/main.ts]`, so **`npm test`, `npm run lint` and `npm run build` type-check no spec code at all.** *Measured 2026-08-27 (`changes/measure-number-signed-decimal` T-09): a spec file passed all three of those gates while carrying **four** `TS7031` errors — `fakeAsync(({ a, b }) => …)` erases `it.each`'s parameter inference, because `fakeAsync(fn: Function)` supplies no parameter types, so the destructured bindings fall to `noImplicitAny`. A sibling `it.each` without `fakeAsync` type-checked fine.*
 
 ## ⚠ Gates must be proven able to fail (Kaizen K-004)
 
