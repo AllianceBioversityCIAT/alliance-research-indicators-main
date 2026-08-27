@@ -198,15 +198,15 @@ graph TD
   - `U-8` is **unsettled**: the charset/collation of the two `IF()` branches inside `CONCAT_WS`. The live view already needs `convert(report_field(...) using utf8mb3)` on another column (`baseline.sql:8080`) — direct evidence that collation aggregation here is not safely assumable. Resolve it against real MySQL in `T-08`, not by reasoning.
   - Needs nothing above MySQL 8.0.4; `OQ-D5` no longer gates this.
 - **Acceptance / done check:**
-  - [ ] `SHOW CREATE VIEW report_oicr` captured **before** the migration and pasted into `execution.md` (`U-3`).
-  - [ ] `down()` restores the previous body byte-for-byte, verified by comparing the captured text.
-  - [ ] Collation of the `CONCAT_WS` result asserted from an executed query, not assumed (`U-8`).
-  - [ ] `OQ-1` ruling recorded before merge.
+  - [x] `SHOW CREATE VIEW report_oicr` captured **before** the migration and pasted into `execution.md` (`U-3`). All three captures (before / after `up()` / after `down()`) preserved with hashes — they existed only in a session-scoped temp dir.
+  - [x] `down()` restores the previous body byte-for-byte, verified by comparing the captured text. **Leader-measured:** identical once `DEFINER` is normalised; the `DEFINER` delta is a connection-derived control, not a defect, since the migration text emits no `DEFINER` clause at all.
+  - [x] Collation of the `CONCAT_WS` result asserted from an executed query, not assumed (`U-8`). ⚠️ **Attributed to the evidence that could have FAILED** — both branches executed with no `1267` and no new warnings — **not** to either collation readout, since one is the measuring session's and the other is fixed by `report_field`'s declaration and structurally cannot detect a mismatch.
+  - [ ] `OQ-1` ruling recorded before merge. ⚠️ **OUTSTANDING — deliberately not discharged.** Gates `R-MSD-010` AC.3 and this task's **merge**, not its implementation. Recommendation on file is *ship it*; the ruling is the product owner's + eng lead's.
 - **What disqualifies this evidence:** §9.2's expected renders are **predicted, not executed** (`U-1`, `U-5`) — no MySQL was reachable to any of the eight judges. **Reasoning about `DECIMAL` formatting is explicitly disqualified** as evidence by `:461`. Until `T-08` runs the query, this task's rendering claims are unverified and must be labelled so.
-- **Input that would make this check FAIL:** run the trim expression against a `bigint` column — `'10'` must render `'1'`, demonstrating `DC-14`. **If it does not, the expression is not the one under test.**
+- **Input that would make this check FAIL:** run the trim expression against a `bigint` column — `'10'` must render `'1'`, demonstrating `DC-14`. **If it does not, the expression is not the one under test.** ✅ **Executed:** bare trim gave `1 / -1 / (empty)` where `DD-10`'s guarded expression gave `10 / -10 / 0` on the same rows. ⚠️ **The framing was wrong, though:** `migration:test:revert` is LIFO, so once T-06 exists one revert removes the expression under test and two remove the column change too. Reached instead by a direct `ALTER` on the scratch schema. **`T-08`'s item 3 has the same flaw.**
 - **Dependencies:** T-05
 - **Estimated effort:** L · **Skills:** `nestjs-expert`
-- **Status:** todo
+- **Status:** **done (implementation)** — Reviewer `PASS` on attempt 2, 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-06`. ⚠️ **MERGE GATED: `OQ-1` unresolved** (acceptance item 4 open by design). **Three carries:** (1) **`T-08` item 3 is not executable** — `migration:test:revert` cannot reach the `bigint` branch once both migrations exist; use a direct `ALTER`. (2) **The scratch container does not represent Dev's `sql_mode`** — container 8.0.46 *with* `ONLY_FULL_GROUP_BY`, Dev 8.0.45 *without*; favourable for T-06, **not** for T-07/T-08. (3) **A single `migration:revert` on Dev is a silent regression** — it reverts T-06 alone, leaving a `DECIMAL` column under the bare view, so OICR exports render `10.0000` again with no error.
 
 ---
 

@@ -855,3 +855,180 @@ Both lenses independently required these. All three correct **measured falsehood
 | Lens A's PASS **invalidated** after attempt 2 | Re-gated | Attempt 2 added a code path and rewrote the TSDoc, so the fourteen-claim audit no longer covered the artifact. A verdict on superseded content is not a verdict on this content — its claim inventory then grew from 14 to 24 |
 | Lens B **not** re-gated for attempt 3 | Deliberate economy, disclosed | Prose-only changes, moving in directions Lens B itself recommended; nothing it audited behaviourally changed. Lens A ratified the call **and closed the one gap it left** — the transaction wrap was a new destructive operating instruction Lens B had recommended but never reviewed as written, so Lens A reviewed it |
 | Ambiguity ruled, not escalated | The backup restores the **pre-migration state**; a post-migration fraction is recoverable by nothing | `tasks.md` implied the backup could recover a seeded `2.5`, which is impossible — it predates the `ALTER`. Ruling stated in the brief and given to the Reviewer to check; Lens A confirmed and noted the TSDoc states it *more precisely than the spec does* |
+
+---
+
+### T-06 — Migration 2: recreate `report_oicr` with `DD-10`'s expression
+
+- **Status:** ✅ **PASS on attempt 2** (`T-06` — Reviewer: **PASS**). ⚠️ **Implementation complete; MERGE still gated by `OQ-1`** (acceptance item 4 deliberately **not** discharged).
+- **Date:** 2026-08-27
+- **Implementer attempts:** 2 (`akili-implementer`, T2 `sonnet`, effort `xhigh`)
+- **Reviewer:** **one** `akili-reviewer`, **single merged lens** (conformance + correctness + operational risk) — **mode change, user-approved:** the spec is over its review budget, so remaining tasks run single-lens **except `T-07`**, which stays parallel
+- **Requirements covered:** `R-MSD-010`
+- **Design references:** `DD-10`, §9.1, §9.2, `U-1`, `U-3`, `U-5`, `U-8`, `OQ-1`, `OQ-D5`
+
+#### File
+
+`server/researchindicators/src/db/migrations/1787270000000-normaliseQuantificationNumberInReportOicr.ts` — new, ~18 KB. Timestamp `1787270000000` > T-05's `1787260000000` (acceptance item 4 of T-05, and item ordering here).
+
+`up()` re-emits `CREATE OR REPLACE VIEW report_oicr` changing **only** the two `report_field(rq.quantification_number, TRUE, TRUE)` sites (role-1 and role-2 sub-selects) to wrap `DD-10`'s expression from §9.2 verbatim. `down()` re-issues the pre-migration body unedited. `report_link_result` — also in the originating migration — untouched.
+
+#### ⚠️ Acceptance item 1 — the `SHOW CREATE VIEW` capture, preserved here because it was volatile
+
+The three captures existed **only** in a session-scoped temp directory with the container torn down. They are the sole evidence for acceptance items 1 and 2 and the reference body `T-08` will need. Preserved on the Reviewer's advisory:
+
+| Capture | `DEFINER` | sha256 (raw, first 16) |
+| --- | --- | --- |
+| BEFORE (`up()` not yet run) | `` `root`@`localhost` `` | `58ef697a9656bdf2` |
+| AFTER (`up()` applied) | `` `root`@`%` `` | `9a26cc6030bb874d` |
+| DOWN-RESTORED (`down()` applied) | `` `root`@`%` `` | `bcc58aec0f6de6f7` |
+
+**Two hash sets appear in this task's evidence and they do NOT contradict each other** — labelling them, per the Reviewer, so a later reader does not read them as conflicting:
+
+- The three hashes **above** are over the **raw** captures. All three differ, because `DEFINER` alone makes BEFORE ≠ DOWN-RESTORED.
+- The Implementer's `edca2fc1…` ("identical") is over the **`DEFINER`-normalised** text. Both are correct at their own scope.
+
+**BEFORE, verbatim (acceptance item 1):**
+
+```sql
+mysql: [Warning] Using a password on the command line interface can be insecure.
+*************************** 1. row ***************************
+                View: report_oicr
+         Create View: CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `report_oicr` AS select `root`.`result_id` AS `result_id`,`report_field`(`ro`.`general_comment`,true,(`root`.`indicator_id` = 5)) AS `general_comment`,`report_field`(`ml`.`full_name`,true,(`root`.`indicator_id` = 5)) AS `maturity_level`,`report_field`(`ro`.`oicr_internal_code`,true,(`root`.`indicator_id` = 5)) AS `oicr_internal_code`,`report_field`(`ro`.`outcome_impact_statement`,true,(`root`.`indicator_id` = 5)) AS `outcome_impact_statement`,`report_field`(`ro`.`short_outcome_impact_statement`,true,(`root`.`indicator_id` = 5)) AS `short_outcome_impact_statement`,`report_field`(`ro`.`sharepoint_link`,false,(`root`.`indicator_id` = 5)) AS `sharepoint_link`,`report_field`(concat_ws('',`aus`.`first_name`,' ',`aus`.`last_name`),true,(`root`.`indicator_id` = 5)) AS `mel_regional_expert`,`report_field`(`rt`.`tag_name`,true,(`root`.`indicator_id` = 5)) AS `tagging`,`report_field`(`rq`.`quantifications`,false,(`root`.`indicator_id` = 5)) AS `quantifications`,`report_field`(`rq2`.`extrapolated_estimates`,false,(`root`.`indicator_id` = 5)) AS `extrapolated_estimates`,`report_field`(`acp`.`authors_contact_persons`,false,(`root`.`indicator_id` = 5)) AS `authors_contact_persons`,`report_field`(if(`ro`.`for_external_use`,'YES','NO'),false,(`root`.`indicator_id` = 5)) AS `for_external_use`,`report_field`(`ro`.`for_external_use_description`,false,(`root`.`indicator_id` = 5)) AS `for_external_use_description`,`report_field`(`ria`.`impact_area`,true,(`root`.`indicator_id` = 5)) AS `impact_area`,`report_field`(`treo`.`existing_oicr`,true,((`root`.`indicator_id` = 5) and (`rt`.`tag_id` in (2,3)) and (`rt`.`tag_id` is not null))) AS `existing_oicr`,`report_field`(`ro`.`cgspace_link`,true,(`root`.`indicator_id` = 5)) AS `cgspace_link` from ((((((((((`results` `root` left join `result_oicrs` `ro` on((`ro`.`result_id` = `root`.`result_id`))) left join `maturity_levels` `ml` on((`ml`.`id` = `ro`.`maturity_level_id`))) left join `alliance_user_staff_groups` `ausg` on(((`ausg`.`staff_group_id` = `ro`.`mel_staff_group_id`) and (`ausg`.`carnet` = `ro`.`mel_regional_expert`)))) left join `alliance_user_staff` `aus` on((`aus`.`carnet` = `ausg`.`carnet`))) left join (select `rt`.`result_id` AS `result_id`,`rt`.`tag_id` AS `tag_id`,`t`.`name` AS `tag_name` from (`result_tags` `rt` join `tags` `t` on((`t`.`id` = `rt`.`tag_id`))) where (`rt`.`is_active` = true) group by `rt`.`result_id` order by `rt`.`result_id`) `rt` on((`rt`.`result_id` = `root`.`result_id`))) left join (select `rq`.`result_id` AS `result_id`,group_concat(concat_ws('','• Number: ',`report_field`(`rq`.`quantification_number`,true,true),', Unit: ',`report_field`(`rq`.`unit`,true,true),', Comment: ',`report_field`(`rq`.`description`,true,true)) separator '\n') AS `quantifications` from `result_quantifications` `rq` where ((`rq`.`is_active` = true) and (`rq`.`quantification_role_id` = 1)) group by `rq`.`result_id`) `rq` on((`rq`.`result_id` = `root`.`result_id`))) left join (select `rq`.`result_id` AS `result_id`,group_concat(concat_ws('','• Number: ',`report_field`(`rq`.`quantification_number`,true,true),', Unit: ',`report_field`(`rq`.`unit`,true,true),', Comment: ',`report_field`(`rq`.`description`,true,true)) separator '\n') AS `extrapolated_estimates` from `result_quantifications` `rq` where ((`rq`.`is_active` = true) and (`rq`.`quantification_role_id` = 2)) group by `rq`.`result_id`) `rq2` on((`rq2`.`result_id` = `root`.`result_id`))) left join (select `ru`.`result_id` AS `result_id`,group_concat(concat_ws('','• ',`aus`.`first_name`,' ',`aus`.`last_name`,' - Position: ',ifnull(`aus`.`position`,'N/D'),' - Affiliation: ',ifnull(`aus`.`center`,'N/D')) separator '\n') AS `authors_contact_persons` from (`result_users` `ru` join `alliance_user_staff` `aus` on((`aus`.`carnet` = `ru`.`user_id`))) where ((`ru`.`user_role_id` = 3) and (`ru`.`is_active` = true)) group by `ru`.`result_id`) `acp` on((`acp`.`result_id` = `root`.`result_id`))) left join (select `ria`.`result_id` AS `result_id`,group_concat('• ',`cia`.`name`,' - Score: ',convert(`report_field`(concat('(',(`ias`.`id` - 1),') ',`ias`.`name`),true,true) using utf8mb3),'\n',`rgt`.`global_targets` separator '\n') AS `impact_area` from (((`result_impact_areas` `ria` left join `clarisa_impact_areas` `cia` on((`cia`.`id` = `ria`.`impact_area_id`))) left join `impact_area_scores` `ias` on((`ias`.`id` = `ria`.`impact_area_score_id`))) left join (select `riagt`.`result_impact_area_id` AS `result_impact_area_id`,group_concat('	◦ ',`cgt`.`smo_code`,' - ',`cgt`.`target` separator '\n') AS `global_targets` from (`result_impact_area_global_target` `riagt` left join `clarisa_global_targets` `cgt` on((`cgt`.`targetId` = `riagt`.`global_target_id`))) where (`riagt`.`is_active` = true) group by `riagt`.`result_impact_area_id`) `rgt` on((`rgt`.`result_impact_area_id` = `ria`.`id`))) where (`ria`.`is_active` = true) group by `ria`.`result_id`) `ria` on((`ria`.`result_id` = `root`.`result_id`))) left join (select `treo`.`result_id` AS `result_id`,concat(`teo`.`external_id`,' - ',`teo`.`title`,' <',`teo`.`handle_link`,'>') AS `existing_oicr` from (`TEMP_result_external_oicrs` `treo` join `TEMP_external_oicrs` `teo` on((`teo`.`id` = `treo`.`external_oicr_id`))) where (`treo`.`is_active` = true) group by `treo`.`result_id`) `treo` on((`treo`.`result_id` = `root`.`result_id`))) where ((`root`.`is_active` = true) and (`root`.`is_snapshot` = false)) order by `root`.`result_id`
+character_set_client: utf8mb4
+collation_connection: utf8mb4_unicode_520_ci
+```
+
+#### Acceptance item 2 — `down()` restores the body: confirmed by the Leader's own measurement
+
+Not taken from the report. Run directly against the preserved captures:
+
+```
+BEFORE vs DOWN-RESTORED (DEFINER normalised):  IDENTICAL
+  -> acceptance item 2 discharged by measurement
+
+BEFORE vs AFTER: only the two `report_field(rq.quantification_number` sites
+  replaced by the DD-10 expression. Nothing else differs.
+```
+
+**The `DEFINER` delta is a control, not a defect**, and the reasoning is structural rather than reassuring: neither `up()` nor `down()` — nor `1780694172676` before them — emits a `DEFINER` clause, so MySQL substitutes `CURRENT_USER`. The migration text is therefore **incapable** of restoring `root@localhost`, and hardcoding one would be a worse defect because it would break on Dev. The control that proves it: the `up()`-applied view *also* shows `root@%`, so the delta tracks the connecting user, not the `down()` text.
+
+#### Transcription fidelity — the highest-value check in this task
+
+This is `CREATE OR REPLACE VIEW` over a ~90-line body, **append-only and uneditable after deploy** (`ADR-5`). The Reviewer compared MySQL's normalised definitions and found they differ at **exactly three places**: the `DEFINER` clause and the two `report_field(...)` sites. Everything a bad retype would have broken survived intact:
+
+- all **17** columns in the same order, `cgspace_link` present, `existing_oicr`'s three-clause third argument intact;
+- the **10-deep join parenthesisation**, same join count and order, `ausg`'s two-condition `ON`;
+- **`convert(report_field(concat('(',(ias.id - 1),') ',ias.name),true,true) using utf8mb3)` on `impact_area` present and byte-identical** — and this one is the strongest signal available, because *MySQL inserts it itself* during normalisation; it is in no source text and reappeared unprompted;
+- `where ((root.is_active = true) and (root.is_snapshot = false)) order by root.result_id`; `character_set_client: utf8mb4` / `collation_connection: utf8mb4_unicode_520_ci` identical across all three captures.
+
+**`R-MSD-010` AC.4** (*"does not change the rendering of any other column"*) is discharged **structurally** by that comparison — the best outcome available at this tier.
+
+#### The falsifier — `DC-14`, and it demonstrates both halves
+
+`tasks.md`'s falsifier is *"run the trim expression against a `bigint` column — `'10'` must render `'1'`."* Measured:
+
+```
+id  quantification_number  bare_trim_ONLY  dd10_guarded_expr
+83  10                     1               10
+84  -10                    -1              -10
+87  0                      (empty)         0
+```
+
+The **bare** trim renders `10 → 1` — `DC-14` demonstrated, exactly as §9.1's disqualified candidate would have behaved. `DD-10`'s **guarded** expression on the same `bigint` column and the same row renders `10` correctly. Confirmed through the live view too: `• Number: 10`, not `• Number: 1`.
+
+**The Reviewer noted the `0` row is the nastier corruption** the bare trim would cause: an empty string, which `report_field(…, TRUE, TRUE)` renders as `Not provided` — a measure of zero silently becoming "not provided" in an OICR export.
+
+**`NULL`:** `• Number: Not provided` under **both** column types, confirming `K-12`'s correction that `NULL = TRUNCATE(NULL,0)` is `NULL` → `IF()` false → the "unreachable" else branch runs, with a benign outcome.
+
+#### 📌 A third spec-text error, found by execution
+
+`tasks.md` T-06's falsifier framing assumes `migration:test:revert` reaches the column. **Once T-06 exists it does not** — revert is LIFO, so one revert removes T-06 (the expression under test) and two reverts remove the expression *and* the column change. The only state instantiating `R-MSD-010` AC.5 / `DC-14` — the new view **over** a `bigint` column — is reached by changing the column type independently, which is what was done (direct `ALTER` on the disposable scratch schema, restored after).
+
+> **⚠️ FORWARD POINTER — `T-08`'s acceptance item 3 is wrong for the same reason.** It mandates *"the `bigint` branch exercised via `migration:test:revert`"*. That is not executable once both migrations are in the tree. Its executable equivalent is the direct `ALTER` on the scratch schema. **This must be carried into `T-08`'s brief.**
+
+#### `U-8` — resolved, and attributed to the evidence that could have FAILED
+
+Both collation readouts taken during the task are **narrower than `U-8` asks**, and recording either as the answer would hand `T-08` a green from a check incapable of reddening:
+
+| Readout | Why it does not settle `U-8` |
+| --- | --- |
+| bare expression → `utf8mb4_0900_ai_ci` | that is the **measuring session's** `collation_connection`. All three captures show the **view's stored** one is `utf8mb4_unicode_520_ci` |
+| view columns → `utf8mb4_unicode_ci` | **fixed by the function declaration** — `baseline.sql:6560-6563` declares `report_field`'s parameter and return as `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`. It cannot change whatever the argument's collation is, so it is **structurally unable** to detect a branch mismatch — a mismatch surfaces as error **`1267`**, not as a different column collation |
+
+**What actually settles `U-8`:** the view **created** and **both branches executed** — integers through `CAST`, and `2.5` / `-0.75` / `12.34` / `NULL` through `TRIM` — with **no `1267` and no new warnings**. Structurally, both branches take their collation from `collation_connection` (the `CAST … AS CHAR`, and the implicit numeric→string conversion inside `TRIM`), so they are **equal by construction in any environment**, and the `IF()` result is then converted into `report_field`'s declared `utf8mb4_unicode_ci` exactly as the bare numeric column was before. **That is why the change is collation-inert.**
+
+#### Renders — recorded as OBSERVATION, not as a gate
+
+T-06's disqualifier assigns the seven-case proof to `T-08`. The Implementer executed renders anyway; the Reviewer ruled that **legitimate over-delivery** (an observation beats a prediction) but **not a gate**, because the container is gone, no fixture exists, and **no artifact in the repo carries the output strings.**
+
+| Case | `decimal(24,4)` | after the falsifier `ALTER` to `bigint` |
+| --- | --- | --- |
+| `10.0000` / `10` | `10` | `10` |
+| `-10.0000` / `-10` | `-10` | `-10` |
+| `2.5000` | `2.5` **(before)** → `3` after the round-trip (expected lossiness, `AR-2`) | `3` |
+| `-0.7500` | `-0.75` **(before)** → `-1` after | `-1` |
+| `0.0000` | `0` | `0` |
+| `NULL` | `Not provided` | `Not provided` |
+| `12.3400` | `12.34` | n/a (seeded after restore) |
+| role 2, `10.0000` | `10` | n/a |
+
+⚠️ **The fractional rows are force-seeded defensive-branch probes, NOT a reachable production path.** `DD-12` + `DD-13` hold roles 1 and 2 to integers, and `report_oicr` reads only those roles — so no fractional row can enter the view's domain in production. Recorded explicitly so a later reader does not mistake these renders for production behaviour.
+
+**`T-08`'s acceptance item 4 is NOT discharged here.** `T-08` still owns the reproducible seven-case fixture proof.
+
+#### `OQ-1` — outstanding, and acceptance item 4 deliberately left open
+
+`OQ-1` asks whether `report_oicr` should accept `10.0000` in exports or ship `DD-10`'s expression. Recommendation on file: *ship it*. **No ruling has been made.** It gates `R-MSD-010` AC.3 and this task's **merge**, not its implementation. The Implementer was instructed not to argue the question and did not; **acceptance item 4 remains unchecked.**
+
+#### Attempt 1 → `FAIL` on one paragraph, and it is the sharpest prose finding of the run
+
+The TSDoc claimed the body was *"reproduced **byte-for-byte from the body transcribed by `SHOW CREATE VIEW report_oicr`** … **not retyped from memory of `1780694172676`'s source**."*
+
+**Both halves false — and the second denied the correct engineering choice actually made.** `SHOW CREATE VIEW` returns MySQL's *normalised* form (lowercase keywords, backticked identifiers, parenthesised joins, the inserted `convert(… using utf8mb3)`), so the file is not a transcription of it. The file **is** `1780694172676-UpdateReportView.ts:5-85`, copied — which is right, and the sentence talked itself out of it.
+
+**Why it gated rather than being tidied:** a maintainer trusting that sentence would diff the file against a `SHOW CREATE VIEW` output, find hundreds of differences, and conclude the migration is **corrupt** — and after merge the sentence can never be edited (`ADR-5`).
+
+Attempt 2 rewrote it to state the real provenance, the normalised-definition comparison, the `DEFINER` control with its three measured values, and — the sentence that makes the file auditable later — that **diffing against `SHOW CREATE VIEW` surfaces MySQL's own normalisation, not corruption.**
+
+**Two reported negatives, independently confirmed.** The Implementer reported that two of the Reviewer's preventive warnings did not apply because the claims are **absent** from the file. The Reviewer verified both by searching the file's only prose block (the TSDoc header; the SQL bodies carry no comments, so there is nowhere else a claim could hide): no collation claim of any kind, and no *"both branches are `CHAR`"* sentence. Reporting "I looked and it is not there" rather than claiming a fix is the right answer, and it was checked rather than accepted.
+
+#### `ADVISORY` — recorded, non-gating
+
+| Lens | Finding |
+| --- | --- |
+| **RISK — reachable, and it is a SILENT regression** | **A single revert on Dev breaks the export quietly.** `design.md` §11's Coupling row covers only *"column reverted ⇒ revert migration 2"*. The reverse is likelier and unguarded: one `migration:revert` after both are applied reverts **T-06 alone**, leaving a `DECIMAL` column under the **bare** view — OICR exports immediately render `10.0000` again, **with no error and no log entry.** Same LIFO fact that invalidated T-08's method. Worth one sentence in the rollout/backout section |
+| **RISK — `DEFINER` on Dev; reachable, not constructed** | `CREATE OR REPLACE VIEW` **re-stamps `DEFINER`** to the applying user on a `SQL SECURITY DEFINER` view. If whoever applies this on Dev/Prod differs from whoever applied `1780694172676`, every reader of `report_oicr` — including `star-results-export.repository.ts:153` — begins executing under the new definer's privileges, and the view breaks with **`1449`** if that account is ever dropped. **Rollout mitigation:** capture `SHOW CREATE VIEW` on Dev before and after, apply via the same connection/user as prior view migrations, confirm `DEFINER` unchanged. Reassuring on the adjacent axis: the AFTER capture kept `collation_connection: utf8mb4_unicode_520_ci`, so applying through TypeORM reproduced the stored charset context exactly |
+| Readability | *"is not expressible in migration text"* is imprecise — `CREATE DEFINER=user@host VIEW …` is valid MySQL. The accurate statement is *deliberately not specified, because hardcoding a user breaks on any environment where it differs.* The imprecision **errs safe** (it discourages exactly the hardcoding that would be a real defect) and the operative claim is correct. **Not worth touching an append-only file for** |
+| Readability | *"copied as-is"* is true modulo trailing whitespace — `1780694172676`'s source has trailing spaces this file lacks. Semantically void in SQL and proven irrelevant by the normalised comparison. **Do not "fix" by re-adding whitespace** |
+| Risk — residual, safe direction | Lines 14-15 assert a `decimal(24,4)` `10.0000` renders `'10.0000'`. True, and corroborated in-spec by T-02's executed round-trip returning the server's own `"10.0000"` text — but not measured *in this task*. Errs safe; `T-08` measures it directly and can retire the residue |
+| **Pre-existing defect — verified, NOT introduced here** | `report_oicr`'s untouched `treo` sub-select violates `ONLY_FULL_GROUP_BY` (`1055` on `teo.external_id`). **The Leader proved it pre-existing the hard way:** fresh container, baseline loaded, **T-06's file physically moved out of the tree, zero migrations applied** — identical `1055`. Out of `R-MSD-010`'s scope and correctly not fixed. **Worth a ticket, owned by nobody** |
+
+#### 📌 Dev measured under user authorisation — three results, one of which kills a suspected production bug
+
+A single read-only query, authorised by the user after the `1055` finding raised the possibility that the STAR export was broken:
+
+```
+Dev @@GLOBAL.sql_mode  = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
+Dev @@SESSION.sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
+Dev VERSION()          = 8.0.45
+```
+
+| Result | Consequence |
+| --- | --- |
+| **No `ONLY_FULL_GROUP_BY` on Dev** | The `1055` **cannot occur there.** `report_oicr` and the STAR export (`star-results-export.repository.ts:153`) are **not broken**. The app sets no `sql_mode` and inherits the server default. **No production defect** |
+| **`STRICT_TRANS_TABLES` present** | **`T-05`'s issue-3 precondition is now confirmed on Dev directly** — `down()` will fail loudly rather than clamp silently. This replaces the 23-routine circumstantial evidence with a measurement |
+| **`VERSION()` = 8.0.45** | **`OQ-D5` has a measured answer for Dev**, and the spec's narrowing was wrong: it had Dev at *"8.0.4 … 8.0.16"*. `DD-10`'s expression needs nothing above 8.0.4, so `R-MSD-010` AC.6 holds on both engines |
+
+> **⚠️ FIXTURE-FIDELITY FINDING for `T-07` / `T-08`.** The scratch container (**8.0.46, with `ONLY_FULL_GROUP_BY`**) does **not** represent Dev (**8.0.45, without it**). For **T-06 this cuts favourably** — the container is the *stricter* engine on that axis, so a view that creates and selects there cannot be worse on Dev. **For `T-07`/`T-08` it cuts the other way:** any `sql_mode`-dependent behaviour proven on the container is **not** thereby proven for Dev, and a fixture may need `SET SESSION sql_mode` to reproduce Dev rather than the container default.
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Review mode | **Single merged lens** | User-approved budget response. The reviewer was told explicitly it carried both perspectives and should raise operational risk itself. **It worked here** — the operational findings (`DEFINER` re-stamping, the single-revert regression) came from the same lens that did the conformance audit |
+| Skills | `nestjs-expert` + `systematic-debugging` | Same deviation as T-05, same reason |
+| Effort | `xhigh` both attempts | Append-only view SQL that cannot be edited after deploy |
+| Ambiguity resolved in-brief | Acceptance item 3 (*"collation asserted from an executed query"*) vs the note deferring `U-8` to `T-08` | Ruled: execute it here (real MySQL was available), and hand `T-08` anything that could not be settled at this tier |
+| `OQ-1` not delegated | Implementer told to implement and record it outstanding, **not** to argue it | An open product question is not an implementer's to close |
+| Leader verified the load-bearing claim | Ran the BEFORE/AFTER/DOWN-RESTORED diffs personally | The Reviewer cannot execute, and transcription fidelity was the task's central risk — a report was not sufficient |
