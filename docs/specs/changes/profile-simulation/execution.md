@@ -324,7 +324,7 @@ Checklist delivered (stack swap to this worktree, 2 screenshots vs artboards 1/4
 - The dev `.env` points `ARI_ROAR_MANAGEMENT_HOST` at `localhost:3002` (a locally-run management service); the deployed test ROAR is `management-allianceindicatorstest.ciat.cgiar.org` and validated the token (`isValid:true, roles:[3,9,1]`). The cloud `management-star` host rejects test tokens (different signing secret).
 
 ### Environment incident (open, not a spec item)
-Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache since the 2026-08-27 06:39 deploy; Jenkins reports success; the same commit builds and boots clean locally on the prod path. Browser CORS/PNA errors are downstream noise. **Owner: DevOps/host logs (pm2/docker) — pending.**
+Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache since the 2026-08-27 06:39 deploy; Jenkins reports success; the same commit builds and boots clean locally on the prod path. Browser CORS/PNA errors are downstream noise. **RESOLVED 2026-08-27 13:50 UTC** — see the root-cause block below; backend answering after `ae38b052` deployed (build #73).
 
 ### Environment incident — findings from the Jenkins console (build #72, 2026-08-27)
 - Deploy = Docker images built on Jenkins (Node 22.12-alpine, `npm ci` + `npm run build`) → ECR → `docker run --restart=always -p 3000:3000` on the on-prem host via SSH. **No health check after `docker run`** — a crash-looping container yields Apache 503 with Jenkins SUCCESS.
