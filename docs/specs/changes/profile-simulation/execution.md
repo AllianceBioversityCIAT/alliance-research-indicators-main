@@ -347,3 +347,32 @@ Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache
 - **Visual defect found by the user and fixed during this half:** the section-header template's `!z-10` painted over the dropdown (capped at host z:3 by D-imp-14) — root-caused with `elementsFromPoint` in a real browser against localhost:4300 (red observed), fixed by raising the navbar host to `z-index: 1001` (`ae9e975d`), re-probed green, deployed (`c5d28369`). This was T-11 review advisory #1 materializing.
 - **Recorded gaps (accepted):** the numeric padding measurement and a formal axe run were not captured — layout and contrast confirmed visually by the user on the live env; banner contrast was design-verified at #b3561a ≈ 4.9:1 (D-imp-7). Escape/focus behaviours are covered by unit specs (T-09/T-10/T-11).
 - Playwright note: local browser verification required copying (not symlinking) the client `environment*.ts` files — Angular's esbuild does not follow out-of-root symlinks; the Aug-25 "materialized" copies had duplicate keys and were replaced with clean copies from the main checkout.
+
+---
+
+## Rollout note
+
+- **Migration:** `1787699586530-createImpersonationTables` (`impersonation_sessions`, `impersonation_actions`) applied to On-Premise Dev **2026-08-25** under human approval (T-01, RB-2). It is now **re-run automatically by the Dev deploy pipeline** on every subsequent deploy (`npm run migration:execute` inside the container, no-op once applied — "No migrations are pending"; Jenkins build #72 console, T-06 environment-incident block). Prod (`main`) parity was not measured in this spec — verify before assuming the AWS pipeline behaves identically.
+- **Env var:** `ARI_IMPERSONATION_TTL_MINUTES` (optional; server validates it and falls back to `240` if unset or out of the accepted `[1, 1440]` range — `app-config.util.ts`, T-02; TSDoc wording there still says "clamp," flagged for a later code pass, not corrected here). **Recommendation:** add `ARI_IMPERSONATION_TTL_MINUTES=240` explicitly to the `dev/app/backend/roar/main` secret so the effective TTL is visible in configuration rather than implicit in code.
+- **Feature gating:** no feature flag. Access is role-gated — only `SYSTEM_ADMIN` can reach `GET /api/impersonation/users` / `POST /api/impersonation/start` (`RolesGuard` + `@Roles(SYSTEM_ADMIN)`); every other authenticated user can only `end`/read `current` a session that is already theirs.
+- **Backout:** revert PR 1 (server) and PR 2 (client), then `npm run migration:revert` — the migration's `down` drops `impersonation_actions` then `impersonation_sessions` (FK-then-table order); both tables carry only audit/session data, no data belonging to another feature, so the revert is non-destructive to the rest of the schema.
+- **Deployment history:** deployed to On-Premise Dev across Jenkins builds **#71–#73**, plus the `c5d28369` deploy carrying the `ae9e975d` z-index fix (2026-08-27). Build #71 shipped the code; #72 was a duplicate trigger of the same cached image; the container crash-looped between #71/#72 and #73 on an unrelated composition-root defect (`ImpersonationModule` exported but not imported after a merge-conflict resolution — see the T-06 "Environment incident — ROOT CAUSE AND FIX" block above), fixed by `ae38b052`, redeployed and verified booting in build #73; the live z-index fix (`ae9e975d`) shipped via the `c5d28369` deploy (see T-12 HITL close, above) — no Jenkins build number is recorded for that deploy in this execution log.
+- **Verified live:** a real SYSTEM_ADMIN-to-user simulation session was observed on the deployed Dev environment by a human (T-12 HITL close, 2026-08-27) — banner, "Account · Simulated" panel, and target-scoped dashboard data all confirmed working end-to-end, not just in unit/e2e evidence.
+
+---
+
+## T-13 — Docs, baseline sync, rollout note
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-27
+- **Attempts:** 2 (Implementer sonnet medium→xhigh; Reviewer opus)
+- **Files:** `docs/ux-ui/design.md` (§7.1 token, §8.1 components, §12.2 decisions, §3.2/§5.2/:409/D-2 versioning sweep), `docs/trd/trd.md` (§10.1 impersonation, §10.2 client mirror, §6.2 + ADR-3 three-state versioning, ), root `CLAUDE.md` (§4.3 K-015 dated correction; §4.1 routing three-state), `docs/prd.md` (AC-API-Surface — reviewer-endorsed scope addition), spec `design.md` (D-imp-17 narrowed), `execution.md` (rollout note)
+- **Attempt 1 — FAIL (6):** headline — the `/v1` correction over-generalized into a false platform claim: `@Version('1')` ×8 (`bilateral.controller.ts`) + ×1 (`agresso-contract.controller.ts`) and `@Version('2')` ×1 (`GET /api/v2/results`) are live; the truth is three-state (no `defaultVersion`; unversioned majority; per-handler opt-in). Plus: GET-vs-POST typo, wrong D-imp citation, unevidenced "#74", header attributed to the wrong class, and design.md still carrying the old grammar.
+- **Attempt 2 — PASS:** reviewer verified the three-state text handler-by-handler at source across all five landing sites; the only surviving `/api/v1` assertions in the baseline are the two genuinely versioned route families + point-in-time records. D-imp-17's own over-broad wording narrowed. `docs/prd.md` addition endorsed ("reverting it would re-open the drift the task exists to close").
+- **ADVISORY:** cross-reference wording fixed by the Leader post-PASS; `docs/pr-staging-to-main.md` carries 12 stale `/api/v1` mentions — point-in-time PR write-up, left as-is, flagged for whoever consults it; `app-config.util.ts` TSDoc still says "clamp" (one word, next code touch).
+
+---
+
+## Summary — all 13 tasks complete (2026-08-27)
+
+13/13 `[x]` with Reviewer PASS evidence per task. Rework totals: T-01×2, T-03×3, T-04×2, T-05×2, T-08×2, T-09×2, T-10×2, T-12×2, T-13×2 (others first-attempt). Two worker runtime failures (session/weekly limits) recovered by resume/inline fallbacks. Two production incidents during rollout, both root-caused and fixed same-day: the EntitiesModule import drop (`ae38b052`) and the dropdown z-index (`ae9e975d`). Feature verified live on On-Prem Dev, including a real simulation session by a second admin. Constitutional corrections shipped: K-015 (pipeline runs migrations), three-state URI versioning. Ready for `/akili-archive` (kaizen candidates recorded in the incident block).

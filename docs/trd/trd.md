@@ -92,7 +92,7 @@ The platform is deliberately **robust-tier** (multi-integration, multi-store, re
 | --- | --- | --- |
 | ADR-1 | **Monorepo, two independently deployable packages** | Shared contracts, separate release cadence; neither package imports the other's code. |
 | ADR-2 | **Single HTTP envelope** — `ServerResponseDto` (server) == `MainResponse<T>` (client) | One wire contract, two names by perspective (see §6). |
-| ADR-3 | **URI API versioning** (`/api/v1`, `/api/v2`) under global `/api` prefix | Explicit, cache-friendly, no header negotiation. |
+| ADR-3 | **URI API versioning** (`VersioningType.URI`) under global `/api` prefix, opt-in per handler — no `defaultVersion` is set, so most controllers mount unversioned at `/api/<resource>`; `bilateral.controller.ts` / `agresso-contract.controller.ts` opt into `/api/v1/...`, `results.controller.ts` opts one route into `/api/v2/results` (see §6.2) | Explicit, cache-friendly, no header negotiation, for the handlers that opt in; unversioned is the default state today, not a placeholder for a future default. |
 | ADR-4 | **RBAC via `@Roles` + `RolesGuard`; Results add `ResultStatusGuard`** | Declarative authorization; `SYSTEM_ADMIN` bypass; lifecycle enforced at the API edge. |
 | ADR-5 | **Append-only TypeORM migrations** | Merged migrations are immutable; forward-only schema evolution. |
 | ADR-6 | **OpenSearch mapping generated from `@OpenSearchProperty` decorators** | Search schema co-located with the entity; no drift. |
@@ -283,12 +283,12 @@ interface MainResponse<T> {
 
 ### 6.2 Server conventions (producer)
 
-- Global prefix `/api`; **URI versioning** (`VersioningType.URI`), default v1, `@Version('2')` for v2 handlers.
+- Global prefix `/api`; NestJS **URI versioning** (`VersioningType.URI`) is enabled on `AppModule` with **no `defaultVersion`** — versioning is opt-in per handler, never implicit. Three states coexist today: (1) the majority of controllers (including all four impersonation endpoints and both AI-formalize endpoints) declare no `@Version` and mount unversioned at `/api/<resource>`; (2) `bilateral.controller.ts` (8 handlers, mounted under `results/:resultCode/pool-funding-alignment`) and one handler in `agresso-contract.controller.ts:469` declare `@Version('1')` and mount at `/api/v1/<resource>`; (3) `results.controller.ts:257-258` declares `@Version('2')` on one `GET /results` handler, mounting at `/api/v2/results`. **Check the controller before asserting a `v1`/`v2` segment for any given endpoint** — an unversioned route's `/api/v1/...` path 404s (confirmed by e2e evidence: `docs/specs/changes/profile-simulation/design.md` D-imp-17, `execution.md` T-04/T-06).
 - REST verbs: GET (list/detail), POST (create), PATCH (partial update), DELETE (remove). Query params kebab-case; arrays via `ListParseToArrayPipe`, booleans via `QueryParseBool`.
 - Every controller MUST declare `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery`/`@ApiBody`.
 - Routes composed in `domain/routes/main.routes.ts` via `RouterModule.register(mainRoute)`; nested children for sub-resources (`/results/:code/evidences`). Per-result routes use the `RESULT_CODE` token + `@GetResultVersion()` (populates `_resultsUtil.resultId/resultCode/platformCode`).
 - Pagination/sorting: `page`, `limit`, `sort-order` (`ASC`/`DESC`), `sort-field` (entity enum). Default `DESC` on `code` unless a spec says otherwise.
-- **AI ingestion:** `POST /api/v1/results/ai/formalize` (any authenticated user); `POST /api/v1/results/ai/formalize/bulk` (`@Roles(TECHNICAL_SUPPORT, CENTER_ADMIN, MEL_REGIONAL_EXPERT)`, strict `ValidationPipe`). Bulk surfaces per-row `error` + `message_error` for partial failures so the pipeline can retry per item.
+- **AI ingestion:** `POST /api/results/ai/formalize` (any authenticated user); `POST /api/results/ai/formalize/bulk` (`@Roles(TECHNICAL_SUPPORT, CENTER_ADMIN, MEL_REGIONAL_EXPERT)`, strict `ValidationPipe`). Bulk surfaces per-row `error` + `message_error` for partial failures so the pipeline can retry per item. (No `v1` segment — see §6.2.)
 - **RabbitMQ:** `Transport.RMQ`, queue `ARI_QUEUE`, durable. Handlers in `domain/tools/broker/` (`AlianceManagementApp`, `AiRoarMiningApp`, `SelfApp`, `MessageMicroservice`). Message envelopes documented per pattern in the broker module spec.
 - **Socket.IO:** server gateway `domain/tools/socket/server.gateway.ts`; event taxonomy captured in a `docs/specs/socket/` module spec — never invented inline.
 
@@ -454,6 +454,8 @@ Federation with STAR / TIP / PRMS / AICCRA is **read/link-only** from the client
 
 **Secrets & limits** — all credentials in `ARI_*` env vars (`.env` gitignored); `app_secrets` + `app_secret_host_list` govern machine tokens; rotation policy is an open question. `express-rate-limit` installed; module specs SHOULD set controller-level defaults for high-traffic public endpoints.
 
+**Impersonation (profile simulation)** — a SYSTEM_ADMIN acting on behalf of another user attaches an `X-Impersonation-Session` request header to a normal ROAR-JWT request; `JwtMiddleware` resolves it (own private `applyImpersonation`, called from all three credential branches) into an effective `request.user` (the target) plus `request.actor` (the real admin), so every existing guard/util downstream is unaware anything changed. Machine tokens never accept the header (`403`). Sessions are server-side, revocable, and expiring, persisted in `impersonation_sessions`; every non-GET request made while a session is active is appended to `impersonation_actions` (real HTTP status, fire-and-forget, never blocks the response) — together they are the audit trail for "who really did this." Machine-readable rejection codes (`NOT_ALLOWED`, `NESTED`, `SESSION_INVALID`, `SESSION_HEADER_REQUIRED`, `TARGET_NOT_FOUND`, `TARGET_IS_ADMIN`, `TARGET_IS_SELF`) travel in the response header `X-Impersonation-Error`; the envelope's `errors` field stays a string, unchanged. Endpoints: `GET /api/impersonation/users`, `POST /api/impersonation/start` (`SYSTEM_ADMIN` only), `POST /api/impersonation/end`, `GET /api/impersonation/current` (see `docs/specs/changes/profile-simulation/design.md` §4/§5/§8).
+
 ### 10.2 Client (mirror of trust decisions)
 
 - **AWS Cognito + JWT** (no alternative IdPs). Tokens (`access_token`, `refresh_token`, `exp`) in `localStorage`, mirrored in cache signals.
@@ -461,6 +463,7 @@ Federation with STAR / TIP / PRMS / AICCRA is **read/link-only** from the client
 - **Guards mirror the backend:** `rolesGuard` (authenticated/unauthenticated routing) and `centerAdminGuard` (composite: `role_id === 1` OR (`role_id === 9` AND focus/sec-role match)). `RolesService` exposes computed signals for role membership / feature visibility.
 - **Never** trust the client for destructive policy — the backend rejects unauthorized writes regardless of UI.
 - **Sensitive data:** no PII beyond account fields client-side; tokens never logged or sent to analytics; evidence uploads route through file-manager (never inlined); service workers do not cache authenticated API responses by default.
+- **Profile simulation (client mirror):** a `SimulationBannerComponent` marks the state platform-wide; `ImpersonationService` swaps `dataCache().user` to the target profile while active. `jWtInterceptor` — not `ImpersonationService` — is what attaches `X-Impersonation-Session` to non-auth calls when a session is active. The server stays the sole authority — a response header `X-Impersonation-Error: SESSION_INVALID` auto-ends the client-side session and shows a toast rather than leaving the UI in a stale state (`docs/specs/changes/profile-simulation/design.md` §5).
 
 ---
 
