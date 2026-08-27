@@ -1,0 +1,62 @@
+@if (allModals.isModalOpen('editPrompt').isOpen && service.editingItem(); as item) {
+<div class="flex w-full max-w-[95vw] flex-col lg:w-[900px]">
+  <section class="mx-auto flex w-full flex-col gap-4 rounded-b-[27px] px-10 py-6">
+    <div class="flex flex-col gap-[2px]">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 class="m-0 text-[17px] font-[600] leading-tight text-[#112F5C]">{{ item.name }}</h2>
+        <span
+          class="inline-block h-[24px] rounded-[6px] border border-[#D9E1EB] bg-[#F4F7F9] px-[8px] font-mono text-[12px] leading-[21px] text-[#035BA9]">{{
+          item.id }}</span>
+      </div>
+      @if (item.description) {
+      <p class="m-0 text-[14px] font-[400] leading-[1.35] text-[#777C83]">{{ item.description }}</p>
+      }
+    </div>
+
+    <div class="flex flex-col gap-[3px]">
+      @if (item.variables.length) {
+      <div class="mb-3 rounded-[10px] border border-[#E8EBED] bg-white px-4 py-3">
+        <div class="flex items-center gap-2">
+          <span class="text-[14px] font-[400] text-[#112F5C] !font-[space_grotesk]">Placeholders:</span>
+        <p class="m-0 text-[14px] leading-normal text-[#777C83]">
+          Keep them exactly as they are — each one is replaced with real data when the prompt runs.
+        </p>
+        </div>
+        <div class="mt-[10px] flex flex-wrap gap-2">
+          @for (variable of item.variables; track variable.name) {
+          <span
+            class="inline-flex items-center rounded-[6px] border border-[#D9E1EB] bg-[#F4F7F9] px-[8px] py-[3px] font-mono text-[12px] leading-[18px] text-[#035BA9]"
+            [title]="variable.description">{{ variable.placeholder }}</span>
+          }
+        </div>
+      </div>
+      }
+
+      @for (sectionKey of sectionKeys(item); track sectionKey) {
+      <div class="flex w-full flex-col">
+        <app-textarea [rows]="5" [label]="sectionLabel(sectionKey)" [signal]="service.editForm"
+          [optionValue]="sectionKey" [maxLength]="0" [placeholder]="'Enter the ' + sectionLabel(sectionKey)" />
+      </div>
+      }
+
+      @if (service.saveError(); as error) {
+      <p class="m-0 pt-1 text-[13px] font-[400] text-[#B00020]" role="alert">{{ error }}</p>
+      }
+
+      <div class="flex justify-end gap-[14px] pt-5 pb-2">
+        <button type="button" (click)="service.closeEdit()"
+          class="cursor-pointer rounded-[14px] border-[1.5px] border-[#035BA9] px-5 py-2 text-[15px] font-medium text-[#035BA9]">
+          Cancel
+        </button>
+        <button type="button" (click)="onSave()" [disabled]="service.saving() || !service.isDirty()"
+          class="flex cursor-pointer items-center gap-2 rounded-[14px] bg-[#035BA9] px-5 py-2 text-[15px] text-white disabled:cursor-not-allowed disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+          @if (service.saving()) {
+          <i class="pi pi-spinner pi-spin"></i>
+          }
+          Save
+        </button>
+      </div>
+    </div>
+  </section>
+</div>
+}

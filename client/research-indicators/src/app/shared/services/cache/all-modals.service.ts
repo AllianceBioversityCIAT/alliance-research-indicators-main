@@ -143,6 +143,10 @@ export class AllModalsService {
       isOpen: false,
       title: 'Environment variables'
     },
+    editPrompt: {
+      isOpen: false,
+      title: 'Prompt Manager'
+    },
     projectGroundingSetup: {
       isOpen: false,
       title: 'Grounding & Setup',
@@ -277,6 +281,7 @@ export class AllModalsService {
       addContactPerson: { ...this.modalConfig().addContactPerson, isOpen: false, isWide: false },
       selectLinkedResults: { ...this.modalConfig().selectLinkedResults, isOpen: false, isWide: false },
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
+      editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
       simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false }
