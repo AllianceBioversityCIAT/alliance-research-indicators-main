@@ -41,4 +41,13 @@
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
+
+  // Actions stays pinned to the right edge while the rest of the table scrolls
+  // horizontally. The explicit background is required: the sticky cell would
+  // otherwise be transparent and let the scrolling columns show through it.
+  th.variable-config-actions-col.p-datatable-frozen-column,
+  td.variable-config-actions-col.p-datatable-frozen-column {
+    background: #ffffff;
+    border-left: 1px solid #e8ebed;
+  }
 }
