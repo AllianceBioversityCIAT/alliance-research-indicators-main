@@ -123,17 +123,17 @@ graph TD
   - **Rule map:** default (roles 1, 2, any future role) = non-negative integer. Role 3 = signed, ≤ 4 decimals, within `DD-14`'s bound.
   - **Null contract:** `null`/`undefined` are accepted and skipped by **every** entry including the default (`R-MSD-011` AC.6).
 - **Acceptance / done check:**
-  - [ ] Role 3 accepts `-12.75`; roles 1 and 2 reject it `400`. Both asserted through `upsertByCompositeKeys`, **not** by calling the override directly.
-  - [ ] `null` is accepted on **every** role, asserted per role.
-  - [ ] The rule is selected from `dataRole`; a payload carrying `quantification_role_id: 3` on an OICR call is **still** validated as role 1 (`R-MSD-011` AC.2).
-  - [ ] `git diff --exit-code` is clean for every file under `result-oicr/` (`R-MSD-011` AC.3).
-  - [ ] Existing `base-service` consumers are unaffected — full server suite green.
+  - [x] Role 3 accepts `-12.75`; roles 1 and 2 reject it `400`. Both asserted through `upsertByCompositeKeys`, **not** by calling the override directly. **Extended in attempt 2** to a table over `0.07, 1.005, 0.0003, 2.55, 0.0001, ±549,755,813,887` — the single `-12.75` case could not discriminate, being dyadic.
+  - [x] `null` is accepted on **every** role, asserted per role.
+  - [x] The rule is selected from `dataRole`; a payload carrying `quantification_role_id: 3` on an OICR call is **still** validated as role 1 (`R-MSD-011` AC.2). Falsified: a payload-keyed variant was shown buying the permissive rule, then reverted.
+  - [x] `git diff --exit-code` is clean for every file under `result-oicr/` (`R-MSD-011` AC.3).
+  - [x] Existing `base-service` consumers are unaffected — full server suite green (`354 suites / 2702 tests`, re-measured by the Leader).
 - **What disqualifies this evidence:** asserting on a **call sequence** — "`createCustomValidation` was called with X" — proves the mock's wiring, not the rejection (**KZ-001**). The assertion must be on the thrown `400` / the persisted row. A test that calls the override directly bypasses the very forwarding this task adds and would stay green if `:134`/`:345` were never touched.
 - **Input that would make this check FAIL:** revert the `dataRole` forwarding at `:345` — the role-3 acceptance test must redden (the map falls to the default and rejects `-12.75`). **If it still passes, the test is not exercising the seam.** Separately: send `quantification_role_id: 3` in an OICR payload; if that buys the permissive rule, the map is payload-keyed and the task is not done.
 - **Declared and NOT fixed here:** `RK-13` (`updateOicr` is not transactional, so this `400` lands on a partially-committed update) and `RK-15` (`upsertQuantificationsByRole` bypasses the base class). Both are out of scope; do not silently fix either, and do not claim the guarantee is absolute.
 - **Dependencies:** T-02
 - **Estimated effort:** M · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
-- **Status:** todo
+- **Status:** **done** — Reviewer `PASS` on attempt **3 of 3** (the ceiling), 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-03`. ⚠️ **Carries a ticketed, reachable advisory into `T-04`:** the shipped scale predicate falsely rejects `274877906944.0405` and ~8.98% of the band `[274,877,906,944, 450,359,962,737)`. `T-04` implements the same `≤ 4 decimals` rule and **must not reproduce this predicate** — see the forward pointer in `execution.md`.
 
 ---
 

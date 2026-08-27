@@ -356,3 +356,148 @@ Per `/akili-execute` §2.4 these die here. Anything that genuinely cannot wait i
 | DX | The new spec file appears in neither `tasks.md` T-02's *Files touched (intended)* nor `design.md` §2.1, which claims to list *"every new file"* and was corrected in round 1 for exactly that omission (`K-17`). Additive, no behavioural risk |
 | Readability | `QuantificationData.quantification_number` (`result-quantifications.service.ts:9`) still types `number`. Inert under `strictNullChecks: false`, and the method has no production caller |
 | Resilience | `NaN` is unreachable and recorded only because the guard is elsewhere: the column is `DECIMAL` so a real read cannot return a non-numeric string, and JSON has no `NaN` literal. The rejection that would matter if a non-HTTP writer ever appeared is `DD-17`'s, in `T-04` |
+
+---
+
+### T-03 — `base-service.ts` optional `dataRole` + `createCustomValidation` override with the per-role rule map
+
+- **Status:** ✅ **PASS on attempt 3** (`T-03` — Reviewer: **PASS**). Reached the rework ceiling; all three attempts recorded below.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 3 (`akili-implementer`, T2 `sonnet`, effort `xhigh` on all three)
+- **Reviewer:** one `akili-reviewer` (T3 `opus`, read-only), resumed across all three attempts so its findings were judged by the party that raised them
+- **Requirements covered:** `R-MSD-011` (all ACs, scenario *The API stops silently rounding*, `:495`), `R-MSD-007`
+- **Design references:** `DD-13` (v4), `DD-14`, `DD-8`, `RK-13`, `RK-14`, `RK-15`, `U-12`
+
+#### Files changed
+
+| File | Change |
+| --- | --- |
+| `server/.../shared/global-dto/base-service.ts` | **the spec's only shared-file edit.** `createCustomValidation` gains optional `dataRole?: string \| number`, forwarded at the two existing call sites — `:134` in `create()`, `:347` in `upsertByCompositeKeys()` (was `:345` pre-edit; the signature insert shifted the file by 2) |
+| `server/.../result-quantifications/result-quantifications.service.ts` | the override + per-role rule map |
+| `server/.../result-quantifications/result-quantifications.service.spec.ts` | the rule map's coverage — `base-service.ts` has no spec file, so it cannot come from one |
+
+#### Safety premise — re-verified inline by the Leader before spawning
+
+`tasks.md` T-03 requires re-confirming the additivity argument before editing. Run at dispatch time:
+
+```
+src/domain/shared/global-dto/base-service.ts:134:    await this.createCustomValidation(dataToSaveArray);
+src/domain/shared/global-dto/base-service.ts:278:  protected async createCustomValidation(
+src/domain/shared/global-dto/base-service.ts:345:    await this.createCustomValidation(dataToSaveArray);
+=== TOTAL: 3 matches ===
+```
+
+Exactly three matches, **no override anywhere in the tree** — so no existing caller's behaviour could change. Had an override appeared since the spec was written, the task's safety argument would have been void and the spawn would have been wasted.
+
+#### Attempt 1 — `STATUS: FAIL`, and how the defect was found
+
+The structure was correct and remains shipped: the optional parameter, the forwarding, the override's placement, the null-skip **before** the role branch, keying on the parameter, the `typeof`/`Number.isFinite` guards, the magnitude gate, and the `BadRequestException` messages.
+
+**One predicate was wrong.** The scale check shipped as `!Number.isInteger(value * 10000)`.
+
+**The Leader found it by execution, not by reading.** The code reads as correct and reviews as correct; `2.55`, `-12.75` and `0.0001` all pass. A one-command `node` probe over the value space:
+
+```
+1.005 * 10000 = 10049.999999999998     -> REJECTED (3 decimals)
+0.07  * 10000 = 700.0000000000001      -> REJECTED (2 decimals)
+2.55  * 10000 = 25500                  -> accepted (why the Implementer's canary passed)
+```
+
+Exhaustive over every 4-decimal value in `[0, 20]`: **25,477 of 200,001 falsely rejected — 12.74%.** `0.0003` received `400 quantification_number must have at most 4 decimal places`. One in eight legal values rejected, and they are precisely the values this spec exists to enable.
+
+The Implementer had chosen multiplication **specifically** to dodge the two traps `DD-17` names (`toFixed`, exponential `toString`) and landed in a third the spec never names.
+
+**The Reviewer confirmed it independently rather than accepting the probe** — hand-deriving that the double nearest `0.07` is `0.070000000000000006661…`, whose exact product with `10⁴` sits `6.66e-14` from `700`, beyond the half-ulp `5.68e-14`, so `fl` lands on `700.0000000000001`. It also showed `2.55` goes the other way by the same arithmetic, which is why the canary passed.
+
+**It corrected the Leader's framing of the violation.** The Leader had assumed `DD-17` prescribed a mechanism that was disregarded. `DD-17` is **not** among T-03's design references (`tasks.md:116`) — it is T-04's. `DD-13` states only the *rule*. So this is an **outcome** violation of DD-13, not a deviation from a prescribed mechanism. Recorded because the distinction changes what the remediation owes.
+
+**Reviewer's second issue: the tests could not have caught it.** The only role-3 acceptance value was `-12.75` = `-51/4` — dyadic, exactly representable, one of the ~87% that survive by luck. *"The suite is green over a validator that refuses 12.74% of the legal grid."* The mandated falsifier (revert the `:347` forwarding) reddened correctly, so the seam was proven — but **no test measured the rule's domain**.
+
+Both issues also cleared, in the same pass: the null-skip is correct for every entry and correctly placed before the role branch; the parameter-vs-payload keying is clean on **both** write paths and fail-closed (`result-oicr.service.ts:234-246` hardcodes roles 1/2, `result-innovation-use.service.ts:251` hardcodes 3, and `base-service.ts:396-418` cannot persist a payload `quantification_role_id` at all); `typeof value !== 'number'` is **reachable and correct**, since the OICR DTO is entity-typed with no `ValidationPipe`; the messages map to `400` with the text verbatim in `errors` (`global.exception.ts:22,29`).
+
+#### Attempt 2 — predicate and tests **DISCHARGED**; `STATUS: FAIL` on two false comments
+
+The Reviewer's own remediation was adopted, and **the Leader verified it exhaustively before spending the attempt** rather than forwarding an unverified suggestion:
+
+```
+Math.round(v*10000)/10000 === v
+EXHAUSTIVE 4-dec grid [0,20]: 200001 tested, falsely rejected: 0
+same, negative:              0
+ACCEPTS: 0.07, 1.005, 0.0003, 2.55, 0.0001, -12.75, ±549755813887, 0, 10
+REJECTS: 1.23456, 0.00005, 1e-7, -1e-7, 0.123456789
+```
+
+Table-driven cases were added over the real inherited `upsertByCompositeKeys`. **Falsifier A** — restore the old predicate — reddened on exactly the three non-dyadic canaries:
+
+```
+✕ accepts role-3 value 0.07 on the 4-decimal grid despite binary floating-point error
+✕ accepts role-3 value 1.005 …
+✕ accepts role-3 value 0.0003 …
+Tests: 3 failed, 23 passed, 26 total
+```
+
+The Reviewer's assessment of that evidence is the reason the round counts: *"`3 failed / 26` matches exactly the three non-dyadic canaries, and Falsifier B's `8 failed / 26` is exactly `1 + 7` role-3 acceptance cases … the two falsifiers cover the two independent failure modes — wrong predicate and missing forwarding — and neither can pass for the other's reason."*
+
+The Implementer also ran **`npx tsc --noEmit`** unprompted, covering the spec file that `tsconfig.build.json` excludes — the `K-004` gate gap named in the brief. The Reviewer noted that command *has been observed failing in this very spec*: it produced attempt 1's TS2416.
+
+**But attempt 2 added two comments and both asserted false arithmetic** — the same failure as attempt 1 wearing different clothes: a claim stated without being computed.
+
+#### Attempt 3 — the comment repairs, at the ceiling
+
+Three edits, no code and no test touched:
+
+1. Deleted the backwards vacuity clause. It had claimed DD-14's bound *"already rejects everything past 2^39, well below where this would matter"*; in fact `2⁵²/10⁴ = 450,359,962,737.05` sits **below** the bound `549,755,813,887`, so the vacuous region begins **inside** the accepted range — a ~99.4 billion window. Verified by the Leader before dispatch.
+2. Corrected *"4 of these 7 … 0.07, 1.005, 0.0003, 0.0001"* to **3 of 7**, with `2.55`, `0.0001` and `±549,755,813,887` named as **controls**. `0.0001 * 10000` is exactly `1` — and the claim was already contradicted by the Implementer's own Falsifier A output (`Tests: 3 failed`) sitting in the same report.
+3. Scoped `~12.74% of the legal 4-decimal grid` to `12.74% of the 4-decimal grid in [0,20], the region measured` (`KZ-005`: one home per measured figure).
+
+**The mandated `KZ-005` sweep found a defect neither the Leader nor the Reviewer had flagged**, and the Implementer **stopped to ask** rather than exceed its three authorized edits: the test comment cited `base-service.ts:134/:345`, but the second forwarding line is `:347`. The Leader verified and authorized the single fix **within the same attempt** — the worker was answering a bound the Leader had set, not opening a fourth cycle.
+
+The sweep also **verified rather than assumed** `service.ts:17-20`'s *"3,616 collisions per 20,000 samples"* against `design.md` DD-14 `:514` / `U-10` `:621` (exact match), and hand-checked that `549,755,813,887 × 10⁴ = 5,497,558,138,870,000 < 2⁵³` — **without writing that number into the file.**
+
+#### Two Leader errors, recorded because the log is worthless if it only records the workers'
+
+**1. The Leader "corrected" the Reviewer on the `ulp` binade, and was wrong.** The Implementer omitted the Reviewer's suggested `ulp = 2⁻¹⁴ ≈ 6.1e-5` figure on the grounds that it was not in the Leader's confirmed set. The Leader then told both worker and user that the figure did not verify, citing `2^(39−52) = 2⁻¹³` for the binade `[2³⁹, 2⁴⁰)`. **That binade is unreachable at this check** — `Math.abs(value) > 549_755_813_887` rejects everything in it first. The bound is `2³⁹ − 1`, which lies in `[2³⁸, 2³⁹)` where spacing is `2^(38−52) = 2⁻¹⁴`. The Reviewer's original figure was right; the Leader's correction was off by one binade. Cross-checked from the design: §6.2 `:330` states the condition as `ulp(v) ≤ 10^-scale`, and DD-14's `⌈log₂(10⁴)⌉ = 14` subtraction exists precisely to land the bound in the `2⁻¹⁴` binade.
+**Outcome unaffected** — no figure was inserted either way, so no false claim reached the file. The Implementer's *process* (never assert an unconfirmed number) produced the right result from a wrong premise.
+
+**2. The Leader's 3-million-sample probe was structurally incapable of failing, and was reported to the user as closing an advisory.** The Reviewer had flagged the band `[2³⁸, 2⁵²/10⁴)` as analytically unexcluded. The Leader sampled it, got **0 false rejections**, and reported the advisory closed by measurement. The Reviewer refused that: *"3,000,000 uniform samples should have hit it ~170,000 times and reported zero, so the harness did not measure what it was believed to measure … an unmeasured region logged as measured is worse than the open advisory it replaced."*
+
+It was right. The probe computed `canon = Math.round(v*10000)/10000` and then tested `ok(canon)` — the **idempotence of the rounding map**, not whether grid values survive it:
+
+```
+ok(v)     = false   <- the real question
+ok(canon) = true    <- what was actually tested (idempotent, so ~always true)
+```
+
+A correct probe, built from the intended scaled integer (`v = n/10000`) instead:
+
+```
+band [2^38, 2^52/1e4), 4-dec values built from scaled integers
+sampled: 2000000   FALSELY REJECTED: 179520 ( 8.98 % )
+examples: 378316057649.8024, 280331090806.8436, 295254301987.1019, 426975499164.0145
+```
+
+**This is `KZ-001` and `K-004` committed by the Leader** — the lesson it had cited at workers three times in this same run. The invalid result is **retired, not recorded as evidence**; the 8.98% figure above replaces it, and the band advisory is **open and ticketed**, not closed.
+
+#### `ADVISORY` — one item is reachable and must be TICKETED, not filed
+
+| Lens | Finding |
+| --- | --- |
+| **RISK — reachable false rejection** | **Input, verified: `quantification_number: 274877906944.0405`** — four decimals, inside DD-14's bound — returns `400 … must have at most 4 decimal places`. Confirmed by execution: `v*10000 = 2748779069440405.5` → `Math.round` → `…406` → round-trip `274877906944.0406 ≠ v`. The Reviewer derived the region exactly — `[274,877,906,944, 450,359,962,737)`, a residue class mod 1024 — and the Leader's corrected probe measures **8.98%** of that band's grid. Below `2³⁸` the scaled error caps at `0.153` and cannot reach the `0.25` threshold; above `450,359,962,737` the product's spacing becomes `1` and `Math.round` always recovers. **Reachability: reachable, input given.** This *upgrades* the attempt-2 advisory that said no input could be constructed |
+| **Why this is not a FAIL** | The Reviewer's reasoning, adopted: a FAIL at the ceiling restores `Number.isInteger(value * 10000)`, which falsely rejects `0.07`, `1.005` and **12.74% of the grid at every magnitude**. The shipped predicate is strictly better than what a rollback would reinstate, so failing would make the requirement *less* satisfied. The exposure traded away is a 4-decimal quantity between 275 and 450 billion |
+| **PROCESS** | If the band is re-measured, sweep by residue class mod 1024 rather than uniformly, and **observe the check going red on `274877906944.0405` first** (`K-004`) |
+| **READABILITY / FP-50** | `result-quantifications.service.spec.ts:130` cites `base-service.ts:134/:347` by line, and that file is inside this spec's change surface — which is exactly how the citation rotted from `:345` in the first place. The child guide §9 calls for an anchor here: *"the two `createCustomValidation(dataToSaveArray, dataRole)` call sites, in `create()` and `upsertByCompositeKeys()`"* cannot rot |
+| **RISK — undeclared tightening axis** | `PATCH /api/v1/result-oicr/:code` with `quantification_number: "5"` (a **string**) now `400`s where MySQL previously stored `5`, because the OICR DTO is entity-typed with no `ValidationPipe`. Consistent with DD-13's rule, so not a violation — but `RK-12` / `NFR-MSD-005`'s comms scope names only *"a negative or fractional quantification number"*. **The rollout note owes a type axis** (for `T-12`'s comms record) |
+| **RELIABILITY** | No row locator in the `400`. OICR resends every row per save, so a reporter with five measures gets one message and no indication which row failed |
+| **Settled, no longer open** | The default entry's missing magnitude bound (the `100000000000000000000` → `500` path raised against T-02) is **outside T-03's scope as specified** *and not a regression* — that value exceeded signed `bigint` too, producing the same `ER_WARN_DATA_OUT_OF_RANGE` → `500` before this spec. No user ruling needed |
+
+> **⚠️ `T-04` FORWARD POINTER — must be copied into `T-04`'s Implementer brief.** T-04 implements the **same** `≤ 4 decimals` rule on the Innovation Use DTO. The predicate shipped in T-03 falsely rejects `274877906944.0405` and ~8.98% of the band `[274,877,906,944, 450,359,962,737)`. **T-04 must not reproduce this predicate.** Derive the scale from the value's decimal string after the finite and magnitude gates (DD-17 step ④'s intent), or compare `Math.abs(value * 10000 - Math.round(value * 10000)) < 1e-3`. Add `274877906944.0405` to T-04's accept table — it is the input that reddens today. **Whether to then unify both tiers on one predicate is a user decision, not T-04's to take:** doing so edits T-03's shipped file, which is scope beyond T-04's approved task.
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Skills | `nestjs-expert`, `tdd`, `error-handling-patterns`; **`systematic-debugging` added** on attempts 2–3 | The task's list for attempt 1; debugging added once the failure was a measured defect rather than a build |
+| Effort | `xhigh` on all three attempts | The rework rule says bump, but the *Tier ↔ effort rule* forbids `max` on a cheaper tier, and escalating the Implementer to `opus` would collapse `author ≠ auditor` against the `opus` Reviewer. Attempts 2–3 had fully specified remediations, where brief precision beats depth |
+| Review mode | **Single merged-lens Reviewer, not the parallel lenses the 4R table prescribes at `xhigh`** | **Deviation, recorded.** The Leader had already measured the headline defect before review, so parallel breadth would have spent a lens auditing code certain to change. The security/bypass questions were merged into the single brief and cleared; the Reviewer was asked at the re-gate whether that left anything unaudited and answered: *"Security lens: nothing left unaudited … the attempt-2 delta only widens acceptance on role 3 inside DD-14's bound"* |
+| Reviewer continuity | Same Reviewer resumed across all three attempts | Its findings were judged by the party that raised them — and at attempt 3 it ruled on **its own** suggested figure rather than the Leader overriding it |
+| Suite re-measured by Leader | After every attempt | `354/2681` → `354/2692` → `354/2702`, each in a quiet tree after the worker reported. **One run reported exit 1 and was not a test failure** — the Leader's shell cwd had drifted, so `cd` failed and Jest never ran. Caught by reading the raw output before counting it (`K-014`); an exit code alone would have read as "T-03 broke the suite" |
