@@ -203,6 +203,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     ImpactOutcomesModule,
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
+    ImpersonationModule,
   ],
   exports: [
     AgressoContractModule,
