@@ -290,3 +290,51 @@ Tests: 6620 passed, 6620 total (all suites green)
 ## T-12 HITL half — handed to the human 2026-08-26
 
 Checklist delivered (stack swap to this worktree, 2 screenshots vs artboards 1/4, DevTools offset snippet, Lighthouse/axe contrast on banner + dialog, focus/Escape notes, T-11 advisories #1–3, role-visibility checks, end + logout paths). Evidence pending.
+
+---
+
+## T-06 — Server e2e — **PASS (Leader-inline evidence battery; user-approved runtime-failure fallback)** → `[x]`
+
+- **Date:** 2026-08-27
+- **Provenance:** the authored jest suite (`test/impersonation.e2e-spec.ts`, eslint/tsc clean) **hangs at AppModule bootstrap in this environment and has never produced output** (two attempts; unresolved — recorded as a known issue for CI, do not cite that file as evidence). After two worker runtime failures (background kill; weekly account limit) the user approved the Leader-inline fallback ("adelante"), and the acceptance evidence was collected by the Leader against the **production bundle** (`npm run build` + `node dist/main.js`, the exact deployed commit) on `localhost:3005`, dev MySQL + dev ROAR (`management-allianceindicatorstest.ciat.cgiar.org`), `ARI_LOCAL_AUTH_BYPASS=false`, real admin JWT (sec_user_id 1). Scripts: scratchpad `t06-evidence.mjs` + `t06-fix.mjs` (HTTP + SQL interleaved; token via env, never written to the repo).
+- **Fixtures (user-approved):** target 105 (Contributor, writes, cleaned up), target 15 (Center Admin, read-only start/end), actor 1.
+
+### Evidence (verbatim outputs in the session log)
+| Case | Result |
+| --- | --- |
+| No token | 401 |
+| `users?search=test` | 200 — rows 140/105 `simulable:true`; `search=ro` → 400; self → `simulable:false, blocked_reason:'self'` |
+| `/api/v1/...` | 404 (D-imp-17) |
+| `start {105}` | 201, session + `role.focus_id` present; DB row `actor=1, target=105, ended_at NULL, created_by=1` |
+| Nested `start` under header | 409 + `X-Impersonation-Error: NESTED` |
+| `users` under header | 403 + NESTED |
+| Forged uuid | 403 + SESSION_INVALID |
+| Foreign session (inserted actor 999999) | 403 + SESSION_INVALID (row cleaned) |
+| **Write attribution** | `POST /result-user/author-contact/save-by-result/19943` as 105 → 201; **DB readback `result_user_id 12741, created_by = 105`**; row deleted afterwards |
+| **Audit** | `impersonation_actions` row per non-GET with real status — including a **500** logged during a failed attempt (`status_code:500, route_pattern, result_official_code 19943`) and the final `status_code:201`; GETs produce no rows. Fire-and-forget insert lands ~1 s after the response (a same-millisecond SELECT races it — evidence note, not a defect) |
+| `end` / idempotent | 200, 200; header on a plain route after end → 403 SESSION_INVALID; `current` → `{active:false}` |
+| Expired (Node-clock fixture) | plain route → 403 SESSION_INVALID; DB `end_reason='expired', ended=1` |
+| Center Admin 15 | 201 — `user_role_list` carries `{role_id:9, sec_role_id:9, focus_id:1}`; ended immediately, zero writes |
+| Log attribution (T-05 in prod) | error/verbose lines carry `[USER_ID:105] [ACTOR_ID:1] [IMPERSONATION_SESSION_ID:…]` |
+| NFR-IMP-003 | middleware `resolve` debug samples n=33: median **91 ms**, min 34.6, max 199.8 — **vantage-dominated** (laptop→VPN→on-prem MySQL round-trips); max > 2× median ⇒ per the disqualifier this number is the spread report, not a pass. Deployment-local measurement owed once the test env is back |
+
+### Evidence notes (fixture artifacts found and fixed during the run — not code defects)
+- A fixture writing `expires_at` via MySQL `NOW()` reads back +5 h through the driver's local-time interpretation → fixtures must compute expiry with the Node clock (as production writes do). First run's "expired → 200" was this artifact.
+- `result_users.user_id` is a **carnet** FK to `alliance_user_staff(carnet)`, not a `sec_users` id.
+- The dev `.env` points `ARI_ROAR_MANAGEMENT_HOST` at `localhost:3002` (a locally-run management service); the deployed test ROAR is `management-allianceindicatorstest.ciat.cgiar.org` and validated the token (`isValid:true, roles:[3,9,1]`). The cloud `management-star` host rejects test tokens (different signing secret).
+
+### Environment incident (open, not a spec item)
+Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache since the 2026-08-27 06:39 deploy; Jenkins reports success; the same commit builds and boots clean locally on the prod path. Browser CORS/PNA errors are downstream noise. **RESOLVED 2026-08-27 13:50 UTC** — see the root-cause block below; backend answering after `ae38b052` deployed (build #73).
+
+### Environment incident — findings from the Jenkins console (build #72, 2026-08-27)
+- Deploy = Docker images built on Jenkins (Node 22.12-alpine, `npm ci` + `npm run build`) → ECR → `docker run --restart=always -p 3000:3000` on the on-prem host via SSH. **No health check after `docker run`** — a crash-looping container yields Apache 503 with Jenkins SUCCESS.
+- Build #72 was a duplicate trigger of the same commit: every layer CACHED, image digest identical to the already-running one (#71 shipped our code).
+- **`migration:execute` RUNS on every deploy inside the container with the host env** ("No migrations are pending") — the constitutional K-015 claim ("pipeline does not apply migrations") is stale for this repo and flagged for T-13/archive. That run also proves host-env DB connectivity from inside the image.
+- FIX-PRMS-sync (previous deploy) changed one OpenSearch service line — not boot-relevant. No evidence test was up between that deploy (Aug 26 20:37 UTC) and ours.
+- Pending (DevOps/host): `docker ps -a` status + `docker logs --tail 120 roar-main-application-server-dev`.
+
+### Environment incident — ROOT CAUSE AND FIX (2026-08-27)
+- **Root cause (Leader error, T-03/T-04→dev merge resolution):** while deduplicating the conflicted `exports` block in `entities.module.ts`, the Leader misread the two hits as imports+exports and deleted the only `imports` entry for `ImpersonationModule` — leaving it exported but not imported. Nest rejects that at module scan; the **microservice bootstrap** (`createMicroservice(AppMicroserviceModule)` → EntitiesModule) hit it first, the container crash-looped behind `--restart=always`, Apache answered 503, Jenkins reported SUCCESS (no health check).
+- **Why local verification missed it (KZ-017):** every "boots clean" run was executed on branch `JuankCadavid/PARI-242` (whose file was correct), not on the merged dev tree — the merge's own artifact was never booted, and no gate in the pipeline or locally scans the microservice graph.
+- **Fix:** `ae38b052` on dev — one line (`ImpersonationModule` into `imports`). Red reproduced on the dev tree first (same error verbatim), then green: `Nest microservice successfully started` + HTTP app started + live 200 on `/api/impersonation/users`; full server suite 3,259 green. Pushed → Jenkins redeploys.
+- **Lessons for kaizen (candidate):** (1) after any merge-conflict resolution in a composition root, boot BOTH bootstraps from the *merged* tree, not the source branch; (2) the deploy pipeline needs a post-`docker run` health check — Jenkins SUCCESS is currently compatible with a dead backend.
