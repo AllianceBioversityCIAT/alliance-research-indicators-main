@@ -34,7 +34,31 @@ The authorized extra review round found **14 merged findings**, and one of them 
 /akili-execute docs/specs/changes/measure-number-signed-decimal
 ```
 
-**Start it in a fresh session.** Everything execution needs is in the three spec files; nothing lives only in the specify conversation.
+**Start it in a fresh session, with cwd = `alliance-research-indicators-main`.** Everything execution needs is in the three spec files; nothing lives only in the specify conversation.
+
+---
+
+## Decisions already taken at the `/akili-execute` gate — 2026-08-27
+
+**Do not re-ask these. They are recorded rulings, not open questions.**
+
+| # | Decision |
+| --- | --- |
+| **1** | **`T-01`'s pre-flight is AUTHORIZED to run against the shared Dev database** (`ARI_MYSQL_*`), by explicit user ruling. Two **read-only `SELECT`s**, no writes. Paste both outputs verbatim into `execution.md`. **Both stop conditions still bind** — a role-3 row above 549,755,813,887, or any negative role-1/2 row, halts the spec for a human ruling rather than continuing |
+| **2** | **The run was deliberately restarted so the `akili-*` wrappers and the tasks-gate hook load.** The first `/akili-execute` attempt was launched from `-management/server/app-authorization`, where `.claude/agents/akili-*.md` and `.claude/hooks/akili-tasks-gate.sh` do **not** exist. The user chose to restart rather than accept a manual substitute. **If you find yourself about to hand-pin Implementer/Reviewer models, you are in the wrong directory — stop and fix the cwd instead** |
+
+### The F-01 check is already done — and it PASSED
+
+`docs/infrastructure.md` warns that a `TEST`-named variable is **not** evidence of a disposable target: on at least one machine `ARI_TEST_MYSQL_*` resolved to the same remote instance as `ARI_MYSQL_*`. Verified on this machine, by **resolved host** rather than variable name:
+
+- `ARI_MYSQL_HOST` → a remote host
+- `ARI_TEST_MYSQL_HOST` → `127.0.0.1`, port `3307`
+
+**They differ**, so the scratch container is genuinely disposable here and `T-05`/`T-07`/`T-08` may use it freely. **Re-verify if the checkout moves to another machine** — this is a property of the machine, not of the repo.
+
+### Environment, verified 2026-08-27
+
+Docker daemon **up** · `server/researchindicators/node_modules` **present** · `client/research-indicators/node_modules` **present**. *(Worth checking anyway: the `oicr-lever-dropdowns` spec had to waive its whole Bug-Mode gate because no `node_modules` existed at execution time.)*
 
 ---
 
