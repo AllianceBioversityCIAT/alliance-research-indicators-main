@@ -560,3 +560,108 @@ Two passes after the first "clean" result still found survivors. **A single clea
 ## State
 
 **Still `ESCALATED`, still accepted — and now with one fewer accepted defect and three made unreachable.** The revision is **not judged**: no re-judgment budget remains. What is different from the pre-revision state is that the un-judged surface is *smaller* than what the judges already reviewed, because the change is the **removal** of edits, not the addition of them.
+
+---
+
+# Round 4 — the authorized extra round, 2026-08-27
+
+**Authorization.** The judgment budget was exhausted at round 3 (2 fix rounds, 2 re-judgments). This round exists because the product owner extended the lineage by exactly one:
+
+> *"mañana comenzaremos con otra revisión, solo una más, y ya nos vamos a las tareas."* — 2026-08-26
+
+Recorded here because the protocol requires a human to authorize an extension, and this is that authorization.
+
+## Dispatch
+
+| | |
+| --- | --- |
+| Judges | **2**, blind, identical prompts, no cross-talk |
+| Model / tier | `opus` (T3 Auditor) |
+| Tools | **read-only by construction** |
+| Scope | the **un-judged surface only** — the additive-defaults revision of `DD-7`/`DD-12`/`DD-13`/`DD-14`, the four rewritten requirement clauses, and an independent survivor hunt |
+| Explicitly out of scope | `judgment.md` lines 1–514. Both judges confirm they did not read them |
+
+⚠️ **Session-hygiene note, and it is a real deviation.** This round ran with cwd = `alliance-research-indicators-management`, so `.claude/agents/akili-*.md` — which live only in `-main` — **were not loaded**, and `akili-reviewer`'s enforced binding (`opus` + read-only `tools:`) was not in force. It was reproduced manually by pinning `opus` on an agent type that is read-only by construction, which matches both axes. **The `akili-tasks-gate.sh` hook was likewise not loaded**; it gates only flipping a task to `[x]` without Reviewer PASS evidence, so it could not have fired during Phase 3 authoring. Recorded rather than glossed: the substitute is faithful, but it is a substitute. *(Handoff note E predicted this exact failure mode.)*
+
+## Merge tally — round 4
+
+| Bucket | Count |
+| --- | --- |
+| Confirmed by **BOTH** judges — SEVERE | **5** |
+| Confirmed by **BOTH** — WARNING | **5** |
+| Single-judge, **Leader-verified before merging** | **4** |
+| Single-judge, open (not merged) | 2 |
+| **Refuted** by the other judge + Leader check | 1 |
+| **Total findings** | **14 merged** |
+
+Lineage total: **4 rounds · 8 judge dispatches · 92 findings.**
+
+## Confirmed by BOTH — SEVERE
+
+| ID | Finding | Disposition |
+| --- | --- | --- |
+| **M-01** | **`DD-13` v3 was not implementable at the seam it named.** `base-service.ts:279-281` declares `createCustomValidation(dataArray)` — one argument. The role travels as `upsertByCompositeKeys`'s separate `dataRole` param and is attached to rows only at `:354-355`, **after** the hook runs. On the IU path the role is absent **by construction**: `InnovationUseQuantificationDto` declares four fields, none of them the role, under `whitelist: true`. A payload-keyed map would have sent every role-3 row to the **default** rule and rejected the exact values this spec exists to enable; on the OICR side (entity-typed DTO, no pipe) a client could have set `quantification_role_id: 3` to buy the permissive rule | **FIXED** — `DD-13` rewritten to v4: an **optional** `dataRole` second parameter on the hook, forwarded at `:134`/`:345`. Additive by construction (no override exists in the tree). The spec's only shared-file edit |
+| **M-02** | **The default entry's rationale was false on the sign axis.** `baseline.sql:3789` is `bigint` — **signed**, no `UNSIGNED`, no CHECK — so the column enforced **integrality only**. Refusing negatives on roles 1/2 is a **new** restriction, not "today's effective behaviour". Reachable: an existing negative row `400`s on an untouched save, because `oicr-details.component.ts` resends every row | **FIXED** — corrected in `DD-8`, `DD-13`, S-7b and the §13 challenge; **gated** by a second pre-flight query in `NFR-MSD-002` and `R-MSD-011` AC.7; tracked as `RK-14` |
+| **M-03** | `R-MSD-011`'s Behavior line, **AC.1** and **AC.3** still mandated the withdrawn DD-12 pin and a `ResultOicrService` edit. AC.2 *between them* had been corrected by the round-3 sweep; its two neighbours had not | **FIXED** — all three rewritten |
+| **M-04** | **`design.md` contradicted itself on `DD-7`.** `DD-16` still read *"the digit guard is **REMOVED** … removed, not re-united"*, four rows below DD-7's withdrawal — plus four more sites in `requirements.md` (Details, AC.5, the `BUT` clause, `DC-10`) | **FIXED** — `DD-16` rewritten; all five sites swept |
+| **M-05** | **`R-MSD-006` AC.3 was unsatisfiable — proven by execution, independently, by both judges.** `input.component.ts:166` compares `value.toString().length >= 18` — **characters**, including sign and point. `-549755813886.9999` is *inside* DD-14's scale-4 bound and is exactly 18 chars, so the guard fires. An AC quantified over "any configured scale" could never go green | **FIXED** — AC.3 rewritten to **pin** the true boundary (clean at scales 0–2, warning present at 3–4) instead of denying it; `RK-16` declares the surviving false positive |
+
+## Confirmed by BOTH — WARNING
+
+| ID | Finding | Disposition |
+| --- | --- | --- |
+| **M-06** | `R-MSD-006`'s new **AC.6** (`max` clamps) contradicted its own scenario clause (*"not enterable"*), which the round-3 amendment never touched | **FIXED** — clause rewritten to distinguish all three shapes |
+| **M-07** | **All 25** of `design.md` §2.3's line anchors were stale. Content mapping intact (12 + 13 = 25), citations unusable — on the table the design nominates as its own anti-propagation fix | **FIXED** — regenerated and **verified to resolve**; see the process note below |
+| **M-08** | The one default whose **value** changes had **no acceptance criterion** — asserted only in Details and inside a `BUT` clause | **FIXED** — `R-MSD-002` AC.5 (and AC.6 for `max`). Both judges noted it turns `quantification-item.component.spec.ts:158,163` red on purpose |
+| **M-09** | `DD-13`'s *"a future caller cannot bypass it"* was false: `upsertQuantificationsByRole` (`:32-115`) writes via `this.mainRepo.save` at `:112` without traversing the base class. Dead today, but `public` and unit-tested | **FIXED** — claim narrowed to *"structural for every production writer"*; `RK-15`, and `U-12` amended |
+| **M-10** | `design.md:462` still justified the full client suite with *"this change now edits OICR deliberately"* | **FIXED** — replaced with the **stronger** true reason: OICR silently *inherits* a changed default |
+
+## Single-judge — Leader-verified before merging
+
+Each was checked against the tree by the Leader rather than relayed (`K-014`).
+
+| ID | Finding | Verification run | Disposition |
+| --- | --- | --- | --- |
+| **M-11** | **`updateOicr` is not transactional.** DD-13's `400` lands with header, tags and external OICRs already committed — a partial-update mode today's silent rounding does not have | `grep -niE 'transaction\|dataSource\|queryRunner\|manager' result-oicr.service.ts` — plumbing exists at `:89-140`/`:354-371` (create path) and **`updateOicr` at `:190` threads none** | **DECLARED, not closed** — `RK-13` + a new §4 row. The fix is an OICR-file edit this spec exists to avoid |
+| **M-12** | `R-MSD-012` **AC.3** (*"the bound cannot be set to a value inconsistent with the scale"*) demanded an impossibility the design does not provide — `max` and `maxFractionDigits` are independent `@Input`s with no cross-check | Read `design.md` §6.1 + DD-14; no derivation or guard exists | **FIXED** — AC.3 rewritten to require derivation *at the call site* |
+| **M-13** | `proposal.md:22` published the **round-2** budget in its *"Current decision"* column; `:24` said 2 rounds / 56 findings / 4 judges | `sed -n '20,26p' proposal.md` | **FIXED** — both rows updated |
+| **M-14** | `proposal.md:242` **SC-5** required the assertion be made *"at the OICR call sites — **not** inferred from the shared component's defaults"* — **forbidding the mechanism DD-12 depends on** | `sed -n '240,244p' proposal.md` | **FIXED** — SC-5 rewritten |
+
+## Refuted
+
+| Claim | Why it fell |
+| --- | --- |
+| Judge A suspected `R-MSD-002`'s `-1` half was clamp-not-prevention, like `max` | **Refuted.** `allowMinusSign()` is `this.min == null \|\| this.min < 0` (`primeng-inputnumber.mjs:1270`), enforced at `:1316`. With `[min]="0"` the minus key is refused **per keystroke**. Judge A labelled it a suspicion and named the falsifier; the falsifier fired. **The three enforcement shapes are now asymmetric and stated as such:** `maxFractionDigits` prevents, `min` prevents, `max` clamps |
+
+## Single-judge, open — NOT merged
+
+| Claim | Why it is left open |
+| --- | --- |
+| A third reading of `DD-12`: rendering an out-of-domain stored value at `maxFractionDigits: 0` could write the rounded value back through the composite key → silent row replacement | Judge's own confidence **low**, explicitly labelled a suspicion, and needs a browser. Reachability today is nil (`bigint` cannot hold a fraction); after `DD-1` it is non-zero only via `RK-15`'s bypass or ops SQL. **Recorded here, not designed against** |
+| The rule map's null contract was under-specified | Raised by one judge — but **merged anyway** as `R-MSD-011` AC.6, because it is cheap, it is right, and `DD-2`'s `null → null` invariant is load-bearing for three other ACs. Noted as single-judge for the record |
+
+## What this round establishes
+
+**`U-4` is resolved, and it was never unresolvable.** Both prior camps were right about different branches: the **keystroke** path (`primeng-inputnumber.mjs:1333-1343`) treats `undefined` as falsy and never inserts the separator — decimals are *already* refused when typing; the **Intl** path (`:834-838`) resolves to 3 and governs formatting and paste. Six judges across three rounds recorded this as *"contested, unresolvable without a browser"*, and one judge settled it by reading `node_modules`. **The claim that a question cannot be answered is itself a claim, and it went unverified for three rounds** — a `KZ-017` failure pointing inward.
+
+**`DD-13` needed a fourth version, and the reason is worth keeping.** v1 (`ValidationPipe`) destroyed data. v2 (`ResultOicrService`) edited OICR. v3 (`createCustomValidation`) found the right seam — and was verified by two judges *at the seam level only*. **Both of them confirmed the hook exists, is called on both paths, and is unoverridden; neither checked whether it receives the argument the design's own rule map needs.** A verified seam is not a verified mechanism, and the gap between those two is exactly where M-01 lived for a whole revision.
+
+**The propagation defect is now four rounds old and did not improve.** Round 3's sweep left `R-MSD-011` AC.1 and AC.3 untouched **while correcting AC.2 between them** — the sweep visited the block and fixed one row of three. `proposal.md`'s banner was fixed at one row and left stale at two others. The lesson stands as recorded at acceptance: this is about **document count**, not sweep diligence.
+
+## The process note this round owes, because it happened here
+
+**Round 4's own fix for M-07 broke 21 of the 25 anchors it was repairing**, by capturing `requirements.md` line numbers *before* writing that round's requirements edits. Caught by verifying each anchor resolved to a line containing its clause — a check no previous round ran, because every previous round checked the **count** (12 + 13 = 25), which reconciles perfectly whether or not a single citation points anywhere real.
+
+**Two claims, one check.** "The clauses exist" and "the citations point at them" are different assertions, and the count only ever tested the first. The durable fix is an **ordering** rule now written into §2.3: regenerate the table **last**, after every requirements edit in the round has landed, then verify resolution — not diligence, sequence.
+
+## Terminal state — round 4
+
+| | |
+| --- | --- |
+| State | **`ESCALATED` — accepted, and now with M-01 repaired.** The acceptance's binding condition still stands: `design.md` governs wherever it and `requirements.md` disagree |
+| Rounds | 4 · Judge dispatches 8 · Findings **92** |
+| Sweep | ran to a **fixed point**: passes 3 and 4 each found survivors *after* earlier passes reported clean; pass 5 clean, anchors 25/25 resolving |
+| Ledger | **frozen.** No further judgment rounds are authorized |
+| Next | `tasks.md` — 12 tasks, 2 PRs |
+
+**Four accepted defects from the 2026-08-26 acceptance, final status:** `L-01` fixed and executed · `L-02` unreachable (edit withdrawn) · `L-03` unreachable, **and its last two live traces removed here** (`M-03`) · `L-04` resolved, **and its last five live traces removed here** (`M-04`).

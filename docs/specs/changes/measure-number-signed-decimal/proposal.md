@@ -19,9 +19,9 @@
 > | Scope item 3 + `RK-7` — "count **digits**, not characters" in `app-input`'s guard | **WITHDRAWN.** The guard is not touched at all (`design.md` DD-7) — removing or re-uniting it deletes paste feedback app-wide (`L-02`) |
 > | ADDED bullet + **`SC-3`** — "refused locally, with a message **naming the limit**" | **WITHDRAWN** (`DD-16`). There is no client state in which an over-scale value exists to report |
 > | `OQ-1`/§Scope — pin or edit OICR's call sites | **Not done.** The shared card's `maxFractionDigits` default becomes `0`; **no OICR file is edited** (`DD-12`) |
-> | Budget: ≈ 700 LOC *(this figure is `design.md`'s "Round 0" column, not stated in this proposal — `L-14`)* | **15 tasks · ≈ 2,400 LOC · ≈ 30 rounds** (`design.md` §14) |
+> | Budget: ≈ 700 LOC *(this figure is `design.md`'s "Round 0" column, not stated in this proposal — `L-14`)* | **12 tasks · ≈ 1,560 LOC · ≈ 24 rounds · 2 PRs** (`design.md` §14) |
 >
-> Two Judgment Day rounds produced **56 findings** across four blind judges. The ledger is [`judgment.md`](./judgment.md).
+> **Four** Judgment Day rounds produced **92 findings** across eight blind judges. The ledger is [`judgment.md`](./judgment.md). *(This line read "Two … 56 findings … four blind judges" until Round 4 — the banner whose entire job is to state the current position was two rounds behind, and its budget row was one revision behind. Both are fixed above; the recurrence is the argument for the document-count lesson, not for sweeping harder.)*
 
 ---
 
@@ -239,7 +239,7 @@ It is the smallest path that leaves **one** field with **one** meaning in **one*
 | SC-2 | The value stored in MySQL for a fractional entry is the value entered, not a rounded one, verified by reading the row |
 | SC-3 | A value beyond the agreed precision is refused **locally**, with a message naming the limit — the server's rejection is not the first thing the user sees |
 | SC-4 | The placeholder no longer says "positive" |
-| SC-5 | **OICR** *Actual count* and *Extrapolated estimates* still refuse negatives and fractions, asserted at the OICR call sites — not inferred from the shared component's defaults |
+| SC-5 | **OICR** *Actual count* and *Extrapolated estimates* still refuse negatives and fractions — asserted on the shared card's **defaults** plus the **rendered** behaviour of each OICR block, and enforced server-side by `ResultQuantificationsService.createCustomValidation` for roles 1 and 2. ⚠️ *Rewritten at Round 4: this criterion previously required the assertion be made "at the OICR call sites — **not** inferred from the shared component's defaults", which **forbids the mechanism `DD-12` now depends on**. A success criterion that contradicts the accepted design is the most expensive kind of survivor, because it reads as the thing the work will be judged against.* |
 | SC-6 | Actor and organization **count** fields still refuse negatives and fractions (`R-IUP-008`, surviving scope) |
 | SC-7 | The **full** client suite is green (not a targeted run), the full server suite is green, and the build is clean |
 | SC-8 | The migration ran red-before-green on a scratch schema, and the four lifecycle routines plus the report views were **transcribed** — with the transcript recorded — before any claim about them |

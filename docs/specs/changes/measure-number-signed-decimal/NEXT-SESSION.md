@@ -1,9 +1,8 @@
 # Next session — handoff
 
-**Paused 2026-08-26. Resume 2026-08-27.**
+**Updated 2026-08-27, at the end of `/akili-specify` Phase 3. The spec is COMPLETE and ready to execute.**
 
-> **Start here, then read `judgment.md`'s last section (*Post-acceptance revision*), then `design.md`.**
-> Do **not** re-read the whole ledger to get going — it is 78 findings of history. The two paragraphs below are the state.
+> **Start here, then read `tasks.md`. You do not need `judgment.md` to execute** — it is 667 lines of history and its ledger is frozen. Read it only if you want to know *why* a decision has the shape it does.
 
 ---
 
@@ -11,50 +10,31 @@
 
 | | |
 | --- | --- |
-| Phase | `/akili-specify` **Phase 2 complete** (`requirements.md` + `design.md` approved). **Phase 3 (`tasks.md`) not started** |
-| Judgment | 3 rounds, 6 blind judges, **78 findings**. State: **`ESCALATED` — accepted by the product owner, not approved** |
-| Then revised | After acceptance, an **additive-defaults ruling** rewrote `DD-7`, `DD-12`, `DD-13`, `DD-14`. It made three accepted defects **unreachable** and fixed the fourth |
-| Budget | **11 tasks · ≈ 1,500 LOC · ≈ 22 review rounds · 2 PRs** |
+| Phase | `/akili-specify` **COMPLETE** — `requirements.md`, `design.md`, `tasks.md` all written and approved |
+| Judgment | **4 rounds · 8 blind judges · 92 findings.** State: **`ESCALATED` — accepted by the product owner, not approved.** Ledger **frozen**, no further rounds authorized |
+| Budget | **12 tasks · ≈ 1,560 LOC · ≈ 24 review rounds · 2 PRs** |
 | Branch | `AC-1679-Create-the-innovation-use-section` |
+| Depth | `Full` |
 
 **The one binding condition of the acceptance:** `design.md` is authoritative wherever it and `requirements.md` disagree.
 
 ---
 
-## ⚠️ Do this first: the work is UNCOMMITTED
+## What round 4 changed, in one paragraph
 
-`git status` shows the entire folder as `??` — untracked. Four documents, ~190 KB, on `AC-1679-…`. **Nothing is in git.** Commit before doing anything else, or a stray `git clean` loses three rounds of judgment.
+The authorized extra review round found **14 merged findings**, and one of them mattered enormously: **`DD-13` was not implementable at the seam it named.** `createCustomValidation` takes one argument and never receives the role, so the per-role rule map would have sent every Innovation Use value to the default rule and **rejected the exact values this spec exists to enable**. It is now v4 — an optional `dataRole` parameter on `base-service.ts`, the spec's only shared-file edit. Round 4 also found that the `bigint` column is **signed**, so the "default entry restores today's behaviour" rationale was false on the sign axis (a genuine new tightening, now gated by a second pre-flight query), and that `R-MSD-006` AC.3 was **unsatisfiable** — proven by execution, twice, independently.
 
-Suggested: `docs(specs): add measure-number-signed-decimal spec through Phase 2`
+**It also resolved `U-4`, which three rounds had recorded as "unresolvable without a browser."** It was resolvable by reading `node_modules`: both camps were right about different code paths.
 
 ---
 
-## Tomorrow's plan, as agreed
+## Start execution
 
-### 1. ONE more review round — then stop reviewing
+```text
+/akili-execute docs/specs/changes/measure-number-signed-decimal
+```
 
-> **Explicit product-owner decision, 2026-08-26:** *"mañana comenzaremos con otra revisión, solo una más, y ya nos vamos a las tareas."*
-
-This is a **deliberate extension of the judgment lineage**, which the protocol requires a human to authorize — and this is that authorization, recorded. The budget was exhausted (2 fix rounds, 2 re-judgments); this adds **one** round and **one** fix pass, and then the spec goes to tasks regardless of what the round finds.
-
-**What the round must target — the un-judged surface only.** Everything the six judges reviewed is already in the ledger; re-reviewing it wastes the round. What no judge has seen:
-
-| # | Un-judged | Why it matters |
-| --- | --- | --- |
-| 1 | **`DD-12`** — the card's `maxFractionDigits` default changing `undefined` → `0` | The only default whose *value* changes. Rests on `U-11`/`U-4`, which is contested and needs a browser |
-| 2 | **`DD-13`** — the `createCustomValidation` override + per-role rule map | Two judges verified the *seam* exists and that `ResultQuantificationsService` is the only path; **none has reviewed the rule map itself**, including whether the default entry reproduces today's behaviour for roles 1 and 2 |
-| 3 | **`DD-14`** — the new bound and its `@Input` plumbing | The formula **is** executed (zero collisions). The *plumbing* — `max` as an `@Input` on `app-input`, defaulting to today's value — is not reviewed |
-| 4 | **`DD-7` withdrawal** | Withdrawing an edit should be safe, but nobody has confirmed nothing else depended on it |
-| 5 | **The three-pass sweep's fixed point** | Passes found 1 → 3 → 0 survivors. A judge should hunt independently; three rounds running, my "clean" was wrong |
-| 6 | `R-MSD-002`'s amended scenario, `R-MSD-006`'s new AC.6, `R-MSD-011` AC.2, `R-MSD-012` AC.2 | All rewritten after the last judge saw them |
-
-**Suggested framing for the round:** two blind read-only judges on `opus`, identical prompts, scoped to the six rows above plus an independent survivor hunt. Same protocol as before — merge only what both confirm, ask before fixing. It is in `judgment.md`'s round-1 and round-3 sections if you want the prompt shape.
-
-### 2. Then `tasks.md` — and stop
-
-11 tasks, 2 PRs. The natural seam is in `design.md` §14: **(1) server** — entity transformer, the shared validator override, both migrations; **(2) client** — the card's inputs and defaults, the Innovation Use call site, the read/write type reconciliation. The client depends on (1)'s transformer existing.
-
-`design.md` §2.1 already lists every file with its responsibility, so the decomposition is mostly transcription, not design.
+**Start it in a fresh session.** Everything execution needs is in the three spec files; nothing lives only in the specify conversation.
 
 ---
 
@@ -62,11 +42,12 @@ This is a **deliberate extension of the judgment lineage**, which the protocol r
 
 | # | Thing |
 | --- | --- |
-| **A** | **`NFR-MSD-002`'s pre-flight is BLOCKING.** If any existing role-3 row exceeds 549,755,813,887, the change **stops**. It is not a formality |
-| **B** | **Code first, migrations second, never the reverse.** Applying the `ALTER` before `DD-2`'s transformer ships puts a string on the wire with no normaliser → `400` on the Innovation Use path and **silent row replacement** on the OICR path |
-| **C** | **`L-08`, a pre-existing client defect this spec does not fix:** `oicr-details.component.ts` sends `q.number ?? 0` while its read preserves `null`, so a `NULL`-valued OICR row churns on save even with `DD-2`. The new OICR fixture **must expect this**, not be surprised by it |
-| **D** | **The migration is applied by a human.** The pipeline deploys code but **not** migrations (`K-015`). A merge does not ship this schema |
-| **E** | **Session hygiene:** run every `/akili-*` command with cwd = `alliance-research-indicators-main`. From `-management` the model wrappers and the tasks-gate hook silently do not load |
+| **A** | **`T-01`'s pre-flight is BLOCKING, and it is now TWO queries.** Query 1 is magnitude (any role-3 row above 549,755,813,887 stops the change). **Query 2 is sign, by role** — added at round 4 — because the `bigint` column is signed and an existing negative role-1/2 row would `400` on a save its reporter never made. Neither is a formality |
+| **B** | **Code first, migrations second, never the reverse.** Applying the `ALTER` before `T-02`'s transformer ships puts a `DECIMAL` string on the wire with no normaliser → `400` on the Innovation Use path and **silent row replacement** on the OICR path |
+| **C** | **`L-08`, a pre-existing client defect this spec does not fix:** `oicr-details.component.ts` sends `q.number ?? 0` while its read preserves `null`, so a `NULL`-valued OICR row churns on save even with `DD-2`. The `T-07` OICR fixture **must expect this**, not be surprised by it |
+| **D** | **The migration is applied by a human.** The pipeline deploys code but **not** migrations (`K-015`). A merge does not ship this schema. `T-05` needs `ALGORITHM=COPY`, which locks writes for a full table rebuild |
+| **E** | **Session hygiene: run every `/akili-*` command with cwd = `alliance-research-indicators-main`.** From `-management` the `akili-*` model wrappers and the tasks-gate hook silently do not load. **This actually happened during round 4** — the judges were dispatched with a manual substitute and it is recorded in the ledger. Do not repeat it during execution, where the `akili-reviewer` read-only binding matters far more |
+| **F** | **Three declared-and-unfixed risks live in `T-03`'s blast radius:** `RK-13` (`updateOicr` is not transactional, so DD-13's `400` lands on a partially-committed update), `RK-15` (`upsertQuantificationsByRole` bypasses the validator), `RK-16` (the `Maximum reached` false positive survives). **Do not silently fix any of them** — each is out of scope by decision, not by oversight |
 
 ---
 
@@ -74,17 +55,20 @@ This is a **deliberate extension of the judgment lineage**, which the protocol r
 
 | ID | Question | Owner |
 | --- | --- | --- |
-| `OQ-1` | `report_oicr`: accept `10.0000` in OICR exports, or ship `DD-10`'s normalising expression? Recommendation: ship it | Product owner + eng lead |
+| `OQ-1` | `report_oicr`: accept `10.0000` in OICR exports, or ship `DD-10`'s normalising expression? Recommendation: ship it. **Gates `T-06`'s merge** | Product owner + eng lead |
 | `OQ-3` | Target branch — stay on `AC-1679-…` or branch from `main`? | You |
 | `OQ-D5` | Dev and Prod MySQL versions. Narrowed to **8.0.4 … 8.0.16**; `DD-10` needs nothing above 8.0.4, so it no longer gates anything | DevOps |
-| `S-10` | Amend `R-IUP-008` in the archived spec, and add the `FR-12` row to `docs/specs/innovation-use/family.md`. **Neither is done** | This spec, at execution |
+| `S-10` | Amend `R-IUP-008` in the archived spec, and add the `FR-12` row to `docs/specs/innovation-use/family.md`. **Neither is done — now owned by `T-12`** |
+| Sign-off | **Security review and DevOps are both REQUIRED**, not optional | Eng lead to schedule |
 
-**Reported, not owned — worth tickets, none opened:** `O-1` (Innovation Use measures reach no report view at all), `O-3` (`orm.config.ts:53` is dead config), `L-19`'s second uncalled quantification upsert, and the still-open `FR-7` / [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718).
+**Reported, not owned — worth tickets, none opened:** `O-1` (Innovation Use measures reach no report view at all), `O-3` (`orm.config.ts:53` is dead config), `RK-13`, `RK-15`, and the still-open `FR-7` / [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718).
 
 ---
 
-## The one thing worth remembering about how this went
+## The two things worth remembering about how this went
 
-The decisions held under six adversarial judges. What failed, three rounds running, was **propagation** — one decision restated across four documents, with no sweep closing all of them. The additive-defaults ruling was the first change that attacked that instead of patching its symptoms: fewer edited files, fewer places to fall out of sync. **The budget went down for the first time in the whole process.**
+**1. A verified seam is not a verified mechanism.** Two judges confirmed `createCustomValidation` exists, is called on both upsert paths, and is unoverridden. Neither checked whether it receives the argument the rule map needs. That gap survived a whole revision and would have reached an implementer as a design that cannot be built.
 
-And the sweep lesson, which is not "sweep harder": passes 2 and 3 still found survivors **after** pass 1 reported clean. A single clean pass is not evidence — the fixed point is.
+**2. The count reconciling is not the citations resolving.** `design.md` §2.3's anchors went stale for all 25 clauses while its count (12 + 13 = 25) stayed perfect — and round 4's own repair broke 21 of them again by capturing line numbers *before* writing that round's edits. The durable fix is an **ordering** rule, now written into §2.3 and into `tasks.md` §4: regenerate the table **last**, then verify each anchor resolves to a line actually containing its clause.
+
+Both are the same lesson the ledger has been circling for four rounds: **the decisions held; the propagation failed.** What finally moved the budget down was structural — fewer documents stating a decision — not better sweeping.
