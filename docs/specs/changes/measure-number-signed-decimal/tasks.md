@@ -174,15 +174,15 @@ graph TD
   - Chosen over an in-table temporary column, which lives inside the table the `ALTER` rebuilds and forces three rebuilds instead of one.
   - The backup table is **retained until sign-off**, not dropped in the same migration.
 - **Acceptance / done check:**
-  - [ ] `up()` executed on a scratch schema; whole-table diff shows **zero** value changes.
-  - [ ] `down()` executed and **its lossiness demonstrated, not asserted**: a fractional value rounds, and a value wider than a signed `bigint` makes it **fail** (`AR-2`, `R-MSD-004` AC.4).
-  - [ ] Restoration from the backup table executed **at least once** (`R-MSD-004` AC.5) — a bare `down()` cannot recover a fraction.
-  - [ ] Migration ordering places this **before** migration 2.
+  - [x] `up()` executed on a scratch schema; whole-table diff shows **zero** value changes. Seeded `NULL`, `-1500`, a 19-digit value, `0`, `42` **before** the diff, so it is not vacuous.
+  - [x] `down()` executed and **its lossiness demonstrated, not asserted**: `2.5` → `3`, and `9223372036854775808` fails whole-statement with **`1292` / `ER_TRUNCATED_WRONG_VALUE`** (`AR-2`, `R-MSD-004` AC.4 — both the literal and the error codes were spec-text errors, corrected above and in AC.4).
+  - [x] Restoration from the backup table executed **at least once** (`R-MSD-004` AC.5). Confirms the honest limit: it restores the **pre-migration state**, and `2.5` is recoverable by nothing.
+  - [x] Migration ordering places this **before** migration 2. `1787260000000` > `1787253483599`, nothing above it — **`T-06` must claim `> 1787260000000`.**
 - **What disqualifies this evidence:** running `up()` on an **empty** scratch schema proves the DDL parses, not that it is lossless — a diff over zero rows is vacuously clean. Seed representative rows (including `NULL`, a negative, and a 19-digit value) **before** the diff, or the check has evaluated nothing.
-- **Input that would make this check FAIL:** seed `9223372036854775807`, run `down()` — it must fail rather than silently truncate. Seed `2.5`, run `down()` — the value must round, and the backup-table restore must be what recovers it.
+- **Input that would make this check FAIL:** seed **`9223372036854775808`**, run `down()` — it must fail rather than silently truncate. ⚠️ **CORRECTED 2026-08-27 (measured):** this previously read `9223372036854775807`, which is **exactly** `2^63 − 1`, signed `bigint`'s max — *in* range, so it round-trips losslessly and cannot instantiate `AR-2`'s *"wider than a signed `bigint`"*. Executed: `down()` **succeeded** on the old literal. `9223372036854775808` (`2^63`, max + 1) is the smallest value that actually falsifies. Seed `2.5`, run `down()` — the value must round; the backup-table restore then returns the table to its **pre-migration** state. ⚠️ The backup **cannot recover `2.5` itself** — it is taken before the `ALTER` and holds only `bigint` integers. That irrecoverability is the accepted lossiness and the reason `down()` alone is not a revert path.
 - **Dependencies:** T-01, T-02
 - **Estimated effort:** L · **Skills:** `nestjs-expert`
-- **Status:** todo
+- **Status:** **done** — Reviewer `PASS` on attempt **3 of 3** (both lenses), 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-05`. ⚠️ **Three carries for later tasks:** (1) **`T-06` must claim a timestamp `> 1787260000000`**; (2) the scratch `quantification_roles` catalog holds **only role 3** — `T-06`/`T-08` must seed roles 1/2 or the FK will reject them; (3) **the retained backup table has no owner** — escalated to the user as a spec gap, since neither sign-off list nor `T-12` mentions dropping it.
 
 ---
 

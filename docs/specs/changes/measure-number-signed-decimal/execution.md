@@ -666,3 +666,192 @@ Lens A on why it surfaced at all: *"it is invisible unless you enumerate the `de
 | Review mode | **Parallel lens (2 reviewers)**, per the 4R table at `xhigh` | Unlike T-03, where the Leader had pre-measured the defect and ran a single merged lens, here nothing was known in advance. **The split earned its cost**: Lens B owned the rewritten pre-existing tests and produced the count reconciliation and the `T-10` precedent; Lens A owned the ordering question and found that two of four steps were unpinned. Neither found the other's issue |
 | Mechanism verified before dispatch | Step ④'s predicate | Direct consequence of T-03 losing three attempts to an unverified one. It worked — T-04's predicate was never a FAIL cause |
 | Parallelism | **T-04 and T-05 NOT run concurrently** despite both being eligible | Both are server-package tasks. `CLAUDE.md` §4.3: cross-package parallelism is safe for editing, two tasks in the same package are not — the rule behind the `excel-workbook.builder.spec.ts` phantom failures, twice |
+
+---
+
+### T-05 — Migration 1: backup table → `ALTER` → whole-table diff
+
+- **Status:** ✅ **PASS on attempt 3** (`T-05` — Reviewer: **PASS**, both lenses). Reached the rework ceiling.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 3 (`akili-implementer`, T2 `sonnet`, effort `xhigh`), one interrupted by a **session-limit runtime failure** and resumed
+- **Reviewers:** two `akili-reviewer` lenses (T3 `opus`, read-only) — Lens A conformance/correctness, Lens B risk/resilience-operational
+- **Requirements covered:** `NFR-MSD-001`, `R-MSD-004`
+- **Design references:** `DD-1`, `DD-18`, `AR-2`, `U-2`
+
+#### File
+
+`server/researchindicators/src/db/migrations/1787260000000-alterQuantificationNumberToDecimal.ts` — new. Timestamp > `1787253483599` (previous newest), nothing above it, so `T-06` must claim `> 1787260000000`.
+
+```ts
+public async up(queryRunner: QueryRunner): Promise<void> {
+  const existing: Array<{ c: number }> = await queryRunner.query(
+    "SELECT COUNT(*) AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'result_quantifications_backup_1787260000000'",
+  );
+  if (Number(existing[0].c) === 0) {
+    await queryRunner.query(
+      'CREATE TABLE `result_quantifications_backup_1787260000000` AS SELECT * FROM `result_quantifications`',
+    );
+  }
+  await queryRunner.query(
+    'ALTER TABLE `result_quantifications` CHANGE `quantification_number` `quantification_number` decimal(24,4) NULL, ALGORITHM=COPY',
+  );
+}
+```
+
+`down()` is the reverse `CHANGE … bigint NULL, ALGORITHM=COPY`. **Neither direction drops the backup** (`DD-18`, retained until sign-off).
+
+#### Executed evidence — the only gate this file has
+
+`db/migrations/**` is coverage-excluded and no unit spec exists (correctly — a spec over these SQL literals would be a presence assertion, not a behavioural proof). So the harness run *is* the gate, per §7's rule that *"the only sound gate for [the placeholder rule] is running the migrations."*
+
+| Step | Result |
+| --- | --- |
+| Container discipline | `compose:test:down` → `up` → `migration:test:bootstrap` (once — `FP-49`, not idempotent), full cycle **run repeatedly** to isolate each falsifier. 320 migrations applied each time, no `ER_TABLE_EXISTS_ERROR` |
+| Seed before `up()` | five rows — `NULL`, `-1500`, `1234567890123456789` (19 digits), `0`, `42`. All `quantification_role_id = 3` (see the scratch-catalog finding below) |
+| `up()` | executed; column afterwards `decimal(24,4) YES NULL` |
+| **Whole-table diff (AC.3)** | pre-snapshot joined against the live table on `CAST(pre AS DECIMAL(24,4)) <> post OR NULL-mismatch` → **zero rows**, `pre_count = post_count = 5`. Backup independently confirmed holding the same five values still typed `bigint` |
+| Full suite | `355 suites / 2727 tests` green, **Leader re-measured independently after every attempt** |
+| `npx eslint` / `npm run build` | exit 0 (bare eslint gate, `K-001`) |
+| `npm run migration:scan` | **fails `MODULE_NOT_FOUND`** — `scripts/scan-migration-placeholders.js` does not exist though `package.json:41` references it. Reported as a tooling gap, **not fabricated as a pass**. Lens A confirmed: already filed four times, consistent with `K-006`'s record that the scanner was withdrawn and the npm entry was not |
+
+#### Two spec-text errors found by execution, not by reading
+
+**1. The falsifier's literal could not falsify anything.** `tasks.md` mandated seeding `9223372036854775807` and expecting `down()` to fail. Run: **`down()` succeeded, value unchanged.** That literal is **exactly** `2^63 − 1`, signed `bigint`'s max — *in* range, not *"wider than"* the range `AR-2` and AC.4 speak about. Substituted `9223372036854775808` (`2^63`, max + 1, 19 digits — fits `DECIMAL(24,4)`'s 20 integer digits, overflows `bigint`). Leader-verified independently.
+
+**2. The error codes in the spec were guesses, and wrong.** `R-MSD-004` AC.4 named `1264`/`1406`. Measured:
+
+```
+driverError: Error: Truncated incorrect DECIMAL value: '9223372036854775808.0000'
+code: 'ER_TRUNCATED_WRONG_VALUE', errno: 1292, sqlState: '22007'
+sql: 'ALTER TABLE `result_quantifications` CHANGE `quantification_number` `quantification_number` bigint NULL, ALGORITHM=COPY'
+```
+
+Post-failure: column still `decimal(24,4)`, all rows unchanged, migration still listed as executed — **whole-statement failure, not partial.** Lens A traced the origin: AC.4's codes were added at the round-2 re-judgment, *"a reasoning round with no MySQL reachable to any judge."*
+
+**And AC.4 carried the inverse of the hazard it names.** Its own sentence warns *"a test asserting only rounding will read a range error as a test bug"* — but a `T-07`/`T-08` author following AC.4 and asserting `errno === 1264` would get a **red test against correct behaviour.** Amended (below).
+
+**Falsifiers were run in separate `down()` executions**, deliberately: `ALGORITHM=COPY` succeeds or fails as one atomic statement, so an overflow row co-resident with the fraction row would abort the whole statement and the rounding would never be observable. Both lenses upheld the reasoning; Lens A added that `FP-49` makes the isolation *mandatory*, not merely convenient.
+
+#### Attempt 1 — Lens A `PASS`, Lens B `FAIL` (3 issues)
+
+Lens A verified all fourteen TSDoc claims individually and passed. **Lens B found three things it had passed over** — the clearest case this run for the parallel-lens cost.
+
+**Issue 1 — `up()` was single-shot, and one failure path is CERTAIN.** MySQL implicit-commits DDL, so statement 1 survived any failure of statement 2 while TypeORM wrote **no** `migrations` row. The deterministic path is the spec's *own prescribed backout*: `up()` succeeds → `migration:revert` → re-roll forward **dies at `ER_TABLE_EXISTS_ERROR`**, because neither direction drops the backup by design. `FP-49` already records that error stranding a schema as a known, expensive trap in this repo — logged to be avoided, and reproduced.
+
+**Issue 2 — the TSDoc asserted something FALSE that licensed a destructive restore.** It claimed the backup snapshots the table *"exactly as it stands."* Verified against `baseline.sql:3781-3799`: the source table has `id bigint NOT NULL AUTO_INCREMENT`, `PRIMARY KEY (id)`, two secondary `KEY`s and two outgoing FKs — **CTAS reproduces none of them.** So an operator could `RENAME` the backup into place and get `id bigint NOT NULL` with no default: first insert fails `1364 ER_NO_DEFAULT_FOR_FIELD`, duplicate ids become possible. **No restore procedure existed anywhere in the spec.**
+
+**It also caught the spec prescribing the restore in the wrong ORDER.** `design.md` §11's Backout row read *"`migration:revert` plus restore"* — but `AR-2` is precisely the finding that the revert is the step that rounds or aborts. Restore first and `down()` is **guaranteed** to succeed, because the restored rows are the pre-`up()` `bigint` values: integral and in range by construction.
+
+**Issue 3 — the failure claim generalised past strict `sql_mode`.** Under a non-strict mode the same `ALTER` **clamps with a warning** instead of aborting — the third case, and the only one that loses data silently. The TSDoc told an operator `down()` would fail loudly rather than mangle.
+
+#### Attempt 2 — all three fixed, with the reds observed
+
+**Issue 1's fix:** probe `information_schema.TABLES`, run the CTAS only when absent. **Two wrong fixes are documented in the file as prohibited**, because both are what a later maintainer would reach for:
+
+- `CREATE TABLE IF NOT EXISTS … AS SELECT` — does not skip; inserts the `SELECT`'s rows into the existing table.
+- `DROP TABLE IF EXISTS` before the CTAS — on a re-apply after `down()` rounded someone's fractions, **overwrites the true pre-migration snapshot with rounded values**, destroying the one thing `DD-18` exists to preserve.
+
+**The `1050` observed BEFORE the fix** (full capture retained at `scratchpad/before-fix-1050.log`, 4,696 bytes):
+
+```
+query: CREATE TABLE `result_quantifications_backup_1787260000000` AS SELECT * FROM `result_quantifications`
+query failed: CREATE TABLE `result_quantifications_backup_1787260000000` AS SELECT * FROM `result_quantifications`
+error: Error: Table 'result_quantifications_backup_1787260000000' already exists
+Migration "AlterQuantificationNumberToDecimal1787260000000" failed, error: Table ... already exists
+query: ROLLBACK
+    code: 'ER_TABLE_EXISTS_ERROR',
+    errno: 1050,
+    sqlState: '42S01',
+```
+
+Post-failure: column type `bigint` (the revert held), **`migrations` table holds 0 rows for `1787260000000`** — the schema stranded exactly as predicted. Lens B credited those post-conditions specifically: *"nobody would invent [them] because they require extra queries."*
+
+**The same sequence AFTER the fix** — no `CREATE TABLE` line at all; the probe returned `c=1` and the CTAS was skipped:
+
+```
+query: SELECT COUNT(*) AS c FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '...'
+query: ALTER TABLE `result_quantifications` CHANGE ... decimal(24,4) NULL, ALGORITHM=COPY
+Migration ... has been executed successfully.
+```
+
+**Snapshot preservation — proven behaviourally, not asserted.** `CHECKSUM TABLE` = `1622928111` after the first apply and `1622928111` after the recovery re-apply, plus an independent content read showing the backup still holds only `id=83, value=42` and **not** the rounded `-13` or the second row. Lens B: *"a retake would necessarily have produced a 2-row table and a different checksum, so the two observations cannot both hold under a retake."*
+
+**Issue 2's fix:** the false sentence replaced with data-snapshot-not-table-snapshot, the four things CTAS drops enumerated with the `baseline.sql` citation, the `RENAME`/`1364` hazard named, and the restore procedure written out — **into the surviving table, never by `RENAME`, and before `down()`.** Executed: live table `[83: 42.0000, 84: -13.0000]` → `DELETE` + `INSERT … SELECT *` → back to the backup's single row, row 84 gone (it never existed pre-migration), column alignment held.
+
+**Issue 3's fix:** scoped to strict `sql_mode`, non-strict clamp named as the silent-loss case, and the container **directly measured** (verbatim, replacing an earlier paraphrase):
+
+```
+@@GLOBAL.sql_mode  = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+@@SESSION.sql_mode = ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+VERSION()          = 8.0.46
+```
+
+Lens A verified no other mode in that list affects rounding or truncation. **Dev and Prod remain unverified** — a `SELECT @@GLOBAL.sql_mode;` is now required in AC.4's pre-flight.
+
+#### The runtime failure, and how it was handled
+
+Attempt 2 was **killed mid-task by a session limit** — an environment blocker, not a work FAIL. Handling: the Leader inspected the working tree before resuming (all three fixes had landed; the file was complete), then resumed the **same** agent with a continuation brief naming only what remained, and instructed it — where a red had not actually been captured — to **say so rather than reconstruct it.** It had preserved the full capture in a scratchpad log, which the Leader read directly rather than accepting the summary.
+
+#### Attempt 3 — Lens A `FAIL` on two prose issues, then `PASS`
+
+**Issue 1: one unlabelled empirical claim among labelled ones.** The `IF NOT EXISTS … AS SELECT` mechanism was asserted as flat fact, executed by nobody. Lens A's reasoning is the important part: *"every other empirical claim in this file is labelled with its provenance and scope … this single assertion sits unlabelled among them, so a reader cannot tell measured from assumed at the exact moment before they run DDL on a shared production table."* Fixed by attribution + *"not executed here"* + an **"either way"** construction. Lens A on the result: *"the 'either way' construction does more than the label does … it makes the action independent of the claim's truth value, so no reader can be misled into a wrong decision by an unverified premise."*
+
+**Issue 2: two `design.md:492` line citations into a file being amended in the same loop** — `FP-50`, whose own precedent is six of seven citations killed by the edit that introduced them. Both anchored to `design.md` §11 → Backout row, and the over-attribution fixed: the observed sequence is the prescribed backout *followed by an unprescribed fix-forward re-apply*, and the citation covered only the middle step.
+
+Also done: restore wrapped in `START TRANSACTION … COMMIT` (a failed `INSERT` would otherwise leave the table **empty**), *"the only path that does"* → *"the only path this migration provides"*.
+
+**The Implementer verified the Leader's own claim rather than trusting it.** The brief asserted zero inbound FKs to `result_quantifications` as reassurance for the unqualified `DELETE`; it ran the grep itself and recorded the result as measured. Lens A then **extended the region that grep could not see** — `baseline.sql` cannot show FKs added by post-baseline migrations — and grepped the migrations directory: still zero. So the file's stated scope under-claims the truth.
+
+**It also declined one reviewer suggestion with a reason, and was right.** Lens A had suggested softening *"lists"* to *"reads as"*; the Implementer dropped the word entirely, arguing that once the citation points at the corrected row there is no ambiguous old text to hedge against. Lens A's ruling: *"it was right and I was wrong, and the reason is stronger than the one it gave"* — hedging would have described **superseded** text, introducing a fresh inaccuracy of exactly the class this spec keeps paying for.
+
+#### 📌 A convention worth keeping — ratified by Lens A, candidate for the Kaizen log
+
+Attempt 3 produced a **provenance sweep** classifying all 16 claim sites as `measured (where)` / `derivable (from what)` / `assumed (labelled)`. Asked whether *every* claim should carry a marker, Lens A ruled **no**, and the reasoning generalises well beyond this file:
+
+> **Do not add a uniform marker.** *"I found the `IF NOT EXISTS` claim **because** its neighbours were selectively labelled and it was not. A blanket marker raises the noise floor and dilutes the markers that carry weight."*
+>
+> The test is not *"is it labelled"* but **"could a reader mistake it for measured, and would that mistake change an action?"**
+>
+> | Case | Label |
+> | --- | --- |
+> | (i) empirical claim about system state nobody observed | **REQUIRED** |
+> | (ii) any claim about **another environment** (Dev, Prod) — a reader may act on it there | **REQUIRED** |
+> | (iii) deductive consequence whose premises are stated in the same sentence | not required |
+> | (iv) counterfactual branch inside an already-scoped conditional | not required |
+
+This is the first rule this run that would have *prevented* rather than merely caught the prose failures — seven review rounds across T-03, T-04 and T-05 went to unverified assertions, and a uniform-labelling response would have made them harder to spot, not easier.
+
+#### Three Leader-owned spec amendments — APPLIED, and they need user ratification
+
+Both lenses independently required these. All three correct **measured falsehoods**; two of them would otherwise make a compliant `T-07`/`T-08` test fail against correct behaviour.
+
+| # | Document | Amendment |
+| --- | --- | --- |
+| 1 | `tasks.md` → `### T-05` falsifier | Literal `9223372036854775807` → **`9223372036854775808`**, with the executed evidence that the old value succeeded. Also recorded that the backup **cannot recover `2.5` itself** — the old text implied it could |
+| 2 | `requirements.md` → `R-MSD-004` **AC.4** | `1264`/`1406` → **the three-part property** (statement fails, column type unchanged, no partial write), with `1292` as the observed instance rather than the contract, plus the **strict-`sql_mode` precondition** and the measured mode list. An errno is version- and `sql_mode`-dependent; the property is not |
+| 3 | `design.md` → §11 **Backout** row | Order corrected to **restore-first, then `migration:revert`**, with `AR-2` as the reason, the transaction wrap, and the `RENAME`/`1364` prohibition |
+| 4 | `design.md` → §11 **step 1** | *"Behaviour does not change yet"* was **false**. Corrected: in the interim window, with `T-03`/`T-04` merged and the column still `bigint`, a `PATCH` of `quantification_number: -12.75` returns **`2xx` with `-13` stored** where it previously returned a clean `400`. **`K-015` means this window can last indefinitely** |
+
+#### `ADVISORY` — recorded, non-gating, none widens a task
+
+| Lens | Finding |
+| --- | --- |
+| **RISK — ESCALATED TO THE USER as a spec gap** | **Nobody owns dropping `result_quantifications_backup_1787260000000`.** *"Retained until sign-off"* appears in `tasks.md` and `DD-18`, but **neither sign-off list** (`tasks.md` §9, `requirements.md` §12) contains a backup-table item, `T-12` does not mention it, and it is absent from the *"reported, not owned"* list. **Reachability: certain.** A permanent orphan table on a shared, non-disposable database, created by design, with no owner and no follow-up migration. Lens B: *"the only item that is certain rather than conditional, and the one with no owner anywhere in the spec."* |
+| **RISK — certain if the backup outlives a baseline regeneration** | `src/db/baseline/README.md:36`,`:96` — the snapshot is `mysqldump --no-data` over the **whole** database, *"no table list — everything."* A regeneration while the backup exists ships `result_quantifications_backup_1787260000000` into `baseline.sql` and thus into **every future scratch schema, permanently**, and invalidates the 196/17/213 counts. Non-breaking; irreversible in practice once merged |
+| **RISK — reachable, no guard** | `ALGORITHM=COPY`'s metadata-lock **acquisition** is independent of the 80 rows: any open transaction holding a shared MDL blocks the `ALTER`, and while it waits **every subsequent query on the table queues behind it, reads included.** `lock_wait_timeout` defaults to **31,536,000 s**. Mitigation for the rollout note: check `information_schema.INNODB_TRX`, and `SET SESSION lock_wait_timeout = 30;` so a contended run fails fast (`1205`) instead of stalling the table |
+| **RISK — narrow, inherent to `DD-18`** | Once the backup is dropped at sign-off, **this migration must not be re-applied**: a re-apply would fire the CTAS against a column `down()` had already rounded, and the new backup would silently not be the pre-migration state. Worth one sentence in whatever ticket the backup-drop escalation produces |
+| Forward — `T-06`/`T-08` | **The scratch `quantification_roles` catalog holds only role 3.** `baseline.sql:8269`'s ledger seed contains `1760653582914`, so the migration inserting roles 1 and 2 never runs; role 3 comes from `1787071463485`, which is not in the ledger. `report_oicr` filters on roles 1/2 and `oicr_validation` reads them, so **`T-06` and `T-08` must seed `quantification_roles`** — the FK will reject inventing them. Plan for it rather than discovering it mid-task |
+| Reliability | AC.3's diff structurally cannot catch a simultaneous delete+insert keeping cardinality equal, nor any column other than `quantification_number`. Both unreachable in this harness. `up()` already snapshots `SELECT *`, so joining against **the backup itself** across all columns would have covered every column and validated the backup in one query |
+| Readability | `NFR-MSD-001` is satisfiable — `requirements.md:553` scopes it to a bootstrapped scratch schema, where the table is empty so `down()` cannot fail. Not a third unsatisfiable requirement; the residual weakness is the opposite, the literal target is **vacuous** on an empty table, which T-05's own disqualifier anticipated and the seeded run exceeded. But `requirements.md:700` summarises it as *"reversible"* unqualified |
+| Readability | The stranding mechanism was **measured** (verbatim `1050` + 0-row ledger) but is dispositioned as *derivable* — under-claiming is safe, never unsafe, but the file is discarding evidence it owns |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Skills | `nestjs-expert` + **`systematic-debugging`** (added) | The task named only `nestjs-expert`; DB work against a container reliably needs the debugging discipline. Deviation recorded |
+| Effort | `xhigh` throughout | Correctness-critical wants `max`, but the *Tier ↔ effort rule* forbids `max` on a T2 model and escalating to `opus` would collapse `author ≠ auditor` against the `opus` lenses |
+| Review mode | **Parallel lens (2)** | `xhigh` + a data-loss surface. **The split paid for itself here more than anywhere else in the run:** Lens A passed attempt 1 outright while Lens B found three issues including a *certain* stranding bug on the spec's own prescribed backout |
+| Lens A's PASS **invalidated** after attempt 2 | Re-gated | Attempt 2 added a code path and rewrote the TSDoc, so the fourteen-claim audit no longer covered the artifact. A verdict on superseded content is not a verdict on this content — its claim inventory then grew from 14 to 24 |
+| Lens B **not** re-gated for attempt 3 | Deliberate economy, disclosed | Prose-only changes, moving in directions Lens B itself recommended; nothing it audited behaviourally changed. Lens A ratified the call **and closed the one gap it left** — the transaction wrap was a new destructive operating instruction Lens B had recommended but never reviewed as written, so Lens A reviewed it |
+| Ambiguity ruled, not escalated | The backup restores the **pre-migration state**; a post-migration fraction is recoverable by nothing | `tasks.md` implied the backup could recover a seeded `2.5`, which is impossible — it predates the `ALTER`. Ruling stated in the brief and given to the Reviewer to check; Lens A confirmed and noted the TSDoc states it *more precisely than the spec does* |
