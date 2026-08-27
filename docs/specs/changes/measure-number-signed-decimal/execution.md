@@ -1180,3 +1180,341 @@ Conformance lens on the routing: *"amend-plus-ticket is the correct discharge fo
 | Guard required to be **proven red** | Baseline-only run | A guard that cannot fail is what this spec has paid a review round for, repeatedly |
 | Environment traps scouted **before** dispatch | `FP-45` band, `FP-48` disciplines, `FP-49`, roles 1/2 absent, the `sql_mode` divergence | The child guide's `FP-45` list was **stale** — it documents bands to `900_600`; the tree had `900_000`–`900_900` plus `902_000`–`902_150` taken. Scouted and handed over **with an instruction to verify by grep**, since `FP-45`'s own rule is not to trust a second-hand list |
 | Advisory **not** actioned by reopening | F13d's sentinel-deletion fragility | Both lenses had already PASSed. Reopening for a comment clause would cost three rounds against a spec already over its review budget; routed to `T-12`, which owns closure |
+
+---
+
+### T-08 — Fixture: `report_oicr` / `report_field` rendering, executed against real MySQL
+
+- **Status:** ✅ **PASS** (`T-08`). Converts `U-1` and `U-5` from **reasoned** to **executed** (`design.md` §17 updated below).
+- **Date:** 2026-08-27
+- **Implementer attempts:** 1 (`akili-implementer`, T2 `sonnet`, effort `xhigh`)
+- **Requirements covered:** `R-MSD-010` (`:461`, `:462`, `:463`)
+- **Design references:** `DD-10`, §9.1, §9.2, `DD-11`, `DC-7`, `DC-14`, `U-1`, `U-5`, `U-8`
+
+#### File
+
+**New:** `server/researchindicators/test/fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts`
+
+#### Container cycles
+
+| Cycle | Command | Why |
+| --- | --- | --- |
+| 1 | `compose:test:down` → `compose:test:up` → `migration:test:bootstrap` | The one required fresh cycle (`FP-49` — bootstrap is not idempotent). Ran to a container with T-05 (decimal column) and T-06 (guarded view) both applied |
+| 2 | `migration:test:revert` (once) | To force the view back to its bare, pre-T-06 body and capture the **view guard's** red, without a full teardown |
+| 3 | `migration:test:execute` (once) | Reapplied T-06 alone (the only migration pending after cycle 2), restoring the guarded view |
+| 4 | Manual `ALTER TABLE result_quantifications CHANGE quantification_number quantification_number bigint NULL, ALGORITHM=COPY` (via `docker exec ... mysql`), then the inverse `ALTER ... decimal(24,4) NULL` | To force the **column-shape guard's** red against a real bigint column, without touching the fixture's own code — see disqualifier below for why this could not be done from inside the file itself |
+
+No second `compose:test:down`/`up`/`bootstrap` cycle was needed — `migration:test:revert`/`:execute` and a manual `ALTER` are documented, repeatable operations against an already-bootstrapped container, not the bootstrap script itself.
+
+#### Band claimed
+
+`902_300`, for `results.result_official_code`. Grep proving it free, run immediately before choosing (`FP-45` — the guide's own list is stale, verify by grep):
+
+```
+$ grep -n "902_" test/fixtures/innovation-use/*.fixture-spec.ts
+innovation-use-edit-plus-add-id-collision.fixture-spec.ts: … 902_000 … 902_1xx … through 902_150
+oicr-quantification-save.fixture-spec.ts:27:… 902_000-902_150 are taken …
+oicr-quantification-save.fixture-spec.ts:30: `902_200` is free — grepped …
+oicr-quantification-save.fixture-spec.ts:112:  const actingUserId = 902_200_000;
+```
+
+`902_000`–`902_200` are the only `902_` values in use across every sibling header; `902_300` appears nowhere. Confirmed again after the file was written (`grep -n "902_3" test/fixtures/innovation-use/*.fixture-spec.ts` → only this file's own header/declarations).
+
+#### Roles/rows seeded
+
+- `quantification_roles` ids **1** (`actual_count`) / **2** (`extrapolate_estimates`), lowercase, via `INSERT IGNORE` — matching `1760653582914-createQuantificationTables.ts:23` and the correction `oicr-quantification-save.fixture-spec.ts` made at its own rework attempt 2. Never deleted (shared, permanent scratch catalog rows).
+- `results` rows: `is_active=1`, a unique `result_official_code` in the `902_300` band, `platform_code=NULL`, `report_year_id=NULL`, `is_snapshot=0`, `result_status_id=NULL`, **`indicator_id=NULL`** (see below).
+- `result_quantifications` rows under roles 1/2, seeded directly via raw SQL (bypassing every DTO/service validator) — including two force-seeded **fractional** role-1 rows (`2.5000`, `-0.7500`) to exercise `DD-10`'s declared-defensive `TRIM` branch, which is unreachable in production (`DD-12`+`DD-13` hold roles 1/2 to integers). Labelled as such in the file; not evidence roles 1/2 can hold fractions in the running app.
+- Phase B's bigint-column case/falsifier rows are seeded into a **session-scoped `CREATE TEMPORARY TABLE`**, never into `result_quantifications` — see "Item 3's method" below for why.
+
+**`indicator_id = NULL`, not `5` — reasoned then confirmed by execution, not merely reasoned.** `report_field`'s first line is `IF NOT COALESCE(applies, TRUE) THEN RETURN 'Not applicable'`. `root.indicator_id = 5` evaluates SQL `NULL` when `indicator_id` is `NULL`, and `COALESCE(NULL, TRUE)` is `TRUE`, so the "not applicable" branch is skipped — identically to `indicator_id = 5`. Every render in the seven-case table below is the **executed** confirmation of this: none show `Not applicable`.
+
+#### `sql_mode` handling
+
+Statement, issued once in `beforeAll` on a **dedicated `QueryRunner`** (not the shared connection pool — `orm.config.ts` sets no `connectionLimit`, so a `SET SESSION` via `dataSource.query()` is not guaranteed to survive to the next pooled call):
+
+```sql
+SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'
+```
+
+**Dev-fidelity note.** This is not a workaround — it is what `T-06` measured Dev to actually run: `@@SESSION.sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION`, with **no** `ONLY_FULL_GROUP_BY`. The container (`mysql:8.0`, measured `8.0.46` by `T-05`) carries the full MySQL 8 default including `ONLY_FULL_GROUP_BY`, under which `report_oicr` cannot be `SELECT`ed at all — its untouched, pre-existing `treo` sub-select trips `1055` on `teo.external_id` (verified pre-existing by the Leader on a fresh baseline with `T-06`'s file removed and zero migrations applied; ticketed `OFGB-1`, out of this task's scope). Dropping `ONLY_FULL_GROUP_BY` for this session therefore makes the fixture **more** faithful to Dev, not less.
+
+#### Column-shape guard, per phase — code + verbatim red
+
+**Phase A** (expects `decimal(24,4)`):
+
+```ts
+async function assertColumnShape(expected: 'decimal'): Promise<void> {
+  const [column] = await runner.query(
+    `SELECT DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE
+       FROM information_schema.columns
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'result_quantifications'
+        AND COLUMN_NAME = 'quantification_number'`,
+  );
+  expect(column).toBeDefined();
+  expect(column.DATA_TYPE).toBe(expected);
+  expect(Number(column.NUMERIC_PRECISION)).toBe(24);
+  expect(Number(column.NUMERIC_SCALE)).toBe(4);
+}
+```
+
+Demonstrated red by manually running `ALTER TABLE result_quantifications CHANGE quantification_number quantification_number bigint NULL, ALGORITHM=COPY` against the live container, then running Phase A alone (`npx jest --config test/jest-fixtures.json report-oicr-number-rendering -t "Phase A"`):
+
+```
+expect(received).toBe(expected) // Object.is equality
+
+Expected: "decimal"
+Received: "bigint"
+
+  205 |     );
+  206 |     expect(column).toBeDefined();
+> 207 |     expect(column.DATA_TYPE).toBe(expected);
+      |                              ^
+  208 |     if (expected === 'decimal') {
+  209 |       expect(Number(column.NUMERIC_PRECISION)).toBe(24);
+  210 |       expect(Number(column.NUMERIC_SCALE)).toBe(4);
+    at assertColumnShape (fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts:207:30)
+```
+
+Restored (`ALTER ... decimal(24,4) NULL, ALGORITHM=COPY`) and re-ran clean before continuing.
+
+**Phase B** (expects `bigint`, on the file's own private `CREATE TEMPORARY TABLE`, not `result_quantifications` — see "Item 3's method"):
+
+```ts
+async function assertBigintProbeTableIsGuarded(): Promise<void> {
+  const [column] = await runner.query(
+    `SHOW COLUMNS FROM \`${BIGINT_PROBE_TABLE}\` WHERE Field = 'quantification_number'`,
+  );
+  expect(column).toBeDefined();
+  expect(column.Type).toBe('bigint');
+}
+```
+
+Demonstrated red by temporarily declaring the probe table's column `DECIMAL(24,4)` instead of `BIGINT` and running Phase B alone:
+
+```
+expect(received).toBe(expected) // Object.is equality
+
+Expected: "bigint"
+Received: "decimal(24,4)"
+
+  263 |     );
+  264 |     expect(column).toBeDefined();
+> 265 |     expect(column.Type).toBe('bigint');
+      |                         ^
+    at assertBigintProbeTableIsGuarded (fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts:265:25)
+```
+
+Reverted and re-ran clean.
+
+#### View guard — code + verbatim red
+
+```ts
+async function assertViewIsGuarded(): Promise<void> {
+  const [view] = await runner.query(
+    `SELECT VIEW_DEFINITION
+       FROM information_schema.views
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'report_oicr'`,
+  );
+  expect(view).toBeDefined();
+  const body = String(view.VIEW_DEFINITION).toLowerCase();
+  expect(body).toContain('truncate(');
+  expect(body).toContain('trim(');
+}
+```
+
+Demonstrated red by running `migration:test:revert` (reverts `T-06` alone — it is the last migration in the tree; `T-05` stays applied), then Phase A alone:
+
+```
+expect(received).toContain(expected) // indexOf
+
+Expected substring: "truncate("
+Received string:    "select `root`.`result_id` as `result_id`,`report_field`(`ro`.`general_comment`,true,(`root`.`indicator_id` = 5)) as `general_comment`, … `report_field`(`rq`.`quantification_number`,true,true) … "
+    (the bare, un-guarded pre-T-06 body — no `truncate(`/`trim(` anywhere)
+
+  223 |     // DD-10's expression is the only place `truncate(`/`trim(` appear in
+  224 |     // this view — a stale (bare, pre-T-06) body has neither.
+> 225 |     expect(body).toContain('truncate(');
+      |                  ^
+    at assertViewIsGuarded (fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts:225:18)
+```
+
+Reapplied via `migration:test:execute` (T-06 was the only pending migration) and re-ran clean.
+
+#### The seven cases — verbatim query output
+
+All via the real, live `report_oicr` view (Phase A, six cases) or DD-10's expression transcribed verbatim from the migration and run against a session-scoped `bigint` `CREATE TEMPORARY TABLE` (Phase B, the seventh case — see "Item 3's method"):
+
+| # | Input | Rendered `quantifications` column (verbatim) |
+| --- | --- | --- |
+| 1 | `10.0000` (decimal column) | `• Number: 10, Unit: sentinel-unit, Comment: sentinel-description` |
+| 2 | `-10.0000` (decimal column) | `• Number: -10, Unit: sentinel-unit, Comment: sentinel-description` |
+| 3 | `2.5000` (decimal column, force-seeded) | `• Number: 2.5, Unit: sentinel-unit, Comment: sentinel-description` |
+| 4 | `-0.7500` (decimal column, force-seeded) | `• Number: -0.75, Unit: sentinel-unit, Comment: sentinel-description` |
+| 5 | `0.0000` (decimal column) | `• Number: 0, Unit: sentinel-unit, Comment: sentinel-description` |
+| 6 | `NULL` (decimal column) | `• Number: Not provided, Unit: sentinel-unit, Comment: sentinel-description` |
+| 7 | `10` (bigint column, via `CREATE TEMPORARY TABLE`) | `10` (bare `report_field(...)` result — no `CONCAT_WS` wrapper needed for this phase; see file header) |
+
+All seven match `design.md` §9.2's predictions exactly.
+
+#### Case-count assertion
+
+```ts
+it('case-count assertion: all seven DD-10 cases from design.md §9.2 were actually executed, not merely absent of failure', () => {
+  expect(executedCases).toEqual([
+    '10.0000', '-10.0000', '2.5000', '-0.7500', '0.0000', 'NULL', 'bigint 10',
+  ]);
+  expect(executedCases).toHaveLength(7);
+});
+```
+
+Each `it` above pushes its own label into `executedCases` as its last statement, so a case that is skipped or never reached (rather than one that ran and asserted something wrong) fails this assertion too, even though nothing else would have gone red for that reason.
+
+#### Falsifier (bare trim vs guarded, bigint column) — verbatim
+
+Run against the **same** `bigint`-column rows in the private `CREATE TEMPORARY TABLE`:
+
+```
+tenRow.bare_trim  = '1'    (expected '10' — REDDENS, exactly DC-14's failure mode)
+tenRow.guarded    = '10'   (DD-10's expression, unaffected)
+zeroRow.bare_trim = ''     (the nastier corruption — an empty string, which
+                            report_field(..., TRUE, TRUE) renders 'Not provided')
+zeroRow.guarded   = '0'    (DD-10's expression, unaffected)
+```
+
+Both assertions pass — i.e. the bare trim's wrong values (`'1'`, `''`) are exactly what a test asserting the **migrated-column expectation** (`'10'`, `'0'`) against it would redden on, and DD-10's guarded expression on the identical rows does not.
+
+#### `U-8` — executed evidence
+
+`report_oicr` queried with both a `CAST`-branch row (integer `10`) and a `TRIM`-branch row (force-seeded fractional `12.34`) in the same `SELECT`, immediately followed by `SHOW WARNINGS`:
+
+```
+errors (Level = 'Error'):        []
+collationErrors (Code = 1267):   []
+```
+
+No `1267`, no new warnings. Per `T-06`'s attribution (carried forward, not re-derived): neither raw collation readout (the measuring session's `collation_connection`, or the view column's — fixed by `report_field`'s own `utf8mb4_unicode_ci` declaration) can detect a branch mismatch; only the **absence of `1267` with both branches executed** settles `U-8`, and that is what this test asserts.
+
+#### `design.md` §17 — before/after
+
+**U-1** — before: *"Predicted, not executed. No MySQL was reachable while authoring…"* — after: **✅ VERIFIED by execution (T-08)**, all seven renders matching §9.2 exactly, cited to this fixture file.
+
+**U-5** — before: *"Reasoned, not executed…"* — after: **three of the four properties (Exact, `down()`-safe, Type-stable) VERIFIED by execution**, cited to the falsifier and the `U-8` result; **Version-portable named as residue** — it was never an execution claim (it is about which MySQL version introduced the syntax used, not about what this container proves), so it is not something `T-08` could close by running SQL, and the row says so rather than papering over it.
+
+Per the brief's explicit scope restriction, **only `U-1` and `U-5` were touched** — `U-8`'s row in §17 (currently "Unsettled") was deliberately **not** edited, even though this task also answers it; the answer lives in this section and the `U-8` test above.
+
+#### Item 3's method — `tasks.md`'s framing is wrong, twice over
+
+**First correction (carried from `T-06`, confirmed again here):** acceptance item 3 asks for the `bigint` branch "via `migration:test:revert`". Impossible with both `T-05`/`T-06` in the tree — revert is LIFO; one revert removes only `T-06` (view stays bare, column stays `decimal`), two reverts remove the expression **and** the column change together. There is no revert depth that yields "the new view over a `bigint` column".
+
+**Second correction, made in this task, after measuring what the first one's prescribed workaround (a direct `ALTER` on the shared scratch schema, `T-06`'s own precedent) costs when it is a *committed, automatically-collected* fixture rather than a one-off Leader-run verification.** An early draft of this file did exactly what `T-06` did and the brief suggested: `ALTER TABLE result_quantifications ... bigint`, run the case, `ALTER` back. Measured directly by running `npm run test:fixtures` five times with that draft in place:
+
+```
+Run 1: Test Suites: 1 failed, 16 passed, 17 total   (Tests: 1 failed, 89 passed)
+Run 2: Test Suites: 1 failed, 16 passed, 17 total   (Tests: 7 failed, 83 passed)
+Run 3: Test Suites: 1 failed, 16 passed, 17 total   (Tests: 2 failed, 88 passed)
+Run 4: Test Suites: 17 passed, 17 total
+Run 5: Test Suites: 17 passed, 17 total
+```
+
+**4 of 5 runs failed**, always the same underlying defect —
+`innovation-use-level-boundary.fixture-spec.ts` (and, in run 2, other siblings too) throwing:
+
+```
+QueryFailedError: Table definition has changed, please retry transaction
+    at Query.onResult (../src/driver/mysql/MysqlQueryRunner.ts:246:33)
+```
+
+MySQL `1412` (`ER_TABLE_DEF_CHANGED`) — this file's `ALTER` on the **shared** `result_quantifications` table invalidating a concurrently-running sibling's mid-transaction table-definition snapshot. `npm run test:fixtures` carries no `--runInBand`/`maxWorkers`, so Jest's default parallelism made this collision real, not hypothetical, and it recurred in 4 of 5 runs — not a rare edge case.
+
+**Resolution (this file's final form): Phase B never touches `result_quantifications`.** It runs `DD-10`'s expression — copied verbatim from `1787270000000-normaliseQuantificationNumberInReportOicr.ts:133` — against a session-scoped `CREATE TEMPORARY TABLE` with its own `quantification_number BIGINT NULL` column. `TEMPORARY TABLE`s are invisible to every other connection (confirmed empirically: `information_schema.columns` returns **zero** rows for one, even from the same session that created it — `SHOW COLUMNS`/`DESCRIBE` is what that session must use instead), so the collision above is structurally impossible against it. Re-ran `npm run test:fixtures` **five** times with this final design: **17/17 suites, 90/90 tests, every run.**
+
+This still satisfies `R-MSD-010` AC.5 / `DC-14` in substance — a real, executed query against a genuine `bigint` column in the same real MySQL — it only stops short of invoking the object literally named `report_oicr` for this one case; transcription fidelity between the migration text and the deployed view was already established byte-for-byte by `T-06`'s `SHOW CREATE VIEW` diff, and Phase A above re-confirms the live view itself for the six cases that do not need a `bigint` column. **Routed as `TESTFIX-1`** in `tasks.md` §8 (Reported, not owned) — the structural fix (serialising `test/jest-fixtures.json`) is an infra decision wider than this task, named for the Leader rather than applied unilaterally.
+
+#### `test:fixtures` / `npm test` / `eslint` / `build`
+
+| Check | Command (from `server/researchindicators`) | Result |
+| --- | --- | --- |
+| Fixture gate | `npm run test:fixtures` | **17 suites / 90 tests, exit 0** — re-run **5 times**, all green (see above) |
+| Isolated file | `npx jest --config test/jest-fixtures.json report-oicr-number-rendering` | 1 suite / 10 tests, exit 0 |
+| Collateral check | `npm test -- --silent` | **355 suites / 2727 tests, exit 0** — identical totals to `T-07`'s own measurement; `rootDir: "src"` means this never runs the new fixture |
+| Lint (bare gate, `K-001`) | `npx eslint test/fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts` | exit 0 (one Prettier finding fixed by hand, not via `--fix`, then re-verified clean) |
+| Build | `npm run build` | exit 0 (`nest build` + `vite build`, admin bundle unaffected) |
+
+#### Cannot reach (`KZ-017`)
+
+- **Dev/Prod are not reachable from this fixture** — every render above is against the disposable scratch container (`mysql:8.0.46`); Dev is `8.0.45` (measured by `T-06`) and is not queried here.
+- **This fixture cannot prove the literal deployed `report_oicr` object renders the `bigint`-column case** — only that `DD-10`'s expression, transcribed verbatim, does so against a genuine `bigint` column. The gap is closed by `T-06`'s separate byte-for-byte transcription proof, not by this file.
+- **`OFGB-1`** (`report_oicr` unusable under `ONLY_FULL_GROUP_BY`) is pre-existing, out of scope, and not fixed here — this file works around it via `sql_mode`, per the file header's Dev-fidelity note.
+- **`U-5`'s "Version-portable" property** is not something an executed query against one MySQL instance can settle (see §17 edit above) — named as residue, not closed.
+- **The `AUDIT-1`/`BACKUP-1` findings from `T-07`** are untouched by this task; not re-verified here.
+
+#### Not Done / Assumptions
+
+- **`tasks.md` acceptance item 3's literal method ("via `migration:test:revert`") was not used — its executable equivalent was, and the reasoning is recorded above and in the file header, not silently substituted.**
+- **A second, novel finding beyond the brief's three carries: `TESTFIX-1`** (the shared-table-`ALTER`-inside-a-committed-fixture hazard, measured at a 4-of-5 failure rate with an early draft). Resolved in this file by design (private `CREATE TEMPORARY TABLE`, not the shared table); routed to `tasks.md` §8 as reported-not-owned since the structural fix (serialising `test/jest-fixtures.json`) is wider than this task.
+- **`design.md` §17's `U-8` row was deliberately left untouched**, per the brief's explicit restriction to `U-1`/`U-5` — `U-8` is answered in this section instead.
+- Nothing else assumed or left incomplete.
+
+#### Reviewer gate — `T-08` — Reviewer: **PASS** (attempt 1)
+
+**Single merged lens** (conformance + correctness + operational risk) — the user-approved budget mode; `T-07` was the parallel-lens exception. The reviewer was told it carried both perspectives.
+
+**It verified nine claims from source rather than accepting the report**, including the ones that could have made the story coincidence: Phase B's inlined SQL is identical to migration `1787270000000:133` modulo the `rq.` alias and whitespace; `report_field`'s body really does return `'Not applicable'` on a false gate (`baseline.sql:6559-6577`) — **plus a third sentinel the report did not name, `'Not mandatory'` (`:6573`)**; the named flakiness victim really does write `result_quantifications` transactionally (`innovation-use-level-boundary.fixture-spec.ts:47`, `:168`, `:187`); `test/jest-fixtures.json` really sets no `maxWorkers` and no `runInBand`; no other committed fixture performs DDL; band `902_300` is free; and the manual restore `ALTER` was byte-identical to `T-05`'s `up()`, so the scratch schema was not left drifted.
+
+**Its four rulings on `TESTFIX-1`:**
+
+1. **The diagnosis is credible and `1412` is the right mechanism.** `ER_TABLE_DEF_CHANGED` is what MySQL raises when a session's cached table definition is invalidated under it rather than blocking. *"The diagnosis does not rest on that reasoning anyway: the error string, the errno, the named victim, a 4/5 reproduction rate, and 5/5 green after removing the `ALTER` are a controlled A/B."*
+2. **The temp-table substitution discharges `DC-14` and item 3**, and it could not construct a property now proven nowhere. `AC.5`'s claim is *expression*-level and is now executed at expression level; `T-06` separately proved deployed-view-text ≡ migration-text byte-for-byte, so the evidence **composes**.
+3. **Routing `TESTFIX-1` to §8 was correct** — nothing in this spec owes the fix, since no committed fixture performs shared-table DDL. **But §8 is the wrong home**: *"§8 of a spec headed for `docs/specs/archive/` is where this knowledge dies"* (the spec's own `KZ-013`). **Acted on — see below.**
+4. **It does NOT invalidate `T-06` or `T-07`.** The distinction is mechanical, not rhetorical: `1412` requires a **concurrent** session holding an open definition. `T-06`'s `ALTER` ran solo via `docker exec` outside the Jest runner; `T-07` performed no DDL. *"`T-06`'s evidence is untouched; what is now known is that its method does not survive being committed as parallel-collected test code."*
+
+**On the two questions where I suspected under-delivery, it ruled against me — with reasons:**
+
+- **`U-5`'s "Version-portable" residue is honest, not an under-delivery.** *"It is settleable, but not by execution… running it on 8.0.46 and 8.0.45 shows presence at those two versions and can never show presence at the 8.0.4 floor. Calling that residue rather than claiming a verify is the correct and more honest of the two available moves — the under-delivery would have been marking it verified because the container ran it."* If it is to be closed, close it **by citation**, not another run.
+- **`U-1` → verified is the right status.** `U-1`'s claim is *"§9.2's expected renders"* — seven **value→string** predictions, not seven view invocations. All seven executed, count-pinned, matched; the differing instrument for one is stated inline in §17's own row, which *is* the partial marker. *"Do not add a partial flag to `U-1`; it would misdescribe the residue as an execution gap."*
+- **The case-count assertion is sound and is not the weakest link.** Ordering is deterministic (Jest runs a describe's children in declaration order, never interleaving within a file), a `push` is the last statement in every `it` so an assertion throw yields **both** a red test and a short array, a red `beforeAll` guard reddens the count too, and `-t`/`--bail` filtering makes the count test **absent, never falsely green**. The only fragilities are false-**red** or drift-blindness — *"neither can manufacture a green."*
+
+#### The two gaps it named precisely — both reachable, both advisory
+
+| Gap | Detail |
+| --- | --- |
+| **Role 2 is executed NOWHERE, and the view-body guard cannot cover for it** | `report_oicr` carries `DD-10` at **two** sites — `1787270000000:133` (role 1 → `quantifications`) and `:140` (role 2 → `extrapolated_estimates`). **Every seed in this fixture is role 1.** The guard checks only that `truncate(`/`trim(` appear *somewhere*, so **a half-patched body — `:133` carrying `DD-10`, `:140` left bare — passes the guard, all six renders, and the count.** Constructed reachability. One `it` seeding role 2 and asserting `extrapolated_estimates` closes both the coverage gap **and** the guard's blind spot. Pointedly: *"the file already seeds role 2's catalog row and then never uses it"* |
+| **The fixture-string ≡ migration-string link is pinned by nothing** | Phase B inlines a **hand-retyped** copy. Correct today (the reviewer diffed it); nothing verifies it tomorrow. Reachable: edit either side and Phase B stays green while the deployed view is wrong. Closeable in ~8 lines by reading the migration file at runtime and asserting containment after normalising whitespace and the alias. **The file's own justification defends against the wrong comparison** — it argues a diff against MySQL's *re-normalised view text* would not compare like for like, which is true and irrelevant; the comparison worth making is against the **migration file's** text, which is a plain file read |
+
+#### Two findings about the EVIDENCE, not the code — and both are about my own handling
+
+**1. One assertion in the file cannot redden for its stated reason.** `expect(collationErrors).toHaveLength(0)` — because **`1267` aborts the statement**, so it surfaces as a thrown error and can never appear in a `SHOW WARNINGS` taken *after* a successful `SELECT`. It is *"the one assertion in the file whose red was **not** demonstrated (K-004)."* The **conclusion is still correct**, carried by the statements executing without throwing. Recorded in §17's `U-8` row as an honest residue.
+
+One detail worth crediting: `SHOW WARNINGS` reads the **previous statement's** diagnostics on the **same connection**, so this test *"would have been silently vacuous on a pooled `dataSource.query`"* — the dedicated `QueryRunner` is load-bearing here, not merely convenient for the temp table.
+
+**2. Two of the three pasted guard reds came from an ANCESTOR of the committed file, and the offsets reconcile exactly.** The transcript shows the failing `expect` at `:207` with a since-removed `if (expected === 'decimal')` at `:208`; the committed file has it unconditional at `:237`. The view guard's red shows `:225`; committed is `:253`. **Δ30 and Δ28 reconcile precisely** to ~30 lines of later header growth minus the 2-line conditional. So the reds **transfer** — the failing statements are textually identical, and dropping the conditional makes the guard *strictly stronger* — but **strictly, the committed guards' red was never observed, only their ancestors'.**
+
+> The reviewer's framing, which is the lesson worth keeping: **"a stale transcript is how a 'proven red' claim quietly detaches from the code it certifies."**
+
+#### Leader-owned actions taken on this verdict
+
+| Action | Detail |
+| --- | --- |
+| **`design.md` §17's `U-8` row rewritten** | It read **"Unsettled"** while `U-5`'s new row two rows above described `U-8` as *"answered the same way"* — **§17 contradicted itself.** Now recorded as answered by execution across `T-06`/`T-07`/`T-08`, **with the attribution the reviewer insisted on**: not the session-`collation_connection` readout, not the view-column readout (structurally unable to detect a mismatch), but *both branches executing with no `1267` and no new warnings* — plus the structural reason there are no two collations to aggregate, and the `impact_area` `convert(… using utf8mb3)` correctly identified as a **wrapper**-level mix rather than a branch mix. The `SHOW WARNINGS` residue is recorded there too |
+| **`TESTFIX-1` re-homed and broadened → `FP-51`** | Copied into **`server/researchindicators/src/CLAUDE.md` §9** beside `FP-45`/`FP-48`/`FP-49`, *"where the next fixture author actually reads"*, rather than left only in a §8 headed for the archive. **Broadened as the reviewer specified:** the hazard is *any* DDL against the shared scratch schema during a `test:fixtures` run, not only a fixture's own `ALTER` — and it records that `test/support/t13-schema.ts:74-80` already contains a committed `DROP TABLE … results` reachable by running `test:integration` concurrently. It also records that a one-off `ALTER` **outside** the runner is still fine (so `T-06`'s method is not condemned), the measured 4/5 → 8/8 A/B, and an explicit **"do not fix this with `maxWorkers: 1`"** |
+
+#### `ADVISORY` — recorded, non-gating
+
+| Finding | Note |
+| --- | --- |
+| **Role-2 coverage + the string-provenance pin** | The two reachable gaps above. **Not actioned by reopening a passed task** — both are strengthenings, no acceptance item mandates either, and the spec is 40% over its review budget. **Escalated to the user** as the highest-value remaining work in this tier |
+| `assertPhaseBIsGuarded()` (fixture `:133`) **resolves to nothing** | The function is `assertBigintProbeTableIsGuarded()`, and it *is* a runtime check, so the sentence's *"TSDoc-adjacent, not runtime"* also misdescribes it. `FP-50`'s corollary — *"an anchor is only an anchor if it resolves"* — and *"the worst place in the file for a dangling name"*, since that sentence carries the substitution's central disclosure. One-line fix, routed to `T-12` |
+| Anchor rot, pre-existing | The fixture header, `execution.md` `### T-08` and `tasks.md` §4 all cite `R-MSD-010` as `:461`/`:462`/`:463`; the clauses now live at `:463`/`:464`/`:465`. **Copied faithfully from `tasks.md`, not introduced here.** Flagged so `T-12`'s sweep does not treat these three as already correct |
+| `report_field`'s third sentinel | `'Not mandatory'` (`baseline.sql:6573`) exists alongside `'Not applicable'` and `'Not provided'`. Not named in the fixture's reasoning, though the reason-then-confirm conclusion holds: **every** failure mode is a distinct literal, none of which is a plausible measure |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Review mode | **Single merged lens** | User-approved budget mode. It held: the reviewer produced operational findings (the `1412` mechanism, the `SHOW WARNINGS` vacuity, the stale-transcript observation) that would previously have been a second lens's |
+| **A Leader briefing error, corrected by the worker's measurement** | I instructed the direct `ALTER`, citing `T-06`'s precedent | **The instruction was wrong in a fixture context** — `T-06` ran solo, fixtures run in parallel. The worker followed it, **measured `test:fixtures` five times, saw 4/5 fail**, diagnosed the sibling collision and redesigned. It improved on its instructions rather than following them into a defect, and disclosed the trade instead of hiding it |
+| Stability re-measured by the Leader | 3 consecutive runs | `17 suites / 90 tests`, exit 0, **zero `1412`** each. With the worker's 5, **eight clean runs** of a suite that was failing 4-in-5 before the redesign |
+| Advisories **not** actioned by reopening | Role-2 coverage, string pinning, the dangling anchor | The task PASSed; reopening costs rounds a 40%-over budget cannot spare. Two routed to `T-12`, the two substantive gaps escalated to the user |
