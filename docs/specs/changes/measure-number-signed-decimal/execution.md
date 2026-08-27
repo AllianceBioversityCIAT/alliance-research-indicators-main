@@ -1651,3 +1651,124 @@ The child guide's `K-002` section instructed *"gate against the **945** baseline
 | Scale table + `[max]` grep + naming trap **scouted before dispatch** | All three verified by the Leader | The naming trap in particular would have aimed the falsifier at the wrong line and reddened nothing |
 | **Reopened after a PASS** | On the reviewer's own gate-gap finding | The verdict was correct on what it could see; the gap was in the Leader's brief. Reopening was cheaper than shipping four type errors that no configured gate would ever surface |
 | AC.3 amended mid-task | On measured evidence | The Implementer's honest `KZ-017` disclaimer is what exposed a false acceptance criterion. **The lesson: a worker declaring what it has *not* proven is worth more than one asserting what it has** |
+
+---
+
+### T-10 — `QuantificationItemComponent`: `min` / `max` / `placeholder` inputs, and `maxFractionDigits` defaulting to `0`
+
+- **Status:** ✅ **PASS on attempt 2** (`T-10` — Reviewer: **PASS**)
+- **Date:** 2026-08-27
+- **Implementer attempts:** 2 (`akili-implementer`, T2 `sonnet`, `xhigh` then `high`)
+- **Reviewer:** one `akili-reviewer`, single merged lens
+- **Requirements covered:** `R-MSD-002` (all ACs, scenario `:222`/`:223`), **`R-MSD-012` AC.1** (reassigned in from `T-09`)
+
+#### The four inputs — each reproducing today's literal, Leader-verified from the template before dispatch
+
+| Input | Default | Reproduces |
+| --- | --- | --- |
+| `min` | `0` | today's `[min]="0"` |
+| `max` | `Number.MAX_SAFE_INTEGER` | today's **absence** of `[max]` — so `app-input`'s own `T-09` default applies, which is what made that promotion inert |
+| `placeholder` | `'Enter a positive number'` | today's static attribute |
+| `maxFractionDigits` | **`0`** | ⚠️ **the ONE changed default in the entire spec** (`DD-12`) |
+
+**That single change is why no OICR file is edited anywhere in this spec.** OICR passes nothing and therefore receives `0`; Innovation Use will pass `4` at `T-11`.
+
+`:29`'s superseded comment — *"No default: `undefined` reproduces today's Intl resolution exactly, so OICR stays byte-identical"* — was rewritten, since `DD-12` supersedes that intent.
+
+#### Two ACs were mis-routed. Both are now fixed, and the second was found by the Implementer.
+
+**`R-MSD-012` AC.1 — reassigned IN, by the Leader.** It was filed against `T-09`, but `design.md` §6.1 places the mechanism in **this card** (*"Scale domain 0–4, guarded… a configuration error surfaced at development time, not rounded quietly"*). `app-input` cannot host it — `T-09`'s Reviewer correctly refused it as drift — and `T-10`'s checklist had **omitted** it. So AC.1 was assigned to a task that could not discharge it and absent from the one that could.
+
+**`R-MSD-012` AC.3 — reassigned OUT, flagged by the Implementer.** It was listed against `T-10`, but **its own text names the Innovation Use call site** (*"the Innovation Use call site computes `max` from its scale rather than hard-coding a literal"*) — `T-11`'s file — and it states that a card-internal derivation would be *"a different decision, **not** what DD-14 specifies."* The Implementer flagged the mismatch rather than claiming or skipping coverage.
+
+> ⚠️ **The Leader's first AC.3 fix was incomplete, and the Reviewer caught it as gate-blocking.** Only the summary row had been edited: `T-10`'s *Requirements covered* still claimed AC.3 and `T-11`'s did not list it, so **AC.3 had no checkbox anywhere** — closing `T-10` would have orphaned the very criterion the reassignment existed to rescue. Now: removed from `T-10`, added to `T-11`'s *Requirements covered*, **and** a real falsifiable checklist item added there (derive from scale, assert on the real `app-input`, *change the scale to 3 and the bound must move*), with `T-09`'s duplicate-formula carry folded in.
+
+#### AC.1's mechanism — a throwing `@Input` setter, and the Reviewer upheld it by MEASURING the blast radius
+
+`maxFractionDigits` became a getter/setter pair over a private backing field, throwing synchronously on an out-of-domain value.
+
+The Leader pressed hard on whether this was right, since **a throw inside change detection propagates and can take down the view**, while §6.1 asks only for *development time*. The Reviewer did not reason about it — it measured the tree:
+
+- Every binding in the client is a **static in-domain literal**: `innovation-use-details.component.html:204` binds `0`; both OICR blocks bind **none** of the four.
+- No dynamic or runtime-derived source anywhere; the card is never created via `ViewContainerRef`.
+- *"I could not construct a production input that reaches the throw."*
+
+And it ruled the alternatives **weaker on the axis the AC is about**: `isDevMode()` logging would have to either pass an out-of-domain scale through to PrimeNG — so the UI accepts a 5th decimal the column drops, or `DD-17` `400`s a value the user was invited to type — or clamp it. **Those are the two outcomes §6.1 exists to forbid.** A template surface is dead UI by the same argument that withdrew `DD-16`: no user can reach this state, only a developer can.
+
+#### Attempt 1 → `PASS`, then the Leader reopened it on the Reviewer's own advisory
+
+The Reviewer filed as `RELIABILITY` that the predicate admitted two values it must reject. Verified in `node`:
+
+```
+null >= 0  ->  true      null <= 4  ->  true      null PASSED
+2.5 >= 0   ->  true      2.5 <= 4   ->  true      2.5 PASSED
+```
+
+**Why the Leader promoted it to required rather than recording it:** `null` forwards to `app-input` → PrimeNG's `?? undefined` → back to **3 fraction digits**, *silently undoing `DD-12`* — the one changed default this task exists to deliver. `2.5` passes and `Intl`'s `DefaultNumberOption` **floors it to `2`** silently. Reachable: `[maxFractionDigits]="2.5"` type-checks today under `strictTemplates`. **A hole that defeats the task's own purpose is not advisory** — the same reasoning that promoted `T-07`'s schema guard.
+
+**Fixed** with `Number.isInteger(value) && value >= 0 && value <= 4`, which **preserves** the deliberate `NaN` rejection *by construction* rather than by a second clause that could drift.
+
+**The Reviewer then found three more cases the fix closes that neither party had named:** `undefined`, boolean `true` (`true >= 0 && true <= 4` were both `true` before), and the **string** `"2"` (both comparisons `true` before, and a string reaching `Intl` is a different failure again). `-0` still passes and is harmless. **No case that previously threw now passes.**
+
+**Falsifier — dropping `Number.isInteger` reddens exactly the two new assertions and nothing else:**
+```
+● … rejects null even though a plain range check would let it through …
+    Expected pattern: /scale domain 0-4/
+    Received function did not throw
+● … rejects a non-integer inside the numeric range, e.g. 2.5 …
+    Received function did not throw
+Tests: 2 failed, 40 skipped, 42 total
+```
+
+#### The `:222` disqualifier — one assertion on the shared default, not a call-site enumeration
+
+*"Enumerating call sites is explicitly disqualified — that enumeration produced **four different wrong figures across three rounds**."*
+
+The suite takes the **real, unstubbed** `p-inputNumber` via `By.directive(InputNumber)` and calls its own **`formatValue()`** — the method PrimeNG's `updateInput()`/paste path use: `formatValue(2.5)` → `'3'`, `formatValue(-2.5)` → `'-3'`.
+
+**Leader-verified in `node` before accepting it:** `maximumFractionDigits: 0` renders `2.5` as `"3"` and `-2.5` as `"-3"`; `undefined` leaves `"2.5"`. So the falsifier's red (`Expected "3" / Received "2.5"`) is exactly this mechanism, and the Reviewer confirmed it satisfies **`DC-1`** to the letter.
+
+**Honest limit, now stated in the code:** `formatValue()` returns the string that *would* be written to the element. **No DOM value and no `ngModel` write-back is observed**, so this does **not** close `U-11`.
+
+#### 📌 A rule the Leader wrote this morning, corrected twice by workers hitting its edges
+
+The child guide's `K-002` gate had said *"gate against the **945** baseline"*; the Leader replaced it with *"the per-file grep must come back **EMPTY**"*.
+
+**That was wrong within hours.** This spec file carries **5 pre-existing `TS2552`** errors (`Cannot find name 'SimpleChanges'` — it imports only the singular `SimpleChange`), so an empty grep is unachievable without fixing unrelated code. The Implementer did the right thing unprompted: compared against the pre-edit state via `git stash`. **Leader-verified: 5 before, 5 after, totals 934 = 934, zero new** — only line numbers shifted, because new blocks were inserted above them.
+
+**The Reviewer then corrected the correction, three ways, all now in the guide:**
+
+| Correction | Why |
+| --- | --- |
+| Compare the **normalized error SET**, not a count | A matching count cannot distinguish *unchanged* from *one pre-existing fixed **plus** one new introduced*. Strip the position (`sed -E 's/\([0-9]+,[0-9]+\)//' \| sort`) and compare sets |
+| **`git stash` mutates the whole tree** | Must not run during concurrent edits (root guide's concurrency rule); prefer `git stash push -- <files>` or `git show HEAD:<file>` |
+| Relabel *"totals must match"* as a **tripwire**, not a gate | It catches `K-004`'s parse-abort mode (a syntax error in your file collapses the project's diagnostics) and a new error in a file you did **not** touch. Same-window only; the `938` figure is illustrative |
+
+**Attempt 2 used the refined method**: normalized before/after sets for both files **identical**, `diff` empty, totals 934 = 934 in one window. *A rule written, broken, corrected and exercised inside a single session — its final form came from two workers hitting its edges, not from the Leader getting it right.*
+
+#### Verification
+
+| Gate | Result |
+| --- | --- |
+| `npx tsc -p tsconfig.spec.json --noEmit` | Normalized sets **identical** before/after for both files; totals **934 = 934** |
+| `npm test` | **316 suites / 6766 tests**, exit 0 (6764 → **+2**, reconciling exactly with the two added `it`s) |
+| `npm run lint -- --quiet` | Clean; **`git status` after shows no `--fix` mutation** |
+| `npm run build` | exit 0, only pre-existing unrelated warnings |
+
+#### `ADVISORY` — recorded, non-gating
+
+| Finding | Note |
+| --- | --- |
+| **`STUB-1` → routed to §8** | `oicr-details.component.spec.ts:873` renders a **`FakeQuantificationItemComponent` stub**, so **no OICR-page coverage exercises the real card.** Two consequences: an out-of-domain literal added to an OICR block **reddens no suite** — it first throws in a browser, and **a throw inside change detection aborts the tick**, which on an in-progress OICR form is *data loss*, not a log line; and `:223`'s two-blocks equivalence can only be carried by a template read. The Reviewer's placement note was the useful part: this was recorded only inside the **card's** spec file, *"which is not where anyone looks for OICR-page coverage debt"* — hence a §8 entry |
+| `design.md` §6.1 clause | Should record that the mechanism is a **synchronous throw that also throws in production**, not only at development time. **Routed to `T-12`** on the Reviewer's advice — T-12 owns the doc amendments, and the code is now self-documenting (*"surfaced immediately as a thrown error"*), so nothing drifts silently meanwhile. **Not held against `T-10`** |
+| `NaN` unasserted | The guard's comment names three rejected cases; the suite pins two. The Reviewer explicitly **declined to require** a third assertion — *"the review must not out-grow the diff"* — which is worth recording as a reviewer exercising restraint after having just had an advisory promoted |
+| Two sweeps the Reviewer required before the checkboxes flipped | **Both were `KZ-013` forward-only sweep failures in the Leader's own edits.** (1) `tasks.md`'s copy still cited **`DC-3`** as `U-11`'s gate after `design.md`'s row had been corrected — and `DC-3` is a **server** DTO table, so the named gate did not exist; corrected to `DC-1` + `DC-2`. (2) `tasks.md` still said the rendered behaviour is *"asserted once per OICR block"*, which **ticking would have certified something the suite does not do** — amended to *"once on the shared OICR configuration"* with the gap recorded |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| AC.1 reassigned **in**, AC.3 reassigned **out** | Both recorded in `tasks.md` with reasoning | Two ACs in one requirement were filed against tasks structurally incapable of discharging them. Left alone, AC.1 would have been discharged by nobody and AC.3 orphaned on T-10's closure |
+| Advisory **promoted** to required | The `null`/non-integer predicate hole | It silently undoes `DD-12`, the task's entire purpose. Same test applied at `T-07`: *does the finding defeat what the task exists to do?* |
+| Reopened after a `PASS` | Twice now in the client tasks (`T-09`, `T-10`) | Both times the reviewer's advisory or gate-gap was worth more than the closure speed. Neither reopening was for a defect the reviewer had gated on |
+| Guide corrected rather than only the code | `K-002`'s `tsc` gate | The rule was the Leader's own, written the same day, and two workers hit its edges. Fixing the instruction is worth more than fixing one file's usage of it |
