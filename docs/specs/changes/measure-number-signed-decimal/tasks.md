@@ -149,16 +149,17 @@ graph TD
   - The crash condition is **not** "any `|value| < 1e-6`": `1.5e-7` returns `true` today and is accepted (`K-05`).
   - Follow `IsActorCountModeExclusiveConstraint` in the same file.
 - **Acceptance / done check:**
-  - [ ] `1e-7`, `-1e-7` and `1e21` each return a clean **`400`**, never a `500` (`DC-15`).
-  - [ ] `2.55` is **accepted** — the `toFixed` trap does not fire.
-  - [ ] The `400` for a sibling field names `actors_count` and **does not** name `quantification_number` (`:265`, `:266`).
-  - [ ] All **six** sibling count fields still reject `2.5`, asserted per field, not as a group.
-  - [ ] The four steps are asserted **in order** — a test that only checks the end result would pass with steps ③ and ④ swapped, which is the `500` bug.
+  - [x] `1e-7`, `-1e-7` and `1e21` each return a clean **`400`**, never a `500` (`DC-15`). Asserted on the **status** (`getStatus() === 400`), not on `toThrow()`.
+  - [x] `2.55` is **accepted** — the `toFixed` trap does not fire. ⚠️ **Discharged by dominating values, not by the named literal:** `2.55` appears in no test. The property is pinned by `3.3` (controller spec) and `274877906944.0405` (DTO spec) — both non-dyadic, both rejected by a `toFixed(20)` mechanism. Recorded so the basis is traceable.
+  - [x] The `400` for a sibling field names `actors_count` and **does not** name `quantification_number` (`:265`, `:266`).
+  - [x] All **six** sibling count fields still reject `2.5`, asserted per field, not as a group.
+  - [x] The four steps are asserted **in order** — ~~a test that only checks the end result would pass with steps ③ and ④ swapped, which is the `500` bug~~. ⚠️ **This parenthetical is FALSE and was measured so** — see `execution.md` → `### T-04`. The swap's failure mode is a **silent false accept (`2xx`)**, not a `500`; `1e21` cannot detect it; and the swap **does not compile** (block ④ ends in `return`, so ③ becomes dead code and `tsc` loses step ①'s narrowing → `TS2365`). Pinned instead by `9.9e20` and `MAX+1`, with the step-③-deletion red observed. Step ② is pinned by `NaN`.
 - **What disqualifies this evidence:** a single "rejects bad input" test that does not distinguish `400` from `500` cannot see `DC-15` at all — the status code **is** the defect. Assert the status, not merely that it threw.
-- **Input that would make this check FAIL:** swap steps ③ and ④ and send `1e21` — the response must become a `500` and the test must redden. **If it stays green, the order is not actually asserted.**
+- **Input that would make this check FAIL:** ~~swap steps ③ and ④ and send `1e21` — the response must become a `500` and the test must redden.~~ ⚠️ **MEASURED WRONG on three counts** (2026-08-27, both Reviewer lenses concurring): the failure mode is a **silent false accept**, not a `500`; `1e21` is double-guarded and structurally cannot detect the swap; and the literal swap **is not executable in TypeScript** — moving block ④ above ③ makes ③ unreachable, so `value` reverts to `unknown` and `tsc` fails with `TS2365` before any test runs. **Its only executable equivalent is deleting step ③**, which was run: `9.9e20` and `MAX+1` redden while `1e21` stays green. Correct this task text when the spec is next amended.
+- **Files touched (actual):** the two intended files **plus `result-innovation-use.controller.spec.ts`** — two pre-existing tests encoded the pre-`DD-8` rule and had to be updated. Upheld by review, with `T-10`'s own text as precedent.
 - **Dependencies:** T-02
 - **Estimated effort:** M · **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
-- **Status:** todo
+- **Status:** **done** — Reviewer `PASS` on attempt **3 of 3** (both lenses), 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-04`. The production constraint was correct on attempt 1 and never changed; all three FAILs were false claims in prose. ⚠️ **Standing limit:** `npm test` has `rootDir: "src"` and never runs the fixture or e2e configs, so the four `innovation-use/*.fixture-spec.ts` files touching this column were **not executed** — `T-07` owns that proof.
 
 ---
 

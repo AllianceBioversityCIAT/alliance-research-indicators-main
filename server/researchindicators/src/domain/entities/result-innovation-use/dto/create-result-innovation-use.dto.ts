@@ -71,6 +71,88 @@ function IsExclusiveOfActorMode(
   };
 }
 
+/**
+ * T-04 (R-MSD-003, R-MSD-007; `design.md` DD-8, DD-17, DC-15).
+ *
+ * `quantification_number` only — the six sibling count fields keep their
+ * `@IsInt() @Min(0)` untouched. Replaces that pair with a signed,
+ * scale-bounded decimal check: finite, within DD-14's derived magnitude
+ * bound (`549_755_813_887` at scale 4), at most 4 fractional digits.
+ *
+ * Deliberately **not** `@IsNumber({ maxDecimalPlaces: 4 })` — `class-validator`
+ * derives the scale via `value.toString().split('.')[1].length`, which
+ * throws a `TypeError` (surfacing as a `500`) whenever `toString()` yields
+ * exponential notation with no `.` (`J-15`, `DC-15`).
+ *
+ * The four steps are a MANDATED order, each gating the next:
+ *   ① reject anything that is not a `number` (the resent-string read shape);
+ *   ② reject non-finite (`NaN`, `±Infinity`);
+ *   ③ reject outside the DD-14 bound — MUST run before any string
+ *      conversion. Skipping ahead here is the whole bug: `1e21` would reach
+ *      step ④'s `String()` and reproduce the very `TypeError` this
+ *      constraint exists to remove;
+ *   ④ only then derive the scale from the value's decimal string form.
+ *      Not via `toFixed` at high precision — `(2.55).toFixed(20)` rejects a
+ *      legal value, and `(1e-7).toFixed(4)` silently rounds to `"0.0000"`.
+ *      After step ③ has passed, a value whose `String()` form is
+ *      exponential can only be `|v| < 1e-6` (step ③ already excluded
+ *      `|v| ≥ 1e21`), which always carries more than 4 decimals — so an
+ *      exponential string is rejected outright, never parsed further.
+ */
+const QUANTIFICATION_NUMBER_MAX = 549_755_813_887; // DD-14, scale 4
+const QUANTIFICATION_NUMBER_MIN = -QUANTIFICATION_NUMBER_MAX;
+const QUANTIFICATION_NUMBER_MAX_DECIMALS = 4;
+
+@ValidatorConstraint({ name: 'isScaleBoundedSignedDecimal', async: false })
+class IsScaleBoundedSignedDecimalConstraint
+  implements ValidatorConstraintInterface
+{
+  validate(value: unknown): boolean {
+    // ① reject anything that is not a `number`
+    if (typeof value !== 'number') return false;
+    // ② reject non-finite
+    if (!Number.isFinite(value)) return false;
+    // ③ reject outside DD-14's bound — before any string conversion
+    if (
+      value < QUANTIFICATION_NUMBER_MIN ||
+      value > QUANTIFICATION_NUMBER_MAX
+    ) {
+      return false;
+    }
+    // ④ only then derive the scale
+    const stringValue = String(value);
+    if (stringValue.includes('e') || stringValue.includes('E')) return false;
+    const dotIndex = stringValue.indexOf('.');
+    return (
+      dotIndex === -1 ||
+      stringValue.length - dotIndex - 1 <= QUANTIFICATION_NUMBER_MAX_DECIMALS
+    );
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return (
+      `${args.property} must be a finite number with at most ` +
+      `${QUANTIFICATION_NUMBER_MAX_DECIMALS} decimal places, between ` +
+      `${QUANTIFICATION_NUMBER_MIN} and ${QUANTIFICATION_NUMBER_MAX}`
+    );
+  }
+}
+
+function IsScaleBoundedSignedDecimal(
+  validationOptions?: ValidationOptions,
+): PropertyDecorator {
+  return (object: object, propertyName: string | symbol) => {
+    registerDecorator({
+      name: 'isScaleBoundedSignedDecimal',
+      target: object.constructor,
+      propertyName: propertyName as string,
+      options: validationOptions,
+      constraints: [],
+      validator: IsScaleBoundedSignedDecimalConstraint,
+    });
+  };
+}
+
 export class InnovationUseActorDto {
   @IsNumber()
   @IsOptional()
@@ -175,8 +257,7 @@ export class InnovationUseQuantificationDto {
   @ApiProperty({ required: false })
   id?: number;
 
-  @IsInt()
-  @Min(0)
+  @IsScaleBoundedSignedDecimal()
   @IsOptional()
   @ApiProperty({ required: false })
   quantification_number?: number;

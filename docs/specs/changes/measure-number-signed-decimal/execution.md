@@ -501,3 +501,168 @@ examples: 378316057649.8024, 280331090806.8436, 295254301987.1019, 426975499164.
 | Review mode | **Single merged-lens Reviewer, not the parallel lenses the 4R table prescribes at `xhigh`** | **Deviation, recorded.** The Leader had already measured the headline defect before review, so parallel breadth would have spent a lens auditing code certain to change. The security/bypass questions were merged into the single brief and cleared; the Reviewer was asked at the re-gate whether that left anything unaudited and answered: *"Security lens: nothing left unaudited … the attempt-2 delta only widens acceptance on role 3 inside DD-14's bound"* |
 | Reviewer continuity | Same Reviewer resumed across all three attempts | Its findings were judged by the party that raised them — and at attempt 3 it ruled on **its own** suggested figure rather than the Leader overriding it |
 | Suite re-measured by Leader | After every attempt | `354/2681` → `354/2692` → `354/2702`, each in a quiet tree after the worker reported. **One run reported exit 1 and was not a test failure** — the Leader's shell cwd had drifted, so `cd` failed and Jest never ran. Caught by reading the raw output before counting it (`K-014`); an exit code alone would have read as "T-03 broke the suite" |
+
+---
+
+### T-04 — Innovation Use DTO: custom scale + range constraint, with the mandated evaluation order
+
+- **Status:** ✅ **PASS on attempt 3** (`T-04` — Reviewer: **PASS**, both lenses). Reached the rework ceiling; the production constraint was correct on **attempt 1** and never changed.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 3 (`akili-implementer`, T2 `sonnet`, effort `xhigh` throughout)
+- **Reviewers:** **two** `akili-reviewer` lenses (T3 `opus`, read-only), both resumed across all three attempts — Lens A conformance/correctness, Lens B regression-risk/resilience
+- **Requirements covered:** `R-MSD-003` (scenario *The relaxation does not leak to the siblings*, `:265`, `:266`), `R-MSD-007`
+- **Design references:** `DD-8`, `DD-17`, `DD-14`, §6.2, `DC-15`
+
+#### Files changed
+
+| File | Change |
+| --- | --- |
+| `server/.../result-innovation-use/dto/create-result-innovation-use.dto.ts` | `@IsInt()`/`@Min(0)` removed from `quantification_number` **only**; new `IsScaleBoundedSignedDecimalConstraint` + `IsScaleBoundedSignedDecimal()` decorator, following `IsActorCountModeExclusiveConstraint` in the same file |
+| `server/.../result-innovation-use/dto/create-result-innovation-use.dto.spec.ts` | **new** — 24 tests (7 accepts, 8 reject rows, `NaN`, non-number, leak, 6 siblings) |
+| `server/.../result-innovation-use/result-innovation-use.controller.spec.ts` | **not in the task's intended file list.** Two pre-existing tests encoded the pre-`DD-8` rule and broke; rewritten + one rejection case added. **Justified and upheld** — see below |
+
+#### The constraint — the four mandated steps, in order
+
+```ts
+validate(value: unknown): boolean {
+  if (typeof value !== 'number') return false;                        // ①
+  if (!Number.isFinite(value)) return false;                          // ②
+  if (value < QUANTIFICATION_NUMBER_MIN ||
+      value > QUANTIFICATION_NUMBER_MAX) return false;                // ③ before any string conversion
+  const stringValue = String(value);                                  // ④
+  if (stringValue.includes('e') || stringValue.includes('E')) return false;
+  const dotIndex = stringValue.indexOf('.');
+  return dotIndex === -1 ||
+    stringValue.length - dotIndex - 1 <= QUANTIFICATION_NUMBER_MAX_DECIMALS;
+}
+```
+
+**Step ④'s mechanism was verified by the Leader before the task was dispatched**, precisely because T-03 had just lost three attempts to an unverified predicate. `[0,20]` grid: 200,001 tested, **0** falsely rejected; T-03's failing band: 500,000 tested, **0** falsely rejected. The exponential branch is sound rather than convenient — JS stringifies exponentially only for `|v| ≥ 1e21` or `|v| < 1e-6`, and step ③ has already excluded `≥ 1e21` (the bound is `5.49e11`), so a surviving `'e'` means the value is tiny, which always means more than 4 decimals. Thresholds checked, not recalled: `String(1e20)` is plain digits, `String(1e21)` is `"1e+21"`, `String(1e-6)` is `"0.000001"`, `String(9.9e-7)` is `"9.9e-7"`.
+
+**T-04 did not reproduce T-03's defect.** `274877906944.0405` — the input that reddens T-03's shipped predicate — is in this tier's accept table, which is the single value proving the two predicates are not the same code.
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent` (full) | `355 suites / 2727 tests` — **Leader re-measured independently after every attempt** |
+| `npx eslint <changed files>` (bare gate, `K-001`) | exit 0 |
+| `npm run build` | exit 0 |
+| **`npx tsc --noEmit`** | exit 0 — the **load-bearing** gate for this diff, since `tsconfig.build.json` excludes `**/*spec.ts` so `npm run build` type-checks no spec file (`K-004`). Run unprompted by the Implementer |
+
+#### ⚠️ STANDING LIMIT on every "full suite green" claim in this spec (`KZ-017`, Lens B)
+
+**`npm test` has `rootDir: "src"`. It never runs `test/jest-fixtures.json` or `test/jest-e2e.json`.** The four `innovation-use/*.fixture-spec.ts` files that touch `quantification_number` were therefore **not executed by any of T-04's three attempts** — nor by T-02's or T-03's. Lens B read them and found they call `harness.service.update(...)` directly, bypassing the `ValidationPipe`, so T-04's relaxation cannot affect them — **but that is a read, not a run.** `T-07` owns the executed proof. This limit applies to every green-suite claim already recorded in this log.
+
+#### Acceptance criteria
+
+| # | Item | State |
+| --- | --- | --- |
+| 1 | `1e-7`, `-1e-7`, `1e21` each a clean `400`, never a `500` | ✅ asserted via `rejects.toBeInstanceOf(BadRequestException)` **plus** `getStatus() === 400` — the disqualifier demands the status, not `toThrow()` |
+| 2 | `2.55` accepted, `toFixed` trap does not fire | ✅ **discharged by dominating values, not by the named literal.** `2.55` appears nowhere; the property is pinned by `3.3` (controller spec) and `274877906944.0405` (DTO spec), both non-dyadic and both rejected by a `toFixed(20)` mechanism. Lens A declined to gate and asked that the discharging values be named here so the checkbox has a traceable basis |
+| 3 | Sibling `400` names `actors_count`, not `quantification_number` | ✅ explicit test; `defaultMessage` interpolates `args.property`, and only *failing* constraints reach the response |
+| 4 | All **six** siblings still reject `2.5`, **per field** | ✅ `it.each` over all six in the DTO spec. Lens B tabulated each one intact |
+| 5 | The four steps asserted **in order** | ✅ — but only after the spec text was **measured to be wrong**; see below |
+
+#### Criterion 5 — the spec text is wrong on three counts, all now measured
+
+`tasks.md:156-158` mandates: *"swap steps ③ and ④ and send `1e21` — the response must become a `500` and the test must redden."* The Implementer ran it and reported honestly that **it does not redden.** Its conclusion — that the mechanism is *"robust to a pure reorder"* — was wrong, and Lens A found why:
+
+1. **`1e21` is double-guarded**, so it cannot discriminate ③ from ④: step ④'s `'e'` check rejects it just as ③ does. Every value in `(MAX, 1e21)` stringifies as **plain digits with no `.`**, so a swapped ④ returns `true` and short-circuits ③.
+2. **The failure mode is a silent false accept (`2xx`), not a `500`.** Leader-verified with a faithful swap (block ④ moved verbatim, retaining its `return`, which makes ③ dead code):
+
+```
+value                shipped  swapped
+1e+21                false    false     <- the mandated input cannot detect it
+990000000000000000000 false    true     <- silent false ACCEPT
+549755813888         false    true      <- silent false ACCEPT (MAX+1)
+-549755813888        false    true      <- silent false ACCEPT
+```
+
+3. **The mandated mutation has no executable form.** Moving ④ above ③ makes ③ unreachable, and TypeScript drops step ①'s `typeof` narrowing in dead code, so `value` reverts to `unknown` → **`TS2365` twice**, `Tests: 0 total`. *"③ is unreachable" and "③ is deleted" are the same runtime predicate, and only the latter compiles.*
+
+**And the consequence was worse than a defective criterion: two of the four steps were pinned by nothing.** Deleting the whole step ③ block left all 21 tests green; deleting step ② left them green while `NaN` became an accepted quantification (`NaN < MIN` and `NaN > MAX` are both `false`; `String(NaN)` has no `e` and no `.`).
+
+**Closed by three new reject rows and two observed reds:**
+
+```
+step ③ DELETED (the mutation tsc accepts):
+  ● rejects 9.9e20 …  Resolved to value: {"quantification_number": 990000000000000000000}
+  ● rejects 549755813888 (DD-14s max + 1) …
+  Tests: 2 failed, 22 passed, 24 total        <- 1e21 among the 22, proving the mandated input is blind
+
+step ② DELETED:
+  ● rejects NaN as a 400 (pins step ② against its own deletion)
+  Tests: 1 failed, 23 passed, 24 total
+```
+
+**The Leader refused the compile-time `TS2365` as sufficient evidence** — `Tests: 0 total` measured nothing, and a suite that never executed cannot certify that any row discriminates. Lens A confirmed that refusal was correct and ruled the `TS2365` worth recording as a **second, incidental guard**: it exists only because the implementation declares `validate(value: unknown)` while `ValidatorConstraintInterface` declares that parameter `any` — annotating it `any` or `number`, a change no reviewer would question, silently removes the compiler guard. It also catches only *this* mutation, not deletion, a changed constant, or `>` vs `>=`. **It cannot substitute for the three rows.**
+
+> **📌 `tasks.md:156-158` is factually wrong and should be corrected when the spec text is next touched** (not done here — amending the approved task at the ceiling is out of scope): the swap's failure mode is a silent false accept, `1e21` cannot detect it, and the literal falsifier is unrunnable in TypeScript. Its only executable equivalent is deleting step ③.
+
+#### The file-scope excursion — upheld, with a precedent the Implementer did not claim
+
+Two pre-existing controller-spec tests asserted that `-1` and `3.3` are rejected. `DD-8` (*"this field only"*), `R-MSD-003` AC.1 (`-1500` accepted), AC.2 (`2.5` accepted) and `:265` (*"it must NOT name `quantification_number` — that value is now valid"*) make both legal, so the tests encoded a rule the spec explicitly removes. **Not tests bent to fit code.**
+
+Lens B's corroboration is the part worth keeping: **the test counts reconcile to the unit.** T-03 closed at `354/2702`; the new DTO spec holds exactly 21 tests (later 24) and the controller spec went 2 → 3, so `354 + 1 = 355` and `2702 + 21 + 1 = 2724` (→ `2727` with the three new rows). A silent deletion anywhere in `src` would have broken that arithmetic. It also stated the limit: this cannot detect an equal-count swap.
+
+It further found the in-spec precedent nobody had cited — **`T-10`'s own text blesses the analogue**: *"it deliberately turns two currently-green specs red … Updating them is in scope and is the visible proof the default moved."* *Files touched (intended)* is a planning estimate, not a prohibition.
+
+Blast radius: **no other consumer or test in the tree** asserts rejection of a negative/fractional `quantification_number` at this DTO; `UpdateResultInnovationUseDto` inherits the constraint and has zero references; no Swagger snapshot test exists.
+
+#### Three attempts, and all three FAILs were prose
+
+**This task's production `validate()` was correct on attempt 1 and never changed.** Both lenses confirmed the constraint, the step order, the exponential branch, the bound symmetry (`min = −max`, mandated by `DD-14`/§6.2), `@IsOptional()`'s null handling (verified from `class-validator` source: `CONDITIONAL_VALIDATION` short-circuits **all** validators, matching T-02's `null → null` and T-03's explicit `continue`), and `defaultMessage`.
+
+| Attempt | FAIL cause |
+| --- | --- |
+| 1 | Lens A: steps ② and ③ pinned by nothing; the "no `KZ-017` gap" declaration false (the field passes **two** validators on this endpoint). Lens B: a comment claim false *twice over* |
+| 2 | Lens B, then Lens A: the repair for attempt 1's false comment **introduced a new inverted order claim** in the same file about the same two steps |
+| 3 | — PASS |
+
+**The classification was contested and resolved deliberately, not by whoever reviewed what.** Lens B first filed its comment finding as `ADVISORY`; asked whether that was consistent with T-03 having been FAILed twice for the identical class, it **upgraded to FAIL**: *"grading mine down would make the standard reviewer-dependent, which is exactly the failure you named."* Lens A then filed the attempt-2 inversion as `ADVISORY` and, put the same question, also upgraded — withdrawing its own classification with *"my declination was a cost argument … not a standards argument, and a §4.3 violation was never eligible for the ADVISORY block under my own contract. I misfiled it."*
+
+**Lens A also corrected the Leader's own brief mid-flight.** The Leader wrote that under a swap *"step ④ would still reject it"* — a **counterfactual**, which is exactly the defect being repaired. Left uncorrected it would have produced a third inverted claim about the same input. The correction was relayed to the in-flight worker rather than allowed to land.
+
+**Lens A's second correction changed the fix:** the offending text is not a comment but the `it.each` **label**, which Jest prints as the test's description — the artifact root `CLAUDE.md` §4.3 names explicitly (*"two reached committed test descriptions before review caught them"*). So the label was shortened, the reasoning moved into a comment, the counterfactual marked as one (`WOULD ... if ③ were absent`), and the measured evidence cited.
+
+**Running total for this spec's execution: six false prose claims, five gated as FAILs, one of them the Leader's own.** In every case the code was right and the sentence about the code was wrong.
+
+#### The mandated claim sweep — and what it caught that two reviewers missed
+
+Attempt 3 was required to verify every claim about **order, count, location or magnitude** in both files. It reported **17 sites with dispositions** — the most thorough in this spec. It recomputed the T-03 predicate claim in node, resolved `:265`/`:266` to the actual requirement clauses, reconciled *"all SIX"* as five `it.each` rows + `organization_count`, and verified `:108`'s step-② rationale.
+
+It also found a defect **neither reviewer had seen**: the controller spec runs `Case 1..7, 9` with **no `Case 8`**, while a header claims *"AC.1–AC.8 … plus T-07's own ninth case."* It left it alone as out of scope and flagged it.
+
+**Both lenses ruled, and the ruling is the line this spec has been drawing all run:**
+
+> **§4.3 governs assertions — a claim that can be checked and found false. A numbering hole asserts nothing; it withholds.**
+
+Every item gated this run was a sentence contradicted by evidence. Here the substantive coverage claim **holds**: Lens B located `AC.8` at `Case 6` (`:560-561`, annotated *"(AC.8, draft-save)"*), and `Case 1` carries two ACs, so seven cases genuinely carry eight. **No coverage gap, no false claim — a naming discontinuity.** Lens A traced its origin to `T-07`; Lens B judged no new owner needed. **Recorded as a forward pointer for `T-12`'s sweep**, not widened into T-04.
+
+Lens A on why it surfaced at all: *"it is invisible unless you enumerate the `describe` labels, which is what this attempt's claim sweep did … the strongest argument for keeping the sweep in the loop."*
+
+#### `ADVISORY` — recorded, non-gating, none widens a task
+
+| Lens | Finding |
+| --- | --- |
+| **RISK — reachable tier divergence** | `274877906944.0405` passes the DTO and is rejected by the service (`result-quantifications.service.ts:131`) with a `400` whose text contradicts a value that visibly *does* have four decimals. Path traced and the value **computed**: `result-innovation-use.service.ts:247-251` → `base-service.ts:319` → `:347` → `result-quantifications.service.ts:81-87` → `:131`. **No `500`, no corruption** — the IU upsert is step 9 inside `dataSource.transaction`, so the throw rolls back atomically; `RK-13`'s partial-update mode belongs to `updateOicr`, which uses roles 1/2. Effective API behaviour is the stricter tier. **If the predicates are ever unified, T-04's mechanism is the one to adopt** |
+| Readability | *"pins the DC-15 crash guard, not the DD-14 bound"* is loose under a strict single-mutation reading — with ③ deleted the case survives via ④, with ④'s guard deleted it survives via ③, so it pins **neither alone**; it reddens only if both are removed. Not a false ordering claim (the comment above fixes the mechanism), and it does discharge criterion 1. Lens B's exact phrasing if that block is ever edited again: *"discharges T-04 acceptance item 1 (`1e21` returns a clean `400`); it pins neither ③ nor ④ alone — `9.9e20` pins ③."* **Do not touch it solely for this** |
+| Resilience | The null contract rests **entirely** on `@IsOptional()`: step ① would reject `null` on its own, and unlike `IsActorCountModeExclusiveConstraint` (`:40`) this constraint has no defensive null branch. No reaching payload could be constructed. Either mirror the sibling's early `return true` or state in the doc block that `@IsOptional()` is load-bearing for `R-MSD-011` AC.6 |
+| Risk | Above ~`2^38` one double covers more than `1e-5`, so a 5-decimal literal such as `549755813886.99991` arrives as its 4-decimal neighbour and is accepted — **the fifth digit is destroyed by `JSON.parse` before any validator runs.** Not fixable in a predicate over a `number`; same for T-03 |
+| Risk | `expectBadRequestNaming` matches a bare field name, and `"women_youth_count"` contains `"men_youth_count"`. No false green today (each payload supplies one field); the indexed form removes the hazard permanently |
+| Reliability | The six sibling cases assert only that the message contains the field name; they would pass if the exclusivity rule fired instead of `@IsInt()`. Verified it does not today. Asserting the constraint key `isInt` would make the reason load-bearing |
+| Conformance | Criterion 2 names `2.55`, which appears nowhere. Non-gating (dominated), but one table row would pin the canary `DD-17`/`K-06` actually name — it fails *downward* (`"2.54999999999999982236"`) where `3.3` fails upward |
+| DX | `@ApiProperty({ required: false })` still advertises a bare `number` while the accepted domain became ±549,755,813,887 at 4 decimals. Not obliged by §4.1 (no new endpoint) |
+| Process | Add `result-innovation-use.controller.spec.ts` to T-04's *Files touched* so PR 1's review order reflects the real surface |
+| Readability | The repaired controller-spec comment names the DTO spec twice — redundancy between two **true** statements, so §4.3 does not reach it |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Skills | `nestjs-expert`, `tdd`, `error-handling-patterns` (attempt 1); dropped to `nestjs-expert` + `tdd` for the prose-only attempts | The task's list. `error-handling-patterns` earned its place on the `400`-vs-`500` design and nothing after |
+| Effort | `xhigh` throughout | Same reasoning as T-03: the *Tier ↔ effort rule* forbids `max` on a T2 model, and escalating to `opus` would collapse `author ≠ auditor` against the `opus` lenses |
+| Review mode | **Parallel lens (2 reviewers)**, per the 4R table at `xhigh` | Unlike T-03, where the Leader had pre-measured the defect and ran a single merged lens, here nothing was known in advance. **The split earned its cost**: Lens B owned the rewritten pre-existing tests and produced the count reconciliation and the `T-10` precedent; Lens A owned the ordering question and found that two of four steps were unpinned. Neither found the other's issue |
+| Mechanism verified before dispatch | Step ④'s predicate | Direct consequence of T-03 losing three attempts to an unverified one. It worked — T-04's predicate was never a FAIL cause |
+| Parallelism | **T-04 and T-05 NOT run concurrently** despite both being eligible | Both are server-package tasks. `CLAUDE.md` §4.3: cross-package parallelism is safe for editing, two tasks in the same package are not — the rule behind the `excel-workbook.builder.spec.ts` phantom failures, twice |
