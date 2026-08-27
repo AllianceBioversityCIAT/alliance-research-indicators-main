@@ -5,21 +5,11 @@
   box-sizing: border-box;
 }
 
-.variable-configuration {
+.prompt-manager {
   box-sizing: border-box;
 }
 
-.json-value-badge {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 14px;
-  color: rgb(3, 91, 169);
-  border: 1px solid rgb(22, 137, 202);
-}
-
-::ng-deep .variable-configuration-table {
+::ng-deep .prompt-manager-table {
   table {
     table-layout: fixed;
   }
@@ -36,8 +26,8 @@
     vertical-align: middle;
   }
 
-  th.variable-config-actions-col,
-  td.variable-config-actions-col {
+  th.prompt-manager-actions-col,
+  td.prompt-manager-actions-col {
     padding-left: 0 !important;
     padding-right: 0 !important;
   }

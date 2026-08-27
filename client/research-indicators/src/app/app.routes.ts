@@ -311,6 +311,16 @@ export const routes: Routes = [
         }
       },
       {
+        path: 'administration/configuration/prompt-manager',
+        loadComponent: () =>
+          import('@platform/pages/administration/configuration/prompt-manager/prompt-manager.component').then(m => m.default),
+        canMatch: [appConfigurationGuard],
+        data: {
+          title: 'Prompt Manager',
+          isLoggedIn: true
+        }
+      },
+      {
         path: 'administration/configuration/variables',
         loadComponent: () =>
           import('@platform/pages/administration/configuration/variable-configuration/variable-configuration.component').then(m => m.default),

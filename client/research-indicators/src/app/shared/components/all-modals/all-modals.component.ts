@@ -10,6 +10,7 @@ import { ResultInformationModalComponent } from './modals-content/result-informa
 import { AddContactPersonModalComponent } from './modals-content/add-contact-person-modal/add-contact-person-modal.component';
 import { SelectLinkedResultsModalComponent } from './modals-content/select-linked-results-modal/select-linked-results-modal.component';
 import { EditEnvironmentVariableModalComponent } from './modals-content/edit-environment-variable-modal/edit-environment-variable-modal.component';
+import { EditPromptModalComponent } from './modals-content/edit-prompt-modal/edit-prompt-modal.component';
 
 @Component({
   selector: 'app-all-modals',
@@ -22,7 +23,8 @@ import { EditEnvironmentVariableModalComponent } from './modals-content/edit-env
     ResultInformationModalComponent,
     AddContactPersonModalComponent,
     SelectLinkedResultsModalComponent,
-    EditEnvironmentVariableModalComponent
+    EditEnvironmentVariableModalComponent,
+    EditPromptModalComponent
   ],
   templateUrl: './all-modals.component.html'
 })
