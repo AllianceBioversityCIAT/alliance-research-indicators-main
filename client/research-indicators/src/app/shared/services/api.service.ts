@@ -39,6 +39,12 @@ import { GetRegion } from '../interfaces/get-region.interface';
 import { GetGeoSearch } from '../interfaces/get-geo-search.interface';
 import { GetOsCountries } from '../interfaces/get-os-countries.interface';
 import { GetOsResult } from '@shared/interfaces/get-os-result.interface';
+import {
+  ImpersonationCurrentResponse,
+  ImpersonationEndResponse,
+  ImpersonationStartResponse,
+  ImpersonationUserRow
+} from '@shared/interfaces/impersonation.interface';
 import { environment } from '../../../environments/environment';
 import { PostError } from '../interfaces/post-error.interface';
 import { GetContractsByUser } from '@shared/interfaces/get-contracts-by-user.interface';
@@ -1247,5 +1253,42 @@ export class ApiService {
   DELETE_AutorContact = (resultUserId: number, resultId: number) => {
     const url = () => `result-user/author-contact/${resultUserId}/by-result/${resultId}`;
     return this.TP.delete(url(), { useResultInterceptor: true });
+  };
+
+  // @akili-spec changes/profile-simulation — R-IMP-001/002/004, design §4.
+  // `mainApiUrl` already ends in `/api` and this app registers no version
+  // segment (D-imp-17), so these paths are `impersonation/...`, not `/api/v1/...`.
+
+  /** `GET /impersonation/users?search=` — R-IMP-001. `SYSTEM_ADMIN` only, server-enforced. */
+  searchImpersonationUsers = (search: string): Promise<MainResponse<ImpersonationUserRow[]>> => {
+    const url = () => `impersonation/users`;
+    const params = new HttpParams().set('search', search);
+    return this.TP.get(url(), { params });
+  };
+
+  /** `POST /impersonation/start` — R-IMP-002. */
+  startImpersonation = (body: { target_user_id: number; reason?: string }): Promise<MainResponse<ImpersonationStartResponse>> => {
+    const url = () => `impersonation/start`;
+    return this.TP.post(url(), body, {});
+  };
+
+  /**
+   * `POST /impersonation/end` — R-IMP-004. `sessionId` is sent explicitly as
+   * `X-Impersonation-Session` (via `ToPromiseService`'s `headers` config) so
+   * this call is self-contained and does not depend on the `jWtInterceptor`
+   * impersonation-header wiring (T-08) — `ImpersonationService.end()` calls
+   * this both from an active session and from the restore-after-reload path,
+   * before that interceptor has any signal to attach a header from.
+   */
+  endImpersonation = (sessionId: string, reason?: 'manual' | 'logout'): Promise<MainResponse<ImpersonationEndResponse>> => {
+    const url = () => `impersonation/end`;
+    const body = reason ? { reason } : {};
+    return this.TP.post(url(), body, { headers: { 'X-Impersonation-Session': sessionId } });
+  };
+
+  /** `GET /impersonation/current` — R-IMP-004. Same self-contained header rationale as `endImpersonation`. */
+  currentImpersonation = (sessionId: string): Promise<MainResponse<ImpersonationCurrentResponse>> => {
+    const url = () => `impersonation/current`;
+    return this.TP.get(url(), { headers: { 'X-Impersonation-Session': sessionId } });
   };
 }

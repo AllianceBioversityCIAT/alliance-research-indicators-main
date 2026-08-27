@@ -350,5 +350,23 @@ describe('ToPromiseService', () => {
       httpClientMock.get = jest.fn().mockReturnValue(throwError(() => error));
       await expect(service.getBlob('/test-url')).rejects.toThrow('Blob fetch failed');
     });
+
+    // Leader-adopted item 4 (reviewer-named latent leak): getBlob must also apply the
+    // X-Ari-Auth-Call marker on isAuth:true calls, same as get/post/put/patch/delete.
+    it('should set the X-Ari-Auth-Call marker header when isAuth is true', async () => {
+      const mockBlob = new Blob(['test'], { type: 'application/pdf' });
+      httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
+      await service.getBlob('/test-url', { isAuth: true });
+      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
+      expect(headers.get('X-Ari-Auth-Call')).toBe('1');
+    });
+
+    it('should NOT set the X-Ari-Auth-Call marker header when isAuth is falsy', async () => {
+      const mockBlob = new Blob(['test'], { type: 'application/pdf' });
+      httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
+      await service.getBlob('/test-url');
+      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
+      expect(headers.has('X-Ari-Auth-Call')).toBe(false);
+    });
   });
 });

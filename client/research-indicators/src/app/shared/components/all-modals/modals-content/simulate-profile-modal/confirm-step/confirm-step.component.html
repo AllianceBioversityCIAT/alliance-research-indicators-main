@@ -1,0 +1,70 @@
+<!-- @akili-spec changes/profile-simulation — T-10, R-IMP-008, mockup artboard 3 -->
+<div class="flex flex-col gap-4" data-testid="confirm-step">
+  <div class="flex items-start gap-[14px]">
+    <div class="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[10px]" style="background: color-mix(in srgb, var(--ac-orange-1) 15%, transparent)">
+      <i class="pi pi-exclamation-triangle text-[20px] atc-orange-1" aria-hidden="true"></i>
+    </div>
+    <div class="flex flex-col gap-[6px]">
+      <span class="!font-[space_grotesk] atc-primary-blue-600 text-[18px] font-[600]">Start simulation as {{ targetName() }}?</span>
+      <span class="description">You will operate STAR with this user's permissions, projects, results and dashboards.</span>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-3 rounded-[8px] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-[14px] py-[12px]" data-testid="confirm-summary">
+    <div class="abc-primary-blue-100 atc-primary-blue-600 flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[12px] !font-[space_grotesk] text-[14px] font-[600]">
+      {{ initials() }}
+    </div>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <span class="atc-primary-blue-600 text-[14px] font-[500]">{{ targetName() }}</span>
+      <span class="atc-grey-600 text-[12.5px]">{{ user().email }} · ID {{ user().sec_user_id }}</span>
+    </div>
+    <div class="flex gap-[6px]">
+      @for (role of user().roles; track role.role_id) {
+        <span
+          class="atc-primary-blue-600 rounded-[10px] px-2 py-[2px] text-[10px] font-[500] uppercase"
+          style="border: 1px solid color-mix(in srgb, var(--ac-primary-blue-600) 40%, transparent)">
+          {{ role.name }}
+        </span>
+      }
+    </div>
+  </div>
+
+  <div
+    class="flex flex-col gap-2 rounded-[8px] px-[14px] py-[12px]"
+    style="border: 1px solid color-mix(in srgb, var(--ac-red-1) 25%, transparent); background: color-mix(in srgb, var(--ac-red-1) 5%, transparent)"
+    data-testid="confirm-callout">
+    <span class="atc-red-1 !font-[space_grotesk] text-[13px] font-[600]">Actions affect real data</span>
+    <span class="atc-grey-800 text-[13.5px] leading-[1.45]">
+      Anything you create, edit, submit or delete during the simulation is saved to {{ targetName() }}'s data exactly as if they had
+      done it. The session is audit-logged under your account ({{ adminName() }}) and {{ targetName() }}.
+    </span>
+  </div>
+
+  @if (errorMessage()) {
+    <p class="atc-red-1 m-0 text-[13px]" data-testid="confirm-error">{{ errorMessage() }}</p>
+  }
+
+  <div class="flex justify-end gap-2 pt-1">
+    <button
+      type="button"
+      class="atc-grey-800 flex cursor-pointer items-center justify-center rounded-[8px] border border-[var(--ac-grey-300)] bg-transparent px-[18px] py-[8px] text-[13px] font-[450] disabled:cursor-not-allowed disabled:opacity-70"
+      [disabled]="pending()"
+      (click)="cancel()"
+      data-testid="confirm-cancel">
+      Cancel
+    </button>
+    <button
+      type="button"
+      class="abc-primary-blue-500 atc-white-1 flex cursor-pointer items-center justify-center gap-2 rounded-[8px] border-0 px-[18px] py-[8px] text-[13px] font-[500] disabled:cursor-not-allowed disabled:opacity-70"
+      [disabled]="pending()"
+      (click)="start()"
+      data-testid="confirm-start">
+      @if (pending()) {
+        <i class="pi pi-spinner pi-spin text-[14px]" aria-hidden="true" data-testid="confirm-start-spinner"></i>
+      } @else {
+        <i class="pi pi-shield text-[14px]" aria-hidden="true"></i>
+      }
+      Start simulation
+    </button>
+  </div>
+</div>

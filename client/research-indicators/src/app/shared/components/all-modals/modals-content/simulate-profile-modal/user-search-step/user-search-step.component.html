@@ -1,0 +1,113 @@
+<!-- @akili-spec changes/profile-simulation — T-09, R-IMP-007, mockup artboard 2 -->
+<div class="flex flex-col gap-4" data-testid="user-search-step">
+  <div class="flex flex-col gap-[6px]">
+    <label class="label" for="user-search-input"> User email or name <span class="text-red-500">*</span> </label>
+    <div class="flex h-[40px] items-center gap-[10px] rounded-[8px] border border-[var(--ac-grey-300)] bg-[var(--ac-white-1)] px-[12px]">
+      <i class="pi pi-search text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true"></i>
+      <input
+        id="user-search-input"
+        type="text"
+        class="flex-1 border-0 bg-transparent text-[14px] text-[var(--ac-grey-900)] outline-none"
+        placeholder="Search by email or name"
+        autocomplete="off"
+        [value]="query()"
+        (input)="onInput($any($event.target).value)" />
+      @if (status() === 'loading') {
+        <i class="pi pi-spinner pi-spin text-[14px] text-[var(--ac-grey-600)]" aria-hidden="true" data-testid="search-input-spinner"></i>
+      }
+    </div>
+    <small class="description">Type at least 3 characters. Results come from the STAR user directory (sec_users).</small>
+  </div>
+
+  @switch (status()) {
+    @case ('loading') {
+      <div class="flex flex-col gap-2" data-testid="search-loading">
+        <p-skeleton width="100%" height="60px" styleClass="rounded-[8px]" />
+        <p-skeleton width="100%" height="60px" styleClass="rounded-[8px]" />
+        <p-skeleton width="100%" height="60px" styleClass="rounded-[8px]" />
+      </div>
+    }
+    @case ('results') {
+      <div class="flex flex-col gap-2" data-testid="search-results">
+        <span class="!font-[space_grotesk] text-[11px] font-[600] uppercase tracking-[2px] text-[var(--ac-grey-600)]">
+          {{ matchesLabel() }}
+        </span>
+        <div class="flex flex-col overflow-hidden rounded-[8px] border border-[var(--ac-grey-200)]">
+          @for (row of results(); track row.sec_user_id) {
+            <div
+              class="flex items-center gap-3 border-b border-[var(--ac-grey-200)] px-[14px] py-[12px] last:border-b-0"
+              [class.abc-grey-100]="!row.simulable"
+              [attr.data-testid]="'search-row-' + row.sec_user_id">
+              <div
+                class="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[12px] !font-[space_grotesk] text-[14px] font-[600]"
+                [class]="row.simulable ? 'abc-primary-blue-100 atc-primary-blue-600' : 'abc-grey-200 atc-grey-600'">
+                {{ initials(row) }}
+              </div>
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="text-[14px] font-[500]" [class]="row.simulable ? 'atc-primary-blue-600' : 'atc-grey-600'">
+                  {{ row.first_name }} {{ row.last_name }}
+                </span>
+                <span class="atc-grey-600 text-[12.5px]">{{ row.email }} · ID {{ row.sec_user_id }}</span>
+              </div>
+              <div class="flex gap-[6px]">
+                @for (role of row.roles; track role.role_id) {
+                  <span
+                    class="rounded-[10px] px-2 py-[2px] text-[10px] font-[500] uppercase"
+                    [class]="row.simulable ? 'atc-primary-blue-600' : 'atc-red-1'"
+                    [style.border]="
+                      row.simulable
+                        ? '1px solid color-mix(in srgb, var(--ac-primary-blue-600) 40%, transparent)'
+                        : '1px solid color-mix(in srgb, var(--ac-red-1) 50%, transparent)'
+                    ">
+                    {{ role.name }}
+                  </span>
+                }
+              </div>
+              @if (row.simulable) {
+                <button
+                  type="button"
+                  class="atc-primary-blue-400 flex cursor-pointer items-center justify-center rounded-[8px] border border-[var(--ac-primary-blue-400)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
+                  (click)="select(row)"
+                  [attr.data-testid]="'search-select-' + row.sec_user_id">
+                  Select
+                </button>
+              } @else {
+                <!-- Finding 3 (attempt-1 rework): [pTooltip] must NOT sit on the
+                     native-disabled button — disabled controls dispatch no mouse
+                     events and drop out of the tab order, so the reason would be
+                     unreachable by any real user. The wrapper span is always
+                     hoverable/focusable, so the tooltip stays reachable. -->
+                <span [pTooltip]="blockedReason(row)" tooltipPosition="top">
+                  <button
+                    type="button"
+                    class="atc-grey-500 flex cursor-not-allowed items-center justify-center rounded-[8px] border border-[var(--ac-grey-300)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
+                    disabled
+                    aria-disabled="true"
+                    [attr.data-testid]="'search-blocked-' + row.sec_user_id">
+                    Not allowed
+                  </button>
+                </span>
+              }
+            </div>
+          }
+        </div>
+        <small class="description">Other System Admins and inactive accounts cannot be simulated.</small>
+      </div>
+    }
+    @case ('empty') {
+      <p class="description m-0" data-testid="search-empty">No users match.</p>
+    }
+    @case ('error') {
+      <div class="flex flex-col items-start gap-2" data-testid="search-error">
+        <p class="atc-red-1 m-0 text-[13px]">{{ errorMessage() }}</p>
+        <button
+          type="button"
+          class="atc-primary-blue-400 flex cursor-pointer items-center gap-2 rounded-[8px] border border-[var(--ac-primary-blue-400)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
+          (click)="retry()"
+          data-testid="search-retry">
+          Retry
+        </button>
+      </div>
+    }
+  }
+</div>

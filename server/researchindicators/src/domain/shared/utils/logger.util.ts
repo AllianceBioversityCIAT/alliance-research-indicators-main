@@ -58,6 +58,15 @@ export class LoggerUtil extends Logger {
       if (additional.userId) {
         message += ` [USER_ID:${additional.userId}]`;
       }
+      // @akili-spec changes/profile-simulation — R-IMP-005/NFR-IMP-004 log
+      // attribution: only present while the request is under an active,
+      // valid impersonation session (design §2.2 "modified" / §9).
+      if (additional.actorId) {
+        message += ` [ACTOR_ID:${additional.actorId}]`;
+      }
+      if (additional.impersonationSessionId) {
+        message += ` [IMPERSONATION_SESSION_ID:${additional.impersonationSessionId}]`;
+      }
       if (additional.url) {
         message += `: ${additional.url}`;
       }
@@ -108,4 +117,8 @@ export class LoggerUtilAdditionalDto {
   public url?: string;
   public method?: string;
   public userId?: string;
+  /** @akili-spec changes/profile-simulation — the real admin's id while a session is active. */
+  public actorId?: string;
+  /** @akili-spec changes/profile-simulation — the active `impersonation_sessions.session_id`. */
+  public impersonationSessionId?: string;
 }

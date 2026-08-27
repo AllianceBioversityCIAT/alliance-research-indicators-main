@@ -35,6 +35,10 @@ export class GlobalExceptions implements ExceptionFilter {
       method: request.method,
       url: request.url,
       userId: request?.user?.sec_user_id,
+      // @akili-spec changes/profile-simulation — R-IMP-005/NFR-IMP-004 log
+      // attribution: only present under an active impersonation session.
+      actorId: request?.actor?.sec_user_id,
+      impersonationSessionId: request?.impersonation?.session_id,
     });
     response.status(status).json(res);
   }

@@ -4,14 +4,20 @@ import { inject } from '@angular/core';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
+import { ImpersonationService } from '../services/impersonation.service';
 import { PostError } from '../interfaces/post-error.interface';
 import { Router } from '@angular/router';
+
+// @akili-spec changes/profile-simulation
+/** Server-set on any response that rejects an impersonation session (design §4/§5). */
+const IMPERSONATION_ERROR_HEADER = 'X-Impersonation-Error';
 
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const actions = inject(ActionsService);
   const cache = inject(CacheService);
   const api = inject(ApiService);
   const router = inject(Router);
+  const impersonation = inject(ImpersonationService);
 
   // Skip timeout check for error endpoint to avoid infinite loop
   if (req.url.includes('ciat-errors.yecksin.workers.dev')) {
@@ -53,6 +59,32 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
         // Send error to tracking endpoint
         from(api.saveErrors(errorObj)).subscribe();
+
+        // R-IMP-010 AC.3: only X-Impersonation-Error === 'SESSION_INVALID' auto-ends the
+        // simulation locally, with exactly ONE toast, suppressing the generic error toast
+        // (design §2.2). Other values (e.g. 'NESTED') suppress the generic toast but do
+        // NOT end the session — this branch only reacts to SESSION_INVALID.
+        const impersonationErrorValue = error.headers?.get(IMPERSONATION_ERROR_HEADER);
+        if (impersonationErrorValue === 'SESSION_INVALID') {
+          // Toast burst: short-circuit if a concurrent 403 already ended the session, so
+          // N concurrent SESSION_INVALID responses produce exactly one end + one toast.
+          if (impersonation.active()) {
+            from(impersonation.end('server-invalid'))
+              .subscribe({
+                next: () => {
+                  actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
+                },
+                error: (endError: unknown) => {
+                  console.error('Failed to end impersonation session after SESSION_INVALID', endError);
+                }
+              });
+          }
+          return throwError(() => error);
+        }
+        if (impersonationErrorValue) {
+          // Non-SESSION_INVALID values (e.g. NESTED): suppress the generic toast, no end.
+          return throwError(() => error);
+        }
 
         const isAiFormalizeError =
           error.status === 502 && req.url.includes('results/ai/formalize');

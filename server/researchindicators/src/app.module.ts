@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { APP_FILTER, APP_INTERCEPTOR, RouterModule } from '@nestjs/core';
 import { LoggingInterceptor } from './domain/shared/Interceptors/logging.interceptor';
 import { ResponseInterceptor } from './domain/shared/Interceptors/response.interceptor';
+import { ImpersonationAuditInterceptor } from './domain/shared/Interceptors/impersonation-audit.interceptor';
 import { GlobalExceptions } from './domain/shared/error-management/global.exception';
 import { EntitiesModule } from './domain/entities/entities.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -62,6 +63,18 @@ import { RESULT_CODE } from './domain/shared/utils/results.util';
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,
+    },
+    // @akili-spec changes/profile-simulation — R-IMP-005. Status is read
+    // from the handler's returned ServerResponseDto / thrown HttpException,
+    // never from `res.statusCode` (design §5, D-imp-10). Known, accepted
+    // gap: on the rare path where a service RETURNS (does not throw) an
+    // error-shaped object, ResponseInterceptor.isError() rewrites it to a
+    // 500 envelope — but this interceptor sits closer to the handler than
+    // ResponseInterceptor in the composed pipeline and records the DTO's
+    // status as returned by the handler, before that rewrite.
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ImpersonationAuditInterceptor,
     },
     {
       provide: APP_FILTER,

@@ -37,6 +37,7 @@
 
   // Orange
   --ac-orange-1: #f58220;
+  --ac-orange-2: #b3561a;
 
   // White
   --ac-white-1: #fff;
@@ -118,6 +119,7 @@ $colors: (
   'grey-800': #4c5158,
   'grey-900': #191919,
   'orange-1': #f58220,
+  'orange-2': #b3561a,
   'white-1': #fff,
   'white-2': #fcfcfc,
   'background': #f5f5f5,
@@ -158,6 +160,10 @@ $colors: (
   --ac-grey-800: #c2c2c2;
   --ac-grey-900: #e5e5e5;
   --ac-orange-1: #ff9d56;
+  // --ac-orange-2 deliberately does NOT lighten in dark mode: it is a
+  // surface token (simulation banner background), not a foreground token,
+  // and NFR-IMP-005 already validated white-on-#b3561a ≈ 4.9:1 in both themes.
+  --ac-orange-2: #b3561a;
   --ac-white-1: #e5e5e5;
   --ac-white-2: #dcdcdc;
   --ac-red-1: #ff4d4d;

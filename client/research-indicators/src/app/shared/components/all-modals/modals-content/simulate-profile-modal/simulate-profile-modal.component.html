@@ -1,0 +1,21 @@
+<!-- @akili-spec changes/profile-simulation — T-09, mockup artboard 2 -->
+@if (allModals.isModalOpen('simulateProfile').isOpen) {
+  <div class="flex w-full max-w-[95vw] flex-col gap-4 px-10 py-6 lg:w-[600px]" data-testid="simulate-profile-modal">
+    <!-- Leader decision (attempt-1 rework): the wrapper's header already renders
+         `getConfig().title` ("Simulate another profile", see all-modals.service.ts)
+         — this component must not duplicate it. Keep only the helper description. -->
+    <div class="flex flex-col gap-1">
+      <span class="description">Search for an existing STAR account, primarily by email address.</span>
+    </div>
+
+    @switch (step()) {
+      @case ('search') {
+        <app-user-search-step (userSelected)="onUserSelected($event)" />
+      }
+      @case ('confirm') {
+        <!-- Cancel closes the modal (mockup artboard 3 has no step to go "back" to). -->
+        <app-confirm-step [user]="selectedUser()!" (back)="allModals.closeModal('simulateProfile')" />
+      }
+    }
+  </div>
+}

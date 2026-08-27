@@ -8,9 +8,14 @@
   </div>
   <div id="content" class="content">
     <app-section-header></app-section-header>
+    <!-- @akili-spec changes/profile-simulation — D-imp-14: the hardcoded pt-[88px]/[109px] offset is replaced by
+         the MEASURED navbar height (navbar + simulation banner, when active — alliance-navbar.component.ts
+         ngAfterViewInit observes the navbar HOST element). The reversion challenge (design §12 D-imp-14) is that
+         this must stay a measured value, not a re-hardcoded constant, or a taller banner variant silently clips
+         under the navbar again. -->
     <div [ngStyle]="{
         paddingLeft: hss ? (cache.isSidebarCollapsed() ? '64px' : '250px') : cache.isSidebarCollapsed() ? '64px' : '250px'
-      }" class="{{ hss ? 'pt-[88px]' : 'pt-[109px]' }}">
+      }" [style.paddingTop.px]="cache.navbarHeight()">
       <router-outlet></router-outlet>
     </div>
   </div>

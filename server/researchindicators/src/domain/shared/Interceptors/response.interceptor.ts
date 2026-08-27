@@ -72,6 +72,10 @@ export class ResponseInterceptor implements NestInterceptor {
           request.method,
           request.url,
           (request as any)?.user?.sec_user_id,
+          // @akili-spec changes/profile-simulation — R-IMP-005/NFR-IMP-004
+          // log attribution: only present under an active session.
+          (request as any)?.actor?.sec_user_id,
+          (request as any)?.impersonation?.session_id,
         );
 
         response.status(modifiedData?.status);
@@ -88,23 +92,26 @@ export class ResponseInterceptor implements NestInterceptor {
     method?: string,
     url?: string,
     userId?: string,
+    actorId?: string,
+    impersonationSessionId?: string,
   ) {
+    const additional = { method, url, userId, actorId, impersonationSessionId };
     if (
       status >= HttpStatus.AMBIGUOUS &&
       status < HttpStatus.INTERNAL_SERVER_ERROR
     ) {
-      logger._warn(message, { method, url, userId });
-      logger._warn(error, { method, url, userId });
+      logger._warn(message, additional);
+      logger._warn(error, additional);
     } else if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
-      logger._error(message, { method, url, userId });
-      logger._error(error, { method, url, userId });
+      logger._error(message, additional);
+      logger._error(error, additional);
     } else if (
       !ENV.IS_PRODUCTION &&
       ENV.SEE_ALL_LOGS &&
       status >= HttpStatus.OK &&
       status < HttpStatus.AMBIGUOUS
     ) {
-      logger._verbose(message, { method, url, userId });
+      logger._verbose(message, additional);
     }
   }
 

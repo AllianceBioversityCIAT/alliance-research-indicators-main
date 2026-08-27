@@ -1,14 +1,23 @@
+// @akili-spec changes/profile-simulation — D-imp-14: the host (not the inner
+// `#navbar` div) now owns the fixed positioning, so `<app-simulation-banner>`
+// can render as a normal-flow sibling above `#navbar` and still be measured
+// by the ResizeObserver observing this host element (ts ngAfterViewInit).
+:host {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+
 .navbar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 18px;
   box-shadow: 0 0 15px 0 #00000030;
-  position: fixed;
-  z-index: 3;
-  right: 0px;
   width: 100%;
-  top: 0px;
 
   .logo {
     min-width: 0;
@@ -256,4 +265,16 @@
       width: 500px !important;
     }
   }
+}
+
+// @akili-spec changes/profile-simulation — R-IMP-009 avatar ring + "Account · Simulated" note (design §6).
+// `styleClass`/`class` on <p-avatar> resolve onto the component's own host element
+// (PrimeNG `hostClass`), so this class targets that same host directly — no ::ng-deep needed.
+.simulation-ring {
+  outline: 2px solid var(--ac-orange-2);
+  outline-offset: 2px;
+}
+
+.simulated-note {
+  background: color-mix(in srgb, var(--ac-orange-2) 12%, white);
 }
