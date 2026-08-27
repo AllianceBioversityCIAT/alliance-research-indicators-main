@@ -8,7 +8,13 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 3;
+  // 1001: above the section-header's template `!z-10` and the platform
+  // sidebar cell (z-index 1000), so the account dropdown — which lives inside
+  // this host's stacking context since D-imp-14 — paints over both, matching
+  // the pre-D-imp-14 behaviour where it escaped to the root at z-9999.
+  // Modals/alerts render OUTSIDE .grid-container at a higher level and still
+  // cover the navbar. (T-11 review advisory #1, observed live on test.)
+  z-index: 1001;
 }
 
 .navbar {
