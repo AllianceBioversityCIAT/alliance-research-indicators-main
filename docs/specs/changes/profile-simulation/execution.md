@@ -275,3 +275,18 @@ Tests: 6620 passed, 6620 total (all suites green)
 - [ ] App running THIS worktree's code (docker decision pending: the running `ari_*` containers belong to `bilateral-visual-improvements`)
 - [ ] Two screenshots vs mockup artboards 1/4 · measured `#content` padding = navbar+banner host height · axe: 0 contrast violations on banner + both dialog steps · tab-order + Escape note
 - [ ] T-11 advisories #1–3 (dropdown z-index over sidebar/popovers; banner `:host` display; cold-load offset flash) · T-09/T-10 aria advisories eyeballed
+
+---
+
+## T-06 — Server e2e · IN PROGRESS `[~]` (two runtime failures; code written, evidence pending)
+
+- **Date:** 2026-08-26
+- **State:** `test/impersonation.e2e-spec.ts` written complete per the work order (R-IMP-001..005 e2e clauses, NFR-IMP-003 latency block, Center Admin read-only case); `npx eslint` clean; `tsc --noEmit` clean. **No run evidence exists** — the suite has never been observed green or red (K-004: nothing may be asserted from it yet).
+- **Runtime failure 1:** the worker's background jest run was killed externally with zero output (`[killed]` was the entire log; not an auth failure — no output at all).
+- **Runtime failure 2:** the worker died on the account's weekly usage limit (resets 03:00 America/Bogota) before the foreground re-run; the admin JWT also expired.
+- **Fixtures agreed with the human:** targets `sec_user_id 105` (Contributor, writes, cleanup owed) and `15` (Center Admin, read-only start/end only); actor `sec_user_id 1`. Token supplied per-run via `ARI_E2E_ADMIN_TOKEN` env var, never written to the repo.
+- **Next:** fresh token from the human + explicit approval for the Leader-inline execution fallback (run + evidence collection only; the spec authorship is the dead worker's, and the review gate stays independent), or a fresh worker after the limit reset. Latency block to run at 25 samples (recorded deviation).
+
+## T-12 HITL half — handed to the human 2026-08-26
+
+Checklist delivered (stack swap to this worktree, 2 screenshots vs artboards 1/4, DevTools offset snippet, Lighthouse/axe contrast on banner + dialog, focus/Escape notes, T-11 advisories #1–3, role-visibility checks, end + logout paths). Evidence pending.

@@ -177,7 +177,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Latency sample recorded with median and spread.
 - **Verification — failing input:** send admin B's JWT with admin A's session id — 403; comment out the ownership comparison in `resolve` → red.
 - **Disqualifier:** if the 50 latency samples span > 2× the median the NFR number is not evidence — report the spread (NFR-IMP-003). A green run while another suite runs in the same package is not evidence (§4.3).
-- **Dependencies:** T-05 · **Effort:** M · **Skills:** `nestjs-expert`, `tdd` · **Status:** todo
+- **Dependencies:** T-05 · **Effort:** M · **Skills:** `nestjs-expert`, `tdd` · **Status:** in-progress `[~]` — spec written + static gates clean; run evidence pending (2 runtime failures, execution.md T-06)
 
 ### T-07 — Client foundation: token, interfaces, `ApiService`, `ImpersonationService`
 
