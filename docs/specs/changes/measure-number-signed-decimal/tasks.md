@@ -98,15 +98,15 @@ graph TD
   - Do **not** use `decimalNumbers: true` on the datasource: seven existing `DECIMAL` columns plus every raw query are in that blast radius (`J-16`).
   - `bilateral.service.ts:669-686` is the in-repo precedent for the null-safe coercion shape.
 - **Acceptance / done check:**
-  - [ ] `null` round-trips as `null` in **both** directions, asserted separately per direction.
-  - [ ] A read value resent verbatim does not `400` — exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, **K-012**).
-  - [ ] `String(value)` composite-key construction produces the **same key** before and after, for an unchanged row.
-  - [ ] The `:287-288` doc comment no longer contradicts §5.4.
+  - [ ] `null` round-trips as `null` in **both** directions, asserted separately per direction. → **unit-tier proven; TRANSFERRED TO `T-07`** (this task's own disqualifier makes T-07's fixture the gate).
+  - [ ] A read value resent verbatim does not `400` — exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, **K-012**). → **NOT REACHED at this tier; TRANSFERRED TO `T-07`.**
+  - [ ] `String(value)` composite-key construction produces the **same key** before and after, for an unchanged row. → **unit-tier proven; TRANSFERRED TO `T-07`.**
+  - [x] The `:287-288` doc comment no longer contradicts §5.4.
 - **What disqualifies this evidence:** a unit test using a **mocked repository** proves nothing here — the defect lives in the driver's hydration type, which a mock supplies by fiat. Mocked-repo tests are allowed as fast feedback but **may not close** this task; `T-07`'s fixture is the gate.
 - **Input that would make this check FAIL:** delete the `from` direction and the untouched-row test must `400`; delete the `to` direction and the composite key must change on resave; return `0` for null and `quantificationRowAbsent` must redden. **If any of those three still passes, the test is asserting the mock.**
 - **Dependencies:** T-01
 - **Estimated effort:** M · **Skills:** `nestjs-expert`, `tdd`
-- **Status:** todo
+- **Status:** **done (code)** — Reviewer `PASS` on attempt 2, 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-02`. ⚠️ **Acceptance items 1–3 are TRANSFERRED to `T-07`, which MUST carry them in its Implementer brief** — this task's disqualifier names T-07's fixture as their gate, and T-07 depends on T-02, so they could not be discharged here.
 
 ---
 
@@ -220,6 +220,7 @@ graph TD
   - **The copy-path comparison must be multi-row-aware and state its matching key.** `result_quantifications` holds several rows per result, including deactivated ones — match on `(result_id, quantification_role_id, unit, description)`, **never** on the value, which is what is under test (`DD-20`, `K-20`).
   - Only **`SP_versioning`'s copy path** names this column (`:367`, `:380`). The other three routines reference the table only, so they can orphan rows but cannot lose a value (`J-11`).
   - ⚠️ **The OICR fixture must EXPECT `L-08`**, not be surprised by it: `oicr-details.component.ts` sends `q.number ?? 0` while its read preserves `null`, so a `NULL`-valued OICR row churns on save even with `DD-2`. **Pre-existing client defect; this spec reports it and does not fix it.**
+  - ⚠️ **INHERITED FROM `T-02` (recorded by the Leader 2026-08-27, on `T-02`'s Reviewer `PASS`).** `T-02`'s acceptance items 1–3 were **transferred here**, because `T-02`'s own disqualifier names this fixture as their gate while `T-07` depends on `T-02`. They are not new scope — they are `T-02`'s scope arriving at the tier that can discharge it, and the `T-07` brief MUST carry them: **(1)** `null` round-trips as `null` in **both** directions, asserted separately per direction; **(2)** a read value resent verbatim does not `400`, exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, `K-012`) — `T-02`'s spec file states in its own comments that it does **not** satisfy this; **(3)** `String(value)` composite-key construction yields the **same key** before and after for an unchanged row, exercised through the real `upsertByCompositeKeys`, not the transformer alone. See `execution.md` → `### T-02` → *forward pointer*.
 - **Acceptance / done check:**
   - [ ] `-12.75` stored and re-read as `-12.75` — not `3`, `2`, or `2.5000` re-read differently (`:297`).
   - [ ] The versioned row holds `-12.75`, read **out of MySQL** on both sides (`:328`), matched on the four-column key.

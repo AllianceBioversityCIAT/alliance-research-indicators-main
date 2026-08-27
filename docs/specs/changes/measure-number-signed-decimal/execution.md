@@ -207,3 +207,152 @@ The prior session left this task deliberately open, and its reasoning is preserv
 The measurement run above was executed from the wrong working directory (`-management`), where the `akili-*` wrappers and `.claude/hooks/akili-tasks-gate.sh` are not loaded, and flipping the checkbox there would have been the Leader self-certifying its own measurement with the machine check absent — precisely the write `.agents/leader.md` names as *"the one claim in the pipeline no Reviewer audits."* The session was restarted from `alliance-research-indicators-main` for exactly that reason, and both owed items — the falsifier and the independent audit — are discharged above.
 
 > **Note for whoever runs that gate — the hook is coarser than it looks.** `akili-tasks-gate.sh` greps `execution.md` for the literal string `PASS`; once *any* verdict exists in this file it stops discriminating between tasks. This entry therefore deliberately avoids writing that token as a verdict. Treat the hook as a guard against an empty log, not as per-task evidence checking.
+
+---
+
+### T-02 — Entity: `DECIMAL(24,4)` column + two-way null-safe transformer
+
+- **Status:** ✅ **PASS on attempt 2** (`T-02` — Reviewer: **PASS**). Code complete and audited; acceptance items 1–3 formally **transferred to `T-07`** as owed scope — see the forward pointer below.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 2 (`akili-implementer`, T2 `sonnet`, effort `xhigh` on both)
+- **Requirements covered:** `R-MSD-003` (incl. scenario *An untouched measure row does not break the save*, `:256`, `:257`), `R-MSD-009`, `R-MSD-013`
+- **Design references:** `DD-1`, `DD-2`, §5.3, §5.4, §5.5
+
+#### Files changed
+
+| File | Change |
+| --- | --- |
+| `server/.../result-quantifications/entities/result-quantification.entity.ts` | `quantification_number`: `bigint` → `decimal(24,4) NULL`; new exported `quantificationNumberTransformer`; TS field widened to `number \| null` |
+| `server/.../result-innovation-use/result-innovation-use.service.ts` | the `:287-292` doc comment **only** (`K-24`) — no logic touched, confirmed by comment-only hunk |
+| `server/.../result-quantifications/entities/result-quantification.entity.spec.ts` | **new** — 9 unit tests over the transformer |
+
+#### The transformer
+
+```ts
+export const quantificationNumberTransformer: ValueTransformer = {
+  to: (value?: number | null): number | null =>
+    value === null || value === undefined ? null : value,
+  from: (value?: string | null): number | null =>
+    value === null || value === undefined ? null : Number(value),
+};
+```
+
+Both null guards are load-bearing rather than defensive, and this was verified against the **installed** TypeORM rather than from recollection: `MysqlDriver.js:466-470` applies `transformTo` **before** its own null check, and `:510-514` routes `null`/`undefined` straight **into** `transformFrom`. So both directions genuinely see `null`, and a naive `Number(v)` on either side would turn an absent measure into `0` — breaking `quantificationRowAbsent` (`innovation-use-details.component.ts:490`, which treats `0` as **present**).
+
+#### Verification
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent` (server, **full** suite per `KZ-003`) | **354 suites / 2681 tests passed** — reported by the Implementer and **independently re-measured by the Leader** in a quiet tree after the worker finished (18.8 s, exit 0). Re-run green after attempt 2 |
+| `npx eslint <changed files>` (the **bare** gate — `npm run lint` carries `--fix` and cannot fail, `K-001`) | clean, exit 0 |
+| `npm run build` | `nest build` + `vite build`, exit 0 |
+
+#### Falsifier mutations — **unit-tier**, and what each one actually reddens
+
+`tasks.md` T-02 names three mutations. All three were run and observed red, then restored. **The scope caveat is part of the evidence, per `KZ-017`** — the task's named symptoms live *above* this seam, and a unit test over two exported functions can only reach one of them:
+
+| Mutation | Observed | Does it exercise the symptom the task names? |
+| --- | --- | --- |
+| `from` coercion deleted (identity passthrough) | 4 tests red; round-trip got `"10.0000"` where `'10'` was expected | **Partly.** It reddens on the string that *would* break the key — but the named symptom, *"the untouched-row test must `400`"*, is an HTTP-tier effect this seam cannot produce. **Owed to `T-07`** |
+| `to` null guard deleted | 3 tests red; `to(null)` → `0` | **Partly.** Named symptom is *"the composite key must change on resave"*, which requires the real `upsertByCompositeKeys`. **Owed to `T-07`** |
+| `from` returns `0` for null | 3 tests red; `from(null)` → `0`, `from(undefined)` → `NaN` | **Yes — this one genuinely discriminates at this tier.** It is the `quantificationRowAbsent` reddening the task names |
+
+Recorded because the alternative — *"all three falsifier mutations observed red"* — reads as the task's own gate having been met, when deleting either function reddens the suite as a call-time `TypeError` rather than for the reason the falsifier was written. Raised by the conformance Reviewer as a `KZ-017` FAIL and accepted.
+
+#### Acceptance items — three of four are transferred, not discharged
+
+**This task's disqualifier and the dependency graph are in tension, and the resolution is recorded rather than assumed.** `tasks.md` T-02 says *"Mocked-repo tests are allowed as fast feedback but may not close this task; T-07's fixture is the gate"* — yet `T-07` depends on `T-02` through `T-03`/`T-04`/`T-05`. Read literally, neither task can close first. **Leader ruling:** T-02 closes on the code, the doc-comment correction and honest unit-tier feedback; items 1–3 transfer to `T-07` as **owed scope via forward pointer** — the mechanism `/akili-execute` §2.2 defines for exactly this, and which only works if the later brief carries it.
+
+| # | Item | State |
+| --- | --- | --- |
+| 1 | `null` round-trips as `null` in both directions, per direction | **unit-level only → `T-07`.** Asserted on the pure functions, not through a real driver |
+| 2 | A read value resent verbatim does not `400`, from a **real read** (`:257`, `DD-19`, `K-012`) | **not reached → `T-07`.** No real read exists at this tier |
+| 3 | `String(value)` composite key identical before/after for an unchanged row | **unit-level only → `T-07`.** The transformer's output stability was proven; `base-service.ts`'s actual key construction was not exercised |
+| 4 | The `:287-288` doc comment no longer contradicts §5.4 | ✅ **discharged.** Independently verified: `ClarisaInnovationUseLevel.level` is `type: 'bigint'`; the threshold check it describes exists (`result-innovation-use.service.ts:193`); the corrected mechanism matches §5.4 word for word, confirmed at `mysql2/lib/parsers/text_parser.js:31-46` |
+
+> **⚠️ `T-07` FORWARD POINTER — must be copied into `T-07`'s Implementer brief.** Acceptance items 1, 2 and 3 above are **owed scope inherited from `T-02`**, and item 2 carries the `DD-19` read-provenance clause: the value must come from a real read, never a literal. `T-02`'s spec file states in its own comments that it does **not** satisfy this. A pointer filed here is not carried by having been filed — the brief carries it or nobody does.
+
+#### Attempt 1 — Reviewer verdicts (parallel lens mode)
+
+Effort `xhigh` on a data-loss surface selected **parallel lens reviewers** per `/akili-execute` §2.3's 4R table: two `akili-reviewer` instances (T3 `opus`, read-only), same diff, different lenses. **They split, which is what the mode is for.**
+
+**Lens A — spec conformance + correctness/reliability: `STATUS: FAIL`** (2 issues, both evidence-honesty, no code defect)
+
+1. **Discovered Issue:** the new spec file asserted **twice** that its inputs came from a real read when they are hand-written literals — a comment reading *"this is the shape a real read produces, not a hand-written literal"* directly above `from('-12.7500')`, and a test **named** *"a value hydrated from a real read resends as the same number"* above `from('10.0000')`. Self-contradictory against the file's own header, and readable by a later task as `DD-19` already satisfied.
+   **Violated Rule:** `requirements.md` `R-MSD-003` `:257` (*"IT MUST be exercised with a value that came from a real read, never with a hand-written literal … K-012"*); `design.md:519` (`DD-19`); root `CLAUDE.md` §4.3 `K-004`/`KZ-014` (*"may not be asserted — not in a code comment … two reached committed test descriptions before review caught them"*).
+   **Remediation:** reword both, keep every assertion; no test logic changes.
+2. **Discovered Issue:** the falsifier evidence was reported without the scope caveat that makes it interpretable — two of the three mutations redden as `TypeError`s, not for the named symptom.
+   **Violated Rule:** root `CLAUDE.md` §4.3 `KZ-017`; the task's own *What disqualifies this evidence*.
+   **Remediation:** label the mutation evidence unit-tier in `execution.md`, per falsifier. **Leader's write, not the Implementer's** — discharged in the table above.
+
+Lens A also **confirmed the code**: `DD-1` correct; all four `DD-2` clauses honored in code and not only in prose (null→null both directions, `to` specified, no `decimalNumbers: true` anywhere in `src`, column transformer rather than a service-layer coercion, shape-identical to the mandated precedent at `bilateral.service.ts:682-686`); `to`'s pass-through correct against `base-service.ts:394-399` + `:446`; item 4 genuinely discharged.
+
+**Lens B — resilience + risk (data loss, blast radius): `STATUS: PASS`**
+
+The finding that mattered, and the reason this lens was run: **no reader bypasses the transformer.** 131 matches of `quantification_number` across `server/` inspected without truncation, plus `ResultQuantification|result_quantifications` over `src/**/*.ts`:
+
+| Reader | Mechanism | Normalised |
+| --- | --- | --- |
+| `result-innovation-use.service.ts:471` | `findByResultIdAndRoles` → `mainRepo.find` | yes |
+| `result-oicr.service.ts:306` | same | yes |
+| `base-service.ts:358` `upsertByCompositeKeys` — **the data-loss surface** | `entityManager.find` | yes |
+| `result-quantifications.service.ts:49` `upsertQuantificationsByRole` — **`RK-15`'s bypass** | `mainRepo.find` at `:49`, own key at `:61` | **yes** — it bypasses the base class's *validation*, not the column transformer |
+
+**Zero** raw queries, query builders or `getRawMany()` touch this table in `src/**/*.ts`; a column transformer would not have covered them. `@OpenSearchProperty` is absent and `quantification` has zero occurrences under `domain/tools/open-search/`, so §3/`D-8`'s "not indexed" claim holds. Both `compositeKeys` arrays are literal, excluding a dynamically-assembled column name.
+
+Two further results worth keeping:
+
+- **Composite-key stability is structural, not range-dependent** — stronger than `design.md` argues. Both sides of `generateCompositeKey` derive from the **same IEEE-754 double**, and `Number::toString` emits the shortest round-tripping representation, so the keys are identical for *every* double the column can hold: `'2.5000'` → `'2.5'`, `'10.0000'` → `'10'`, negatives included. The repo's own `isEmpty` (`object.utils.ts:77`) is not lodash's, so `0` is **not** empty and still keys as `'0'`. Verified against `mysql2/lib/packets/packet.js:439`: with `supportBigNumbers` falsy a ≥14-digit `bigint` is decoded as `Number(s)` — *the same lossy operation* `from` performs, which is why `O-4`'s pre/post key symmetry actually holds and is now checkable from source.
+- **The deploy ordering is safe in both directions.** `orm.config.ts:51` `synchronize: false`, so shipping the entity ahead of `T-05`'s migration cannot mutate the schema; and in that interim window the column is still `bigint`, so `from` receives a number and `Number(number)` is identity.
+
+#### Attempt 2 — the reword
+
+One file touched (`result-quantification.entity.spec.ts`), both flagged sites corrected, all assertions unchanged. A `KZ-005` sweep for other provenance claims reported `none` with the file re-read end to end, three sites considered and deliberately retained with stated reasons (the self-caveating header; a test name argued to describe input *shape*; a `read -> resave` phrase argued to name the round trip generically). **That sweep was sent back to the same Lens A Reviewer to judge** — an exemption claimed by argument rather than by clause is precisely `KZ-005` recurrence 6's failure of a correction *relocated* rather than *applied*, and the Leader is not the right party to accept its own worker's reasoning on it. Full suite green after the reword; `npx eslint` clean.
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Skills | `nestjs-expert`, `tdd` | As `tasks.md` specifies. No deviation — TypeORM integration plus a logic contract is exactly where `tdd` earns its cost |
+| Effort | `xhigh` both attempts | Small in LOC, subtle in failure modes. **Not bumped to `max` on the retry** despite the rework rule: the *Tier ↔ effort rule* forbids `max` on a cheaper tier, and escalating the Implementer to `opus` would have collapsed `author ≠ auditor` against the `opus` Reviewers. The remaining work was a fully specified two-site reword, where brief precision beats depth |
+| Review mode | **Parallel lens** (2 reviewers) | Effort `xhigh` **and** a data-loss surface — both triggers in the 4R table |
+| Full-suite re-measurement | Leader, after each worker reported | `CLAUDE.md` §4.3 concurrency rule: never measure beside a live worker. Both runs taken in the quiet window |
+
+#### Reviewer gate — `T-02` — Reviewer: **PASS** (attempt 2)
+
+Re-gated by **the same Lens A Reviewer that issued the FAIL** — resumed with its round-1 context intact, scope restricted to its own two findings. The code it had already passed was explicitly not re-audited.
+
+- **Issue 1 — closed.** *"Fixed at the clause rather than around it."* Site 1 now states the opposite of what it did: the value is declared a hand-written literal, the tier is declared unable to obtain a real read, and the clause plus its owner are named. Site 2 drops the provenance claim; *"hydrated"* is accurate because the value did pass through `from`.
+- **The `none` sweep answer holds, and was judged rather than accepted.** All three retained sites are exempt **on the clause's own terms**, not by argument: the header is self-caveating and bounded; `:23` names the input *class* that §5.4 establishes and now sits directly above the comment declaring the value a literal (**shape ≠ origin**, the distinction `:257` draws); `:57`'s *"read → resave"* names the `from`/`to` round trip in §5.2's own vocabulary, and the null-carries-no-shape-ambiguity reasoning is the **correct** reading of `K-012` — the hazard the clause exists for is *type* substitution, and a DB NULL reaches `transformFrom` as `null` before any type branch (`MysqlDriver.js:511-514`), so no fixture could supply a shape this literal misrepresents.
+- **Why this is not `KZ-005` relocation** — *"the decisive evidence is directional: the new text adds the disclaimer the old text denied and hands the clause to its owner, rather than restating the claim in softer words."*
+- **Issue 2 — discharged.** The unit-tier labelling recorded above is the wording the Reviewer specified, with nothing missing.
+- **Bonus verification the Reviewer volunteered:** it resolved the `quantificationRowAbsent` anchor rather than trusting it, and confirmed the rationale is correct **in direction, not inverted** — `innovation-use-details.component.ts:490-494` computes `numberAbsent` from `undefined || null` under its own comment *"`0` is a present number"*, and `buildPayload():433` filters on it. So a transformer returning `0` for a DB null really would make an absent row stop being absent.
+
+**Verdict summary (verbatim):** *"Both round-1 findings are closed — the two provenance claims now state their own limits and name `T-07` as owner of the `:257`/`DD-19` clause, the retained three sites are genuinely exempt under the clause (shape-vs-origin, and `null`'s single type), and the `quantificationRowAbsent` anchor resolves to code whose logic matches the claim."*
+
+#### `ADVISORY` ledger — recorded, never gating, and none of them widens a task
+
+Per `/akili-execute` §2.4 these die here. Anything that genuinely cannot wait is a **spec gap** for the user to rule on, not scope to absorb.
+
+**Reachable today — flagged for the user, remedy owned elsewhere:**
+
+| Finding | Detail |
+| --- | --- |
+| **`T-03`'s default rule has no magnitude bound → a reachable `500`** | Lens B **constructed the payload**: `PATCH /api/v1/result-oicr/:code` with `quantification_number: 100000000000000000000` passes `Number.isInteger`, so `tasks.md:123`'s *"non-negative integer"* default rule accepts it; MySQL then raises `ER_WARN_DATA_OUT_OF_RANGE`, and `GlobalExceptions` has no `QueryFailedError` branch → **`500`**. **Pre-existing class, not a regression from `T-02`** (today's `bigint` `500`s above ~9.2e18; the new threshold is *higher*). The remedy — bounding the *default* entry as well as role 3 — belongs to `T-03`, but is **not in `T-03`'s approved scope**. Escalated to the user as a candidate spec gap; **not** absorbed |
+
+**Not reachable today, each with its load-bearing guard named:**
+
+| Lens | Finding |
+| --- | --- |
+| Risk | **`@ApiProperty()` emits `Number` only by accident of two settings** — `tsconfig.json:15` `strictNullChecks: false` (which makes the metadata serializer elide `null` from the union) and **no** `@nestjs/swagger` CLI plugin in `nest-cli.json`. A one-line change to either file turns `design:type` into `Object` and silently degrades the documented response to `type: object`. `@ApiProperty({ type: Number, nullable: true })` would decouple the contract from the flag. Corollary: the `number \| null` annotation buys no compile-time null discipline here — it is documentation |
+| Risk | **`DECIMAL(24,4)` accepts ~8 orders of magnitude more than the double-safe region; the column's own limits are not the safety property.** Two loss regions: `\|v\| > 2^39` (ulp > 1e-4, so an untouched resave can write back a different 4-decimal grid point) is held shut by **`DD-14`'s bound, enforced in `T-04`** — the bound *is* exactly `2^39 − 1`; `\|v\| > 2^53` (one-unit integer drift, `O-4`) is held by **`T-03`'s integrality rule** plus T-01's measured live max of 87,654. **Unreachable given other guards, not safe** — a later task widening a bound, allowing decimals on roles 1/2, or raising the scale past 6 reopens them, and the column would accept the value silently |
+| Reliability | `O-4`'s `> 2^53` case is *"load-bearing and **undocumented**"* per `design.md` §17, and the new entity TSDoc is the only place a maintainer would ever meet it. Two sentences naming `2^39` and `2^53` as the fidelity ceilings would close a gap the design itself flags |
+| Resilience | **`maxFractionDigits: 0` on the OICR card (`DD-12`) is a row-churn mechanism, not only a display change.** If a role-1/2 row ever held a fraction, PrimeNG's write-back would resend the rounded integer, the key would miss, and the row would be deactivated with a duplicate inserted — silently, on the path with no validation. No reaching payload could be constructed (the historical `bigint` enforced integrality). Worth naming in `T-07`'s OICR fixture beside the `L-08` NULL churn it already expects |
+| Risk | **The most load-bearing code in this spec sits in a file class excluded from coverage** — the child guide excludes `*.entity.ts`, so deleting this spec file later would show no coverage delta. `T-07`'s fixture is the real gate; do not read a green coverage report as protecting this function |
+| Readability | `from`'s parameter is annotated `string \| null`, but during the mandated code-before-migration window the column is still `bigint` and the driver delivers a **number**. Behaviour is correct in both windows; `string \| number \| null` would say so |
+| Readability | The round-trip test calls `String(value)` *"the composite key basis"*, which is loose — `base-service.ts:363-375` routes each part through the repo's own `isEmpty` **before** `String(value)`, so a `null` part becomes `''`, not `"null"`. The invariant that matters survives (`isEmpty(0)` is `false`, so `0` still keys as `'0'`) |
+| Readability | Declaration form differs from the repo's other seven `decimal` columns, which all use the positional `@Column('decimal', {...})` form. No spec mandates a form; the object form matches this file's own style **and** is findable by the `type: 'decimal'` grep whose blind spot §13 recorded as a `KZ-017` failure in this spec's own authoring |
+| Readability | The `describe` at `:14` cites `R-MSD-003 AC.7` / `R-MSD-013`, neither closed at this tier. Reads as traceability, and the header two lines above scopes the file — noted only as the line a future reader is most likely to over-read |
+| DX | The new spec file appears in neither `tasks.md` T-02's *Files touched (intended)* nor `design.md` §2.1, which claims to list *"every new file"* and was corrected in round 1 for exactly that omission (`K-17`). Additive, no behavioural risk |
+| Readability | `QuantificationData.quantification_number` (`result-quantifications.service.ts:9`) still types `number`. Inert under `strictNullChecks: false`, and the method has no production caller |
+| Resilience | `NaN` is unreachable and recorded only because the guard is elsewhere: the column is `DECIMAL` so a real read cannot return a non-numeric string, and JSON has no `NaN` literal. The rejection that would matter if a non-HTTP writer ever appeared is `DD-17`'s, in `T-04` |
