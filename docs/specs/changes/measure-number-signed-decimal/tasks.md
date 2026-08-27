@@ -74,15 +74,15 @@ graph TD
   - Query 2 — **sign, by role** (added at round 4): `SELECT quantification_role_id, COUNT(*) FROM result_quantifications WHERE quantification_number < 0 GROUP BY quantification_role_id;`
   - Query 1 has **no role filter**, which is precisely why query 2 is not redundant: a global `MIN` cannot say *which* role holds it.
 - **Acceptance / done check:**
-  - [ ] Both queries executed against the target DB; **output pasted verbatim**, not summarised, not derived.
-  - [ ] **STOP CONDITION 1** — any role-3 row with `|value| > 549,755,813,887` halts the change for a human ruling (`RK-4`).
-  - [ ] **STOP CONDITION 2** — any role-1 or role-2 row with a negative value halts the change for a human ruling (`RK-14`). Such a row would `400` on a save its reporter never made.
-  - [ ] The row count and `ALGORITHM=COPY` implication are recorded for `T-05`'s lock-window estimate (`U-2`).
+  - [x] Both queries executed against the target DB; **output pasted verbatim**, not summarised, not derived.
+  - [x] **STOP CONDITION 1** — any role-3 row with `|value| > 549,755,813,887` halts the change for a human ruling (`RK-4`). **Not triggered:** global `max_v` = 87,654 with `min_v` = 0, so role 3 is bounded by containment.
+  - [x] **STOP CONDITION 2** — any role-1 or role-2 row with a negative value halts the change for a human ruling (`RK-14`). Such a row would `400` on a save its reporter never made. **Not triggered:** query 2 returned zero rows.
+  - [x] The row count and `ALGORITHM=COPY` implication are recorded for `T-05`'s lock-window estimate (`U-2`). **80 rows** — copy phase negligible; the MDL wait is independent of size.
 - **What disqualifies this evidence:** a query run against a **local scratch schema** instead of the target database measures nothing — the whole point is live data. If the target DB is unreachable, this task is **BLOCKED**, not passed; record "unreachable" and stop. A summarised result ("no negatives found") without the pasted output is a `KZ-008` claim, not a measurement.
 - **Input that would make this check FAIL:** seed a negative role-1 row and a role-3 row at `549,755,813,888` in a scratch copy and re-run — both stop conditions must fire. **If neither fires, the queries are not evidence.**
 - **Dependencies:** none
 - **Estimated effort:** S · **Skills:** none (DBA/DevOps coordination)
-- **Status:** todo
+- **Status:** **done** — Reviewer `PASS` 2026-08-27, evidence in [`execution.md`](./execution.md) → `### T-01`. Neither stop condition fired on Dev; both shown able to fire on seeded scratch input (K-004).
 
 ---
 
