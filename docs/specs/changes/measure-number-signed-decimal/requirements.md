@@ -534,7 +534,11 @@ The cap is enforced independently at three tiers — a UI clamp (`[min]="0"` + `
 **Acceptance criteria**
 
 - [ ] AC.1 — Saving a section whose measure rows are unmodified leaves their primary keys unchanged.
-- [ ] AC.2 — `created_by` / `created_at` are unchanged on those rows.
+- [ ] AC.2 — `created_by` / `created_at` are unchanged on those rows. ⚠️ **AMENDED 2026-08-27 — the two halves have DIFFERENT causes and only one is satisfiable.**
+  - **`created_at` — SATISFIABLE, now asserted** (`T-07`). It is a `@CreateDateColumn` (`auditable.entity.ts`) appearing in **no** `audit()` payload, so TypeORM never writes it on an update. Asserted by raw SQL before/after an untouched resave at three sites (the IU round-trip and both OICR role tests); `created_at`/`created_by` are `select: false`, so raw SQL is the only route.
+  - **`created_by` — UNSATISFIABLE against current code, and the unsatisfiability is a REACHABLE PRE-EXISTING DEFECT this AC correctly identified.** Mechanism, verified at source: `base-service.ts:440-446` applies `...this.currentUser.audit(SetAuditEnum.BOTH)` via `.map()` to **every** row in `finalDataToSave`, **including the reused/untouched branch** at `:394-402`; `current-user.util.ts:57-59` shows `BOTH` returns `{ created_by, updated_by }`. So `created_by` is rewritten to the acting user on **every** resave.
+  - **The reachable failure, as ordinary collaborative editing:** user A saves a measure row → user B opens the same section and saves **without touching it** → `created_by` becomes **B**. Row authorship is destroyed, with no error and no log.
+  - **Not fixed here.** `base-service.ts` is a shared base class every entity service inherits; changing its audit semantics is far outside this spec's scope. **Routed to [`tasks.md`](./tasks.md) §8's *Reported, not owned* list as `AUDIT-1`, for a ticket.** Do **not** assert `created_by` immutability in a fixture — it would assert something false against shipped code.
 - [ ] AC.3 — No row is deactivated and re-inserted as a side effect of an unmodified save.
 - [ ] AC.4 — The same holds on the **OICR** path, asserted separately.
 - [ ] AC.5 — Proven at the fixture tier by reading primary keys before and after — a unit test cannot observe row identity.

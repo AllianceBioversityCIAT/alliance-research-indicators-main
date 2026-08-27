@@ -1032,3 +1032,151 @@ Dev VERSION()          = 8.0.45
 | Ambiguity resolved in-brief | Acceptance item 3 (*"collation asserted from an executed query"*) vs the note deferring `U-8` to `T-08` | Ruled: execute it here (real MySQL was available), and hand `T-08` anything that could not be settled at this tier |
 | `OQ-1` not delegated | Implementer told to implement and record it outstanding, **not** to argue it | An open product question is not an implementer's to close |
 | Leader verified the load-bearing claim | Ran the BEFORE/AFTER/DOWN-RESTORED diffs personally | The Reviewer cannot execute, and transcription fidelity was the task's central risk — a report was not sufficient |
+
+---
+
+### T-07 — Fixtures: storage, the `SP_versioning` copy path, and row identity on both paths
+
+- **Status:** ✅ **PASS on attempt 2** (`T-07` — Reviewer: **PASS**, both lenses). **This task discharges `T-02`'s three transferred acceptance items**, closing the forward pointer opened on 2026-08-27.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 2 (`akili-implementer`, T2 `sonnet`, effort `xhigh`)
+- **Reviewers:** **two** `akili-reviewer` lenses (T3 `opus`) — conformance/correctness and **fixture fidelity**. `T-07` was the user-approved **exception** to single-lens mode, and the exception earned itself: **both lenses independently FAILed on the same issue**, and each found things the other did not
+- **Requirements covered:** `R-MSD-004` (`:297`, `:298`), `R-MSD-005` (`:327`, `:328`), `R-MSD-013` (`:545`, `:546`), `R-MSD-003` (`:256`, `:257`)
+
+#### Files
+
+| File | Change |
+| --- | --- |
+| `test/fixtures/innovation-use/innovation-use-section-round-trip.fixture-spec.ts` | +147 — one self-contained `it`: untouched decimal + untouched `NULL` measure, **seeded from a real read**, resaved unmodified through the real `upsertByCompositeKeys` |
+| `test/fixtures/innovation-use/innovation-use-lifecycle-routines.fixture-spec.ts` | +92 — case **F13d** (`SP_versioning` copies `result_quantifications`, closes `RK-9`), plus a `result_quantifications` teardown step that was **previously missing** and without which the file would have failed on FK `1451` |
+| `test/fixtures/innovation-use/oicr-quantification-save.fixture-spec.ts` | **new** — role-1 and role-2 unmodified saves, and the `L-08` expected-churn case. Band **`902_200`** |
+
+#### Verification — the tier's own gate, re-measured by the Leader
+
+| Check | Result |
+| --- | --- |
+| **`npm run test:fixtures`** | **16 suites / 80 tests**, exit 0 — **independently re-measured by the Leader twice**, once from a fresh `compose:test:down` → `up` → `bootstrap` cycle |
+| `npm test -- --silent` | 355 / 2727, exit 0 — reported **separately** because `rootDir: "src"` makes the two command sets **disjoint**; `npm test` never runs a fixture |
+| `npx eslint` | exit 0, after a **manual** reformat (no `--fix`, `K-001`) |
+| `npm run build` | exit 0 |
+
+#### ✅ `T-02`'s three transferred acceptance items — discharged here
+
+The circular evidence dependency recorded at `T-02` is now closed:
+
+| # | Item | Discharge |
+| --- | --- | --- |
+| 1 | `null` round-trips as `null` **both** directions, separately | Raw SQL for the `to` direction, a real service read for `from`, in both the IU and the OICR `L-08` tests |
+| 2 | A read value resent verbatim does not `400`, **from a real read**, never a literal (`:257`, `DD-19`, `K-012`) | `harness.service.findOne` output resent unmodified through `harness.service.update`. **This is the item `T-02`'s own spec file states in its comments that it does not satisfy** |
+| 3 | `String(value)` composite key identical before/after, through the **real** `upsertByCompositeKeys` | PK-identity assertions that hold only if the key matched, exercised through the service — never the transformer alone |
+
+#### The falsifiers — one exemplary, one honestly half-unreachable
+
+**Falsifier 2 is the best-constructed evidence in this spec.** Rather than *arguing* that a value-based match would be vacuous, the Implementer ran the real `SP_versioning`, then injected a positional transposition — swapping `unit`/`description` between the two copied rows **with values untouched**:
+
+```
+KEY-based match:    reddened  (Expected: -12.75 / Received: 549755813887)
+VALUE-only match:   stayed GREEN under identical corruption  ("✓ ... VACUOUS")
+```
+
+Conformance lens: *"the mandated version argues vacuousness; the worker exhibited it. That is the exact content of `DD-20`/`K-20`."* One caveat recorded and deliberately **not** upgraded: a row-swap is not a corruption `SP_versioning` could produce (its copy is a set-based `INSERT … SELECT`, so a real positional fault swaps *columns*). It demonstrates **assertion sensitivity**, which is what was asked.
+
+**Falsifier 1 is half-unreachable, and the Implementer said so instead of claiming both halves.** Removing the transformer reddened both new tests on the read shape, and a probe confirmed the resend independently throws `BadRequestException`. But the probe **also** showed PK and `is_active` unchanged — because `createCustomValidation` runs at `base-service.ts:347`, *before* the fetch (`:360`), the key map (`:380-384`), the deactivate (`:430-437`) and the save (`:448`). **Zero writes occur, so the key mismatch cannot be observed.**
+
+Conformance lens ruling: *"a falsifier whose second conjunct cannot instantiate **because the product got safer** is discharged. What would have been unacceptable is claiming the key change was observed; the worker explicitly did not."*
+
+#### 📌 The `DC-16` answer — and `design.md` §5.3 was wrong about what closes it
+
+Asked what still gates `DC-16` if the key mismatch is unreachable, the conformance lens produced the most consequential finding of the task:
+
+- The closure is **broader** than reported: **both** rule-map branches open with `typeof value !== 'number'`, so a `DECIMAL` string `400`s on **every** role and **both** write paths.
+- But §5.3's *"DD-13's pipe closes that door too"* **overstates it.** The key comparison is *hydrated existing row* vs *incoming payload*. With `DD-2`'s `from` removed, an **echoing** client's key still matches — only a `400`, no replacement. The variant §5.3's own table depicts needs a client that **coerces on read**, which is exactly what `DD-3`/`T-11` guarantees. **There, validation passes and the row is replaced silently.**
+- **So `DC-16` is closed by `DD-2` alone.** Not a product defect — the silent variant needs `from` removed, a state in which the round-trip fixture is already red — **and it is why the fixture asserting the read-shape invariant is the correct gate: it dominates both symptom-specific checks.**
+
+`design.md` §5.3 amended accordingly (below).
+
+#### The false green the fidelity lens found — a fixture that passes on the wrong schema
+
+**`oicr-quantification-save.fixture-spec.ts` used only integer sentinels** (`87_654`, `13_579`, `null`, `0`) — and an integer hydrates to the identical JS `number` from a `bigint` column **and** from `DECIMAL(24,4)`+`DD-2`. So **the file passed unchanged on a baseline-only schema**, discharging `R-MSD-013` AC.4 / `DC-16` **on the pre-migration column shape the requirement is about.** The mirror image of T-07's own disqualifier.
+
+**Leader ruling: required, not advisory** — it serves the task's own disqualifier (*"a green run against a schema that was not rebuilt from `baseline.sql` … is not evidence"*) rather than widening it.
+
+Fixed with an `information_schema.columns` guard in `beforeAll`, **and the guard was proven able to redden** (baseline-only run, verbatim):
+
+```
+Expected: "decimal"
+Received: "bigint"
+  171 |     expect(quantificationNumberColumn.DATA_TYPE).toBe('decimal');
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+```
+
+The fidelity lens then checked the guard's own fidelity, which is the part usually skipped: *"a connection with no default schema makes `DATABASE()` NULL → zero rows → `toBeDefined()` reddens. **There is no path where a missing answer reads as a passing one.**"* And it confirmed the guard covers that file's **entire** migration-dependent surface — one column, no view — *"not a sample of the surface; it is the surface."*
+
+**Why the other two files correctly did NOT get a copy**, reasoned by disjunction so the conclusion does not rest on an unexecuted premise: a `bigint` column either rounds `-12.75` to `-13` or rejects the statement. On the rounding branch the sentinel assertions redden; on the rejection branch the seeding `INSERT` throws. **Both branches redden**, so those files self-guard.
+
+#### 🔍 A vacuous-pass risk created by the fix for a vacuous-coverage problem
+
+The fidelity lens checked something nobody asked it to. The three new `created_at` assertions compare `new Date(x).getTime()`. **Had the driver returned `timestamp(6)` as a string with microseconds, V8 would yield `Invalid Date` on both sides — and Jest's `toBe` uses `Object.is`, where `Object.is(NaN, NaN)` is `true`. All three assertions would have passed vacuously.**
+
+It verified they do not: neither `orm.config.ts` nor `orm.test.config.ts` sets `dateStrings` (the only `extra` key is `namedPlaceholders`), so mysql2's default applies and `TIMESTAMP` arrives as a `Date`. The comparisons are real. The residual — `getTime()` truncating microseconds — is not reachable as a false green, because a deactivate-and-reinsert costs a round trip and the PK assertion fires first.
+
+#### Attempt 1 → `FAIL`, both lenses, the same issue
+
+**F13d compared against a hand-written three-column list and read only ONE side out of MySQL.** `requirements.md:318` — verified verbatim by the Leader:
+
+> *"The copy is compared by `SELECT *` on both sides with the identity/PK columns deleted before comparing — **never against a hand-written column list** (`ADR-11` column-coverage method)."*
+
+`DD-20` says the same. The matching-key half was implemented; the **column-coverage half was dropped.**
+
+**Reachability, constructed by the fidelity lens:** `SP_versioning`'s copy block copies **eleven** columns; F13d asserted **one**. Strip `rq.created_by` from that block and every copied row lands `NULL` — **ADR-11 blind spot (i), the exact failure `R-MSD-005` exists to catch — and F13d stayed green.**
+
+**Fixed, and both lenses confirmed it closes by the mechanism rather than by resemblance.** `SELECT *` both sides, trimmed of **only** `id` and `result_id` — so **all ten** remaining columns are compared, including the seven the old projection could not see. The fidelity lens re-ran its own falsifier against the new code and confirmed it now reddens. The deactivated-row exclusion became **stronger** than the remediation asked: key count (source 3 / snapshot 2) **plus** an explicit absent-key assertion, so *"the deactivated row specifically was excluded"* is asserted rather than inferred from a count two other errors could also produce. `fetchFullRow`'s `toHaveLength(1)` — the `J-20` trap in that precedent — was correctly not copied.
+
+#### `R-MSD-013` AC.2 — the halves have different causes, and only one was T-07's
+
+The Implementer found AC.2 unasserted and investigated why. The conformance lens then **refined the diagnosis**: the report had collapsed both halves onto `audit(BOTH)`, which is right for one and wrong for the other.
+
+| Half | Ruling | Owner |
+| --- | --- | --- |
+| **`created_at`** | **Satisfiable, merely unasserted.** It is a `@CreateDateColumn` appearing in **no** `audit()` payload, so TypeORM never writes it on an update | **T-07** — now asserted by raw SQL at **three** sites (`created_at`/`created_by` are `select: false`, so raw SQL is the only route) |
+| **`created_by`** | **UNSATISFIABLE against current code, and the unsatisfiability is a reachable pre-existing defect AC.2 correctly identified** | **Nobody** → routed as `AUDIT-1` |
+
+**Mechanism, verified at source by the Leader:** `base-service.ts:440-446` applies `...audit(SetAuditEnum.BOTH)` via `.map()` to **every** row in `finalDataToSave`, including the reused/untouched branch at `:394-402`; `current-user.util.ts:57-59` shows `BOTH` returns `{ created_by, updated_by }`.
+
+**The reachable failure is ordinary collaborative editing:** user A saves a measure row → user B opens the same section and saves **without touching it** → `created_by` becomes **B**. Authorship destroyed, silently.
+
+Conformance lens on the routing: *"amend-plus-ticket is the correct discharge for an unsatisfiable AC… Asserting `created_by` immutability would have been the failure mode; changing a shared base class inside a fixture task would have been worse."*
+
+⚠️ **Caveat to carry into the ticket:** the ruling is a **source-level inference**; the emitted `UPDATE` was never observed. `AUDIT-1` should be confirmed against real SQL before it is actioned.
+
+#### Spec amendments applied for this task
+
+| Document | Amendment |
+| --- | --- |
+| `requirements.md` `R-MSD-013` AC.2 | **Split.** `created_at` marked satisfiable and now asserted; `created_by` marked **UNSATISFIABLE** with the mechanism cited and the two-user sequence recorded |
+| `design.md` §5.3 | *"DD-13's pipe closes that door too"* **corrected** — `DD-13` closes only the echoing-client variant; `DC-16` is closed by **`DD-2` alone**; and this is why the read-shape invariant is the right gate |
+| `tasks.md` §8 *Reported, not owned* | **Three unowned findings routed for tickets:** `AUDIT-1`, `BACKUP-1` (nobody owns dropping the T-05 backup table), `OFGB-1` (`report_oicr` unusable under `ONLY_FULL_GROUP_BY`) |
+
+⚠️ **A Leader error in those amendments, caught by review and fixed:** the AC.2 amendment routed `created_by` to *"§12's Reported, not owned list"*. `requirements.md` §12 is **Sign-off**; the list is in **`tasks.md` §8**. Corrected. **Tenth instance of unverified prose in this spec — this one the Leader's**, and the `DC-12` class exactly.
+
+#### `ADVISORY` — recorded, non-gating
+
+| Lens | Finding |
+| --- | --- |
+| **RELIABILITY — the highest-value follow-up in this task** | **F13d's stale-schema tripwire is now SOLELY the sentinel assertions.** The `SELECT *` `toEqual` **cannot** detect a `bigint` column — both sides would hold `-13`, so only `expect(Number(...)).toBe(-12.75)` reddens. **If a future reader deletes those as "already covered by the `SELECT *` comparison", F13d silently becomes schema-blind in exactly the way the OICR file was.** One clause in the comment prevents it. **Routed to `T-12`** rather than reopening a passed task |
+| **RISK — forward to `T-08`** | Repeat the `information_schema` guard over **`report_oicr`**, and prove it red the same way. `T-08`'s sentinels (`10`, `-10.0000`, `NULL`) have the **same integer-blindness** the OICR file had, and the view is the *other half* of T-07's disqualifier (*"a stale view or a pre-migration column"*). Also carry: **`T-08`'s acceptance item 3 is not executable** (`migration:test:revert` cannot reach the `bigint` branch once both migrations exist — use a direct `ALTER`) |
+| Documentation — `FP-45` | **The declared band is not the consumed prefix.** Every file uses `BASE + Date.now()`, so today's stored codes are ≈`903_987_xxx_xxx_xxx`. The fidelity lens **ran the arithmetic**: a collision needs `|t_i − t_j| ≥ 1e11 ms ≈ 3.17 years`, so an in-run collision is **impossible, not merely unlikely**; `result_official_code` carries no unique index and every file cleans up its own codes. **Not a defect, not ticketed** — one sentence into `FP-45` when §9 is next edited: *"a band is the BASE constant, not the stored prefix; collision safety comes from the ≥1e11 gap between bases, not from the label."* What the artifact costs is comprehension: grepping the schema for `902_200%` finds nothing and reads as "the fixture never ran" |
+| Readability | The round-trip `it`'s title claims `R-MSD-004` AC.2, whose stated value `-1500` is exercised **nowhere** in the diff (`-12.75` covers sign and fraction jointly; no negative-**integer** case exists). Drop the claim or add the case |
+| Reliability | The OICR fixture calls `upsertByCompositeKeys` **directly** rather than through `ResultOicrService.updateOicr`. Faithful — same method, same composite keys, same roles, verified against `result-oicr.service.ts:234-246` — and justified by `T-03`'s `git diff --exit-code` constraint on `result-oicr/`. **The limit it buys:** the fixture cannot see a defect in `updateOicr`'s own payload assembly, e.g. `data?.actual_count ?? []` resolving empty, which would take `base-service.ts:334-344` and deactivate **every** row. Record the limit; do not widen the fixture |
+| Readability | `tasks.md`'s `:297`/`:327`/`:545` anchors had already rotted by two lines, **and this attempt's AC.2 amendment displaced `:545`/`:546` by four more** (`R-MSD-013`'s `BUT`/`AND IT MUST` now sit at `:551`/`:552`). §4's rule — regenerate that table **last** — attaches to `T-12` |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| Review mode | **Parallel lenses** — the user-approved exception to single-lens mode | Vindicated: both lenses FAILed on the same F13d issue **independently**, and each found what the other missed. Conformance found the AC.2 split and the `DC-16`/§5.3 correction; fidelity found the stale-schema false green, the catalog-name race, and the `Object.is(NaN, NaN)` vacuity risk |
+| An advisory promoted to **required** | The `information_schema` schema guard | It serves the task's **own** disqualifier rather than widening it — and a fixture that passes on the pre-migration schema defeats the entire tier |
+| Guard required to be **proven red** | Baseline-only run | A guard that cannot fail is what this spec has paid a review round for, repeatedly |
+| Environment traps scouted **before** dispatch | `FP-45` band, `FP-48` disciplines, `FP-49`, roles 1/2 absent, the `sql_mode` divergence | The child guide's `FP-45` list was **stale** — it documents bands to `900_600`; the tree had `900_000`–`900_900` plus `902_000`–`902_150` taken. Scouted and handed over **with an instruction to verify by grep**, since `FP-45`'s own rule is not to trust a second-hand list |
+| Advisory **not** actioned by reopening | F13d's sentinel-deletion fragility | Both lenses had already PASSed. Reopening for a comment clause would cost three rounds against a spec already over its review budget; routed to `T-12`, which owns closure |

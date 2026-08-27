@@ -98,15 +98,15 @@ graph TD
   - Do **not** use `decimalNumbers: true` on the datasource: seven existing `DECIMAL` columns plus every raw query are in that blast radius (`J-16`).
   - `bilateral.service.ts:669-686` is the in-repo precedent for the null-safe coercion shape.
 - **Acceptance / done check:**
-  - [ ] `null` round-trips as `null` in **both** directions, asserted separately per direction. → **unit-tier proven; TRANSFERRED TO `T-07`** (this task's own disqualifier makes T-07's fixture the gate).
-  - [ ] A read value resent verbatim does not `400` — exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, **K-012**). → **NOT REACHED at this tier; TRANSFERRED TO `T-07`.**
-  - [ ] `String(value)` composite-key construction produces the **same key** before and after, for an unchanged row. → **unit-tier proven; TRANSFERRED TO `T-07`.**
+  - [x] `null` round-trips as `null` in **both** directions, asserted separately per direction. → **DISCHARGED AT `T-07`** 2026-08-27 (raw SQL for `to`, a real service read for `from`, in both the IU and OICR tests). Transfer closed.
+  - [x] A read value resent verbatim does not `400` — exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, **K-012**). → **DISCHARGED AT `T-07`** 2026-08-27: `harness.service.findOne` output resent unmodified through `harness.service.update`. Transfer closed.
+  - [x] `String(value)` composite-key construction produces the **same key** before and after, for an unchanged row. → **DISCHARGED AT `T-07`** 2026-08-27 via PK-identity assertions through the real `upsertByCompositeKeys`. Transfer closed.
   - [x] The `:287-288` doc comment no longer contradicts §5.4.
 - **What disqualifies this evidence:** a unit test using a **mocked repository** proves nothing here — the defect lives in the driver's hydration type, which a mock supplies by fiat. Mocked-repo tests are allowed as fast feedback but **may not close** this task; `T-07`'s fixture is the gate.
 - **Input that would make this check FAIL:** delete the `from` direction and the untouched-row test must `400`; delete the `to` direction and the composite key must change on resave; return `0` for null and `quantificationRowAbsent` must redden. **If any of those three still passes, the test is asserting the mock.**
 - **Dependencies:** T-01
 - **Estimated effort:** M · **Skills:** `nestjs-expert`, `tdd`
-- **Status:** **done (code)** — Reviewer `PASS` on attempt 2, 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-02`. ⚠️ **Acceptance items 1–3 are TRANSFERRED to `T-07`, which MUST carry them in its Implementer brief** — this task's disqualifier names T-07's fixture as their gate, and T-07 depends on T-02, so they could not be discharged here.
+- **Status:** **done (code)** — Reviewer `PASS` on attempt 2, 2026-08-27; evidence in [`execution.md`](./execution.md) → `### T-02`. ✅ **Acceptance items 1–3 were transferred to `T-07` and are now DISCHARGED there (2026-08-27).** Originally: **transferred because `T-07` is the gate** — this task's disqualifier names T-07's fixture as their gate, and T-07 depends on T-02, so they could not be discharged here.
 
 ---
 
@@ -223,16 +223,16 @@ graph TD
   - ⚠️ **The OICR fixture must EXPECT `L-08`**, not be surprised by it: `oicr-details.component.ts` sends `q.number ?? 0` while its read preserves `null`, so a `NULL`-valued OICR row churns on save even with `DD-2`. **Pre-existing client defect; this spec reports it and does not fix it.**
   - ⚠️ **INHERITED FROM `T-02` (recorded by the Leader 2026-08-27, on `T-02`'s Reviewer `PASS`).** `T-02`'s acceptance items 1–3 were **transferred here**, because `T-02`'s own disqualifier names this fixture as their gate while `T-07` depends on `T-02`. They are not new scope — they are `T-02`'s scope arriving at the tier that can discharge it, and the `T-07` brief MUST carry them: **(1)** `null` round-trips as `null` in **both** directions, asserted separately per direction; **(2)** a read value resent verbatim does not `400`, exercised with a value **from a real read**, never a literal (`:257`, `DD-19`, `K-012`) — `T-02`'s spec file states in its own comments that it does **not** satisfy this; **(3)** `String(value)` composite-key construction yields the **same key** before and after for an unchanged row, exercised through the real `upsertByCompositeKeys`, not the transformer alone. See `execution.md` → `### T-02` → *forward pointer*.
 - **Acceptance / done check:**
-  - [ ] `-12.75` stored and re-read as `-12.75` — not `3`, `2`, or `2.5000` re-read differently (`:297`).
-  - [ ] The versioned row holds `-12.75`, read **out of MySQL** on both sides (`:328`), matched on the four-column key.
-  - [ ] An unmodified save changes **no** primary key and deactivates **no** row, on **both** the IU and OICR paths (`:545`).
-  - [ ] Every value under test is **seeded from a real read** (`:546`, `:257`).
-  - [ ] The `NULL`-valued OICR churn is asserted as **expected** behaviour with a comment naming `L-08`.
+  - [x] `-12.75` stored and re-read as `-12.75` — not `3`, `2`, or `2.5000` re-read differently (`:297`).
+  - [x] The versioned row holds `-12.75`, read **out of MySQL** on both sides (`:328`), matched on the four-column key. **Attempt 2 fix:** `SELECT *` on both sides trimmed of only `id`/`result_id`, so **all ten** remaining columns are compared per `ADR-11` — attempt 1's hand-written three-column list violated `R-MSD-005` AC.2 and stayed green when a copied column was dropped.
+  - [x] An unmodified save changes **no** primary key and deactivates **no** row, on **both** the IU and OICR paths (`:545`).
+  - [x] Every value under test is **seeded from a real read** (`:546`, `:257`).
+  - [x] The `NULL`-valued OICR churn is asserted as **expected** behaviour with a comment naming `L-08`. ⚠️ The comment also records that fixing `L-08` will **not** redden this test (the `?? 0` is hard-coded here, not read from the client) — it becomes a pin on `upsertByCompositeKeys`'s null-vs-`0` key semantics instead.
 - **What disqualifies this evidence:** a fixture that asserts `toHaveLength(1)` against `result_quantifications` is asserting a false premise — the table holds several rows per result (`J-20`). A green run against a schema that was **not** rebuilt from `baseline.sql` may be testing a stale view or a pre-migration column; rebuild first or the run is not evidence. **Routine bodies are not to be diffed** — `:327` explicitly disqualifies a body diff, because the body does not change.
 - **Input that would make this check FAIL:** remove the entity transformer and re-run — the untouched-row save must `400` **and** the composite keys must change. **If either stays green, the fixture is not reaching the defect.** For the copy path: match on the value instead of the four-column key and the test must become vacuous.
 - **Dependencies:** T-03, T-04, T-05
 - **Estimated effort:** L · **Skills:** `tdd`, `nestjs-expert`
-- **Status:** todo
+- **Status:** **done** — Reviewer `PASS` on attempt 2, 2026-08-27, **both lenses**; evidence in [`execution.md`](./execution.md) → `### T-07`. ✅ **Discharges `T-02`'s three transferred acceptance items.** ⚠️ **Two carries for `T-08`:** (1) repeat the `information_schema` guard over **`report_oicr`** and prove it red — T-08's sentinels (`10`, `-10.0000`, `NULL`) have the same **integer-blindness** that let this task's OICR fixture pass on a baseline-only schema; (2) **T-08 item 3 is not executable** — `migration:test:revert` cannot reach the `bigint` branch once both migrations exist; use a direct `ALTER`. ⚠️ **One carry for `T-12`:** F13d's stale-schema tripwire is now **solely** its sentinel assertions (the `SELECT *` `toEqual` cannot detect a `bigint` column — both sides hold `-13`); add a comment clause so they are not deleted as redundant.
 
 ---
 
@@ -454,7 +454,9 @@ Both descriptions follow `cognitive-doc-design` review-empathy rules: what to re
 | **OQ-3** | Target branch — stay on `AC-1679-…` or branch from `main`? | You | execution setup |
 | **OQ-D5** | Dev and Prod MySQL versions (narrowed to 8.0.4 … 8.0.16) | DevOps | nothing now |
 
-**Reported, not owned — worth tickets, none opened:** `O-1` (Innovation Use measures reach no report view at all), `O-3` (`orm.config.ts:53` is dead config), `RK-13` (`updateOicr` is not transactional), `RK-15` (the uncalled quantification upsert), and the still-open `FR-7` / [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718).
+**Reported, not owned — worth tickets, none opened:** `O-1` (Innovation Use measures reach no report view at all), `O-3` (`orm.config.ts:53` is dead config), `RK-13` (`updateOicr` is not transactional), `RK-15` (the uncalled quantification upsert), **`AUDIT-1` (NEW, 2026-08-27 — `created_by` is overwritten on every resave)**, **`BACKUP-1` (NEW — nobody owns dropping `result_quantifications_backup_1787260000000`)**, **`OFGB-1` (NEW — `report_oicr` cannot be `SELECT`ed under `ONLY_FULL_GROUP_BY`; harmless on Dev, which does not set it, but it breaks the view on any strict-mode server)**, and the still-open `FR-7` / [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718).
+
+> **`AUDIT-1` detail** — `base-service.ts:440-446` applies `audit(SetAuditEnum.BOTH)` to every row including the reused/untouched branch (`:394-402`), so an untouched resave by a different user rewrites `created_by` to them. Reachable as ordinary collaborative editing; destroys row authorship silently. It is why `R-MSD-013` AC.2's `created_by` half is marked UNSATISFIABLE rather than merely unasserted. **Shared base class — out of this spec's scope to change.**
 
 ---
 
