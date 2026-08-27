@@ -338,3 +338,12 @@ Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache
 - **Why local verification missed it (KZ-017):** every "boots clean" run was executed on branch `JuankCadavid/PARI-242` (whose file was correct), not on the merged dev tree — the merge's own artifact was never booted, and no gate in the pipeline or locally scans the microservice graph.
 - **Fix:** `ae38b052` on dev — one line (`ImpersonationModule` into `imports`). Red reproduced on the dev tree first (same error verbatim), then green: `Nest microservice successfully started` + HTTP app started + live 200 on `/api/impersonation/users`; full server suite 3,259 green. Pushed → Jenkins redeploys.
 - **Lessons for kaizen (candidate):** (1) after any merge-conflict resolution in a composition root, boot BOTH bootstraps from the *merged* tree, not the source branch; (2) the deploy pipeline needs a post-`docker run` health check — Jenkins SUCCESS is currently compatible with a dead backend.
+
+---
+
+## T-12 — HITL half closed → task **PASS** → `[x]` (2026-08-27)
+
+- **Human evidence (user, on the deployed test env):** screenshot of the admin account menu with "Simulate another profile"; screenshot of a **live simulation by a second admin** (Santiago Sanchez Correa simulating Fabio Catini — banner with identity/started-by/End simulation, "Account · Simulated" panel, target dashboard data). User verdict after the z-index fix: "todo good".
+- **Visual defect found by the user and fixed during this half:** the section-header template's `!z-10` painted over the dropdown (capped at host z:3 by D-imp-14) — root-caused with `elementsFromPoint` in a real browser against localhost:4300 (red observed), fixed by raising the navbar host to `z-index: 1001` (`ae9e975d`), re-probed green, deployed (`c5d28369`). This was T-11 review advisory #1 materializing.
+- **Recorded gaps (accepted):** the numeric padding measurement and a formal axe run were not captured — layout and contrast confirmed visually by the user on the live env; banner contrast was design-verified at #b3561a ≈ 4.9:1 (D-imp-7). Escape/focus behaviours are covered by unit specs (T-09/T-10/T-11).
+- Playwright note: local browser verification required copying (not symlinking) the client `environment*.ts` files — Angular's esbuild does not follow out-of-root symlinks; the Aug-25 "materialized" copies had duplicate keys and were replaced with clean copies from the main checkout.

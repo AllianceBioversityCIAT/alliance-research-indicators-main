@@ -264,7 +264,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Human evidence in `execution.md`: two screenshots, the measured padding value, axe result (0 contrast violations on the banner), tab-order note.
 - **Verification — failing input:** load a Center Admin target whose `role.focus_id` is `null` → `canAccessCenterAdmin()` must be false — proves the spec discriminates on the field.
 - **Disqualifier:** an axe run in jsdom reporting "incomplete" for contrast has evaluated nothing — only the real-browser run counts.
-- **Dependencies:** T-08, T-10, T-11 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** todo
+- **Dependencies:** T-08, T-10, T-11 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (unit PASS attempt 2 + HITL closed 2026-08-27, execution.md T-12)
 
 ### T-13 — Docs, baseline sync, rollout note
 
