@@ -325,3 +325,10 @@ Checklist delivered (stack swap to this worktree, 2 screenshots vs artboards 1/4
 
 ### Environment incident (open, not a spec item)
 Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache since the 2026-08-27 06:39 deploy; Jenkins reports success; the same commit builds and boots clean locally on the prod path. Browser CORS/PNA errors are downstream noise. **Owner: DevOps/host logs (pm2/docker) — pending.**
+
+### Environment incident — findings from the Jenkins console (build #72, 2026-08-27)
+- Deploy = Docker images built on Jenkins (Node 22.12-alpine, `npm ci` + `npm run build`) → ECR → `docker run --restart=always -p 3000:3000` on the on-prem host via SSH. **No health check after `docker run`** — a crash-looping container yields Apache 503 with Jenkins SUCCESS.
+- Build #72 was a duplicate trigger of the same commit: every layer CACHED, image digest identical to the already-running one (#71 shipped our code).
+- **`migration:execute` RUNS on every deploy inside the container with the host env** ("No migrations are pending") — the constitutional K-015 claim ("pipeline does not apply migrations") is stale for this repo and flagged for T-13/archive. That run also proves host-env DB connectivity from inside the image.
+- FIX-PRMS-sync (previous deploy) changed one OpenSearch service line — not boot-relevant. No evidence test was up between that deploy (Aug 26 20:37 UTC) and ours.
+- Pending (DevOps/host): `docker ps -a` status + `docker logs --tail 120 roar-main-application-server-dev`.
