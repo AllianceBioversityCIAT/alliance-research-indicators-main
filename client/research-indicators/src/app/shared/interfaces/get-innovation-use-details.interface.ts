@@ -35,7 +35,18 @@ export class InnovationUseOrganization {
 
 export class InnovationUseQuantification {
   id: number | undefined = undefined;
-  quantification_number: number | undefined = undefined;
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-11 — DD-3/DD-15)
+  /**
+   * Widened from `number | undefined`. That declaration was false before this spec: the driver can
+   * hydrate a `DECIMAL` column as either a `number` or a `string` depending on configuration this
+   * client does not control. DD-2's entity transformer normalises this to a `number` (or `null`) at
+   * the API boundary; this widened type lets the client assert that invariant defensively at the
+   * read edge (`quantificationsView`) instead of silently trusting it, following
+   * `result-actors.service.ts:377-384`'s stance of never trusting the driver's hydration type by
+   * construction. See `innovation-use-details.component.ts:80-85`'s `InnovationUseQuantificationPayload`
+   * for the write-side declaration this must be reconciled with (DD-15) — that one stays `number`.
+   */
+  quantification_number: number | string | undefined = undefined;
   unit: string | undefined = undefined;
   description: string | undefined = undefined;
 }

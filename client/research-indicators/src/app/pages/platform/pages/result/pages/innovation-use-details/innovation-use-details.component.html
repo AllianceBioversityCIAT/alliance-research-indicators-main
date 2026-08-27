@@ -195,13 +195,18 @@
 
       <div class="flex flex-col rs-gap-[16]">
         @for (quantification of quantificationsView(); track $index) {
+          <!-- @akili-spec docs/specs/changes/measure-number-signed-decimal (T-11 — DD-5: scale 4, the
+               derived symmetric bound, and copy without "positive". No [step] binding — DD-6. -->
           <app-quantification-item
             [quantification]="quantification"
             [quantNumber]="$index + 1"
             [headerLabel]="'MEASURE'"
             [disabled]="!submission.isEditableStatus()"
             [fieldsRequired]="false"
-            [maxFractionDigits]="0"
+            [min]="quantificationNumberMin"
+            [max]="quantificationNumberMax"
+            [maxFractionDigits]="quantificationNumberScale"
+            [placeholder]="quantificationNumberPlaceholder"
             (update)="onQuantificationUpdate($index, $event)"
             (delete)="removeQuantification($index)" />
         }

@@ -1772,3 +1772,125 @@ The child guide's `K-002` gate had said *"gate against the **945** baseline"*; t
 | Advisory **promoted** to required | The `null`/non-integer predicate hole | It silently undoes `DD-12`, the task's entire purpose. Same test applied at `T-07`: *does the finding defeat what the task exists to do?* |
 | Reopened after a `PASS` | Twice now in the client tasks (`T-09`, `T-10`) | Both times the reviewer's advisory or gate-gap was worth more than the closure speed. Neither reopening was for a defect the reviewer had gated on |
 | Guide corrected rather than only the code | `K-002`'s `tsc` gate | The rule was the Leader's own, written the same day, and two workers hit its edges. Fixing the instruction is worth more than fixing one file's usage of it |
+
+---
+
+### T-11 — Innovation Use call site: bindings, read coercion, and both payload type declarations
+
+- **Status:** ✅ **PASS on attempt 1** (`T-11` — Reviewer: **PASS**) — ⚠️ **acceptance item 8 (HITL visual gate) remains OPEN and is with the user.** Items 1–7 discharged.
+- **Date:** 2026-08-27
+- **Implementer attempts:** 1 · **Reviewer:** one `akili-reviewer`, single merged lens
+- **Requirements covered:** `R-MSD-001` (`:181`, `:182`, `:189`, `:190`), `R-MSD-008`, `R-MSD-009` (`:430`, `:431`), **`R-MSD-012` AC.3** (reassigned in from `T-10`), `NFR-MSD-004` (**open**)
+- **Last implementation task in the spec.** `T-12` is closure only.
+
+#### 📌 The Implementer refuted the brief's falsifier with a repro — and the Reviewer found it was even more wrong
+
+Acceptance item 7's mandated falsifier was *"revert the interface widening but keep the component change → build must fail."*
+
+**It does not fire.** The Implementer built a minimal `tsc` case: `typeof x === 'string'` on an `x: number | undefined` **compiles cleanly**, because TypeScript types `typeof`'s result as the union of the eight typeof strings and never narrows it to the operand's declared type — so `TS2367` structurally cannot fire on a `typeof` guard. It disclosed the discrepancy rather than reporting the brief's version as passed.
+
+**The Reviewer then found a second, independent reason the revert cannot redden**, which the Implementer had missed: the read coercion also compares `=== null`, and TypeScript's equality check is `isTypeEqualityComparableTo(source, target) = (target.flags & TypeFlags.Nullable) !== 0 || …` — **any** `=== null`/`=== undefined` comparison is exempted from `TS2367` by the target's Nullable flag. So *both* T-11 edits survive the revert. **The mandated falsifier was not mis-worded; it could not have reddened by any route in this file.**
+
+**The forward direction is what `J-17` actually says**, and it was reproduced: widened interface **+** the original unreconciled passthrough →
+
+```
+TS2322: Type '{ ... quantification_number: string | number | undefined; ... }[]' is not assignable to
+        type 'InnovationUseQuantificationPayload[]'.  Type 'string' is not assignable to type 'number'.
+```
+
+`J-17`'s text at `design.md:376`/`:515` and `tasks.md:322` reads *"widening only the shared interface **does not compile**"* — the forward direction. **Item 7 is discharged in the direction the design specifies; `tasks.md:337` inverted it, and the inversion is a spec defect.**
+
+#### `DD-15` — reconciled, not evaded, and the Reviewer gave three reasons
+
+The shared interface widened to `number | string | undefined`; the **local** `InnovationUseQuantificationPayload.quantification_number?: number` deliberately left **narrow**, with an explicit `typeof` narrowing at the assignment where the read and write paths meet.
+
+`DD-15` says *"**reconcile** the second payload type declaration"* — not *"widen it"*. Why narrow is correct:
+
+1. **`DD-17` step ① mandates the server reject anything not a `number`.** A widened write type would make sending a string **type-legal** — i.e. would let the client produce the exact `400` this spec exists to remove.
+2. `design.md:242` states the response *"stays a **number**"*.
+3. The narrowing is a **live client-side defence on the resent-untouched-row path**, at the one point the two paths meet.
+
+*"The two declarations are now coupled in the direction that matters: the widened read type is what makes the `typeof` branch reachable, and the narrow write type is what forces the coercion to exist."*
+
+#### 📌 The Implementer found one of its OWN tests could not fail
+
+While running falsifier 2 it discovered **`primeng-inputnumber.mjs:1635` — `writeValue(value) { this.value = value ? Number(value) : value; }`.** PrimeNG coerces any truthy string on the model-write path, so **the DOM-level seam is insensitive to removing `DD-3`'s coercion.** It added two adapter-seam tests and said so.
+
+**Falsifier 2** (bare `as number` cast instead of `Number(...)`) reddened **only** the adapter test:
+```
+Expected: -0.75
+Received: "-0.7500"
+```
+Number-wire and both DOM tests stayed green — exactly what the PrimeNG source predicts.
+
+**Reviewer ruling: KEEP the DOM tests — they are not a `KZ-001` no-op, they carry a different clause.** `R-MSD-009` AC.3 is *"trailing zeros … not shown to the user as significant digits"*. The adapter test returns the **number** `-0.75` and would stay green if someone later bound `minFractionDigits="4"` and the field began painting `-0.7500`; **only the DOM test reddens on that.** It also proves the four-hop composition (`quantificationsView` → card → `app-input` → `p-inputNumber` → `ngModel`) actually delivers. *"Dropping them would remove the only assertion of what the user sees."*
+
+#### `R-MSD-012` AC.3 + `T-09`'s carry — both closed by one new shared util
+
+`shared/utils/quantification-number-bound.util.ts` exports `deriveMaxForScale(scale)` (throwing outside 0–4). The component derives `MAX = deriveMaxForScale(4)` = **549,755,813,887**, `MIN = -MAX`, asserted on the real `app-input`. **Falsifier 3** (scale → 3): `Expected: 549755813887 / Received: 8796093022207`.
+
+**`T-09`'s carry closed** by importing this util into `input.component.spec.ts` and **deleting its local copy** — chosen over delete-in-favour-of-literals because *"a shared/component-level spec importing from a page component would invert the layering."*
+
+**Reviewer: right home, sound layering, justified excursion.** The child guide maps a reusable util to exactly this path; intra-layer import is fine where the inverse would not be. It **recomputed all five rows** of `DD-14` independently and every value matches §6.2. And: *"before T-11 no importable production derivation existed — the new file is the necessary consequence of the option the acceptance item names."*
+
+#### Bindings — confirmed against PrimeNG's own source, not assumed
+
+| Item | Evidence |
+| --- | --- |
+| `min` negative enables the minus key | `allowMinusSign()` is `this.min == null \|\| this.min < 0` (`:1270-1272`) ⇒ true at `-549,755,813,887` |
+| **`min` actually ARRIVES at `p-inputNumber`** | `validateValue` (`:1492-1503`) returns `this.min` when `value < min`, so with the default `min = 0` the `spin(…, −1)` test would return `0` and redden. **The forwarding chain is measured, not assumed** |
+| No `[step]` binding (`DD-6`) | default `step = 1` (`:596`); `spin()` uses `this.step * dir` (`:982`); grep-confirmed absent |
+| Replacing hardcoded `[maxFractionDigits]="0"` is not a regression | The `0` was the **card's own** default (`T-10`, `DD-12`); the card still defaults to `0` and only this call site passes `4`. `oicr-details.component.html` untouched. `formatValue(-12.75) !== '-13'` reddens if the `4` fails to arrive |
+
+#### Read coercion, `0`/`null`, and `KZ-015`
+
+The coercion sits **inside** `quantificationsView` — `=== undefined || === null ? null : Number(...)` — one normaliser (`DD-2`) plus one assertion, mirroring `result-actors.service.ts:377-384`. `0` survives as `0`; `null` and `undefined` both land on `null`; `quantificationRowAbsent` still treats only null/undefined as absent, so **`0` remains a present row**.
+
+**`KZ-015` verified by the Reviewer:** the outer `beforeEach` renders with `quantifications: []`, so **zero cards exist at first render**; all eleven T-11 cases create the card *after* it. No case pre-populates before the first `detectChanges()`.
+
+#### Declared limits — and one the Reviewer sharpened
+
+`:189`/`:190` and `:181` are discharged **at the tier the spec's own gate text names** — `DC-6`/`DC-1` ask for *"the effective value on the real `app-input`/`p-inputNumber` instance"*, not keystroke simulation. `spin()` is PrimeNG's own decrement path (`onDownButtonMouseDown → repeat → spin`); `formatValue()` is the instance's own Intl formatter built from the delivered scale.
+
+**What is genuinely not reached:** `onInputKeyDown → insert → updateValue` — **no test observes the minus key or the decimal separator being *admitted*.** Those are established **structurally** instead (`allowMinusSign()` from a measured negative `min`; `:1341`'s `decimalCharIndex === -1 && this.maxFractionDigits` truthy at `4`). *"'During entry' is covered by composition rather than by simulation"* — a declared limit, disclosed in the test comments, consistent with the spec's gate text.
+
+#### A Leader correction of the Implementer's report
+
+It reported the `tsc` tripwire as **`1330 = 1330`**. **Leader-measured: the total is `934`, unchanged from `T-10`'s close, and all six touched/added files are individually CLEAN.** The substantive result holds; the figure does not.
+
+> **Thirteenth number-in-prose defect in this spec — and note where it landed: the tripwire slot.** A wrong number there is the one place a wrong number defeats the mechanism that exists to catch wrong numbers.
+
+#### Verification
+
+`npm test`: **317 suites / 6784 tests**, exit 0 (6766 → **+18**: +9 page-spec, **+2 adapter-seam added after the falsifier-2 finding**, +7 util-spec). `tsc`: total **934 = 934**, all six files clean (Leader-verified). `lint -- --quiet` clean, no `--fix` mutation. `npm run build` exit 0 — **which is itself acceptance item 7**.
+
+#### 🔴 Acceptance item 8 — OPEN, with the user. And the prep needed correcting first.
+
+`DC-11`/`NFR-MSD-004`: the field in **both themes and in error state**. *"No automated substitute exists."* Correctly left unticked; jsdom applies no stylesheet and Tailwind is a runtime CDN script, so no green test here can evaluate contrast or layout.
+
+⚠️ **The Reviewer caught that the prepared instructions asked the user to inspect something that CANNOT EXIST at this call site.** This call site passes `[fieldsRequired]="false"`, so `isRequired` and `validateEmpty` are both `false` ⇒ `inputValid()` returns `{valid: true}` on every path and `isInvalid()` is **permanently false** ⇒ **no required/empty error message or amber border can ever render on this field.**
+
+The only reachable amber state is **`showMaxReachedMessage()`** — `input.component.ts:162-176` fires at `value.toString().length >= 18`, reached by entering **`-549755813886.9999`**, an in-bound *legal* value. **That is `RK-16`'s own pinned false positive**, which this spec deliberately does not fix.
+
+**Two preconditions the prep also omitted:** the result must be an **Innovation Use (indicator 6)** result in an **editable status** — both the ADD affordance and the field's enablement sit behind `submission.isEditableStatus()`.
+
+**And two pre-existing a11y defects sit exactly in the HITL's crosshairs** (`input.component.html` is *not* in this diff): `:56` hardcodes `inputId="minmax-buttons"`, so **every** number `app-input` on the page emits the same DOM id — duplicated as soon as a second measure row is added; and the Number field has **no `<label for>` at all** (the card renders `<h2 class="label">Number</h2>`, and `app-input`'s `<label for>` is behind `@if (label)`, which this card never passes). **Both predate this spec and must be named as pre-existing, or the human will file a false regression.**
+
+**Corrected instructions handed to the user** — see the Leader's message accompanying this entry.
+
+#### `ADVISORY` — recorded, non-gating
+
+| Finding | Note |
+| --- | --- |
+| `tasks.md` T-11 doc defects → **`T-12`** | (a) `:337`'s falsifier is stated **backwards**; record the forward direction and the observed `TS2322`. (b) *Files touched (intended)* omits `input.component.spec.ts` and the two new util files — **both mandated by acceptance item 1's own amended text**, so the list is stale relative to its own item. (c) Record `934` (not `1330`) as the same-window `tsc` figure |
+| Pre-existing a11y (advisory 2) | The duplicate `inputId` and the missing `<label for>`, above. Out of scope, `input.component.html` untouched — but must be named in the HITL brief |
+| Unreached-but-named | A non-numeric or empty wire string would flow `Number("")→0` / `Number("abc")→NaN`, and `NaN` serialises to `null` via `JSON.stringify`, which `DD-13`'s map accepts and skips — a **silent value loss** rather than a `400`. **Could not construct a reaching input:** mysql2 returns `null` or a numeric string for `DECIMAL`, and `DD-2` normalises before the wire, so it needs a non-conforming API response |
+| Not reachable today | `deriveMaxForScale` runs at **module-evaluation time**, so a throw would surface as a **lazy-chunk load failure** rather than a component error. Unreachable with the literal `4`; worth a comment if a future call site derives the scale at runtime |
+
+#### Leader decisions recorded for this task
+
+| Decision | Value | Reason |
+| --- | --- | --- |
+| **Third Leader briefing error, caught by a worker measuring rather than complying** | The reverse falsifier | After T-08's shared-table `ALTER` and T-09's missing `tsc` gate. The Implementer built a repro; the Reviewer then found a *second* reason the same falsifier could not fire. **Both were disclosures, not defences** |
+| Advisory **acted on before dispatching the HITL** | The impossible "error state" | Sending the user to inspect a state that cannot render would have wasted their time and invited a false negative on an item with no automated substitute |
+| Kept the DOM tests despite their insensitivity | On the Reviewer's ruling | They carry `R-MSD-009` AC.3, which the adapter test cannot: only the DOM assertion reddens if the field later paints `-0.7500` |

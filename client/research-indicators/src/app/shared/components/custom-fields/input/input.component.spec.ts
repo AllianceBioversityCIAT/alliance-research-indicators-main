@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { WordCountService } from '../../../services/word-count.service';
 import { By } from '@angular/platform-browser';
 import { InputNumber } from 'primeng/inputnumber';
+import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -873,22 +874,11 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
   // R-MSD-012 AC.1, AC.2 — DD-14's scale→bound table, and the scale-domain guard
   // ---------------------------------------------------------------------------------------------
   describe('DD-14 scale→bound table (AC.2) and the scale-domain guard (AC.1)', () => {
-    /**
-     * DD-14's formula, applied here ONLY as a test-side helper to derive the expected bound per
-     * scale: `max = 2^(53 - ceil(log2(10^scale))) - 1`, `min = -max`. `app-input` does not
-     * implement this formula itself — T-09's scope is the `@Input` promotion only; T-11's call
-     * site is what will derive `max` from a scale for real. This helper exists so the table below
-     * is asserted against the formula rather than against hand-copied literals, and so scale 0's
-     * landing on `Number.MAX_SAFE_INTEGER` is demonstrated as a CONSEQUENCE of one uniform
-     * computation — there is no `if (scale === 0)` branch anywhere in it.
-     */
-    function deriveMaxForScale(scale: number): number {
-      if (!Number.isInteger(scale) || scale < 0 || scale > 4) {
-        throw new Error(`scale ${scale} is outside the supported configuration domain 0…4`);
-      }
-      const bitsConsumedByScale = Math.ceil(Math.log2(10 ** scale));
-      return 2 ** (53 - bitsConsumedByScale) - 1;
-    }
+    // `deriveMaxForScale` used to be a test-side reimplementation of DD-14's formula, duplicating
+    // `app-input`'s own scope (the `@Input` promotion only) with what T-11's call site derives for
+    // real. T-11 extracted the formula to `shared/utils/quantification-number-bound.util.ts` and
+    // this now imports THAT production implementation — so this table and the call site's actual
+    // `min`/`max` cannot silently disagree (the original hazard this comment used to just disclaim).
 
     const scaleTable = [
       { scale: 0, expectedMax: 9_007_199_254_740_991 },
