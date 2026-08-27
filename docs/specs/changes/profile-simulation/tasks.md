@@ -2,7 +2,7 @@
 
 - **Module:** auth (cross-cutting, server + STAR client)
 - **Spec id:** 2026-08-profile-simulation
-- **Status:** in-progress
+- **Status:** completed
 - **Owner:** Juan Carlos Cadavid
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (post-Judgment-Day revision, ./judgment.md)
@@ -264,7 +264,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Human evidence in `execution.md`: two screenshots, the measured padding value, axe result (0 contrast violations on the banner), tab-order note.
 - **Verification — failing input:** load a Center Admin target whose `role.focus_id` is `null` → `canAccessCenterAdmin()` must be false — proves the spec discriminates on the field.
 - **Disqualifier:** an axe run in jsdom reporting "incomplete" for contrast has evaluated nothing — only the real-browser run counts.
-- **Dependencies:** T-08, T-10, T-11 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** todo
+- **Dependencies:** T-08, T-10, T-11 · **Effort:** S · **Skills:** `angular-developer`, `ui-ux-pro-max` · **Status:** done (unit PASS attempt 2 + HITL closed 2026-08-27, execution.md T-12)
 
 ### T-13 — Docs, baseline sync, rollout note
 
@@ -274,7 +274,7 @@ Closure is at clause granularity (Step 3.2 rule). A gap may never be discharged 
   - [ ] Each doc edit cites `D-imp-*`; `grep -rn "orange-2" docs/ux-ui/design.md` ≥ 1; TRD §10.1 mentions `X-Impersonation-Session`.
   - [ ] Rollout note lists: migration applied (who/when), env var present in each environment, backout steps.
 - **Verification — failing input:** the grep counts are presence checks — they prove the text exists, not that it is right; the Reviewer reads the paragraphs.
-- **Dependencies:** T-06, T-12 · **Effort:** S · **Skills:** `cognitive-doc-design` · **Status:** todo
+- **Dependencies:** T-06, T-12 · **Effort:** S · **Skills:** `cognitive-doc-design` · **Status:** done (PASS attempt 2, execution.md T-13)
 
 ---
 

@@ -170,22 +170,24 @@ Golden paths new work must not regress. Each is a sequence of transitions.
 
 ### 3.2 [Server] API + operations flows
 
+> **Paths below carry no version segment** — these routes' handlers declare no `@Version` (see §5.2 below and `docs/trd/trd.md` §6.2 for the handlers that do declare a version).
+
 **Contributor result lifecycle (STAR → ARI API)**
 ```
-STAR UI → POST  /api/v1/results                              (create draft)
-        → PATCH /api/v1/results/:code/general-information
-        → PATCH /api/v1/results/:code/alignments
-        → PATCH /api/v1/results/:code/geo-location
-        → POST  /api/v1/results/:code/evidences              (+ other sub-resources)
-        → POST  /api/v1/results/:code/status/transitions     (submit)
+STAR UI → POST  /api/results                              (create draft)
+        → PATCH /api/results/:code/general-information
+        → PATCH /api/results/:code/alignments
+        → PATCH /api/results/:code/geo-location
+        → POST  /api/results/:code/evidences              (+ other sub-resources)
+        → POST  /api/results/:code/status/transitions     (submit)
 ResponseInterceptor wraps every response in ServerResponseDto.
 Socket.IO emits result-updated events; STAR refreshes views in real time.
 ```
 
 **AI-assisted result formalization**
 ```
-AI pipeline → POST /api/v1/results/ai/formalize          (single)
-            → POST /api/v1/results/ai/formalize/bulk      (admin/MEL only)
+AI pipeline → POST /api/results/ai/formalize          (single)
+            → POST /api/results/ai/formalize/bulk      (admin/MEL only)
 ARI validates payload (whitelist + transform + forbidNonWhitelisted),
 links to indicator/contract/lever via CLARISA + AGRESSO references,
 returns a result_official_code or per-row error envelope.
@@ -194,8 +196,8 @@ returns a result_official_code or per-row error envelope.
 **Partner platform (PRMS/TIP/AICCRA) data consumption**
 ```
 Partner → POST /token (out of band) → base64({client_id, client_secret})
-        → GET /api/v1/opensearch/results?...
-        → GET /api/v1/results?platform-code=PRMS&...
+        → GET /api/opensearch/results?...
+        → GET /api/results?platform-code=PRMS&...
 ARI validates token + origin/IP against app_secret_host_list before serving.
 ```
 
@@ -205,8 +207,8 @@ Admin → GET  /admin                                        (SSR React 19 dashb
       → GET  /admin/dashboard                              (stats)
       → GET  /admin/users                                  (user management)
       → GET  /admin/settings                               (configuration)
-      → POST /api/v1/configuration/application/secrets     (CRUD app secrets)
-      → GET  /api/v1/tools/clarisa/...                      (force sync)
+      → POST /api/configuration/application/secrets     (CRUD app secrets)
+      → GET  /api/tools/clarisa/...                      (force sync)
 ```
 
 **Sync cycle (cron-driven)**
@@ -272,12 +274,13 @@ One table across both surfaces. **Owner/Package** column distinguishes STAR clie
 
 ### 5.2 [Server] API navigation (URL grammar)
 
-- Global prefix `/api`; URI versioning `/api/v1/...`, `/api/v2/...` (`VersioningType.URI` in `main.ts`).
-- Bounded-context segments mirror `domain/routes/main.routes.ts`:
-  - `/api/v1/results/...` + children (`status`, `evidences`, `alignments`, `geo-location`, `actors`, `institutions`, …)
-  - `/api/v1/agresso/...`, `/api/v1/clarisa/...` (via `/api/v1/tools/...`)
-  - `/api/v1/opensearch/...`, `/api/v1/configuration/...`, `/api/v1/user/configuration/...`
-  - `/api/v1/reports/...`, `/api/v1/reporting-feedback/...`
+- Global prefix `/api`; `VersioningType.URI` is enabled in `main.ts` with **no `defaultVersion`**, so versioning is **opt-in per handler**, not blanket. Three states coexist in this app today: most controllers declare no `@Version` and mount unversioned (`/api/<resource>`); `bilateral.controller.ts` (8 handlers) and one `agresso-contract.controller.ts` handler declare `@Version('1')` (`/api/v1/<resource>`); one `results.controller.ts` handler (`GET /results` v2) declares `@Version('2')` (`/api/v2/results`). Never assume a `v1`/`v2` segment without checking the controller — an unversioned route's `/api/v1/...` path 404s (`docs/trd/trd.md` §6.2).
+- Bounded-context segments mirror `domain/routes/main.routes.ts` — most mount unversioned:
+  - `/api/results/...` + children (`status`, `evidences`, `alignments`, `geo-location`, `actors`, `institutions`, …); one v2-only listing route at `/api/v2/results`
+  - `/api/agresso/...`, `/api/clarisa/...` (via `/api/tools/...`) — except the single `PATCH /api/v1/agresso/contracts/:code/pool-funding-tag` handler
+  - `/api/opensearch/...`, `/api/configuration/...`, `/api/user/configuration/...`
+  - `/api/reports/...`, `/api/reporting-feedback/...`
+  - `/api/v1/results/:result-code/pool-funding-alignment/...` (all 8 `bilateral.controller.ts` handlers, mounted under `results` children, opt into v1)
 - Per-result sub-resources nest under `/results/:result-code/{sub-resource}`.
 - Boolean and list query params normalized by `QueryParseBool` and `ListParseToArrayPipe`.
 
@@ -349,6 +352,7 @@ Tokens live in `client/research-indicators/src/styles/colors.scss`, `src/styles/
 | Primary blue | `--ac-primary-blue-100` … `-700` | Brand, navbar, primary CTAs |
 | Green | `--ac-green-100` … `-700` | Indicators 1–3 (capacity sharing, innovation dev, policy change A) |
 | Orange | `--ac-orange-1` | Indicators 4–5 |
+| Orange (simulation) | `--ac-orange-2` = `#b3561a`, identical in light and dark | Profile-simulation banner surface. White text ≈4.9:1 (AA). Deliberately does **not** lighten in dark mode — it is a background token, not a foreground one, so the light-mode-parity convention doesn't apply (design decision D-imp-7, `docs/specs/changes/profile-simulation/design.md`) |
 | Grey | `--ac-grey-100` … `-900` | Neutrals, borders, body text |
 | Red | `--ac-red-1` | Errors, destructive actions |
 | White | `--ac-white-1`, `--ac-white-2` | Surfaces |
@@ -411,7 +415,7 @@ The Admin panel and any inline HTML responses follow a small token set. **This b
 
 ### 7.3 Shared status tokens (cross-cutting)
 
-Display-only labels; exact values come from the `result_status` table. **Both STAR and Admin should pull human labels from `/api/v1/results/status` rather than hardcode them.**
+Display-only labels; exact values come from the `result_status` table. **Both STAR and Admin should pull human labels from `/api/results/status` rather than hardcode them.**
 
 | Token | Meaning |
 |---|---|
@@ -429,10 +433,10 @@ Display-only labels; exact values come from the `result_status` table. **Both ST
 
 All shared, reusable components live under `client/research-indicators/src/app/shared/`. Reach for them before building new ones.
 
-- **Shell & navigation:** `alliance-navbar`, `alliance-sidebar`, `section-header`, `result-sidebar`, `section-sidebar`, `form-header`, `navigation-buttons`
+- **Shell & navigation:** `alliance-navbar`, `alliance-sidebar`, `section-header`, `result-sidebar`, `section-sidebar`, `form-header`, `navigation-buttons`, `simulation-banner` (`SimulationBannerComponent` — 44 px status bar hosted inside `alliance-navbar`, above `#navbar`, visible platform-wide while a SYSTEM_ADMIN is simulating another profile; `docs/specs/changes/profile-simulation/design.md` §6)
 - **Data display:** `results-table`, `project-results-table`, `project-item`, `partner-selected-item`, `notification-item`, `custom-tag`, `custom-progress-bar`, `metadata-panel`, `alert-tag`
 - **Forms & input:** `dropdowns`, `dropdown`, `custom-fields`, `search-export-controls`, `shared-result-form`, `quantification-item` (`shared/components/quantification-item/` — **moved here 2026-08-21** from `pages/platform/pages/result/pages/oicr-details/components/quantification-item/`; two result-detail pages now render it, OICR and Innovation Use — see decision record §12.2)
-- **Modals & overlays:** `all-modals` (host), `modal` (wrapper) — all dialogs route through these; never instantiate ad-hoc overlays.
+- **Modals & overlays:** `all-modals` (host), `modal` (wrapper) — all dialogs route through these; never instantiate ad-hoc overlays. `simulate-profile-modal` (`SimulateProfileModalComponent`, registry key `simulateProfile`, opened from the `alliance-navbar` account menu) — two-step "simulate another profile" flow: `user-search-step` (`UserSearchStepComponent` — debounced admin user search) and `confirm-step` (`ConfirmStepComponent` — confirmation + `POST /api/impersonation/start`); `docs/specs/changes/profile-simulation/design.md` §6
 - **System feedback:** `global-alert`, `global-toast`, `alert-tag`
 - **OICR-specific:** `download-oicr-template`, `oicr-header`, `oicr-workflow-status`
 - **Result indicator-6 (Innovation Use) section, `pages/platform/pages/result/pages/innovation-use-details/`:**
@@ -529,7 +533,7 @@ Per-screen note (STAR): dark+light parity is not codified as a hard product cons
 | # | Date | Decision | Rationale |
 |---|---|---|---|
 | D-1 | (legacy) | Uniform `ServerResponseDto` envelope on every HTTP response, including errors. | Predictable client handling; uniform logging via `ResponseInterceptor`. |
-| D-2 | (legacy) | URI versioning (`/api/v1`, `/api/v2`) under a single `/api` prefix. | Clients pin to a version; avoids header negotiation; matches existing controllers. |
+| D-2 | (legacy) | URI versioning (`/api/v1`, `/api/v2`) under a single `/api` prefix. **(superseded — see trd §6.2: versioning is opt-in per handler, no `defaultVersion`; most controllers mount unversioned at `/api/<resource>`, only `bilateral`/`agresso-contract` opt into v1 and one `results` route opts into v2)** | Clients pin to a version; avoids header negotiation; matches existing controllers. |
 | D-3 | (legacy) | TypeORM + MySQL (utf8mb4) as system of record; explicit migrations under `src/db/migrations`. | Strict schema control; rich relations on `Result`. |
 | D-4 | (legacy) | Two auth shapes: ROAR JWT (humans), base64 `client_id/client_secret` (machines) validated against `app_secrets` + `app_secret_host_list`. | First-party partner integrations without minting ROAR identities. |
 | D-5 | (legacy) | OpenSearch shape derived from TypeORM entities via `@OpenSearchProperty`. | One source of truth for entity ↔ search mapping; lower drift. |
@@ -589,6 +593,10 @@ Per-screen note (STAR): dark+light parity is not codified as a hard product cons
   - **Page shape follows `capacity-sharing`'s titled cards, not `innovation-details`'s four-panel accordion** (spec `DD-1`). *Rationale:* the section is one detail group plus three repeatable blocks, not four distinct sub-forms — an accordion would hide three of the four cards behind a click for no structural reason.
   - **Empty-state affordance: exactly one blank Actor card; Organizations and Other quantitative measures are deliberately left empty** (spec `DD-10`). *Rationale:* actors are required, so a blank starter card helps completion; organizations and quantifications are optional, and a blank organization card is exactly the identity-less row whose `400` a prior chunk of this feature added server-side validation to stop.
   - **`Add other actor` / `Add other organization` do not auto-save** (spec `DD-8`). *Rationale (corrected from the spec's own stated reason):* the reference page's `addActor()` calls `ActionsService.saveCurrentSection()`. That call is inert today — `saveCurrentSectionValue` is a signal with **zero production consumers** anywhere in the client, so it PATCHes nothing right now, and the spec's original "guaranteed `400`" framing does not hold as written. The decision is sound regardless: the day any component wires that signal to actually trigger a save, the hazard (PATCHing a row with no `actor_type_id`) goes live retroactively in **every** page that calls `saveCurrentSection()` — and this page is the only one already built immune to it.
+- **2026-08-25 — Profile simulation: client identity swap replaces `dataCache().user`, not a parallel "acting-as" field (D-imp-8, `docs/specs/changes/profile-simulation/design.md` §5/§12).** While a simulation is active, `localStorage['data'].user` **holds the target profile**; the real admin's snapshot lives only in the separate `localStorage['impersonation']` key (`{ session, actor }`). *Rationale:* every existing reader of identity (`RolesService`, `cache.isMyResult`, navbar name/email) already reads `dataCache().user` — swapping that one signal reuses every choke point instead of teaching each reader a second "who is really acting" branch, and keeps `CacheService` hydration consistent across reload/refresh.
+- **2026-08-25 — Profile-simulation calls to the ARI main API are marked, not host-matched (D-imp-12, same spec §2.2/§5).** `ToPromiseService` sets `X-Ari-Auth-Call: 1` on ROAR-bound calls (login/refresh/current-user); `jWtInterceptor` strips that marker and skips the `X-Impersonation-Session` header only on marked requests. *Rationale:* the deployed environment has `mainApiUrl === managementApiUrl`, so a host-string check is not falsifiable — a call marker is the only mechanism that reliably keeps the impersonation header off ROAR traffic.
+- **2026-08-25 — Simulation banner lives inside `alliance-navbar`, and platform top padding is bound to the measured `navbarHeight()` signal instead of a hardcoded constant (D-imp-14, same spec §2.2/§6). Amended 2026-08-27: banner host raised to `z-index: 1001` after a live regression.** `AllianceNavbarComponent` hosts `SimulationBannerComponent` above `#navbar` and observes its own host element with `ResizeObserver`, so `navbarHeight()` = navbar + banner (when present). `platform.component.html` replaces the hardcoded `pt-[88px]`/`pt-[109px]` with `[style.paddingTop.px]="cache.navbarHeight()"`. The banner's host `z-index: 1001` sits above the section-header's `!z-10` (raised post-launch after a live z-index regression — see the T-12 rollout note). *Rationale:* a hardcoded padding constant cannot account for a banner that only exists while simulating; the measured height is the only path proven correct for both states.
+- **2026-08-26 — The simulate-profile modal's title is rendered once, by the shared `app-modal` wrapper, not duplicated in the modal's own content (D-imp-18, same spec §12).** `SimulateProfileModalComponent`'s content carries only the helper `.description` text; "Simulate another profile" is supplied to the wrapper's title slot. *Rationale:* a T-09 review caught the title rendered twice against the mockup; the wrapper already owns title rendering for all 11 modals, so fixing it in the wrapper would touch every modal — fixing it in this one modal's content was the contained change.
 
 ---
 
