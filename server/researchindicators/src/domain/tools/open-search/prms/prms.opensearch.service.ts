@@ -239,7 +239,7 @@ export class PrmsOpenSearchService
         SyncProcessEnum.PRMS_INTEGRATION,
       );
       while (keepGoing) {
-        const centerAcronym = ['ABC', 'ABC RH'];
+        const centerAcronym = ['Bioversity (Alliance)', 'CIAT (Alliance)'];
         let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
         if (!isEmpty(year)) {
           prmsUrl += `&year=${year}`;
