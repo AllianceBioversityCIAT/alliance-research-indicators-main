@@ -214,19 +214,25 @@ describe('UserSearchStepComponent', () => {
     expect(blockedBtn.textContent?.trim()).toBe('Not allowed');
     expect(blockedBtn.getAttribute('aria-disabled')).toBe('true');
 
-    // The [pTooltip] directive must sit on a wrapper SPAN (always hoverable/
+    // The blocked-reason [pTooltip] must sit on a wrapper SPAN (always hoverable/
     // focusable), NOT on the native-disabled button — a disabled control
     // dispatches no mouse events and leaves the tab order, so a tooltip
     // attached directly to it can never be reached by a real user.
-    const tooltipDebugEl = fixture.debugElement.query(By.directive(Tooltip));
+    // NB: rows also carry a [pTooltip] on the (truncated) email span, so the
+    // tree holds several Tooltip directives — target the one whose element
+    // actually wraps the blocked button rather than "the first one".
+    const blockedReasonText = component.blockedReason(blockedRow());
+    const tooltipDebugEl = fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .find((de) => de.nativeElement.contains(blockedBtn));
     expect(tooltipDebugEl).toBeTruthy();
-    expect(tooltipDebugEl.nativeElement.tagName).toBe('SPAN');
-    expect(tooltipDebugEl.nativeElement.contains(blockedBtn)).toBe(true);
+    expect(tooltipDebugEl!.nativeElement.tagName).toBe('SPAN');
+    expect(tooltipDebugEl!.nativeElement.contains(blockedBtn)).toBe(true);
     // `Tooltip` is a directive, not a component — its instance comes from
     // the element injector, not `.componentInstance` (that resolves to the
     // nearest hosted COMPONENT, i.e. this test's own fixture component).
-    const tooltipDirective = tooltipDebugEl.injector.get(Tooltip);
-    expect(tooltipDirective.content).toBe(component.blockedReason(blockedRow()));
+    const tooltipDirective = tooltipDebugEl!.injector.get(Tooltip);
+    expect(tooltipDirective.content).toBe(blockedReasonText);
 
     blockedBtn.click();
     expect(selected).not.toHaveBeenCalled();

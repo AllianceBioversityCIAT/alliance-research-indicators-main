@@ -34,25 +34,35 @@
         </span>
         <div class="flex flex-col overflow-hidden rounded-[8px] border border-[var(--ac-grey-200)]">
           @for (row of results(); track row.sec_user_id) {
+            <!-- The modal content is always narrow (~490px even on a wide
+                 viewport), so this row does NOT switch on a viewport breakpoint:
+                 it is always stacked — [avatar + name] on line 1, role chips wrap
+                 on line 2 — with the action button pinned top-right (absolute) so
+                 three role chips + a long email can never squeeze the name out.
+                 `pr-[96px]` on the identity reserves room for that button. -->
             <div
-              class="flex items-center gap-3 border-b border-[var(--ac-grey-200)] px-[14px] py-[12px] last:border-b-0"
+              class="relative flex flex-col gap-[10px] border-b border-[var(--ac-grey-200)] px-[14px] py-[12px] last:border-b-0"
               [class.abc-grey-100]="!row.simulable"
               [attr.data-testid]="'search-row-' + row.sec_user_id">
-              <div
-                class="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[12px] !font-[space_grotesk] text-[14px] font-[600]"
-                [class]="row.simulable ? 'abc-primary-blue-100 atc-primary-blue-600' : 'abc-grey-200 atc-grey-600'">
-                {{ initials(row) }}
+              <div class="flex min-w-0 items-center gap-3 pr-[96px]">
+                <div
+                  class="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[12px] !font-[space_grotesk] text-[14px] font-[600]"
+                  [class]="row.simulable ? 'abc-primary-blue-100 atc-primary-blue-600' : 'abc-grey-200 atc-grey-600'">
+                  {{ initials(row) }}
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="truncate text-[14px] font-[500]" [class]="row.simulable ? 'atc-primary-blue-600' : 'atc-grey-600'">
+                    {{ row.first_name }} {{ row.last_name }}
+                  </span>
+                  <span class="atc-grey-600 truncate text-[12.5px]" [pTooltip]="row.email" tooltipPosition="bottom">
+                    {{ row.email }} · ID {{ row.sec_user_id }}
+                  </span>
+                </div>
               </div>
-              <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-[14px] font-[500]" [class]="row.simulable ? 'atc-primary-blue-600' : 'atc-grey-600'">
-                  {{ row.first_name }} {{ row.last_name }}
-                </span>
-                <span class="atc-grey-600 text-[12.5px]">{{ row.email }} · ID {{ row.sec_user_id }}</span>
-              </div>
-              <div class="flex gap-[6px]">
+              <div class="flex flex-wrap gap-[6px] pl-[52px]">
                 @for (role of row.roles; track role.role_id) {
                   <span
-                    class="rounded-[10px] px-2 py-[2px] text-[10px] font-[500] uppercase"
+                    class="whitespace-nowrap rounded-[10px] px-2 py-[2px] text-[10px] font-[500] uppercase"
                     [class]="row.simulable ? 'atc-primary-blue-600' : 'atc-red-1'"
                     [style.border]="
                       row.simulable
@@ -66,7 +76,7 @@
               @if (row.simulable) {
                 <button
                   type="button"
-                  class="atc-primary-blue-400 flex cursor-pointer items-center justify-center rounded-[8px] border border-[var(--ac-primary-blue-400)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
+                  class="atc-primary-blue-400 absolute right-[14px] top-[12px] flex shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-[var(--ac-primary-blue-400)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
                   (click)="select(row)"
                   [attr.data-testid]="'search-select-' + row.sec_user_id">
                   Select
@@ -77,7 +87,10 @@
                      events and drop out of the tab order, so the reason would be
                      unreachable by any real user. The wrapper span is always
                      hoverable/focusable, so the tooltip stays reachable. -->
-                <span [pTooltip]="blockedReason(row)" tooltipPosition="top">
+                <span
+                  class="absolute right-[14px] top-[12px] shrink-0"
+                  [pTooltip]="blockedReason(row)"
+                  tooltipPosition="top">
                   <button
                     type="button"
                     class="atc-grey-500 flex cursor-not-allowed items-center justify-center rounded-[8px] border border-[var(--ac-grey-300)] bg-transparent px-[14px] py-[6px] text-[13px] font-[450]"
