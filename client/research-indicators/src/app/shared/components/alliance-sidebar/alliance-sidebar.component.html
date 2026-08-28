@@ -1,7 +1,11 @@
 @let hss = this.cache.hasSmallScreen();
-<div class="sidebar border-r-1 border-[#e8ebed] abc-white-1 p-[15px] {{ hss ? 'p-[19px] pt-[15px] mt-[50px]' : 'p-[24px] pt-[15px] mt-[70px]' }} {{
+<!-- @akili-spec changes/profile-simulation — D-imp-14: the fixed sidebar's top offset
+     tracks the MEASURED navbar height (navbar + simulation banner when active) instead
+     of a hardcoded mt-[70px]/[50px], so the banner does not push the navbar over the
+     sidebar's first items. -->
+<div class="sidebar border-r-1 border-[#e8ebed] abc-white-1 p-[15px] {{ hss ? 'p-[19px] pt-[15px]' : 'p-[24px] pt-[15px]' }} {{
     cache.isSidebarCollapsed() ? 'w-[65px]' : 'w-[250px]'
-  }}" [class.collapsed]="cache.isSidebarCollapsed()">
+  }}" [style.marginTop.px]="cache.navbarHeight()" [class.collapsed]="cache.isSidebarCollapsed()">
   <div class="sidebar-header">
     <div
       class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]">
