@@ -911,16 +911,20 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
   });
 
   // ---------------------------------------------------------------------------------------------
-  // R-MSD-006 AC.3, AC.5 — the character guard is unchanged; the scale-3/4 false positive is
-  // PINNED, not denied (RK-16 / DC-10). Values verified once with `node -e` before writing this
-  // test (see the implementer's report — not re-derived from memory):
-  //   (-9007199254740991).toString()   -> 17 chars
-  //   (-562949953421311).toString()    -> 16 chars
-  //   (-70368744177663).toString()     -> 15 chars
-  //   (-8796093022206.999).toString()  -> "-8796093022206.999" (18 chars)
-  //   (-549755813886.9999).toString()  -> "-549755813886.9999" (18 chars — RK-16's own example)
+  // R-MSD-006 AC.3, AC.5 — the character guard is unchanged; the false positive is PINNED, not
+  // denied (RK-16 / DC-10), and it fires at SCALES 1-4 — only scale 0 is clean, by arithmetic
+  // (its 16-digit bound plus a sign cannot exceed 17 characters). Values verified once with
+  // `node -e` before writing this test (see the implementer's / T-12's report — not re-derived
+  // from memory):
+  //   (-9007199254740991).toString()    -> 17 chars (scale 0 — no warning, ever)
+  //   (-562949953421311).toString()     -> 16 chars (scale 1's largest integer — no warning)
+  //   (-70368744177663).toString()      -> 15 chars (scale 2's largest integer — no warning)
+  //   (-156294995342131.1).toString()   -> "-156294995342131.1" (18 chars, scale 1 in-bound — WARNS)
+  //   (-18796093022206.99).toString()   -> "-18796093022206.99" (18 chars, scale 2 in-bound — WARNS)
+  //   (-8796093022206.999).toString()   -> "-8796093022206.999" (18 chars, scale 3 in-bound — WARNS)
+  //   (-549755813886.9999).toString()   -> "-549755813886.9999" (18 chars, scale 4 — RK-16's own example — WARNS)
   // ---------------------------------------------------------------------------------------------
-  describe('the character guard is unchanged; the scale-3/4 false positive is pinned', () => {
+  describe('the character guard is unchanged; the false positive fires at scales 1-4, only scale 0 is clean (R-MSD-006 AC.3, amended 2026-08-27)', () => {
     type SignedBoundaryCase = { scale: number; max: number; value: number; chars: number };
 
     const noWarningCases: SignedBoundaryCase[] = [
@@ -929,17 +933,24 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
       { scale: 2, max: 70_368_744_177_663, value: -70_368_744_177_663, chars: 15 }
     ];
 
+    // T-12 (measure-number-signed-decimal): scale 1 and scale 2 were UNTESTED at 18 characters —
+    // T-09 pinned only scale 3/4, but the amended AC.3 (requirements.md R-MSD-006) states the
+    // defect fires at every scale except 0. These two rows close that gap; scale 3/4 rows are
+    // T-09's original evidence, unchanged.
     const warningPresentCases: SignedBoundaryCase[] = [
+      { scale: 1, max: 562_949_953_421_311, value: -156294995342131.1, chars: 18 },
+      { scale: 2, max: 70_368_744_177_663, value: -18796093022206.99, chars: 18 },
       { scale: 3, max: 8_796_093_022_207, value: -8796093022206.999, chars: 18 },
       { scale: 4, max: 549_755_813_887, value: -549755813886.9999, chars: 18 } // RK-16's own pinned example
     ];
 
     // Titled on character length, not scale: R-MSD-006 AC.3 was amended after the implementer
     // measured that "an in-bound value at this scale never warns" is FALSE for scales 1-4 (an
-    // 18-character in-bound value at those scales DOES warn — see warningPresentCases). Only
-    // scale 0 is a true scale-wide guarantee, since its 16-digit bound plus a sign cannot exceed
-    // 17 characters. Each title below names the specific character count this row exercises,
-    // asserted in-test against value.toString().length, so it can never generalise past its case.
+    // 18-character in-bound value at those scales DOES warn — see warningPresentCases, which now
+    // covers all four). Only scale 0 is a true scale-wide guarantee, since its 16-digit bound plus
+    // a sign cannot exceed 17 characters. Each title below names the specific character count this
+    // row exercises, asserted in-test against value.toString().length, so it can never generalise
+    // past its case.
     it.each(noWarningCases)(
       'scale $scale — a $chars-character in-bound value stays under the 18-character guard',
       fakeAsync(({ max, value, chars }: SignedBoundaryCase) => {
@@ -956,7 +967,7 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
     );
 
     it.each(warningPresentCases)(
-      'scale $scale — the known 18-character signed value at the bound DOES render "Maximum reached" (pinned, not fixed)',
+      'scale $scale — the known 18-character in-bound signed value DOES render "Maximum reached" (pinned, not fixed)',
       fakeAsync(({ max, value }: SignedBoundaryCase) => {
         expect(value.toString().length).toBe(18); // the guard's exact, unchanged threshold
         utilsService.getNestedProperty.mockReturnValue(value);

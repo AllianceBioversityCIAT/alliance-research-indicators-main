@@ -64,7 +64,7 @@ The field is capped at **non-negative integers**, and each tier enforces that in
 
 **Why the UI clamp is not simply a default to change.** `app-input`'s `@Input() min = 0` (`input.component.ts:35`) is the default for **every** number input in the app — the five actor counts, `organization_count`, and the pool-funding SP block all rely on it. The fix must be a **per-call-site input**, never a change to that default.
 
-**Requirement of record.** `R-IUP-008 — "Counts accept non-negative integers only"` (archived `requirements.md:450-478`) binds `quantification_number` in the *same clause* as the seven person-count fields. This change splits that clause; it does not delete it.
+**Requirement of record.** `R-IUP-008 — "Counts accept non-negative integers only"` (archived `requirements.md:450-480` ⚠️ *range corrected by `T-12`, was `:450-478`*) binds `quantification_number` in the *same clause* as the **six** person-count fields ⚠️ *(corrected by `T-12`/`S-10` — this previously said "seven," the same double-count `J-05`/`DD-8` flagged: the DTO carries seven `@Min(0)` total, one of which is `quantification_number` itself, leaving six siblings)*. This change splits that clause; it does not delete it.
 
 ---
 
@@ -157,7 +157,7 @@ The field is capped at **non-negative integers**, and each tier enforces that in
 
 ### MODIFIED Requirements
 
-- **`R-IUP-008` is split.** Its title and clause currently read *"Counts accept non-negative integers only"* covering the four disaggregated counts, `actors_count`, `organization_count` **and** `quantification_number` in one sentence. After this change it governs the **seven count fields only**; the measure Number is governed by the new requirement above. `AC.1`–`AC.5` and the paste scenario must be re-scoped, not merely re-worded — **including the "Named blind spot" note**, which cites the server's `@IsInt()` + `@Min(0)` as the authority the client mirrors.
+- **`R-IUP-008` is split.** Its title and clause currently read *"Counts accept non-negative integers only"* covering the four disaggregated counts, `actors_count`, `organization_count` **and** `quantification_number` in one sentence. After this change it governs the **six count fields only** ⚠️ *(corrected 2026-08-27 by `T-12`/`S-10` — this previously read "seven," which double-counted `quantification_number` itself; the DTO carries seven `@Min(0)` decorators total, one of which is the field being carved out, leaving six siblings — `J-05`, `DD-8`, `requirements.md:266`)*; the measure Number is governed by the new requirement above. `AC.1`–`AC.5` and the paste scenario must be re-scoped, not merely re-worded — **including the "Named blind spot" note**, which cites the server's `@IsInt()` + `@Min(0)` as the authority the client mirrors.
 - **Server validation** for `quantification_number`: integer-and-non-negative → bounded-decimal, unsigned constraint removed.
 - **Storage type** for `result_quantifications.quantification_number`: `bigint NULL` → `DECIMAL(p,s) NULL`.
 - **Placeholder copy**: "Enter a positive number" → truthful copy.
@@ -224,7 +224,7 @@ It is the smallest path that leaves **one** field with **one** meaning in **one*
 | **OQ-1** | The argument says *"innovation **dev** detail"*, but the screenshot's *OTHER QUANTITATIVE MEASURES* / *MEASURE # 1* pair renders **only** on `innovation-use-details` (`innovation-use-details.component.html:194,201`); `innovation-details` (Innovation Dev) has no such block. **Confirm the page.** | Product owner | the whole spec's target | Read as **Innovation Use details**, per the rendered evidence |
 | **OQ-2** | **How many decimal places** may a measure carry? | Product owner | `(p,s)`, the DTO's `maxDecimalPlaces`, the UI's `maxFractionDigits` | **Enforce 2** in UI + DTO; **store scale 4**, so widening later needs no second migration |
 | **OQ-3** | Does this extend to OICR's *Actual count* / *Extrapolated estimates* (same component, same column)? | Product owner | scope size, `RK-5`'s weight | **No** (`NG-1`). Reopen as its own change if wanted |
-| **OQ-4** | Do the seven **count** fields stay non-negative integers? | Product owner | `R-IUP-008`'s surviving scope | **Yes** (`NG-2`) |
+| **OQ-4** | Do the **six** surviving count fields stay non-negative integers? *(⚠️ corrected by `T-12` rework attempt 2 — was "seven," a third instance of the same miscount already fixed at `:67` and `:160`; the `:10-22` banner supersedes this table but the cell itself should not stay wrong)* | Product owner | `R-IUP-008`'s surviving scope | **Yes** (`NG-2`) |
 | **OQ-5** | Spec placement: this `changes/` folder, or a **fourth child** of the `innovation-use` family? | You | folder location only | **`changes/`.** The blast radius is platform-shared (a shared card, a shared column, the OICR page), which sits outside the family's *"Innovation Use result category"* scope; and the family's child list is a **closed set** — a child would need a manifest row approved *before* the folder existed. Record `FR-12` in the manifest instead |
 | **OQ-6** | Target branch — continue on `AC-1679-…`, or branch from `main`? | You | execution setup | Confirm at the specify gate; `RK-6` |
 | **OQ-7** | Is there a **floor** at all (e.g. a business minimum), or is any value in range valid? | Product owner | the UI's `min` | No business floor; bound only by the column and `RK-7` |

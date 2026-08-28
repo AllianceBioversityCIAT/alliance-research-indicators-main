@@ -543,6 +543,22 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
     // Human-readable sentinel check, kept alongside the SELECT *
     // comparison above (task instruction) — the exact values a reader
     // can eyeball without decoding the map keys.
+    //
+    // ⚠️ T-12 (measure-number-signed-decimal): DO NOT delete these two
+    // assertions as "already covered by the SELECT * / toEqual comparison
+    // above." They are not redundant — they are this file's ONLY defence
+    // against a stale schema. `toEqual` compares source-side and
+    // snapshot-side rows to EACH OTHER, never to an expected literal: on
+    // a pre-migration `bigint` column (or a scratch schema not rebuilt
+    // from `baseline.sql`) MySQL rounds `-12.75` to `-13` on the way in,
+    // both the source row and its `SP_versioning` copy hold `-13`, and
+    // `toEqual` stays green — it cannot see a `bigint` column at all,
+    // because both sides agree. Only the two `.toBe(-12.75)` /
+    // `.toBe(549755813887)` assertions below compare against the actual
+    // decimal literals this test seeded, so they are the sole tripwire
+    // that reddens on a stale (`bigint`) schema. This is the same
+    // integer-blindness `T-07`'s review found in the sibling OICR fixture
+    // before its `information_schema` guard was added.
     expect(
       Number((copiedActive1 as Record<string, unknown>).quantification_number),
     ).toBe(-12.75);

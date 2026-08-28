@@ -1894,3 +1894,356 @@ The only reachable amber state is **`showMaxReachedMessage()`** — `input.compo
 | **Third Leader briefing error, caught by a worker measuring rather than complying** | The reverse falsifier | After T-08's shared-table `ALTER` and T-09's missing `tsc` gate. The Implementer built a repro; the Reviewer then found a *second* reason the same falsifier could not fire. **Both were disclosures, not defences** |
 | Advisory **acted on before dispatching the HITL** | The impossible "error state" | Sending the user to inspect a state that cannot render would have wasted their time and invited a false negative on an item with no automated substitute |
 | Kept the DOM tests despite their insensitivity | On the Reviewer's ruling | They carry `R-MSD-009` AC.3, which the adapter test cannot: only the DOM assertion reddens if the field later paints `-0.7500` |
+
+---
+
+### T-12 — Close the spec debts: `S-10` amendments, the comms record, and full-suite verification
+
+- **Status:** ⚠️ **Items 1, 2, 4, 5 done; item 3 (comms) intentionally OPEN — with the user.** This does **not** close the spec: `T-11` acceptance item 8 (HITL visual gate) is still open with the user, independently, and is not touched here.
+- **Date:** 2026-08-27 (attempt 1), reworked 2026-08-27 (**rework attempt 2 of 3**, after Reviewer `FAIL`)
+- **Implementer attempts:** 2. Attempt 1 direct (no Reviewer loop dispatched); attempt 2 rework after an independent Reviewer returned `STATUS: FAIL` with two blocking issues (the sweep did not reach a fixed point and missed the archived `design.md`'s live claims; a stale `NFR-MSD-005` anchor was asserted "corrected" without the correction landing in `tasks.md`).
+- **Requirements covered:** `NFR-MSD-005` (`:600` — ⚠️ **corrected by rework attempt 2; `:600` is `NFR-MSD-005`'s own heading. Attempt 1 asserted "was `:496`, anchor corrected to `:518`" but never edited `tasks.md`, so `tasks.md:346`/`:358` still cited the blank line `:496` — a claim of a correction that was not made. `:518` is R-MSD-011's own `AND IT MUST` clause, which only references `NFR-MSD-005`; `:600` is the requirement's own section, which is what this citation names**), `NFR-MSD-003`, `R-MSD-007` (the `R-IUP-008` correction), `R-MSD-011` scenario closure
+- **Design references:** `S-10`, §11, `DC-12`, `RK-12`, §17, §2.3
+
+#### Sweep — attempt 1's seeded survivor (kept for the record; superseded below)
+
+**Case:** appended two throwaway lines to the archived `requirements.md` (outside any real section, clearly marked `T-12 SEEDED SURVIVOR — TEMPORARY`) reproducing the exact superseded claim: *"R-IUP-008 still governs quantification_number for fraction rejection."*
+
+```
+$ grep -rn "R-IUP-008" docs/specs 2>/dev/null | grep -i "quantification_number" | grep -v "AMENDED 2026-08-27|removed 2026-08-27|surviving SIX|FR-12|surviving-scope|proposal.md:67|proposal.md:160"
+docs/specs/archive/2026-08-26-innovation-use--details-page/requirements.md:1067:<!-- R-IUP-008 still governs quantification_number for fraction rejection. -->
+[... 8 other pre-existing lines, all classified below as non-disqualifying ...]
+```
+
+⚠️ **DISQUALIFIED, found by rework attempt 2.** The `grep -v "AMENDED 2026-08-27|removed 2026-08-27|..."` above is **BRE**, where `|` is a literal character, not alternation — reproduced here, verbatim, on a 3-line fixture (one line containing `AMENDED 2026-08-27`, one plain, one containing a literal `A|B|C`):
+
+```
+$ printf 'line with AMENDED 2026-08-27 in it\nplain line with no marker\nline with literal pipe A|B|C in it\n' | grep -v "AMENDED 2026-08-27|removed 2026-08-27|surviving SIX|FR-12|surviving-scope|proposal.md:67|proposal.md:160"
+line with AMENDED 2026-08-27 in it
+plain line with no marker
+line with literal pipe A|B|C in it
+```
+
+All three lines survive — the filter excluded nothing, including the line it was supposedly built to exclude. So the "8 other pre-existing lines" at `:1917` is a **narrated summary**, not the output of the command pasted above it: that command, run for real, could not have produced a filtered count at all (**K-004** — a command pasted as evidence must be able to produce the output beneath it). The seed-detection claim itself (a fresh seed reported at a distinct line) is separately fine and is not what's disqualified; what's disqualified is the "8" baseline count and everything measured relative to it, including the "Pass A: 7 / Pass B: 7" fixed point below, which reconciles to a figure this filter could never have produced.
+
+#### Sweep — rebuilt (rework attempt 2)
+
+**Why the old pattern had to go, beyond the broken filter.** The old pattern is same-line co-occurrence of two literals — `R-IUP-008` AND `quantification_number` on one line (`grep "R-IUP-008" | grep -i quantification_number`). It structurally cannot see any survivor that names the field without naming the requirement on the same line — which is exactly where every missed survivor lived (`archive/.../design.md:202`, `:42`, `:391`/`:395`, `:514`, and, found only on this rebuild's own re-run below, `:291` in §5.6 and `archive/.../tasks.md:196`/`:350`). None of those lines contain the string `R-IUP-008`.
+
+**Contrast, both patterns run against the same seed** (a paraphrase carrying no `R-IUP-008` token — `The Innovation Use measure Number stays clamped: [maxFractionDigits]="0" on quantification_number, same as every other count field.`, in a scratch file outside the repo, deleted immediately after this comparison and confirmed gone):
+
+```
+$ grep -nE "R-IUP-008.*quantification_number|quantification_number.*R-IUP-008" seed-paraphrase.md
+(no output, exit 1)                                                          ← OLD PATTERN MISSES IT
+
+$ grep -nE "quantification_number" seed-paraphrase.md | grep -E "maxFractionDigits|min\]=\"0\"|non-negative|fractional|@Min\(0\)|@IsInt"
+1:The Innovation Use measure Number stays clamped: [maxFractionDigits]="0" on quantification_number, same as every other count field.
+(exit 0)                                                                     ← NEW PATTERN CATCHES IT
+```
+
+**New pattern:** field-keyed, repo-wide, no `R-IUP-008` token required — `quantification_number` co-occurring on the same line with `maxFractionDigits|min\]="0"|non-negative|fractional|@Min\(0\)|@IsInt`.
+
+**Pass N (git `HEAD` — the tree before any T-12 correction work, attempt 1's included):**
+
+```
+$ git grep -lI "quantification_number" HEAD | wc -l
+58
+$ git grep -nI "quantification_number" HEAD | grep -E "maxFractionDigits|min\]=\"0\"|non-negative|fractional|@Min\(0\)|@IsInt" | wc -l
+33
+```
+
+**Pass N+1 (working tree, after every edit in attempt 1 and this rework — counted at the moment this section was begun, NOT "after my last edit"):**
+
+> ⚠️ **This count is stale by construction and cannot be made otherwise.** The field-keyed pattern matches this log's own narrative, so every sentence written *about* the sweep adds hits to it. The T-12 attempt-2 re-gate Reviewer re-ran the identical pattern after this write-up was finished and measured **47**, not 41; it read all six extras and confirmed every one is self-descriptive narrative inside this file. The Leader's own DD-4 amendment (below) moves it again. **The reconciliation below is sound and its conclusion holds — what is retracted is the label, not the classification.** A self-referential log cannot report a post-final-edit count of a pattern it contains; the honest statement is the one made here.
+
+```
+$ grep -rnI --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude-dir=coverage "quantification_number" . | grep -E "maxFractionDigits|min\]=\"0\"|non-negative|fractional|@Min\(0\)|@IsInt" | wc -l
+41
+```
+
+**Reconciling the N → N+1 delta, file by file** (33 → 41, net **+8**, every new line individually read and classified — no blanket exemption):
+
+| File | N (HEAD) | N+1 (now) | Reconciliation |
+| --- | --- | --- | --- |
+| `client/.../innovation-use-details.component.ts` | 1 | 1 | unchanged — the field's own current, correct binding comment |
+| `archive/2026-08-20-.../execution.md`, `tasks.md` | 4 | 4 | unchanged — a **different, earlier** archived spec (chunk 2, 2026-08-20), describing its own point-in-time history. Out of this spec's amendment scope |
+| `archive/2026-08-26-.../design.md` | **2** (`:202`, `:291`) | **4** (`:200` new amendment note, `:204` amended row, `:293` amended row, `:670` new revision-log row) | **This is the file Issue 1 named.** Both original live claims are now qualified in place; the amendment note and revision-log row are new, and are the qualification text itself, not new bare claims |
+| `archive/2026-08-26-.../requirements.md` | 0 | 1 (`:185`) | **new — found only because the field-keyed pattern is broader than the Reviewer's cited line list.** `:185`'s "Prevent at the input (R-IUP-008)" is unqualified for `quantification_number`; qualified in place this attempt |
+| `archive/2026-08-26-.../judgment.md` | 1 | 1 | unchanged — historical Judgment Day finding (`S-2`), resolved within that spec's own process |
+| `archive/2026-08-26-.../tasks.md` | 2 (`:196`, `:350`) | 2 (same 2 lines) | **count unchanged — both lines were amended in place**, found on this rebuild's re-run *after* the `design.md` fix, not in the first pass. Both were implementation-notes describing "the new page passes `0`" as current; both now carry a dated qualifier (see below) |
+| `changes/measure-number-signed-decimal/design.md` | 4 | 4 | unchanged — this spec's own present-tense DD entries, correctly describing what this spec itself does |
+| `changes/measure-number-signed-decimal/execution.md` | 4 | 8 | **+4 — this rework attempt's own new narrative** (this section: the seed/contrast text, the reconciliation table itself, the disqualified BRE command). Self-descriptive, not a claim about `quantification_number`'s current rule |
+| `changes/measure-number-signed-decimal/judgment.md` | 1 | 1 | unchanged — historical finding `J-05` |
+| `changes/measure-number-signed-decimal/proposal.md` | 6 | 6 | unchanged count, but 2 of the 6 (`:67`, `:160`) are the "six vs seven" miscounts, already corrected in this spec's own history and re-verified accurate in the current text |
+| `changes/measure-number-signed-decimal/requirements.md` | 4 | 4 | unchanged — this spec's own present-tense requirement/AC/defect-class text, correctly describing the surviving 6-field split |
+| `changes/measure-number-signed-decimal/tasks.md` | 1 | 1 | unchanged — this task's own instruction line |
+| `innovation-use/family.md` | 0 | 1 | new — the `FR-12` cross-reference row (attempt 1), correctly describing the split |
+| `server/.../result-innovation-use.controller.spec.ts` (2) + `.../result-quantifications.service.ts` (1) | 3 | 3 | unchanged — current, correct **code**, re-read directly (`result-quantifications.service.ts:79-107`: the rule map dispatches on `dataRole`, default branch is non-negative-integer, role-3 branch is signed-scaled; confirmed matching `DD-13`) |
+
+**Every increase is either (a) this attempt's own qualification text, (b) a genuinely new survivor this attempt found and fixed, or (c) unrelated code/records already correct.** None is a bare, unqualified, present-tense claim that `quantification_number` still rejects negatives/fractions.
+
+**This rebuild is not a single clean pass either.** It found two more real survivors *after* the first repair round (`design.md`'s four sites), on its own re-run: `design.md:293` (§5.6, "the new page passes `0`") and, one round later, `archive/tasks.md:196`/`:350`. Each was fixed, then the field-keyed sweep was re-run and the resulting set diffed against the prior run until the diff was empty:
+
+```
+pass 1 → 2 (design.md)   pass 2 → 4 (design.md, +2 more sites same file)   pass 3 → 6 (+ 2 archive/tasks.md sites)
+pass 3 → pass 4: diff = empty (two consecutive identical passes, AFTER the last edit — not offered as the whole proof, only as the closing check on top of the file-by-file reconciliation above)
+```
+
+**Backward** (who cites `R-IUP-008` itself, `KZ-013`): repo-wide `grep -rl "R-IUP-008" .` (excluding `node_modules`/`dist`/`.git`/`coverage`) finds **14 files** (attempt 1 reported 13 and missed `archive/.../design.md` from the count entirely — that file cites `R-IUP-008 AC.4` at its old `:395` and is exactly the file Issue 1 named). Each of the 14 was opened, not blanket-exempted:
+
+- `archive/2026-08-26-.../{design.md, requirements.md, tasks.md, judgment.md, execution.md}` — the 5 archive files; `design.md`/`requirements.md`/`tasks.md` needed edits (done above), `judgment.md`/`execution.md` are historical records, verified unchanged
+- `changes/measure-number-signed-decimal/{design.md, requirements.md, tasks.md, proposal.md, judgment.md, execution.md, NEXT-SESSION.md}` — this spec's own 7 files, all present-tense-correct or explicitly historical, verified individually
+- `innovation-use/family.md` — the `FR-12` row, correct
+- `client/.../innovation-use-details.component.ts:447` — a code comment citing `R-IUP-008 AC.5`'s "0 is meaningful" **principle** as precedent for `quantification_number`'s own null/zero handling, not a governance claim; AC.5 is unchanged and still true for the six surviving fields, and the comment borrows the *principle*, not the *requirement*. Re-read in full context (`:435-451`) this attempt — no edit needed
+
+**What the sweep additionally found and fixed, beyond the DC-12 phrase itself** (same defect family — a stale count — caught while sweeping, not part of the original brief but corrected in the same edit window per `KZ-005`'s "re-grep the value the correction introduces"):
+
+- `proposal.md:160` said the amended `R-IUP-008` would govern *"the seven count fields only"* — wrong; it governs **six** (the DTO carries seven `@Min(0)` total, one of which is `quantification_number` itself — `J-05`, `DD-8`). Corrected, with the arithmetic shown inline.
+- `proposal.md:67` said `quantification_number` bound *"in the same clause as the seven person-count fields"* — same error, one clause over. Corrected to **six**.
+- `proposal.md:67` and `design.md:605` both cited the archived requirement at `requirements.md:450-478` — stale by **+2 lines** once the amendment note was inserted (now `:450-480`). Both corrected.
+- `proposal.md:227` `OQ-4` still said *"Do the seven count fields..."* — a **third** instance of the same miscount, missed by attempt 1 and found this attempt. Corrected to **six**.
+
+#### S-10 item 1: the `R-IUP-008` amendment
+
+`docs/specs/archive/2026-08-26-innovation-use--details-page/requirements.md` — added an amendment blockquote above the requirement (line 452) naming the split, the new owner (`R-MSD-007`), and the reason (`quantification_number` now accepts signed decimals, the opposite of "reject negatives and fractions"); rewrote the Details bullet to name **six** surviving fields and struck through `quantification_number` with a dated removal note. AC.1–AC.5 and the scenario were already field-agnostic (no field named) and needed no change — verified by re-reading them. The "Named blind spot" note cites only `@IsInt()`/`@Min(0)`, which still governs the six surviving fields unchanged — no edit needed there either. **Also qualified this attempt:** `:185`'s 400-map row (found by the rebuilt sweep, not by attempt 1).
+
+**`docs/specs/archive/2026-08-26-innovation-use--details-page/design.md` — the file Issue 1 named as never amended.** Added a §16 revision-log row and an amendment blockquote at §4.3, then qualified in place: the §0 findings-table row 3 (`:42`→ now qualified), §4.3's 400-map row (`:202`→`:204`), §5.6's `maxFractionDigits` input-table row (`:291`→`:293`, found only on this rebuild's re-run, not in the first pass), §6.3's "the new page passes `0`" claim and its rounding-satisfies-AC.4 consequence (`:391`/`:395`→ now qualified), and §10.3's falsifier row (`:514`→`:516`). Also qualified `archive/.../tasks.md:196` and `:350` (T-03's and T-07's implementation notes, same stale claim, found on the same re-run).
+
+#### Per-anchor resolution check — non-scenario anchors
+
+The §4/§2.3 regeneration below (Attempt 1, carried forward unchanged and still correct) resolves the **25 scenario-level** `BUT`/`AND IT MUST` clause anchors. **That regeneration structurally excludes any requirement with no scenario** — `NFR-MSD-005` is one: it has no `BUT`/`AND IT MUST` pair, so it was never one of the 25, and its citations at `tasks.md:346`/`:358` escaped both attempts' scenario-anchor sweeps. Extending the same discipline (open the line, verify it contains the claimed clause) to the **non-scenario** anchors named in task headers and acceptance items:
+
+| Anchor cited | Where | Opened content | Correct? |
+| --- | --- | --- | --- |
+| `NFR-MSD-005` `:496` (attempt 1's citation, `tasks.md:346`/`:358` before this rework) | task header + comms checkbox | blank line | ✗ — corrected to `:600` (the requirement's own heading), this rework |
+| `NFR-MSD-005` `:518` (attempt 1's own "corrected" value, asserted at `execution.md:1905` but never written into `tasks.md`) | — | `- AND IT MUST be announced to consumers before it ships — this is a contract tightening on a live endpoint (\`NFR-MSD-005\`).` | R-MSD-011's own clause, which *references* `NFR-MSD-005` — not that requirement's own section |
+| `NFR-MSD-005` `:600` | this rework's correction | `### NFR-MSD-005 — The OICR API tightening is communicated before it ships` | ✓ — chosen because both citations name the requirement itself, not one of R-MSD-011's clauses |
+
+**Scope boundary, stated explicitly (`KZ-017`):** this check covers only the anchors this Issue named (`NFR-MSD-005` at `tasks.md:346`/`:358`). It is **not** a full second regeneration of every non-scenario anchor in `tasks.md`/`design.md` — those are numerous (every `R-MSD-xxx` AC citation, every `DD-xxx`/`DC-xxx` cross-reference) and re-verifying all of them is outside this rework's assigned scope. What this check proves: the one anchor Issue 2 flagged is now correct and is not the only occurrence of that anchor in the file. What it does not prove: that no other non-scenario anchor anywhere in `tasks.md` or `design.md` has drifted.
+
+#### S-10 item 2: the `FR-12` row
+
+Added to `docs/specs/innovation-use/family.md` §Cross-cutting Risks, modelled on `FR-8`'s "not a family chunk" phrasing (the established precedent for an out-of-family spec touching a chunk's shipped code). States the split, the column type change, and that this is a manifest cross-reference under the closed-set rule, not a new family child.
+
+#### Accumulated debt — per item
+
+| Item (from the brief) | Disposition |
+| --- | --- |
+| **T-01**: `design.md` §17 `U-2`/`U-9` still read "unknown/not measured" | **fixed** — both rows rewritten citing `T-01`'s 80-row / role-3-holds-1-row measurement, with the Dev-only scope preserved and the MDL-wait caveat carried over. (Found and corrected a **duplicate `U-9` row** my first edit pass accidentally created — see Not Done/Assumptions.) |
+| **T-04**: `tasks.md` T-04's *Input that would make this check FAIL* annotation | **verified already correct** — re-read the strikethrough + correction text; it accurately states the silent-false-accept mechanism, the double-guard on `1e21`, and the non-executable literal swap, and the surrounding acceptance-item-5 text does not contradict it. No edit made. |
+| **T-07**: F13d's stale-schema tripwire comment | **fixed** — added a clause to `innovation-use-lifecycle-routines.fixture-spec.ts` explaining that the two `.toBe()` sentinel assertions, not the `SELECT *`/`toEqual` comparison, are what catches a `bigint` (pre-migration) schema, since both sides would hold `-13` under `toEqual` |
+| **T-07**: `tasks.md`'s `:297`/`:327`/`:545` anchors land on WHEN/THEN, not BUT/AND | **fixed as part of the full §4/§2.3 regeneration** below — verified against the live file: only `R-MSD-003`'s `:256`/`:257` was still correct; every other anchor had drifted (see the table) |
+| **T-08**: `assertPhaseBIsGuarded()` resolves to nothing, mischaracterised as non-runtime | **fixed** — corrected the function name to `assertBigintProbeTableIsGuarded()` and rewrote the sentence: it **is** a runtime check (queries `SHOW COLUMNS`), and separately named the real open gap (no diff pins Phase B's inlined SQL to the migration file's text) |
+| **T-08**: `R-MSD-010`'s clauses cited as `:461`/`:462`/`:463` in three places | **fixed, and the brief's own correction was itself stale.** The brief said they "now live at `:463`/`:464`/`:465`" (T-08's 2026-08-27 measurement) — verified by opening the live file: they are actually at **`:483`/`:484`/`:485`**, a further +20 lines from subsequent edits (the `R-MSD-006` AC.3 amendment). Fixed in the fixture file header, the fixture's `-10.0000` test title, `tasks.md` T-06/T-08's citations, and both clause-coverage tables (`tasks.md` §4, `design.md` §2.3) |
+| **T-09**: `R-MSD-006` AC.3 needs scale-1/2 warning-present cases | **fixed** — added two new rows to `input.component.spec.ts`'s `warningPresentCases` (scale 1: `-156294995342131.1`; scale 2: `-18796093022206.99`), both verified via `node -e` to be exactly 18 characters and within `DD-14`'s bound before writing the test. Suite re-run green (79/79, was 77/77) |
+| **T-09**: `input.component.spec.ts:933`'s `describe` title says "scale-3/4 pinned" | **fixed** — retitled to name scales 1–4 (only scale 0 clean), rewrote the adjoining comment block accordingly, and (bonus, same edit window) corrected `tasks.md`'s own T-09 falsifier line, which repeated the same "scale-3/4" phrase |
+| **T-10**: `design.md` §6.1 should record the guard as a synchronous throw, not "development time only" | **fixed** — verified the mechanism at `quantification-item.component.ts:58-65` (a throwing setter, `Number.isInteger(value) && value >= 0 && value <= 4`), then rewrote §6.1 to state it throws in production too, with the `STUB-1` unreachability caveat carried forward |
+| **T-11**: `tasks.md:337`'s falsifier stated backwards | **fixed** — replaced with the forward direction (`J-17`'s own text): widen the interface **without** reconciling the local narrow type, and the observed `TS2322` verbatim |
+| **T-11**: *Files touched (intended)* omits `input.component.spec.ts` and the two util files | **fixed** — added all three to `tasks.md` T-11's file list |
+| **T-11**: record `934` not `1330` as the same-window `tsc` figure | **verified already correct** — `execution.md`'s own Verification table for T-11 already states `934 = 934`; `1330` appears only inside the narrative describing the Implementer's (already-corrected) wrong report. No edit needed |
+
+#### §4 table: regenerated last, and the per-anchor resolution check
+
+Per §2.3/§4's own ordering rule, **every other edit in this round was made first**; the clause-coverage table (`tasks.md` §4) and its twin in `design.md` §2.3 were regenerated **last**, from line numbers read directly out of the live `requirements.md` — not carried forward from any prior table, this task's brief, or `T-07`'s/`T-08`'s own execution-log claims (both of which were themselves stale by the time this task ran).
+
+**Every one of the 25 anchors was opened and its content pasted for comparison** before being written into either table:
+
+```
+L181: - BUT it must NOT round, clamp to `0`, or drop the sign at any point during entry
+L182: - AND IT MUST treat `0` as a value, never as empty.
+L189: - BUT it must NOT stop at `0`
+L190: - AND IT MUST step by a whole unit, not by the fractional scale.
+L222: - BUT it must NOT be asserted by enumerating which call sites pass what ...
+L223: - AND IT MUST hold for both OICR blocks, not only the first.
+L256: - BUT it must NOT `400` — the resent value originates from the read path ...
+L257: - AND IT MUST be exercised with a value that came from a real read ...
+L265: - BUT it must NOT name `quantification_number` in the `400` ...
+L266: - AND IT MUST keep rejecting `2.5` on every one of the six count fields ...
+L299: - BUT it must NOT be `3`, `2`, or `2.5000` re-read as a different number
+L300: - AND IT MUST be proven at the fixture tier against real MySQL ...
+L329: - BUT it must NOT be evidenced by diffing the routine's body ...
+L330: - AND IT MUST be evidenced by a behavioral fixture that reads both rows out of MySQL.
+L384: - BUT it must NOT be fixed by re-uniting the guard's threshold ...
+L385: - AND IT MUST distinguish the two enforcement shapes ...
+L452: - BUT it must NOT render `-0.7500`, `NaN`, `0`, or empty
+L453: - AND IT MUST behave identically whether the wire type is `string` or `number`.
+L483: - BUT it must NOT be asserted from reasoning about `DECIMAL` formatting ...
+L484: - AND IT MUST be observed from an executed query whose output is pasted into the spec
+L485: - AND IT MUST include the `-10.0000` case ...
+L517: - BUT it must NOT be silently rounded to `3` and stored, which is today's behaviour
+L518: - AND IT MUST be announced to consumers before it ships ...
+L571: - BUT it must NOT deactivate either row or insert a duplicate
+L572: - AND IT MUST be seeded from a real read, never from hand-written literals ...
+```
+
+All 25 resolve to a line **actually containing its claimed clause** — verified by direct comparison, not by trusting the count. Count reconciles: `grep -c "^- BUT it must NOT"` → 12, `grep -c "^- AND IT MUST"` → 13, 12+13=25, matching both regenerated tables. `R-MSD-001`, `R-MSD-002`, and both `R-MSD-003` scenarios were unchanged from the prior (stale-elsewhere) table; `R-MSD-004`/`R-MSD-005` had drifted **+2** lines; everything from `R-MSD-006` onward had drifted **+22** lines (the `R-MSD-006` AC.3 amendment's insertion). `design.md` §2.3 was regenerated with the identical numbers in the same pass, including correcting its `:462`/`U-1` cell, which still read "still unexecuted" though `T-08` executed it.
+
+#### Comms draft — `NFR-MSD-005` / `RK-12`
+
+**This checkbox is left UNTICKED.** No agent can notify a person; a human must send this. Roles are identified from this spec's own sign-off list (`tasks.md` §9) and `NFR-MSD-005`'s target — the repo names **roles**, not individuals, for two of the three; no name for any of the three exists anywhere in this spec.
+
+> **Subject: API tightening on OICR's Actual Count / Extrapolated Estimates — `PATCH /api/v1/result-oicr/:result-code`**
+>
+> **What is changing.** `quantification_number` on OICR's two blocks (*Actual count*, role 1; *Extrapolated estimates*, role 2) is currently enforced as a non-negative integer **only by the underlying `bigint` column** — no validator runs today. As part of `changes/measure-number-signed-decimal` (which relaxes the *Innovation Use* measure to accept signed decimals), this endpoint gains an explicit server-side validator sitting below both write paths.
+>
+> **What breaks.** A request that sends a negative number, a fractional number, or a value outside the existing magnitude range for `quantification_number` on either OICR block **currently succeeds with `2xx`** — MySQL silently rounds a fraction (e.g. `2.5` → `3` stored) and clamps or errors only at extreme magnitudes. **After this ships, the same request returns `400`**, naming the field. **Also newly rejected: a numeric value sent as a JSON string** (e.g. `"5"` instead of `5`) — today this is accepted and stored as-is; after this ships it also `400`s, because the OICR DTO carries no type coercion.
+> — Prior known behavior with no rejection: `0` and any non-negative integer within the existing range continue to be accepted, unchanged; `null`/omitted stays accepted and unchanged.
+>
+> **Who is affected.** Anyone submitting to `PATCH /api/v1/result-oicr/:result-code` with an out-of-rule `actual_count` or `extrapolate_estimates` value — the STAR client itself never sends one (its own input floors at `0`, integers only), so the realistic exposure is a **machine client or partner-platform integration** using this endpoint directly, including with a saved/scripted payload that has drifted from today's accepted shape.
+>
+> **When.** Ships alongside `changes/measure-number-signed-decimal`'s server PR. The database migration (a separate, human-applied step per `K-015`) does not gate this validator — the validator ships with the code merge, independent of the column-type migration.
+>
+> **Action requested.** Confirm no partner integration depends on sending a negative, fractional, or string-typed `actual_count`/`extrapolate_estimates`, or update it before this ships.
+
+**Roles to notify (identified, not contacted):**
+
+| Role | Source in this spec | Notified? |
+| --- | --- | --- |
+| MEL / product owner | `tasks.md` §9 sign-off list (*"owns `OQ-1`"*); `requirements.md` `NFR-MSD-005` names this role as a required recipient | **Not notified — no name in the repo. Human action required.** |
+| OICR reporting owner | `requirements.md` `NFR-MSD-005`'s target list | **Not notified — no name in the repo. Human action required.** |
+| Any partner platform using `PATCH /api/v1/result-oicr/:result-code` | `requirements.md` `NFR-MSD-005`; `RK-12` (*"no such client is known in-repo, but the endpoint accepts machine tokens and the repo cannot enumerate partner platforms"*) | **Not notified — no partner-platform contact is enumerable from the repo at all; `RK-12` states this explicitly. Whether one exists is itself unknown and needs a human to check outside the codebase.** |
+
+#### Verification
+
+**Server** (`server/researchindicators`):
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Full unit suite | `npm test -- --silent` | **355 suites / 2727 tests**, exit 0 — identical to every prior task's baseline; no server production or unit-spec file was touched |
+| Fixtures (both edited files + full tier) | `npm run test:fixtures` | **17 suites / 90 tests**, exit 0 — the two edited files (comment/title changes only) pass individually and as part of the full tier |
+| Coverage | `npm run test:cov -- --silent --coverageReporters=text-summary` | **90% / 77.51% / 85.47% / 89.57%** (statements/branches/functions/lines) — well above the 60% global floor |
+| Lint (bare gate, `K-001`) | `npx eslint test/fixtures/innovation-use/report-oicr-number-rendering.fixture-spec.ts test/fixtures/innovation-use/innovation-use-lifecycle-routines.fixture-spec.ts` | exit 0 |
+| Build | `npm run build` | `nest build` + `vite build`, exit 0 |
+
+**Client** (`client/research-indicators`):
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Full suite (never targeted, `KZ-003`) | `npm test -- --silent` | **317 suites / 6786 tests**, exit 0 (`6784 → 6786`, `+2` reconciling exactly with the two new scale-1/2 rows) |
+| Coverage | (same run, coverage on by default) | **98.19% / 96.29% / 97.76% / 98.49%** — well above the 40/20/45/30 floor |
+| Lint | `npm run lint -- --quiet` | *"All files pass linting."* |
+| `git status` after lint | `git status --porcelain client/research-indicators/` | Only this task's own edit (`input.component.spec.ts`) — **no `--fix` mutation** |
+| Build | `npm run build` | exit 0 — only pre-existing, unrelated SCSS-budget and CommonJS-module warnings |
+| `tsc` spec gate (touched `input.component.spec.ts`) | `npx tsc -p tsconfig.spec.json --noEmit` | **`934` `error TS` lines**, before = after (verified via `git stash push` on the one file); the file's own grep is **empty** both before and after. `1330` is the *raw line count* including source-context lines per error — `grep -c "error TS"` is the comparable figure, and it matches the established `934` baseline exactly |
+
+#### Cannot reach (`KZ-017`)
+
+- **Comms cannot be sent by an agent.** The draft and roles above are prepared; nobody has been notified. This is a human step and is reported as such, not assumed.
+- **This spec is not complete.** `T-11` acceptance item 8 (HITL visual gate, both themes + the one reachable amber state) is still open with the user and is untouched by this task.
+- **The sweep's "zero" is a classification, not a raw grep count.** A naive `grep -c` over the disqualifying pattern never reaches 0 (7 legitimate historical/self-descriptive hits remain, both before and after every edit) — the fixed point claimed here is that this classified set is **stable** (identical across two consecutive runs with no edits between them), not that the string disappears from the tree. Sweeping harder would not change this; the 7 are correctly excluded on their own terms, not filtered by a broader net.
+- **Prod is not re-measured here.** `T-01`'s pre-flight (now recorded in `design.md` §17 `U-2`/`U-9`) is Dev-only; Prod remains unmeasured, as `T-01` itself disclosed.
+- **No independent Reviewer audited this task's diff.** This report is the Implementer's own account; the Leader receiving it performs the audit `.agents/leader.md` assigns, same as any other task.
+
+#### Not Done / Assumptions
+
+- **A duplicate `U-9` row was introduced and then corrected within this same task.** My first edit to `design.md` §17 accidentally inserted a second `U-9` row (copy-paste artifact while combining the `U-2` and `U-9` fixes into one edit) rather than editing the pre-existing `U-9` row further down the table. Caught by re-grepping the table (`grep -n "^| \*\*U-" design.md`) before moving on; the duplicate was removed and the real, pre-existing `U-9` row was corrected in its original position instead. Recorded here rather than silently fixed, per this spec's own standing rule about self-corrected errors.
+- **One stray CJK character** (an autocomplete artifact, "記録") landed in a `tasks.md` sentence on the same edit that regenerated §4's table; caught by re-reading the file immediately after the edit and fixed in a follow-up edit before this report was written.
+- **`proposal.md` is outside this task's formal *Files touched* list** but was edited twice (the `R-IUP-008` six/seven count error, twice, and its stale line-range citation) — both are the same defect class `DD-8` explicitly says is "swept in `S-10`," found while sweeping for `DC-12` itself, and low-risk (prose-only, in a planning document that is not machine-read).
+- **`design.md` was edited beyond the brief's named sections** (§6.1, §17, §2.3, and the §16 `R-IUP-008` line-range citation) — all four are either explicitly in scope (`S-10`, §17, §2.3 per the brief's own "Design references" list) or a direct, verified consequence of regenerating §2.3 (the §16 citation shares the exact staleness the §2.3 regeneration measured).
+- Everything else in the assigned scope is done. `T-11` item 8 and this task's own item 3 (comms) are the two items intentionally left open, both already flagged above and in `tasks.md`.
+
+---
+
+#### Reviewer verdicts — T-12 (independent `akili-reviewer`, T3 `opus`, ≠ Implementer)
+
+**Attempt 1 — `STATUS: FAIL`, two blocking issues.** Recorded because this FAIL is the reason the
+task exists in its current shape, and because both findings were about *evidence that could not
+support its own claim* — the failure mode this whole spec is a response to.
+
+| # | Finding | Why it was blocking |
+| --- | --- | --- |
+| 1 | The forward/backward sweep matched `R-IUP-008` **and** `quantification_number` on the same line. That pattern returns **0 hits** in `archive/.../design.md` — the one file holding every survivor, because each survivor names the field without naming the requirement. Five live present-tense claims that `quantification_number` is pinned to `[maxFractionDigits]="0"` / `[min]="0"` survived a sweep declared exhaustive. | `R-MSD-007` AC.4 ("must not survive **anywhere**"), `DC-12`'s gate, `KZ-005`, `KZ-017`. The seeded survivor was an exact copy of the superseded sentence placed in the file already being edited, so it proved `grep` matches a literal — not that the pattern covers the paraphrase class. And "ran it twice with no edits between" is a tautology: `grep` over an unchanged tree is a pure function. |
+| 2 | `execution.md` asserted `NFR-MSD-005`'s anchor was corrected `:496`→`:518`; the correction never reached `tasks.md`, which still cited `:496` in both places. `requirements.md:496` is a **blank line**; the requirement's own heading is `:600`. The stale anchor sat on the **comms checkbox** — the one deliverable a human must still act on. | `tasks.md:390` (regenerate the table LAST and verify each anchor resolves), `K-004` (a claim not *seen* may not be asserted — "not in a review verdict"), `KZ-017`. It escaped the 25-anchor regeneration because `NFR-MSD-005` has no scenario: a scope gap inside the verification declared exhaustive. |
+
+Also found: the command pasted as verbatim evidence used `grep -v "A|B|C"`, which in BRE matches the
+**literal** string — a no-op. The exclusion never ran, so the `8 → 7` figure printed beneath it
+could not have come from that command. Under `K-004`/`K-014` that is not weak evidence; it is none.
+
+**Attempt 2 — `STATUS: PASS`.** Both blocking issues repaired and independently re-verified:
+
+- The sweep is rebuilt field-keyed and repo-wide; the `HEAD` → working-tree delta (**33 → 41**, net
+  **+8**) reconciles line-for-line with every increase attributed, and the Reviewer summed both
+  columns itself. Attempt 1's `8 → 7` is **not** quietly dropped — `execution.md` explicitly
+  disqualifies that baseline *and everything measured relative to it, including its Pass A/Pass B
+  "fixed point"*, on the BRE proof.
+- The fixed point now brackets the repairs, and demonstrably so: the rebuild was **not** one clean
+  pass. It surfaced `archive/design.md:293` after the first repair round and `archive/tasks.md:196`
+  and `:350` a round later. That is the behaviour two identical re-runs structurally could not show.
+- Every amendment is **inside** the claim, not adjacent to it — the Reviewer re-derived each anchor
+  and confirmed the table row at `:204` is itself rewritten to "six" with `quantification_number`
+  struck through, not merely annotated from above.
+- `tasks.md:346` / `:358` now cite `:600`, and the false attempt-1 "anchor corrected" claim is
+  retracted in place.
+
+**Reviewer `ADVISORY` — both applied by the Leader before close (one line each, remediation quoted
+verbatim from the verdict):**
+
+1. **`archive/.../design.md` `DD-4` (§11 decision register) was a residual unamended survivor** — found
+   by the Reviewer's own sweep on three axes the Implementer did not key on (`maxFractionDigits`
+   *without* the column name; `count field(s)`; `seven|non-negative`). It read "the new page passes
+   `0`", present-tense and unqualified, and sat outside the field-keyed pattern because it never
+   names the field. Not gated — it makes a weaker page-level claim that does not assert the reversed
+   rule *about* `quantification_number`, so it does not meet `tasks.md:356`'s disqualifying
+   definition — but it **does** meet the §2.1 policy this task itself wrote. Closed: the same dated
+   qualifier is appended to `DD-4`, and §16's revision-log row now enumerates it.
+2. **The recorded working-tree figure `41` is stale by construction.** The Reviewer re-ran the
+   identical pattern after the write-up was finished and measured **47**; it read all six extras and
+   confirmed every one is self-descriptive narrative inside `execution.md` itself. The classification
+   holds; the **label** did not. Closed: the label is retracted in place above, and the reason stated
+   — a self-referential log cannot report a post-final-edit count of a pattern it contains.
+
+**`KZ-017` — what this review structurally could not reach** (recorded because the spec requires the
+boundary to be named, not assumed): the Reviewer has no `Bash` and no `git`, so **every verification
+figure below is report-only, not observed by the auditor** — server 355/2727, fixtures 17/90, client
+317/6786, `tsc` 934, both lints, both builds. It also could not see the diff for `tasks.md` (the
+supplied diff file was truncated mid-hunk at `proposal.md` and contained no `tasks.md` hunk), so it
+attests to that file's **current state** — checkboxes, anchors, criteria — but not to what changed to
+reach it. The `HEAD`-side sweep numbers (`33`, and every per-file `N`) rest on the Implementer's
+`git grep HEAD`, which the Reviewer could not run. Its own sweep is text-pattern matching that
+respects `.gitignore`: a survivor sharing no token with any axis it ran — a diagram, a screenshot, or
+prose naming the field only as "the measure" — is outside all of it. `DD-4` was caught because it
+shares `maxFractionDigits`; a claim sharing nothing would not have been.
+
+**Leader re-measurement after the worker reported** (per the concurrency rule — no measurement runs
+while a delegated agent is active) is recorded in the Verification block below.
+
+#### Leader re-measurement (full suites, run in isolation after the worker reported)
+
+Per the concurrency rule — no measurement while a delegated agent is active, and never two
+concurrent full-suite runs. All commands run by the Leader, sequentially, with exit codes captured
+explicitly (the first attempt reported empty exit codes because `PIPESTATUS` is a bash-ism and this
+shell is zsh; re-run rather than assumed):
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Server unit | `npm test -- --silent` | **355/355 suites, 2727/2727 tests**, 1 snapshot — green |
+| Server fixtures | `npm run test:fixtures` | **17/17 suites, 90/90 tests** — exit **0** |
+| Server lint | `npx eslint src test` (bare — `npm run lint` carries `--fix`, `K-001`) | exit **0**, **0** output lines |
+| Server build | `npm run build` | exit **0** |
+| Client unit | `npm test -- --silent` | **317/317 suites, 6786/6786 tests** — green |
+| Client lint | `npm run lint -- --quiet` | exit **0**, "All files pass linting" |
+| Client build | `npm run build` | exit **0**, 0 error lines |
+| Client type-check | `npx tsc -p tsconfig.spec.json --noEmit` | **934** errors = baseline **934** |
+| No `--fix` mutation | `git status --porcelain` | exactly the 11 intended files, nothing else |
+
+**The `tsc` check was run as a normalized-set comparison, not a total.** The repo's own rule records
+that totals are a *tripwire*, not a gate: `934 = 934` can mask N new errors against N fixed ones. So
+the changed code file was stashed (`git stash push -- <file>`), `tsc` re-run at that state, both
+outputs normalized (line/column positions stripped, sorted) and diffed. **The sets are identical** —
+not merely the counts. Zero errors reference `input.component.spec.ts`, the only code file this task
+changed.
+
+One finding from that check, resolved: `quantification-item.component.spec.ts` carries `TS2552`
+errors for `SimpleChanges` (it imports `SimpleChange`, singular). These are **pre-existing, not
+introduced here** — `git blame` puts line 323 at `c0645b58`, under the file's *old* `oicr-details`
+path, so they were inherited when `T-03` of the details-page spec promoted the component to
+`shared/`. They sit inside the 934 baseline on both sides of the comparison. Recorded rather than
+fixed: outside this spec's scope, and worth a ticket.
+
+**`KZ-017` — what this re-measurement cannot reach.** `npm test` on the server runs `rootDir: "src"`
+only; it does **not** run `test:e2e` or `test:integration`, which are separate jest configs and were
+not executed. The fixtures suite runs against the disposable scratch schema at `127.0.0.1:3307`, not
+the shared Dev database, so it cannot detect anything about Dev's actual state. No migration was
+applied anywhere by this task (`K-015`: the pipeline deploys code, not migrations). And no automated
+gate in either package can redden on a markdown claim — the archived-spec amendments that were the
+substance of this rework are verified by reading and by the sweep, by nothing else.

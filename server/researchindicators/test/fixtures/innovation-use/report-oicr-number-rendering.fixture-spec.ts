@@ -3,7 +3,9 @@ import type { QueryRunner } from 'typeorm';
 
 /**
  * T-08 (`docs/specs/changes/measure-number-signed-decimal`) — `R-MSD-010`
- * (`:461`, `:462`, `:463`), `design.md` `DD-10` (`:510`), §9.1, §9.2, `DD-11`,
+ * (`:483`, `:484`, `:485` — anchor corrected by `T-12`; these line numbers
+ * rot on every `requirements.md` edit, see `tasks.md` §4), `design.md`
+ * `DD-10` (`:510`), §9.1, §9.2, `DD-11`,
  * `DC-7`, `DC-14`, `U-1`, `U-5`, `U-8`. Converts `U-1` (§9.2's expected
  * renders) and `U-5` (the expression's four "Exact / down()-safe /
  * version-portable / type-stable" properties) from **reasoned** to
@@ -130,11 +132,20 @@ import type { QueryRunner } from 'typeorm';
  * migration's text and the deployed view was already established
  * byte-for-byte by `T-06` (its `SHOW CREATE VIEW` diff); Phase A below
  * re-confirms the deployed view itself, live, for the six cases that do
- * not require a `bigint` column. `assertPhaseBIsGuarded()` below is a
- * TSDoc-adjacent, not runtime, fidelity check — deliberately, since a
- * runtime string-diff against MySQL's own re-normalised view text (which
- * lowercases keywords and reformats whitespace) would not compare like for
- * like.
+ * not require a `bigint` column. **Corrected by `T-12` (`FP-50`'s
+ * corollary — an anchor is only an anchor if it resolves):** the function
+ * below is `assertBigintProbeTableIsGuarded()`, not `assertPhaseBIsGuarded()`
+ * (that name resolves to nothing), and it **is** a runtime check — it
+ * queries the probe table's column type via `SHOW COLUMNS` and asserts on
+ * the result, exactly like `assertColumnShape`/`assertViewIsGuarded` above
+ * it. What it does **not** do, and what remains an open gap (a `T-08`
+ * Reviewer finding, not closed here): diff Phase B's inlined SQL against
+ * `1787270000000-normaliseQuantificationNumberInReportOicr.ts:133`'s own
+ * text, so nothing pins the two together if either drifts. Separately, a
+ * runtime string-diff against MySQL's own re-normalised `SHOW CREATE VIEW`
+ * output (which lowercases keywords and reformats whitespace) would not
+ * compare like for like against either source text — that comparison is
+ * intentionally not attempted anywhere in this file.
  *
  * **Force-seeded defensive-branch cases (`2.5000`/`-0.7500`) are NOT a
  * reachable production path — same caveat `T-06` recorded.** `report_oicr`
@@ -342,7 +353,7 @@ describe('report_oicr number rendering — DD-10 executed against real MySQL (T-
       executedCases.push('10.0000');
     });
 
-    it('-10.0000 -> "-10" (CAST branch, negative integer with trailing zeros — R-MSD-010 :463)', async () => {
+    it('-10.0000 -> "-10" (CAST branch, negative integer with trailing zeros — R-MSD-010 :485)', async () => {
       const resultId = await seedResult();
       await seedQuantification(resultId, -10.0);
 

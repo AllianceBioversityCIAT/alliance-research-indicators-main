@@ -193,7 +193,7 @@ graph TD
 
 - `oicr-details.component.html` is **not touched.** The selector `app-quantification-item` is unchanged by the move and OICR passes neither new input, so both defaults preserve its behavior (`judgment.md` → `C-1`, which corrected an earlier claim that two OICR files change).
 - **`fieldsRequired = true` must reproduce OICR's *field-asymmetric* rendering** (`judgment.md` → `S-1`): Number and Unit carry `[isRequired]="true"` **and** `[validateEmpty]="true"`; **Comments** is an `app-textarea` carrying `[isRequired]="true"` and **no `[validateEmpty]`**. Applying both attributes to all three would change OICR's rendered validation at both of §2.3's call sites.
-- `maxFractionDigits` defaults to `undefined`; the new page passes `0`. Without it, `quantification_number` was the one count field in the section with no fraction guard while the server DTO enforces `@IsInt() @Min(0)` (`judgment.md` → `S-2`).
+- `maxFractionDigits` defaults to `undefined`; **the new page passed `0` at the time this task was built.** ⚠️ **AMENDED 2026-08-27 by `docs/specs/changes/measure-number-signed-decimal` (`S-10`, `DC-12`): that call site no longer passes `0` — see `design.md`'s §16 revision log for the current behavior.** Without it, `quantification_number` was the one count field in the section with no fraction guard while the server DTO enforces `@IsInt() @Min(0)` (`judgment.md` → `S-2`).
 - **`QuantificationItemData` (`{number, unit, comments}`) is not changed.** The new page adapts at its own boundary — `{id, quantification_number, unit, description}` ↔ `{number, unit, comments}`, merged by array index so `id` round-trips without the shared component knowing it exists (§5.6).
 
 **Done criteria**
@@ -347,7 +347,7 @@ graph TD
 - **Empty state (DD-10):** push **one** blank actor card. Leave `organizations` and `quantifications` empty — a blank organization card *is* the identity-less row whose `400` chunk 2 added to stop a silent data-destruction path.
 - **Conditional justification (§6.4):** visibility and requiredness are evaluated on the **resolved `level`** — `levels.find(l => l.id === body().innovation_use_level_id)?.level` — never on the id. Lowering the level **hides** the control; the value stays in `body()`.
 - **`Add` does not auto-save** (**DD-8**). The reference page calls `saveCurrentSection()` from `addActor()`; here that PATCHes a row with no `actor_type_id` — a guaranteed `400` on the user's first click of `Add other actor`.
-- Adapt the quantification shape at this boundary: `{id, quantification_number, unit, description}` ↔ `{number, unit, comments}`, merged by array index. Pass `fieldsRequired="false"` and `maxFractionDigits="0"`.
+- Adapt the quantification shape at this boundary: `{id, quantification_number, unit, description}` ↔ `{number, unit, comments}`, merged by array index. **This call site passed** `fieldsRequired="false"` and `maxFractionDigits="0"` **at the time this task was built.** ⚠️ **AMENDED 2026-08-27 by `docs/specs/changes/measure-number-signed-decimal` (`S-10`, `DC-12`): this call site now passes a derived signed `min`/`max` and `[maxFractionDigits]="4"` instead — see `innovation-use-details.component.ts` and that spec's `design.md`.**
 - Nav: Back → `alliance-alignment`, Next → `partners`, **preserving `?version=N`**.
 - Every control and affordance is gated on `SubmissionService.isEditableStatus()`; `isExternalResult()` already forces it false, so a federated record renders read-only with no extra code.
 

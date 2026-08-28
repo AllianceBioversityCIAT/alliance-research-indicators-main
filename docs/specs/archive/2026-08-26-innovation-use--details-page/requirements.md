@@ -182,7 +182,7 @@ Response `data` for both result endpoints:
 
 | Trigger | Client obligation |
 | --- | --- |
-| Negative or fractional count | Prevent at the input (R-IUP-008) |
+| Negative or fractional count | Prevent at the input (R-IUP-008) — ⚠️ **since 2026-08-27, R-IUP-008 governs the six count fields only; `quantification_number` is carved out and now accepts signed decimals. See R-IUP-008's own amendment note below.** |
 | Both count modes populated on one row | Structurally impossible in the UI (R-IUP-007) |
 | Missing `actor_type_id` | Filter blank actor rows before send (R-IUP-013) |
 | ~~Missing justification at effective `level >= 6`~~ — **removed 2026-08-21 by `bugfix/innovation-use-draft-save`.** The server no longer rejects this at save; a blank/whitespace-only justification now saves and the `400` cannot fire on this input | ~~Mirror the rule (R-IUP-006)~~ — nothing to mirror. Completeness stays submit-gated only (see R-IUP-006's Pivot note, §Details) |
@@ -449,13 +449,15 @@ Seeded by migration `1787066437593`. `id = level + 1`; `additional_guidance` **d
 
 ### R-IUP-008 — Counts accept non-negative integers only
 
+> ⚠️ **AMENDED 2026-08-27 by `docs/specs/changes/measure-number-signed-decimal` (`S-10`, `DC-12`).** This requirement's Details bullet originally named **seven** fields in one clause — the four disaggregated counts, `actors_count`, `organization_count`, **and `quantification_number`** — and required all seven to "reject negatives and fractions." That clause is now **split**: `quantification_number` (the Innovation Use measure's Number) is carved OUT, because it now accepts **signed decimals** (scale ≤ 4, magnitude bounded per `DD-14`), the opposite of "reject negatives and fractions." Its governing requirement is now `R-MSD-007` in [`docs/specs/changes/measure-number-signed-decimal/requirements.md`](../../changes/measure-number-signed-decimal/requirements.md) (surviving-scope restatement) and the family requirements around it (`R-MSD-001`…`R-MSD-013`). **`R-IUP-008` below governs the surviving SIX fields only** — the four disaggregated counts, `actors_count`, and `organization_count` — whose behavior is **unchanged**: they still refuse negatives and fractions, at input, at blur, and on paste. The AC's and the scenario below were already field-agnostic and needed no rewording; only the Details bullet and this note change.
+
 - **As a** Result Contributor
 - **I want** the count fields to refuse impossible numbers as I type
 - **So that** I do not discover a `400` after filling the whole section
 
 **Details**
 
-- Behavior: all five count fields (four disaggregated + `actors_count`) and `organization_count` and `quantification_number` reject negatives and fractions. Enforcement is at input, at blur, and on paste — not only at submit.
+- Behavior: the **six** count fields — all five disaggregated-mode fields (four disaggregated + `actors_count`) and `organization_count` — reject negatives and fractions. Enforcement is at input, at blur, and on paste — not only at submit. ~~and `quantification_number`~~ — **removed 2026-08-27**; see the amendment note above. `quantification_number` is no longer governed by this requirement.
 
 **Acceptance criteria**
 
