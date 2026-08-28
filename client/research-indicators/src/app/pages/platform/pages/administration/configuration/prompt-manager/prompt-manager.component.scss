@@ -1,0 +1,34 @@
+:host {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.prompt-manager {
+  box-sizing: border-box;
+}
+
+::ng-deep .prompt-manager-table {
+  table {
+    table-layout: fixed;
+  }
+
+  .p-datatable-thead > tr > th {
+    padding-top: 16px !important;
+    padding-bottom: 16px !important;
+  }
+
+  th,
+  td {
+    box-sizing: border-box;
+    overflow: hidden;
+    vertical-align: middle;
+  }
+
+  th.prompt-manager-actions-col,
+  td.prompt-manager-actions-col {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}

@@ -8,6 +8,7 @@ export type ModalName =
   | 'addContactPerson'
   | 'selectLinkedResults'
   | 'editEnvironmentVariable'
+  | 'editPrompt'
   | 'projectGroundingSetup'
   | 'portfolioManagement'
   // @akili-spec changes/profile-simulation — R-IMP-007, design §2.2/§6
