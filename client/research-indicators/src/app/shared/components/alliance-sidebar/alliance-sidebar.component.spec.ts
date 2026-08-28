@@ -17,6 +17,8 @@ describe('AllianceSidebarComponent', () => {
     const mockCacheService = {
       hasSmallScreen: jest.fn().mockReturnValue(false),
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
+      // D-imp-14: the template binds the sidebar's marginTop to this measured signal.
+      navbarHeight: jest.fn().mockReturnValue(70),
       toggleSidebar: jest.fn()
     } as unknown as CacheService;
     const mockAllModalsService = {
@@ -266,6 +268,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
   let mockCache: {
     hasSmallScreen: jest.Mock;
     isSidebarCollapsed: jest.Mock;
+    navbarHeight: jest.Mock;
     toggleSidebar: jest.Mock;
   };
 
@@ -276,6 +279,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
     mockCache = {
       hasSmallScreen: jest.fn().mockReturnValue(false),
       isSidebarCollapsed: jest.fn().mockReturnValue(true),
+      // D-imp-14: template binds the sidebar marginTop to this measured signal.
+      navbarHeight: jest.fn().mockReturnValue(70),
       toggleSidebar: jest.fn()
     };
     const routerMock = {

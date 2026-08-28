@@ -376,3 +376,13 @@ Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache
 ## Summary — all 13 tasks complete (2026-08-27)
 
 13/13 `[x]` with Reviewer PASS evidence per task. Rework totals: T-01×2, T-03×3, T-04×2, T-05×2, T-08×2, T-09×2, T-10×2, T-12×2, T-13×2 (others first-attempt). Two worker runtime failures (session/weekly limits) recovered by resume/inline fallbacks. Two production incidents during rollout, both root-caused and fixed same-day: the EntitiesModule import drop (`ae38b052`) and the dropdown z-index (`ae9e975d`). Feature verified live on On-Prem Dev, including a real simulation session by a second admin. Constitutional corrections shipped: K-015 (pipeline runs migrations), three-state URI versioning. Ready for `/akili-archive` (kaizen candidates recorded in the incident block).
+
+---
+
+## Post-delivery fix (2026-08-28) — layout offsets under the simulation banner
+
+Two user-reported defects, both traced to the D-imp-14 offset logic, fixed together:
+1. **Results Center filters hidden by the section-header (pre-existing regression from D-imp-14).** The section-header floats `position: fixed` (measured: top 70, height 42, bottom 112), but D-imp-14 set the content `paddingTop` to `navbarHeight()` (71) alone — 41px of the page (indicator chips, tabs, Apply/Clear Filters) sat under the header. Present with OR without the banner. Fix: content `paddingTop = navbarHeight() + headerHeight()` (both measured signals) → first row now starts at the header's bottom.
+2. **Sidebar + section-header not shifted by the banner.** Both used a hardcoded `mt-[70px]/[50px]` that ignores the 44px banner, so the navbar overlapped the sidebar's first items and the header overlapped the filters when simulating. Fix: both bind `[style.marginTop.px]="cache.navbarHeight()"` (navbar host height, which includes the banner when active). `navbarHeight()` measured 71 ≈ the old 70, so the non-simulating layout is unchanged.
+- **Verified in a real browser (Playwright, 1280px), normal AND banner-active states** (banner forced via the `active` signal): normal → content clears header at 113; banner → navbar/sidebar/header all shift to 115, content to 157, nothing overlaps (screenshots taken). 120/120 specs green across the three touched components (three CacheService mocks gained the `navbarHeight`/`headerHeight` signals); `tsc -p tsconfig.app.json` clean.
+- This corrects the original D-imp-14 (which used `navbarHeight()` where it needed `navbarHeight() + headerHeight()`), logged against design §12 D-imp-14 as the 2026-08-28 amendment.

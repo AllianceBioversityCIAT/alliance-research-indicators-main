@@ -8,14 +8,16 @@
   </div>
   <div id="content" class="content">
     <app-section-header></app-section-header>
-    <!-- @akili-spec changes/profile-simulation — D-imp-14: the hardcoded pt-[88px]/[109px] offset is replaced by
-         the MEASURED navbar height (navbar + simulation banner, when active — alliance-navbar.component.ts
-         ngAfterViewInit observes the navbar HOST element). The reversion challenge (design §12 D-imp-14) is that
-         this must stay a measured value, not a re-hardcoded constant, or a taller banner variant silently clips
-         under the navbar again. -->
+    <!-- @akili-spec changes/profile-simulation — D-imp-14 (corrected 2026-08-28): the hardcoded pt-[88px]/[109px]
+         offset is replaced by the MEASURED navbar height PLUS the fixed section-header height. The section-header
+         floats `position: fixed` above this content, so the offset must clear navbar + banner + header — using
+         navbarHeight() alone (the original D-imp-14 value) left the page's first rows (e.g. Results Center filters)
+         hidden under the header. navbarHeight = navbar + simulation banner (measured on the navbar host);
+         headerHeight = the section-header's own height (measured on #section-sidebar). Must stay measured, not
+         re-hardcoded, or a taller banner/header variant clips again. -->
     <div [ngStyle]="{
         paddingLeft: hss ? (cache.isSidebarCollapsed() ? '64px' : '250px') : cache.isSidebarCollapsed() ? '64px' : '250px'
-      }" [style.paddingTop.px]="cache.navbarHeight()">
+      }" [style.paddingTop.px]="cache.navbarHeight() + cache.headerHeight()">
       <router-outlet></router-outlet>
     </div>
   </div>
