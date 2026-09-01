@@ -26,3 +26,4 @@ One-line record of trivial, fast-tracked changes made with `/akili-quick`.
 
 
 
+| 2026-09-01 | quick/actors-youth-definition — add the UN youth age-range (15–24) note and source link to the ACTORS callout in Innovation use details | client/research-indicators/src/app/pages/platform/pages/result/pages/innovation-use-details/innovation-use-details.component.html, innovation-use-details.component.ts | `npx eslint` (0 errors) & `npm test -- --testPathPattern innovation-use-details.component.spec` (144/144 passed) | [SPEC:quick/actors-youth-definition] |

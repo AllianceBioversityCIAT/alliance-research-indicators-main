@@ -51,6 +51,9 @@ const QUANTIFICATION_NUMBER_PLACEHOLDER = 'Enter a number';
 const INNOVATION_USE_CALCULATOR_URL = 'https://www.scalingreadiness.org/calculator-use-headless/';
 const INNOVATION_USE_DEFINITIONS_URL = 'https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view';
 
+/** UN "Youth" global-issues page — the source for the 15-24 age range the ACTORS callout cites. */
+const UN_YOUTH_DEFINITION_URL = 'https://www.un.org/en/global-issues/youth';
+
 /**
  * §6.6 / R-IUP-009 AC.2: CLARISA actor-type value reserved for "OTHER". A client-side literal,
  * not an import — `ClarisaActorTypesEnum.OTHER = 5` exists only in the server tree
@@ -143,6 +146,7 @@ export default class InnovationUseDetailsComponent {
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
   readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
   readonly definitionsUrl = INNOVATION_USE_DEFINITIONS_URL;
+  readonly youthDefinitionUrl = UN_YOUTH_DEFINITION_URL;
 
   /**
    * T-11 (DD-5/DD-14): template-bindable mirrors of the module-level consts above, forwarded to the
