@@ -525,9 +525,20 @@ describe('AgressoContractRepository', () => {
       )?.[0] ?? '') as string;
     const countSql = () => sqlContaining('COUNT(DISTINCT ac.agreement_id)');
     const mainSql = () => sqlContaining('paginated_contracts');
-    // Resolves the carnet lookup so the count/main mocks line up with their queries.
-    const mockCarnetLookup = () =>
-      (repository.query as jest.Mock).mockResolvedValueOnce([]);
+    // The carnet lookup only runs when a user is supplied, so responses are routed
+    // by SQL content rather than by call order.
+    const mockQueryBySql = (responses: {
+      carnet?: unknown[];
+      count?: unknown[];
+      main?: unknown[];
+    }) =>
+      (repository.query as jest.Mock).mockImplementation((sql: string) => {
+        if (sql.includes('alliance_user_staff'))
+          return Promise.resolve(responses.carnet ?? []);
+        if (sql.includes('COUNT(DISTINCT ac.agreement_id)'))
+          return Promise.resolve(responses.count ?? []);
+        return Promise.resolve(responses.main ?? []);
+      });
 
     it('should get contracts with all filters', async () => {
       const filter = {
@@ -667,10 +678,9 @@ describe('AgressoContractRepository', () => {
     });
 
     it('should run count query and set metadata when paginated', async () => {
-      mockCarnetLookup();
-      (repository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '12' }])
-        .mockResolvedValueOnce([
+      mockQueryBySql({
+        count: [{ total: '12' }],
+        main: [
           {
             agreement_id: 'C1',
             indicator_id: 1,
@@ -691,7 +701,8 @@ describe('AgressoContractRepository', () => {
             funding_type: 'x',
             ubwClientDescription: 'CIAT',
           },
-        ]);
+        ],
+      });
 
       const out = await repository.getContracts(
         {},
@@ -701,8 +712,8 @@ describe('AgressoContractRepository', () => {
         { page: 2, limit: 5 },
       );
 
-      expect(repository.query).toHaveBeenCalledTimes(3);
       expect(countSql()).toContain('COUNT(DISTINCT ac.agreement_id)');
+      expect(mainSql()).toContain('paginated_contracts');
       expect(out.metadata).toMatchObject({
         total: 12,
         page: 2,
@@ -788,10 +799,7 @@ describe('AgressoContractRepository', () => {
 
     it('should filter with the effective predicate on both count and main queries when pool-funding is true', async () => {
       // R-BIL-101 AC.1 — mapping-derived contracts are included in the "true" set.
-      mockCarnetLookup();
-      (repository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '1' }])
-        .mockResolvedValueOnce([]);
+      mockQueryBySql({ count: [{ total: '1' }], main: [] });
 
       await repository.getContracts(
         { is_pool_funding_contributor: true } as any,
@@ -819,10 +827,7 @@ describe('AgressoContractRepository', () => {
     it('should filter with the effective predicate on both count and main queries when pool-funding is false', async () => {
       // R-BIL-101 AC.3 — mapping-derived contracts are excluded from the "false" set
       // because the predicate (not the raw column) is what gets compared to 0.
-      mockCarnetLookup();
-      (repository.query as jest.Mock)
-        .mockResolvedValueOnce([{ total: '0' }])
-        .mockResolvedValueOnce([]);
+      mockQueryBySql({ count: [{ total: '0' }], main: [] });
 
       await repository.getContracts(
         { is_pool_funding_contributor: false } as any,

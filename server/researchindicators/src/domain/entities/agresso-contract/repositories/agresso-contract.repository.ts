@@ -419,9 +419,12 @@ export class AgressoContractRepository
                               where su.sec_user_id = ${user?.sec_user_id}
                               limit 1`;
 
-    const userCarnet = await this.query(queryUserCarnet).then(
-      (response) => response[0]?.carnet || null,
-    );
+    let userCarnet = null;
+    if (user?.sec_user_id) {
+      userCarnet = await this.query(queryUserCarnet).then(
+        (response) => response[0]?.carnet || null,
+      );
+    }
 
     const userContracts = (userId?: number) =>
       userId
