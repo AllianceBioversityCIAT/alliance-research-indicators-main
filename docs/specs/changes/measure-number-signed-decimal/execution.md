@@ -2323,3 +2323,34 @@ at:
 `tasks.md:335`'s checkbox therefore stays `[ ]`. It covers the visual gate, and the visual gate has
 not been reported on. The persistence-tier confirmation above is real and is recorded on its own
 terms.
+
+#### `R-MSD-001` AC.7 / `DC-13` / `RK-11` — **DISCHARGED on Dev by the user (2026-09-01)**
+
+The user resaved a result editing **only** the justification, leaving the measure row untouched, and
+**it saved without error**. This is the spec's central defect and it is now closed on real
+infrastructure: `mysql2` returns `DECIMAL` as a **string** where `bigint` returned a number, the page
+resends whatever the previous read produced, and before `DD-2`'s two-way transformer that string hit
+the pipe and produced a `400` on a row the user never edited. The write path (typing a new value) and
+the read-then-write path are different, and it is the second one that broke. Both now pass.
+
+#### The screenshot's `0` — investigated, NOT a defect
+
+The user reported the Number field showing `0` with no amber warning, with a screenshot. Both
+observations are **correct behaviour**, established by reading the code rather than by assurance:
+
+| Question | Finding |
+| --- | --- |
+| Does a new row pre-fill `0`? | **No.** `InnovationUseQuantification.quantification_number` initialises to `undefined` (`get-innovation-use-details.interface.ts:49`) |
+| Does the read adapter coerce `null` to `0`? | **No.** `quantificationsView` (`innovation-use-details.component.ts:310-316`) tests `=== undefined \|\| === null` and maps both to `null`, explicitly "never coerced to `0` (DD-2's null contract)" |
+| Does PrimeNG's `writeValue` turn `null` into `0`? | **No.** `primeng-inputnumber.mjs:1635` is `this.value = value ? Number(value) : value` — `null` is falsy, so it passes through unchanged. (`0` is falsy too, and also passes through as `0`.) |
+| Does `app-input` default a value to `0`? | **No.** `body = signal({ value: null })` (`input.component.ts:46`). The `@Input() min = 0` at `:35` is a **bound**, not a value, and the Innovation Use call site overrides it with a derived signed minimum (T-10/T-11) |
+
+So the `0` is a genuine value — entered, or reached with the spinner from empty — which is precisely
+`R-MSD-005`'s requirement that **`0` is a value, never an absence**. And the amber "Maximum reached"
+is conditional on an **18-character** value string, so `0` cannot trigger it. The placeholder is not
+visible for the same reason a placeholder never is: the field is not empty.
+
+**Still not reported on, and therefore `tasks.md:335` stays `[ ]`:** the placeholder text with the
+field **cleared**; the amber warning triggered deliberately with `-549755813886.9999` (a **pinned**
+false positive, `RK-16` — judged for legibility only); the spinner stepping a whole unit **through**
+`0`; and **dark theme**. The screenshot shows light theme only.
