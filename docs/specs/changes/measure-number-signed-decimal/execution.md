@@ -2354,3 +2354,69 @@ visible for the same reason a placeholder never is: the field is not empty.
 field **cleared**; the amber warning triggered deliberately with `-549755813886.9999` (a **pinned**
 false positive, `RK-16` — judged for legibility only); the spinner stepping a whole unit **through**
 `0`; and **dark theme**. The screenshot shows light theme only.
+
+#### HITL visual gate — **DISCHARGED 2026-09-01**, with dark theme deferred on a measured reason
+
+User-confirmed on Dev, in light theme: the **placeholder appears** with the field cleared, and the
+**amber "Maximum reached" appears** on the 18-character value. Combined with the earlier
+confirmations (values persist, pre-existing data survived, decimals store, negatives store, and
+AC.7's untouched-row resave succeeds), every behavioural item of `NFR-MSD-004` / `DC-11` is now
+observed by a human on real infrastructure.
+
+**The spinner item** (`R-MSD-003` AC.1/AC.2 — steps a **whole unit**, does not stop at `0`) is
+treated as discharged on two grounds rather than a separate observation: the user's confirmation that
+**negatives store** proves the field does not clamp at `0` — which is the substance of the
+requirement — and `step = 1` is PrimeNG's default, asserted directly in the T-10 unit tests. Recorded
+as an inference, not as an observation, so the distinction stays visible.
+
+**Dark theme — NOT verified, and NOT a defect of this spec.** The user reports that light/dark is not
+yet correctly implemented across the app and is being worked on separately, so switching to dark is
+not currently possible. Measured, rather than accepted on description:
+
+| Check | Finding |
+| --- | --- |
+| Is dark mode wired at all? | **Yes.** `app.config.ts:33` sets `darkModeSelector: '.dark-mode'`, and `shared/services/dark-mode.service.ts` exists with a toggle in `alliance-navbar` |
+| Why would *this* card not respond? | **`quantification-item.component.html` uses four hardcoded hex literals** — `#F4F7F9` (card background), `#E8EBED` (border), `#8D9299` (header label), `#CF0808` (remove control). Hardcoded light values cannot respond to a theme selector |
+| Does the project forbid that? | **Yes, explicitly.** Root `CLAUDE.md:145`: *"token utility classes (`.abc-*`, `.atc-*`, `.rs-*`, `.fs-*`) or `var(--ac-*)` — **no hex literals in components**. Light + dark via PrimeNG Aura."* |
+| Did **this** spec introduce them? | **No.** `git log -S "#F4F7F9"` attributes them to `d2f6a15e` — `[SPEC:docs/specs/innovation-use/details-page]` T-03, the commit that promoted the component to `shared/`. This spec edited the same template once (T-10's min/max/placeholder bindings) but added no colour |
+
+So the user's read is correct as a programme statement, and the **local** cause is narrower and
+actionable: this card is theme-blind for a specific, pre-existing, convention-violating reason. The
+app-wide dark-mode work should not have to rediscover it. **Ticketed as `THEME-1`** below rather than
+fixed here — changing four colours to tokens is a visual change to a shared component used by OICR as
+well, which is outside this spec's scope and needs its own before/after review.
+
+`tasks.md:335` is therefore ticked, with the dark-theme sub-item carried forward as `THEME-1`.
+
+#### `THEME-1` (new ticket, 2026-09-01)
+
+`client/.../shared/components/quantification-item/quantification-item.component.html` hardcodes
+`#F4F7F9`, `#E8EBED`, `#8D9299`, `#CF0808`, violating root `CLAUDE.md:145`. The component is shared
+by the Innovation Use details page **and** OICR, so it renders theme-blind on both. Origin
+`d2f6a15e` (details-page spec, T-03). Fix belongs with the app-wide light/dark work: replace with
+token utilities or `var(--ac-*)`, and review both consumers in both themes.
+
+#### Two deferred acceptance items closed (2026-09-01)
+
+Both had been left unticked **on purpose**, each waiting on something specific. Both conditions are
+now met, so they close on evidence rather than on elapsed time:
+
+- **`R-MSD-012` AC.1 — a scale outside `0…4` is rejected, not clamped** (`tasks.md:277`). The
+  condition was: *"`T-10` must re-prove this against the card's real guard, and must NOT cite T-09's
+  green"* — because T-09 had only asserted a **test-side helper**. Verified: the guard lives in the
+  real `@Input` setter, `quantification-item.component.ts:58-64`, and
+  `quantification-item.component.spec.ts:181-203` drives it through
+  `fixture.componentRef.setInput` — Angular's real input path — for `5`, `-1`, `null` and `2.5`,
+  plus the whole `0…4` domain not throwing. `null` is covered explicitly, because `null <= 4`
+  evaluates `true` in JS and a plain range check would have admitted it.
+- **`R-MSD-006` AC.3 — the false positive is PINNED, not denied** (`tasks.md:279`). The condition
+  was that closing it is *"a judgment for the Reviewer that authorized it open, not a
+  self-certification by the task that added the missing evidence."* That judgment arrived: the T-12
+  attempt-2 Reviewer ruled **"AC.3 — discharges fully"**, having re-derived both scale-1/2 bounds by
+  hand and confirmed each test body self-asserts `value.toString().length`. And the user has now
+  **seen the amber warning in the browser on Dev**, so the pinned false positive is confirmed in the
+  product, not only in the suite.
+
+**Remaining open items are all human-owned and none is an implementation gap:** `OQ-1` (product
+owner, gates merge), the comms record (`NFR-MSD-005`), and the four sign-off roles. `THEME-1` is
+carried forward to the app-wide light/dark work.
