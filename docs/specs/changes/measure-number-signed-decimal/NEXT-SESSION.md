@@ -15,6 +15,7 @@ The spec is NOT closed: two items require a human and cannot be done by an agent
 | --- | --- |
 | Phase | `/akili-execute` **COMPLETE** — `T-01`…`T-12` all implemented, each gated by an independent Reviewer (`author ≠ auditor`) |
 | Closure | ⚠️ **NOT closed.** 56 acceptance boxes ticked, 9 open — see below |
+| Dev DB | **Migrations applied 2026-09-01** (user-reported). The HITL visual check is now actually performable — before this it could not pass, since the column was still `bigint` |
 | Last commit | `de1d6b98` on `AC-1679-Create-the-innovation-use-section`. **Not pushed** — the user pushes |
 | Audit trail | `execution.md` (~2,270 lines, append-only). Read the entry for a task, not the whole file |
 | Binding condition | `design.md` is authoritative wherever it and `requirements.md` disagree |
@@ -62,14 +63,47 @@ Tick the box only after it is actually sent.
 
 ---
 
-## Before merging — two things the CI pipeline will NOT do
+## Migrations — APPLIED to the shared Dev database (2026-09-01)
 
-1. **The pipeline deploys code, not migrations** (`K-015`). This spec ships **two**: the
-   `bigint` → `DECIMAL(24,4)` column change and the `report_oicr` view rebuild. Applying them to
-   the shared Dev database is a separate, human-decided step. Check pending state first:
-   `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts`
-   (`migration:show` is **not** an npm script; and its output carries ANSI escapes, so normalize
-   before counting — `K-014`.)
+**Reported by the user on 2026-09-01: both migrations have been applied to the shared Dev
+database.** Not verified by an agent — no read-only confirmation was run at the time of writing, so
+if you need certainty, check before relying on it:
+
+```
+npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts
+```
+
+(`migration:show` is **not** an npm script; its output carries ANSI escapes, so normalize before
+counting — `K-014`. And check the raw output for an error before counting it: a count over a failed
+command is a confident zero.)
+
+**Two consequences of applying them, both live now:**
+
+1. **`BACKUP-1` is now a real object in a shared database.** The first migration creates
+   `result_quantifications_backup_1787260000000` — a **full copy** of `result_quantifications` — and
+   **nothing ever drops it**. That is deliberate (the backout path in `design.md` §11 needs it) but
+   unbounded: it will sit there until someone removes it. Confirmed present in the scratch schema by
+   direct `information_schema` query on 2026-09-01; expect the same on Dev. **Decide explicitly when
+   it goes**, and do not drop it until the change is confirmed good, because dropping it removes the
+   backout path.
+2. **`report_oicr` was recreated.** The second migration rebuilds the view. Recreating a view resets
+   its definer; if anything depended on the previous `SQL SECURITY DEFINER` context, verify it still
+   resolves.
+
+**What remains unmeasured even now:** the `ALTER … ALGORITHM=COPY` has still never been *timed*
+against a populated table, and the fixtures suite runs only against the disposable scratch schema
+(`ari_scratch_test` @ `127.0.0.1:3307`), so no automated test in this repo has ever touched Dev's
+actual data.
+
+---
+
+## Before merging — what the CI pipeline will NOT do
+
+1. **The pipeline deploys code, not migrations** (`K-015`). Dev is done (see the section above),
+   but **Production is not** — a merge to `main` deploys the code and leaves the column as
+   `bigint`, which is the exact shape that produces a `400` on saving an untouched row. The
+   Production migration is its own human-decided step, and it must be sequenced with the deploy,
+   not after it.
 2. **The migration needs strict `sql_mode`** to fail loudly rather than truncate. Dev was measured
    on 2026-08-27 at MySQL **8.0.45**, outside the spec's recorded 8.0.4–8.0.16 window (`OQ-D5`),
    and **without** `ONLY_FULL_GROUP_BY`.
