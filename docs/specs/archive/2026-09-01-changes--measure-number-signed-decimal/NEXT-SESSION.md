@@ -1,3 +1,12 @@
+# ⛔ SUPERSEDED — this spec was ARCHIVED on 2026-09-01
+
+> **Do not act on this file.** It was the live handoff and its present tense is now false: the
+> HITL visual gate **was discharged** on 2026-09-01, and the comms item was **accepted as
+> follow-up** with its risk measured. Read **`archive-summary.md`** in this folder instead — it
+> is the current record. This file is kept only as a point-in-time artifact.
+
+---
+
 # Next session — handoff
 
 **Updated 2026-08-27, at the end of `/akili-execute`. All 12 tasks are IMPLEMENTED and reviewed.
