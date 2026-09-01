@@ -2247,3 +2247,45 @@ the shared Dev database, so it cannot detect anything about Dev's actual state. 
 applied anywhere by this task (`K-015`: the pipeline deploys code, not migrations). And no automated
 gate in either package can redden on a markdown claim — the archived-spec amendments that were the
 substance of this rework are verified by reading and by the sweep, by nothing else.
+
+---
+
+#### Post-close verification — the two suites `KZ-017` recorded as NOT run (2026-09-01)
+
+`execution.md`'s `KZ-017` blocks correctly declared that `npm test` (`rootDir: "src"`) never runs
+`test:e2e` or `test:integration`. Both have now been executed. **Both fail, and neither failure
+belongs to this spec** — established by measurement, not by inspection:
+
+| Suite | Result | Cause | Attribution |
+| --- | --- | --- | --- |
+| `test:integration` | exit **1**, 9/9 failed | `T13_MYSQL_PASSWORD is not set. This suite refuses to fall back to a committed default credential.` | **Environmental, and another spec's.** The only spec it matches is `bilateral-primary-contributing-sp.integration-spec.ts` (`T-13`). It touches no quantification code |
+| `test:e2e` | exit **1**, 1/1 failed | `RangeError: Maximum call stack size exceeded` in Nest DI (`cloneStaticInstance` ↔ `getInstanceByContextId`), plus a 5 s `beforeEach` timeout compiling `AppModule` | **Pre-existing.** Proven in a `git worktree` at `eca8e68f` — the commit before this spec's first code change — with `node_modules` symlinked. The baseline shows the **same** `RangeError`, exactly once, and the same boot timeout. Identical failure class on both sides |
+
+The worktree was removed after measurement (`git worktree remove --force`). Neither suite contains a
+test that touches `quantification`; all seven quantification-bearing test files live in the fixtures
+suite, which does run and is green (17/17, 90/90).
+
+#### Migration state — measured, not assumed
+
+Both migrations **have executed**, against the disposable scratch schema only
+(`ari_scratch_test` @ `127.0.0.1:3307`). Verified directly against `information_schema`:
+
+```
+migrations table:  AlterQuantificationNumberToDecimal1787260000000      ✓ applied
+                   NormaliseQuantificationNumberInReportOicr1787270000000 ✓ applied
+column:            quantification_number  decimal(24,4)  nullable=YES
+view report_oicr:  present
+```
+
+So the DDL is proven to *apply cleanly*. What it is **not** proven against is real data: the scratch
+schema is bootstrapped from the committed schema-only baseline, so the `ALTER … ALGORITHM=COPY` has
+never run over a populated `result_quantifications`, and the row-count/duration characteristics on
+Dev or Production are unmeasured.
+
+**`BACKUP-1` confirmed live, with evidence.** The scratch schema still contains a
+`result_quantifications_backup_1787260000000` table — the migration creates it and never drops it,
+by design (the backout path needs it), but nothing removes it afterwards either. **On any shared
+database this leaves a permanent full-table copy behind.** Previously ticketed on reading the code;
+now observed in a database. Whoever applies the migration should plan its removal explicitly.
+
+**Neither migration is applied anywhere else, and the pipeline will not apply them** (`K-015`).
