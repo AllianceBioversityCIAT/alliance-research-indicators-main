@@ -124,9 +124,23 @@
     <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
       <h2 class="section-title">ACTORS</h2>
 
-      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
+      <div class="flex items-start rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
         <i class="material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-300)]">info</i>
-        <span class="fs-[14] text-[var(--ac-grey-800)]">List every actor group using this innovation.</span>
+        <div class="flex flex-col rs-gap-[4]">
+          <span class="fs-[14] text-[var(--ac-grey-800)]">List every actor group using this innovation.</span>
+          <!-- Youth guidance: the sex/age disaggregation fields below split each actor group into
+               youth / non-youth, so the callout states the age boundary the counts assume and links
+               to the UN source that defines it. -->
+          <span class="fs-[14] text-[var(--ac-grey-800)]"
+            >For the youth counts, the United Nations defines youth as people between 15 and 24 years old.{{ ' ' }}<a
+              [href]="youthDefinitionUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-[var(--ac-light-blue-400)] underline"
+              >See the UN definition of youth</a
+            >.</span
+          >
+        </div>
       </div>
 
       @if (body().actors.length === 0) {
