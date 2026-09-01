@@ -6,6 +6,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { By } from '@angular/platform-browser';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
+import { InputNumber } from 'primeng/inputnumber';
 
 describe('QuantificationItemComponent', () => {
   let component: QuantificationItemComponent;
@@ -152,25 +153,119 @@ describe('QuantificationItemComponent', () => {
     });
   });
 
-  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
-  describe('maxFractionDigits input (T-03)', () => {
-    it('defaults to undefined and leaves the Number field\'s rendered binding unchanged', () => {
-      expect(component.maxFractionDigits).toBeUndefined();
-      fixture.detectChanges();
-
-      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
-      const numberInput = inputs[0].componentInstance as InputComponent;
-      expect(numberInput.maxFractionDigits).toBeUndefined();
-    });
-
-    it('is forwarded to the Number field only, not Unit', () => {
-      component.maxFractionDigits = 0;
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — DD-12: default changed from undefined to 0)
+  describe('maxFractionDigits input (T-10 — default changed to 0, R-MSD-002 AC.5)', () => {
+    it('defaults to 0 — the scale-domain floor — and forwards it to the Number field\'s rendered binding, not Unit', () => {
+      expect(component.maxFractionDigits).toBe(0);
       fixture.detectChanges();
 
       const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
       const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
       expect(numberInput.maxFractionDigits).toBe(0);
       expect(unitInput.maxFractionDigits).toBeUndefined();
+    });
+
+    it('a non-default value is forwarded to the Number field only, not Unit', () => {
+      component.maxFractionDigits = 2;
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.maxFractionDigits).toBe(2);
+      expect(unitInput.maxFractionDigits).toBeUndefined();
+    });
+  });
+
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — R-MSD-012 AC.1: scale-domain guard is PRODUCTION behaviour here, not a test-side helper. T-09 discharged this only with a test-side reimplementation and its Reviewer ruled hosting the guard in app-input would be drift, so it is re-proved here against the real @Input setter.)
+  describe('maxFractionDigits scale-domain guard (R-MSD-012 AC.1)', () => {
+    it('rejects a value above the declared domain as a configuration error, thrown from the real @Input setter — not silently clamped', () => {
+      // fixture.componentRef.setInput() is Angular's own input-delivery transition (KZ-015): it is
+      // exactly what a parent template's [maxFractionDigits] binding does, not a bypass of it.
+      expect(() => fixture.componentRef.setInput('maxFractionDigits', 5)).toThrow(/scale domain 0-4/);
+    });
+
+    it('rejects a value below the declared domain the same way', () => {
+      expect(() => fixture.componentRef.setInput('maxFractionDigits', -1)).toThrow(/scale domain 0-4/);
+    });
+
+    it('accepts every value inside the declared domain 0–4 without throwing, and forwards each to the real property', () => {
+      [0, 1, 2, 3, 4].forEach(value => {
+        expect(() => fixture.componentRef.setInput('maxFractionDigits', value)).not.toThrow();
+        expect(component.maxFractionDigits).toBe(value);
+      });
+    });
+
+    it('rejects null even though a plain range check would let it through (null >= 0 and null <= 4 both coerce to true)', () => {
+      expect(() => fixture.componentRef.setInput('maxFractionDigits', null)).toThrow(/scale domain 0-4/);
+    });
+
+    it('rejects a non-integer inside the numeric range, e.g. 2.5 (a plain range check would let it through and Intl would silently floor it to 2)', () => {
+      expect(() => fixture.componentRef.setInput('maxFractionDigits', 2.5)).toThrow(/scale domain 0-4/);
+    });
+  });
+
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — DD-4: min/max/placeholder promoted to inputs, R-MSD-002 AC.1/AC.2/AC.3/AC.4/AC.6)
+  describe('min / max / placeholder inputs (R-MSD-002 AC.1, AC.2, AC.6)', () => {
+    it('with nothing passed, forwards today\'s literals to the real app-input instance on the Number field only', () => {
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const numberInput = inputs[0].componentInstance as InputComponent;
+
+      expect(numberInput.min).toBe(0);
+      expect(numberInput.max).toBe(Number.MAX_SAFE_INTEGER);
+      expect(numberInput.placeholder).toBe('Enter a positive number');
+    });
+
+    it('non-default values reach the Number field\'s real app-input instance only — the Unit field is unaffected (AC.4)', () => {
+      component.min = 5;
+      component.max = 100;
+      component.placeholder = 'Custom placeholder';
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+
+      expect(numberInput.min).toBe(5);
+      expect(numberInput.max).toBe(100);
+      expect(numberInput.placeholder).toBe('Custom placeholder');
+
+      // Unit's app-input carries no [min]/[max]/[placeholder] bindings from this card at all, so it
+      // keeps app-input's OWN defaults untouched by the Number field's values.
+      expect(unitInput.min).toBe(0);
+      expect(unitInput.max).toBe(Number.MAX_SAFE_INTEGER);
+      expect(unitInput.placeholder).toBe('Write the unit');
+    });
+  });
+
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — R-MSD-002 :222/:223 scenario, KZ-001/KZ-002)
+  // Both OICR call sites (oicr-details.component.html:60-63 "ACTUAL COUNT" and :81-85 "EXTRAPOLATED
+  // ESTIMATES") pass no min/max/maxFractionDigits/placeholder — Leader-verified grep, both blocks
+  // identical in that respect. So rendering this card with NOTHING passed (below) is not "one call
+  // site's" behaviour to enumerate; it is the one shared configuration both OICR blocks are bound to.
+  // KNOWN GAP (not coverage): this equivalence is carried by the template grep above, not by an
+  // assertion in this suite — nothing here reddens if an OICR block later binds a non-default
+  // maxFractionDigits/min/max/placeholder. The natural closure (asserting against the real OICR
+  // template) is blocked: oicr-details.component.spec.ts:873 renders a FakeQuantificationItemComponent
+  // stub, not the real card, and de-stubbing that spec is outside this task.
+  describe('rendered integer behaviour with nothing passed — the one shared OICR configuration, not by enumerating call sites (:222, :223)', () => {
+    it('the real, unstubbed PrimeNG instance formats a fractional value with no decimal digits', () => {
+      fixture.detectChanges();
+
+      const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+      const inputNumberInstance = inputNumberDe.componentInstance as InputNumber;
+
+      // formatValue() is PrimeNG's own rendering method (also used by updateInput() and the paste
+      // path), called here unmocked on the real instance — so this assertion IS the measurement of
+      // what maxFractionDigits actually forwarded to PrimeNG produces, not the class field that holds
+      // it (KZ-001): maximumFractionDigits:0 rounds 2.5 to "3" and -2.5 to "-3" (no decimal digits,
+      // no dangling minus-sign read as a hyphen).
+      //
+      // NOTE ON SCOPE: this test observes only PrimeNG's formatValue() return value — no DOM text and
+      // no ngModel write-back is asserted here, so it does not close U-11 (that gate needs a rendered
+      // value and/or a write-back observation, not just the formatter's return value).
+      expect(inputNumberInstance.formatValue(2.5)).toBe('3');
+      expect(inputNumberInstance.formatValue(-2.5)).toBe('-3');
     });
   });
 

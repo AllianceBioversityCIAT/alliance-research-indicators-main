@@ -131,7 +131,7 @@ export abstract class BaseServiceSimple<
       dataToSave,
     ).filter((el) => !isEmpty(el?.[generalCompareKey]));
 
-    await this.createCustomValidation(dataToSaveArray);
+    await this.createCustomValidation(dataToSaveArray, dataRole);
 
     const whereData: FindOptionsWhere<any> = {
       [this.resultKey]: resultId,
@@ -278,6 +278,8 @@ export abstract class BaseServiceSimple<
   protected async createCustomValidation(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     dataArray: Partial<Entity>[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    dataRole?: string | number,
   ): Promise<void> {
     // Override this method to add custom validation
   }
@@ -342,7 +344,7 @@ export abstract class BaseServiceSimple<
       return [];
     }
 
-    await this.createCustomValidation(dataToSaveArray);
+    await this.createCustomValidation(dataToSaveArray, dataRole);
 
     // 1. Get all existing records (active and inactive)
     const whereData: FindOptionsWhere<any> = {

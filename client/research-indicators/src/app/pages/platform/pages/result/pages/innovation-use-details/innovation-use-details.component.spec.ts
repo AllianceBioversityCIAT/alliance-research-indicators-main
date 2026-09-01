@@ -18,6 +18,8 @@ import { QuantificationItemComponent } from '@components/quantification-item/qua
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels.interface';
 import { GetInnovationUseDetails, InnovationUseActor, InnovationUseOrganization } from '@shared/interfaces/get-innovation-use-details.interface';
+import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { InputNumber } from 'primeng/inputnumber';
 
 /** Family D-1: `id = level + 1`. Levels 0-9 -> ids 1-10. */
 const LEVELS_FIXTURE: InnovationUseLevel[] = Array.from({ length: 10 }, (_, level) => ({
@@ -2085,6 +2087,184 @@ describe('InnovationUseDetailsComponent', () => {
         expect(wrongRatio).toBeCloseTo(2.91, 1);
         expect(wrongRatio).toBeLessThan(4.5);
       });
+    });
+  });
+
+  // =================================================================================================
+  // T-11 — Innovation Use call site: DD-5/DD-14 bindings, the read coercion, R-MSD-001/R-MSD-009.
+  // KZ-015: every test below arranges the empty -> populated TRANSITION (the outer beforeEach already
+  // rendered the empty state via fixture.detectChanges(); each test then adds/sets a row and renders
+  // again), matching how this page actually acquires data (async getData()), never a pre-populated
+  // fixture created before the first detectChanges().
+  // =================================================================================================
+  describe('T-11 — R-MSD-012 AC.3: max/min are DERIVED from scale at this call site, not hard-coded (DD-14)', () => {
+    it('forwards the scale-4 derived symmetric bound to the real app-input instance', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+
+      // Literal from requirements.md R-MSD-012 AC.2 / design.md §6.2's Leader-verified table — not
+      // recomputed here via the same formula under test (that would be tautological).
+      expect(numberInput.max).toBe(549_755_813_887);
+      expect(numberInput.min).toBe(-549_755_813_887);
+      expect(numberInput.maxFractionDigits).toBe(4);
+    });
+  });
+
+  describe('T-11 — R-MSD-008: the placeholder no longer says "positive" (DD-5, AC.1/AC.2)', () => {
+    it('renders a placeholder without the word "positive" on the Number field\'s native input (not asserted on the class property alone)', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInputDe = quantCard.query(By.directive(InputComponent));
+      const nativeInput = numberInputDe.query(By.css('input')).nativeElement as HTMLInputElement;
+
+      expect(nativeInput.placeholder).not.toContain('positive');
+      expect(nativeInput.placeholder.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('T-11 — R-MSD-001 :181/:182 — a negative fraction survives entry; 0 is a value, not empty', () => {
+    it('the real p-inputNumber instance neither rounds nor clamps -12.75 to 0, and does not drop the sign', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputNumberInstance = quantCard.query(By.directive(InputNumber)).componentInstance as InputNumber;
+
+      // formatValue() is PrimeNG's own rendering method (T-10 precedent) — this measures what the
+      // derived bound + maxFractionDigits:4 actually do to a signed fraction, not the class field
+      // that holds them (KZ-001).
+      expect(inputNumberInstance.formatValue(-12.75)).toBe('-12.75');
+      expect(inputNumberInstance.formatValue(-12.75)).not.toBe('0');
+      expect(inputNumberInstance.formatValue(-12.75)).not.toBe('-13');
+    });
+
+    it('0 is rendered as "0", never as an empty string', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputNumberInstance = quantCard.query(By.directive(InputNumber)).componentInstance as InputNumber;
+
+      expect(inputNumberInstance.formatValue(0)).toBe('0');
+    });
+
+    it('the read adapter treats 0 as a value (never absent) and keeps null/undefined as null (DD-2)', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [
+          { id: 1, quantification_number: 0, unit: 'kg', description: '' },
+          { id: 2, quantification_number: null as unknown as undefined, unit: '', description: '' },
+          { id: 3, quantification_number: undefined, unit: '', description: '' }
+        ]
+      });
+
+      const view = component.quantificationsView();
+      expect(view[0].number).toBe(0);
+      expect(view[1].number).toBeNull();
+      expect(view[2].number).toBeNull();
+    });
+  });
+
+  describe('T-11 — R-MSD-001 :189/:190 — the spinner does not reintroduce the floor', () => {
+    it('does not bind [step] — PrimeNG\'s own default of 1 (whole-unit stepping) applies', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputNumberInstance = quantCard.query(By.directive(InputNumber)).componentInstance as InputNumber;
+
+      expect(inputNumberInstance.step).toBe(1);
+    });
+
+    it('decrementing from 0 goes below zero — min is negative here, so PrimeNG\'s validateValue() does not clamp at 0', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputNumberInstance = quantCard.query(By.directive(InputNumber)).componentInstance as InputNumber;
+
+      inputNumberInstance.input!.nativeElement.value = '0';
+      // spin() is PrimeNG's own decrement mechanism, called by the down-button's mousedown handler
+      // (onDownButtonMouseDown -> repeat -> spin) — called directly here rather than via a simulated
+      // DOM mousedown (see this task's completion report for what that does and does not close).
+      inputNumberInstance.spin({} as Event, -1);
+
+      expect(inputNumberInstance.value).toBe(-1);
+    });
+  });
+
+  // R-MSD-009 :430/:431 — DC-6 (string-on-wire render defect). Asserted at TWO seams, because they
+  // are sensitive to DIFFERENT things: `quantificationsView()` directly is the DD-3 adapter itself
+  // (removing its coercion's string branch reddens ONLY this seam's string case — measured: PrimeNG's
+  // own `p-inputNumber.writeValue()` ALSO runs `Number(value)` on write, so the RENDERED-DOM seam
+  // below stays green even with the adapter's coercion removed — it is not load-bearing for THAT
+  // seam alone. Both seams are kept: the adapter-level test is what the mandated falsifier reddens;
+  // the rendered-DOM test is what R-MSD-009's AC actually reads ("renders exactly").
+  describe('T-11 — R-MSD-009 :430/:431 — the DD-3 adapter itself, string vs. number wire type', () => {
+    it('wire type NUMBER (-0.75): quantificationsView() returns the number -0.75 unchanged', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 1, quantification_number: -0.75, unit: 'kg', description: '' }]
+      });
+
+      const view = component.quantificationsView();
+      expect(view[0].number).toBe(-0.75);
+      expect(typeof view[0].number).toBe('number');
+    });
+
+    it('wire type STRING ("-0.7500"): quantificationsView() coerces to the number -0.75, not the literal string', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 1, quantification_number: '-0.7500' as unknown as number, unit: 'kg', description: '' }]
+      });
+
+      const view = component.quantificationsView();
+      expect(view[0].number).toBe(-0.75);
+      expect(typeof view[0].number).toBe('number'); // NOT the string "-0.7500" the falsifier leaves behind
+    });
+  });
+
+  // Same claim, at the RENDERED-DOM seam R-MSD-009's AC actually names ("the field renders -0.75").
+  describe('T-11 — R-MSD-009 :430/:431 — a wire value of "-0.7500" (string) renders identically to -0.75 (number)', () => {
+    it('wire type NUMBER (-0.75): renders "-0.75"', async () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 1, quantification_number: -0.75, unit: 'kg', description: '' }]
+      });
+      fixture.detectChanges();
+      // app-input's own onChange effect (which copies the card's signal into its rendered value)
+      // is scheduled, not synchronous with detectChanges() — flush it before reading the DOM.
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+
+      expect(nativeInput.value).toBe('-0.75');
+    });
+
+    it('wire type STRING ("-0.7500"): renders "-0.75" — not "-0.7500", NaN, "0", or empty', async () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 1, quantification_number: '-0.7500' as unknown as number, unit: 'kg', description: '' }]
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+
+      expect(nativeInput.value).toBe('-0.75');
+      expect(nativeInput.value).not.toBe('-0.7500');
+      expect(nativeInput.value).not.toBe('NaN');
+      expect(nativeInput.value).not.toBe('0');
+      expect(nativeInput.value).not.toBe('');
     });
   });
 });

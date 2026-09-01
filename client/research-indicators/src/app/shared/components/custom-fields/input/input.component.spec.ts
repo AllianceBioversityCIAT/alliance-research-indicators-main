@@ -6,6 +6,7 @@ import { signal } from '@angular/core';
 import { WordCountService } from '../../../services/word-count.service';
 import { By } from '@angular/platform-browser';
 import { InputNumber } from 'primeng/inputnumber';
+import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -810,5 +811,257 @@ describe('InputComponent — rendered p-inputNumber (T-02 maxFractionDigits)', (
     fixture.detectChanges();
 
     expect(setValueSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+// @akili-spec docs/specs/changes/measure-number-signed-decimal (T-09 — max as @Input, character
+// guard asserted UNCHANGED)
+// Every assertion below reads the REAL rendered p-inputNumber instance, the real underlying
+// <input> DOM node, or the rendered warning text — never `component.max` / `component.MAX_SAFE_INTEGER`
+// directly. `KZ-001`: a presence-assertion on the class instance proves the field's value, not that
+// the template forwards it to PrimeNG — it would pass even with the [max] binding removed.
+describe('InputComponent — T-09: max as @Input, character guard asserted unchanged', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+  let utilsService: jest.Mocked<UtilsService>;
+
+  beforeEach(async () => {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn(),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    utilsService = TestBed.inject(UtilsService) as jest.Mocked<UtilsService>;
+
+    // Arrange the TRANSITION the product performs (KZ-015): configure inputs the way a parent
+    // binding would, BEFORE the first detectChanges — do not construct into the end state.
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+  });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  function getInputNumber(): InputNumber {
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    return inputNumberDe.componentInstance as InputNumber;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-012 AC.4 — default reaches the real instance
+  // ---------------------------------------------------------------------------------------------
+  it('AC.4 — with no [max] binding, the rendered p-inputNumber resolves max to Number.MAX_SAFE_INTEGER', () => {
+    fixture.detectChanges();
+    expect(getInputNumber().max).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-012 AC.1, AC.2 — DD-14's scale→bound table, and the scale-domain guard
+  // ---------------------------------------------------------------------------------------------
+  describe('DD-14 scale→bound table (AC.2) and the scale-domain guard (AC.1)', () => {
+    // `deriveMaxForScale` used to be a test-side reimplementation of DD-14's formula, duplicating
+    // `app-input`'s own scope (the `@Input` promotion only) with what T-11's call site derives for
+    // real. T-11 extracted the formula to `shared/utils/quantification-number-bound.util.ts` and
+    // this now imports THAT production implementation — so this table and the call site's actual
+    // `min`/`max` cannot silently disagree (the original hazard this comment used to just disclaim).
+
+    const scaleTable = [
+      { scale: 0, expectedMax: 9_007_199_254_740_991 },
+      { scale: 1, expectedMax: 562_949_953_421_311 },
+      { scale: 2, expectedMax: 70_368_744_177_663 },
+      { scale: 3, expectedMax: 8_796_093_022_207 },
+      { scale: 4, expectedMax: 549_755_813_887 }
+    ];
+
+    it.each(scaleTable)('scale $scale renders max=$expectedMax on the real p-inputNumber instance', ({ scale, expectedMax }) => {
+      const derived = deriveMaxForScale(scale);
+      expect(derived).toBe(expectedMax); // cross-check: the formula reproduces the Leader-verified table
+
+      component.max = derived;
+      fixture.detectChanges();
+
+      expect(getInputNumber().max).toBe(expectedMax);
+    });
+
+    it('scale 0 lands exactly on Number.MAX_SAFE_INTEGER as a CONSEQUENCE of the formula, not a special case', () => {
+      // Same call as every other scale above — no branch singles scale 0 out.
+      expect(deriveMaxForScale(0)).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it('AC.1 — a scale outside 0…4 is rejected as a configuration error, not silently clamped', () => {
+      expect(() => deriveMaxForScale(5)).toThrow();
+      expect(() => deriveMaxForScale(-1)).toThrow();
+      expect(() => deriveMaxForScale(2.5)).toThrow(); // non-integer scale is also a configuration error
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-006 AC.3, AC.5 — the character guard is unchanged; the false positive is PINNED, not
+  // denied (RK-16 / DC-10), and it fires at SCALES 1-4 — only scale 0 is clean, by arithmetic
+  // (its 16-digit bound plus a sign cannot exceed 17 characters). Values verified once with
+  // `node -e` before writing this test (see the implementer's / T-12's report — not re-derived
+  // from memory):
+  //   (-9007199254740991).toString()    -> 17 chars (scale 0 — no warning, ever)
+  //   (-562949953421311).toString()     -> 16 chars (scale 1's largest integer — no warning)
+  //   (-70368744177663).toString()      -> 15 chars (scale 2's largest integer — no warning)
+  //   (-156294995342131.1).toString()   -> "-156294995342131.1" (18 chars, scale 1 in-bound — WARNS)
+  //   (-18796093022206.99).toString()   -> "-18796093022206.99" (18 chars, scale 2 in-bound — WARNS)
+  //   (-8796093022206.999).toString()   -> "-8796093022206.999" (18 chars, scale 3 in-bound — WARNS)
+  //   (-549755813886.9999).toString()   -> "-549755813886.9999" (18 chars, scale 4 — RK-16's own example — WARNS)
+  // ---------------------------------------------------------------------------------------------
+  describe('the character guard is unchanged; the false positive fires at scales 1-4, only scale 0 is clean (R-MSD-006 AC.3, amended 2026-08-27)', () => {
+    type SignedBoundaryCase = { scale: number; max: number; value: number; chars: number };
+
+    const noWarningCases: SignedBoundaryCase[] = [
+      { scale: 0, max: 9_007_199_254_740_991, value: -9_007_199_254_740_991, chars: 17 },
+      { scale: 1, max: 562_949_953_421_311, value: -562_949_953_421_311, chars: 16 },
+      { scale: 2, max: 70_368_744_177_663, value: -70_368_744_177_663, chars: 15 }
+    ];
+
+    // T-12 (measure-number-signed-decimal): scale 1 and scale 2 were UNTESTED at 18 characters —
+    // T-09 pinned only scale 3/4, but the amended AC.3 (requirements.md R-MSD-006) states the
+    // defect fires at every scale except 0. These two rows close that gap; scale 3/4 rows are
+    // T-09's original evidence, unchanged.
+    const warningPresentCases: SignedBoundaryCase[] = [
+      { scale: 1, max: 562_949_953_421_311, value: -156294995342131.1, chars: 18 },
+      { scale: 2, max: 70_368_744_177_663, value: -18796093022206.99, chars: 18 },
+      { scale: 3, max: 8_796_093_022_207, value: -8796093022206.999, chars: 18 },
+      { scale: 4, max: 549_755_813_887, value: -549755813886.9999, chars: 18 } // RK-16's own pinned example
+    ];
+
+    // Titled on character length, not scale: R-MSD-006 AC.3 was amended after the implementer
+    // measured that "an in-bound value at this scale never warns" is FALSE for scales 1-4 (an
+    // 18-character in-bound value at those scales DOES warn — see warningPresentCases, which now
+    // covers all four). Only scale 0 is a true scale-wide guarantee, since its 16-digit bound plus
+    // a sign cannot exceed 17 characters. Each title below names the specific character count this
+    // row exercises, asserted in-test against value.toString().length, so it can never generalise
+    // past its case.
+    it.each(noWarningCases)(
+      'scale $scale — a $chars-character in-bound value stays under the 18-character guard',
+      fakeAsync(({ max, value, chars }: SignedBoundaryCase) => {
+        expect(value.toString().length).toBe(chars); // ties the title's claimed length to the actual value
+        utilsService.getNestedProperty.mockReturnValue(value);
+        component.max = max;
+        component.min = -max;
+        fixture.detectChanges();
+        tick();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).not.toContain('Maximum reached');
+      })
+    );
+
+    it.each(warningPresentCases)(
+      'scale $scale — the known 18-character in-bound signed value DOES render "Maximum reached" (pinned, not fixed)',
+      fakeAsync(({ max, value }: SignedBoundaryCase) => {
+        expect(value.toString().length).toBe(18); // the guard's exact, unchanged threshold
+        utilsService.getNestedProperty.mockReturnValue(value);
+        component.max = max;
+        component.min = -max;
+        fixture.detectChanges();
+        tick();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('Maximum reached');
+      })
+    );
+
+    it('AC.5 — the guard fires on the type "number" branch, and the shared type "text" paste path is untouched', fakeAsync(() => {
+      // "number" branch, unchanged threshold: 17 characters stays under it.
+      utilsService.getNestedProperty.mockReturnValue(-9_007_199_254_740_991);
+      component.max = 9_007_199_254_740_991;
+      component.min = -9_007_199_254_740_991;
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.type).toBe('number');
+      expect(fixture.nativeElement.textContent).not.toContain('Maximum reached');
+
+      // The shared type "text" 40,000-character paste-truncation path (L-02) is a DIFFERENT branch
+      // of the SAME guard signal and is not part of this task's diff — `handlePasteText`'s own
+      // suite above (describe('handlePasteText', ...)) already exercises it unmodified; asserting
+      // MAX_SAFE_TEXT is still 40000 here would be a class-field presence-assertion (KZ-001) and is
+      // not the claim this test makes. What this test asserts is narrower and DOM-grounded: the
+      // "number" branch above renders no warning at 17 characters, unmodified by this task's change.
+    }));
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-006 AC.6 — the three enforcement shapes are asymmetric; each asserted on the rendered
+  // value, never on the absence of a message (:363).
+  // ---------------------------------------------------------------------------------------------
+  describe('the three enforcement shapes are asymmetric (:363, AC.6)', () => {
+    it('maxFractionDigits PREVENTS an extra decimal digit per keystroke — the rendered value is unchanged', () => {
+      component.maxFractionDigits = 2;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+
+      inputNumber.input.nativeElement.value = '1.23';
+      inputNumber.input.nativeElement.selectionStart = 4;
+      inputNumber.input.nativeElement.selectionEnd = 4;
+
+      inputNumber.insert({ preventDefault: jest.fn() } as unknown as Event, '4');
+      fixture.detectChanges();
+
+      // A 3rd decimal digit never lands on the rendered input: prevention, not a post-hoc clamp.
+      expect(inputNumber.input.nativeElement.value).toBe('1.23');
+    });
+
+    it('min PREVENTS the minus key per keystroke — the rendered value never goes negative', () => {
+      component.min = 0;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+      const setValueSpy = jest.spyOn(component, 'setValue');
+
+      inputNumber.input.nativeElement.value = '';
+      inputNumber.input.nativeElement.selectionStart = 0;
+      inputNumber.input.nativeElement.selectionEnd = 0;
+
+      inputNumber.onInputKeyPress({ which: 45, code: 'Minus', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      fixture.detectChanges();
+
+      expect(setValueSpy).not.toHaveBeenCalled();
+      expect(inputNumber.input.nativeElement.value).not.toContain('-');
+    });
+
+    it('max CLAMPS only on blur/Tab/Enter/spinner — NOT per keystroke (L-07, AC.6)', () => {
+      component.max = 5;
+      component.min = 0;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+
+      inputNumber.input.nativeElement.value = '';
+      inputNumber.input.nativeElement.selectionStart = 0;
+      inputNumber.input.nativeElement.selectionEnd = 0;
+
+      // Typing '9' with max=5: per-keystroke insert() never calls validateValue/max at all.
+      inputNumber.onInputKeyPress({ which: 57, code: 'Digit9', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      fixture.detectChanges();
+      expect(inputNumber.input.nativeElement.value).toBe('9'); // unclamped while typing — the rendered DOM value
+      expect(inputNumber.value).toBe(9); // the real PrimeNG instance's own model — also unclamped
+
+      // Only on blur does PrimeNG's validateValue() run and clamp to max.
+      inputNumber.onInputBlur({} as Event);
+      fixture.detectChanges();
+
+      expect(inputNumber.input.nativeElement.value).toBe('5'); // clamped on the rendered DOM value
+      expect(inputNumber.value).toBe(5); // clamped on the real PrimeNG instance
+    });
   });
 });

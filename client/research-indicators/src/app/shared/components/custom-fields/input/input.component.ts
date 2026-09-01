@@ -48,7 +48,8 @@ export class InputComponent {
   MAX_SAFE_INTEGER = 18;
   MAX_SAFE_TEXT = 40000;
   showMaxReachedMessage = signal(false);
-  max = Number.MAX_SAFE_INTEGER;
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-09 — max promoted to @Input, default unchanged)
+  @Input() max = Number.MAX_SAFE_INTEGER;
 
   @HostListener('paste', ['$event'])
   onPaste(event: ClipboardEvent): void {

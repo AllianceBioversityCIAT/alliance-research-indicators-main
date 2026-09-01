@@ -284,12 +284,16 @@ export class ResultInnovationUseService {
    * surface as a `500` carrying TypeORM's raw SQL and constraint name,
    * because `GlobalExceptions` has no `QueryFailedError` branch.
    *
-   * `level` is a `bigint` column, which the MySQL driver returns as a
-   * `string` at runtime. `Number(...)` keeps the resolved scalar a real
-   * `number` so a later refactor of the threshold check (e.g. to `===` or
-   * `Number.isInteger`) cannot silently break against real rows while
-   * every mocked test — which supplies `level` as a JS number literal —
-   * stays green.
+   * `level` is a `bigint` column. **Corrected** (`docs/specs/changes/
+   * measure-number-signed-decimal` §5.4, `K-24`): mysql2 does NOT return
+   * `bigint` as a string at runtime by default — `LONGLONG` decodes to a
+   * real `number` via `parseLengthCodedInt(false)`; only `DECIMAL`/
+   * `NEWDECIMAL` columns decode as a string, via `readLengthCodedString`.
+   * `Number(...)` here is a defensive normalization, not a coercion of a
+   * string runtime value, so a later refactor of the threshold check
+   * (e.g. to `===` or `Number.isInteger`) cannot silently break against
+   * real rows while every mocked test — which supplies `level` as a JS
+   * number literal — stays green.
    */
   private async resolveInnovationUseLevel(
     levelId?: number,
