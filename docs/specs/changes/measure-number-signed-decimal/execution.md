@@ -2420,3 +2420,43 @@ now met, so they close on evidence rather than on elapsed time:
 **Remaining open items are all human-owned and none is an implementation gap:** `OQ-1` (product
 owner, gates merge), the comms record (`NFR-MSD-005`), and the four sign-off roles. `THEME-1` is
 carried forward to the app-wide light/dark work.
+
+#### `NFR-MSD-005` — the comms risk, MEASURED (2026-09-01) and accepted as follow-up
+
+The requirement exists because the OICR write path gains validation it never had: before this spec
+`UpdateOicrDto` had no validator and the controller no `ValidationPipe`, so integrality was enforced
+by **nothing but the `bigint` column type**. Roles 1 and 2 (OICR) now hit
+`validateNonNegativeIntegerQuantification`. Two distinct changes, and only one is a genuine
+tightening — the code says so itself:
+
+| Change | Before | Now | Nature |
+| --- | --- | --- | --- |
+| **Decimals** | `2.5` → `200 OK`, silently rounded by the `bigint` column | `400`: *"must be a non-negative integer, received 2.5"* | **Restoration.** The data was already being corrupted; it is now refused out loud |
+| **Negatives** | `-5` → accepted and **stored as `-5`** (`bigint` is signed) | `400` | **Genuine tightening** (`DD-8`/`RK-14`). The service comment states it explicitly: *"refusing a negative here is a genuine tightening, not a restoration of today's effective behaviour"* |
+
+**Who can actually be broken by it — measured, not assumed:**
+
+1. **The OICR UI: cannot be.** `oicr-details.component.html` binds only `[quantification]`,
+   `[quantNumber]` and `[headerLabel]` — it passes **neither `min` nor `maxFractionDigits`**, so it
+   takes `QuantificationItemComponent`'s defaults (`_maxFractionDigits = 0`, min `0`). Only
+   `innovation-use-details.component.html` passes the derived signed `[min]`. This is `DD-4`/`DD-13`'s
+   additive-defaults design working as intended: **OICR keeps its old behaviour by construction, not
+   by coincidence.** Confirmed independently by the user in the running app on 2026-09-01 — the OICR
+   input accepts neither negatives nor decimals.
+2. **Internal integrations: none are exposed.** `grep -rln "quantification" src/domain/tools/`
+   returns **nothing**. No `tip-integration`, `broker`, `roar-management`, `clarisa` or `agresso` code
+   reads or writes quantifications.
+3. **External API callers: possible, unenumerable from this repo.** The endpoint
+   (`result-oicr.controller.ts:41`) requires auth but is not UI-restricted, and `JwtMiddleware`
+   accepts base64 machine tokens. A partner platform calling it directly is by definition not in our
+   source tree, so no grep here can rule it in or out.
+
+**Resolution: accepted as follow-up, with the residual risk named.** The blast radius is (3) alone —
+a direct API caller sending negative or fractional quantifications. Nothing in this repository does
+so, and both UI paths are structurally incapable of it. The notice is therefore a **courtesy to
+whoever owns OICR reporting and to any partner platform that integrates directly**, not an incident
+control. It remains genuinely owed — the requirement's own wording is *"communicated **before** it
+ships"*, and Dev has already shipped — so it is carried forward rather than waived, and
+`tasks.md:358` stays `[ ]`.
+
+**This entry does not record a notification. None has been sent.**
