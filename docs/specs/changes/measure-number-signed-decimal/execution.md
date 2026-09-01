@@ -2289,3 +2289,37 @@ database this leaves a permanent full-table copy behind.** Previously ticketed o
 now observed in a database. Whoever applies the migration should plan its removal explicitly.
 
 **Neither migration is applied anywhere else, and the pipeline will not apply them** (`K-015`).
+
+---
+
+#### HITL check — what the user confirmed on Dev (2026-09-01), and what it does NOT cover
+
+**User-reported, after applying both migrations to the shared Dev database.** Recorded verbatim in
+substance, scoped precisely — a human observation is evidence, but only for what was actually looked
+at:
+
+| Confirmed by the user | Discharges |
+| --- | --- |
+| Values persist to the database | `R-MSD-001` AC.1 (the save path works end to end on real infrastructure) |
+| **Pre-existing data is still present** | The migration's data-preservation guarantee — `ALTER … ALGORITHM=COPY` did not lose rows. This is the single largest risk the migration carried, and it is now closed on Dev |
+| Decimals are stored | `R-MSD-001` / `R-MSD-002` at the persistence tier — the `DECIMAL(24,4)` column and the two-way transformer round-trip correctly against real MySQL, not just the scratch schema |
+| Negatives are stored | The signed half of the same, and `DD-2`'s removal of the `@Min(0)` floor on this field |
+
+**NOT covered by that report — stated so nobody reads this entry as a full discharge:**
+
+1. **`R-MSD-001` AC.7 / `DC-13` / `RK-11` — resaving an *untouched* measure row.** This is the
+   spec's central defect and it is **not** the same as "decimals save" or "old data is still
+   there". The failure shape: open a result whose measure row already has a value, edit **only
+   something else** (the justification), and save **without touching the Number field**. The client
+   resends whatever the previous read produced; `mysql2` returns `DECIMAL` as a **string** where
+   `bigint` came back a number, and before the transformer that string hit the pipe and produced a
+   `400` on a row the user never edited. Typing a new value exercises the *write* path; this
+   exercises the *read-then-write* path, which is the one that broke.
+2. **`NFR-MSD-004` / `DC-11` — the visual items**: both themes (light **and** dark), the
+   placeholder reading "Enter a number", the spinner stepping a **whole unit** through `0`, and the
+   legibility of the amber "Maximum reached" on `-549755813886.9999` (a **pinned** false positive,
+   `RK-16` — judged for legibility, not correctness).
+
+`tasks.md:335`'s checkbox therefore stays `[ ]`. It covers the visual gate, and the visual gate has
+not been reported on. The persistence-tier confirmation above is real and is recorded on its own
+terms.
