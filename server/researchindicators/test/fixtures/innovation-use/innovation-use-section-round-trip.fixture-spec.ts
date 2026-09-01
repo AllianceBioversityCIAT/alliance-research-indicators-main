@@ -140,6 +140,24 @@ import type { CreateResultInnovationUseDto } from '../../../src/domain/entities/
  * catch. Uses this file's own `nextOfficialCode()` counter (already inside
  * its reserved `900_700` band, no new band needed) and cleans its own
  * `results` row up in a `finally`, independent of this file's `afterAll`.
+ *
+ * **T-07 extension (`docs/specs/changes/measure-number-signed-decimal`) --
+ * the untouched decimal measure, seeded from a real read.** The final `it`
+ * below closes the three acceptance items `T-02` transferred here (see
+ * `execution.md` -> `T-02` -> forward pointer): (1) `null` round-trips as
+ * `null` in both directions, asserted separately per direction; (2) a
+ * value from a REAL read (never a hand-written literal, K-012/DD-19)
+ * resent verbatim does not `400`; (3) `String(value)` composite-key
+ * construction yields the same key before and after, exercised through the
+ * real `upsertByCompositeKeys` (via `harness.service.update`), not the
+ * transformer alone. It also covers this task's concern 1 (`-12.75` stored
+ * and re-read as `-12.75`, R-MSD-004 `:297`) and the Innovation-Use half of
+ * concern 3 (R-MSD-013 AC.1/AC.3 -- no PK churn, no deactivation, on an
+ * unmodified resave). Uses its own `results` row (this file's own
+ * `nextOfficialCode()` counter, same `900_700` band) and its own
+ * `harness.service.create()`/`update()` pair (the KZ-006 pattern), so it
+ * does not depend on -- or disturb -- the shared `resultId` state chain
+ * the earlier `it`s in this file build up.
  */
 describe('Innovation Use section round trip via the real ResultInnovationUseService (T-09, F-A)', () => {
   const uniqueSuffix = Date.now();
@@ -1273,4 +1291,141 @@ describe('Innovation Use section round trip via the real ResultInnovationUseServ
       ]);
     }
   });
+
+  it('T-07 / R-MSD-003 AC.7, R-MSD-004 AC.1/AC.2, R-MSD-013 AC.1/AC.3 — an untouched decimal measure and an untouched NULL measure both survive a resave seeded from a REAL read, with no 400 and no PK churn', async () => {
+    const officialCode = nextOfficialCode();
+    const msdResult = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, platform_code, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, ?, ?, 0, NULL)`,
+      [officialCode, platformCode, reportYear],
+    );
+    const msdResultId = msdResult.insertId;
+
+    try {
+      await harness.service.create(msdResultId);
+
+      const seedDto = {
+        quantifications: [
+          {
+            quantification_number: -12.75,
+            unit: 'sentinel-unit-msd-decimal',
+            description: 'sentinel-description-msd-decimal',
+          },
+          {
+            quantification_number: null,
+            unit: 'sentinel-unit-msd-null',
+            description: 'sentinel-description-msd-null',
+          },
+        ],
+      };
+      await harness.service.update(msdResultId, seedDto);
+
+      // DD-2 `to` direction, asserted separately from `from` below: a
+      // saved `null` is stored as SQL NULL, never `0` -- raw SQL bypasses
+      // the entity entirely, so this is independent of the transformer's
+      // read side.
+      const [nullRowRaw] = await dataSource.query(
+        `SELECT quantification_number FROM result_quantifications WHERE result_id = ? AND unit = ? AND is_active = 1`,
+        [msdResultId, 'sentinel-unit-msd-null'],
+      );
+      expect(nullRowRaw.quantification_number).toBeNull();
+
+      // Primary keys AND `created_at` captured BEFORE the untouched resave
+      // (R-MSD-013 AC.2 + AC.5 -- fixture-tier, reading PKs and
+      // `created_at` before/after; a unit test cannot observe row
+      // identity, and `created_at` is a `@CreateDateColumn` that appears
+      // in no `audit()` payload, so raw SQL is the only way to see it —
+      // same pattern as this file's own `created_by`/`updated_by` reads
+      // above, `:518-523`).
+      const beforeRows = await dataSource.query(
+        `SELECT id, unit, description, created_at FROM result_quantifications WHERE result_id = ? AND is_active = 1 ORDER BY id`,
+        [msdResultId],
+      );
+      // Scoped to this file's own resultId (2 rows) -- NOT
+      // toHaveLength(1) against the whole table, which holds several rows
+      // per result including deactivated ones (J-20).
+      expect(beforeRows).toHaveLength(2);
+
+      // The REAL read (K-012, DD-19): through
+      // ResultInnovationUseService.findOne -> ResultQuantificationsService
+      // .findByResultIdAndRoles -> the repository -> DD-2's `from`
+      // transformer. Never a hand-rolled Number() over a raw SQL string --
+      // that would test this file's own coercion, not the entity's.
+      const readBack = await harness.service.findOne(msdResultId);
+      const decimalQ = readBack.quantifications.find(
+        (q: any) => q.unit === 'sentinel-unit-msd-decimal',
+      );
+      const nullQ = readBack.quantifications.find(
+        (q: any) => q.unit === 'sentinel-unit-msd-null',
+      );
+      expect(decimalQ).toBeDefined();
+      expect(nullQ).toBeDefined();
+      // :297 -- not 3, 2, or 2.5000 re-read differently.
+      expect(decimalQ.quantification_number).toBe(-12.75);
+      expect(typeof decimalQ.quantification_number).toBe('number');
+      // DD-2 `from` direction, asserted separately from `to` above.
+      expect(nullQ.quantification_number).toBeNull();
+
+      // T-02 item 2 + item 3: resend EXACTLY what the real read produced
+      // -- nothing hand-written, nothing else in the section touched --
+      // through the real upsertByCompositeKeys (via `update`), not the
+      // transformer in isolation.
+      const resendDto = {
+        quantifications: readBack.quantifications.map((q: any) => ({
+          quantification_number: q.quantification_number,
+          unit: q.unit,
+          description: q.description,
+        })),
+      };
+
+      await expect(
+        harness.service.update(msdResultId, resendDto),
+      ).resolves.toBeDefined();
+
+      const afterRows = await dataSource.query(
+        `SELECT id, unit, description, is_active, created_at FROM result_quantifications WHERE result_id = ? ORDER BY id`,
+        [msdResultId],
+      );
+      const afterActive = afterRows.filter(
+        (r: any) => Number(r.is_active) === 1,
+      );
+      expect(afterActive).toHaveLength(2); // R-MSD-013 AC.3 -- no duplicate
+
+      // R-MSD-013 AC.1 + T-02 item 3: matched on (unit, description) --
+      // DD-20 -- never on the value, which is what is under test. A
+      // mismatch here would show as a DIFFERENT id (deactivate +
+      // reinsert), which is exactly what a changed `String(value)`
+      // composite key would produce.
+      for (const before of beforeRows) {
+        const after = afterActive.find(
+          (a: any) =>
+            a.unit === before.unit && a.description === before.description,
+        );
+        expect(after).toBeDefined();
+        expect(Number(after.id)).toBe(Number(before.id));
+        // R-MSD-013 AC.2 -- `created_at` unchanged by an untouched resave.
+        expect(new Date(after.created_at).getTime()).toBe(
+          new Date(before.created_at).getTime(),
+        );
+      }
+
+      const deactivatedCount = await dataSource.query(
+        `SELECT COUNT(*) AS c FROM result_quantifications WHERE result_id = ? AND is_active = 0`,
+        [msdResultId],
+      );
+      expect(Number(deactivatedCount[0].c)).toBe(0);
+    } finally {
+      await dataSource.query(
+        `DELETE FROM result_quantifications WHERE result_id = ?`,
+        [msdResultId],
+      );
+      await dataSource.query(
+        `DELETE FROM result_innovation_use WHERE result_id = ?`,
+        [msdResultId],
+      );
+      await dataSource.query(`DELETE FROM results WHERE result_id = ?`, [
+        msdResultId,
+      ]);
+    }
+  }, 30000);
 });

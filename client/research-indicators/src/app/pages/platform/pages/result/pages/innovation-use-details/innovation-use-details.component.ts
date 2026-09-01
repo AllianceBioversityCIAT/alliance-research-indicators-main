@@ -27,9 +27,21 @@ import {
   RESULT_ENTRY_SOURCE_VALUE_HOME,
   RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
 } from '@shared/constants/result-entry-source';
+import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
 
 /** §6.4 / R-IUP-006 AC.4: the justification is gated on the resolved `level`, never on the id. */
 const JUSTIFICATION_MIN_LEVEL = 6;
+
+// @akili-spec docs/specs/changes/measure-number-signed-decimal (T-11 — DD-5/DD-14: scale 4, the
+// derived symmetric bound, and the new placeholder copy for the Number field's app-input at this
+// call site only). `max`/`min` are DERIVED from `QUANTIFICATION_NUMBER_SCALE` via `deriveMaxForScale`
+// rather than hard-coded literals, so the scale and its bound cannot drift apart (R-MSD-012 AC.3).
+/** The `quantification_number` column's scale (`DECIMAL(24,4)`, DD-1) — also bound as `maxFractionDigits`. */
+const QUANTIFICATION_NUMBER_SCALE = 4;
+const QUANTIFICATION_NUMBER_MAX = deriveMaxForScale(QUANTIFICATION_NUMBER_SCALE);
+const QUANTIFICATION_NUMBER_MIN = -QUANTIFICATION_NUMBER_MAX;
+/** R-MSD-008 / SC-4: the shared card's default ("Enter a positive number") is false here — signed values are allowed. */
+const QUANTIFICATION_NUMBER_PLACEHOLDER = 'Enter a number';
 
 /**
  * R-IUP-020 (Amendment 01 / T-14, §5.8) — the guidance callout's calculator link and the
@@ -131,6 +143,18 @@ export default class InnovationUseDetailsComponent {
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
   readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
   readonly definitionsUrl = INNOVATION_USE_DEFINITIONS_URL;
+
+  /**
+   * T-11 (DD-5/DD-14): template-bindable mirrors of the module-level consts above, forwarded to the
+   * Number field's `app-input` instance via `QuantificationItemComponent`'s `min`/`max`/
+   * `maxFractionDigits`/`placeholder` inputs (T-10, DD-4). `min`/`max` are the derived symmetric
+   * bound for scale 4, never a hard-coded literal (R-MSD-012 AC.3) — `step` is deliberately NOT
+   * bound (DD-6): PrimeNG's own default of `1` already gives whole-unit stepping across zero.
+   */
+  readonly quantificationNumberScale = QUANTIFICATION_NUMBER_SCALE;
+  readonly quantificationNumberMax = QUANTIFICATION_NUMBER_MAX;
+  readonly quantificationNumberMin = QUANTIFICATION_NUMBER_MIN;
+  readonly quantificationNumberPlaceholder = QUANTIFICATION_NUMBER_PLACEHOLDER;
 
   /**
    * DD-11 — distinct from an empty `body`, and never inferred from its shape. A failed GET sets
@@ -273,10 +297,21 @@ export default class InnovationUseDetailsComponent {
    * Adapts the server shape (`id`, `quantification_number`, `unit`, `description`) to the shared
    * card's shape (`number`, `unit`, `comments`) at this boundary, merged by array index so `id`
    * round-trips without `QuantificationItemComponent` knowing it exists (§5.6).
+   *
+   * T-11 (DD-3): the `number` mapping is a DEFENSIVE ASSERTION of DD-2's read-shape invariant, not a
+   * second normaliser. DD-2's entity transformer already guarantees a `number` (or `null`) at the API
+   * boundary; this coerces defensively in case that invariant ever lapses three layers away, rather
+   * than trusting the driver's hydration type outright — the same stance
+   * `result-actors.service.ts:377-384` takes for `result_actors_id` (a `bigint` column, same driver
+   * hazard). `null`/`undefined` stay `null` — never coerced to `0` (DD-2's null contract) — and `0`
+   * itself is a value, never treated as absent.
    */
   quantificationsView = computed<QuantificationItemData[]>(() =>
     this.body().quantifications.map(row => ({
-      number: row.quantification_number ?? null,
+      number:
+        row.quantification_number === undefined || row.quantification_number === null
+          ? null
+          : Number(row.quantification_number),
       unit: row.unit ?? '',
       comments: row.description ?? ''
     }))
@@ -432,7 +467,13 @@ export default class InnovationUseDetailsComponent {
       organizations: current.organizations.filter(row => this.organizationIdentitySatisfied(row)).map(row => this.buildOrganizationPayload(row)),
       quantifications: current.quantifications.filter(row => !this.quantificationRowAbsent(row)).map(row => ({
         id: row.id,
-        quantification_number: row.quantification_number,
+        // T-11 (DD-15): the payload's declared type (`InnovationUseQuantificationPayload`, below)
+        // stays `number` — the API always expects a number (DD-17) — so this narrows the widened
+        // read type back down at the one point the read and write paths meet. Reverting the read
+        // widening at `get-innovation-use-details.interface.ts` while keeping this narrowing makes
+        // the `typeof` check compare against a type with no `string` member, which does not compile
+        // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
+        quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
         unit: row.unit,
         description: row.description
       }))

@@ -3,7 +3,7 @@
 > **This is an amendment to an in-flight child spec, not a new spec.** It is filed beside
 > [`proposal.md`](./proposal.md) rather than in its own folder **on purpose**: creating a folder under
 > `docs/specs/innovation-use/` would mint a child the family manifest's **closed set** has not
-> authorized. No new row in [`../family.md`](../family.md) §Children is requested; chunk 3's existing
+> authorized. No new row in [`../family.md`](../../innovation-use/family.md) §Children is requested; chunk 3's existing
 > row gains an *Amendments* note instead.
 
 **Answer up front:** add two copy blocks around the existing 0–9 use-level stepper (a guidance callout
@@ -33,7 +33,7 @@ while `T-10`…`T-13` are still open, so the full-suite/visual/a11y gate (KZ-003
 | --- | --- |
 | Slug | `level-guidance-copy` — derived from the free-text `/akili-propose` argument ("agregar textos alrededor del selector… modificar el primer párrafo") |
 | Amends | [`docs/specs/innovation-use/details-page/`](./) — chunk 3 of the `innovation-use` family |
-| Parent Spec | [`docs/specs/innovation-use/`](../family.md) |
+| Parent Spec | [`docs/specs/innovation-use/`](../../innovation-use/family.md) |
 | Document path | `docs/specs/innovation-use/details-page/proposal-amendment-01-level-guidance.md` |
 | Type | **Change** |
 | Approval Mode | **gated** — no pre-approval mandate was given |
@@ -117,7 +117,7 @@ Behavioral rules the outcome commits to:
 - [`requirements.md`](./requirements.md) — add **R-IUP-020**, **R-IUP-021**. ~~amend **R-IUP-005**~~ (Correction 2: nothing to amend).
 - [`tasks.md`](./tasks.md) — add **T-14**; add it to `T-13`'s dependencies. ~~extend `T-11`, `T-12`~~ (Correction 1: both `done`, not reopened).
 - [`design.md`](./design.md) — the two new blocks' placement, token choices, and the navigation decision.
-- [`../family.md`](../family.md) — chunk 3's row gains an *Amendments* note; **no new child row**.
+- [`../family.md`](../../innovation-use/family.md) — chunk 3's row gains an *Amendments* note; **no new child row**.
 - ~~[`../../../ux-ui/design.md`](../../../ux-ui/design.md) — register the guidance-callout pattern.~~ **Not owed** (Correction 3): `T-12`'s trigger is a **new token**, and none is added.
 
 ## Non-Goals
@@ -207,7 +207,7 @@ preference:
 
 Execution shape: **one new task, T-14**, placed **before T-11** so the a11y/token/design-registration
 tasks see the final surface. `tasks.md` §6's derivation and `design.md` §12's budget both need the
-delta recorded — the running total is already **4,871 LOC against ~3,200 budgeted**, so T-14 must be
+delta recorded — the running total is already **4,871 LOC against ~3,200 budgeted** *(the T-09 figure as read on 2026-08-26 at drafting; corrected to **4,874** on 2026-08-26 — see `execution.md` → `T-13` c10, the single home. The amendment's reasoning is unaffected by 3 lines)*, so T-14 must be
 added to the ledger explicitly, not absorbed.
 
 ## Risks, Dependencies, And Open Questions

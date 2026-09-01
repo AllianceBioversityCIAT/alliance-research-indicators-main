@@ -22,6 +22,26 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * when it goes red, and "some edit is missing" is a weaker gate than
  * "edit #1 is missing".
  *
+ * **F13d (`docs/specs/changes/measure-number-signed-decimal` T-07, closes
+ * `RK-9`).** No case here ever covered `result_quantifications` — `RK-9`
+ * found the measure copy path unasserted at every tier. F13d seeds two
+ * ACTIVE role-3 rows (signed, fractional, and at `DD-14`'s derived bound —
+ * maximally distinct sentinels, FP-48) plus one DEACTIVATED role-3 row on
+ * the same source result, calls the same real `SP_versioning`, then reads
+ * BOTH sides out of MySQL (`R-MSD-005`'s scenario, `:328`) with `SELECT *`
+ * on each side (ADR-11's column-coverage method, `R-MSD-005` AC.2 — rework
+ * attempt 2, FAIL: a hand-written column list was disqualified because it
+ * cannot see a column the routine's copy block silently drops), matches
+ * copied rows to their source by `(quantification_role_id, unit,
+ * description)` — **never by the value**, which is what is under test
+ * (`DD-20`, `J-20`: `result_quantifications` holds several rows per
+ * result, including deactivated ones, so a `toHaveLength(1)` premise or a
+ * value-only match would be a false gate) — and compares every remaining
+ * column after deleting only the identity columns (`id`, `result_id`).
+ * Only `SP_versioning`'s copy block names `quantification_number`
+ * (migration `1787083305648:360-387`); the routine's body is not diffed —
+ * `:327` disqualifies that as evidence, because the body does not change.
+ *
  * Only F13a/b/c call `SP_versioning` — the ONLY one of the four routines
  * that filters its source lookup by `platform_code = 'STAR'` (transcript
  * `1783029013035:93`; confirmed empirically while authoring this file: a
@@ -286,6 +306,16 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
             [resultId],
           ),
         );
+        // T-07 (measure-number-signed-decimal): F13d seeds
+        // result_quantifications rows on both the source and (via
+        // SP_versioning) the snapshot result — both share this
+        // officialCode, so this loop already reaches both result_ids.
+        await tryStep(`delete result_quantifications ${resultId}`, () =>
+          dataSource.query(
+            `DELETE FROM result_quantifications WHERE result_id = ?`,
+            [resultId],
+          ),
+        );
       }
 
       await tryStep(`delete results official_code ${officialCode}`, () =>
@@ -392,6 +422,149 @@ describe('Innovation Use lifecycle routines (T-13, F13/F14/F15/F18)', () => {
     );
     expect(copiedInstitutionType).toBeDefined();
     expect(copiedInstitutionType.organization_count).toBe(42);
+  }, 30000);
+
+  it('F13d: SP_versioning copies result_quantifications (role 3, signed, fractional) onto the new version, matched on (quantification_role_id, unit, description) — never the value (RK-9, R-MSD-005, DD-9, DD-20)', async () => {
+    const { resultId, officialCode } = await seedSourceResult(starPlatformCode);
+
+    // Maximally distinct sentinels (FP-48 — routine copy-path discipline):
+    // negative + fractional (the exact value from R-MSD-005's own
+    // scenario) and DD-14's derived scale-4 bound, so a positional
+    // mix-up between the two active rows would be visible. Plus one
+    // DEACTIVATED row the copy's `WHERE rq.is_active = TRUE`
+    // (`1787083305648:386`) must NOT carry over — proving
+    // `result_quantifications` holds several rows per result, including
+    // deactivated ones (J-20), rather than a false toHaveLength(1)
+    // premise.
+    await dataSource.query(
+      `INSERT INTO result_quantifications
+         (result_id, quantification_role_id, quantification_number, unit, description, is_active, created_by, updated_by)
+       VALUES (?, 3, -12.75, 'f13d-unit-active-1', 'f13d-desc-active-1', 1, 1, 1)`,
+      [resultId],
+    );
+    await dataSource.query(
+      `INSERT INTO result_quantifications
+         (result_id, quantification_role_id, quantification_number, unit, description, is_active, created_by, updated_by)
+       VALUES (?, 3, 549755813887, 'f13d-unit-active-2', 'f13d-desc-active-2', 1, 1, 1)`,
+      [resultId],
+    );
+    await dataSource.query(
+      `INSERT INTO result_quantifications
+         (result_id, quantification_role_id, quantification_number, unit, description, is_active, created_by, updated_by)
+       VALUES (?, 3, 2.5, 'f13d-unit-deactivated', 'f13d-desc-deactivated', 0, 1, 1)`,
+      [resultId],
+    );
+
+    const newResultId = await callSpVersioning(officialCode);
+
+    // Rework attempt 2, FAIL (both lenses): `SELECT *` on BOTH sides
+    // (:328), never a hand-written column list — ADR-11's
+    // column-coverage method (`R-MSD-005` AC.2, `DD-20`) still governs,
+    // and a hand-picked three-column projection would stay green if a
+    // future migration added a column to the routine's SELECT list but
+    // not its copy list (ADR-11 blind spot (i) — the exact class of
+    // defect this requirement exists to catch).
+    const sourceRows: Record<string, unknown>[] = await dataSource.query(
+      `SELECT * FROM result_quantifications WHERE result_id = ? AND quantification_role_id = 3`,
+      [resultId],
+    );
+    const newRows: Record<string, unknown>[] = await dataSource.query(
+      `SELECT * FROM result_quantifications WHERE result_id = ? AND quantification_role_id = 3`,
+      [newResultId],
+    );
+
+    // Key-count assertion (DD-20 multi-row-aware, J-20), by COUNT rather
+    // than by column list: the source holds all three seeded rows (two
+    // ACTIVE + one DEACTIVATED); the copy holds only the two ACTIVE ones
+    // (`WHERE rq.is_active = TRUE`, `1787083305648:386`).
+    expect(sourceRows).toHaveLength(3); // source: 2 active + 1 deactivated
+    expect(newRows).toHaveLength(2); // snapshot: deactivated row excluded
+
+    // Matched on (unit, description) — DD-20's key, minus
+    // (result_id, quantification_role_id), which are already fixed per
+    // side by each query's own WHERE clause — NEVER on
+    // quantification_number, which is what is under test.
+    const keyOf = (row: Record<string, unknown>): string =>
+      `${row.unit}::${row.description}`;
+    const sourceByKey = new Map(sourceRows.map((r) => [keyOf(r), r]));
+    const newByKey = new Map(newRows.map((r) => [keyOf(r), r]));
+
+    // Only `id` and `result_id` legitimately differ between a source row
+    // and its copy — every other column, including the audit columns
+    // the routine copies verbatim (`rq.created_at`, `rq.created_by`,
+    // ...), must match exactly.
+    const withoutIdentityColumns = (
+      row: Record<string, unknown>,
+    ): Record<string, unknown> => {
+      const trimmed = { ...row };
+      delete trimmed.id;
+      delete trimmed.result_id;
+      return trimmed;
+    };
+
+    const sourceActive1 = sourceByKey.get(
+      'f13d-unit-active-1::f13d-desc-active-1',
+    );
+    const sourceActive2 = sourceByKey.get(
+      'f13d-unit-active-2::f13d-desc-active-2',
+    );
+    const copiedActive1 = newByKey.get(
+      'f13d-unit-active-1::f13d-desc-active-1',
+    );
+    const copiedActive2 = newByKey.get(
+      'f13d-unit-active-2::f13d-desc-active-2',
+    );
+
+    expect(sourceActive1).toBeDefined();
+    expect(sourceActive2).toBeDefined();
+    expect(copiedActive1).toBeDefined();
+    expect(copiedActive2).toBeDefined();
+    // The DEACTIVATED row's key must be absent from the snapshot side —
+    // not merely fewer rows overall, but THIS specific row excluded.
+    expect(newByKey.has('f13d-unit-deactivated::f13d-desc-deactivated')).toBe(
+      false,
+    );
+
+    const trimmedSourceActive1 = withoutIdentityColumns(
+      sourceActive1 as Record<string, unknown>,
+    );
+    const trimmedSourceActive2 = withoutIdentityColumns(
+      sourceActive2 as Record<string, unknown>,
+    );
+    const trimmedCopiedActive1 = withoutIdentityColumns(
+      copiedActive1 as Record<string, unknown>,
+    );
+    const trimmedCopiedActive2 = withoutIdentityColumns(
+      copiedActive2 as Record<string, unknown>,
+    );
+    expect(trimmedCopiedActive1).toEqual(trimmedSourceActive1);
+    expect(trimmedCopiedActive2).toEqual(trimmedSourceActive2);
+
+    // Human-readable sentinel check, kept alongside the SELECT *
+    // comparison above (task instruction) — the exact values a reader
+    // can eyeball without decoding the map keys.
+    //
+    // ⚠️ T-12 (measure-number-signed-decimal): DO NOT delete these two
+    // assertions as "already covered by the SELECT * / toEqual comparison
+    // above." They are not redundant — they are this file's ONLY defence
+    // against a stale schema. `toEqual` compares source-side and
+    // snapshot-side rows to EACH OTHER, never to an expected literal: on
+    // a pre-migration `bigint` column (or a scratch schema not rebuilt
+    // from `baseline.sql`) MySQL rounds `-12.75` to `-13` on the way in,
+    // both the source row and its `SP_versioning` copy hold `-13`, and
+    // `toEqual` stays green — it cannot see a `bigint` column at all,
+    // because both sides agree. Only the two `.toBe(-12.75)` /
+    // `.toBe(549755813887)` assertions below compare against the actual
+    // decimal literals this test seeded, so they are the sole tripwire
+    // that reddens on a stale (`bigint`) schema. This is the same
+    // integer-blindness `T-07`'s review found in the sibling OICR fixture
+    // before its `information_schema` guard was added.
+    expect(
+      Number((copiedActive1 as Record<string, unknown>).quantification_number),
+    ).toBe(-12.75);
+    expect(
+      Number((copiedActive2 as Record<string, unknown>).quantification_number),
+    ).toBe(549755813887);
   }, 30000);
 
   it('F14: SP_delete_result_version leaves no orphaned result_innovation_use row (edit #4)', async () => {

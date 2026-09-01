@@ -432,16 +432,35 @@ describe('ResultInnovationUseController', () => {
         );
       });
 
-      it('negative quantifications.0.quantification_number', async () => {
-        await expectRejected(
-          { quantifications: [{ quantification_number: -1 }] },
-          'quantifications.0.quantification_number',
-        );
+      // `quantification_number` is superseded here (`docs/specs/changes/
+      // measure-number-signed-decimal` T-04, DD-8, R-MSD-003): its
+      // `@IsInt() @Min(0)` pair is replaced by a signed, scale-bounded
+      // decimal constraint — this field only, the six sibling counts above
+      // are untouched. Negative and one-fractional-digit values
+      // are now accepted; the field's own spec
+      // (`dto/create-result-innovation-use.dto.spec.ts`) carries the
+      // exhaustive accept/reject matrix, including the DC-15 500-vs-400
+      // status-code proof; the per-field `2.5` matrix for all six siblings
+      // lives in `dto/create-result-innovation-use.dto.spec.ts`; this suite
+      // keeps the indexed-path (`quantifications.0.…`) rejection proof that
+      // spec's bare-name helper does not reproduce.
+      it('negative quantifications.0.quantification_number is now accepted', async () => {
+        const result = (await transform({
+          quantifications: [{ quantification_number: -1 }],
+        })) as CreateResultInnovationUseDto;
+        expect(result.quantifications?.[0].quantification_number).toBe(-1);
       });
 
-      it('fractional quantifications.0.quantification_number', async () => {
+      it('one-fractional-digit quantifications.0.quantification_number is now accepted', async () => {
+        const result = (await transform({
+          quantifications: [{ quantification_number: 3.3 }],
+        })) as CreateResultInnovationUseDto;
+        expect(result.quantifications?.[0].quantification_number).toBe(3.3);
+      });
+
+      it('a fifth fractional digit on quantifications.0.quantification_number still rejects', async () => {
         await expectRejected(
-          { quantifications: [{ quantification_number: 3.3 }] },
+          { quantifications: [{ quantification_number: 3.33333 }] },
           'quantifications.0.quantification_number',
         );
       });
