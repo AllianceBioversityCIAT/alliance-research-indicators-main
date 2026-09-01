@@ -413,6 +413,16 @@ export class AgressoContractRepository
       offset = (pagination.page - 1) * pagination.limit;
     }
 
+    const queryUserCarnet = `SELECT aus.carnet 
+                              from sec_users su 
+                              inner join alliance_user_staff aus on LOWER(TRIM(aus.email)) = LOWER(TRIM(su.email)) 
+                              where su.sec_user_id = ${user?.sec_user_id}
+                              limit 1`;
+
+    const userCarnet = await this.query(queryUserCarnet).then(
+      (response) => response[0]?.carnet || null,
+    );
+
     const userContracts = (userId?: number) =>
       userId
         ? `
@@ -433,7 +443,7 @@ export class AgressoContractRepository
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(user?.sec_user_id)}
     WHERE 1=1
-    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
+    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
     ${validFilter(queryConditions, `AND (${queryConditions})`)}
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
@@ -513,7 +523,7 @@ export class AgressoContractRepository
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
         ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL` : ''}
-        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
+        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}

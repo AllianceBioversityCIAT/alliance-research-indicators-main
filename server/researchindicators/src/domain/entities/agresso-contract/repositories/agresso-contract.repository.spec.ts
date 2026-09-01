@@ -517,6 +517,18 @@ describe('AgressoContractRepository', () => {
   });
 
   describe('getContracts', () => {
+    // getContracts issues a user-carnet lookup before the count/main queries, so
+    // the SQL under test is located by content instead of by call index.
+    const sqlContaining = (needle: string): string =>
+      ((repository.query as jest.Mock).mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes(needle),
+      )?.[0] ?? '') as string;
+    const countSql = () => sqlContaining('COUNT(DISTINCT ac.agreement_id)');
+    const mainSql = () => sqlContaining('paginated_contracts');
+    // Resolves the carnet lookup so the count/main mocks line up with their queries.
+    const mockCarnetLookup = () =>
+      (repository.query as jest.Mock).mockResolvedValueOnce([]);
+
     it('should get contracts with all filters', async () => {
       const filter = {
         contract_code: 'CONTRACT001',
@@ -648,13 +660,14 @@ describe('AgressoContractRepository', () => {
         undefined,
         'alpha beta',
       );
-      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      const sql = mainSql();
       expect(escapeLikeString).toHaveBeenCalled();
       expect(sql).toContain("ac.description LIKE '%alpha%'");
       expect(sql).toContain("ac.agreement_id LIKE '%beta%'");
     });
 
     it('should run count query and set metadata when paginated', async () => {
+      mockCarnetLookup();
       (repository.query as jest.Mock)
         .mockResolvedValueOnce([{ total: '12' }])
         .mockResolvedValueOnce([
@@ -688,10 +701,8 @@ describe('AgressoContractRepository', () => {
         { page: 2, limit: 5 },
       );
 
-      expect(repository.query).toHaveBeenCalledTimes(2);
-      expect(
-        (repository.query as jest.Mock).mock.calls[0][0] as string,
-      ).toContain('COUNT(DISTINCT ac.agreement_id)');
+      expect(repository.query).toHaveBeenCalledTimes(3);
+      expect(countSql()).toContain('COUNT(DISTINCT ac.agreement_id)');
       expect(out.metadata).toMatchObject({
         total: 12,
         page: 2,
@@ -751,9 +762,7 @@ describe('AgressoContractRepository', () => {
         with_indicators: true,
       } as any);
 
-      expect(
-        (repository.query as jest.Mock).mock.calls[0][0] as string,
-      ).toContain('AND pfc.id IS NULL');
+      expect(mainSql()).toContain('AND pfc.id IS NULL');
       expect(out.data).toHaveLength(1);
     });
 
@@ -767,7 +776,7 @@ describe('AgressoContractRepository', () => {
 
       await repository.getContracts();
 
-      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      const sql = mainSql();
       const predicate = effectivePoolFundingContributorSql('ac');
 
       expect(sql).toContain(`${predicate} AS is_pool_funding_contributor`);
@@ -779,6 +788,7 @@ describe('AgressoContractRepository', () => {
 
     it('should filter with the effective predicate on both count and main queries when pool-funding is true', async () => {
       // R-BIL-101 AC.1 — mapping-derived contracts are included in the "true" set.
+      mockCarnetLookup();
       (repository.query as jest.Mock)
         .mockResolvedValueOnce([{ total: '1' }])
         .mockResolvedValueOnce([]);
@@ -791,22 +801,25 @@ describe('AgressoContractRepository', () => {
         { page: 1, limit: 10 },
       );
 
-      const countSql = (repository.query as jest.Mock).mock
-        .calls[0][0] as string;
-      const mainSql = (repository.query as jest.Mock).mock
-        .calls[1][0] as string;
+      const countQuerySql = countSql();
+      const mainQuerySql = mainSql();
       const predicate = effectivePoolFundingContributorSql('ac');
 
-      expect(countSql).toContain(`AND ${predicate} = 1`);
-      expect(mainSql).toContain(`AND ${predicate} = 1`);
+      expect(countQuerySql).toContain(`AND ${predicate} = 1`);
+      expect(mainQuerySql).toContain(`AND ${predicate} = 1`);
       // Fails if the old raw-column filter is restored (tasks.md T-04 acceptance).
-      expect(countSql).not.toContain('AND ac.is_pool_funding_contributor =');
-      expect(mainSql).not.toContain('AND ac.is_pool_funding_contributor =');
+      expect(countQuerySql).not.toContain(
+        'AND ac.is_pool_funding_contributor =',
+      );
+      expect(mainQuerySql).not.toContain(
+        'AND ac.is_pool_funding_contributor =',
+      );
     });
 
     it('should filter with the effective predicate on both count and main queries when pool-funding is false', async () => {
       // R-BIL-101 AC.3 — mapping-derived contracts are excluded from the "false" set
       // because the predicate (not the raw column) is what gets compared to 0.
+      mockCarnetLookup();
       (repository.query as jest.Mock)
         .mockResolvedValueOnce([{ total: '0' }])
         .mockResolvedValueOnce([]);
@@ -819,16 +832,18 @@ describe('AgressoContractRepository', () => {
         { page: 1, limit: 10 },
       );
 
-      const countSql = (repository.query as jest.Mock).mock
-        .calls[0][0] as string;
-      const mainSql = (repository.query as jest.Mock).mock
-        .calls[1][0] as string;
+      const countQuerySql = countSql();
+      const mainQuerySql = mainSql();
       const predicate = effectivePoolFundingContributorSql('ac');
 
-      expect(countSql).toContain(`AND ${predicate} = 0`);
-      expect(mainSql).toContain(`AND ${predicate} = 0`);
-      expect(countSql).not.toContain('AND ac.is_pool_funding_contributor =');
-      expect(mainSql).not.toContain('AND ac.is_pool_funding_contributor =');
+      expect(countQuerySql).toContain(`AND ${predicate} = 0`);
+      expect(mainQuerySql).toContain(`AND ${predicate} = 0`);
+      expect(countQuerySql).not.toContain(
+        'AND ac.is_pool_funding_contributor =',
+      );
+      expect(mainQuerySql).not.toContain(
+        'AND ac.is_pool_funding_contributor =',
+      );
     });
 
     it('should not add the pool-funding predicate as a filter when it is absent', async () => {
@@ -838,7 +853,7 @@ describe('AgressoContractRepository', () => {
 
       await repository.getContracts({ contract_code: 'X' } as any);
 
-      const sql = (repository.query as jest.Mock).mock.calls[0][0] as string;
+      const sql = mainSql();
       const predicate = effectivePoolFundingContributorSql('ac');
 
       expect(sql).not.toContain(`AND ${predicate} = `);
