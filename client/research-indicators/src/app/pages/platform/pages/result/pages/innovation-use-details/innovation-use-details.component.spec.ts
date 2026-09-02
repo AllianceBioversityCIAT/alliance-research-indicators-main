@@ -2438,14 +2438,10 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   // SCOPE OF THIS EXCEPTION (KZ-017): every constant in this R3 block (WHITE_1, GREY_100, …) is
   // the LIGHT-theme value only, so this whole instrument — every role in it, not only this one —
   // is light-mode-only by construction; this exception is scoped the same way and proves nothing
-  // about dark mode. Separately: AR-1's own text states "Dark mode passes at 6.29:1; the failure
-  // is light-mode only." That sentence is CONFIRMED only for the 5 sites on --ac-grey-100 (dark
-  // RGB [43, 43, 43] -> 6.29:1) and is NOT accurate for the 3 sites on --ac-white-1
-  // (details:107,147, stepper:4): dark --ac-white-1 is RGB [229, 229, 229], and the amber on it
-  // measures roughly 1.79:1 — worse than light mode's 2.25:1, not a pass. That discrepancy in
-  // AR-1's wording is flagged to the Leader for correction at the source document; it is not
-  // corrected here (this task touches spec files only, per its own scope boundary), and no
-  // dark-mode assertion is added below — R3 does not cover dark mode for any role.
+  // about dark mode. The dark-mode deviation is real and spans both themes (requirements.md §8
+  // AR-1, corrected — the single home of this spec's contrast figures; accepted by the user as
+  // Pivot option A, tracked as tasks.md §5 RB-5), and no dark-mode assertion is added below — R3
+  // does not cover dark mode for any role.
   // -----------------------------------------------------------------------------------------------
   describe('validation role (--ac-warning-1): documented AA exception, not an omission (DD-9, AR-1, DR-1, D-7)', () => {
     const WARNING_AMBER: Rgb = [230, 159, 0]; // --ac-warning-1

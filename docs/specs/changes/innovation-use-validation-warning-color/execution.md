@@ -543,7 +543,9 @@ All three new/changed arrangements were checked against the client child guide's
 
 ## Pivot Record: T-03
 
-**Filed 2026-09-02. Status: awaiting user decision. Execution is stopped, not merely paused.**
+**Filed 2026-09-02. Status: RESOLVED the same day — user chose option A; see *Pivot resolution* below.**
+**When filed, this read "awaiting user decision, execution is stopped, not merely paused"** — kept visible because the
+stop actually happened and the record of a halted run is part of the audit trail, not noise to tidy away.
 
 ### The blocker
 
@@ -754,7 +756,7 @@ someone dropped a **qualifier**.
 | # | Item | Owner |
 | --- | --- | --- |
 | 1 | **AC.10** — the human visual check, still not discharged. Native stack confirmed running (pre-existing `ng serve` + backend on `:3001`); `styles.css` served already carries `--ac-warning-1` twice | User |
-| 2 | **A stale in-code comment introduced by this very correction.** `innovation-use-details.component.spec.ts:2446` still reads *"AR-1's wording is flagged to the Leader for correction at the source document; it is not corrected here"* — true when written, **false now** that `requirements.md` is corrected. The `T-03` Reviewer had already predicted this: *"once you correct that document these 12 lines should collapse to a one-line pointer."* Needs one small Implementer round; it is a **correctness fix, not the line-trim the user declined** | Leader — offered to the user |
+| 2 | ~~A stale in-code comment introduced by this very correction~~ — **DONE 2026-09-02.** The `SCOPE OF THIS EXCEPTION (KZ-017)` paragraph (`innovation-use-details.component.spec.ts:2438–2444`) said the `AR-1` correction was *pending at the source document*; true when written, false once `405908b1` landed. Replaced with a pointer to the corrected `AR-1` + `RB-5`, 11 comment lines → 7, comment-only diff, suite unchanged at 234/234. **Reviewer PASS** — it verified all six pointer claims at source, which mattered because the Leader wrote both the documents and the brief and was therefore not an independent auditor of the pointer's truth | ✅ closed |
 | 3 | The owed design-system ticket (`AR-1`, `RB-1`, done-definition) — now scoped to both themes | User |
 | 4 | `docs/specs/innovation-use/OPEN-ITEMS.md` is the innovation-use surface's open-items register and does **not** know about `RB-5`. Adding it is outside option A's scope; flagged, not done | Observation |
 
