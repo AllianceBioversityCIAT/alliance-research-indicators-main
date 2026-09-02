@@ -1,6 +1,6 @@
 <!-- @akili-spec docs/specs/innovation-use/details-page (T-05 — innovation use actor card) -->
 <ng-template #requiredMessage>
-  <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-red-1)]">
+  <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
     <i class="material-symbols-rounded !text-[14px]">warning</i>
     <span class="fs-[14]">This field is required</span>
   </div>
@@ -31,14 +31,14 @@
       [optionValue]="'code'"
       placeholder="Select the actor type"
       [ariaLabel]="'Select the actor type'"
-      class="fs-[14] w-full {{ actorTypeMissing || duplicateType ? 'border-2 rounded-md border-[var(--ac-red-1)]' : '' }}"
+      class="fs-[14] w-full {{ actorTypeMissing || duplicateType ? 'border-2 rounded-md border-[var(--ac-warning-1)]' : '' }}"
       [ngModel]="body().actor_type_id"
       (onChange)="onActorTypeChange($event.value)"
       [options]="actorService.list()">
     </p-select>
 
     @if (duplicateType) {
-      <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-red-1)]">
+      <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
         <i class="material-symbols-rounded !text-[14px]">warning</i>
         <span class="fs-[14]">This actor type has already been reported on another row</span>
       </div>
@@ -49,7 +49,7 @@
     @if (body().actor_type_id === otherActorTypeId) {
       <input
         pInputText
-        class="rs-mt-[12] w-full {{ otherNameMissing ? 'border-2 border-[var(--ac-red-1)]' : '' }}"
+        class="rs-mt-[12] w-full {{ otherNameMissing ? 'border-2 border-[var(--ac-warning-1)]' : '' }}"
         placeholder="Specify other"
         aria-label="Specify other actor type"
         [ngModel]="body().actor_type_custom_name"

@@ -71,11 +71,11 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - **Do not touch** `details:6,7` · `details:114` · `details:247,249` · `actor:16` · `org:16` · `details:15` · `actor:25`.
   - `details:114` is the trap — it sits between two sites that do change and looks field-scoped. It is server-sourced (`DD-8`).
 - **Acceptance / done check:**
-  - [ ] AC.1 — the 8 sites reference `var(--ac-warning-1)`.
-  - [ ] AC.2 — each changed line keeps its `material-symbols-rounded` `warning` icon and its existing text-size class.
-  - [ ] AC.3 — `actor:34` and `actor:52` still carry `border-2`.
-  - [ ] AC.4 — **no hex colour literal** was introduced into the 4 templates (`NFR-IUW-001`).
-  - [ ] AC.5 — every `--ac-*` name referenced in the 4 templates exists in `colors.scss` (defect class `D-3`).
+  - [x] AC.1 — the 8 sites reference `var(--ac-warning-1)`.
+  - [x] AC.2 — each changed line keeps its `material-symbols-rounded` `warning` icon and its existing text-size class.
+  - [x] AC.3 — `actor:34` and `actor:52` still carry `border-2`.
+  - [x] AC.4 — **no hex colour literal** was introduced into the 4 templates (`NFR-IUW-001`).
+  - [x] AC.5 — every `--ac-*` name referenced in the 4 templates exists in `colors.scss` (defect class `D-3`).
 - **Verification:**
   - Site count: `grep -c 'ac-warning-1' <the 4 templates>` totals **8**.
   - Kept-red count: `grep -c 'ac-red-1'` totals **7** (`details` 6,7,114,247,249 = 5 · `actor:16` · `org:16`).
@@ -87,7 +87,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Dependencies:** `T-01`
 - **Effort:** S
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** done
 
 ---
 
@@ -167,6 +167,7 @@ No new spec **files**. Coverage floors unchanged (client: statements 40 / branch
 | RB-1 | 2026-09-02 | **`AR-1`** — the amber fails light-mode AA (2.09 / 2.25 vs 4.5), moving this page from compliant to non-compliant | Accepted per `DR-1`; recorded as an executable exception in R3 (`DD-9`); design-system follow-up ticket owed | User | open |
 | RB-2 | 2026-09-02 | `D-6` has no automated gate — a wrong rendered colour passes every command | AC.10 human check with a quoted-observation disqualifier | Implementer | open |
 | RB-3 | 2026-09-02 | Engineering-lead formal sign-off on a §7.1 token addition may be owed (`DR-3`) | Confirm before merge | D. Casañas | open |
+| RB-4 | 2026-09-02 | **`T-02` must not merge without `T-03`.** As of `T-02` the page ships validation text at 2.09:1 / 2.25:1 against PRD `C-4`, and the R3 harness (`innovation-use-details.component.spec.ts:2284`) is silent about the new role — the exact failure mode R3 was built to remediate. `T-02` alone on `dev` is a live *and* undetectable deviation, materially worse than the pre-spec red. Raised by `T-02`'s Reviewer | Treat as a **hard merge condition**, not a preference: no PR carrying `T-02` without `T-03` | Leader / D. Casañas | open |
 
 ---
 
