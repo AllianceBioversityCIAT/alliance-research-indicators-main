@@ -755,9 +755,164 @@ someone dropped a **qualifier**.
 
 | # | Item | Owner |
 | --- | --- | --- |
-| 1 | **AC.10** — the human visual check, still not discharged. Native stack confirmed running (pre-existing `ng serve` + backend on `:3001`); `styles.css` served already carries `--ac-warning-1` twice | User |
+| 1 | **AC.10** — performed 2026-09-02. **RESULT: FAIL — a real rendering defect, see the dedicated section below.** | User (observed) / Leader (investigating) |
 | 2 | ~~A stale in-code comment introduced by this very correction~~ — **DONE 2026-09-02.** The `SCOPE OF THIS EXCEPTION (KZ-017)` paragraph (`innovation-use-details.component.spec.ts:2438–2444`) said the `AR-1` correction was *pending at the source document*; true when written, false once `405908b1` landed. Replaced with a pointer to the corrected `AR-1` + `RB-5`, 11 comment lines → 7, comment-only diff, suite unchanged at 234/234. **Reviewer PASS** — it verified all six pointer claims at source, which mattered because the Leader wrote both the documents and the brief and was therefore not an independent auditor of the pointer's truth | ✅ closed |
 | 3 | The owed design-system ticket (`AR-1`, `RB-1`, done-definition) — now scoped to both themes | User |
 | 4 | `docs/specs/innovation-use/OPEN-ITEMS.md` is the innovation-use surface's open-items register and does **not** know about `RB-5`. Adding it is outside option A's scope; flagged, not done | Observation |
+
+---
+
+## AC.10 — human visual check: **FAILED**, and it found what no command could
+
+**Performed 2026-09-02 by the user (D. Casañas) on the running native stack, with two screenshots.**
+
+### The observation, quoted (`KZ-002` / the task's own Evidence disqualifier)
+
+> *"esta el texto en ambar pero el borde no esta con el color"*
+> — with a screenshot of `ACTOR # 5`: the `Actor type` select empty, the *"⚠ This field is required"*
+> message rendering **amber**, and the select's border rendering as the **ordinary light PrimeNG
+> border — no coloured outline at all.**
+
+> *"adjunto de imagen de muestra de como deberia quedar"*
+> — with a reference screenshot of the **`Contribution to SDG`** field: a **2px amber rounded border**
+> around the select **plus** the amber message below it. That is the intended treatment.
+
+**This discharges the disqualifier's requirement.** The observation names the *validation* amber on an
+*invalid actor card* and compares it against a reference field on the same surface, and it is specific
+about **which property** diverges (the border, not the text). It is not a "looks right".
+
+### Verdict against the criterion
+
+AC.10 asks that *"an invalid actor card and the `Justification` field are compared on the same rendered
+screen; the amber is indistinguishable between them and no layout shifted."* The amber is **not**
+indistinguishable: the message colour matches, the border does not render at all. **AC.10 fails.** It
+stays `[ ]`, and `T-03` stays `[~]`.
+
+### Why this matters more than the defect itself
+
+Every automated gate in this spec passed over it, and each one passed **correctly** — none of them was
+broken or badly written:
+
+| Gate | Result | Why it could not see this |
+| --- | --- | --- |
+| `grep -c 'ac-warning-1'` = 8 | ✅ green | The token name **is** in the markup at `actor:34`. Presence is all it claims |
+| Token cross-check (`D-3`) | ✅ green | `--ac-warning-1` **does** exist in `colors.scss`. No typo |
+| `npx jest --testPathPattern innovation-use` | ✅ 234/234 | jsdom has no layout engine, no cascade resolution, no computed colour |
+| T-03 AC.2's assertion | ✅ green | It asserts `className` **contains** `border-[var(--ac-warning-1)]`. It does. The class is present **and inert** |
+| Full client suite | ✅ 6790/6790 | Same limitation, 6790 times over |
+| `npm run lint -- --quiet` | ✅ clean | Lint has no opinion on whether a utility class wins the cascade |
+| R3 contrast harness | ✅ green | Pure arithmetic over RGB triples — it never touches the DOM's painted state |
+
+**This is `D-6` landing exactly as `requirements.md` §6 predicted it would**, and it is the strongest
+possible vindication of that section: *"`npm test` and a grep both pass over a page that renders wrong.
+The gate is a person looking at the screen — stated here so it is not quietly skipped."* Had AC.10 been
+waived as bureaucracy, this spec would have shipped a validation state with **no visible border**, with
+six green gates and a Reviewer PASS behind it.
+
+It is also a textbook `KZ-001` instance at the highest severity the log records (Critical, recurrence
+13): *a cohort assertion that doesn't evaluate what it stands in for produces a green suite over broken
+behavior — a property that lives in generated output must be asserted there.* The assertion proved the
+token name **won the attribute**. Nobody proved it **won the cascade**.
+
+### Open question the investigation must answer first
+
+**Did the RED border ever render?** `requirements.md` §3's site table and the original proposal
+screenshots both describe a red border on this select before the change. If red rendered and amber does
+not, the cause is specific to this change. If the red border came from somewhere else entirely — PrimeNG's
+own invalid styling, or a global rule in `custom-prime-force-styles.scss` — then **`actor:34`'s Tailwind
+arbitrary class never painted anything**, the site was mis-enumerated from the start, and `DD-4`
+(*"the Tailwind risk is closed, not deferred"*) is falsified for the `p-select` case.
+
+A read-only scout is investigating. The distinction decides whether this is a bug fix inside T-03 or a
+second Pivot, so **no code will be changed until it is settled.**
+
+---
+
+## Pivot Record: T-02 / T-03 — `DD-4` is falsified
+
+**Filed 2026-09-02 after AC.10 failed. Status: awaiting user decision. No code changed.**
+
+### Root cause: CSS Cascade Layers, not the token, not the DOM
+
+Investigated by a read-only scout, then **each load-bearing claim re-verified by the Leader
+independently** (`K-004` — the crux of a Pivot may not rest on a single report):
+
+| Claim | Verified |
+| --- | --- |
+| PrimeNG draws the border with its own rule on the same element | ✅ `node_modules/primeng/fesm2022/primeng-select.mjs:28` — `border: 1px solid ${dt('select.border.color')}`; `primeng-inputtext.mjs:17` — same shape |
+| PrimeNG's CSS is **unlayered** | ✅ `client/research-indicators/src/app/app.config.ts:29–36` — `providePrimeNG({ theme: { preset, options: { darkModeSelector } } })`. **`cssLayer` is never set**, and it defaults to `false`, so nothing is wrapped in `@layer` |
+| Tailwind emits every utility **inside `@layer utilities`** | ✅ Tailwind v4 is a cascade-layers engine by architecture, and it is loaded **only** as the runtime browser CDN (`src/index.html:12–15`, `@tailwindcss/browser@4.1.6`); `grep -c tailwind package.json` = **0**, so there is no build-time config that could change this |
+| The reference field paints its border with an **inline style**, not a class | ✅ `custom-fields/select/select.component.html:20` — `[style]="isInvalid() ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"`; `multiselect.component.html:20` is identical |
+
+**The mechanism:** per the CSS Cascade Layers spec, **unlayered author CSS unconditionally beats layered
+author CSS** for the same property on the same element — regardless of selector specificity or source
+order. So `.p-select { border: 1px solid … }` (unlayered) always defeats `border-2
+border-[var(--ac-warning-1)]` (layered), and no amount of specificity, ordering, or class placement can
+change that. The class **is generated, does land on the right element, and is inert.**
+
+The text renders amber because nothing unlayered contests `color` on a plain `<div>`. There is no cascade
+fight to lose there.
+
+### The finding that reframes the whole change: **the red border never rendered either**
+
+`actor:34` and `actor:52` carried `border-[var(--ac-red-1)]` before `6e33707f`, subject to the **identical**
+defeat. No project SCSS colours a `.p-select` / `.p-inputtext` border, and PrimeNG's own red invalid
+border needs `.p-select.ng-invalid.ng-dirty` — which requires Angular Forms validators, while this
+component uses one-way `[ngModel]` with plain boolean getters (`innovation-use-actor-item.component.ts:90,94`)
+and declares no `Validators` anywhere.
+
+**So this spec did not break these two sites. It inherited them broken and renamed an inert rule.**
+
+### What is falsified
+
+| Artifact | Status |
+| --- | --- |
+| **`DD-4`** — *"The Tailwind risk is **closed, not deferred**"* | **FALSIFIED for PrimeNG elements.** `DD-4` verified that the runtime JIT **generates** the class and that the remote `colors.css` holds no competing utility rules. Both true. But the risk it declared closed was *"will the class exist"*, while the actual failure is *"will the class win the cascade"* — a different question it never asked. **This is `KZ-017` in the design phase: a verification narrower than the claim it backed, returning a confident green.** The `DD-4` investigation even fetched a remote stylesheet to rule out interference, and never checked the one thing that mattered |
+| **`requirements.md` §3's site table** | Mis-enumerated. `actor:34` (*"invalid `p-select` border"*) and `actor:52` (*"invalid 'Specify other' input border"*) are listed as sites that render a coloured border. They render none |
+| **`R-IUW-002` AC.2 / AC.3** | *"Colour is the only delta"* and *"border sites keep `border-2`"* cannot both hold with the fix: the fix **replaces the mechanism** at these 2 sites |
+| **`T-02`** | Marked `[x]`, and its AC.1 is literally true — the 8 sites do reference the token. **2 of the 8 reference it inertly**, so the requirement's *intent* is unmet at 25% of its surface |
+| **`T-03` AC.2** | Asserts `className` contains `border-[var(--ac-warning-1)]`. It passes over the defect and would keep passing after a wrong fix |
+| **`AR-1`'s SC 1.4.11 note** | *"below the 3:1 SC 1.4.11 asks of the two border sites"* — measured against borders that do not exist. The real a11y state is **worse** than a low-contrast border: an invalid select has **no** non-text indicator at all |
+
+### The fix, and why it improves on the reference it copies
+
+Match the established pattern — a `[style]` object binding, which Angular applies as a genuine inline
+style (`Renderer2.setStyle`), and **inline style outranks every stylesheet rule, layered or not**:
+
+- `actor:34` — `[style]="actorTypeMissing || duplicateType ? { border: '2px solid var(--ac-warning-1)' } : {}"`
+- `actor:52` — `[style]="otherNameMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"`
+
+**One deliberate divergence from the reference:** `select.component.html:20` hardcodes `'2px solid
+#E69F00'` — a **hex literal**, exactly what `DD-7` bans and what the other 22 unmigrated files do. The fix
+uses `var(--ac-warning-1)` instead, which works identically in an inline style. So `NFR-IUW-001` (zero hex
+literals) still holds, and the fix is *more* compliant than the pattern it imitates. Recorded because
+"follow the exemplar" would have introduced the violation this whole spec exists to remove.
+
+`radio-button.component.scss:12–17` (`::ng-deep` + `!important`) is the fallback for when the paint node
+is a **descendant** PrimeNG cannot reach with a host-level `[style]`. Not needed here — both sites paint
+on their own element.
+
+### Blast radius beyond this spec (flagged, not actioned)
+
+**Any Tailwind `border-*` utility on any PrimeNG element anywhere in this app is inert**, by the same
+mechanism. `custom-fields/input/input.component.html:49,55` already hedges with *both* a Tailwind class
+**and** an `[style]` carrying `!important` — evidence the team has hit this before without naming it.
+`DR-2` (Option A) scopes this spec to Innovation use, so a repo-wide audit is **out of scope here** and
+belongs in its own proposal.
+
+### Why this is a Pivot and not a bug fix inside T-03
+
+`T-03` is test-files-only, and the change needed is in a **template** — inside `T-02`, which is closed and
+committed. More importantly the approved design is **wrong about how this works**: `DD-4` cleared a risk
+that was live, and `R-IUW-002` AC.2's *"colour is the only delta"* is not satisfiable at these 2 sites.
+Proceeding without amending the spec would mean implementing against a design that has been shown false.
+
+### Alternatives for the user
+
+| # | Option | Consequence |
+| --- | --- | --- |
+| **A** | **Fix it in this spec.** Amend `DD-4`, the §3 site table, `R-IUW-002` AC.2/AC.3; reopen `T-02` for the 2 border sites with the `[style]` pattern; update `T-03` AC.2's assertion to read the inline style (which jsdom **can** see — `element.style.border` is real there, unlike a class's cascade outcome); re-run and re-verify AC.10 | Delivers what was actually asked (validation that looks like the reference, border included). Costs one more T-02 + T-03 round. **Recommended** |
+| **B** | **Fix only the colour scope; file the border defect separately.** Accept that `actor:34`/`actor:52` show no border — as they never did — close this spec on the 6 text sites, and raise a new proposal for the PrimeNG/Tailwind cascade defect app-wide | Defensible: the defect is **pre-existing** and this spec did not cause it. But it closes a spec whose stated goal is visual parity with the reference, while 2 of 8 sites visibly diverge |
+| **C** | **A, plus widen to the app-wide audit** | Honest about the blast radius, but `DR-2` explicitly scoped the app-wide migration out, and the budget already overran 5× |
 
 ---
