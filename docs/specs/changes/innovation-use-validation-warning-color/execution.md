@@ -1101,6 +1101,55 @@ inline styles win, claimed jsdom can read them back". **The pattern is asserting
 **What none of it proves:** the composited pixel. **AC.8 is the only remaining gate**, and per the
 Reviewer it must be asked more sharply than "is the border amber now" — see below.
 
+#### AC.8 — human visual re-check: **PASSES for `actor:34`, and is NOT yet discharged for `actor:52`**
+
+**Performed 2026-09-02 by the user with a screenshot of `ACTOR # 5`.**
+
+**On the evidence, and on the disqualifier.** The user's words were *"ahora si se ve bien"* (*"now it does
+look right"*). Taken alone **those words are exactly what this spec's Evidence disqualifier rejects** —
+*"a report that the page 'looks right' or that 'the section renders' does not discharge it."* What
+discharges the criterion is the **attached screenshot**, which the Leader read directly. A rendered image
+is strictly stronger evidence than a sentence about it, because it can be interrogated against criteria
+the observer was not asked about. Recorded this way so the trail does not credit a disqualified phrase
+with work the image did.
+
+**Read off the screenshot, against the Reviewer's sharpened questions:**
+
+| Question the Reviewer insisted on | Observed |
+| --- | --- |
+| Is there **one** 2px amber border, not two concentric outlines? | ✅ **One.** This was the live open question — which node of the `p-select` receives the inline border (host vs PrimeNG's inner root div). A double outline would have meant both. It does not occur |
+| Is PrimeNG's normal corner radius preserved after `rounded-md` was dropped? | ✅ Rounded corners present, matching the reference field's appearance. Confirms the Reviewer's ruling that `rounded-md` was inert and PrimeNG supplies its own radius |
+| Same amber, same 2px weight as the reference? | ✅ Visually indistinguishable from the `Contribution to SDG` reference image the user supplied earlier |
+| Did any layout shift? | ✅ No. Label, select, message, checkbox and the four count fields hold the spacing of the pre-fix screenshot |
+| Message treatment intact? | ✅ Amber text + `warning` icon, unchanged |
+| Negative guards visible in the same frame? | ✅ `Actor type*` asterisk still **red**; the remove (⊗) button still **red** — `D-2`'s two negative guards confirmed *visually*, not just by assertion |
+
+**So the border half of `R-IUW-002` scenario 1's THEN clause is delivered and observed** — for the first
+time in this spec's history, since it never rendered before `T-04`.
+
+#### ⛔ The gap: `actor:52` is not visually verified, and it is a materially different code path
+
+The screenshot cannot show it. With `Actor type` **empty**, the `Specify other` input is not rendered at
+all (`@if (body().actor_type_id === otherActorTypeId)`), so the frame that proves `:34` structurally
+excludes `:52`.
+
+**This is not pedantry, and the reason is specific.** The two sites lose the same cascade fight, but they
+**apply** the inline style through different mechanisms:
+
+- `actor:34` is a **`p-select` component**, which declares `style` as an `@Input` and re-applies it to its
+  host through PrimeNG's own compiled `ɵɵstyleMap` host binding.
+- `actor:52` is a native `<input>` carrying the **`pInputText` directive**, which declares no `style`
+  input — Angular writes the style straight onto the element.
+
+The unit tests cover both (`c8b`'s pair asserts `:52` in its invalid and valid states), and the mechanism
+is sound in both. But the whole reason `AC.8` exists is that this spec has already shipped one defect
+where every assertion passed and the pixel was wrong, on precisely a *"the mechanism is obviously the
+same"* assumption (`DD-4`). **Extending an observation of `:34` to `:52` would repeat that inference.**
+
+Per the disqualifier — *"if the observation covers an adjacent property, say which and leave it
+blocked"* — `AC.8` stays **`[ ]`** and `T-04` stays **`[~]`** pending one more frame: `Actor type` set to
+**Other** with the `Specify other` name left empty.
+
 ---
 
 ---
