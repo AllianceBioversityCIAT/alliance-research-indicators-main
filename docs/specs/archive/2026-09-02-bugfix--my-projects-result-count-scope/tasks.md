@@ -2,7 +2,7 @@
 
 - **Module:** agresso (server)
 - **Spec id:** 2026-09-my-projects-result-count-scope
-- **Status:** in-progress
+- **Status:** validated (PASS WITH WARNINGS) — ready to archive
 - **Owner:** David Felipe Casañas Hernández
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -100,10 +100,10 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
   5. Load **My Projects**, sort by **Results** DESC, and read the column top to bottom.
 
 - **Acceptance / done check:**
-  - [ ] The two `count_results` values in steps 2 and 3 are **equal**.
-  - [ ] `metadata.total` and the ordered `agreement_id` list for a fixed request are **unchanged** vs. the pre-deploy capture (R-MPC-002 — the fix must not widen the row set).
-  - [ ] The Results column under DESC is non-increasing **and** its values match what All Projects shows for the same contracts.
-  - [ ] Screenshots or raw JSON for steps 2, 3 and 5 attached to `execution.md`.
+  - [x] The two `count_results` values in steps 2 and 3 are **equal** — both `112` for `A1048` on Dev, 2026-09-02 (see `execution.md`). Deploy confirmed via `git log origin/dev`.
+  - [ ] `metadata.total` and the ordered `agreement_id` list for a fixed request are **unchanged** vs. the pre-deploy capture (R-MPC-002 — the fix must not widen the row set). **DECLARED UNVERIFIED** — no pre-deploy baseline was captured and the merge to `dev` has landed, so the comparison is unavailable for this deployment. A structural argument (visibility mechanism byte-identical) is recorded in `execution.md` and is explicitly **not** a substitute.
+  - [x] The Results column under DESC is non-increasing **and** its values match what All Projects shows for the same contracts — `A1048`=112, `A1065`=39 on both tabs, DESC active (Dev, 2026-09-02). Closes DC-6.
+  - [x] Screenshots or raw JSON for steps 2, 3 and 5 attached to `execution.md` — committed under `evidence/` and read back from the committed files, not from the paste.
 
 - **What disqualifies this evidence:**
   - A pre-deploy capture taken from a different environment or a different page size — it is not a baseline.
@@ -114,7 +114,7 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
 - **Skills:** none required
 - **Dependencies:** T-01 deployed to Dev
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** done
 
 ---
 
@@ -143,7 +143,7 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
 - **Skills:** none required
 - **Dependencies:** T-01 deployed to Dev
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** waived (accepted, unmeasured risk — user decision 2026-09-02)
 
 ---
 
@@ -218,9 +218,9 @@ the `count-results` sort on My Projects changes from user-scoped to contract-wid
 
 ## 8. Done definition
 
-- [ ] T-01, T-02, T-03 all `done`.
-- [ ] Every AC in `requirements.md` checked, and every clause in §4 above owned by a task that ran.
-- [ ] Coverage thresholds still green (60% server).
+- [x] T-01 `done`, T-02 `done`, **T-03 `waived`** — NFR-MPC-001 accepted as an unmeasured risk by user decision (2026-09-02). Not satisfied, not measured; see `execution.md`.
+- [x] Every AC in `requirements.md` checked, and every clause in §4 above owned by a task that ran — independently audited 2026-09-02 at scenario-and-clause granularity: **26 clauses, 0 FAIL, 20 PASS, 6 WARN (all declared)**. See `validation-report.md` §6.
+- [x] Coverage thresholds still green (60% server) — verified 2026-09-02: `All files 84.18% stmts / 76.3% branch / 84.55% funcs / 84.22% lines`, `npm run test:cov` exit `0`. Unit config only (`rootDir: src`); not e2e/integration.
 - [x] No Swagger change needed — verified 2026-09-02: `agresso-contract.controller.ts:372` reads `'Field to order by (count-results = total active results per contract)'`, which the fix makes true. `mapper-agresso-contract.dto.ts:15` ("same basis as count-results sort") is likewise now accurate.
-- [ ] OQ-1 and OQ-2 either resolved or carried forward as a new spec.
+- [x] OQ-1 and OQ-2 **carried forward, not resolved** — OQ-1 (surface the user's own contribution, e.g. "21 of 54 yours") is explicitly out of scope here and needs its own proposal if wanted; OQ-2 (is `rc.is_primary = TRUE` the intended definition of a contract total?) was flagged only so this fix did not silently change it, and it did not. Both belong to `/akili-archive`'s carry-forward.
 - [x] NF-3 and NF-4 from `judgment.md` §9.1 acknowledged **and honored** — both caveats (keep the `:402` wrapper parens; do not reorder the four predicates) were passed verbatim in the Implementer brief, the corrected DC-7 mutation ("delete the closing-paren line at `:326` from the *fixed* code") was the one actually run, and the Reviewer independently confirmed the parens are preserved and `rc_ord.is_primary = TRUE` is still last.
