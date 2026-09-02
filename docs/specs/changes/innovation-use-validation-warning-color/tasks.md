@@ -2,7 +2,7 @@
 
 - **Module:** client — `innovation-use-details`
 - **Spec id:** 2026-09-innovation-use-validation-warning-color
-- **Status:** in-progress
+- **Status:** in-progress — 4 tasks (T-04 added by the 2026-09-02 Pivot)
 - **Owner:** D. Casañas
 - **Depth:** Lite
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -18,7 +18,13 @@
 T-01 (token + §7.1 registration)
    └──> T-02 (8 call sites)
            └──> T-03 (assertions + R3 role + human visual check)
+                   └──> T-04 (Pivot: the 2 border sites never rendered — [style] fix + assertions + re-verify AC.10)
 ```
+
+**`T-04` was added 2026-09-02 by the Pivot** (`RB-6`, `DD-10`), after `T-03`'s AC.10 human check found the
+two border sites render no border in any colour. It is not new scope: it delivers `R-IUW-002` scenario 1's
+THEN clause (*"the select's 2px border … render[s] in the warning token"*), which `T-02` was believed to
+have delivered and had not.
 
 Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03`'s site list is derived from `T-02`'s failing suite (**K-018**).
 
@@ -67,7 +73,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Description:** Replace `var(--ac-red-1)` with `var(--ac-warning-1)` at exactly the 8 client-side field-validation sites. Colour is the only delta — markup, icon, text, spacing, border width and conditionals are untouched.
 - **Implementation notes:**
   - Static attributes (`details:107,147` · `actor:3,41` · `org:3` · `stepper:4`): `text-[var(--ac-red-1)]` → `text-[var(--ac-warning-1)]`.
-  - Interpolated class strings (`actor:34`, `actor:52`): swap **only** the token inside `{{ … }}`; keep `border-2` and the surrounding ternary intact.
+  - ~~Interpolated class strings (`actor:34`, `actor:52`): swap **only** the token inside `{{ … }}`; keep `border-2` and the surrounding ternary intact.~~ **← SUPERSEDED by `T-04` (`RB-6`, `DD-10`).** This instruction was carried out exactly and produced an inert class. Kept struck-through, not deleted, because `T-02`'s commit implemented it and the audit trail must explain what that commit did. **`T-04` removes these fragments** — do not follow this line.
   - **Do not touch** `details:6,7` · `details:114` · `details:247,249` · `actor:16` · `org:16` · `details:15` · `actor:25`.
   - `details:114` is the trap — it sits between two sites that do change and looks field-scoped. It is server-sourced (`DD-8`).
 - **Acceptance / done check:**
@@ -87,7 +93,8 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Dependencies:** `T-01`
 - **Effort:** S
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** done
+- **Status:** done — **but superseded at 2 of its 8 sites by `T-04`** (`RB-6`)
+- **⚠️ Supersede note (2026-09-02).** `T-02` executed the approved spec **faithfully and correctly**: all 5 of its ACs hold, its diff is exactly the token substitution the design specified, and its Reviewer PASS stands. The **spec** was wrong. At `actor:34` and `actor:52` the substituted class is inert (`DD-10`), so the token reached the attribute and never the pixel — and the pre-change red was equally inert, meaning `T-02` did not regress anything. Left `done` rather than reopened, because reopening would imply the work was mis-executed; the correction is new, separately-approved work in `T-04`.
 
 ---
 
@@ -127,6 +134,42 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 
 ---
 
+
+### T-04 — Render the two border sites (Pivot: `DD-4` falsified)
+
+- **Origin:** **Pivot**, 2026-09-02 (`execution.md` → *Pivot Record: T-02 / T-03*; risk `RB-6`). User approved direction **A**. Not new scope — it delivers `R-IUW-002` scenario 1's THEN clause, which `T-02` was believed to have delivered and had not.
+- **Requirements covered:** `R-IUW-002` AC.3 (revised), scenario 1 THEN (border half), `NFR-IUW-001`, `NFR-IUW-002`
+- **Design refs:** `DD-10` (supersedes `DD-4`), `§5.2` (revised row), `§6` (inline-style row), defect class `D-8`
+- **Files touched (intended):**
+  - `…/components/innovation-use-actor-item/innovation-use-actor-item.component.html` (2 sites: `34`, `52`)
+  - `…/components/innovation-use-actor-item/innovation-use-actor-item.component.spec.ts` (realign the border assertions)
+- **Description:** Make the two invalid-field borders actually paint, using the codebase's established `[style]` object-binding pattern, and convert their assertions from a class check (which cannot see the cascade) to an inline-style check (which jsdom can).
+- **Implementation notes:**
+  - `actor:34` → `[style]="actorTypeMissing || duplicateType ? { border: '2px solid var(--ac-warning-1)' } : {}"`
+  - `actor:52` → `[style]="otherNameMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"`
+  - **Remove** the now-dead `border-2 rounded-md border-[var(--ac-warning-1)]` / `border-2 border-[var(--ac-warning-1)]` fragments from both `class` interpolations. Leaving them would keep a lie in the markup that the old assertions still pass on.
+  - Keep `w-full` / `rs-mt-[12]` / `fs-[14]` and both ternary **conditions** exactly as they are. The condition logic is not in scope.
+  - **Use the token, NOT the exemplar's hex.** `custom-fields/select/select.component.html:20` hardcodes `'2px solid #E69F00'`; copying that verbatim would violate `NFR-IUW-001` and `DD-7` — the very rule this spec exists to satisfy. Use `var(--ac-warning-1)`.
+  - Do **not** add `!important` and do **not** touch component SCSS. That fallback (`radio-button.component.scss:12–17`) is for descendant paint nodes; both sites here paint on their own element.
+- **Acceptance / done check:**
+  - [ ] AC.1 — `actor:34` and `actor:52` each carry an `[style]` binding producing a 2px `var(--ac-warning-1)` border in their invalid state, and `{}`/no border otherwise.
+  - [ ] AC.2 — the dead Tailwind border fragments are gone from both `class` interpolations; a grep for `border-\[var(--ac-warning-1)\]` in the 4 templates returns **0**.
+  - [ ] AC.3 — both ternary conditions (`actorTypeMissing || duplicateType`, `otherNameMissing`) and all non-border classes are unchanged.
+  - [ ] AC.4 — **no hex literal** in the touched files (`NFR-IUW-001`).
+  - [ ] AC.5 — assertions read the **inline style** (`element.style.border` / the `style` attribute), not the class list, and the old class-based border assertions are replaced rather than kept alongside.
+  - [ ] AC.6 — every `--ac-*` referenced still exists in `colors.scss` (`D-3` cross-check).
+  - [ ] AC.7 — route suite green and ≥ its current baseline of **234**.
+  - [ ] AC.8 — **human visual re-check of AC.10, quoted:** an invalid actor card's select border compared against the `Contribution to SDG` reference field — the 2px amber border must now be present and indistinguishable, with no layout shift. **The observation must be quoted, and an inconclusive result is not a pass.**
+- **Verification:** `npx jest --testPathPattern innovation-use --coverage=false` · `npm run lint -- --quiet` · hex grep · then the AC.8 browser re-check.
+- **Input that makes this FAIL (K-012):** revert `actor:34` to the Tailwind class → AC.2's grep finds it and AC.5's inline-style assertion reddens. **Note the falsifier that does NOT work:** changing the token name inside the class fragment reddens nothing visually, because the class was never painting — that is exactly `D-8`, and it is why AC.5 must assert the inline style.
+- **What this cannot prove:** the composited pixel colour. An inline style outranks every stylesheet rule, so a passing AC.5 does imply the border paints — a materially stronger claim than the class assertion it replaces, but still not a screenshot. AC.8 remains the only criterion touching rendering.
+- **Dependencies:** `T-03`
+- **Effort:** S
+- **Skills:** `angular-developer`, `ui-ux-pro-max`
+- **Status:** todo
+
+---
+
 ## 3. Requirement → clause coverage
 
 Closure is at **scenario and clause** granularity, not requirement ID.
@@ -135,7 +178,8 @@ Closure is at **scenario and clause** granularity, not requirement ID.
 | --- | --- | --- |
 | `R-IUW-001` | AC.1 · AC.2 · AC.3 · AC.4 | T-01 |
 | `R-IUW-002` | AC.1 · AC.2 · AC.3 · AC.4 | T-02 |
-| `R-IUW-002` S1 | THEN border + message amber | T-02 (markup) · T-03 AC.2 (assertion) |
+| `R-IUW-002` S1 | THEN **message** amber | T-02 (markup) · T-03 AC.3 (assertion) |
+| `R-IUW-002` S1 | THEN **border** amber — **reassigned 2026-09-02 (`RB-6`)**; `T-02`'s markup and `T-03` AC.2's assertion both passed over a border that never rendered | **T-04** AC.1 (markup) · T-04 AC.5 (inline-style assertion) · T-04 AC.8 (human) |
 | `R-IUW-002` S1 | AND icon + text size kept | T-02 AC.2 · T-03 AC.3 |
 | `R-IUW-002` S1 | BUT it must NOT change the asterisk | T-03 AC.4 |
 | `R-IUW-002` S1 | BUT it must NOT change the remove button | T-03 AC.5 |
@@ -169,17 +213,18 @@ No new spec **files**. Coverage floors unchanged (client: statements 40 / branch
 | RB-3 | 2026-09-02 | Engineering-lead formal sign-off on a §7.1 token addition may be owed (`DR-3`) | Confirm before merge | D. Casañas | open |
 | RB-4 | 2026-09-02 | **`T-02` must not merge without `T-03`.** As of `T-02` the page ships validation text at 2.09:1 / 2.25:1 against PRD `C-4`, and the R3 harness (`innovation-use-details.component.spec.ts:2284`) is silent about the new role — the exact failure mode R3 was built to remediate. `T-02` alone on `dev` is a live *and* undetectable deviation, materially worse than the pre-spec red. Raised by `T-02`'s Reviewer | Treat as a **hard merge condition**, not a preference: no PR carrying `T-02` without `T-03` | Leader / D. Casañas | open |
 | RB-5 | 2026-09-02 | **`AR-1`/`DD-5`'s dark-mode claim was false for 3 of the 8 sites.** *"Dark mode passes at 6.29:1; the failure is light-mode only"* holds for the 5 sites on `--ac-grey-100` (dark `#2b2b2b`) but NOT for `details:107`, `details:147`, `stepper:4` on `--ac-white-1`, where it is **worse than in light mode** (figures live in `requirements.md` §8 `AR-1` — the single home, `KZ-005`; deliberately not restated here). Derived independently by Leader, Implementer and Reviewer; backgrounds verified in the markup. Reachable today and **undetectable** — every R3 constant is a light value | **RESOLVED 2026-09-02 — user chose option A** (Pivot Record in `execution.md`): documents corrected (`requirements.md` AR-1 + AC.2 + OQ-3 · `design.md` DD-5 + §9 · `proposal.md` correction notice), token value and scope unchanged, `OQ-3` reopened then accepted, owed ticket widened to both themes. **Residual accepted knowingly: the dark deviation ships documented but ungateable** | D. Casañas | **resolved — residual accepted** |
-| RB-6 | 2026-09-02 | **`DD-4` FALSIFIED — the Tailwind border classes at `actor:34` and `actor:52` are inert, and always were.** PrimeNG injects `.p-select`/`.p-inputtext { border: 1px solid … }` **unlayered** (`app.config.ts:29–36` never sets `cssLayer`), while Tailwind v4 emits every utility inside `@layer utilities`; unlayered author CSS unconditionally beats layered. So the border renders as PrimeNG's default and **the red never rendered either** — this spec inherited the defect, it did not cause it. Found by **AC.10's human check**, invisible to all 7 automated gates | **Pivot Record filed in `execution.md`; awaiting user decision between options A–C.** Fix is the established `[style]` object binding (inline style outranks every stylesheet), using `var(--ac-warning-1)` rather than the reference's hardcoded hex so `NFR-IUW-001` still holds | D. Casañas | **open — blocking** |
+| RB-6 | 2026-09-02 | **`DD-4` FALSIFIED — the Tailwind border classes at `actor:34` and `actor:52` are inert, and always were.** PrimeNG injects `.p-select`/`.p-inputtext { border: 1px solid … }` **unlayered** (`app.config.ts:29–36` never sets `cssLayer`), while Tailwind v4 emits every utility inside `@layer utilities`; unlayered author CSS unconditionally beats layered. So the border renders as PrimeNG's default and **the red never rendered either** — this spec inherited the defect, it did not cause it. Found by **AC.10's human check**, invisible to all 7 automated gates | **RESOLVED 2026-09-02 — user chose option A** (fix it in this spec). Fix is the established `[style]` object binding (inline style outranks every stylesheet), using `var(--ac-warning-1)` rather than the reference's hardcoded hex so `NFR-IUW-001` still holds | D. Casañas | **resolved — `T-04` owns the fix** |
 
 ---
 
 ## 6. Done definition
 
-- [ ] `T-01`, `T-02`, `T-03` are `done`.
+- [ ] `T-01`, `T-02`, `T-03`, **`T-04`** are `done`.
 - [ ] Every clause in §3 is discharged by its named task.
-- [ ] `npx jest --testPathPattern innovation-use` ≥ 230 passing.
+- [ ] `npx jest --testPathPattern innovation-use` ≥ 234 passing (baseline raised by `T-03`).
 - [ ] `npm run lint -- --quiet` clean.
-- [ ] AC.10's human observation is **quoted**, not summarised.
+- [x] AC.10's human observation is **quoted**, not summarised. **Done 2026-09-02 — and it FAILED**, which is what produced the Pivot and `T-04`. Quoted in `execution.md`.
+- [ ] `T-04` AC.8's human re-check is **quoted** and passes.
 - [ ] `AR-1`'s follow-up design-system ticket is filed — and it must cover **both** themes, not only light mode (`RB-5`).
 - [x] Actuals compared against the budget (3 tasks / ~40 LOC / 1 round); any overrun escalated, not absorbed. **Fired and escalated:** 205 LOC vs ~40. User accepted the overrun 2026-09-02; cause recorded in `execution.md` (the estimate priced AC.2–AC.7 at zero) and queued as a Kaizen candidate.
 - [x] Full client suite green, not only the route pattern: `npm test -- --silent` → **317 suites / 6790 tests passing**, coverage 98.19 / 96.29 / 97.76 / 98.49 (floors 40 / 20 / 45 / 30). Closes the scope gap the `T-03` Reviewer named — `--testPathPattern innovation-use` is narrower than `npm test` (`KZ-017`).
