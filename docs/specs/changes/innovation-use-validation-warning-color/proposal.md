@@ -210,6 +210,30 @@ Why it is the smallest safe path:
 | OQ-4 | Token name: `--ac-warning-1` (proposed) or another family name? | Non-blocking | Resolve in `/akili-specify`; `-1` suffix matches the existing `--ac-red-1` / `--ac-orange-1` single-value convention |
 | OQ-5 | Should the amber also replace red in `innovation-details` (the sibling Innovation dev page), which carries the same bespoke red? | Non-blocking | Out of scope here; candidate for the Option B chunk |
 
+> ### ⚠️ Correction notice — 2026-09-02, added during `/akili-execute` `T-03`
+>
+> **The rows above are left exactly as they were approved** — a proposal is a point-in-time record and
+> its decision rows (`DR-1`..`DR-3`) are never edited in place. This notice records that **two claims in
+> the table above were later found inaccurate**, so a reader does not carry them forward:
+>
+> - **`AR-1`'s sentence** *"In dark mode the same amber measures 6.29:1 and passes"* is true only on the
+>   dark **card** background (`--ac-grey-100` → `#2b2b2b`), which covers 5 of the 8 sites. The other 3
+>   (`details:107`, `details:147`, `stepper:4`) sit on `--ac-white-1`, which in dark mode is `#e5e5e5`,
+>   where the amber measures **worse than in light mode** (figures: `requirements.md` §8 `AR-1`). The deviation is therefore present
+>   in **both** themes and is at its worst in dark.
+> - **`OQ-3`'s conclusion** *"it needs no lightening to be legible on dark"* over-generalises from the
+>   same card-only measurement. `OQ-3` reopened during `T-03` and was re-decided by the user (**option
+>   A**: keep the value, correct the record, hand the colour to the owed design-system ticket).
+>
+> **Provenance worth noting** (`KZ-007` — a derived claim propagates and is rarely re-verified): `OQ-3`'s
+> own wording here was *precise* — *"measures 6.29:1 on the dark **card**"*. The imprecision was
+> introduced downstream, when `requirements.md` §8 `AR-1` generalised it to *"Dark mode passes at 6.29:1;
+> the failure is light-mode only."* The claim got **less** accurate as it moved between documents, which
+> is the failure mode `KZ-007` names.
+>
+> **Live, corrected figures:** `requirements.md` §8 `AR-1` (the single home — `KZ-005`). Audit trail:
+> `execution.md` → *Pivot Record: T-03*. Risk row: `tasks.md` §5 `RB-5`.
+
 **Kaizen lessons applied:** `KZ-002` (scope enumerated by what renders — this is what revealed the same-page split) · `KZ-001` (assert the property where it lives) · `KZ-017` (the assertion-count correction in §5) · `KZ-007` (this document corrects an earlier record — the `DD-7`/Reviewer rationale — citing source lines rather than restating from memory).
 
 ---

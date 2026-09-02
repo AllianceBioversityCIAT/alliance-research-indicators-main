@@ -660,4 +660,102 @@ entry, not a retro-trim of tested assertions.
 **Continue/pause gate:** `gated` mode, and two exceptions have fired (Pivot + budget tripwire), neither of
 which pre-approval would absorb even under a different mode. Stopped for the user.
 
+### Pivot resolution — user decision 2026-09-02
+
+**Option A selected: correct the documents, keep the token value and the scope.** The user also
+**accepted the budget overrun** (rather than trimming the ≈17 surplus lines or re-sizing the spec).
+
+Option **B** (lighten the dark value only) was offered and declined; option **C** (extend R3 to dark mode)
+and **D** (defer with only the in-comment record) likewise. Recorded because the *rejected* options are
+what make the accepted residual legible: **the dark-mode deviation ships documented but ungateable.**
+
+#### Amendments applied
+
+| Document | Site | Change |
+| --- | --- | --- |
+| `requirements.md` | §8 `AR-1` | Rewritten as the **single home** of this spec's contrast figures (`KZ-005`), carrying the deriving method and the three-way independent derivation. The dark claim is corrected in place with the superseded sentence quoted, and the disposition (option A) plus the ungateable residual recorded |
+| `requirements.md` | §3 `R-IUW-001` AC.2 | Restated figure replaced by a pointer to `AR-1`; the false rationale corrected while noting the criterion's **mechanical content is unaffected and still holds** |
+| `requirements.md` | §9 `OQ-3` | **Reopened, then accepted.** Marked as answered *by decision*, not settled *by measurement* |
+| `design.md` | §7 `DD-5` | **Rule unchanged, rationale corrected.** The withdrawn measurement sentence is struck through rather than deleted; the decision now rests on consistency with the 22 unmigrated files + `DR-1`'s authority limit |
+| `design.md` | §9 | The claim *"`OQ-3` settled by `DD-5`"* corrected — it was never settled by measurement |
+| `proposal.md` | after §11 | **Correction notice added; the approved rows left byte-identical.** A proposal is a point-in-time record and its decision rows are never edited in place |
+| `tasks.md` | §5 `RB-1` | Widened — the deviation is both themes, not light-mode only; figures de-duplicated to a pointer |
+| `tasks.md` | §5 `RB-5` | Marked **resolved — residual accepted** |
+| `tasks.md` | §6 | Owed design-system ticket must now cover **both** themes; budget line and full-suite line ticked |
+
+#### Correction closure — two-direction sweep (`/akili-specify` Correction Closure, `K-003`, `KZ-005`)
+
+**The forward sweep was run BEFORE editing, and it is what made the correction complete.** Grepping the
+claim across the whole spec folder on 8 phrasings found it in **8 sites across 4 files** — where the
+finding itself had cited only two (`AR-1` and `DD-5`). The three sites a citation-driven amendment would
+have missed:
+
+- `requirements.md:48` — `R-IUW-001` AC.2's parenthetical rationale, on an **already-ticked** criterion
+- `requirements.md:186` — `OQ-3`'s recorded default
+- `proposal.md:203` / `:209` — the approved proposal's own `AR-1` and `OQ-3` rows
+
+This is `KZ-005` recurrence 6's own lesson landing: *a correction sweep must bound its search space on
+every axis — phrasing, token, file set — not only the axis that last failed.*
+
+**Forward re-grep after editing:** every surviving occurrence of the superseded claim is now a
+**quotation inside a correction record** (the Pivot Record, `RB-5`, the `proposal.md` notice, or the
+struck-through `DD-5` text). **No site asserts it any more.** Repo-wide, the only `6.29` outside this
+spec is an unrelated coverage figure in an archived spec.
+
+**Backward sweep:** grepping citations *of* the corrected sections returns 82 hits for
+`AR-1`/`DD-5`/`OQ-3`/`RB-1` across `docs/` — and **none is a reference to this spec.** They are **ID
+collisions**: `docs/prd.md` has its own `OQ-3`, `bugfix/innovation-use-draft-save` its own `DD-5`, and
+`docs/specs/innovation-use/OPEN-ITEMS.md` its own `AR-1`/`RB-1`. Nothing outside this spec depends on the
+corrected text, so no downstream document was left asserting a falsehood.
+
+> **Finding worth carrying to Kaizen: spec IDs are not globally unique, so a naive backward sweep is
+> ~100% false positives.** A backward sweep must match the ID **together with its spec path or a
+> distinguishing phrase**, never the bare ID. Grepping `DD-5` alone would have produced 26 hits and
+> either buried a real dependency or invited an edit to the wrong spec's decision row.
+
+#### New values introduced by the correction, re-grepped (`KZ-005`'s second clause) — **and the re-grep caught the Leader**
+
+This is the clause that earned its place. Having just declared `AR-1` the **single home** of the contrast
+figures and cited `KZ-005` while doing it, the Leader then **restated the new `1.79` figure in four
+separate documents** — `requirements.md` (the home, correct), plus `design.md` §9, `proposal.md`'s
+correction notice, and `tasks.md` `RB-5`. Three sites too many, seeded by the very edit that invoked the
+rule against them.
+
+The re-grep is what surfaced it. Fixed immediately: `design.md`, `proposal.md` and `tasks.md` now say
+*"worse than in light mode"* and **point** to `AR-1` for the number.
+
+| Value | Live sites after de-duplication | Verdict |
+| --- | --- | --- |
+| `1.79` (derived ratio) | `requirements.md` **×1** (`AR-1`, the home) + `execution.md` ×6 (audit trail) | ✅ one home |
+| `6.29` (derived ratio) | Everywhere it still appears, it is a **quotation of the superseded claim inside a correction record**, plus the one live corrected figure in `AR-1` | ✅ |
+| `#e5e5e5`, `#2b2b2b` (token values) | 2–3 live sites each | ✅ **deliberately not de-duplicated** — these are *facts of `colors.scss`*, not derived figures. They cannot go stale from a re-measurement, only from a token edit, and naming the actual background is what makes the correction notices readable. `KZ-005` governs **derived** figures; over-applying it to raw constants would cost clarity for no staleness benefit |
+
+**The distinction in that last row is the point of the lesson, not an exemption from it:** a figure needs
+one home because it is *computed* and goes stale when the tree changes. A hex literal copied out of
+`colors.scss` has a different failure mode and a different fix.
+
+**An earlier draft of this very section claimed the re-grep found nothing.** That sentence was written
+before the grep was run and was false. It is replaced by the account above — recorded rather than quietly
+overwritten, because a correction record asserting an unperformed check is precisely `KZ-007` (*a
+correction record is the highest-risk artifact class*) committed inside a `KZ-007` write-up.
+
+#### Provenance of the error — recorded because it is the interesting part
+
+`proposal.md`'s `OQ-3` row was **precise**: *"already measures 6.29:1 on the dark **card**"*. The
+imprecision was introduced **downstream**, when `requirements.md` §8 `AR-1` generalised it to *"Dark mode
+passes at 6.29:1; the failure is light-mode only."* The claim became **less** accurate as it moved
+between documents, then `DD-5` inherited the generalisation and built a decision on it. That is `KZ-007`
+exactly — *a correction record is the highest-risk artifact class; it reads as settled fact, is rarely
+re-verified, and propagates* — and this instance shows the mechanism: nobody introduced a wrong number,
+someone dropped a **qualifier**.
+
+#### Outstanding after the Pivot resolution
+
+| # | Item | Owner |
+| --- | --- | --- |
+| 1 | **AC.10** — the human visual check, still not discharged. Native stack confirmed running (pre-existing `ng serve` + backend on `:3001`); `styles.css` served already carries `--ac-warning-1` twice | User |
+| 2 | **A stale in-code comment introduced by this very correction.** `innovation-use-details.component.spec.ts:2446` still reads *"AR-1's wording is flagged to the Leader for correction at the source document; it is not corrected here"* — true when written, **false now** that `requirements.md` is corrected. The `T-03` Reviewer had already predicted this: *"once you correct that document these 12 lines should collapse to a one-line pointer."* Needs one small Implementer round; it is a **correctness fix, not the line-trim the user declined** | Leader — offered to the user |
+| 3 | The owed design-system ticket (`AR-1`, `RB-1`, done-definition) — now scoped to both themes | User |
+| 4 | `docs/specs/innovation-use/OPEN-ITEMS.md` is the innovation-use surface's open-items register and does **not** know about `RB-5`. Adding it is outside option A's scope; flagged, not done | Observation |
+
 ---
