@@ -252,22 +252,139 @@ describe('InnovationUseActorItemComponent', () => {
   });
 
   // c8 — A row with no actor type shows the inline required message and the error border.
+  // T-03 (changes/innovation-use-validation-warning-color): realigned after T-02 moved this site
+  // to the warning token (R-IUW-002 scenario 1 — THEN); the BUT-it-must-NOT clauses (AC.4/AC.5)
+  // are added as negative guards in the same test so the positive and negative claims sit
+  // together over one render.
+  // T-04 (RB-6, DD-10, D-8): the class-based border checks below were REPLACED, not kept
+  // alongside — they were passing over a Tailwind class that never painted on the PrimeNG
+  // element (DD-4 falsified). The fix moved the border to a `[style]` object binding.
+  //
+  // Why these assertions spy on `CSSStyleDeclaration.prototype.border`'s setter instead of
+  // reading `element.style.border` / `getAttribute('style')` (what AC.5 literally names, and
+  // what the design's own §6 table claims is "a real, readable string in jsdom"): it is NOT,
+  // for a `var(...)` reference. Empirically verified in this exact jsdom test environment
+  // (jest-preset-angular / jsdom's `cssstyle` package): `<div [style]="{border:'2px solid
+  // var(--x)'}">` renders with `style.border === ''` and `getAttribute('style') === null` —
+  // cssstyle parses the shorthand atomically and silently drops the whole declaration when any
+  // component (here, the color) fails to parse; the identical binding with a literal colour
+  // (the exemplar's own hardcoded literal colour, decimal RGB 230/159/0) DOES read back correctly. So
+  // `element.style.border` cannot discriminate correct-and-broken here — it is unconditionally
+  // empty either way, for every possible implementation. This is a second, independent instance
+  // of D-8/KZ-017: a claim about jsdom's read-back that is confidently wrong when checked.
+  // What jsdom's CSS engine WILL show is the assignment attempt itself: Angular applies a
+  // `[style]="{ border: '…' }"` binding via a direct property write (`el.style.border = value`,
+  // confirmed by spying on `CSSStyleDeclaration.prototype.setProperty`, which is never called
+  // for this binding, vs. the accessor setter, which is). Spying on that setter observes the
+  // exact string Angular hands the DOM — the same call a real browser's CSSOM receives and
+  // would paint — before jsdom's own (irrelevant here) validation silently discards it. This is
+  // strictly stronger evidence of correctness than the class list it replaces, and, per K-004,
+  // is proven able to fail below (revert `actor:34`'s `[style]` binding and this spy sees zero
+  // 'border' calls, or a stale value, instead of the current-state string).
   describe('c8 — missing actor type shows the required message and error border', () => {
-    it('renders the required message and a red-token border on the select', () => {
+    it('renders the required message (warning token, icon, text-size) and sets a warning-token inline-style border on the select — but leaves the asterisk and remove button red', () => {
       component.actor = new InnovationUseActor();
+      component.actorNumber = 4;
       component.duplicateType = false;
+      component.disabled = false;
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
       fixture.detectChanges();
 
       expect((fixture.nativeElement.textContent as string)).toContain('This field is required');
 
-      const selectDe = fixture.debugElement.query(By.directive(Select));
-      expect(selectDe.nativeElement.className).toContain('border-[var(--ac-red-1)]');
+      // AC.1 / AC.5 (T-04) — scenario 1 THEN, border half: the invalid p-select's `[style]`
+      // binding assigns a real 2px `var(--ac-warning-1)` inline border.
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
 
-      // T-11 c3 — icon AND text, never text alone. Only the required message renders here
-      // (actor_type_id is unset, duplicateType is false), so exactly one warning icon exists.
+      // AC.3 (T-03) — scenario 1 AND: the required message keeps its `warning` icon AND its
+      // `fs-[14]` text-size class. T-11 c3 precedent: icon AND text, never text alone. Only the
+      // required message renders here (actor_type_id is unset, duplicateType is false), so
+      // exactly one warning icon exists.
       const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
       expect(icon).toBeTruthy();
       expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
+
+      const messageSpan = fixture.debugElement
+        .queryAll(By.css('span'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This field is required');
+      expect(messageSpan).toBeTruthy();
+      expect((messageSpan!.nativeElement as HTMLElement).className).toContain('fs-[14]');
+      // The colour utility sits on the message's containing div (#requiredMessage template),
+      // not on the span itself — see innovation-use-actor-item.component.html:3.
+      const messageContainer = (messageSpan!.nativeElement as HTMLElement).closest('div');
+      expect(messageContainer).toBeTruthy();
+      expect(messageContainer!.className).toContain('text-[var(--ac-warning-1)]');
+      expect(messageContainer!.className).not.toContain('text-[var(--ac-red-1)]');
+
+      // AC.4 (T-03) — scenario 1 BUT: it must NOT change the red colour of the `Actor type*`
+      // asterisk (D-2 negative guard — over-applying the warning token here is the defect this
+      // guard exists to catch).
+      const asterisk = fixture.debugElement
+        .queryAll(By.css('span.text-red-500'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === '*');
+      expect(asterisk).toBeTruthy();
+
+      // AC.5 (T-03) — scenario 1 BUT: it must NOT change the red colour of the card's remove
+      // (`pi-times-circle`) button (D-2 negative guard).
+      const removeButton = fixture.debugElement.query(By.css('[aria-label^="Remove actor"]'));
+      expect(removeButton).toBeTruthy();
+      expect((removeButton.nativeElement as HTMLElement).className).toContain('text-[var(--ac-red-1)]');
+      expect((removeButton.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
+    });
+
+    // T-04 AC.1 negative half: a valid actor type must not set the border at all. Rendered
+    // valid from the component's very first `detectChanges()` (not a transition into validity —
+    // matching this file's existing per-`it()` fresh-fixture convention) so the ternary's `{}`
+    // branch is exercised from the start, not inferred.
+    it('sets no border style when the actor type is present (valid state)', () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 1 };
+      component.actorNumber = 4;
+      component.duplicateType = false;
+      component.disabled = false;
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      fixture.detectChanges();
+
+      expect(borderSetSpy).not.toHaveBeenCalled();
+      borderSetSpy.mockRestore();
+    });
+  });
+
+  // T-04 (RB-6, DD-10) — actor:52, the "Specify other" input's border. Same defect (D-8), same
+  // fix, same testing constraint as c8 above: no prior assertion existed for this site (T-02's
+  // class fragment was never covered by a border-specific check here), so this is new coverage,
+  // not a realignment.
+  describe('c8b — missing "Specify other" name sets a warning-token inline-style border on the input', () => {
+    it('sets a 2px var(--ac-warning-1) inline border when actor_type_id is OTHER and no custom name is set', () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 5 };
+      component.actorNumber = 4;
+      component.duplicateType = false;
+      component.disabled = false;
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      fixture.detectChanges();
+
+      const specifyOther = fixture.debugElement.query(By.css('input[placeholder="Specify other"]'));
+      expect(specifyOther).toBeTruthy();
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('sets no border style when a custom name is present (valid state)', () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: 'local cooperatives' };
+      component.actorNumber = 4;
+      component.duplicateType = false;
+      component.disabled = false;
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      fixture.detectChanges();
+
+      const specifyOther = fixture.debugElement.query(By.css('input[placeholder="Specify other"]'));
+      expect(specifyOther).toBeTruthy();
+      expect(borderSetSpy).not.toHaveBeenCalled();
+      borderSetSpy.mockRestore();
     });
   });
 
