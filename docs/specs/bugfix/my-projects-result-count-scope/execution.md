@@ -129,7 +129,7 @@ Lint gate: `npx eslint <the two changed files>` → no output, exit `0`. `npm ru
 
 Independently confirmed by the Reviewer against the working tree rather than the supplied patch:
 
-- `userContracts()` still carries its original trailing whitespace at `:435-436` — positive proof it was not reformatted. Visibility clause verbatim at `:449` and `:529`; carnet lookup `:416-427` and the `COUNT_RESULTS` map `:343` untouched. RB-2 avoided: wrapper parens preserved, `rc_ord.is_primary = TRUE` still last.
+- `userContracts()` still carries its original trailing whitespace at `:435-436` — positive proof it was not reformatted. Visibility clause verbatim at `:449` and `:532` (**post-fix** anchors; this line originally read `:529`, the *pre-fix* anchor, while citing the carnet lookup in post-fix terms — corrected during validation); carnet lookup `:416-427` and the `COUNT_RESULTS` map `:343` untouched. RB-2 avoided: wrapper parens preserved, `rc_ord.is_primary = TRUE` still last.
 - Both named patterns match design §10.2.1 character-for-character and are real regex literals, not pipe-escaped table copies — the failure class this round existed to close.
 - Hand-counted generated regions: counting subquery 4 `\bAND\b`, `result_counts` block 3. The first `LEFT JOIN (` in `mainSql()` is genuinely the `result_counts` join, so TS-3's extraction terminus is unambiguous.
 - TS-1's `not.toMatch(/AND\s+r\.created_by\s*=/)` cannot match the surviving `AND (r.created_by = 456 OR …` — `\s+` cannot consume the `(`. Mechanism confirmed.
@@ -257,14 +257,16 @@ was spent on the substantive diff.
 | Metric | Budgeted | Final | Status |
 | --- | --- | --- | --- |
 | Production logic LOC | ~7 | **7** | on budget |
-| Production total (incl. 6 documentation lines, none in SQL) | — | 10 insertions / 7 deletions | documentation, not logic |
+| Production total (incl. 6 documentation lines, none in SQL) | — | **9 insertions / 7 deletions** | documentation, not logic. *(Corrected during validation: this line read "10 insertions" — `git diff --numstat b795c1c5..HEAD` reports 9. The independent auditor derived 9 from the file and flagged the discrepancy without git access.)* |
 | Test LOC | ~110 | 171 | **over budget, accepted by the user at the gate** |
 | Tasks | 3 | 3 | unchanged |
 | Review rounds | 1 | 1 | unchanged |
 
 Three advisories are now closed by construction (placeholder hazard, newline truncation, prose/gate
-coupling). The remaining four stand as recorded: the unobserved DC-2 falsifier, TS-1's unobserved second
-assertion, the TS-5 title drift, and the un-rerun `test:cov`.
+coupling). **Three** remain: the unobserved DC-2 falsifier, TS-1's unobserved second assertion, and the
+TS-5 title drift. *(Corrected during validation: this read "four", counting the un-rerun `test:cov` — which
+was subsequently run and is recorded in the T-03 section below. A stale count in an archive record reads as
+an open item forever.)*
 
 **T-01 is complete.** `tasks.md` T-01 flipped to `done` after this entry was written, per the
 evidence-before-checkbox ordering.
@@ -434,3 +436,77 @@ exit=0
 execute `test:e2e` or `test:integration`, so this figure is the unit-suite coverage floor and nothing else.
 That is the threshold `tasks.md` §8 names, so the box is satisfied — but the number should not be read as
 whole-repository coverage.
+
+### Validation findings folded back (2026-09-02)
+
+`/akili-validate` dispatched an independent auditor with fresh context — the execution Leader cannot
+impartially audit its own adjudications. Verdict **PASS WITH WARNINGS**. Full report in
+`validation-report.md`; the items that change this log are folded in here.
+
+#### G-2 — `proposal.md` Success Criterion 3: the per-indicator RUNTIME value was never exercised
+
+`proposal.md` §Success Criteria item 3 reads: *"With `with-indicators=true&current-user=true`, the
+per-indicator counts are global and consistent with the contract total."*
+
+**That criterion is NOT verified, and this is its declaration.** TS-3 gates the *SQL text* of the
+`result_counts` block only. T-02 ran with `with-indicators=false` (`tasks.md` T-02 step 2, and
+`my-projects.service.ts:87` defaults it off), so no request in the evidence exercised the indicator path at
+all. The runtime value of `indicators[].count_results` has never been observed on any environment.
+
+This closes a genuine seam the auditor found: `tasks.md` §4 calls DC-5 *"substituted by T-02"* and the T-02
+entry above calls it *"substantially covered"* — but that substitution never touched the indicator path. Read
+one way the per-indicator runtime value sat inside DC-5's declared-uncovered region; read the other way it sat
+inside a "substantially covered" DC-5. It was the closest thing in this spec to a coverage claim that nothing
+backs.
+
+**Corrected disposition of DC-5:** the *contract-level* count is confirmed against live MySQL for two
+contracts (T-02). The *per-indicator* count is confirmed at the SQL-text level only and **not** at runtime.
+Anyone relying on `with-indicators=true` should treat R-MPC-003's runtime behavior as unverified.
+
+#### B-2 — the `\bAND\b` predicate count is case-SENSITIVE; DC-1b's "however spelled" overclaims
+
+`requirements.md` §8 DC-1b promises the predicate-count gate reddens on a reintroduction *"however spelled"*.
+It does not. `spec.ts:705` and `:740` match `/\bAND\b/g` — case-sensitive — so a predicate written
+`and r_ord.owner_id = 456` evades **both** the count (lowercase keyword) and `RE_USER_TOKENS` (token outside
+the pattern) and stays green.
+
+This is not a stylistic hypothetical: the carnet lookup five lines away in the same method
+(`repository.ts:416-420`) is written in **entirely lowercase SQL** (`from`, `inner join`, `on`, `where`,
+`limit`), so lowercase keywords are an established convention in this exact file.
+
+The exposure is narrow — every *user-token* spelling is still caught by `RE_USER_TOKENS`, and every
+uppercase-keyword predicate by the count. `/\band\b/gi` would close it at zero cost. **Carried forward as a
+known gate limitation; DC-1b's claim is stronger than its gate.**
+
+#### B-6 — the DC-6 sort evidence was captured under a relevance-primary `ORDER BY`
+
+Both T-02 screenshots show the search box populated with `A1048 A1065`. The client sends that as `query`
+(`my-projects.component.ts`), which at `repository.ts:387` sets
+`queryRelevanceOrderPrefix = '_query_relevance DESC, '`, so the emitted clause was
+`ORDER BY _query_relevance DESC, contract_total_results DESC` — **relevance was the primary key, not the
+count.**
+
+The DC-6 conclusion survives: the auditor computed both rows' relevance from
+`buildQueryRelevanceScoreSql` (`repository.ts:283-308`) at `300 + 150 = 450` each — own-code prefix plus
+own-code contains, with neither description containing the other token — so the two **tie** and
+`contract_total_results DESC` is the effective decider.
+
+But that is a reconstruction the record did not contain. Per KZ-017 the closure argument as originally written
+was narrower than its claim: it reasoned about a sort key that was not the primary one, and it holds only by a
+tie nobody had established. **Carried forward.** If DC-6 is ever re-verified, clear the search box first so
+`contract_total_results DESC` is the sole ordering key and the argument needs no reconstruction.
+
+#### E-8 — T-02 substituted the search box for the prescribed `contract-code` filter
+
+`tasks.md` T-02 step 3 prescribes `current-user=false&contract-code=<code>`; the evidence used the free-text
+`query` box on both tabs. Parity of a returned value does not depend on which filter selected the row, and
+using the *same* mechanism on both tabs is arguably the better parity test — but the substitution was not
+recorded, and it is the root cause of B-6. Recorded now.
+
+#### One auditor finding rejected
+
+The auditor reported `design.md` §2.1 and `requirements.md` §3's `:567` anchor for `filter?.with_indicators`
+as off by one. **It is correct.** `git show b795c1c5:…/agresso-contract.repository.ts` line 567 is exactly
+`filter?.with_indicators ? indicators : null`. The auditor had no git access and reconstructed the pre-fix
+frame by arithmetic; the arithmetic was off, not the spec. Recorded because an uncontested audit finding
+becomes fact, and this one is false.
