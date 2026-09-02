@@ -143,7 +143,7 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
 - **Skills:** none required
 - **Dependencies:** T-01 deployed to Dev
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** waived (accepted, unmeasured risk — user decision 2026-09-02)
 
 ---
 
@@ -218,9 +218,9 @@ the `count-results` sort on My Projects changes from user-scoped to contract-wid
 
 ## 8. Done definition
 
-- [ ] T-01, T-02, T-03 all `done`.
+- [x] T-01 `done`, T-02 `done`, **T-03 `waived`** — NFR-MPC-001 accepted as an unmeasured risk by user decision (2026-09-02). Not satisfied, not measured; see `execution.md`.
 - [ ] Every AC in `requirements.md` checked, and every clause in §4 above owned by a task that ran.
-- [ ] Coverage thresholds still green (60% server).
+- [x] Coverage thresholds still green (60% server) — verified 2026-09-02: `All files 84.18% stmts / 76.3% branch / 84.55% funcs / 84.22% lines`, `npm run test:cov` exit `0`. Unit config only (`rootDir: src`); not e2e/integration.
 - [x] No Swagger change needed — verified 2026-09-02: `agresso-contract.controller.ts:372` reads `'Field to order by (count-results = total active results per contract)'`, which the fix makes true. `mapper-agresso-contract.dto.ts:15` ("same basis as count-results sort") is likewise now accurate.
 - [ ] OQ-1 and OQ-2 either resolved or carried forward as a new spec.
 - [x] NF-3 and NF-4 from `judgment.md` §9.1 acknowledged **and honored** — both caveats (keep the `:402` wrapper parens; do not reorder the four predicates) were passed verbatim in the Implementer brief, the corrected DC-7 mutation ("delete the closing-paren line at `:326` from the *fixed* code") was the one actually run, and the Reviewer independently confirmed the parens are preserved and `rc_ord.is_primary = TRUE` is still last.

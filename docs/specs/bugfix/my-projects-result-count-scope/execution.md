@@ -379,3 +379,58 @@ promoted to evidence.
 **DC-5 disposition:** substantially covered. The parity of real MySQL-returned values across two contracts is
 exactly what the unit suite structurally cannot reach (design §10.4). What remains untested is operator
 precedence on row sets other than these two.
+
+### T-03 — Latency comparison against the All Projects path
+
+| Field | Value |
+| --- | --- |
+| Status | **WAIVED — accepted, unmeasured risk** (user decision, 2026-09-02) |
+| Requirement | NFR-MPC-001 |
+| Defect classes gated | none (NFR, not a defect class) |
+
+**Not measured.** T-03 needs authenticated requests against Dev; the Dev base URL is not in the repo (only
+`environment.example.ts` with `localhost`) and the Leader holds no Dev bearer token. A ready-to-run script was
+prepared (same page size on both paths, one untimed warm-up per path, three timed runs each, all six figures
+printed rather than an average) and offered for the user to run with the token kept out of the conversation.
+The user elected to accept the risk instead.
+
+**The argument for accepting it — recorded so it can be re-examined, not to make the risk disappear:**
+
+- The un-scoped counting expression is **not new code**. It is exactly what `getContracts` already emits when
+  `user` is `null` — the All Projects path — which runs in production today at the same page size (design
+  §2.2). The fix makes `current-user=true` emit the same string that `current-user=false` has always emitted.
+- So the shape being worried about is already in production and has produced no reported latency complaint.
+
+**What that argument does NOT cover, stated plainly (KZ-017):**
+
+- All Projects and My Projects do not execute the *same* query. My Projects additionally carries the
+  visibility clause and the carnet join, so its plan may differ and the removed predicate may have been doing
+  more selective work there. "All Projects already runs it" is an argument about the *expression*, not about
+  the *plan*.
+- The counting subquery lost a selective predicate on a query users hit constantly, and the round-1 judgment
+  established `result_counts` is emitted on **every** `getContracts` call, not only when
+  `with-indicators=true`. That is why this was given its own task rather than a measure-only-if-reported
+  clause — and waiving it returns the spec to the weaker posture the judgment deliberately rejected.
+
+**Disposition: NFR-MPC-001 is UNVERIFIED and accepted.** It is not satisfied, not measured, and must not be
+reported as either. If My Projects latency is reported as degraded, this task is the first thing to run — the
+script and its reading criteria (spread within a path exceeding the difference between paths ⇒ inconclusive)
+are specified in `tasks.md` T-03.
+
+#### Coverage floor — verified (closes `tasks.md` §8)
+
+Run in isolation, nothing else active:
+
+```
+All files                    |   84.18 |     76.3 |   84.55 |   84.22 |
+Test Suites: 338 passed, 338 total
+Tests:       2418 passed, 2418 total
+exit=0
+```
+
+84.18% statements against the 60% global threshold; the command exits `0`, so no threshold was breached.
+
+**Scope of this check (KZ-017):** `npm run test:cov` runs the unit config only (`rootDir: src`). It does not
+execute `test:e2e` or `test:integration`, so this figure is the unit-suite coverage floor and nothing else.
+That is the threshold `tasks.md` §8 names, so the box is satisfied — but the number should not be read as
+whole-repository coverage.
