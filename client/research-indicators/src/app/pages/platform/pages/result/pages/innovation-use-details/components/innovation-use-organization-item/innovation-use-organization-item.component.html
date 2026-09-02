@@ -86,6 +86,14 @@
         [ngModel]="body().institution_type_id"
         (onChange)="onInstitutionTypeChange($event.value)"
         [options]="institutionTypesService.list()">
+        <ng-template pTemplate="selectedItem" let-institutionType>
+          <div class="min-w-0 truncate">
+            <span class="font-semibold">{{ institutionType.name }}</span>
+            @if (institutionType.description) {
+              <span class="font-normal">: {{ institutionType.description }}</span>
+            }
+          </div>
+        </ng-template>
         <ng-template pTemplate="item" let-institutionType>
           <div class="whitespace-normal break-words">
             <span class="font-semibold">{{ institutionType.name }}</span>
@@ -109,6 +117,14 @@
           [ngModel]="body().sub_institution_type_id"
           (onChange)="onSubTypeChange($event.value)"
           [options]="subTypeOptions()">
+          <ng-template pTemplate="selectedItem" let-subType>
+            <div class="min-w-0 truncate">
+              <span class="font-semibold">{{ subType.name }}</span>
+              @if (subType.description) {
+                <span class="font-normal">: {{ subType.description }}</span>
+              }
+            </div>
+          </ng-template>
           <ng-template pTemplate="item" let-subType>
             <div class="whitespace-normal break-words">
               <span class="font-semibold">{{ subType.name }}</span>
