@@ -911,8 +911,196 @@ Proceeding without amending the spec would mean implementing against a design th
 
 | # | Option | Consequence |
 | --- | --- | --- |
-| **A** | **Fix it in this spec.** Amend `DD-4`, the §3 site table, `R-IUW-002` AC.2/AC.3; reopen `T-02` for the 2 border sites with the `[style]` pattern; update `T-03` AC.2's assertion to read the inline style (which jsdom **can** see — `element.style.border` is real there, unlike a class's cascade outcome); re-run and re-verify AC.10 | Delivers what was actually asked (validation that looks like the reference, border included). Costs one more T-02 + T-03 round. **Recommended** |
+| **A** | **Fix it in this spec.** Amend `DD-4`, the §3 site table, `R-IUW-002` AC.2/AC.3; reopen `T-02` for the 2 border sites with the `[style]` pattern; update `T-03` AC.2's assertion to read the inline style ~~(which jsdom **can** see — `element.style.border` is real there, unlike a class's cascade outcome)~~ **← this parenthetical was WRONG, and it was in the option text the user chose.** `cssstyle@2.3.0` drops the whole shorthand for a `var()` colour, so `element.style.border` is `''` either way (confirmed from source by the `T-04` Reviewer; see `design.md` §6). **The decision itself is unaffected** — the cascade question is still decidable, just via an accessor spy rather than a DOM read-back, and `T-04` delivered exactly that. Recorded because a decision record that misstates its own basis is the highest-risk artifact class in a spec (`KZ-007`), and this one was authored by the Leader inside a correction of the same error class (`KZ-017`); re-run and re-verify AC.10 | Delivers what was actually asked (validation that looks like the reference, border included). Costs one more T-02 + T-03 round. **Recommended** |
 | **B** | **Fix only the colour scope; file the border defect separately.** Accept that `actor:34`/`actor:52` show no border — as they never did — close this spec on the 6 text sites, and raise a new proposal for the PrimeNG/Tailwind cascade defect app-wide | Defensible: the defect is **pre-existing** and this spec did not cause it. But it closes a spec whose stated goal is visual parity with the reference, while 2 of 8 sites visibly diverge |
 | **C** | **A, plus widen to the app-wide audit** | Honest about the blast radius, but `DR-2` explicitly scoped the app-wide migration out, and the budget already overran 5× |
+
+### Pivot resolution — user decision 2026-09-02
+
+**Option A selected: fix it in this spec.** B and C declined. Spec amended in `39fd519c` (`DD-4` struck
+and superseded by `DD-10`, §5.2 revised, §6 gains an inline-style row, `R-IUW-002` AC.2 carved out and
+AC.3 replaced, defect class `D-8` added, `AR-1`'s SC 1.4.11 clause withdrawn, `T-04` created, `T-02`
+annotated as superseded at 2 sites without reopening it).
+
+---
+
+### T-04 — Render the two border sites (Pivot: `DD-4` falsified)
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **`[~]` — code work PASS, AC.8 (human re-check) outstanding** |
+| Date | 2026-09-02 |
+| Implementer attempts | **1** |
+| Reviewer rounds | 1 |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max` |
+| Effort assigned | `high` — raised above the task's `S` sizing because a prior round produced correct-looking work by faithfully following a false design |
+| Requirements covered | `R-IUW-002` AC.3 (revised), scenario 1 THEN (border half), `NFR-IUW-001` |
+| Design refs honoured | `DD-10`, §5.2 (revised), §6, defect class `D-8` |
+
+#### The `K-018` run
+
+| Run | Result |
+| --- | --- |
+| Baseline (before any edit) | **234 / 234 passed** |
+| After the 2 template edits, before spec realignment | **232 passed, 2 failed** — the realignment list, derived from the run |
+| Final | **237 / 237 passed** (234 + 3 new tests) |
+| Full client suite | `npm test -- --silent` → **317 suites / 6793 tests passing**, coverage 98.2 / 96.3 / 97.76 / 98.5 (floors 40 / 20 / 45 / 30) |
+| `npm run build` | clean, exit 0 |
+
+#### The change
+
+```html
+<!-- actor:34 — was: class="fs-[14] w-full {{ … ? 'border-2 rounded-md border-[var(--ac-warning-1)]' : '' }}" -->
+class="fs-[14] w-full"
+[style]="actorTypeMissing || duplicateType ? { border: '2px solid var(--ac-warning-1)' } : {}"
+
+<!-- actor:52 — was: class="rs-mt-[12] w-full {{ … ? 'border-2 border-[var(--ac-warning-1)]' : '' }}" -->
+class="rs-mt-[12] w-full"
+[style]="otherNameMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
+```
+
+Both ternary conditions byte-for-byte unchanged. `rounded-md` was dropped with the rest of the dead
+fragment — **the Reviewer confirmed this is harmless**: it was inert by the same `DD-10` mechanism
+(PrimeNG sets `border-radius` in the same unlayered rule that beat `border-*`), and the reference field
+the user screenshotted renders a *rounded* amber border with no Tailwind radius class anywhere.
+
+**The exemplar's hex was NOT copied.** `custom-fields/select/select.component.html:20` hardcodes
+`'2px solid #E69F00'`; `T-04` uses `var(--ac-warning-1)`, so `NFR-IUW-001` holds and the fix is more
+compliant than the pattern it imitates. The Implementer also caught and fixed one of its own comments
+that had spelled the hex out.
+
+#### The novel technique, and why the literal AC could not be met
+
+`AC.5` named `element.style.border`. **That mechanism is structurally unreachable in this jsdom**, and the
+Reviewer confirmed it from `cssstyle@2.3.0` source rather than accepting the Implementer's word:
+`border`'s `shorthandSetter` returns without writing when any part fails to parse; `shorthandParser`
+requires every part to validate; `border-color` demands `TYPES.COLOR`; and `valueType()` has **no `var()`
+branch**, so `var(--ac-warning-1)` falls through to `KEYWORD` and fails. The whole declaration is dropped
+atomically — `element.style.border === ''` **and** `getAttribute('style') === null`, *identically whether
+the binding is right or wrong*. Longhands do not rescue it. With a literal colour it reads back fine,
+which is exactly why the five sibling hex-valued bindings are readable and this one is not.
+
+The substitute is `jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set')`, which observes the exact
+string Angular hands the CSSOM — the same call a real browser would receive and paint. The Reviewer
+verified the spy is correctly wired (jsdom's `element.style` is a `cssstyle.CSSStyleDeclaration` and the
+global constructor is the same one, so prototype and instance share accessors).
+
+**Reviewer verdict: `STATUS: PASS`**
+
+> T-04's markup matches `DD-10` byte-for-byte, AC.1–AC.4 and AC.6 verify at source, and the replacement
+> assertions — contrary to my first reading — do discriminate per-site in the states they assert, because
+> the only other `style.border` writers in the render tree emit a *different string*. AC.5's literal
+> wording is structurally unreachable in this jsdom, which I confirmed from `cssstyle` source; the
+> substitution is justified and disclosed.
+
+#### The Reviewer corrected the Implementer's own reasoning — record this, it matters
+
+The Leader asked whether the **global** prototype spy is a `KZ-001` cohort assertion, since
+`toContainEqual(['2px solid var(--ac-warning-1)'])` proves *"some element received that string"*, not
+*"this element did"*. The cohort is genuinely not size 1: `custom-fields/input/input.component.html:30,55`
+writes `style.border` too, and `app-input` renders **four times** per actor card.
+
+**What saves it:** every sibling writer emits `'2px solid #E69F00'` — a hex string. Sites 34 and 52 are
+the only producers of the *token* string in the repo, and in each asserted state exactly one of them is
+live. So a broken binding at either site reddens its own test.
+
+**But two of the Implementer's claims were wrong and are not carried forward:**
+
+1. **The `K-004` falsifier does not show what it claimed.** Reverting `actor:34` left `c8b` green *because
+   site 34 is inactive in `c8b`'s state* — not because `c8b` discriminates per-site. What the falsifier
+   **does** prove, and it is valuable, is that with site 34's binding removed **nothing else in a fully
+   rendered card writes `border` at all** (`Received array: []`).
+2. **The negative tests are the stronger half and the actual differential control.**
+   `not.toHaveBeenCalled()` cannot be fooled by the wrong element, and each negative renders the *same
+   tree* as its positive twin with exactly one flag flipped. Zero-vs-one across a single-variable delta is
+   what pins the producer — never the `toContainEqual` alone.
+
+This is why the Reviewer gate is not collapsible: the Implementer's evidence was **sound in conclusion
+and wrong in argument**, and only an independent auditor separated the two.
+
+#### The R3 toggle — the Reviewer rejected both of the Leader's framings
+
+The R3 realignment toggles the actor row valid → invalid to defeat Angular's style memoization. The Leader
+offered two readings: (a) a `KZ-015` violation, or (b) legitimate because clearing a selection is a real
+product transition. **Both were wrong.**
+
+- **(b) fails on its own premise:** the select has no `showClear` (`innovation-use-actor-item.component.html:27–39`)
+  and `onActorTypeChange` only ever fires with a chosen value, so **a user cannot clear a previously-valid
+  actor type back to `undefined` on the same row.** The Reviewer tried to construct the sequence and could
+  not.
+- **(a) fails too:** `KZ-015`'s failure mode is *asserting on a state the product never reaches*. The state
+  **under assertion** is `actor_type_id: undefined` — the row's natural first-render state, which every
+  user sees on a fresh actor row.
+
+**Ruling: honest instrument scaffolding, not a fake transition.** The real criticism is different and is
+filed as an advisory: the border assertion **does not belong in that test at all** — it is redundant with
+`c8`, sits inside a *text*-contrast measurement where a border participates in no ratio, and is the sole
+reason the toggle exists.
+
+#### Per-AC closure
+
+| AC | Verdict | Evidence |
+| --- | --- | --- |
+| AC.1 | ✅ | Both `[style]` bindings present; proven by the K-004 falsifier and by dedicated negative-state tests |
+| AC.2 | ✅ | `grep -n 'border-\[var(--ac-warning-1)\]'` over the 4 templates → **0**; `ac-warning-1` total still **8** (2 dead class fragments out, 2 inline-style refs in — net zero) |
+| AC.3 | ✅ | Both conditions and all non-border classes byte-identical; `rounded-md` drop confirmed harmless |
+| AC.4 | ✅ | Zero hex in both templates **and** both spec files, comments included |
+| AC.5 | ✅ **with a documented, Reviewer-confirmed deviation** | Assertions read the inline-style *assignment* via an accessor spy, not `element.style.border` — which is unreachable, not merely awkward. Old class assertions replaced, not kept alongside |
+| AC.6 | ✅ | Every `--ac-*` in the 4 templates resolves in `colors.scss` |
+| AC.7 | ✅ | 237 / 237, above the 234 baseline |
+| **AC.8** | ⛔ **OUTSTANDING** | Human visual re-check. Leader-owned; the Implementer was barred from it and complied |
+
+#### Scope deviation: a third file (Leader's briefing error)
+
+The brief said *"two files only"*. The Implementer also touched
+`innovation-use-details.component.spec.ts`, because `T-03`'s R3 block asserted the **same dead class** on
+the same `<p-select>`, so removing the fragment per `DD-10` necessarily broke it and `AC.7` was
+unreachable without realigning it. The Reviewer established this as **necessary, not merely argued** — the
+intermediate run's two failures locate one there.
+
+**This was the Leader's error.** The file list came from the `T-04` task text the Leader wrote, and the
+Leader did not grep for other assertions on that class — despite having seen T-03's R3 block assert it in
+the T-03 diff hours earlier. The Implementer surfaced the conflict instead of silently violating either
+the rule or `AC.7`, which is the correct behaviour.
+
+#### `ADVISORY` findings (recorded; never gate, and per `/akili-execute` they may **not** become tasks in this spec)
+
+| Lens | Finding |
+| --- | --- |
+| Reliability / Risk | The positive spy assertions discriminate **only** because the five other `style.border` writers emit hex rather than the token string — and **nothing in the test says so**. `mock.contexts` (jest 29.7.0) would bind each call to its element in one line per test, and on the `p-select` would additionally record *which* node receives the border (host vs PrimeNG's inner root), which is currently unknown |
+| Reliability | The two `not.toHaveBeenCalled()` negatives are **global** over a tree containing four `app-input`s that write their own border when invalid. Safe direction (no false pass) but a **false-failure** surface: a future fixture change that invalidates a count field would redden a test about the actor-type border |
+| Readability | The R3 border assertion is redundant with `c8` and is the sole cause of the artificial toggle. Deleting it and citing `c8`/`c8b` would also have been the more minimal form of an already-unlisted-file deviation |
+| Coverage | Nothing pins the **second operand** of `actorTypeMissing \|\| duplicateType`. A row with a valid type **and** `duplicateType: true` must also paint the border; `c9` renders the duplicate message but entangles the two operands |
+| Readability | An in-file comment claims `setProperty` *"is never called for this binding"*. The Reviewer could not confirm it read-only and notes it is **unnecessary** — `cssstyle`'s `setProperty` dispatches to the same accessor, so the spy fires either way. A `K-004`-style over-claim in an explanatory comment is how the next reader inherits a wrong premise |
+
+#### 🔴 Leader correction owed and applied: `KZ-017` recurred inside its own correction
+
+The Reviewer confirmed the jsdom read-back claim was **false** — and that claim was written **by the
+Leader, in `DD-10` and §6, while correcting `DD-4` for exactly this failure mode**: a verification narrower
+than the claim it backs. It then propagated to **four** sites, which the Reviewer enumerated rather than
+leaving to a citation-driven sweep:
+
+| Site | Corrected |
+| --- | --- |
+| `design.md` §6 inline-style row | ✅ struck through with the `cssstyle` source chain recorded |
+| `design.md` `DD-10` prose | ✅ verified — the row does not itself repeat the claim; `DD-10`'s load-bearing statement (inline style outranks every stylesheet rule) **stands**, corroborated by the user's own reference screenshot |
+| `requirements.md` `D-8` Mitigation | ✅ corrected to name the accessor spy as the observable |
+| `execution.md` Pivot **option A** — *the text the user chose* | ✅ struck through in place. **The decision is unaffected** (the cascade question is still decidable, just via a spy), but a decision record that misstates its own basis is the highest-risk artifact class in a spec (`KZ-007`) |
+
+**Kaizen candidate, and the sharpest one this run produced:** `KZ-017` was invoked *by name* in the very
+edit that committed it again. Knowing a lesson and citing it did not prevent the recurrence — the
+Leader corrected `DD-4`'s "verified generation, claimed rendering" and immediately wrote "verified that
+inline styles win, claimed jsdom can read them back". **The pattern is asserting a mechanism's
+*observability* without running the observation.**
+
+#### Final verification
+
+237 / 237 route suite · 317 suites / 6793 tests full client suite · `npm run build` clean ·
+`npm run lint -- --quiet` clean · zero hex · AC.2 grep zero · `tsc -p tsconfig.spec.json` no new errors.
+
+**What none of it proves:** the composited pixel. **AC.8 is the only remaining gate**, and per the
+Reviewer it must be asked more sharply than "is the border amber now" — see below.
+
+---
 
 ---

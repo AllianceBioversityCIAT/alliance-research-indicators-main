@@ -31,7 +31,8 @@
       [optionValue]="'code'"
       placeholder="Select the actor type"
       [ariaLabel]="'Select the actor type'"
-      class="fs-[14] w-full {{ actorTypeMissing || duplicateType ? 'border-2 rounded-md border-[var(--ac-warning-1)]' : '' }}"
+      class="fs-[14] w-full"
+      [style]="actorTypeMissing || duplicateType ? { border: '2px solid var(--ac-warning-1)' } : {}"
       [ngModel]="body().actor_type_id"
       (onChange)="onActorTypeChange($event.value)"
       [options]="actorService.list()">
@@ -49,7 +50,8 @@
     @if (body().actor_type_id === otherActorTypeId) {
       <input
         pInputText
-        class="rs-mt-[12] w-full {{ otherNameMissing ? 'border-2 border-[var(--ac-warning-1)]' : '' }}"
+        class="rs-mt-[12] w-full"
+        [style]="otherNameMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
         placeholder="Specify other"
         aria-label="Specify other actor type"
         [ngModel]="body().actor_type_custom_name"

@@ -2465,10 +2465,30 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(requiredMessageContainer!.className).toContain('text-[var(--ac-warning-1)]');
       expect(requiredMessageContainer!.className).not.toContain('text-[var(--ac-red-1)]');
 
+      // T-04 (RB-6, DD-10, D-8) realignment: the select border moved from a Tailwind class
+      // (never painted on a PrimeNG element — DD-4 falsified) to a `[style]` object binding.
+      // `element.style.border` cannot read it back in jsdom for a `var(...)` colour value (the
+      // `cssstyle` parser silently drops the whole shorthand — verified empirically; see the
+      // longer note on the `c8`/`c8b` tests this mirrors, in
+      // innovation-use-actor-item.component.spec.ts), so this spies on the accessor Angular's
+      // binding actually writes through instead of reading the (unreadable-here) DOM back.
+      // Angular's styling engine memoizes the last-applied value per property and skips a
+      // redundant re-write when a render repeats the same computed string — this describe's own
+      // `beforeEach` already rendered the missing state before the spy below exists, so a bare
+      // extra `detectChanges()` here would (and, verified, does) produce zero spy calls, not
+      // because nothing is bound but because nothing CHANGED. Toggling the row to valid and
+      // back to missing forces the value to actually differ between cycles, which is what makes
+      // the write — and the spy — observable.
       const selectDe = actorItem.query(By.css('p-select'));
       expect(selectDe).toBeTruthy();
-      expect((selectDe.nativeElement as HTMLElement).className).toContain('border-[var(--ac-warning-1)]');
-      expect((selectDe.nativeElement as HTMLElement).className).not.toContain('border-[var(--ac-red-1)]');
+      const actorRow = component.body().actors[0];
+      component.onActorUpdate(0, { ...actorRow, actor_type_id: 1 });
+      fixture.detectChanges();
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      component.onActorUpdate(0, { ...actorRow, actor_type_id: undefined });
+      fixture.detectChanges();
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
 
       const ratio = contrastRatio(WARNING_AMBER, GREY_100);
       expect(ratio).toBeCloseTo(2.09, 2);

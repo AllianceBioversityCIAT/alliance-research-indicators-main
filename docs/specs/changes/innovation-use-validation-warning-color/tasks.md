@@ -152,13 +152,13 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - **Use the token, NOT the exemplar's hex.** `custom-fields/select/select.component.html:20` hardcodes `'2px solid #E69F00'`; copying that verbatim would violate `NFR-IUW-001` and `DD-7` — the very rule this spec exists to satisfy. Use `var(--ac-warning-1)`.
   - Do **not** add `!important` and do **not** touch component SCSS. That fallback (`radio-button.component.scss:12–17`) is for descendant paint nodes; both sites here paint on their own element.
 - **Acceptance / done check:**
-  - [ ] AC.1 — `actor:34` and `actor:52` each carry an `[style]` binding producing a 2px `var(--ac-warning-1)` border in their invalid state, and `{}`/no border otherwise.
-  - [ ] AC.2 — the dead Tailwind border fragments are gone from both `class` interpolations; a grep for `border-\[var(--ac-warning-1)\]` in the 4 templates returns **0**.
-  - [ ] AC.3 — both ternary conditions (`actorTypeMissing || duplicateType`, `otherNameMissing`) and all non-border classes are unchanged.
-  - [ ] AC.4 — **no hex literal** in the touched files (`NFR-IUW-001`).
-  - [ ] AC.5 — assertions read the **inline style** (`element.style.border` / the `style` attribute), not the class list, and the old class-based border assertions are replaced rather than kept alongside.
-  - [ ] AC.6 — every `--ac-*` referenced still exists in `colors.scss` (`D-3` cross-check).
-  - [ ] AC.7 — route suite green and ≥ its current baseline of **234**.
+  - [x] AC.1 — `actor:34` and `actor:52` each carry an `[style]` binding producing a 2px `var(--ac-warning-1)` border in their invalid state, and `{}`/no border otherwise.
+  - [x] AC.2 — the dead Tailwind border fragments are gone from both `class` interpolations; a grep for `border-\[var(--ac-warning-1)\]` in the 4 templates returns **0**.
+  - [x] AC.3 — both ternary conditions (`actorTypeMissing || duplicateType`, `otherNameMissing`) and all non-border classes are unchanged.
+  - [x] AC.4 — **no hex literal** in the touched files (`NFR-IUW-001`).
+  - [x] AC.5 — assertions read the **inline style** (`element.style.border` / the `style` attribute), not the class list, and the old class-based border assertions are replaced rather than kept alongside.
+  - [x] AC.6 — every `--ac-*` referenced still exists in `colors.scss` (`D-3` cross-check).
+  - [x] AC.7 — route suite green and ≥ its current baseline of **234**.
   - [ ] AC.8 — **human visual re-check of AC.10, quoted:** an invalid actor card's select border compared against the `Contribution to SDG` reference field — the 2px amber border must now be present and indistinguishable, with no layout shift. **The observation must be quoted, and an inconclusive result is not a pass.**
 - **Verification:** `npx jest --testPathPattern innovation-use --coverage=false` · `npm run lint -- --quiet` · hex grep · then the AC.8 browser re-check.
 - **Input that makes this FAIL (K-012):** revert `actor:34` to the Tailwind class → AC.2's grep finds it and AC.5's inline-style assertion reddens. **Note the falsifier that does NOT work:** changing the token name inside the class fragment reddens nothing visually, because the class was never painting — that is exactly `D-8`, and it is why AC.5 must assert the inline style.
@@ -166,7 +166,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Dependencies:** `T-03`
 - **Effort:** S
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** blocked — code work PASS (Reviewer, 1st attempt); **AC.8 human re-check outstanding**
 
 ---
 
