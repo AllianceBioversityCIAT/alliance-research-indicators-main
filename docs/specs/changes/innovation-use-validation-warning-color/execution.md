@@ -1147,9 +1147,133 @@ where every assertion passed and the pixel was wrong, on precisely a *"the mecha
 same"* assumption (`DD-4`). **Extending an observation of `:34` to `:52` would repeat that inference.**
 
 Per the disqualifier — *"if the observation covers an adjacent property, say which and leave it
-blocked"* — `AC.8` stays **`[ ]`** and `T-04` stays **`[~]`** pending one more frame: `Actor type` set to
-**Other** with the `Specify other` name left empty.
+blocked"* — `AC.8` stayed **`[ ]`** pending one more frame: `Actor type` set to **Other** with the
+`Specify other` name left empty.
+
+#### AC.8 — **DISCHARGED.** The second frame arrived, and it proved more than it was asked to
+
+**Second observation, 2026-09-02, user screenshot of `ACTOR # 5` with `Actor type = Other`:**
+
+> *"igual sale bien"* — with a screenshot showing `Actor type` set to **Other**, the `Specify other`
+> input **empty and carrying a single 2px amber rounded border**, the amber *"⚠ This field is required"*
+> message beneath it, and the red asterisk and red remove button unchanged.
+
+| Claim | Observed |
+| --- | --- |
+| `actor:52` renders a 2px amber border via its own (`pInputText` directive) code path | ✅ present, single outline, radius intact |
+| Message treatment beneath it | ✅ amber text + `warning` icon |
+| `D-2` negative guards | ✅ asterisk red, remove button red |
+| Layout | ✅ no shift; the four count fields and `Total` hold their spacing |
+
+**The frame also settled something nobody asked for — and it is the most valuable part.** With
+`Actor type = Other` the select now holds a **valid** value, and the screenshot shows it with **no amber
+border at all**. That is the `{}` branch of `actor:34`'s ternary, **confirmed in a real browser**. Until
+this frame that branch was proven only in jsdom, by the two `not.toHaveBeenCalled()` negatives — whose own
+limitation the `T-04` Reviewer had flagged as a *global* negative over a tree containing four other border
+writers. A human looking at the screen closed a gap the test suite could only approximate.
+
+So both sites are verified through **both** of their distinct application mechanisms, in both states:
+
+| Site | Mechanism | Invalid | Valid |
+| --- | --- | --- | --- |
+| `actor:34` (`p-select` component, `style` re-applied via PrimeNG's host binding) | ✅ border (frame 1) | ✅ **no** border (frame 2) |
+| `actor:52` (`pInputText` directive on a native input, Angular writes directly) | ✅ border (frame 2) | — covered by unit test `c8b`'s negative |
+
+**`AC.8` is discharged. `T-04` closes.**
+
+#### Disposition of `T-03`'s `AC.10`
+
+`AC.10` **failed**, and that failure is the most productive event in this run — it produced the Pivot,
+`DD-10`, defect class `D-8`, and `T-04`. Its substance (a human confirming visual parity) is now
+delivered by `AC.8`'s two frames, so it is marked discharged **by `T-04` AC.8** rather than re-run.
+
+**One honest deviation from its literal wording.** `AC.10` names the **`Justification`** field as the
+side-by-side reference; the user compared against **`Contribution to SDG`** instead. That is the same
+shared-component treatment — both are `custom-fields/` components applying `'2px solid #E69F00'` through
+an inline `[style]` (`select.component.html:20`, `textarea.component.html:35`) — so the comparison is
+equivalent in substance. Recorded rather than glossed, because substituting a reference is exactly the
+kind of quiet drift `KZ-002` recurrence 6 was about (*"the proxy was a human's answer to a different
+question"*). Here the substitution is defensible and stated; it is not being credited as the literal
+criterion.
 
 ---
 
 ---
+
+## 3. Summary — spec complete
+
+**All four tasks `done`. 2026-09-02, one session, `gated` mode.**
+
+### Outcome
+
+| Task | Status | Attempts | Reviewer |
+| --- | --- | --- | --- |
+| T-01 — define `--ac-warning-1`, register in §7.1 | `[x]` | 1 | PASS |
+| T-02 — 8 call sites to the token | `[x]` (superseded at 2 sites) | 1 | PASS |
+| T-03 — assertions + R3 validation role | `[x]` | 1 | PASS |
+| T-04 — make the 2 borders render (Pivot) | `[x]` | 1 | PASS |
+| *(follow-up)* R3 comment repointed after the doc correction | — | 1 | PASS |
+
+**Five Reviewer rounds, five PASSes, all on the first attempt. Zero rework, zero HALTs.** The two
+exceptions that stopped the run were a **budget tripwire** and **two Pivots** — neither an implementation
+failure.
+
+### Verification, final
+
+| Check | Result |
+| --- | --- |
+| Route suite | `npx jest --testPathPattern innovation-use --coverage=false` → **237 / 237** (baseline was 230) |
+| Full client suite | `npm test -- --silent` → **317 suites / 6793 tests passing** |
+| Coverage | 98.2 / 96.3 / 97.76 / 98.5 (floors 40 / 20 / 45 / 30) |
+| Build | `npm run build` clean |
+| Lint | `npm run lint -- --quiet` clean |
+| Hex literals | zero in all touched templates and spec files, comments included |
+| Human visual | **2 frames, both sites, both mechanisms, both states** |
+
+### Budget, final
+
+| Metric | Expected | Actual |
+| --- | --- | --- |
+| Tasks | 3 | **4** (T-04 from the Pivot) |
+| LOC (code + `docs/ux-ui`) | ~40 | **+300 / −14** |
+| Review rounds | 1 | **1 per task** (5 total, zero rework) |
+
+Overrun **escalated, not absorbed**, and accepted by the user. Composition: 13 lines of production
+change (2 token definitions, 1 doc row, 8 class swaps, 2 `[style]` bindings) against ~290 lines of test
+and comment. **The estimate's defect was that it priced the acceptance criteria at zero** — `design.md`
+§8 costed `DD-9` plus "1 updated assertion" while `tasks.md` demanded eleven more assertions by name.
+
+### What this run actually produced
+
+The token change was trivial. **The value was in what the process caught.**
+
+1. **`DD-8` — a new defect class the repo did not have a name for.** A generated, correctly-placed
+   utility class that loses the cascade and paints nothing. Silent in a way `D-3` (a misspelled token) is
+   not: a typo at least leaves a name a grep can flag.
+2. **`DD-10` — a rule for the whole codebase.** Never colour a PrimeNG element's border with a Tailwind
+   utility; PrimeNG's CSS is unlayered and beats `@layer utilities` unconditionally. Use an `[style]`
+   object binding.
+3. **`AR-1` corrected in both directions** — the dark-mode claim was false for 3 of 8 sites, and the
+   SC 1.4.11 clause was measuring borders that did not exist.
+4. **The human gate paid for itself twice.** AC.10's failure produced the Pivot; AC.8's second frame
+   closed a negative-case gap the unit tests could only approximate.
+
+### Kaizen candidates for `/akili-archive`
+
+| # | Candidate | Evidence from this run |
+| --- | --- | --- |
+| 1 | **Asserting a mechanism's *observability* without running the observation.** `KZ-017`'s sharpest recurrence yet: the Leader corrected `DD-4` for "verified generation, claimed rendering" and, **in the same edit, citing `KZ-017` by name**, wrote "verified inline styles win, claimed jsdom can read them back". Knowing and naming the lesson did not prevent it. | `DD-4` → `DD-10`; the four-site correction |
+| 2 | **Price the budget from `tasks.md`'s AC list, not `design.md`'s decision rows.** Both are written in the same `/akili-specify` pass, so the decision log looks complete while the AC list is where the work lives. | 205 LOC vs ~40, with T-01/T-02 exactly on budget |
+| 3 | **A backward correction sweep must match the ID *with* its spec path.** Spec IDs are not globally unique: `AR-1`/`DD-5`/`OQ-3`/`RB-1` returned 82 hits across `docs/`, **none** referencing this spec. A naive sweep is ~100% false positives and could invite an edit to another spec's decision row. | The `RB-5` closure sweep |
+| 4 | **A quoted human observation can be disqualified while its attached artifact discharges the criterion.** *"ahora si se ve bien"* is precisely the phrasing the disqualifier rejects; the screenshot is what proved the case, and it answered questions the observer was never asked. Evidence rules should name the artifact, not only the sentence. | AC.8, both frames |
+| 5 | **An Implementer's evidence can be sound in conclusion and wrong in argument.** The `T-04` K-004 falsifier "proved" per-site discrimination; it did not (the other site was inactive in that state). Only an independent auditor separated the two — the case against ever collapsing the Reviewer gate for efficiency. | `T-04` Reviewer, concern 1 |
+
+### Outstanding — outside execution, user-owned
+
+| # | Item |
+| --- | --- |
+| `RB-3` | Engineering-lead formal sign-off on adding a colour family to §7.1, if process requires it (`DR-3` flagged it as possibly owed) |
+| `RB-1` / `RB-5` | The design-system ticket for the amber's contrast, now scoped to **both** themes. **The dark-mode deviation ships documented but ungateable** — every R3 constant is a light-theme value |
+| `RB-4` | **Still binding: this branch is not PR-ready as T-02 alone.** T-02 + T-03 + T-04 merge together or not at all |
+| Advisory | `docs/specs/innovation-use/OPEN-ITEMS.md` does not know about `RB-5`; adding it was outside the approved scope |
+| Blast radius | **Any Tailwind `border-*` on any PrimeNG element app-wide is inert** by `DD-10`'s mechanism. `DR-2` scoped this spec to Innovation use, so a repo-wide audit needs its own proposal |

@@ -2,7 +2,7 @@
 
 - **Module:** client — `innovation-use-details`
 - **Spec id:** 2026-09-innovation-use-validation-warning-color
-- **Status:** in-progress — 4 tasks (T-04 added by the 2026-09-02 Pivot)
+- **Status:** **complete** — 4 tasks (T-04 added by the 2026-09-02 Pivot). Two items remain OUTSIDE execution: `RB-3` and the owed design-system ticket, both user-owned
 - **Owner:** D. Casañas
 - **Depth:** Lite
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -121,7 +121,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - [x] AC.7 — an assertion proves **both** `details:114` and `details:249` render `--ac-red-1`, i.e. the same `saveErrors()` array never renders in two colours *(scenario 3 — THEN + AND IT MUST)*.
   - [x] AC.8 — the R3 block covers the validation role, with the exception documented in-file and citing `AR-1` / `DR-1` (`DD-9`, `D-7`).
   - [x] AC.9 — no hex literal was introduced into the spec file (its own `:1997–2000` grep still passes).
-  - [ ] AC.10 — **human visual check:** an invalid actor card and the `Justification` field are compared **on the same rendered screen**; the amber is indistinguishable between them and no layout shifted (`NFR-IUW-002`, `D-6`).
+  - [x] AC.10 — **performed 2026-09-02 and it FAILED**, which is this run's most productive event: it produced the Pivot, `DD-10`, defect class `D-8` and `T-04`. Its substance is now discharged by **`T-04` AC.8**'s two frames. *Literal-wording deviation, recorded not glossed:* the reference compared against was `Contribution to SDG`, not `Justification` — the same shared-component treatment (both apply `'2px solid #E69F00'` via an inline `[style]`), so equivalent in substance but not the field this criterion names.
   - [x] AC.11 — full route suite green: `npx jest --testPathPattern innovation-use` (baseline **230/230**; expect ≥ 230).
 - **Verification:** `npx jest --testPathPattern innovation-use --coverage=false` · then `npm run lint -- --quiet` · then the AC.10 browser check.
 - **Input that makes this FAIL (K-012):** revert one `T-02` site back to `--ac-red-1` → AC.2 reddens. For AC.7, colour `details:114` amber → the paired assertion reddens. For AC.10, the disqualifier below applies.
@@ -130,7 +130,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Dependencies:** `T-02`
 - **Effort:** M
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** blocked — code work PASS; AC.10 (human visual check) outstanding; Pivot Record filed (see `execution.md`)
+- **Status:** done — code work PASS; AC.10 failed as recorded and its substance is discharged by `T-04` AC.8
 
 ---
 
@@ -159,14 +159,14 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - [x] AC.5 — assertions read the **inline style** (`element.style.border` / the `style` attribute), not the class list, and the old class-based border assertions are replaced rather than kept alongside.
   - [x] AC.6 — every `--ac-*` referenced still exists in `colors.scss` (`D-3` cross-check).
   - [x] AC.7 — route suite green and ≥ its current baseline of **234**.
-  - [~] AC.8 — **human visual re-check, PARTIAL 2026-09-02.** ✅ `actor:34` **verified from the user's screenshot**: one 2px amber border (not a double outline — the open question about which `p-select` node receives it), PrimeNG's radius preserved after `rounded-md` was dropped, amber matching the reference, no layout shift, and the red asterisk + red remove button visible in the same frame. ⛔ `actor:52` **NOT verified** — with `Actor type` empty the `Specify other` input is not rendered, so the frame that proves `:34` structurally excludes `:52`, and the two apply the inline style through **different mechanisms** (`p-select` re-applies a `style` @Input via PrimeNG's host binding; `pInputText` is a directive on a native input that Angular writes directly). Inferring one from the other is the same "obviously-the-same-mechanism" step that produced `DD-4`. Needs one frame: `Actor type = Other`, name left empty.
+  - [x] AC.8 — **human visual re-check DISCHARGED 2026-09-02, two frames.** Frame 1 (`Actor type` empty): `actor:34` renders one 2px amber rounded border, amber message, red asterisk + red remove button, no layout shift. Frame 2 (`Actor type = Other`, name empty): `actor:52` renders the same through its own `pInputText` code path — **and the select, now valid, renders NO border, confirming the ternary's `{}` branch in a real browser** (previously proven only by jsdom negatives whose global scope the Reviewer had flagged). Both sites, both mechanisms, both states. Observations recorded in `execution.md`.
 - **Verification:** `npx jest --testPathPattern innovation-use --coverage=false` · `npm run lint -- --quiet` · hex grep · then the AC.8 browser re-check.
 - **Input that makes this FAIL (K-012):** revert `actor:34` to the Tailwind class → AC.2's grep finds it and AC.5's inline-style assertion reddens. **Note the falsifier that does NOT work:** changing the token name inside the class fragment reddens nothing visually, because the class was never painting — that is exactly `D-8`, and it is why AC.5 must assert the inline style.
 - **What this cannot prove:** the composited pixel colour. An inline style outranks every stylesheet rule, so a passing AC.5 does imply the border paints — a materially stronger claim than the class assertion it replaces, but still not a screenshot. AC.8 remains the only criterion touching rendering.
 - **Dependencies:** `T-03`
 - **Effort:** S
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** blocked — code work PASS (Reviewer, 1st attempt); **AC.8 human re-check outstanding**
+- **Status:** done — Reviewer PASS on attempt 1; AC.8 discharged by two human-verified frames
 
 ---
 
@@ -219,12 +219,12 @@ No new spec **files**. Coverage floors unchanged (client: statements 40 / branch
 
 ## 6. Done definition
 
-- [ ] `T-01`, `T-02`, `T-03`, **`T-04`** are `done`.
-- [ ] Every clause in §3 is discharged by its named task.
-- [ ] `npx jest --testPathPattern innovation-use` ≥ 234 passing (baseline raised by `T-03`).
-- [ ] `npm run lint -- --quiet` clean.
+- [x] `T-01`, `T-02`, `T-03`, **`T-04`** are `done`.
+- [x] Every clause in §3 is discharged by its named task.
+- [x] `npx jest --testPathPattern innovation-use` ≥ 234 passing (baseline raised by `T-03`). **Final: 237/237.**
+- [x] `npm run lint -- --quiet` clean.
 - [x] AC.10's human observation is **quoted**, not summarised. **Done 2026-09-02 — and it FAILED**, which is what produced the Pivot and `T-04`. Quoted in `execution.md`.
-- [ ] `T-04` AC.8's human re-check is **quoted** and passes.
+- [x] `T-04` AC.8's human re-check is **quoted** and passes — two frames, both sites, both mechanisms, both states.
 - [ ] `AR-1`'s follow-up design-system ticket is filed — and it must cover **both** themes, not only light mode (`RB-5`).
 - [x] Actuals compared against the budget (3 tasks / ~40 LOC / 1 round); any overrun escalated, not absorbed. **Fired and escalated:** 205 LOC vs ~40. User accepted the overrun 2026-09-02; cause recorded in `execution.md` (the estimate priced AC.2–AC.7 at zero) and queued as a Kaizen candidate.
 - [x] Full client suite green, not only the route pattern: `npm test -- --silent` → **317 suites / 6790 tests passing**, coverage 98.19 / 96.29 / 97.76 / 98.49 (floors 40 / 20 / 45 / 30). Closes the scope gap the `T-03` Reviewer named — `--testPathPattern innovation-use` is narrower than `npm test` (`KZ-017`).
