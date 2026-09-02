@@ -350,21 +350,61 @@ Suite: `backend-unit` (Jest, sibling `*.spec.ts`). No E2E suite is added; the bu
 
 ## 13. Budget (Step 2.4 tripwire)
 
-Estimated from the design above, for `/akili-execute` to trip against:
+> **Re-baselined 2026-09-02, after T-03, by owner decision.** The original estimate is preserved below as the superseded row because a budget that quietly rewrites its own history stops being a tripwire. Per **KZ-008**, this correction fixes the **basis** — the per-task ratio the original got wrong — not merely the total. A corrected sum carrying an uncorrected per-item estimate breaches again at the next measurement, and T-06 (pure test code) would have been that next breach.
+
+### 13.1 Superseded estimate (original, pre-execution)
 
 | Metric | Estimate |
 | --- | --- |
 | Tasks | **7** |
-| Production LOC | **~250** |
-| Test LOC | **~250** |
+| Production LOC | ~250 |
+| Test LOC | ~250 |
 | Total LOC | **~500** |
-| Review rounds | **2** |
+| Review rounds | 2 |
 
-Depth re-check: the estimate matches the declared **Standard** depth — 7 tasks across 6 files with two high-severity constraints is above Lite and well below Full (no migration, no auth, no cross-package work). Depth stands.
+### 13.2 What the original basis got wrong
 
-Where the two review rounds are expected to be spent: R-RES-007 (proving the section-wide save is unreachable, not merely unused) and R-RES-008 (proving per-item routing with a fixture that can actually fail). Exceeding this budget is information — the Leader escalates rather than continuing.
+The estimate priced **test code at roughly 1:1 against production code**. That is a reasonable default, and it is wrong for *this* spec — because this spec's own evidence standard makes tests the dominant artifact:
 
----
+| Requirement this spec imposes on itself | Cost it adds to every logic-bearing task |
+| --- | --- |
+| **KZ-001 — double fidelity** | Doubles must *evaluate* the predicate they stand in for, not return canned rows. T-02's repository double parses TypeORM `FindOperator` internals; T-03's is a stateful reconciler that models `BaseServiceSimple.create`'s deactivation. Each is 20–40 lines that a naive stub would do in 2 |
+| **KZ-004 — discriminating fixtures** | Every multi-unit fixture must vary per unit, so fixtures cannot be shared or defaulted |
+| **Falsifier probes** (each task's `Disqualifies` clause) | Every acceptance clause needs a case that provably goes red, which frequently means a *second* test asserting the negative |
+| **`AND IT MUST` / `BUT NOT` clause granularity** | tasks.md §4 closes at clause level, not requirement level — so clauses become individual test cases |
+
+**Measured ratio across the three completed tasks: ~3:1 test:production**, not 1:1. Production LOC is in fact tracking close to the original estimate; the entire overrun is test code, and it is buying the falsifiability that has already caught two real defects (the empty-survivor wipe and the missing per-element validator).
+
+### 13.3 Revised estimate
+
+Actuals for T-01 … T-03 are measured; T-04 … T-07 are re-estimated on the corrected 3:1 basis.
+
+| Task | Prod LOC | Test LOC | Total | Source |
+| --- | --- | --- | --- | --- |
+| T-01 | 12 | 78 | 90 | **actual** |
+| T-02 | 32 | 111 | 143 | **actual** |
+| T-03 | 135 | 351 | 486 | **actual** |
+| T-04 | ~30 | ~90 | ~120 | estimate |
+| T-05 | ~90 | ~260 | ~350 | estimate |
+| T-06 | 0 | ~240 | ~240 | estimate — **pure test task**, which the 1:1 basis could not represent at all |
+| T-07 | ~10 | 0 | ~10 | estimate — lint `--fix` formatting only |
+| **Total** | **~310** | **~1,130** | **~1,440** | |
+
+| Metric | Original | Revised | Delta |
+| --- | --- | --- | --- |
+| Tasks | 7 | **7** | unchanged — the decomposition was right |
+| Production LOC | ~250 | **~310** | +24% |
+| Test LOC | ~250 | **~1,130** | +352% ← the entire miss |
+| Total LOC | ~500 | **~1,440** | +188% |
+| Review rounds | 2 | **4** | +2 |
+
+**Review rounds** are raised from 2 to 4 on measured evidence: T-03 alone consumed a full round as a **parallel two-lens pass** (triggered by its data-loss surface), and the original note below correctly predicted that R-RES-007 and R-RES-008 would each need one — those are T-05 and T-06, both still ahead.
+
+Depth re-check: **Standard still stands.** The revised figure reflects evidence density, not scope growth — the task count, file count, and requirement set are all unchanged, and no migration, auth, or cross-package work has appeared.
+
+### 13.4 The tripwire that remains armed
+
+This re-baseline resets the threshold; it does not disarm the mechanism. **A further overrun against §13.3 is still escalated, not absorbed.** The specific figures to watch: T-05 above ~350 total, T-06 above ~240, or a fifth review round.
 
 ## 14. Open Questions
 

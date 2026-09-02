@@ -6,7 +6,7 @@
 - **Owner:** David Felipe Casañas Hernández
 - **Depth:** Standard
 - **Requirements:** `./requirements.md` · **Design:** `./design.md`
-- **Budget (design.md §13):** 7 tasks · ~250 prod LOC + ~250 test LOC · 2 review rounds
+- **Budget (design.md §13):** **re-baselined 2026-09-02 after T-03** — 7 tasks · ~310 prod LOC + ~1,130 test LOC (~1,440 total) · 4 review rounds. Superseded original: ~250 + ~250 (~500) · 2 rounds. The basis, not just the total, was corrected (KZ-008): this spec's KZ-001/KZ-004 evidence standard makes tests ~3:1 against production, and T-06 is a pure-test task the 1:1 basis could not represent. Task count and scope are unchanged; depth stays **Standard**
 - **Last updated:** 2026-09-02
 
 ---

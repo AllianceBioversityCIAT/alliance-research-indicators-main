@@ -275,3 +275,67 @@ None blocking. First-attempt PASS on both lenses; no rework attempt consumed.
 **Budget draw:** 3 of 7 tasks · ~719 LOC against the ~500 estimate — **the LOC budget is now exceeded; see the tripwire note below** · **1 of the 2 budgeted review rounds consumed** (the parallel-lens pass counts as one round).
 
 > **⚠️ Budget tripwire — LOC.** `design.md` §13 estimated ~500 total LOC across all seven tasks. Three tasks in, the actual is **~719** (90 + 143 + 486), and the four largest-surface tasks remain. The overrun is concentrated in T-03, where ~350 of the 486 lines are **test** code — driven by this spec's own KZ-001/KZ-004 double-fidelity and falsifiability requirements, which the budget's per-task estimate did not price. Per `/akili-execute` Step 2.4 this is escalated to the owner rather than absorbed. See KZ-008: a re-baseline must correct the **basis**, not just the total.
+
+---
+
+## Budget Re-baseline — 2026-09-02, after T-03
+
+**Trigger.** The Step 2.4 tripwire fired at the close of T-03: ~719 actual LOC against a ~500 estimate, with the four largest-surface tasks still ahead. Escalated to the owner rather than absorbed. **Owner decision: re-baseline the basis.**
+
+**What was wrong with the basis.** The original §13 priced test code at ~1:1 against production. Measured across T-01…T-03 the real ratio is **~3:1**, and the cause is this spec's own evidence standard rather than scope growth:
+
+- **KZ-001 (double fidelity)** — doubles must *evaluate* what they stand in for. T-02's repository double parses TypeORM `FindOperator` internals; T-03's is a stateful reconciler modelling `BaseServiceSimple.create`'s deactivation semantics. 20–40 lines each where a canned stub would be 2.
+- **KZ-004 (discriminating fixtures)** — fixtures must vary per unit, so they cannot be shared or defaulted.
+- **Falsifier probes** — every acceptance clause needs a case that provably goes red, often a second negative-asserting test.
+- **Clause-level closure** — tasks.md §4 closes at `BUT` / `AND IT MUST` granularity, so clauses become individual cases.
+
+**Production LOC is tracking close to the original estimate (179 actual of ~250 across three tasks). The entire overrun is test code** — and it is buying the falsifiability that has already caught two real defects: the empty-survivor wipe (T-03) and the missing per-element validator (T-01).
+
+**Revised figures** (`design.md` §13.3 carries the per-task table; §13.1 preserves the superseded original):
+
+| Metric | Original | Revised |
+| --- | --- | --- |
+| Tasks | 7 | **7** (unchanged — the decomposition was right) |
+| Production LOC | ~250 | **~310** |
+| Test LOC | ~250 | **~1,130** |
+| Total LOC | ~500 | **~1,440** |
+| Review rounds | 2 | **4** |
+
+Review rounds raised on measured evidence: T-03 alone consumed a full round as a parallel two-lens pass, and the original §13 correctly predicted R-RES-007 and R-RES-008 would each need one — those are T-05 and T-06, both still ahead.
+
+**Depth re-check: Standard stands.** Task count, file count and requirement set are all unchanged; no migration, auth, or cross-package work has appeared.
+
+**The tripwire stays armed** against the revised figures. Specific thresholds to watch: T-05 above ~350 total, T-06 above ~240, or a fifth review round.
+
+---
+
+## Session Pause — 2026-09-02
+
+**Owner elected to pause here and resume tomorrow.** State is clean: no task is in flight, no delegation is outstanding, and nothing is uncommitted.
+
+| Item | State |
+| --- | --- |
+| **Completed** | T-01 `[x]`, T-02 `[x]`, T-03 `[x]` — all PASS on attempt 1, all committed |
+| **Commits** | `367336de` (T-01) · `d5a1db5b` (T-02) · `4590f22b` (T-03), on branch `AC-1607-Send-bulk-upload-completion-email-with-CapDev-metrics` |
+| **Next eligible** | **T-04** — explicit-portfolio entry point on the orchestrator (effort S, no dependencies beyond T-03 which is now done) |
+| **Working tree** | clean |
+| **Unpushed** | yes — push is the owner's call and has not been requested |
+
+### What the next session MUST carry into T-05's brief
+
+These are recorded here because a forward pointer is carried by the brief that cites it, or by nobody at all. **Re-read this block when composing T-05.**
+
+1. **The `supported === false` terminating branch** — the verbatim obligation is in the T-03 entry above, under *Forward pointer*. It includes the required red-capable test (content equality on `missing_fields`, not `toContain`).
+2. **Step 1's guard is load-bearing twice over** — for R-RES-007 *and* for R-RES-004 AC.4, because portfolio 1 returns `supported: false` even for an empty id list.
+3. **R-RES-002 AC.4** — injected into T-05's acceptance list after T-02's review; `findByYear(year: number)` structurally cannot cover it.
+
+### Carried to T-07
+
+- **R-RES-003 AC.2 (audit columns)** — box deliberately left unticked; discharged by construction, needs integration-level closure.
+- **The full-package suite (DC-6 / KZ-003)** — three targeted runs have accumulated; T-07 must not inherit an "already green" assumption from them. No coverage figure has been reported since execution began.
+- **Q-1, Q-2, RK-6** — unchanged and still open (see Document Control).
+- **The `/swagger` render check** for R-RES-001 AC.4.
+
+### Recommended resume path
+
+`/akili-resume`, or `/akili-execute results/ai-formalize-strategic-objectives` — the latter rebuilds state from this log and selects T-04 automatically.
