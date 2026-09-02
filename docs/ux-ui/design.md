@@ -355,6 +355,7 @@ Tokens live in `client/research-indicators/src/styles/colors.scss`, `src/styles/
 | Orange (simulation) | `--ac-orange-2` = `#b3561a`, identical in light and dark | Profile-simulation banner surface. White text ≈4.9:1 (AA). Deliberately does **not** lighten in dark mode — it is a background token, not a foreground one, so the light-mode-parity convention doesn't apply (design decision D-imp-7, `docs/specs/changes/profile-simulation/design.md`) |
 | Grey | `--ac-grey-100` … `-900` | Neutrals, borders, body text |
 | Red | `--ac-red-1` | Errors, destructive actions |
+| Warning | `--ac-warning-1` | Validation warnings, non-blocking field errors |
 | White | `--ac-white-1`, `--ac-white-2` | Surfaces |
 | Background | `--ac-background` | Page background (flips in dark mode) |
 | Pool Funding | `--ac-pool-funding-fg`, `--ac-pool-funding-border` | Bilateral "Pool Funding" tag |

@@ -104,7 +104,7 @@
                  `justificationMissing()` directly) keeps the two messages mutually exclusive by
                  construction — never both, never neither — so R-IUD-003's count stays 1/1/0
                  without editing or suppressing the shared component from the call site. -->
-            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
+            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-warning-1)]">
               <i class="material-symbols-rounded !text-[14px]">warning</i>
               <span class="fs-[14]">This field is required</span>
             </div>
@@ -144,7 +144,7 @@
       </div>
 
       @if (body().actors.length === 0) {
-        <div class="flex items-center rs-gap-[8] rs-mb-[12] text-[var(--ac-red-1)]">
+        <div class="flex items-center rs-gap-[8] rs-mb-[12] text-[var(--ac-warning-1)]">
           <i class="material-symbols-rounded !text-[14px]">warning</i>
           <span class="fs-[14]">At least one actor is required</span>
         </div>
