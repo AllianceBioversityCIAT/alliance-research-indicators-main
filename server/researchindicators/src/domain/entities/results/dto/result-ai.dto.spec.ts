@@ -16,7 +16,7 @@ import {
 } from './result-ai.dto';
 
 // Mirrors the exact pipe configuration the endpoint runs under
-// (results.controller.ts:663-669 — POST /api/v1/results/ai/formalize/bulk).
+// (results.controller.ts:663-669 — POST /api/results/ai/formalize/bulk).
 // A DTO validated under default class-validator/ValidationPipe options
 // proves nothing about the endpoint's real `whitelist` + `forbidNonWhitelisted`
 // + `transform` behavior.
@@ -307,6 +307,83 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
         expect(meta).toBeDefined();
         expect(meta.required).toBe(false);
       }
+    });
+  });
+
+  describe('ResultRawAi.strategic_objectives (R-RES-001) under the endpoint ValidationPipe', () => {
+    const bodyMetadata = { type: 'body' as const, metatype: RootAi, data: '' };
+
+    it('AC.1/AC.2 — accepts a numeric array and does not reject the request', async () => {
+      const payload = {
+        results: [{ ...minimalResult, strategic_objectives: [1, 3, 5] }],
+      };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result).toBeInstanceOf(RootAi);
+      expect(result.results[0].strategic_objectives).toEqual([1, 3, 5]);
+    });
+
+    it('does not require the field to be present (backward compatibility)', async () => {
+      const payload = { results: [minimalResult] };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result.results[0].strategic_objectives).toBeUndefined();
+    });
+
+    it('AC.3 — rejects a comma-separated string in place of an array', async () => {
+      const payload = {
+        results: [
+          { ...minimalResult, strategic_objectives: '1,3,5' as any },
+        ],
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toThrow();
+    });
+
+    it('AC.3 — rejects an array containing a non-number element, naming the field', async () => {
+      const payload = {
+        results: [
+          { ...minimalResult, strategic_objectives: [1, 'x'] as any },
+        ],
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          message: expect.arrayContaining([
+            expect.stringContaining('strategic_objectives'),
+          ]),
+        }),
+      });
+    });
+
+    it('AC.4 — Swagger documents `strategic_objectives` as an optional number array on ResultRawAi', () => {
+      const properties: string[] = Reflect.getMetadata(
+        'swagger/apiModelPropertiesArray',
+        ResultRawAi.prototype,
+      );
+      expect(properties).toContain(':strategic_objectives');
+
+      const meta = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        ResultRawAi.prototype,
+        'strategic_objectives',
+      );
+      expect(meta).toBeDefined();
+      expect(meta.type).toBe(Number);
+      expect(meta.isArray).toBe(true);
+      expect(meta.required).toBe(false);
     });
   });
 });

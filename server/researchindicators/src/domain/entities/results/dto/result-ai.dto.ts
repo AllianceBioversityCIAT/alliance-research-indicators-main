@@ -35,6 +35,7 @@ export class ResultAiDto {
   evidences?: CreateResultEvidenceDto;
   sdgs?: ResultSdg[];
   ipRights?: UpdateIpRightDto;
+  strategic_objectives?: number[];
 }
 
 export class CountryAreas {
@@ -365,6 +366,17 @@ export class ResultRawAi {
   @IsArray()
   @IsNumber({}, { each: true })
   regions: number[];
+
+  @ApiProperty({
+    type: Number,
+    isArray: true,
+    description: 'Strategic objectives associated with the result',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  strategic_objectives?: number[];
 
   @ApiProperty({
     type: String,
