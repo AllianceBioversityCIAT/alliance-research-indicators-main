@@ -502,6 +502,13 @@ describe('AgressoContractRepository', () => {
       });
     });
 
+    // TS-6 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // R-MPC-004 AC.1 — the existing test above covers ASC only; DESC completes both directions.
+    it('orderBy maps count-results in both directions', () => {
+      const result = repository.orderBy(OrderFieldsEnum.COUNT_RESULTS, 'DESC');
+      expect(result).toBe('contract_total_results DESC ');
+    });
+
     it('should return default ORDER BY when field is empty', () => {
       const result = repository.orderBy('', 'ASC');
       expect(result).toBe('');
@@ -539,6 +546,17 @@ describe('AgressoContractRepository', () => {
           return Promise.resolve(responses.count ?? []);
         return Promise.resolve(responses.main ?? []);
       });
+
+    // @akili-spec docs/specs/bugfix/my-projects-result-count-scope
+    // Named verbatim from design.md §10.2.1 — not copied out of a markdown table cell,
+    // whose pipe-escaping would silently defang the regex.
+    // any spelling of a user-scoping token; used as .not.toMatch(...)
+    const RE_USER_TOKENS = /created_by|updated_by|sec_user/;
+
+    // the counting subquery is CLOSED: both the helper's own paren (:326) and the :402 wrapper.
+    // Deleting the `${userFilter})` line at :326 removes one of the two and this stops matching.
+    const RE_SUBQUERY_CLOSED =
+      /rc_ord\.is_primary = TRUE\s*\)\s*\)\s*AS contract_total_results/;
 
     it('should get contracts with all filters', async () => {
       const filter = {
@@ -626,25 +644,167 @@ describe('AgressoContractRepository', () => {
       expect(result.data).toBeInstanceOf(Array);
     });
 
-    it('should include user filter when userId is provided', async () => {
-      const userId = { sec_user_id: 456 } as any;
-      (repository.query as jest.Mock).mockResolvedValue([]);
+    // TS-1 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // Rewrite of the former 'should include user filter when userId is provided'
+    // (R-MPC-001, R-MPC-002). The row-visibility clause (untouched by this fix) must
+    // still gate both queries; the two counting expressions must no longer reference
+    // the requesting user at all.
+    it('separates user-scoped visibility from contract-wide counting', async () => {
+      const user = { sec_user_id: 456 } as any;
+      mockQueryBySql({
+        carnet: [{ carnet: 'CARNET-1' }],
+        count: [{ total: 1 }],
+        main: [],
+      });
 
-      await repository.getContracts({}, userId);
+      await repository.getContracts({}, user, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
 
-      expect(repository.query).toHaveBeenCalledWith(
-        expect.stringContaining(`AND r.created_by = ${userId.sec_user_id}`),
+      const main = mainSql();
+      const count = countSql();
+
+      // Row-visibility clause survives, unchanged, in both queries.
+      expect(main).toContain(
+        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1')",
+      );
+      expect(count).toContain(
+        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1')",
+      );
+      // The counting subqueries must carry no user reference whatsoever.
+      expect(main).not.toContain('r_ord.created_by');
+      expect(main).not.toMatch(/AND\s+r\.created_by\s*=/);
+    });
+
+    // TS-2 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // R-MPC-001 AC.2/AC.3, DC-1/DC-1b/DC-7 — asserts on the generated SQL string (DD-3),
+    // a predicate *count* rather than a substring absence so any additional/differently
+    // spelled user predicate reddens this gate regardless of spelling.
+    it('emits a contract-wide counting subquery with a fixed predicate set', async () => {
+      const user = { sec_user_id: 456 } as any;
+      mockQueryBySql({
+        carnet: [{ carnet: 'CARNET-1' }],
+        count: [{ total: 1 }],
+        main: [],
+      });
+
+      await repository.getContracts({}, user, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      const main = mainSql();
+      const start = main.indexOf('(SELECT COUNT(DISTINCT r_ord.result_id)');
+      const markerIndex = main.indexOf('AS contract_total_results', start);
+      const subquery = main.slice(
+        start,
+        markerIndex + 'AS contract_total_results'.length,
+      );
+
+      const andCount = (subquery.match(/\bAND\b/g) || []).length;
+      expect(andCount).toBe(4);
+      expect(subquery).toContain('rc_ord.contract_id = ac.agreement_id');
+      expect(subquery).toContain('r_ord.is_active = 1');
+      expect(subquery).toContain('r_ord.is_snapshot = FALSE');
+      expect(subquery).toContain('rc_ord.is_active = 1');
+      expect(subquery).toContain('rc_ord.is_primary = TRUE');
+      expect(subquery).not.toMatch(RE_USER_TOKENS);
+      expect(main).toMatch(RE_SUBQUERY_CLOSED);
+    });
+
+    // TS-3 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // R-MPC-003 AC.1, DC-1/DC-1b — same predicate-count discipline as TS-2, applied to
+    // the `result_counts` per-indicator block.
+    it('emits a contract-wide per-indicator count block', async () => {
+      const user = { sec_user_id: 456 } as any;
+      mockQueryBySql({
+        carnet: [{ carnet: 'CARNET-1' }],
+        count: [{ total: 1 }],
+        main: [],
+      });
+
+      await repository.getContracts({}, user, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      const main = mainSql();
+      const start = main.indexOf('LEFT JOIN (');
+      const markerIndex = main.indexOf(') result_counts ON', start);
+      const block = main.slice(
+        start,
+        markerIndex + ') result_counts ON'.length,
+      );
+
+      const andCount = (block.match(/\bAND\b/g) || []).length;
+      expect(andCount).toBe(3);
+      expect(block).toContain('HAVING COUNT(r.result_id) > 0');
+      expect(block).not.toMatch(RE_USER_TOKENS);
+      expect(main).toContain(
+        'COALESCE(result_counts.total_results, 0) as count_results',
       );
     });
 
-    it('should not include user filter when userId is null', async () => {
-      (repository.query as jest.Mock).mockResolvedValue([]);
+    // TS-4 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // R-MPC-002 AC.1/AC.2, DC-3 — HEAD-green guard. Not a regression test: proves the
+    // visibility joins and the resolved carnet remain intact in both queries.
+    it('retains both visibility joins and the resolved carnet in both queries', async () => {
+      const user = { sec_user_id: 456 } as any;
+      mockQueryBySql({
+        carnet: [{ carnet: 'CARNET-1' }],
+        count: [{ total: 1 }],
+        main: [],
+      });
 
-      await repository.getContracts({}, null);
+      await repository.getContracts({}, user, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
 
-      expect(repository.query).toHaveBeenCalledWith(
-        expect.not.stringContaining('AND r.created_by'),
+      const main = mainSql();
+      const count = countSql();
+
+      expect(main).toContain(
+        'LEFT JOIN result_contracts rc ON rc.contract_id = ac.agreement_id',
       );
+      expect(main).toContain(
+        'LEFT JOIN results r ON r.result_id = rc.result_id',
+      );
+      expect(count).toContain(
+        'LEFT JOIN result_contracts rc ON rc.contract_id = ac.agreement_id',
+      );
+      expect(count).toContain(
+        'LEFT JOIN results r ON r.result_id = rc.result_id',
+      );
+      expect(main).toContain("ac.projectLeadId = 'CARNET-1'");
+    });
+
+    // TS-5 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)
+    // Extends the former 'should not include user filter when userId is null'
+    // (R-MPC-001 AC.3, R-MPC-002, DC-7) — HEAD-green guard for the All Projects path.
+    it('no user filter anywhere, and the counting subquery stays closed', async () => {
+      mockQueryBySql({ count: [{ total: 1 }], main: [] });
+
+      await repository.getContracts({}, null, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      const main = mainSql();
+
+      expect(main).not.toMatch(RE_USER_TOKENS);
+
+      const start = main.indexOf('(SELECT COUNT(DISTINCT r_ord.result_id)');
+      const markerIndex = main.indexOf('AS contract_total_results', start);
+      const subquery = main.slice(
+        start,
+        markerIndex + 'AS contract_total_results'.length,
+      );
+      const andCount = (subquery.match(/\bAND\b/g) || []).length;
+      expect(andCount).toBe(4);
+
+      expect(main).toMatch(RE_SUBQUERY_CLOSED);
     });
 
     it('should throw when search query has invalid characters', async () => {
