@@ -268,3 +268,114 @@ assertion, the TS-5 title drift, and the un-rerun `test:cov`.
 
 **T-01 is complete.** `tasks.md` T-01 flipped to `done` after this entry was written, per the
 evidence-before-checkbox ordering.
+
+### T-02 — Manual Dev verification: cross-tab parity and sort order
+
+| Field | Value |
+| --- | --- |
+| Status | **`[~]` IN PROGRESS** — step 2/3 (parity) confirmed; step 5 (sort order) and step 4 (row-set baseline) outstanding |
+| Date | 2026-09-02 |
+| Deploy confirmed | `origin/dev` carries `31e5599d Merge branch 'FIX-My-contracts-2026' into dev`, which contains `8755b7ba` (the fix). Verified by `git log origin/dev`, not assumed from the UI |
+| Defect classes gated | DC-5 (partially — parity observed), DC-6 (**not yet**) |
+
+#### Steps 2 and 3 — cross-tab parity: CONFIRMED
+
+| Request surface | Contract | `count_results` |
+| --- | --- | --- |
+| **My Projects** (`current-user=true`) | `A1048` | **112** |
+| **All Projects** (`current-user=false`, searched by code `A1048`) | `A1048` | **112** |
+
+Equal. This is R-MPC-001 **AC.1** satisfied against the live Dev database — the first evidence in this spec
+that MySQL *returns* the contract-wide number, which no unit test here can reach (design §10.4). Before the
+fix the My Projects figure was the user-scoped subset; both surfaces now agree.
+
+Contract metadata cross-checks as the same row on both tabs (`CIFOR Hosted - HQ`, `HOS-CG`, status
+`ONGOING`, lead center `Bioversity International`, PI `GRESPAN, GABRIELE`), so this is genuinely one contract
+seen twice and not two rows that happen to share a code — the disqualifier `tasks.md` T-02 names.
+
+**Evidence provenance — read this before trusting the table above.** The two figures were read from
+screenshots the user supplied in-session. The table is a *transcription*, and per KZ-014 a transcription is
+not the screenshot. The image files live only in the chat transcript and are **not** committed to the repo,
+so this entry is not yet durable evidence. To close that: save both PNGs under
+`docs/specs/bugfix/my-projects-result-count-scope/evidence/` and reference them here. Until then, treat the
+parity claim as user-attested rather than archived.
+
+#### Step 4 — row-set baseline: NOT VERIFIABLE, declared gap
+
+R-MPC-002 **AC.3** ("`metadata.total` for a fixed request is unchanged before vs. after") requires a
+**pre-deploy** capture. The merge to `dev` has already happened, so if no baseline was taken the comparison is
+permanently unavailable for this deployment.
+
+What can honestly be said instead, labelled as what it is:
+
+- **Structural argument, not a measurement.** The row-visibility mechanism is byte-identical to `HEAD`: the
+  `(r.created_by = … OR ac.projectLeadId = …)` clause, the carnet lookup, `userContracts()` and both
+  `LEFT JOIN`s were verified unchanged by the Reviewer, and TS-1/TS-4 gate them in both the main and the
+  count query. The row set therefore cannot have widened *by construction of the diff*.
+- This is a code-level inference. It is **not** the observation AC.3 asks for, and it is recorded here as an
+  argument so that nobody later reads it as a measurement (KZ-014).
+
+Disposition: **AC.3 declared unverified for this deployment.** Not claimed as passed.
+
+#### Step 5 — sort order: OUTSTANDING
+
+`R-MPC-004 AC.2` and **DC-6** need the Results column read top to bottom under DESC on My Projects. Both
+screenshots supplied so far show a **single row**, and a one-row column is trivially non-increasing — it
+cannot demonstrate ordering. DC-6 remains **uncovered**.
+
+If the signed-in account has only one contract on My Projects, this step cannot be satisfied from that
+account at all, and DC-6 must be carried as an accepted, unmitigated risk (or re-run by an account with
+several contracts). Recorded as open rather than quietly satisfied.
+
+#### T-02 — COMPLETION (supersedes the in-progress state above)
+
+**Status: PASS**, with R-MPC-002 AC.3 declared unverified (unrecoverable for this deployment).
+
+Second round of Dev evidence, this time with **two** contracts on **both** tabs under the same search
+(`A1048 A1065`) and the Results column sorted **DESC**. Screenshots committed to
+`evidence/` — these are the artifacts themselves, not a transcription:
+
+| Artifact | Surface |
+| --- | --- |
+| `evidence/t02-step3-all-projects-A1048-A1065-desc.png` | All Projects (`current-user=false`) |
+| `evidence/t02-step2-step5-my-projects-A1048-A1065-desc.png` | My Projects (`current-user=true`) |
+
+Both images were read back from the committed files (not accepted from the paste) and show:
+
+| Contract | All Projects | My Projects | Equal? |
+| --- | --- | --- | --- |
+| `A1048` — CIFOR Hosted - HQ | **112** | **112** | ✅ |
+| `A1065` — EUROPEAN COUNTRI… | **39** | **39** | ✅ |
+
+Both surfaces report `Showing 1 to 2 of 2 projects`, page size 10, Results header carrying the active DESC
+indicator.
+
+**Step 2 / Step 3 — R-MPC-001 AC.1: CLOSED.** Two contracts, not one, agree across both tabs. Row identity
+cross-checks on both (`HOS-CG`/`HOS`, `ONGOING`, `Bioversity International`, PIs `GRESPAN, GABRIELE` and
+`MAGGIONI, LORENZO`), so these are the same contracts seen twice.
+
+**Step 5 — R-MPC-004 AC.2 and DC-6: CLOSED.** The Results column reads `112, 39` top to bottom —
+non-increasing — and both values match what All Projects shows for the same contracts.
+
+Why this actually discriminates DC-6 rather than merely looking right: DC-6's defect is *ordering by the
+user's own result counts instead of the displayed count*. Under that defect the My Projects ordering would be
+driven by two hidden per-user numbers, which have no reason to preserve the `112 > 39` relation of the
+contract-wide totals — a user with fewer results on `A1048` than on `A1065` would see the rows swapped. The
+two tabs show identical order **and** identical values, so the defect would have surfaced here.
+
+**Honest limit on that claim (KZ-017):** two rows demonstrate the sort *direction* is correct and that the
+ordering key is the displayed contract-wide count. They cannot exclude a subtle comparator fault that only
+appears in a longer list (ties, nulls, paging boundaries). DC-6 is closed for the defect this spec
+introduced; it is not a general proof of the sort.
+
+**R-MPC-002 AC.3 — remains DECLARED UNVERIFIED.** No pre-deploy `metadata.total` baseline was captured before
+the merge to `dev` landed, so the before/after comparison is permanently unavailable for this deployment. The
+structural argument recorded above (row-visibility mechanism byte-identical, Reviewer-verified, gated by
+TS-1/TS-4) stands as an argument and is **not** counted as the observation AC.3 asks for. Note the two
+screenshots do provide weak corroboration — `Showing 1 to 2 of 2` is identical on both tabs for this filtered
+request — but a filtered two-row view is not the fixed unfiltered request AC.3 specifies, so it is not
+promoted to evidence.
+
+**DC-5 disposition:** substantially covered. The parity of real MySQL-returned values across two contracts is
+exactly what the unit suite structurally cannot reach (design §10.4). What remains untested is operator
+precedence on row sets other than these two.

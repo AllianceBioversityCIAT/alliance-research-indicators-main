@@ -100,10 +100,10 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
   5. Load **My Projects**, sort by **Results** DESC, and read the column top to bottom.
 
 - **Acceptance / done check:**
-  - [ ] The two `count_results` values in steps 2 and 3 are **equal**.
-  - [ ] `metadata.total` and the ordered `agreement_id` list for a fixed request are **unchanged** vs. the pre-deploy capture (R-MPC-002 — the fix must not widen the row set).
-  - [ ] The Results column under DESC is non-increasing **and** its values match what All Projects shows for the same contracts.
-  - [ ] Screenshots or raw JSON for steps 2, 3 and 5 attached to `execution.md`.
+  - [x] The two `count_results` values in steps 2 and 3 are **equal** — both `112` for `A1048` on Dev, 2026-09-02 (see `execution.md`). Deploy confirmed via `git log origin/dev`.
+  - [ ] `metadata.total` and the ordered `agreement_id` list for a fixed request are **unchanged** vs. the pre-deploy capture (R-MPC-002 — the fix must not widen the row set). **DECLARED UNVERIFIED** — no pre-deploy baseline was captured and the merge to `dev` has landed, so the comparison is unavailable for this deployment. A structural argument (visibility mechanism byte-identical) is recorded in `execution.md` and is explicitly **not** a substitute.
+  - [x] The Results column under DESC is non-increasing **and** its values match what All Projects shows for the same contracts — `A1048`=112, `A1065`=39 on both tabs, DESC active (Dev, 2026-09-02). Closes DC-6.
+  - [x] Screenshots or raw JSON for steps 2, 3 and 5 attached to `execution.md` — committed under `evidence/` and read back from the committed files, not from the paste.
 
 - **What disqualifies this evidence:**
   - A pre-deploy capture taken from a different environment or a different page size — it is not a baseline.
@@ -114,7 +114,7 @@ T-02 and T-03 are independent of each other and both require T-01 deployed to De
 - **Skills:** none required
 - **Dependencies:** T-01 deployed to Dev
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** done
 
 ---
 
