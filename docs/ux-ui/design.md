@@ -351,6 +351,7 @@ Tokens live in `client/research-indicators/src/styles/colors.scss`, `src/styles/
 | Orange | `--ac-orange-1` | Indicators 4–5 |
 | Grey | `--ac-grey-100` … `-900` | Neutrals, borders, body text |
 | Red | `--ac-red-1` | Errors, destructive actions |
+| Warning | `--ac-warning-1` | Validation warnings, non-blocking field errors |
 | White | `--ac-white-1`, `--ac-white-2` | Surfaces |
 | Background | `--ac-background` | Page background (flips in dark mode) |
 | Pool Funding | `--ac-pool-funding-fg`, `--ac-pool-funding-border` | Bilateral "Pool Funding" tag |

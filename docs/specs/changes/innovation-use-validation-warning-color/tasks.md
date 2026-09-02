@@ -2,7 +2,7 @@
 
 - **Module:** client — `innovation-use-details`
 - **Spec id:** 2026-09-innovation-use-validation-warning-color
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** D. Casañas
 - **Depth:** Lite
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -40,18 +40,18 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - Do **not** add a `$colors` map entry — `DD-6`.
   - §7.1 row wording: `| Warning | \`--ac-warning-1\` | Validation warnings, non-blocking field errors |`.
 - **Acceptance / done check:**
-  - [ ] AC.1 — `grep -n 'ac-warning-1' src/styles/colors.scss` returns a `:root` hit with `#e69f00`.
-  - [ ] AC.2 — the same grep returns a `[data-theme='dark']` hit.
-  - [ ] AC.3 — the two hits carry the identical value (`AC.4`).
-  - [ ] AC.4 — `docs/ux-ui/design.md` §7.1 lists the token in the same table format as the existing families.
-  - [ ] AC.5 — `$colors` map is unchanged (`DD-6`): `git diff` shows no map edit.
+  - [x] AC.1 — `grep -n 'ac-warning-1' src/styles/colors.scss` returns a `:root` hit with `#e69f00`.
+  - [x] AC.2 — the same grep returns a `[data-theme='dark']` hit.
+  - [x] AC.3 — the two hits carry the identical value (`AC.4`).
+  - [x] AC.4 — `docs/ux-ui/design.md` §7.1 lists the token in the same table format as the existing families.
+  - [x] AC.5 — `$colors` map is unchanged (`DD-6`): `git diff` shows no map edit.
 - **Verification:** `grep -n 'ac-warning-1' client/research-indicators/src/styles/colors.scss docs/ux-ui/design.md`
 - **Input that makes this FAIL (K-012):** define the token only under `:root` → the dark grep returns nothing → AC.2 red.
 - **What this cannot prove:** that any component uses the token, or that it renders. Presence only (`KZ-001`).
 - **Dependencies:** none
 - **Effort:** S
 - **Skills:** `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** done
 
 ---
 
