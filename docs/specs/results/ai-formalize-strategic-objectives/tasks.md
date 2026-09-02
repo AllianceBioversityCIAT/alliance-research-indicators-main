@@ -71,7 +71,7 @@ No cycles.
 
 ### T-02 — Add `PortfoliosService.findByYear(year)` with per-request memoization
 
-- **Requirements covered:** R-RES-002 (both scenarios, both clauses, AC.1–AC.4), NFR-RES-001, NFR-RES-002
+- **Requirements covered:** R-RES-002 (both scenarios, both clauses, AC.1–AC.3), NFR-RES-001, NFR-RES-002 — **AC.4 is not T-02's:** `findByYear(year: number)` cannot observe an absent year. `design.md` §5.1 step 2 places the `result.year ?? new Date().getFullYear()` default in the formalizer, so AC.4 is asserted by **T-05** (see `execution.md` → T-02 forward pointer)
 - **Files touched (intended):**
   - `src/domain/entities/portfolios/portfolios.service.ts`
   - `src/domain/entities/portfolios/portfolios.service.spec.ts`
@@ -82,17 +82,17 @@ No cycles.
   - Cache negative results too, or a batch of 200 unresolvable items produces 200 queries.
   - No year literal anywhere (NFR-RES-001).
 - **Acceptance / done check:**
-  - [ ] 2025 → the portfolio covering 2025; 2026 → the portfolio covering 2026.
-  - [ ] A portfolio with `is_active = 0` whose range matches is **not** returned (the `AND IT MUST` clause).
-  - [ ] With fixture ranges shifted so 2026 falls in portfolio 1, the method returns portfolio 1 — the "data change moves the routing" scenario.
-  - [ ] A year outside every range returns `null` without throwing.
-  - [ ] A 10-call sequence over 2 distinct years issues 2 repository calls.
+  - [x] 2025 → the portfolio covering 2025; 2026 → the portfolio covering 2026.
+  - [x] A portfolio with `is_active = 0` whose range matches is **not** returned (the `AND IT MUST` clause).
+  - [x] With fixture ranges shifted so 2026 falls in portfolio 1, the method returns portfolio 1 — the "data change moves the routing" scenario.
+  - [x] A year outside every range returns `null` without throwing.
+  - [x] A 10-call sequence over 2 distinct years issues 2 repository calls.
 - **Tests:** `portfolios.service.spec.ts` — new `describe('findByYear')`.
 - **Verification:** `npm test -- --silent src/domain/entities/portfolios/portfolios.service.spec.ts`
 - **Falsifying input:** an inactive portfolio row whose range contains the year — an implementation that omits `is_active` from the `where` returns it and FAILs. And the shifted-range fixture FAILs any implementation that compares the year to a constant.
 - **Disqualifies:** the memoization assertion is worthless if the repository double does not record calls — a call-count assertion against a stub that cannot count is a tautology (`design.md` §10). The shifted-range test is worthless if it reuses the same year as the unshifted test, since both would pass a hardcoded rule.
 - **Skills:** `nestjs-expert`, `tdd`
-- **Effort:** S · **Status:** todo
+- **Effort:** S · **Status:** done
 
 ---
 
@@ -158,7 +158,7 @@ No cycles.
 
 ### T-05 — Wire the alignment step into `formalizeResult`, with reporting and the metadata guard
 
-- **Requirements covered:** R-RES-003 (scenario, `BUT`/`AND IT MUST`, AC.3–AC.4), R-RES-004 (scenario, both clauses, AC.1–AC.4), R-RES-006 (scenario, both clauses, AC.1–AC.4), R-RES-007 (both scenarios, all clauses, AC.2, AC.4), R-RES-009 (scenario, both clauses, AC.1–AC.3), NFR-RES-003
+- **Requirements covered:** R-RES-003 (scenario, `BUT`/`AND IT MUST`, AC.3–AC.4), R-RES-004 (scenario, both clauses, AC.1–AC.4), R-RES-006 (scenario, both clauses, AC.1–AC.4), R-RES-007 (both scenarios, all clauses, AC.2, AC.4), R-RES-009 (scenario, both clauses, AC.1–AC.3), NFR-RES-003, **R-RES-002 AC.4** (injected by the Leader after T-02's review: `findByYear(year: number)` structurally cannot observe an absent year, and `design.md` §5.1 step 2 places the default here — see `execution.md` → T-02 forward pointer)
 - **Files touched (intended):**
   - `src/domain/entities/results/results.service.ts`
   - `src/domain/entities/results/results.service.spec.ts`
@@ -183,6 +183,7 @@ No cycles.
   - [ ] Absent / `[]` / `null` field → the resolver and orchestrator are **never called** (assert zero interactions, not just zero rows).
   - [ ] Single endpoint: a valid payload returns the created result and it persists; an unknown `contract_code` still rolls back and rethrows.
   - [ ] Bulk metadata output unchanged: one `bulk_upload_results` row per item, same fields.
+  - [ ] **R-RES-002 AC.4** — an item with **no** `year` resolves via the current calendar year (`result.year ?? new Date().getFullYear()`), and the portfolio it routes to is the one covering that year. Assert against a fixture whose covering portfolio differs from the other items, so a hardcoded calendar-year default cannot pass unnoticed.
 - **Tests:** `results.service.spec.ts` — extend `formalizeResult` and `createResultFromAiRoar` describes.
 - **Verification:** `npm test -- --silent src/domain/entities/results/results.service.spec.ts`
 - **Falsifying input:** an item with `year: 2035`. An implementation that defaults to portfolio 1 when the resolver returns `null` writes rows and FAILs. And a payload with **no** field, asserted with zero-interaction spies on the resolver and orchestrator: any implementation that calls the alignment step unconditionally FAILs even though no rows would be written — which is the whole point, since the row count alone cannot see that defect.
