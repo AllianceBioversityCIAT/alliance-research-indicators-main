@@ -105,17 +105,17 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
   - **Express colours as decimal RGB triples.** This file's own zero-hex grep bans a literal hex **anywhere, comments included** (`:1997–2000`). `#e69f00` is `[230, 159, 0]`.
   - Add negative guards for `D-2`: the `*` asterisks and the remove buttons still carry red; `details:114` still carries red (`DD-8`).
 - **Acceptance / done check:**
-  - [ ] AC.1 — every assertion broken by `T-02` is realigned; the list came from the failing run, and the run's count is recorded (`K-018`).
-  - [ ] AC.2 — an assertion proves the invalid `p-select` border carries the warning token *(scenario 1 — THEN)*.
-  - [ ] AC.3 — an assertion proves the required message keeps its `warning` icon and text-size class *(scenario 1 — AND)*.
-  - [ ] AC.4 — an assertion proves the `Actor type*` asterisk is still `text-red-500` *(scenario 1 — BUT it must NOT)*.
-  - [ ] AC.5 — an assertion proves the remove button is still `--ac-red-1` *(scenario 1 — BUT it must NOT)*.
-  - [ ] AC.6 — an assertion proves the `loadFailed()` banner is still `--ac-red-1` *(scenario 2 — THEN + AND IT MUST)*.
-  - [ ] AC.7 — an assertion proves **both** `details:114` and `details:249` render `--ac-red-1`, i.e. the same `saveErrors()` array never renders in two colours *(scenario 3 — THEN + AND IT MUST)*.
-  - [ ] AC.8 — the R3 block covers the validation role, with the exception documented in-file and citing `AR-1` / `DR-1` (`DD-9`, `D-7`).
-  - [ ] AC.9 — no hex literal was introduced into the spec file (its own `:1997–2000` grep still passes).
+  - [x] AC.1 — every assertion broken by `T-02` is realigned; the list came from the failing run, and the run's count is recorded (`K-018`).
+  - [x] AC.2 — an assertion proves the invalid `p-select` border carries the warning token *(scenario 1 — THEN)*.
+  - [x] AC.3 — an assertion proves the required message keeps its `warning` icon and text-size class *(scenario 1 — AND)*.
+  - [x] AC.4 — an assertion proves the `Actor type*` asterisk is still `text-red-500` *(scenario 1 — BUT it must NOT)*.
+  - [x] AC.5 — an assertion proves the remove button is still `--ac-red-1` *(scenario 1 — BUT it must NOT)*.
+  - [x] AC.6 — an assertion proves the `loadFailed()` banner is still `--ac-red-1` *(scenario 2 — THEN + AND IT MUST)*.
+  - [x] AC.7 — an assertion proves **both** `details:114` and `details:249` render `--ac-red-1`, i.e. the same `saveErrors()` array never renders in two colours *(scenario 3 — THEN + AND IT MUST)*.
+  - [x] AC.8 — the R3 block covers the validation role, with the exception documented in-file and citing `AR-1` / `DR-1` (`DD-9`, `D-7`).
+  - [x] AC.9 — no hex literal was introduced into the spec file (its own `:1997–2000` grep still passes).
   - [ ] AC.10 — **human visual check:** an invalid actor card and the `Justification` field are compared **on the same rendered screen**; the amber is indistinguishable between them and no layout shifted (`NFR-IUW-002`, `D-6`).
-  - [ ] AC.11 — full route suite green: `npx jest --testPathPattern innovation-use` (baseline **230/230**; expect ≥ 230).
+  - [x] AC.11 — full route suite green: `npx jest --testPathPattern innovation-use` (baseline **230/230**; expect ≥ 230).
 - **Verification:** `npx jest --testPathPattern innovation-use --coverage=false` · then `npm run lint -- --quiet` · then the AC.10 browser check.
 - **Input that makes this FAIL (K-012):** revert one `T-02` site back to `--ac-red-1` → AC.2 reddens. For AC.7, colour `details:114` amber → the paired assertion reddens. For AC.10, the disqualifier below applies.
 - **Evidence disqualifier:** AC.10 is a human observation, so **quote what was actually observed** (`KZ-002`). A report that the page "looks right" or that "the section renders" does **not** discharge it — the quoted words must state that the *validation* amber on an *invalid actor card* was compared against the *Justification* field. If the observation covers an adjacent property, say which and leave AC.10 blocked. An inconclusive visual check is a legitimate outcome; it is never a pass.
@@ -123,7 +123,7 @@ Strictly sequential. `T-02` cannot resolve a token `T-01` has not defined; `T-03
 - **Dependencies:** `T-02`
 - **Effort:** M
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
-- **Status:** todo
+- **Status:** blocked — code work PASS; AC.10 (human visual check) outstanding; Pivot Record filed (see `execution.md`)
 
 ---
 
@@ -168,6 +168,7 @@ No new spec **files**. Coverage floors unchanged (client: statements 40 / branch
 | RB-2 | 2026-09-02 | `D-6` has no automated gate — a wrong rendered colour passes every command | AC.10 human check with a quoted-observation disqualifier | Implementer | open |
 | RB-3 | 2026-09-02 | Engineering-lead formal sign-off on a §7.1 token addition may be owed (`DR-3`) | Confirm before merge | D. Casañas | open |
 | RB-4 | 2026-09-02 | **`T-02` must not merge without `T-03`.** As of `T-02` the page ships validation text at 2.09:1 / 2.25:1 against PRD `C-4`, and the R3 harness (`innovation-use-details.component.spec.ts:2284`) is silent about the new role — the exact failure mode R3 was built to remediate. `T-02` alone on `dev` is a live *and* undetectable deviation, materially worse than the pre-spec red. Raised by `T-02`'s Reviewer | Treat as a **hard merge condition**, not a preference: no PR carrying `T-02` without `T-03` | Leader / D. Casañas | open |
+| RB-5 | 2026-09-02 | **`AR-1`/`DD-5`'s dark-mode claim is false for 3 of the 8 sites.** *"Dark mode passes at 6.29:1; the failure is light-mode only"* holds for the 5 sites on `--ac-grey-100` (dark `#2b2b2b` → 6.29:1) but NOT for `details:107`, `details:147`, `stepper:4`, which sit on `--ac-white-1` (dark `#e5e5e5` → **≈1.79:1**, worse than light mode's 2.25:1). Derived independently by Leader, Implementer and Reviewer. Reopens `OQ-3`; falsifies `DD-5`'s no-lightening rationale and `R-IUW-001` AC.2's stated reason. Reachable today and **undetectable** — every R3 constant is a light value | **Pivot Record filed in `execution.md`; awaiting user decision between options A–D.** No spec document amended and no code changed pending that decision | D. Casañas | **open — blocking** |
 
 ---
 

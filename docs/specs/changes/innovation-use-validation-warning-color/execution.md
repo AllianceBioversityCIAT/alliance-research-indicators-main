@@ -325,6 +325,339 @@ surfaced to the user at this task's gate.
 a presence assertion over markup (`KZ-001`). Deferred to `T-03` AC.10's human check, which is this spec's
 only gate that touches rendering.
 
-**Continue/pause gate:** `gated` mode — presented to the user with the merge condition above.
+**Continue/pause gate:** `gated` mode — presented to the user with the merge condition above. The user
+chose **"Sí, arrancar T-03"**, and for AC.10 chose **"Ruta nativa, y lo mirás vos"** (native route, user
+performs the observation).
+
+---
+
+### T-03 — Realign assertions, extend the R3 WCAG harness, and verify visually
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **`[~]` — code work PASS, AC.10 outstanding, and a Pivot Record filed** |
+| Date | 2026-09-02 |
+| Implementer attempts | **1** (Reviewer PASS on the delivered scope) |
+| Reviewer rounds | 1 |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max`, **`systematic-debugging`** |
+| Skill deviation | `systematic-debugging` is a **Leader addition** beyond the task's list: T-03's first act is reading a failing test run, which is precisely that skill's trigger. Recorded per `.agents/leader.md` → *Delegation Discipline* |
+| Effort assigned | `high` (task sized `M`; raised because the `DD-9` exception is precision work and `AC.7` required reasoning about a reachable multi-error state) |
+| Requirements covered | `R-IUW-002` scenarios 1–3 incl. every `BUT` / `AND IT MUST` clause; `NFR-IUW-002` (AC.10 — **not yet discharged**) |
+| Design refs honoured | `§6`, `DD-8`, `DD-9`, `AR-1` |
+
+#### Why this task is `[~]` and not `[x]`
+
+Two independent reasons, either sufficient on its own:
+
+1. **AC.10 is not discharged.** It is a human visual check and the Implementer was explicitly barred from
+   it. Per the task's own **Evidence disqualifier**, an inconclusive or absent visual check is never a
+   pass, and per `/akili-execute` Step 2.3.0 a task with outstanding scope never reaches `[x]` **even on a
+   Reviewer PASS** — the Reviewer audits what was written, not what was omitted.
+2. **A Pivot Record is filed against this task** (below). The Pivot Protocol marks the task `[~]` even
+   when rework attempts remain.
+
+#### The `K-018` run — the realignment list came from the failing run, not a grep
+
+Command: `npx jest --testPathPattern innovation-use --coverage=false`, run **before** any edit:
+
+```
+Test Suites: 1 failed, 5 passed, 6 total
+Tests:       1 failed, 229 passed, 230 total
+```
+
+The complete failure list — exactly one entry:
+
+```
+● InnovationUseActorItemComponent › c8 — missing actor type shows the required message and error border
+  › renders the required message and a red-token border on the select
+
+  expect(received).toContain(expected)
+  Expected substring: "border-[var(--ac-red-1)]"
+  Received string:    "border-2 border-[var(--ac-warning-1)] fs-[14] rounded-md w-full …"
+    at innovation-use-actor-item.component.spec.ts:264:48
+```
+
+**The `230/230` baseline in `design.md` §6 and `tasks.md` AC.11 is confirmed** — 229 + 1 = 230.
+
+The pre-flight grep had predicted exactly this one site, and `K-018` requires treating that prediction as
+a hypothesis to falsify rather than as the list. **The Reviewer falsified it independently** and the
+prediction survived: a grep for `ac-red-1|ac-warning-1` across **every** `*.spec.ts` under
+`client/research-indicators/src` matches exactly **2 files**, and before T-03 the details spec contained
+**zero** token references while the actor-item spec's only one was `:264`. The sibling specs for the
+organization-item and level-stepper components assert text and icon presence but never a colour class. So
+one realigned assertion is genuinely the complete set — a verified exhaustive list, not a lucky match.
+
+#### Attempt 1 — files changed (2 files, 194 insertions, 5 deletions; test files only)
+
+| File | Change |
+| --- | --- |
+| `…/innovation-use-actor-item/…component.spec.ts` | +42/−4 — realigned the `c8` border assertion to the warning token; added AC.3 (`fs-[14]` + icon), AC.4 (asterisk still `text-red-500`), AC.5 (remove button still `--ac-red-1`) as negative guards over the same render |
+| `…/innovation-use-details.component.spec.ts` | +152/−1 — extended the R3 `loadFailed` test with border+icon red guards (AC.6); new paired `:114`/`:249` test (AC.7, `DD-8`); new `describe('validation role …')` with two role tests + a falsifier and the cited exception (AC.8) |
+
+#### WCAG arithmetic — three independent derivations agreeing
+
+`AR-1`'s figures had already been corrected once in this spec (an earlier reviewer reported 2.10 / 1.95
+and was wrong), so `KZ-007` applies: a corrected figure is the highest-risk artifact class. All three
+derivations used the same sanity anchors — black-on-white = **21.00** and WCAG's canonical `#767676`
+on white = **4.54** — so the instrument was shown to discriminate before its output was trusted.
+
+| Pair | Leader | Implementer | Reviewer | `AR-1` claims |
+| --- | --- | --- | --- | --- |
+| amber `#e69f00` on `--ac-grey-100` `#f4f7f9` | 2.0934 → **2.09** | 2.093 → **2.09** | **2.09** | 2.09 ✅ |
+| amber on `--ac-white-1` `#fff` | 2.2523 → **2.25** | 2.253 → **2.25** | **2.25** | 2.25 ✅ |
+| red `#cf0808` on `--ac-grey-100` | 5.2878 → **5.29** | 5.288 → **5.29** | — | 5.29 ✅ |
+| red on `--ac-white-1` | 5.6890 → **5.69** | 5.689 → **5.69** | — | 5.69 ✅ |
+
+**`AR-1`'s light-mode figures are confirmed correct.** *(A Leader first pass produced 2.07 / 5.22 by using
+`#f5f5f5` — which is `--ac-background` — instead of `--ac-grey-100`'s actual `#f4f7f9`. Recorded because
+the sanity anchors passed while the answer was wrong: a validated instrument does not validate its
+inputs.)*
+
+#### `K-004` / `KZ-014` — every new assertion was observed FAILING before being cited
+
+| Mutation | Observed |
+| --- | --- |
+| actor-item `c8` mutated to a self-contradictory pair | `1 failed, 24 passed, 25 total` |
+| 4 independent mutations in the details spec (AC.6 banner border/icon · AC.7 `:114`/`:249` · AC.8 grey-100 role · the AC.8 falsifier itself) | `4 failed, 208 passed, 212 total` |
+| All files restored | `diff` confirmed **RESTORED IDENTICAL**, suite re-ran `234 passed, 234 total` |
+
+#### Final verification
+
+| Check | Result |
+| --- | --- |
+| `npx jest --testPathPattern innovation-use --coverage=false` | `Test Suites: 6 passed, 6 total` · `Tests: 234 passed, 234 total` — **230 → 234**, ≥ baseline (AC.11 ✅) |
+| `npm run lint -- --quiet` | `All files pass linting.` |
+| `grep -nE '#[0-9a-fA-F]{3,8}'` over the **whole route directory** (Reviewer widened this beyond the two touched files) | no matches, comment blocks included (AC.9 ✅) |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **0** errors in either touched file — run by the Implementer unprompted, and load-bearing: root `CLAUDE.md` §4.3 records that this exact gate once hid 945 type errors behind a report of 3 |
+
+**Reviewer verdict: `STATUS: PASS`**
+
+> T-03 discharges AC.1–AC.9 and AC.11 on a test-files-only diff (2 `.spec.ts`, 194 insertions). The single
+> realigned assertion is verifiably the complete set, AC.7's fixture genuinely reaches both render blocks,
+> the DD-9 exception covers the validation role with measured (not `>= 4.5`) values and a correctly-inverted
+> falsifier, and the dark-mode arithmetic the Implementer escalated is correct.
+
+#### Per-AC closure
+
+| AC | Verdict | Evidence |
+| --- | --- | --- |
+| AC.1 | ✅ | List derived from the failing run (1 failure of 230); exhaustiveness independently falsified by the Reviewer's repo-wide spec grep; counts recorded 230 → 234 |
+| AC.2 | ✅ | `actor-item.spec.ts` asserts `border-[var(--ac-warning-1)]` present **and** `border-[var(--ac-red-1)]` absent |
+| AC.3 | ✅ | Same test asserts the `warning` icon and the message span's `fs-[14]`; colour asserted on the containing div, where the utility actually sits (`actor-item.component.html:3`) |
+| AC.4 | ✅ | `span.text-red-500` containing `*` asserted present — and the selector is itself a class query, so an over-applied warning token makes `.find()` return `undefined` and the test fail |
+| AC.5 | ✅ | Remove button asserted `text-[var(--ac-red-1)]` and **not** `--ac-warning-1` |
+| AC.6 | ✅ | R3 `loadFailed` test extended: banner border + icon both asserted red, both asserted not-warning |
+| AC.7 | ✅ | See the dedicated analysis below — verified non-vacuous from the component source |
+| AC.8 | ✅ | Validation role added to R3 on both backgrounds, asserting the **measured** ratio and `toBeLessThan(4.5)` — never `>=`; cites `AR-1`, `DR-1`, `DD-9`, `D-7`; falsifier included; the `KZ-017` light-mode-only scope of the whole block declared in-file |
+| AC.9 | ✅ | Zero hex literals across the entire route directory, comments included |
+| **AC.10** | ⛔ **OUTSTANDING** | Human visual check. Native stack started for the user's observation; nothing may be recorded here until their words are quoted |
+| AC.11 | ✅ | 234/234, ≥ 230 |
+
+#### AC.7 — the assertion worth auditing, audited
+
+`AC.7` is the clause that pays for `DD-8`, so the Reviewer verified the fixture actually reaches the state
+rather than accepting that it does:
+
+- `idForLevel(7)` → id `8`; `LEVELS_FIXTURE` (`:25`) maps id 8 → `level: 7`; `resolvedLevel()` (`:196`)
+  returns 7 ≥ `JUSTIFICATION_MIN_LEVEL = 6` → `showJustification()` true → the `@if` at
+  `…component.html:86` opens, making the `:113` `@if (justificationError())` block reachable. The R3
+  `beforeEach` loads `idForLevel(3)`, so the `body.set` is a **real state change, not a no-op**.
+- `justificationError()` (`:283`) filters case-insensitively for `innovation_use_level_explanation` and
+  returns `matches.join(' ')`, so the interpolation equals the exact string the `.find()` compares.
+- `unaddressedSaveErrors()` (`:296`) is the strict complement, so `'actors.0.actor_type_id must not be
+  empty'` lands there and the `@if` at `:243` opens.
+- Both `.find()` results are guarded by `toBeTruthy()`, so a missing element **fails** rather than passing
+  vacuously.
+
+**One genuine `KZ-001` instance was found and is recorded rather than waived.** The test's final line —
+`expect(justificationBlock.className.includes('…red-1')).toBe(unaddressedBlock.className.includes('…red-1'))`
+— is **tautological**. By the time it runs, the two preceding `toContain` assertions have forced both
+operands to `true`; if either had failed, Jest never reaches the line. It compares `true` to `true` and
+cannot discriminate, and it does **not** establish the property its comment claims ("never one warning and
+one red") — that property is established by the two `.not.toContain('…warning-1')` assertions above it.
+AC.7 is fully discharged **without** this line. Left in place (it is harmless and the AC closes regardless);
+recorded here because a cohort assertion standing in for something it does not evaluate is exactly
+`KZ-001`, recurrence 13, and the honest disposition is to name it, not to count it as evidence.
+
+#### The AC.8 falsifier — direction deliberately inverted, and correctly so
+
+The existing R3 falsifier idiom (`~:2481`) mutates **pass → fail** (`substituting --ac-grey-600 … reports
+2.91:1 and fails 4.5:1`), because it guards a *passing* assertion. T-03's new falsifier mutates
+**fail → pass** (substituting `--ac-red-1` reports `5.29:1` and passes), because it guards a *failing*
+assertion. Same instrument, mirrored — and the mirror is required: the risk it closes is that
+`contrastRatio()` might be structurally incapable of returning ≥ 4.5 (broken formula, swapped numerator),
+which would make "measured 2.09, below 4.5" meaningless. Feeding it the role's own pre-token value and
+getting a pass rules exactly that out. **Honest limit:** the falsifier covers only the arithmetic half of
+AC.8; the class-presence half rests on the `.not.toContain` complements plus the K-004 mutation.
+
+#### Decisions made — the two judgment calls, both ruled for the Implementer
+
+- **AC.6 added by extending the existing `loadFailed` test rather than as a dedicated `it()`.** Accepted:
+  the AC's wording is *"an assertion proves"*, not *"a test proves"*; the `it` title was updated to name
+  the new claim, preserving discoverability; and colocating avoids duplicating the `loadFailed.set(true)`
+  arrange. The trailing `component.loadFailed.set(false)` will not run if an earlier assertion throws, but
+  the R3 `beforeEach` rebuilds the fixture per test, so no leakage is possible.
+- **AC.8 asserts representative sites, not all 8.** Accepted: AC.8's object is *"the validation **role**"*,
+  singular, and R3 is organized by role with each existing role asserting one representative element — two
+  tests (one per background) is *more* than the block's own pattern requires. Per-site presence at all 8 is
+  carried by T-02 AC.1's verified 8/7 partition, and §3's rows map the S1 clauses to AC.2/AC.3, which the
+  actor-item guards assert directly. No coverage row is left uncredited.
+
+#### `KZ-015` sweep (fixture arranges the TRANSITION, not the end state)
+
+All three new/changed arrangements were checked against the client child guide's rule and none violates it:
+
+- **AC.8 grey-100 test** — relies on the `describe`'s own `beforeEach`, which loads
+  `actors: [new InnovationUseActor()]` through `GET_InnovationUseDetails` and `await component.getData()`.
+  `actorTypeMissing` is `!this.body().actor_type_id` (`actor-item.component.ts:90`) — unconditional, no
+  `touched()` gate. A server-loaded draft actor row with no type is a reachable product state.
+- **AC.8 white-1 test** — constructs at `idForLevel(3)` (message absent), renders, **then** clears to
+  `undefined` and re-renders. That is the compliant ordering, and `undefined` is the product's own initial
+  state (`new GetInnovationUseDetails()`), which is what `@if (!selectedLevel)` exists for.
+- **actor-item `c8`** — sets inputs before the single `detectChanges()`, but the component is a pure
+  `@Input` card created inside the parent's `@for` with `[actor]` already bound, so initial binding **is**
+  the product path. Also the file's pre-existing universal idiom, unchanged by T-03.
+
+#### `ADVISORY` findings (4R lens checklist — advisory only, never gate, never become tasks)
+
+| Lens | Finding |
+| --- | --- |
+| Readability | `actor-item.component.spec.ts:259` — the `describe` title still says *"error border"* while the `it` beneath it now says "warning-token border". Realign on a future touch so the block does not read as pre-T-02 |
+| Readability | The new `it` name is ~170 characters; Jest wraps it and the failure line becomes hard to scan. A shorter title with clause IDs in a leading comment matches the file's own shape elsewhere |
+| Readability | The actor-item spec locates the select with `By.directive(Select)`; the new R3 test uses `By.css('p-select')`. Same host element (the details spec does not import `Select`) — cosmetic, noted so no future reader infers a difference in intent |
+| Reliability | The K-004 mutation evidence is **coarser than per-AC**: one self-contradictory mutation inside `c8` proves *the test* can redden, not that each of AC.2–AC.5's four assertions independently discriminates. The Reviewer reasoned through each and found each structurally discriminating, so it was not filed as an issue — but `c8` is the test where four ACs share one `it` and one mutation |
+| Resilience | The `:247` **outer border** of the unaddressed-save-errors block is asserted nowhere in the DOM. `R-IUW-002` S3's THEN reads *"its **border** and messages remain `var(--ac-red-1)`"*; AC.7 narrows to `:114`/`:249` and the border half is carried by T-02's verified 7-site kept-red count — so the clause **is** covered, by a grep rather than by the DOM. A one-line guard mirroring AC.6's banner-border assertion would close that at essentially zero cost |
+| Risk | The dark-mode gap — see the Pivot Record below. Reachability verdict: **reachable today**, and no assertion in this repo can redden on it |
+
+#### Scope declarations — what these checks structurally CANNOT reach (`KZ-017`)
+
+| Region | Why | Owner |
+| --- | --- | --- |
+| **The rendered pixel** (`D-6`) | Every assertion is a jsdom class-presence check over markup. R3's own header says the class assertions prove which token name won the element, never the painted pixel | **AC.10 — outstanding** |
+| **Dark mode** | Every constant in the R3 block is a `:root` (light) value, so the instrument is light-mode-only **for every role**, not just the new one. Nothing in this repo can redden on a dark-mode contrast failure | Pivot Record below |
+| The full client suite | `--testPathPattern innovation-use` is narrower than `npm test`; the full suite was **not** run. Both changed files are page-local `*.spec.ts` with no exports, so nothing outside the pattern should exercise them — **but that was not verified by running `npm test`.** The Leader owes the full-suite re-measure per root `CLAUDE.md` §4.3 |
+| What the browser paints | The WCAG math is pure-function arithmetic over hand-transcribed RGB triples. It proves formula consistency and agreement with `AR-1` — not font antialiasing, OS colour management, or the actual composited pixel | AC.10 (partially) |
+| Production build | `npm run build` not run — test-files-only change, no `.ts`/`.html` production delta |
+
+---
+
+## Pivot Record: T-03
+
+**Filed 2026-09-02. Status: awaiting user decision. Execution is stopped, not merely paused.**
+
+### The blocker
+
+`AR-1` (`requirements.md` §8) states: *"Dark mode passes at 6.29:1; the failure is light-mode only."*
+`DD-5` (`design.md` §7) rests the whole no-lightening decision on the same claim: *"It also needs no
+lightening: measured 6.29:1 on the dark card, comfortably AA."*
+
+**That claim is true for 5 of the 8 sites and false for the other 3.** Independently derived by the Leader,
+then confirmed by both the Implementer and the Reviewer, all three using the validated sanity anchors:
+
+| Site group | Dark background | Ratio | Verdict |
+| --- | --- | --- | --- |
+| `actor:3,34,41,52` · `org:3` (5 sites) | dark `--ac-grey-100` = `#2b2b2b` (`colors.scss:143`) | **6.29:1** | passes AA — `AR-1` correct here |
+| `details:107`, `details:147`, `stepper:4` (3 sites) | dark `--ac-white-1` = `#e5e5e5` (`colors.scss:153`) | **≈1.79:1** | **fails, and is worse than light mode's 2.25:1** |
+
+The site→background mapping was verified in the markup, not taken from the spec's table: `details:107` and
+`details:147` sit inside cards at `innovation-use-details.component.html:12` and `:124`, both
+`bg-[var(--ac-white-1)]`; the stepper renders at `:44`, inside the `:12` card.
+
+### Why this is a Pivot and not an advisory
+
+1. **The falsified claim is load-bearing for an approved decision.** `DD-5` chose "same value in both
+   themes, do not lighten" *because* dark mode was believed to pass. At 1.79:1 that premise is gone, so
+   `OQ-3` — recorded as settled in `design.md` §9 — **reopens as a live design question**.
+2. **It is load-bearing for an already-ticked acceptance criterion.** `requirements.md` `R-IUW-001` AC.2
+   justifies the dark value with *"it already clears AA on the dark surface at 6.29:1"*. The AC's
+   mechanical content (a `[data-theme='dark']` definition exists at `#e69f00`) is satisfied and stays
+   ticked; its **stated rationale** is false.
+3. **It is reachable and unguarded.** Any user with `[data-theme='dark']` active on this page sees amber on
+   `#e5e5e5` at ≈1.79:1 today — a live PRD `C-4` deviation that `AR-1` currently documents as a non-issue.
+   And because every R3 constant is a light value, **no assertion in this repo can ever redden on it.**
+   That is precisely the `D-7` gap this spec was written to close, reopened on the dark axis.
+4. It is **worse than the deviation `DR-1` accepted.** `AR-1` accepted 2.09 / 2.25 knowingly. 1.79 was
+   never presented to the user, so it has not been accepted by anyone.
+
+### What was NOT done, deliberately
+
+- **No spec document was amended.** The Pivot Protocol calls for mapping the revised plan into
+  `requirements.md` / `design.md` — but the direction is a **user decision** (see alternatives), and
+  writing a plan in the wrong direction would be worse than writing none. The amendments are held pending
+  the user's choice.
+- **No dark-mode assertion, constant, or test was added**, and the amber value was not touched. Widening
+  R3 to dark mode is not in T-03's scope, and `DR-1` fixes the colour.
+- **No code was changed on account of this finding.** T-03's delivered diff matches the approved `DD-5`
+  exactly (identical value in both blocks). The code is not wrong; the recorded reason for it is.
+- The finding is currently recorded **in-comment** in the R3 exception block. The Reviewer ruled that the
+  correct action for a test-files-only task and the **insufficient resting place** — the erroneous claim
+  lives in two documents the comment does not reach.
+
+### Alternatives for the user
+
+| # | Option | Consequence |
+| --- | --- | --- |
+| **A** | **Correct the documents, keep the value and the scope.** Amend `AR-1` and `DD-5` to state the deviation's real extent (5 sites pass dark, 3 fail worse than light), reopen `OQ-3` with "accepted for now", add `RB-5`, and file the owed design-system ticket covering **both** axes | Cheapest and fully honest. The 1.79:1 deviation ships, but knowingly and recorded. Does not touch code |
+| **B** | **A, plus lighten the dark value only.** Give `--ac-warning-1` a lighter `[data-theme='dark']` value so the 3 white-1 sites clear AA in dark mode | Overturns `DD-5` (which `DR-1` does *not* fix — `DR-1` fixes the *brand light* amber; the dark counterpart was this spec's own choice). Small code change, but the 22 unmigrated files would then differ from Innovation use in dark mode — the exact divergence `DD-5` was written to avoid |
+| **C** | **A, plus extend R3 to dark mode.** Add dark-theme constants and assert the dark ratios with their own documented exception | Closes the `D-7` gap on the dark axis so the deviation is at least *detectable*. Adds test scope to an already over-budget task |
+| **D** | Defer entirely; ship as-is with only the in-comment record | Not recommended. `RB-4` already forbids merging T-02 without T-03, and this would merge a live, undocumented, undetectable `C-4` deviation |
+
+---
+
+## Budget Tripwire: fired at T-03
+
+`design.md` §8 sets **3 tasks · ~40 LOC · 1 review round** and instructs `/akili-execute` to stop and
+escalate if actuals exceed it. Tasks (3) and review rounds (1 per task, **zero rework across the whole
+spec**) are on budget. **LOC is not.**
+
+### Line-item reconciliation (`git --numstat`, excluding spec bookkeeping)
+
+| Budget line item (`design.md` §8) | Expected | Actual | Delta |
+| --- | --- | --- | --- |
+| 2 token lines | 2 | `colors.scss` **+2** | ✅ exact |
+| 1 doc row | 1 | `docs/ux-ui/design.md` **+1** | ✅ exact |
+| 8 template lines | 8 | 4 templates **+8** | ✅ exact |
+| 1 updated assertion | 1 | `actor-item…spec.ts` **+42/−4** | **+41** |
+| ~25 lines for the `DD-9` R3 role | 25 | `details…spec.ts` **+152/−1** | **+127** |
+| **Total** | **~37 (stated ~40)** | **205** | **+168 (≈5.1×)** |
+
+**T-01 and T-02 hit their budget lines exactly.** The entire overrun sits in T-03's two test files: 194
+actual against 26 budgeted.
+
+### Cause — the budget under-priced the task; the Implementer did not over-build it
+
+The §8 breakdown priced only `DD-9` (the R3 role) plus one realignment. It priced **AC.2 through AC.7 at
+zero** — six acceptance criteria that each explicitly demand a new assertion, three of which (AC.6, AC.7,
+and AC.8's two-background structure) need their own fixture arrangement. Those ACs are not invented scope:
+they are the `BUT it must NOT` / `AND IT MUST` clauses of `R-IUW-002`'s three scenarios, and `tasks.md` §3's
+coverage table assigns each of them to T-03 by name.
+
+So the budget was derived from the **design decisions log** rather than from the **task's own AC list** —
+both written in the same `/akili-specify` pass. This is the `K-008` family (*writing a coverage table does
+not make it exhaustive — the same pass authored the requirements and the table*), and it is a candidate
+Kaizen entry for `/akili-archive`: **price the budget from `tasks.md`'s AC list, not from `design.md`'s
+decision rows.**
+
+The composition supports the same reading: ~72 comment / ~122 code lines.
+
+### Genuinely surplus content the Reviewer itemized (≈17 of 194 lines)
+
+| Location | Lines | Disposition |
+| --- | --- | --- |
+| `details…spec.ts` ~`:2417–2419` — AC.7's tautological equality line + its comment | 3 | Recorded above as the `KZ-001` instance. Removable; AC.7 closes without it |
+| `details…spec.ts` `:2438–2449` — the dark-mode discrepancy paragraph inside the `KZ-017` scope note | ~12 | **Worth keeping today** — currently the only durable record of the `AR-1` error. Its correct home is `AR-1` itself; once corrected (option A/B/C), collapse to a one-line pointer |
+| `actor-item…spec.ts` `:262`, `:264` — `actorNumber = 4` and `disabled = false` | 2 | Redundant against the `@Input` defaults, but defensible as explicit arrange for the remove-button guard, which does depend on `!disabled` |
+
+Everything else traces to an approved AC.
+
+### Leader recommendation
+
+Accept the overrun. Every line above the estimate traces to an acceptance criterion the user approved, the
+work passed review on the first attempt with zero rework, and the surplus is ≈17 lines of the 194. The
+mis-sizing is a defect in the **estimate**, not in the delivery — and the correct remedy is the Kaizen
+entry, not a retro-trim of tested assertions.
+
+**Continue/pause gate:** `gated` mode, and two exceptions have fired (Pivot + budget tripwire), neither of
+which pre-approval would absorb even under a different mode. Stopped for the user.
 
 ---

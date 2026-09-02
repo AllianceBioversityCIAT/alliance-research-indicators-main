@@ -2347,7 +2347,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     fixture.detectChanges();
   });
 
-  it('loadFailed banner: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  it('loadFailed banner: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1); border + icon stay --ac-red-1 (R-IUW-002 scenario 2, AC.6)', () => {
     component.loadFailed.set(true);
     fixture.detectChanges();
 
@@ -2362,7 +2362,158 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeCloseTo(7.44, 1);
     expect(ratio).toBeGreaterThanOrEqual(4.5);
 
+    // AC.6 (T-03) — scenario 2 THEN + AND IT MUST: this is a section-level failure
+    // (loadFailed()), not field validation, so §7.1 assigns it red — the border and icon must
+    // stay --ac-red-1 and must NOT move to the warning token added by T-01/T-02.
+    const bannerContainer = (banner!.nativeElement as HTMLElement).closest('div');
+    expect(bannerContainer).toBeTruthy();
+    expect(bannerContainer!.className).toContain('border-[var(--ac-red-1)]');
+    expect(bannerContainer!.className).not.toContain('border-[var(--ac-warning-1)]');
+
+    const bannerIcon = bannerContainer!.querySelector('i.material-symbols-rounded');
+    expect(bannerIcon).toBeTruthy();
+    expect((bannerIcon as HTMLElement).className).toContain('text-[var(--ac-red-1)]');
+    expect((bannerIcon as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
+
     component.loadFailed.set(false);
+  });
+
+  // -----------------------------------------------------------------------------------------------
+  // T-03 (changes/innovation-use-validation-warning-color) — R-IUW-002 scenario 3, AC.7 (DD-8).
+  // `justificationError()` (`:114`) and `unaddressedSaveErrors()` (`:249`) are complementary
+  // filters over the SAME `saveErrors()` array (single `set` at `:599`). This is the trap T-02 was
+  // required NOT to touch — colouring one amber and leaving the other red would paint one server
+  // error list in two colours in this single reachable state (a save returning both a
+  // justification error and an actor-row error).
+  // -----------------------------------------------------------------------------------------------
+  it('details:114 and details:249 both stay --ac-red-1 — one saveErrors() array never renders in two colours (R-IUW-002 scenario 3, DD-8, AC.7)', () => {
+    // A level >= 6 is required for showJustification() to render the `:114` block at all
+    // (innovation-use-details.component.ts JUSTIFICATION_MIN_LEVEL = 6).
+    component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(7) });
+    // Two messages from the SAME saveErrors() array: one names the justification field
+    // (renders at `:114` via justificationError()), one names an actor-row field with no
+    // page binding (renders at `:249` via unaddressedSaveErrors()).
+    component.saveErrors.set(['innovation_use_level_explanation is required at this level', 'actors.0.actor_type_id must not be empty']);
+    fixture.detectChanges();
+
+    const justificationSpan = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent === 'innovation_use_level_explanation is required at this level');
+    expect(justificationSpan).toBeTruthy();
+    const justificationBlock = (justificationSpan!.nativeElement as HTMLElement).closest('div');
+    expect(justificationBlock).toBeTruthy();
+    expect(justificationBlock!.className).toContain('text-[var(--ac-red-1)]');
+    expect(justificationBlock!.className).not.toContain('text-[var(--ac-warning-1)]');
+
+    const unaddressedSpan = fixture.debugElement
+      .queryAll(By.css('span'))
+      .find(s => (s.nativeElement as HTMLElement).textContent === 'actors.0.actor_type_id must not be empty');
+    expect(unaddressedSpan).toBeTruthy();
+    const unaddressedBlock = (unaddressedSpan!.nativeElement as HTMLElement).closest('div');
+    expect(unaddressedBlock).toBeTruthy();
+    expect(unaddressedBlock!.className).toContain('text-[var(--ac-red-1)]');
+    expect(unaddressedBlock!.className).not.toContain('text-[var(--ac-warning-1)]');
+
+    // The two filters must never diverge in colour — both carry --ac-red-1, never one warning
+    // and one red.
+    expect(justificationBlock!.className.includes('text-[var(--ac-red-1)]')).toBe(unaddressedBlock!.className.includes('text-[var(--ac-red-1)]'));
+  });
+
+  // -----------------------------------------------------------------------------------------------
+  // T-03 (changes/innovation-use-validation-warning-color) — DD-9: the validation role
+  // (--ac-warning-1, the 8 client-side field-validation sites T-02 moved off --ac-red-1) joins
+  // this R3 instrument with a DOCUMENTED, CITED EXCEPTION instead of being silently omitted —
+  // omission is exactly the gap R3 exists to close (D-7, requirements.md §6).
+  //
+  // MEASURED (not asserted >= 4.5:1 — it fails): --ac-warning-1 = [230, 159, 0] measures
+  // 2.09:1 on --ac-grey-100 and 2.25:1 on --ac-white-1, both below the 4.5:1 design.md §10 /
+  // PRD C-4 text minimum this block otherwise enforces (AR-1, requirements.md §8).
+  //
+  // ACCEPTED (AR-1, DR-1): the amber is a fixed, pre-existing brand value that this change did
+  // not introduce and has no authority to alter (DR-1 — Option A/the value is out of scope); the
+  // deviation was already live and app-wide (22 other files) before this spec, and Innovation Use
+  // was the outlier, not the standard. A follow-up design-system ticket to correct the amber
+  // app-wide is OWED (requirements.md §8 AR-1; tasks.md §5 RB-1) — not filed by this task.
+  //
+  // SCOPE OF THIS EXCEPTION (KZ-017): every constant in this R3 block (WHITE_1, GREY_100, …) is
+  // the LIGHT-theme value only, so this whole instrument — every role in it, not only this one —
+  // is light-mode-only by construction; this exception is scoped the same way and proves nothing
+  // about dark mode. Separately: AR-1's own text states "Dark mode passes at 6.29:1; the failure
+  // is light-mode only." That sentence is CONFIRMED only for the 5 sites on --ac-grey-100 (dark
+  // RGB [43, 43, 43] -> 6.29:1) and is NOT accurate for the 3 sites on --ac-white-1
+  // (details:107,147, stepper:4): dark --ac-white-1 is RGB [229, 229, 229], and the amber on it
+  // measures roughly 1.79:1 — worse than light mode's 2.25:1, not a pass. That discrepancy in
+  // AR-1's wording is flagged to the Leader for correction at the source document; it is not
+  // corrected here (this task touches spec files only, per its own scope boundary), and no
+  // dark-mode assertion is added below — R3 does not cover dark mode for any role.
+  // -----------------------------------------------------------------------------------------------
+  describe('validation role (--ac-warning-1): documented AA exception, not an omission (DD-9, AR-1, DR-1, D-7)', () => {
+    const WARNING_AMBER: Rgb = [230, 159, 0]; // --ac-warning-1
+    const RED_1: Rgb = [207, 8, 8]; // --ac-red-1 — this role's pre-token value, used by the falsifier below
+
+    it('grey-100 sites (actor:3 required message, actor:34 select border): text-[var(--ac-warning-1)], measured 2.09:1, below 4.5:1', () => {
+      // Naturally rendered by this describe's own beforeEach: the one actor row
+      // (new InnovationUseActor()) has no actor_type_id, so actorTypeMissing is unconditionally
+      // true (innovation-use-actor-item.component.ts get actorTypeMissing()) — no extra setup.
+      const actorItem = fixture.debugElement.query(By.css('app-innovation-use-actor-item'));
+      expect(actorItem).toBeTruthy();
+
+      const requiredMessage = actorItem
+        .queryAll(By.css('span'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This field is required');
+      expect(requiredMessage).toBeTruthy();
+      // The colour utility sits on the message's containing div (#requiredMessage template), not
+      // on the span itself — innovation-use-actor-item.component.html:3.
+      const requiredMessageContainer = (requiredMessage!.nativeElement as HTMLElement).closest('div');
+      expect(requiredMessageContainer).toBeTruthy();
+      expect(requiredMessageContainer!.className).toContain('text-[var(--ac-warning-1)]');
+      expect(requiredMessageContainer!.className).not.toContain('text-[var(--ac-red-1)]');
+
+      const selectDe = actorItem.query(By.css('p-select'));
+      expect(selectDe).toBeTruthy();
+      expect((selectDe.nativeElement as HTMLElement).className).toContain('border-[var(--ac-warning-1)]');
+      expect((selectDe.nativeElement as HTMLElement).className).not.toContain('border-[var(--ac-red-1)]');
+
+      const ratio = contrastRatio(WARNING_AMBER, GREY_100);
+      expect(ratio).toBeCloseTo(2.09, 2);
+      expect(ratio).toBeLessThan(4.5);
+    });
+
+    it('white-1 site (stepper:4 required message): text-[var(--ac-warning-1)], measured 2.25:1, below 4.5:1', () => {
+      // The stepper's own required message only renders with no level selected
+      // (innovation-use-level-stepper.component.html:4, `@if (!selectedLevel)`) — clear it to
+      // reach that state.
+      component.body.set({ ...component.body(), innovation_use_level_id: undefined });
+      fixture.detectChanges();
+
+      const stepper = fixture.debugElement.query(By.css('app-innovation-use-level-stepper'));
+      expect(stepper).toBeTruthy();
+
+      const requiredMessage = stepper
+        .queryAll(By.css('span'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This field is required');
+      expect(requiredMessage).toBeTruthy();
+      // The colour utility sits on the message's containing div, not on the span itself —
+      // innovation-use-level-stepper.component.html:4.
+      const requiredMessageContainer = (requiredMessage!.nativeElement as HTMLElement).closest('div');
+      expect(requiredMessageContainer).toBeTruthy();
+      expect(requiredMessageContainer!.className).toContain('text-[var(--ac-warning-1)]');
+      expect(requiredMessageContainer!.className).not.toContain('text-[var(--ac-red-1)]');
+
+      const ratio = contrastRatio(WARNING_AMBER, WHITE_1);
+      expect(ratio).toBeCloseTo(2.25, 2);
+      expect(ratio).toBeLessThan(4.5);
+    });
+
+    // Falsifying input (K-004/KZ-014): substituting this role's PRE-token value (--ac-red-1) into
+    // the same formula reports a PASSING ratio — proving the validation role's failing reading
+    // above is a genuine property of the amber, not an artifact of a contrastRatio() that always
+    // reports below 4.5:1.
+    it('falsifying input: substituting --ac-red-1 (this role\'s pre-token value) reports 5.29:1 and PASSES 4.5:1', () => {
+      const ratio = contrastRatio(RED_1, GREY_100);
+      expect(ratio).toBeCloseTo(5.29, 1);
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    });
   });
 
   it('ACTORS callout body: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {

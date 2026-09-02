@@ -252,22 +252,60 @@ describe('InnovationUseActorItemComponent', () => {
   });
 
   // c8 — A row with no actor type shows the inline required message and the error border.
+  // T-03 (changes/innovation-use-validation-warning-color): realigned after T-02 moved this site
+  // to the warning token (R-IUW-002 scenario 1 — THEN); the BUT-it-must-NOT clauses (AC.4/AC.5)
+  // are added as negative guards in the same test so the positive and negative claims sit
+  // together over one render.
   describe('c8 — missing actor type shows the required message and error border', () => {
-    it('renders the required message and a red-token border on the select', () => {
+    it('renders the required message (warning token, icon, text-size) and a warning-token border on the select — but leaves the asterisk and remove button red', () => {
       component.actor = new InnovationUseActor();
+      component.actorNumber = 4;
       component.duplicateType = false;
+      component.disabled = false;
       fixture.detectChanges();
 
       expect((fixture.nativeElement.textContent as string)).toContain('This field is required');
 
+      // AC.2 (T-03) — scenario 1 THEN: the invalid p-select's 2px border carries the warning
+      // token, not the red one it carried before T-02.
       const selectDe = fixture.debugElement.query(By.directive(Select));
-      expect(selectDe.nativeElement.className).toContain('border-[var(--ac-red-1)]');
+      expect(selectDe.nativeElement.className).toContain('border-[var(--ac-warning-1)]');
+      expect(selectDe.nativeElement.className).not.toContain('border-[var(--ac-red-1)]');
 
-      // T-11 c3 — icon AND text, never text alone. Only the required message renders here
-      // (actor_type_id is unset, duplicateType is false), so exactly one warning icon exists.
+      // AC.3 (T-03) — scenario 1 AND: the required message keeps its `warning` icon AND its
+      // `fs-[14]` text-size class. T-11 c3 precedent: icon AND text, never text alone. Only the
+      // required message renders here (actor_type_id is unset, duplicateType is false), so
+      // exactly one warning icon exists.
       const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
       expect(icon).toBeTruthy();
       expect((icon.nativeElement.textContent || '').trim()).toBe('warning');
+
+      const messageSpan = fixture.debugElement
+        .queryAll(By.css('span'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This field is required');
+      expect(messageSpan).toBeTruthy();
+      expect((messageSpan!.nativeElement as HTMLElement).className).toContain('fs-[14]');
+      // The colour utility sits on the message's containing div (#requiredMessage template),
+      // not on the span itself — see innovation-use-actor-item.component.html:3.
+      const messageContainer = (messageSpan!.nativeElement as HTMLElement).closest('div');
+      expect(messageContainer).toBeTruthy();
+      expect(messageContainer!.className).toContain('text-[var(--ac-warning-1)]');
+      expect(messageContainer!.className).not.toContain('text-[var(--ac-red-1)]');
+
+      // AC.4 (T-03) — scenario 1 BUT: it must NOT change the red colour of the `Actor type*`
+      // asterisk (D-2 negative guard — over-applying the warning token here is the defect this
+      // guard exists to catch).
+      const asterisk = fixture.debugElement
+        .queryAll(By.css('span.text-red-500'))
+        .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === '*');
+      expect(asterisk).toBeTruthy();
+
+      // AC.5 (T-03) — scenario 1 BUT: it must NOT change the red colour of the card's remove
+      // (`pi-times-circle`) button (D-2 negative guard).
+      const removeButton = fixture.debugElement.query(By.css('[aria-label^="Remove actor"]'));
+      expect(removeButton).toBeTruthy();
+      expect((removeButton.nativeElement as HTMLElement).className).toContain('text-[var(--ac-red-1)]');
+      expect((removeButton.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
     });
   });
 
