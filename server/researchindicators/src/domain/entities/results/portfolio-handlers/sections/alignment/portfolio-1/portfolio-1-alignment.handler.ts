@@ -6,6 +6,7 @@ import { ResultAlignmentDto } from '../../../../dto/result-alignment.dto';
 import {
   AlignmentSectionHandler,
   AlignmentSectionView,
+  StrategicObjectivesSaveReport,
 } from '../alignment-section-handler.interface';
 import { ResultAlignmentOperationsService } from '../shared/result-alignment-operations.service';
 
@@ -32,5 +33,22 @@ export class Portfolio1AlignmentHandler implements AlignmentSectionHandler {
 
   find(context: PortfolioHandlerContext): Promise<AlignmentSectionView> {
     return this.alignmentOperations.find(context.resultId);
+  }
+
+  /**
+   * Portfolio 1 owns no strategic objectives (R-RES-004) — this is a
+   * property of the portfolio, not something to discover per call, so it
+   * reports unsupported without issuing any reference-data query. There is
+   * deliberately no `StrategicObjectivesService` dependency on this class.
+   */
+  async saveStrategicObjectives(
+    _resultId: number,
+    ids: number[],
+  ): Promise<StrategicObjectivesSaveReport> {
+    return {
+      supported: false,
+      saved: [],
+      discarded: Array.from(new Set(ids ?? [])),
+    };
   }
 }

@@ -104,6 +104,7 @@ No cycles.
   - `.../alignment/portfolio-1/portfolio-1-alignment.handler.ts` + `.spec.ts`
   - `.../alignment/portfolio-2/portfolio-2-alignment.handler.ts` + `.spec.ts`
   - `src/domain/entities/results/portfolio-handlers/portfolio-handlers.module.ts`
+  - **Authorized deviation (Leader, 2026-09-02):** `src/domain/entities/strategic-objectives/strategic-objectives.service.ts` + `.spec.ts` — `StrategicObjectivesService` had no id-filtered finder (`findAll(portfolioId?)` has no id filter; `findOne(id)` throws and ignores `portfolio_id`), so the predicate `design.md` §3 names was unreachable. `findActiveByIdsForPortfolio(ids, portfolioId)` was added there rather than filtering in memory. Recorded in `execution.md` → T-03 so T-07's blast-radius review has the reason.
 - **Description:** Extend `AlignmentSectionHandler` (not the generic `PortfolioSectionHandler` — DD-1) with a method that persists only strategic objectives and returns a report: whether the portfolio supports the sub-section, which ids were saved, which were discarded. Portfolio 1 reports unsupported and writes nothing. Portfolio 2 validates ids against **its own** portfolio and writes the survivors. Also harden the two unguarded `.map` calls in the portfolio-2 section save (R-RES-010).
 - **Implementation notes:**
   - Report shape carries `supported`, `saved` and `discarded`; the caller formats the reporting (DD-5). The handler must not know about `missing_fields`.
@@ -114,19 +115,19 @@ No cycles.
   - Portfolio 1 must report unsupported **without** querying anything — its emptiness is a property of the portfolio, not a query result to discover per call.
   - R-RES-010 hardening: treat an absent/null `strategic_objectives` or `impact_outcomes` array as empty inside the existing `save`. Keep the OICR / POLICY_CHANGE indicator gate byte-identical.
 - **Acceptance / done check:**
-  - [ ] Portfolio 2: `[1, 999, 3]` where 1 and 3 are valid → two rows at `role_id = 1`, `discarded` contains 999, no row for 999, no throw.
-  - [ ] Portfolio 2: an id that exists but has `portfolio_id` of another portfolio is discarded; an id with `is_active = 0` is discarded (the `AND IT MUST` clause).
-  - [ ] Portfolio 2: `[999, 1000]` → zero rows written, and **no pre-existing row for that result and role is deactivated** (R-RES-005 scenario 2's `BUT`).
-  - [ ] Portfolio 2: `[1, 1, 3]` → two rows.
-  - [ ] Portfolio 2: audit columns populated from the current user.
-  - [ ] Portfolio 1: `supported: false`, zero writes, zero reference-data queries.
-  - [ ] The existing section `save` returns normally for a payload omitting both arrays, and its behavior for a fully populated payload is unchanged — proven by the **pre-existing** handler spec assertions still passing untouched.
+  - [x] Portfolio 2: `[1, 999, 3]` where 1 and 3 are valid → two rows at `role_id = 1`, `discarded` contains 999, no row for 999, no throw.
+  - [x] Portfolio 2: an id that exists but has `portfolio_id` of another portfolio is discarded; an id with `is_active = 0` is discarded (the `AND IT MUST` clause).
+  - [x] Portfolio 2: `[999, 1000]` → zero rows written, and **no pre-existing row for that result and role is deactivated** (R-RES-005 scenario 2's `BUT`).
+  - [x] Portfolio 2: `[1, 1, 3]` → two rows.
+  - [ ] Portfolio 2: audit columns populated from the current user. — **not directly assertable at this unit scope** (both specs double `ResultStrategicObjectivesService`). Discharged **by construction**: the narrow save calls the same service, the same `create`, and the same `ALIGNMENT` role as the `PATCH` path, and audit stamping lives in `BaseServiceSimple` via `CurrentUserUtil.audit(SetAuditEnum.BOTH)`, applied unconditionally. **Carried to T-07** for integration-level closure — see `execution.md` → T-03. Deliberately left unticked rather than ticked on inference.
+  - [x] Portfolio 1: `supported: false`, zero writes, zero reference-data queries.
+  - [x] The existing section `save` returns normally for a payload omitting both arrays, and its behavior for a fully populated payload is unchanged — proven by the **pre-existing** handler spec assertions still passing untouched.
 - **Tests:** `portfolio-1-alignment.handler.spec.ts`, `portfolio-2-alignment.handler.spec.ts` — extend both.
 - **Verification:** `npm test -- --silent src/domain/entities/results/portfolio-handlers`
 - **Falsifying input:** an id row with `portfolio_id` set to the *other* portfolio — an implementation that filters only by `id IN (...)` and `is_active` saves it and FAILs. For R-RES-010, a payload omitting `strategic_objectives` FAILs today's handler with `TypeError`; run it against the unmodified handler first to confirm the test can fail.
 - **Disqualifies:** a double for `ResultStrategicObjectivesService` that does not model role scoping — then role correctness is untested however green the suite (KZ-001). Likewise, asserting only that `create` was called proves a call, not a row at role 1: assert the arguments, including the role.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
-- **Effort:** M · **Status:** todo
+- **Effort:** M · **Status:** done
 
 ---
 
@@ -139,7 +140,7 @@ No cycles.
 - **Description:** A method that takes the result id, an explicit portfolio id and the objective ids, resolves the handler from the registry, and delegates to T-03's narrow save. It must not consult request-scoped state.
 - **Implementation notes:**
   - Must **not** call `resolvePortfolioId()`, and must **not** read `portfolioUtil.portfolio` or `resultsUtil.result` — both getters throw when unset, which is the state a formalize request is in (DD-3).
-  - Build the handler context with the given portfolio id; leave `result` and `portfolio` absent. The narrow save does not need `indicator_id` (only the impact-outcome branch of the section save does).
+  - ~~Build the handler context with the given portfolio id; leave `result` and `portfolio` absent.~~ **Superseded by T-03's frozen contract (Leader, 2026-09-02).** T-03 implemented `saveStrategicObjectives(resultId: number, ids: number[])` — it takes no `PortfolioHandlerContext` at all, which makes DD-8's "must not thread an `EntityManager`" true *by construction* rather than by discipline, and makes a caller-supplied `context.portfolioId` diverging from the handler's own `readonly portfolioId` unrepresentable. So: **do not build a `PortfolioHandlerContext`** — resolve the handler from the registry by the given portfolio id and call `registry.get(portfolioId).saveStrategicObjectives(resultId, ids)`. The orchestrator's own signature from `design.md` §2.1 (`saveStrategicObjectivesForPortfolio(resultId, portfolioId, ids)`) is unchanged, and the contract-lens Reviewer confirmed all four T-04 acceptance items still hold — the throwing-doubles check passes *more* strongly, since there is now no context to build and therefore nothing to tempt a `{ ...this.resultsUtil.result }` spread. See `execution.md` → T-03.
   - Pass no `EntityManager` (DD-8): the step runs in its own transaction like every other write in `formalizeResult`.
   - Leave `saveAlignment` / `findAlignment` untouched — the `PATCH`/`GET` path keeps request-based resolution.
 - **Acceptance / done check:**

@@ -162,3 +162,116 @@ This is a genuine ownership gap in the decomposition, not an advisory: R-RES-002
 None. First-attempt PASS; no rework attempt consumed.
 
 **Budget draw:** 2 of 7 tasks · ~233 LOC of the ~500 estimate · **0 of the 2 budgeted review rounds consumed.**
+
+---
+
+### T-03 — Add the narrow strategic-objectives save to the alignment handler contract
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** on attempt 1 of 3 (both lenses) |
+| **Date** | 2026-09-02 |
+| **Requirements covered** | R-RES-005 (both scenarios, all clauses, AC.1–AC.4), R-RES-010 (scenario, both clauses, AC.1–AC.2), R-RES-004 (`supported: false` half), R-RES-003 (role, dedup — AC.1; **AC.2 discharged by construction, see below**) |
+| **Implementer attempts** | 1 |
+| **Model routing** | Implementer T2 (`sonnet`, effort **`high`**) · **two parallel lens Reviewers** T3 (`opus`) |
+| **Skills assigned** | `nestjs-expert`, `tdd`, `error-handling-patterns` — as recommended; no deviation |
+
+#### Review mode deviation — parallel lens reviewers instead of the checklist
+
+The lens table selects parallel reviewers at effort `xhigh`/`max` **or when the task touches security, migrations, or data-loss surfaces**. T-03's central hazard is `BaseServiceSimple.create`'s reconciliation semantics — a data-loss surface — so the Leader ran two lens-scoped Reviewers concurrently at effort `high` rather than a single checklist pass:
+
+| Lens | Scope |
+| --- | --- |
+| **Reliability / data-loss** | the empty-survivor guard, R-RES-010's new semantics, the DD-1 boundary |
+| **Contract / blast-radius / risk** | the interface change's consumers, the signature deviation, the portfolio-1 `discarded` contract, module wiring |
+
+Both returned `STATUS: PASS`. No lens FAIL, so no adjudication was required.
+
+#### Attempt 1
+
+**Files changed** — `+486`, `-7` across 8 files. All 7 deletions are in production files; the three spec files are purely additive.
+
+| File | Change |
+| --- | --- |
+| `.../sections/alignment/alignment-section-handler.interface.ts` | `+41/-4` — promoted from type alias to a real `interface` **extending** `PortfolioSectionHandler`, plus the `StrategicObjectivesSaveReport` shape |
+| `.../alignment/portfolio-1/portfolio-1-alignment.handler.ts` | `+18` — `saveStrategicObjectives` returning `supported: false`; **no new dependency** |
+| `.../alignment/portfolio-2/portfolio-2-alignment.handler.ts` | `+54/-2` — the narrow save, the new `StrategicObjectivesService` dependency, and the two `?? []` guards (R-RES-010) |
+| `.../portfolio-handlers.module.ts` | `+2` — `StrategicObjectivesModule` import |
+| three sibling `*.spec.ts` | `+38 / +248 / +65` — new describes only; no pre-existing assertion touched |
+| **`.../strategic-objectives/strategic-objectives.service.ts` + `.spec.ts`** | `+27/-1`, `+65` — **authorized deviation, see below** |
+
+**Leader-authorized deviation from the task's intended file list.** `design.md` §3 and T-03 both specify validating "via `StrategicObjectivesService`" with the predicate `id IN (ids) AND portfolio_id = <resolved> AND is_active = true`. **That service had no such method**: `findAll(portfolioId?)` carries no id filter, and `findOne(id)` throws `NotFoundException` and ignores `portfolio_id`. Neither was usable. The Leader authorized adding `findActiveByIdsForPortfolio(ids, portfolioId)` to that service plus a sibling spec, rather than loading a whole portfolio's objectives and filtering in memory. Rationale: keep the query in the service that owns the table — the reasoning DD-2 applies to `PortfoliosService` — match the predicate the design names, and avoid degrading as the table grows. The contract lens judged the resulting API "well-formed and correctly placed", and noted that returning `[]` rather than throwing (unlike `findOne`) is load-bearing for R-RES-005: *a throwing finder would have converted a reported discard into a failed item.*
+
+**Implementer verification** — from `server/researchindicators`:
+
+```
+npm test -- --silent src/domain/entities/results/portfolio-handlers
+Test Suites: 5 passed, 5 total    Tests: 34 passed, 34 total
+
+npm test -- --silent src/domain/entities/strategic-objectives
+Test Suites: 2 passed, 2 total    Tests: 22 passed, 22 total
+
+npx tsc --noEmit -p tsconfig.json   → clean
+npx eslint --quiet --fix (8 touched files) → clean
+```
+
+**Lint incident, resolved.** The project-wide `npm run lint` glob incidentally reformatted an unrelated **already-committed** file; the Implementer reverted it with `git checkout --` before proceeding. The Leader independently confirmed the T-01 and T-02 commits are intact (`git diff HEAD` over both paths is empty). No work was lost. This is the root `CLAUDE.md` §4.3 warning about the `--fix` script behaving exactly as documented.
+
+**Falsification probes — all three required probes went red:**
+
+| Probe | Result |
+| --- | --- |
+| `portfolio_id` dropped from the finder's `where` | **RED** — the foreign-portfolio discard case failed. Restored → GREEN (16/16) |
+| Both `?? []` guards reverted (R-RES-010) | **RED** — `TypeError: Cannot read properties of undefined (reading 'map')` and `... of null (reading 'map')`. Restored → GREEN. The bug provably existed before the fix |
+| Empty-survivor guard removed so the empty case calls `create([])` | **RED** immediately on the `create` not-called assertion. With that assertion temporarily disabled, the stateful reconciler fake flipped `preExisting[0].is_active` from `true` to `false` — proving the pre-existing-row assertion is load-bearing, not decorative. Restored → GREEN (34/34) |
+
+#### Reliability / data-loss lens — `STATUS: PASS`
+
+*The empty-survivor guard is airtight on both branches and provably load-bearing; the DD-1 boundary holds by construction on both handlers with the generic `PortfolioSectionHandler` untouched; and the R-RES-010 `?? []` hardening is conformant because `PATCH .../alignments` is already an unvalidated full-section replace for contracts, SDGs, levers and research areas — `strategic_objectives` was the sole outlier, protected only by a crash.*
+
+- **A hole the Leader had not asked about, checked and closed.** `BaseServiceSimple.create` **re-filters** its input with `.filter((el) => !isEmpty(el?.[generalCompareKey]))`, so a non-empty survivor array could in principle collapse to `[]` *inside* `create` and trigger the wipe regardless of the handler's guard. It cannot here: `isEmpty` is false for `0`, and every element carries a real primary key from a row the finder returned.
+- **The Leader's "silent wipe" challenge was investigated and refuted on evidence, not on wording.** `PATCH .../alignments` has **no `ValidationPipe`** on the handler, `main.ts` registers no global pipe, and `ResultAlignmentDto` carries **zero class-validator decorators** — so `PATCH {}` reaches the handler unfiltered. Contracts and SDGs already reconcile to empty via `formatDataToArray(undefined) → []`; levers use an explicit `: []` ternary; `research_areas` already yields `undefined` (pre-existing, untouched by this diff). `Portfolio1AlignmentHandler.save` **already commits that full wipe today**. The `TypeError` was not a guard but an outlier bug that accidentally made portfolio 2 atomic-safe against one malformed shape. DC-2 is scoped to *the new write*, and R-RES-007's text binds the *formalizer* — neither covers PATCH replace semantics.
+
+#### Contract / blast-radius lens — `STATUS: PASS`
+
+*The interface change is additive against a type with exactly four in-package references, all of which still compile and behave; the registry, orchestrator and both alignment-endpoint specs are untouched; module wiring introduces no cycle and resolves the injected service.*
+
+- **Blast radius enumerated exhaustively.** Both handlers `implement` the new member; `AlignmentHandlerRegistry` uses the type only as a generic argument and its constraint is still satisfied by extension; its spec's `{ portfolioId } as Portfolio1AlignmentHandler` doubles stay legal because assignability is insensitive to added members; `ResultSectionOrchestratorService` never names the type. Nothing else in `src/` mentions `AlignmentSectionHandler`, `StrategicObjectivesSaveReport` or `saveStrategicObjectives`.
+- **The signature deviation satisfies DD-3 and DD-8 without contradicting §2.1**, which fixes the *orchestrator's* signature, not the handler's. All four T-04 acceptance items still hold — and the throwing-doubles check passes *more* strongly, since there is no context to build and therefore nothing to tempt a `{ ...this.resultsUtil.result }` spread. The choice also makes a whole disagreement class unrepresentable: a caller-supplied `context.portfolioId` can no longer diverge from the handler's own `readonly portfolioId`.
+- **A silent-failure mode that was one config flag away.** `strategic_objectives.id` is `bigint`. TypeORM's MySQL driver defaults `bigNumberStrings` to `true`, which would have made every `validIds.has(id)` comparison string-vs-number and **silently discarded every id**. `orm.config.ts:53` sets it to `false`, so the comparison is number-to-number and sound.
+- **DD-5 holds structurally**: the only occurrence of `missing_fields` under `portfolio-handlers/` is the prohibition in a doc comment. **Portfolio 1's "zero reference-data queries" holds structurally too** — it has no `StrategicObjectivesService` to call.
+
+#### 🔭 Forward pointer — MUST be copied verbatim into T-05's brief
+
+Both lenses independently flagged this. The contract lens's wording is adopted as canonical:
+
+> T-05 MUST treat `supported === false` as a terminating branch. When the report's `supported` is false: append exactly one **field-level** `strategic_objectives` entry to that item's `missing_fields`, emit exactly one `warn` naming the result and the resolved portfolio, and **ignore `report.discarded` entirely** — no `strategic_objectives:<id>` entry may be emitted on that path, however many ids the report lists. Per-id `strategic_objectives:<id>` entries are emitted **only** when `supported === true` and `report.discarded` is non-empty (`design.md` §5.1 steps 5 vs 6–7, §5.2). A T-05 implementation that iterates `report.discarded` unconditionally is a FAIL of R-RES-005 AC.2 and `design.md` §5.2, because an unsupported item would then carry both `missing_fields` shapes at once. T-05 MUST carry a test that goes red under the unconditional loop: a 2025 (portfolio-1) item with `strategic_objectives: [1, 999]`, asserting `missing_fields` **equals** the AI-reported entries plus exactly `['strategic_objectives']` — content equality, not `toContain`, since `toContain` passes with the spurious per-id entries present.
+
+**Second, smaller forward obligation** from the same contract asymmetry: portfolio 2 returns `supported: true` for an empty id list while portfolio 1 returns `supported: false` for one. T-05's `design.md` §5.1 **step 1** guard is therefore load-bearing for **R-RES-004 AC.4** as well as for R-RES-007 — an empty/`null`/absent list reaching the orchestrator for a portfolio-1 item would emit a `strategic_objectives` entry for an item that never carried the field.
+
+**Third — carried to T-07:** **R-RES-003 AC.2 (audit columns) is not directly asserted by any test and cannot be at this unit scope**, because the specs double `ResultStrategicObjectivesService`. It is discharged **by construction**: the narrow save calls the same service, the same `create`, and the same `ALIGNMENT` role as the `PATCH` path, and audit stamping lives in `BaseServiceSimple` via `CurrentUserUtil.audit(SetAuditEnum.BOTH)`, applied unconditionally. Recorded here so T-07 does not re-litigate it and does not silently tick it either.
+
+#### ADVISORY (4R lens — recorded, non-gating, not convertible into new tasks)
+
+| Lens | Finding |
+| --- | --- |
+| **Risk — undocumented endpoint semantics** | That `PATCH .../alignments` is a full-section replace (absent == empty == deactivate, for *every* sub-array) appears **nowhere** in `requirements.md` or `design.md`. Without it, the next reader of R-RES-010 will read `?? []` as tolerance rather than intent. A one-line note in `design.md` §5 would fix it. Separately and **out of this spec's scope**: `ResultAlignmentDto` has no class-validator decorators, so a destructive `PATCH` runs with no body validation at all — a standing hazard this spec neither caused nor fixes |
+| **Risk — portfolio-1 `discarded`** | Returning `[]` there would make the T-05 obligation unnecessary by construction, which is the spec's own stated preference (§5.1 step 1: *"unreachable by construction rather than by care"*). **Not applied** — it is advisory-derived and may not widen an approved task; the forward pointer above is the mitigation |
+| **Reliability — DD-8's "own transaction" is loose** | The narrow save passes no manager, so `create`'s deactivate-`update` and insert-`save` are two auto-committed statements with no enclosing transaction; a failure between them deactivates survivors without writing replacements. **Inert for the only intended caller** (a freshly created result has no pre-existing ALIGNMENT rows, and `deleteFullResultById` compensates), but the method is public on the handler contract. DD-8 would be more accurate as *"not the caller's transaction"* |
+| **Risk — stale barrel** | `portfolio-handlers/index.ts` exports neither new type, and nothing in `src/` imports from that barrel — `results.service.ts` and `results.controller.ts` both deep-import. T-05 will deep-import too, matching local precedent. Leaving the barrel half-accurate invites a future reader to trust it as the module's public surface |
+| **Readability** | `AlignmentSectionHandler` now carries two save methods with dissimilar shapes. Justified and explained in the interface doc comment — keep that comment if the signature is ever revisited |
+
+#### Decisions made
+
+- **Ran parallel lens reviewers** rather than the single checklist, on the data-loss-surface trigger. Cost: one extra Reviewer. Return: the `isEmpty` re-filter hole, the `bigNumberStrings` near-miss, and the exhaustive consumer enumeration each came from a lens that had room to look.
+- **Authorized the two-file deviation** to `strategic-objectives.service.ts` + spec (rationale above). T-03's file list in `tasks.md` amended to match, per the contract lens's process advisory.
+- **Amended T-04's implementation note.** Its bullet *"Build the handler context with the given portfolio id; leave `result` and `portfolio` absent"* is now a no-op under the frozen signature. Corrected in `tasks.md` so the T-04 Implementer does not build a `PortfolioHandlerContext` and discard it. This is an implementation note, not a DD or AC — nothing in the §4 coverage table is orphaned.
+- **Did not apply** the portfolio-1 `discarded: []` change, the DD-8 wording fix, the `design.md` §5 replace-semantics note, or the barrel export. All are advisory-derived; advisories are recorded and do not grow the approved spec.
+
+#### Issues encountered
+
+None blocking. First-attempt PASS on both lenses; no rework attempt consumed.
+
+**Budget draw:** 3 of 7 tasks · ~719 LOC against the ~500 estimate — **the LOC budget is now exceeded; see the tripwire note below** · **1 of the 2 budgeted review rounds consumed** (the parallel-lens pass counts as one round).
+
+> **⚠️ Budget tripwire — LOC.** `design.md` §13 estimated ~500 total LOC across all seven tasks. Three tasks in, the actual is **~719** (90 + 143 + 486), and the four largest-surface tasks remain. The overrun is concentrated in T-03, where ~350 of the 486 lines are **test** code — driven by this spec's own KZ-001/KZ-004 double-fidelity and falsifiability requirements, which the budget's per-task estimate did not price. Per `/akili-execute` Step 2.4 this is escalated to the owner rather than absorbed. See KZ-008: a re-baseline must correct the **basis**, not just the total.

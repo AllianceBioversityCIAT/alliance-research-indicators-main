@@ -6,11 +6,13 @@ import { ResultAlignmentDto } from '../../../../dto/result-alignment.dto';
 import {
   AlignmentSectionHandler,
   AlignmentSectionView,
+  StrategicObjectivesSaveReport,
 } from '../alignment-section-handler.interface';
 import { ResultAlignmentOperationsService } from '../shared/result-alignment-operations.service';
 import { ResultLeversService } from '../../../../../result-levers/result-levers.service';
 import { LeverRolesEnum } from '../../../../../lever-roles/enum/lever-roles.enum';
 import { ResultStrategicObjectivesService } from '../../../../../result-strategic-objectives/result-strategic-objectives.service';
+import { StrategicObjectivesService } from '../../../../../strategic-objectives/strategic-objectives.service';
 import { ResultImpactOutcomesService } from '../../../../../result-impact-outcomes/result-impact-outcomes.service';
 import { ResultStrategicObjectiveRolesEnum } from '../../../../../result-strategic-objectives/enum/result-strategic-objective-roles.enum';
 import { ResultImpactOutcomeRolesEnum } from '../../../../../result-impact-outcomes/enum/result-impact-outcome-roles.enum';
@@ -33,6 +35,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     private readonly resultLeversService: ResultLeversService,
     private readonly resultStrategicObjectivesService: ResultStrategicObjectivesService,
     private readonly resultImpactOutcomesService: ResultImpactOutcomesService,
+    private readonly strategicObjectivesService: StrategicObjectivesService,
   ) {}
 
   async save(
@@ -75,7 +78,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     const strategicObjectives =
       await this.resultStrategicObjectivesService.create(
         context.resultId,
-        payload.strategic_objectives.map((strategicObjective) => ({
+        (payload.strategic_objectives ?? []).map((strategicObjective) => ({
           strategic_objective_id: parseInt(
             strategicObjective?.strategic_objective_id as unknown as string,
           ),
@@ -94,7 +97,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     ) {
       const impactOutcomes = await this.resultImpactOutcomesService.create(
         context.resultId,
-        payload.impact_outcomes.map((impactOutcome) => ({
+        (payload.impact_outcomes ?? []).map((impactOutcome) => ({
           impact_outcome_id: impactOutcome.impact_outcome_id,
         })),
         'impact_outcome_id',
@@ -106,6 +109,53 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     }
 
     return responseData;
+  }
+
+  /**
+   * Narrow strategic-objectives-only save (DD-1/DD-4). Validates ids
+   * against portfolio 2's own `strategic_objectives` rows and writes only
+   * the survivors — never calls `ResultAlignmentOperationsService.save` or
+   * threads an `EntityManager` (DD-8), so it cannot reach, let alone
+   * reconcile away, any row the section-wide `save` owns.
+   */
+  async saveStrategicObjectives(
+    resultId: number,
+    ids: number[],
+  ): Promise<StrategicObjectivesSaveReport> {
+    const uniqueIds = Array.from(new Set(ids ?? []));
+
+    if (uniqueIds.length === 0) {
+      return { supported: true, saved: [], discarded: [] };
+    }
+
+    const validObjectives =
+      await this.strategicObjectivesService.findActiveByIdsForPortfolio(
+        uniqueIds,
+        this.portfolioId,
+      );
+    const validIds = new Set(validObjectives.map((objective) => objective.id));
+
+    const saved = uniqueIds.filter((id) => validIds.has(id));
+    const discarded = uniqueIds.filter((id) => !validIds.has(id));
+
+    // BaseServiceSimple.create is a reconciler: calling it with an empty
+    // array would deactivate every pre-existing ALIGNMENT-role row for this
+    // result (design.md's DD-1 rationale). When nothing survived validation
+    // there is nothing to write, so the call must not happen at all.
+    if (saved.length === 0) {
+      return { supported: true, saved: [], discarded };
+    }
+
+    await this.resultStrategicObjectivesService.create(
+      resultId,
+      saved.map((strategicObjectiveId) => ({
+        strategic_objective_id: strategicObjectiveId,
+      })),
+      'strategic_objective_id',
+      ResultStrategicObjectiveRolesEnum.ALIGNMENT,
+    );
+
+    return { supported: true, saved, discarded };
   }
 
   async find(
