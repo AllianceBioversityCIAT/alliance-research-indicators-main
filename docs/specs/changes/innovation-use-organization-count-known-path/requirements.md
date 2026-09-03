@@ -169,7 +169,7 @@ Named per the specify contract: each class this spec can produce, and the comman
 | --- | --- | --- | --- |
 | **AR-1** | Nulling a count on the known path is *cleanup*, not data loss, because under this spec's definition the value is meaningless there. Accepted by the user in approving the proposal's Option A. | User | Accepted |
 | **AR-2** | No API consumer other than the STAR client writes Innovation Use organizations. If one exists, it could still write a known-path count — the invariant is client-enforced only (proposal R-3). | — | Accepted risk |
-| **OQ-1** | **How many live rows have `is_organization_known = 1` AND `organization_count IS NOT NULL`?** Determines whether AR-1 affects real reported data. `SELECT COUNT(*) FROM result_institution_types WHERE is_organization_known = 1 AND organization_count IS NOT NULL AND is_active = 1;` — a human-run read against the shared DB. | User | **Open — must be answered before `/akili-execute`** |
+| **OQ-1** | **CLOSED 2026-09-03 by user decision.** Innovation Use is still in development, the captured counts are consumed by nothing, and any matching rows are test data that can be deleted. No query was run and none is owed; `AR-1` stands and no backfill or MEL comms are needed. Also confirmed at source: `resolveOrganizationCount` never sets the column on an Innovation **Dev** row, so this change cannot reach Dev. | User | **Closed** |
 | **OQ-2** | *Resolved in this document:* the field hides on `is_organization_known` alone, not on `institution_id`. See R-IUC-001 Details. | — | Closed |
 
 ---

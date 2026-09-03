@@ -12,16 +12,11 @@
 
 ---
 
-## 1. Gate before execution
+## 1. Gate before execution — ✅ CLEARED
 
-> ⛔ **`OQ-1` must be answered before `/akili-execute` starts.** How many live rows carry `is_organization_known = 1` with a non-null `organization_count`? `T-02` nulls them on the next save of each affected result. A human runs this against the shared DB and the user decides:
+> ✅ **`OQ-1` resolved 2026-09-03 by the user; T-02 is unblocked.** No DB read was needed: Innovation Use is still in development, the `organization_count` values captured so far are consumed by nothing, and any matching rows are test data that can be deleted. Nulling them costs nothing real — no backfill, no MEL comms.
 >
-> ```sql
-> SELECT COUNT(*) FROM result_institution_types
-> WHERE is_organization_known = 1 AND organization_count IS NOT NULL AND is_active = 1;
-> ```
->
-> Zero → proceed. Non-zero → the user decides whether MEL is told first (`design.md` §10 Comms). This gate is not a task; it is a precondition.
+> Confirmed at source while closing: `resolveOrganizationCount` returns `{}` for any role other than `INNOVATION_USE`, so this change **cannot** reach an Innovation Dev row.
 
 ---
 
@@ -111,19 +106,19 @@ graph TD
   - **Scope limit (KZ-017):** the build type-checks; it does **not** prove the emitted JSON reaches the server correctly. No E2E or integration test in this spec exercises a real request — `NFR-IUC-001`'s reasoning (verified in `design.md` §6.1) is what covers the server side, not a run.
 
 - **Acceptance / done check:**
-  - [ ] `npm run build` succeeds (`D-10`).
-  - [ ] Known-path row with a body count emits `organization_count: null` (`AC.1`).
-  - [ ] The same row still emits its `institution_id` — the `AND` clause of scenario 1.
-  - [ ] Unknown-path row emits its count verbatim, `institution_id` null (`AC.2`, and the `BUT it must NOT` clause).
-  - [ ] A mixed payload emits both outcomes in one build (`AC.3`).
-  - [ ] The `T-08 Issue 1 fix` block's four original assertions are unchanged and green.
-  - [ ] The restore test at `:436` passes **unmodified** (`DD-2`'s evidence).
-  - [ ] Both reds observed and quoted in `execution.md`.
+  - [x] `npm run build` succeeds (`D-10`).
+  - [x] Known-path row with a body count emits `organization_count: null` (`AC.1`).
+  - [x] The same row still emits its `institution_id` — the `AND` clause of scenario 1.
+  - [x] Unknown-path row emits its count verbatim, `institution_id` null (`AC.2`, and the `BUT it must NOT` clause).
+  - [x] A mixed payload emits both outcomes in one build (`AC.3`).
+  - [x] The `T-08 Issue 1 fix` block's four original assertions are unchanged and green.
+  - [x] The restore test at `:436` passes **unmodified** (`DD-2`'s evidence).
+  - [x] Both reds observed and quoted in `execution.md`.
 
 - **Dependencies:** none
 - **Effort:** **S**
 - **Skills:** `angular-developer`
-- **Status:** todo
+- **Status:** **done** — Reviewer PASS 2026-09-03, 1 attempt (`execution.md` → T-02)
 
 ---
 
