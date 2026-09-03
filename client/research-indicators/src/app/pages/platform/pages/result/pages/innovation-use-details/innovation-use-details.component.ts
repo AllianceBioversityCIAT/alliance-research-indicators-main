@@ -89,7 +89,7 @@ interface InnovationUseOrganizationPayload {
   sub_institution_type_id?: number | null;
   institution_type_custom_name?: string | null;
   is_organization_known: boolean;
-  organization_count?: number;
+  organization_count?: number | null;
 }
 
 interface InnovationUseQuantificationPayload {
@@ -523,7 +523,7 @@ export default class InnovationUseDetailsComponent {
     return {
       result_institution_type_id: row.result_institution_type_id,
       is_organization_known: known,
-      organization_count: row.organization_count,
+      organization_count: known ? null : row.organization_count,
       institution_id: known ? row.institution_id : null,
       institution_type_id: known ? null : row.institution_type_id,
       sub_institution_type_id: known ? null : row.sub_institution_type_id,
