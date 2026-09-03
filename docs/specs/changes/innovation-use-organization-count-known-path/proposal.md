@@ -190,7 +190,7 @@ actors_count:      aggregate ? row.actors_count : null
 5. An unknown-path row's count round-trips unchanged (save → GET → re-render).
 6. Row drop/submission behavior is unchanged — `organizationIdentitySatisfied` never consulted the count.
 7. Full client suite green; **no server file changed**, `result-institution-types.service.spec.ts:301` untouched and still passing.
-8. `design.md` §5.5 and `tasks.md:309` in the archived spec carry an amendment note; no dangling reference to "both paths" survives (`grep` per KZ-013/K-003).
+8. `design.md` §5.5 and `tasks.md:309` in the archived spec carry an amendment note, and §16's external-amendment index records it. ⚠️ **CORRECTED 2026-09-03 during T-03:** this criterion originally read *"no dangling reference to 'both paths' survives"*, which was **wrong as written**. Three present-tense both-paths statements survive in the archived `execution.md` (`:719`, `:741`, `:780`) and **must** survive — an execution log is a frozen record of what was verified on 2026-08-26, not a live claim, and the `measure-number-signed-decimal` precedent likewise amended only `design.md`/`tasks.md`/`requirements.md` and left the archived `execution.md` untouched. The criterion is met by the amendment notes plus the KZ-013 sweep (27 hits / 17 files, no external referrer of §5.5), not by erasing history.
 
 ---
 

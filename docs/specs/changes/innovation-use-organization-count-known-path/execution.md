@@ -217,3 +217,66 @@ The failure is the **discriminating** one — `Expected: 12 / Received: null` on
 #### Budget
 
 2 of 3 tasks · cumulative 4 files · +102/−21 · 1 review round each, 0 rework. Within `design.md` §11 (~90 LOC expected). No tripwire.
+
+---
+
+### T-03 — Amend the archived spec and close the verification sweep
+
+| Field | Value |
+| --- | --- |
+| **Status** | **PASS on the documentation + measurement halves; `[~]` overall — `D-7` (human visual check) still open with the user** |
+| Date | 2026-09-03 |
+| Requirements covered | `NFR-IUC-001`, `NFR-IUC-002`, `R-IUC-002` Sc.1 `AND IT MUST` + `AC.4` |
+| Defect classes owned | `D-6`, `D-8` closed; **`D-7` open** |
+| Implementer attempts | **1** (documentation half) |
+| Reviewer verdict | **PASS** |
+
+#### Scope split
+
+T-03 was executed in two halves by design: the Implementer took the documentation amendment and the KZ-013 search; the **Leader** ran the measurement sweep afterwards, per the root guide's rule that the Leader re-measures once workers are idle. No measurement command was run while a worker was active.
+
+#### Implementer half — archive amendment (`DD-5`)
+
+Amendment notes appended — **originals preserved, nothing rewritten** — at `docs/specs/archive/2026-08-26-innovation-use--details-page/design.md:282` (§5.5's `both paths` row) and `tasks.md:309`. Each note carries all four mandated elements: unknown-path-only rendering, payload nulling on the known path, the reason, and that the two Lens B guards were reworked rather than deleted.
+
+**KZ-013 backward sweep — recorded here because the figure lived nowhere in the repo until now** (the Reviewer flagged that `tasks.md`'s "hit count recorded" box could not honestly flip without it):
+
+```
+grep -rn "2026-08-26-innovation-use--details-page" docs/   →  27 hits across 17 files
+```
+
+Count taken over raw output with no truncation and no error present (K-014). Every hit re-read. **No document outside this spec's own folder cites §5.5 or `tasks.md:309`** — external citations point at `DD-7`/`DD-17`/`OQ-IUP-4` (the validation-warning-colour spec), `R-IUP-008`/§4.3/§6.3/§10.3/§16 (measure-number-signed-decimal), and chunk-status pointers in `innovation-use/family.md` and `kaizen/quick--innovation-use-visual-alignment.md`. The Reviewer reproduced the sweep independently at 27/17 and additionally ran the search the *conclusion* needs — a repo-wide hunt for `§5.5` / `tasks.md:309` — confirming that `family.md` records chunk status but **not** the chunk's field set, so `FR-12` stays true. No referrer asserts a falsehood.
+
+**Stale-citation correction (correction closure).** T-01's edits shifted the restore test from `:436` to `:464` (assertion at `:474`), making a factual claim in our own spec false. Five sites corrected — `design.md:91` (`DD-2`) and `tasks.md:96, :115, :143, :152` — verified at source. Exactly one `436` survives in the folder: `execution.md:192`, which correctly records the move as history and must keep saying it.
+
+#### Leader half — measurement sweep (no worker active)
+
+| Check | Result |
+| --- | --- |
+| `NFR-IUC-001` — cumulative diff `e368686f..HEAD` + working tree | **13 paths, 0 under `server/`**, nothing outside `client/` and `docs/`. First attempt at this check was malformed (a subshell printed the file list into the count); **re-run clean** rather than reported — a count over a broken command is a confident zero (K-014). |
+| Full client suite (`npm test -- --silent`) | **317 suites / 6798 tests passed.** 6793 before this spec; **+5** matches the five tests added (2 in T-01, 3 in T-02) exactly. |
+| `D-6` / `NFR-IUC-002` — protected blocks | No `+`/`-` line in the organization-item spec diff touches the `c6` block or the restore test. Both intact. |
+| `AC.4` / row inclusion | Unchanged — `organizationIdentitySatisfied` and the row filter at `:471` are byte-for-byte as before (verified by the T-02 Reviewer at source). |
+
+#### Leader-decided additions after the Reviewer report
+
+| # | Decision | Rationale |
+| --- | --- | --- |
+| E-6 | **Added the missing §16 revision-log row** to the archived `design.md`. The Reviewer ruled its absence a *cosmetic gap, not a `DD-5` violation*, and explicitly said not to spend a rework attempt on it — but §16 **is** that archive's index of external amendments (the `measure-number-signed-decimal` precedent added one at `:670`), and leaving it out means a reader who starts at §16 is under-informed. One line, inside a file T-03 already edits. Not new scope. | Leader |
+| E-7 | **Corrected `proposal.md` success criterion 8**, which was wrong as written: *"no dangling reference to 'both paths' survives"*. Three present-tense both-paths statements survive in the archived `execution.md` (`:719`, `:741`, `:780`) and **must** — an execution log is a frozen record, not a live claim, and the precedent left its archived `execution.md` untouched too. Corrected in place with the reasoning, so `/akili-validate` does not read a deliberate preservation as a miss. | Leader, on the Reviewer's flag |
+
+#### Outstanding — `D-7`
+
+**The human visual check has NOT been performed.** `jsdom` cannot evaluate layout and no test in this repo asserts spacing, so the card's vertical rhythm where the field was removed is verified by nothing automated. This was recorded as a substitute from `requirements.md` §6 onward, never as coverage. **T-03 stays `[~]` and the spec is not complete until the user reports the browser check on both paths.**
+
+Risk-reducing datum (not a substitute): the T-01 Reviewer established that on the **unknown** path the rendered node order is byte-identical to before, so any visual regression can only be on the known path.
+
+#### Scope limits (KZ-017)
+
+- The **server suite was not run** — no server file changes. A declared non-measurement, not a green.
+- The Reviewer had **no shell**: "originals preserved verbatim" rests on corroboration against three independent quotations of the pre-edit text, not a byte diff, and the working-tree overreach check was a declared non-measurement on its side — the Leader's `git diff --name-only` is the sound one, and it reads 0 under `server/`.
+- No E2E exercises a real HTTP request anywhere in this spec; `NFR-IUC-001` rests on the `design.md` §6.1 analysis plus the diff check.
+
+#### Budget — final
+
+3 tasks · **13 paths** · 1 review round each · **0 rework attempts, 0 HALTs, 0 pivots.** `design.md` §11 predicted 3 tasks / ~90 LOC / 1 review round. **Met exactly.** No tripwire fired.
