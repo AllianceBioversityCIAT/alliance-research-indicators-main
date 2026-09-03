@@ -5,7 +5,6 @@ import { ApiService } from '@shared/services/api.service';
 import { ProjectUtilsService } from '@shared/services/project-utils.service';
 import { ResultsCenterService } from '../../../results-center/results-center.service';
 import { GetGeoScopeService } from '@shared/services/get-geo-scope.service';
-import { GetTopContributorsContractsService } from '@shared/services/get-top-contributors-contracts.service';
 import { GetTopMainContactPersonsService } from '@shared/services/get-top-main-contact-persons.service';
 import { GetTopPartnersService } from '@shared/services/get-top-partners.service';
 import { GetTopPrimaryLeversService } from '@shared/services/get-top-primary-levers.service';
@@ -63,7 +62,6 @@ describe('ProjectDashboardComponent', () => {
   let fixture: ComponentFixture<ProjectDashboardComponent>;
   let component: ProjectDashboardComponent;
   let apiMock: { GET_ResultsCount: jest.Mock; GET_Results: jest.Mock };
-  let topContributorsMock: ReturnType<typeof createRankedServiceMock>;
   let topMainContactsMock: ReturnType<typeof createRankedServiceMock>;
   let topPartnersMock: ReturnType<typeof createRankedServiceMock>;
   let topLeversMock: ReturnType<typeof createRankedServiceMock>;
@@ -106,7 +104,6 @@ describe('ProjectDashboardComponent', () => {
   }
 
   async function setup(contractId: string | null = 'C-1', options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }) {
-    topContributorsMock = createRankedServiceMock();
     topMainContactsMock = createRankedServiceMock();
     topPartnersMock = createRankedServiceMock();
     topLeversMock = createRankedServiceMock();
@@ -221,7 +218,6 @@ describe('ProjectDashboardComponent', () => {
         remove: {
           imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
           providers: [
-            GetTopContributorsContractsService,
             GetTopMainContactPersonsService,
             GetTopPartnersService,
             GetTopPrimaryLeversService,
@@ -231,7 +227,6 @@ describe('ProjectDashboardComponent', () => {
         add: {
           imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
           providers: [
-            { provide: GetTopContributorsContractsService, useValue: topContributorsMock },
             { provide: GetTopMainContactPersonsService, useValue: topMainContactsMock },
             { provide: GetTopPartnersService, useValue: topPartnersMock },
             { provide: GetTopPrimaryLeversService, useValue: topLeversMock },
@@ -262,7 +257,6 @@ describe('ProjectDashboardComponent', () => {
       sortField: 'code',
       sortOrder: 'DESC'
     });
-    expect(topContributorsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topMainContactsMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topPartnersMock.main).toHaveBeenCalledWith('C-1', 4);
     expect(topLeversMock.main).toHaveBeenCalledWith('C-1', 4);
@@ -299,12 +293,6 @@ describe('ProjectDashboardComponent', () => {
   it('should build and sort ranked service items', async () => {
     await setup();
 
-    topContributorsMock.list.set([
-      { contract_code: 'C-2', contract_description: 'Contributor', results_count: 1 },
-      { project_name: 'Only project', count: 3 },
-      { contract_id: 'C-3' },
-      {}
-    ]);
     topMainContactsMock.list.set([
       { name: 'Named', results_count: 1, email: 'named@example.com' },
       { full_name: 'Full Name', count: 2 },
@@ -325,7 +313,6 @@ describe('ProjectDashboardComponent', () => {
       { lever_id: 3, short_name: '', full_name: '', count: 2 }
     ]);
 
-    expect(component.contributorItems().map(item => item.label)).toEqual(['Only project', 'C-2 - Contributor', 'C-3', '—']);
     expect(component.mainContactPersonItems().map(item => item.label)).toEqual([
       'Contact Name',
       'Full Name',
@@ -354,17 +341,14 @@ describe('ProjectDashboardComponent', () => {
   it('should compute empty states from loading, error, and list signals', async () => {
     await setup();
 
-    expect(component.contributorsEmpty()).toBe(true);
     expect(component.mainContactPersonsEmpty()).toBe(true);
     expect(component.partnersEmpty()).toBe(true);
     expect(component.leversEmpty()).toBe(true);
 
-    topContributorsMock.loading.set(true);
     topMainContactsMock.loadError.set(true);
     topPartnersMock.list.set([{}]);
     topLeversMock.list.set([{}]);
 
-    expect(component.contributorsEmpty()).toBe(false);
     expect(component.mainContactPersonsEmpty()).toBe(false);
     expect(component.partnersEmpty()).toBe(false);
     expect(component.leversEmpty()).toBe(false);
