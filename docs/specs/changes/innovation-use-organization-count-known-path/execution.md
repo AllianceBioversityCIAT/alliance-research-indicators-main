@@ -224,10 +224,10 @@ The failure is the **discriminating** one — `Expected: 12 / Received: null` on
 
 | Field | Value |
 | --- | --- |
-| **Status** | **PASS on the documentation + measurement halves; `[~]` overall — `D-7` (human visual check) still open with the user** |
+| **Status** | **PASS** — all halves closed, including `D-7` |
 | Date | 2026-09-03 |
 | Requirements covered | `NFR-IUC-001`, `NFR-IUC-002`, `R-IUC-002` Sc.1 `AND IT MUST` + `AC.4` |
-| Defect classes owned | `D-6`, `D-8` closed; **`D-7` open** |
+| Defect classes owned | `D-6`, `D-7`, `D-8` — all closed |
 | Implementer attempts | **1** (documentation half) |
 | Reviewer verdict | **PASS** |
 
@@ -265,11 +265,16 @@ Count taken over raw output with no truncation and no error present (K-014). Eve
 | E-6 | **Added the missing §16 revision-log row** to the archived `design.md`. The Reviewer ruled its absence a *cosmetic gap, not a `DD-5` violation*, and explicitly said not to spend a rework attempt on it — but §16 **is** that archive's index of external amendments (the `measure-number-signed-decimal` precedent added one at `:670`), and leaving it out means a reader who starts at §16 is under-informed. One line, inside a file T-03 already edits. Not new scope. | Leader |
 | E-7 | **Corrected `proposal.md` success criterion 8**, which was wrong as written: *"no dangling reference to 'both paths' survives"*. Three present-tense both-paths statements survive in the archived `execution.md` (`:719`, `:741`, `:780`) and **must** — an execution log is a frozen record, not a live claim, and the precedent left its archived `execution.md` untouched too. Corrected in place with the reasoning, so `/akili-validate` does not read a deliberate preservation as a miss. | Leader, on the Reviewer's flag |
 
-#### Outstanding — `D-7`
+#### `D-7` — human visual check: **PASS** (user, 2026-09-03)
 
-**The human visual check has NOT been performed.** `jsdom` cannot evaluate layout and no test in this repo asserts spacing, so the card's vertical rhythm where the field was removed is verified by nothing automated. This was recorded as a substitute from `requirements.md` §6 onward, never as coverage. **T-03 stays `[~]` and the spec is not complete until the user reports the browser check on both paths.**
+The spec's one gate with no automated substitute. `jsdom` cannot evaluate layout and no test in this repo asserts spacing, so this was recorded as a substitute from `requirements.md` §6 onward and never counted as coverage. The user performed it in the running app and supplied two screenshots:
 
-Risk-reducing datum (not a substitute): the T-01 Reviewer established that on the **unknown** path the rendered node order is byte-identical to before, so any visual regression can only be on the known path.
+| Path | Observed |
+| --- | --- |
+| **Known** (`is_organization_known` ticked, WUR selected) | No Organization count field. The card closes cleanly after the selected-partner preview; the vertical rhythm reads correctly with nothing left dangling where the field used to be. |
+| **Unknown** (unticked) | Organization type → Organization count (`How many?`) → the amber *"This row does not identify an organization yet"* message, in the original order and spacing. Unchanged, as `R-IUC-001` Sc.2 requires. |
+
+User verdict: *"se ve bien"*. This corroborates — from rendered pixels rather than from the DOM tree — the T-01 Reviewer's structural finding that the unknown path's node order is byte-identical to before.
 
 #### Scope limits (KZ-017)
 
@@ -280,3 +285,54 @@ Risk-reducing datum (not a substitute): the T-01 Reviewer established that on th
 #### Budget — final
 
 3 tasks · **13 paths** · 1 review round each · **0 rework attempts, 0 HALTs, 0 pivots.** `design.md` §11 predicted 3 tasks / ~90 LOC / 1 review round. **Met exactly.** No tripwire fired.
+
+
+---
+
+## 3. Summary — spec complete
+
+| | |
+| --- | --- |
+| Tasks | **3 of 3 PASS** |
+| Rework attempts | **0** |
+| HALTs / Pivots / `FATAL_FAIL` | **0** |
+| Review rounds | 1 per task (3 total) |
+| Commits | `b7eafa25` (T-01) · `93568e1c` (T-02) · `3ecb3672` (T-03) · + this closing commit |
+| Paths touched | 13 — 4 client, 9 docs. **0 under `server/`** |
+| Production lines changed | **3** (one template block move, one ternary, one type widening) |
+| Budget (`design.md` §11) | 3 tasks / ~90 LOC / 1 review round — **met exactly, no tripwire** |
+| Final suite | **317 suites / 6798 tests green** (6793 before; +5 matches the five added tests) |
+
+### Every defect class, and how it closed
+
+| # | Class | Outcome |
+| --- | --- | --- |
+| `D-1` | Field still renders on the known path | ✅ red observed, then green |
+| `D-2` | Field stops rendering on the unknown path | ✅ asserted |
+| `D-3` | Payload still sends the count on the known path | ✅ red observed, then green |
+| `D-4` | Payload stops sending it on the unknown path | ✅ red observed (Leader addendum, closing a Reviewer advisory) |
+| `D-5` | Visibility does not track a live toggle | ✅ transition-arranged test (KZ-015) |
+| `D-6` | Row inclusion changes as a side effect | ✅ protected blocks byte-unchanged |
+| `D-7` | Card layout regresses | ✅ **human browser check, both paths** — no automated gate exists |
+| `D-8` | Server behaviour changes | ✅ 0 `server/` paths in the cumulative diff |
+| `D-9` | Existing stored counts silently wiped | ✅ dissolved — user ruled the data disposable (`OQ-1`) |
+| `D-10` | Type error invisible to `npm test` | ✅ `TS2322` red observed; `npm run build` green |
+| `D-11` | Second Lens B guard left un-reworked | ✅ red observed on `c8` |
+
+**Every gate that this spec claimed had a red was observed failing before it was trusted (K-004).** The one class with no automated gate (`D-7`) was declared as such from `requirements.md` onward and closed by a human, not by a command.
+
+### What the run changed about the spec itself
+
+| Source | Finding | Effect |
+| --- | --- | --- |
+| Step 2.3 reversion challenge | The payload edit as proposed **did not compile** — the interface was never widened | `DD-6`, a third production edit; `D-10` |
+| Step 2.3 reversion challenge | A **second** Lens B guard breaks, not only `:183` | `DD-4` widened; `D-11` |
+| T-02 Reviewer | `D-4` had a named falsifying input but was never run red | Leader ran it inline; advisory resolved |
+| T-02 Reviewer | `design.md` `DD-2` cited a line number T-01 had shifted | 5 stale `:436` citations corrected to `:464` |
+| T-03 Reviewer | `proposal.md` criterion 8 demanded erasing frozen history | Criterion corrected in place with reasoning |
+| T-03 Reviewer | The archive's §16 amendment index would stay incomplete | Leader added the row (`E-6`) |
+
+### Open items carried out of this spec
+
+- **One `ADVISORY`, deliberately not actioned:** no spec in the client package drives a PrimeNG checkbox through its rendered element, so a deleted `(onChange)` binding would ship green. Pre-existing, outside this spec's change surface. Recorded in T-01's entry; **it earns its own proposal if it is to be fixed** — it was never converted into a task here.
+- Next: `/akili-validate`, then `/akili-archive`.

@@ -2,7 +2,7 @@
 
 - **Module:** client — `innovation-use-details` (STAR result page), organization card
 - **Spec id:** 2026-09-innovation-use-organization-count-known-path
-- **Status:** in-progress — T-01 ✅ · T-02 ✅ · T-03 `[~]` (awaiting D-7)
+- **Status:** **completed** — 3/3 tasks PASS, 0 rework (`execution.md` §3)
 - **Owner:** D. Casañas
 - **Depth:** **Lite**
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
@@ -153,12 +153,12 @@ graph TD
   - [x] Row inclusion is unchanged — the payload contains the same set of rows as before for the same input (`AC.4`).
   - [x] Archived `design.md` §5.5 and `tasks.md:309` carry the amendment note; originals not rewritten.
   - [x] KZ-013 backward grep run, hit count recorded, every referrer re-read.
-  - [ ] **Human visual check performed on both paths and its outcome written down (`D-7`) — OPEN, with the user.** No automated gate exists for this; jsdom cannot measure layout.
+  - [x] Human visual check performed on both paths and its outcome written down (`D-7`) — **PASS, user, 2026-09-03** (*"se ve bien"*, two screenshots).
 
 - **Dependencies:** T-01, T-02
 - **Effort:** **S**
 - **Skills:** `angular-developer`
-- **Status:** `[~]` **in-progress** — documentation + measurement halves PASS (Reviewer 2026-09-03, 1 attempt); **blocked on `D-7`, the human visual check.**
+- **Status:** **done** — Reviewer PASS 2026-09-03, 1 attempt; `D-7` closed by the user's browser check (`execution.md` → T-03)
 
 ---
 
