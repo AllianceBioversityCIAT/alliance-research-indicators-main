@@ -6,7 +6,7 @@
 - **Owner:** David Felipe Casañas Hernández
 - **Depth:** Standard
 - **Requirements:** `./requirements.md` · **Design:** `./design.md`
-- **Budget (design.md §13):** **re-baselined 2026-09-02 after T-03** — 7 tasks · ~310 prod LOC + ~1,130 test LOC (~1,440 total) · 4 review rounds. Superseded original: ~250 + ~250 (~500) · 2 rounds. The basis, not just the total, was corrected (KZ-008): this spec's KZ-001/KZ-004 evidence standard makes tests ~3:1 against production, and T-06 is a pure-test task the 1:1 basis could not represent. Task count and scope are unchanged; depth stays **Standard**
+- **Budget (design.md §13.5 — live):** **re-baselined twice; current basis 2026-09-03 after T-05** — 7 tasks · ~268 prod LOC + ~1,633 test LOC (~1,901 total) · **4 rework rounds** (0 consumed). Superseded: 2026-09-02 §13.3 (~310 + ~1,130 = ~1,440 · 4 review rounds) and the original (~250 + ~250 = ~500 · 2 rounds). Both re-baselines moved **test** LOC only; production LOC has now been revised *down* twice and is tracking 14% under the first revision — there has been no scope growth. The 2026-09-03 correction also **retired the review-round metric** as mis-specified (7 tasks cannot fit in 4 one-per-task review passes) and replaced it with rework rounds, per KZ-008 widened: re-derive *every* metric a re-baseline restates, not just the one that triggered it. Task count and scope unchanged; depth stays **Standard**
 - **Last updated:** 2026-09-02
 
 ---
@@ -176,21 +176,21 @@ No cycles.
   - Place the step where a later failure still routes through the existing `catch` → `deleteFullResultById`.
   - Contains **no** portfolio branching. If an `if` on a portfolio id appears here, the task is wrong (DD-4).
 - **Acceptance / done check:**
-  - [ ] 2026 item with valid ids → rows written; item in `results_created`.
-  - [ ] 2025 item with ids → item created, zero rows, `missing_fields` contains `strategic_objectives` **in addition to** the AI-reported entries; item **not** in `results_errors`.
-  - [ ] 2025 item **without** the field → no such `missing_fields` entry (R-RES-004 AC.4).
-  - [ ] Year 2035 (no covering portfolio) → item created, zero rows, field-level entry present, warn names the year, no exception, no fallback portfolio.
-  - [ ] Discarded ids appear as `strategic_objectives:<id>`, distinguishable from the field-level entry.
-  - [ ] Absent / `[]` / `null` field → the resolver and orchestrator are **never called** (assert zero interactions, not just zero rows).
-  - [ ] Single endpoint: a valid payload returns the created result and it persists; an unknown `contract_code` still rolls back and rethrows.
-  - [ ] Bulk metadata output unchanged: one `bulk_upload_results` row per item, same fields.
-  - [ ] **R-RES-002 AC.4** — an item with **no** `year` resolves via the current calendar year (`result.year ?? new Date().getFullYear()`), and the portfolio it routes to is the one covering that year. Assert against a fixture whose covering portfolio differs from the other items, so a hardcoded calendar-year default cannot pass unnoticed.
+  - [x] 2026 item with valid ids → rows written; item in `results_created`.
+  - [x] 2025 item with ids → item created, zero rows, `missing_fields` contains `strategic_objectives` **in addition to** the AI-reported entries; item **not** in `results_errors`.
+  - [x] 2025 item **without** the field → no such `missing_fields` entry (R-RES-004 AC.4).
+  - [x] Year 2035 (no covering portfolio) → item created, zero rows, field-level entry present, warn names the year, no exception, no fallback portfolio.
+  - [x] Discarded ids appear as `strategic_objectives:<id>`, distinguishable from the field-level entry.
+  - [x] Absent / `[]` / `null` field → the resolver and orchestrator are **never called** (assert zero interactions, not just zero rows).
+  - [x] Single endpoint: a valid payload returns the created result and it persists; an unknown `contract_code` still rolls back and rethrows.
+  - [x] Bulk metadata output unchanged: one `bulk_upload_results` row per item, same fields.
+  - [x] **R-RES-002 AC.4** — an item with **no** `year` resolves via the current calendar year (`result.year ?? new Date().getFullYear()`), and the portfolio it routes to is the one covering that year. Assert against a fixture whose covering portfolio differs from the other items, so a hardcoded calendar-year default cannot pass unnoticed.
 - **Tests:** `results.service.spec.ts` — extend `formalizeResult` and `createResultFromAiRoar` describes.
 - **Verification:** `npm test -- --silent src/domain/entities/results/results.service.spec.ts`
 - **Falsifying input:** an item with `year: 2035`. An implementation that defaults to portfolio 1 when the resolver returns `null` writes rows and FAILs. And a payload with **no** field, asserted with zero-interaction spies on the resolver and orchestrator: any implementation that calls the alignment step unconditionally FAILs even though no rows would be written — which is the whole point, since the row count alone cannot see that defect.
 - **Disqualifies:** asserting `missing_fields` **length** or presence rather than content — a length assertion passes while the entry names the wrong thing (DC-4 is silent data loss, and a presence check is blind to it). Also: any inertness assertion that checks only the absence of the new row, without asserting the sibling rows survived (see T-06).
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging` (on any failure)
-- **Effort:** L · **Status:** todo
+- **Effort:** L · **Status:** done — PASS on attempt 1, **unanimous across a three-lens parallel review** (contract / falsifiability / data-loss). Budget tripwire fired and was re-baselined by owner decision first; see `execution.md` → *Budget Tripwire — 2026-09-03* and the T-05 entry
 
 ---
 

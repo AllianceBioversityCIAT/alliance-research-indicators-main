@@ -8,7 +8,7 @@
 | **Spec id** | 2026-09-ai-formalize-strategic-objectives |
 | **Approval Mode** | `gated` (proposal §1) — the Leader pauses at every continue/pause gate |
 | **Depth** | Standard |
-| **Budget (design.md §13)** | 7 tasks · ~250 prod LOC + ~250 test LOC · 2 review rounds |
+| **Budget (design.md §13.5 — live)** | 7 tasks · ~268 prod LOC + ~1,633 test LOC (~1,901 total) · **4 rework rounds** (0 consumed). Re-baselined 2026-09-02 (§13.3) and 2026-09-03 (§13.5); the review-round metric was retired as mis-specified on 2026-09-03. **This row was itself stale from 2026-09-02 to 2026-09-03** — it still carried the original ~500/2 figures through the first re-baseline, which is the same carried-forward-metric failure KZ-008 names. Fixed and now maintained as a live field |
 | **Target package** | `server/researchindicators` (all seven tasks) |
 | **Verification** | from `server/researchindicators` → `npm test -- --silent` · `npm run lint -- --quiet` |
 | **Branch** | `AC-1607-Send-bulk-upload-completion-email-with-CapDev-metrics` — the owner chose on 2026-09-02 to keep this spec's commits on the existing CapDev branch rather than opening a dedicated one. Recorded because the tasks.md §7 two-PR split now has to be carved out of a shared branch |
@@ -446,3 +446,231 @@ Per the Advisory Never Gates / Advisory Never Becomes A Task rules, none of thes
 **Budget.** +160 LOC (23 prod / 137 test) against the re-baselined ~1,440 total; cumulative production LOC now ~202 of ~310. Review rounds consumed: still 1 per task, 0 rework. The armed tripwire thresholds — T-05 above ~350 total, T-06 above ~240, or a fifth review round — are untouched. **The ~3:1 test-to-production ratio the re-baseline established held again here (137:23 ≈ 6:1 on a task that is almost entirely test), consistent with the corrected basis rather than with the superseded one.**
 
 **Constitution impact** — none. No module created, no boundary moved, no public surface change beyond one method on an existing internal service. No child-guide or `## Module Guides` update needed.
+
+---
+
+## ⚠️ Budget Tripwire — 2026-09-03, T-05 implemented, escalated **before** review
+
+**Two armed thresholds from `design.md` §13.4 fired at the same moment.** Escalated to the owner rather than absorbed. **T-05 is `[~]`, implemented but unreviewed; its work sits uncommitted in the working tree.**
+
+### Why the escalation happened *before* the Reviewer, not after
+
+§13.4 arms three specific figures: *"T-05 above ~350 total, T-06 above ~240, or a fifth review round."* T-05 breached the first, and **spawning T-05's Reviewer is itself the fifth review round** — so the review pass could not be run without consuming the very threshold under watch. Escalating first is the only order that leaves the owner a decision.
+
+### Threshold 1 — T-05 LOC
+
+| Metric | §13.3 estimate | Actual | Delta |
+| --- | --- | --- | --- |
+| Production | ~90 | **56** | **−38%** (under) |
+| Test | ~260 | **~556** | **+114%** |
+| Total | ~350 | **~612** | **+75%** |
+
+Plus 2 lines of prettier line-joining in `dto/result-ai.dto.spec.ts` from the mandatory `lint --fix` (root `CLAUDE.md` §4.3 warns the script mutates files). Leader verified: pure formatting, T-01's own tests, no assertion altered. Accepted rather than reverted — reverting re-dirties lint for the next run.
+
+### Threshold 2 — the fifth review round, and why that metric is mis-specified
+
+Four review rounds are consumed (T-01…T-04, one Reviewer pass each) with **zero rework rounds** — every task has passed on attempt 1. T-05's pass would be the fifth.
+
+**But the metric cannot mean what it literally says.** Seven tasks each requiring at least one independent review pass puts the *floor* at **7**, and both the original (2) and revised (4) figures are below that floor. A budget of 4 review rounds for 7 tasks was unsatisfiable the day it was written, regardless of execution quality. Read as *rework* rounds — extra Implementer→Reviewer cycles beyond the first — the spec stands at **0 of 4**, comfortably under.
+
+**This is KZ-008 recurring in a new form.** The 2026-09-02 re-baseline corrected the LOC *basis* (1:1 → 3:1) but carried the review-round metric forward without re-deriving it, so an uncorrected per-item estimate breached again at the next measurement — exactly the failure mode KZ-008 names. Recorded for the Kaizen step; the lesson may need widening from "the basis" to "every metric in the re-baseline, including the ones the trigger did not concern."
+
+### Spec-level position, with two tasks left
+
+| Metric | Revised §13.3 | Actual T-01…T-05 | Remaining (est.) | Projected | vs revised |
+| --- | --- | --- | --- | --- | --- |
+| Production | ~310 | **258** | ~10 (T-07) | **~268** | **−14% (under)** |
+| Test | ~1,130 | **1,233** | ~240 (T-06) | **~1,473** | **+30%** |
+| Total | ~1,440 | **1,491** | ~250 | **~1,741** | **+21%** |
+| Rework rounds | 4 | **0** | — | — | **under** |
+
+Per-task actuals against §13.3: T-04 160 vs ~120 (+33%), T-05 ~612 vs ~350 (+75%).
+
+**The diagnosis is unchanged from 2026-09-02, and it is not scope growth.** Production LOC is coming in *under* the corrected estimate and will finish there — the feature is the size it was designed to be. The entire variance is test code, and the cause is this spec's own evidence standard, which the Implementer was explicitly forbidden from trimming:
+
+- **The `Disqualifies` clause bans every cheap shortcut.** No `missing_fields` length or presence assertions, no `toContain` where content equality is required, no inertness check that omits the sibling rows. Each prohibition converts one cheap assertion into a fixture-plus-content-equality case.
+- **KZ-004 forbids shared fixtures.** Nine acceptance items with per-item routing semantics need nine discriminating fixtures (distinct year *and* distinct ids), which cannot be defaulted or shared.
+- **KZ-001 forbids canned doubles.** T-05's `findByYear` double routes by a year→portfolio map and the orchestrator double returns per-portfolio reports — a constant-returning stub would be 2 lines and would certify a batch-wide bug as correct.
+- **Two forward obligations arrived as scope**, each with its own mandated red-capable test: T-03's `supported === false` terminating branch (content equality, not `toContain`) and T-02's R-RES-002 AC.4 gap. Neither was in the §13.3 estimate for T-05 — the estimate predates both.
+
+**What the evidence has bought so far:** three defects caught before review across the spec — the empty-survivor wipe (T-03), the missing per-element validator (T-01), and T-05's three falsifier probes each confirmed red on the exact bug their requirement names, including the unconditional-`discarded`-loop bug the T-03 forward pointer predicted in advance.
+
+### Implementer's `Not Done / Assumptions` — carried verbatim, per Step 2.3.0
+
+> - Budget tripwire breach (above) — reported, not silently absorbed.
+> - Judgment call: used `processedResult.strategic_objectives` (the carried field) rather than raw `result.strategic_objectives` for the ids passed to the orchestrator, since the task explicitly required carrying the field through `createResultFromAiRoar` and this matches how every other data field in `formalizeResult` flows (sdgs, ipRights, geoScope, etc.). Effective year is computed independently in `formalizeResult` from the raw `result.year` (not from `processedResult.result.year`), per the implementation note's literal expression and to keep the AC.4 test decoupled from how `createResultFromAiRoar` is mocked.
+> - `dto/result-ai.dto.spec.ts` was reformatted by mandatory `lint --fix` (pure whitespace, no assertions changed) — flagged, not reverted, since reverting would leave it lint-dirty again for the next run.
+> - T-06/T-07 items (mixed-batch cross-item leakage stress test, inertness on sibling `result_sdgs`/`result_contracts` rows, full-package suite, Dev manual checks) are explicitly out of T-05's scope and untouched.
+
+**Leader adjudication of that field:** it contains **no outstanding scope** — an escalation, a recorded judgment call, a disclosure, and a confirmation of what is out of scope. All nine acceptance items plus both forward obligations and the AC.4 injection are reported covered. So this field does not independently bar `[x]`; the unrun review and the tripwire do. The judgment call is sound and worth flagging to the Reviewer: reading ids from `processedResult` while computing the year from raw `result.year` is a deliberate asymmetry, and the Reviewer should confirm it cannot desynchronize the year used for routing from the year persisted.
+
+### Verification already on record (Implementer, pre-review)
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent src/domain/entities/results/results.service.spec.ts` | **PASS** 114/114 |
+| `npm test -- --silent src/domain/entities/results` (KZ-003 blast radius, Leader-added) | **PASS** 10 suites / 263 tests |
+| `npm run lint -- --quiet` | clean (`git status` re-checked; the one out-of-scope file above) |
+
+**Falsifier probes — all three confirmed red, then reverted and re-confirmed green:**
+
+| Probe | Mutation | Result |
+| --- | --- | --- |
+| No-fallback-portfolio (R-RES-006) | injected a portfolio-1 fallback when `findByYear` returns null | year-2035 test **red** |
+| Step-1 guard (R-RES-007) | replaced the guard with `if (true)` | all three absent/`[]`/`null` cases **red** — `findByYear` called once, expected zero |
+| `supported === false` terminating branch (T-03 forward obligation) | replaced the if-else with two independent unconditional `if`s — the exact bug the forward pointer predicted | content-equality test **red**, spurious `strategic_objectives:1` / `:999` entries present |
+
+**Leader-verified independently of the report:** DD-4 clean (no `PORTFOLIO_1` / `PORTFOLIO_2` / portfolio-id comparison anywhere in the added production lines) and DD-7 satisfied at both `push` sites (`resultMetadata?.push(...)`, lines ~955 and ~980).
+
+### Decision required from the owner
+
+The spec's own rule: *"Exceeding a budget is information, not failure; the cost of a mis-sized spec is only recoverable while it is still running."* Options put to the owner:
+
+1. **Re-baseline again and continue** — accept ~1,741 projected total, and re-derive the review-round metric as *rework* rounds (0 of 4 used). Precedent: the 2026-09-02 decision on the same cause.
+2. **Continue without re-baselining**, recording T-05 as an accepted overrun with the tripwire re-armed for T-06 at ~240.
+3. **Relax the evidence standard for T-06** — the only lever that actually reduces the remaining number, since T-06 is a pure-test task. This trades away the `Disqualifies` protections and the KZ-001/KZ-004 fidelity that have caught three defects. Not recommended.
+4. **Stop the spec here** and defer T-06/T-07 to a follow-up.
+
+Pending the decision, **T-05's Reviewer has not been spawned** and no attempt has been consumed.
+
+### ✅ Owner decision — 2026-09-03: **Option 1, re-baseline again and continue**
+
+**Decision:** re-baseline against the measured actuals and proceed with T-05's review. The evidence standard is **not** relaxed (option 3 declined by not being chosen — the `Disqualifies` clauses, KZ-001 double fidelity and KZ-004 discriminating fixtures all stand for T-06).
+
+**Applied to the spec documents:**
+
+| Document | Change |
+| --- | --- |
+| `design.md` §13 | Preamble rewritten to record **two** re-baselines. §13.3 relabelled *"First revision — superseded by §13.5"*. §13.4 relabelled and annotated with the firing outcome. **New §13.5 is the live budget** (~268 prod / ~1,633 test / ~1,901 total). **New §13.6** re-arms the tripwire |
+| `design.md` §13.5 | **The review-round metric is retired**, not merely raised — see below. Replaced by **4 rework rounds**, 0 consumed. T-06 re-estimated ~240 → **~400** off measured multi-item fixture density |
+| `tasks.md` header | Live budget line rewritten to §13.5 figures, with both superseded baselines preserved |
+| `execution.md` Document Control | Budget row rewritten to §13.5. **This row was itself stale** — it still carried the original ~500/2 figures straight through the 2026-09-02 re-baseline, undetected for a day. Now flagged in place as a live field |
+
+**Why the review-round metric was retired rather than raised.** Seven tasks each requiring one independent Reviewer pass puts the floor at **7**; the original budget said 2 and the first revision said 4. The figure was unsatisfiable the day it was written, so the tripwire was guaranteed to fire on it regardless of execution quality — and it fired on a spec with **zero rework**. One review pass per task is the *method*, not an overrun. What is worth budgeting is **rework** rounds: extra Implementer→Reviewer cycles beyond the first, which signal an under-specified task. Budget 4; consumed 0.
+
+**KZ-008 needs widening, and this is the second instance in two days.** The 2026-09-02 re-baseline corrected the LOC basis but carried the review-round count forward untouched, and it breached at the very next measurement — the same shape of failure KZ-008 already describes for an uncorrected per-item estimate. The `execution.md` Document Control row above is a *third* instance of the identical pattern in this same spec: a live figure that a correction did not sweep. Proposed widening, for the Kaizen step at `/akili-archive`:
+
+> A re-baseline must re-derive **every metric it restates and sweep every live field that carries one** — not only the metric the triggering measurement concerned. An untouched metric carried through a correction is indistinguishable from a validated one, and it breaches at the next measurement exactly as an uncorrected basis does.
+
+**Correction closure sweep (two directions), per `/akili-specify` → *Correction Closure*:**
+
+- **Forward** (the superseded values, swept across the whole spec folder): `~1,440`, `~1,130`, `~310`, `~350`, `~240`, `4 review rounds`. Found and fixed in the two **live** headers (`tasks.md` §header, `execution.md` Document Control). All remaining occurrences are inside `execution.md`'s append-only task entries and `design.md` §13.1/§13.2/§13.3/§13.4 — **deliberately left unchanged**, because those are point-in-time records and a log that rewrites its own history stops being evidence.
+- **Backward** (documents citing the corrected sections): `design.md` §13.3 was cited by the `tasks.md` budget header and by the tripwire text in §13.4 — both updated to point at §13.5. `tasks.md` §8's done-check cites `design.md` §13 generically and needs no change. One factual error was caught by the sweep itself and fixed: §13.5's T-06 rationale said *"three measurements"* while listing two.
+
+**Tripwire re-armed** (§13.6): T-06 above ~400, T-07 above ~60, any second rework round on one task or 5 spec-wide, and — the meaningful one — **production LOC above ~300 spec-wide**, which would indicate genuine scope growth rather than evidence density.
+
+**T-05's review now proceeds.** It is the spec's first parallel-lens pass since T-03, triggered by effort `xhigh` and the DC-4 silent-data-loss surface.
+
+---
+
+### T-05 — Wire the alignment step into `formalizeResult`, with reporting and the metadata guard
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** on attempt 1 of 3 — **unanimous across a three-lens parallel review** |
+| **Date** | 2026-09-03 |
+| **Requirements covered** | R-RES-003 (scenario, `BUT`/`AND IT MUST`, AC.3–AC.4), R-RES-004 (scenario, both clauses, AC.1–AC.4), R-RES-006 (scenario, both clauses, AC.1–AC.4), R-RES-007 (both scenarios, all clauses, AC.2, AC.4), R-RES-009 (scenario, both clauses, AC.1–AC.3), NFR-RES-003, **R-RES-002 AC.4** (Leader-injected from T-02's forward pointer) |
+| **Implementer attempts** | 1 |
+| **Model routing** | Implementer T2 (`sonnet`, effort **`xhigh`**) · Reviewers T3 (`opus`) × 3 in **parallel lens mode** — triggered by effort `xhigh` and the DC-4 silent-data-loss surface. `author ≠ auditor` held on both axes for all three |
+| **Skills assigned** | `nestjs-expert`, `error-handling-patterns`, `tdd` (+ `systematic-debugging` on failure) — as the task specifies; no deviation |
+| **Budget** | **Tripwire fired.** Escalated before review, owner chose re-baseline; see the two blocks above |
+
+#### Attempt 1
+
+**Files changed**
+
+| File | Kind | LOC |
+| --- | --- | --- |
+| `src/domain/entities/results/results.service.ts` | production | **+56 / −2** |
+| `src/domain/entities/results/results.service.spec.ts` | test | **~+556** |
+| `src/domain/entities/results/dto/result-ai.dto.spec.ts` | *incidental* | +2 / −6 — prettier reflow of two already-committed T-01 blocks, from the mandatory `lint --fix` (root `CLAUDE.md` §4.3). Leader-verified pure formatting, no assertion altered |
+| | **total** | **~612** |
+
+**What was implemented** — the new step sits at `results.service.ts:949-997`, inside the existing `try`, after the indicator-type `switch` and **before** `customStatus`. Plus `ResultSectionOrchestratorService` injected, `strategic_objectives` carried through `createResultFromAiRoar` (L1231), and both `resultMetadata.push` sites changed to `resultMetadata?.push` (L1008, L1033).
+
+**Verification**
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent src/domain/entities/results/results.service.spec.ts` (task's stated command) | **PASS** 114/114 |
+| `npm test -- --silent src/domain/entities/results` (Leader-added, KZ-003 blast radius) | **PASS** 10 suites / 263 tests |
+| `npm run lint -- --quiet` | clean; `git status` re-checked, one incidental file above |
+
+**Falsifier probes — three run, all red-then-green.** Lens B independently judged each for *structural necessity* — whether the claimed red actually follows from how the test is written — and found **no overstated red**:
+
+| Probe | Mutation | Lens B's independent judgment |
+| --- | --- | --- |
+| No-fallback-portfolio (R-RES-006) | portfolio-1 fallback injected on the `null` path | **Doubly red** — trips `not.toHaveBeenCalled()` *and* returns `undefined`, so `alignmentReport.supported` throws into the `catch` and `error: false` fails too |
+| Step-1 guard (R-RES-007) | guard replaced with `if (true)` | **Red in all three `it.each` arms** — `findByYear` fires once against a zero-call assertion, and `missing_fields` gains an entry, failing `toEqual([])` as well |
+| `supported === false` terminating branch (T-03 obligation) | if-else replaced with two unconditional `if`s | **Red — and only this test catches it.** The other `supported: false` case uses `discarded: []` and stays green. The T-03 forward pointer's mandated test is *uniquely* load-bearing |
+
+That last row is the run's most valuable finding: the obligation T-03's Reviewer deferred forward was not redundant belt-and-braces — it is the **only** guard against the exact bug it predicted, and without the pointer the task would have shipped a green suite over it.
+
+#### Three-lens verdicts — all `STATUS: PASS`
+
+**Lens A — Contract / spec conformance.** All eight §5.1 steps present, in order, with correct terminating behavior. Verified at source rather than accepted: `isEmpty` returns true for exactly `null` / `undefined` / `[]` — the three R-RES-007 AC.2 cases and no more — and the guard provably precedes the year computation, the resolver and the orchestrator. **DD-4 clean** on an independent grep: the only `PortfolioIdEnum` occurrences are the import and a widening cast; zero portfolio-id branching. `missing_fields` appended never replaced. **DD-7 verified at the callers**, not just the `push` sites — `results.controller.ts:645` passes no third argument, so no throwaway collector was introduced. DD-8 clean: no manager threaded, no enclosing transaction.
+
+> The `supported === false` branch is discharged **structurally, not by care**: `if (!supported) {…} else if (!isEmpty(discarded))` makes the per-id path unreachable when unsupported — and Lens A confirmed the branch is load-bearing rather than decorative, since portfolio 1's frozen contract really does echo ids back in `discarded`.
+
+**Lens B — Test evidence / falsifiability.** Every `missing_fields` assertion is `toEqual([...])`; **zero length or presence assertions anywhere in the diff**, so the hard `Disqualifies` rubric is clean. The T-03-mandated content-equality test exists verbatim as specified. All twelve cases carry distinct `result_id` and `title` (KZ-004), and the R-RES-002 AC.4 fixture varies year, ids, title *and* result id with its two years landing in different portfolios — a hardcoded calendar-year default fails call 2 twice over. The `findByYear` double genuinely routes by year where routing is the claim.
+
+> Lens B's structural find: the orchestrator double is shaped `Pick<…, 'saveStrategicObjectivesForPortfolio'>`, so **any call to the section-wide `saveAlignment` from the formalizer would hit an undefined member** → swallowed by the `catch` → `error: true`, which every test asserts is `false`. **R-RES-007 AC.4 is therefore enforced by the double's shape, not by an assertion anyone could delete.**
+
+**Lens C — Reliability / data loss / rollback.** The step is inside the `try` with `resultExists` already assigned at L900, so every later throw reaches the compensating `deleteFullResultById`. R-RES-009 holds in both directions: the optional chain is on the **collector**, not on an operation that can fail, and the roll-back-and-rethrow path for genuine failures is untouched (AC.2). DD-8's window is *narrower* than those already accepted for SDGs, partners and evidence. R-RES-007's code path cannot reach the section-wide save — neither handler's narrow method touches `ResultAlignmentOperationsService`. Observability sufficient: three warn branches, one line per item per case, each naming the result id.
+
+> Lens C's two most valuable finds, neither of which any brief asked for:
+>
+> 1. **The step's position before `customStatus` is required, not merely acceptable.** `customStatus` on `APPROVED` calls `createSnapshot`, and migration `1783029013035`'s versioning routine copies `result_strategic_objectives` into the new version. A well-intentioned future refactor moving the step *down* to shrink the DD-8 window would **silently drop objectives from an approved item's snapshot**.
+> 2. **DD-6's migration dependency fails loudly, not silently.** `deleteFullResultById` runs `SELECT full_delete_result_version(?)` with no surrounding `try`, and the function body declares no `HANDLER` — so an FK 1451 on a pre-migration schema aborts and propagates, preceded by a log naming the item id. RK-6 stays a real rollout gate, but the code's dependence on it is observable rather than hidden.
+
+**Cross-lens corroboration worth recording.** Lens B flagged that the orchestrator double returns `{ supported: true, saved: [], discarded: [] }` for portfolio 1 — a report T-03's frozen contract makes impossible. Lens C, working independently on a different question, **proved that shape cannot occur**: for a non-empty input `Portfolio2` guarantees `saved ∪ discarded = uniqueIds`, and the only producer of an all-empty supported report is the `uniqueIds.length === 0` branch, which step 1 makes unreachable. Two lenses converging on the same impossibility from opposite directions is the strongest evidence in this task's file.
+
+#### Acceptance / done check — all ten closed
+
+| # | Item | Closed by |
+| --- | --- | --- |
+| 1 | 2026 item, valid ids → rows written, item in `results_created` | Lens A §5.1 steps 4/6; suite green |
+| 2 | 2025 item with ids → created, zero rows, entry **in addition to** AI-reported, not in `results_errors` | content-equality test, `toEqual(['sdg_targets','strategic_objectives'])` |
+| 3 | 2025 item **without** the field → no such entry (R-RES-004 AC.4) | zero-interaction case + step-1 guard |
+| 4 | Year 2035 → created, zero rows, entry, warn names the year, no exception, **no fallback** | falsifier probe 1, doubly red |
+| 5 | Discarded ids as `strategic_objectives:<id>`, distinguishable | Lens A §5.1 step 7; `else if` branch |
+| 6 | Absent / `[]` / `null` → resolver and orchestrator **never called** | interaction spies on both, all three arms; probe 2 |
+| 7 | Single endpoint: valid payload persists; unknown `contract_code` still rolls back and rethrows | Lens C item 1 (R-RES-009 both directions) |
+| 8 | Bulk metadata output unchanged | Lens A DD-7 caller check; module-wide suite |
+| 9 | **R-RES-002 AC.4** — absent `year` → current calendar year, discriminating fixture | `toHaveBeenNthCalledWith(1, currentYear)` / `(2, 2010)` + per-portfolio args |
+| 10 | T-03 obligation's red-capable content-equality test | probe 3 — and it is the *only* test that catches the bug |
+
+#### ADVISORY (4R lenses) — recorded, non-gating, **not convertible into tasks**
+
+Eleven findings across three lenses. Per the Advisory Never Gates / Never Becomes A Task rules: none consumed an attempt, none widened T-05, none minted a task. **Nothing below was acted on** — and a second reason applies here beyond the rule: the diff has just been audited by three independent Reviewers, so editing it post-PASS would invalidate the reviewed artifact.
+
+| Lens | Finding |
+| --- | --- |
+| **A · RELIABILITY** | The routing year is recomputed at L959 rather than read from `processedResult.result.year`. Values are provably identical in every case but one: an item **omitting** `year` whose formalization straddles a **New Year midnight** would persist Y and route on Y+1. Not a FAIL — §5.1 step 2 prescribes exactly this expression, so the code conforms and the *spec* is what would change. Sub-second annual probability. One-line fix available |
+| **A · READABILITY** | The comment at L955-958 justifies recomputation as guaranteeing the portfolio matches the result's effective year — but recomputation is what opens the window above; *reuse* would be the actual guarantee. Reword if the line survives |
+| **A · RISK** (T-07/DC-9, not this task) | `ResultRawAi.year` is declared `year: number` but validated `@IsOptional() @IsString()` (pre-existing, `dto/result-ai.dto.ts:289-295`). Benign here — MySQL coerces identically for both the `findByYear` predicate and `report_year_id` — but T-02's memo keys on the raw value, so a batch mixing `"2026"` with year-absent items caches two entries for one year. NFR-RES-002's target still holds. Confirm the extractor's real `year` type during the DC-9 run |
+| **B · RELIABILITY** | The orchestrator double returns a constant report and never differs per portfolio, including a contract-impossible report for portfolio 1 (see the cross-lens note above). Masks no present defect — that test discriminates on call **arguments** — but a portfolio-aware double would let it assert per-item *outcomes* instead |
+| **B · READABILITY** | The AC.4 test's name says "routing per-item" but it is two sequential `formalizeResult` calls, so it proves per-**call** year computation. Batch-scoped per-item routing is T-06's; the title over-claims |
+| **B · RELIABILITY** | The **per-id branch's append semantics** is never asserted against a non-empty AI list — that fixture starts from `missing_fields: []`, so an implementation assigning rather than pushing *in that branch alone* would stay green. Lens B classified it advisory: R-RES-004 AC.3 is discharged on the field-level branch by content equality, and T-05's approved acceptance list does not require it on both shapes. **Leader concurs** — the specialist lens owns this judgment, and a one-word fixture change is exactly the shape the no-widening rule exists to refuse. Surfaced to the owner as an optional follow-up instead |
+| **B · RELIABILITY** | The second `resultMetadata?.push` guard (the `catch`, L1033) is unreachable by any test **and any real caller** — single path throws at L1029 first, bulk always supplies a collector. Correct defensive change with zero evidence behind it |
+| **C · RISK** | A portfolio row that **exists but has no registered handler** is a hard item failure, not a degradation: `registry.get` throws for any id outside `PortfolioIdEnum {1,2}` while `findByYear` reads the live table. Inserting a portfolio 3 covering 2031–2035 — a pure reference-data change, which R-RES-002's "no code release" premise actively invites — would error *every* AI item in that range, whereas a **missing** row degrades gracefully per R-RES-006. Unreachable with today's seed, loud when it happens, and §5.1 step 8 does sanction a throw. **The most substantive advisory of the run**; suggest a risk row beside RK-6 |
+| **C · RELIABILITY** | Single-endpoint degradations are **log-only**: `elementResultMetadata` is fully populated then discarded when no collector is passed, so `POST /api/results/ai/formalize` returns `201` with no signal that ids were dropped. DD-7 accepts this and §9's two-channel rule only ever applied to the bulk report — but it is the DC-4 shape as that consumer sees it. Suggest one sentence in DD-7 |
+| **C · READABILITY** | Add a one-line comment that the step must stay **above** `customStatus`, for the snapshot reason in Lens C's find (1). The single highest-value advisory to act on later, precisely because the hazard is invisible at the edit site |
+| **C · RESILIENCE** | `isEmpty` treats a non-array truthy scalar as non-empty, so `"1,3,5"` would pass step 1 and reach `new Set(ids)`, iterating characters. Unreachable through both HTTP endpoints (`@IsArray` + `ValidationPipe`), so no gate is owed — noted only because DTO validation is the **sole** barrier, which is Q-2 / DC-9's open question |
+
+#### Decisions made
+
+- **Escalated the budget tripwire *before* spawning the Reviewers**, because one of the armed thresholds was the review round itself. Owner chose re-baseline; §13.5 is now the live budget and the review-round metric is retired.
+- **Parallel three-lens review** rather than the default lens-checklist, on effort `xhigh` + DC-4. Lens split: contract / falsifiability / data-loss. Justified by outcome — each lens produced findings the other two did not, and two independently converged on the same impossibility proof.
+- **The Implementer's disclosed judgment call was routed to Lens A explicitly**, with instruction that a routing-year/persisted-year desync would be a conformance FAIL rather than an advisory. Lens A traced it and found one narrow window, correctly classified advisory.
+- **No advisory acted on**, including the two I consider genuinely valuable (the `customStatus` ordering comment and the portfolio-3 risk row). Recorded and surfaced to the owner.
+
+#### Issues encountered
+
+None in the work. One process observation: the incidental `result-ai.dto.spec.ts` reflow arrived because `npm run lint` carries `--fix`. The constitution already warns of this (§4.3) and the Implementer flagged it as instructed. Lens B's suggestion that it belongs in a separate formatting commit is noted; it rides along here because reverting would re-dirty lint for the next run.
+
+#### Carried to T-07 — **all three lenses raised this independently**
+
+**The full-package `npm test -- --silent` with a coverage figure (DC-6 / KZ-003) is still owed, and five targeted/module runs have now accumulated with no coverage number reported since execution began.** Three independent Reviewers flagging the same gap is the strongest form this log has for a carried obligation. T-07 must not inherit an "already green" assumption from the targeted runs.
+
+**Constitution impact** — none. No module created, no boundary moved. `ResultSectionOrchestratorService` gained a consumer, not a new public surface.

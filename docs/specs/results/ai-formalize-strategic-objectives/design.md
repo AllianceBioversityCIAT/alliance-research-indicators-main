@@ -350,7 +350,9 @@ Suite: `backend-unit` (Jest, sibling `*.spec.ts`). No E2E suite is added; the bu
 
 ## 13. Budget (Step 2.4 tripwire)
 
-> **Re-baselined 2026-09-02, after T-03, by owner decision.** The original estimate is preserved below as the superseded row because a budget that quietly rewrites its own history stops being a tripwire. Per **KZ-008**, this correction fixes the **basis** — the per-task ratio the original got wrong — not merely the total. A corrected sum carrying an uncorrected per-item estimate breaches again at the next measurement, and T-06 (pure test code) would have been that next breach.
+> **Re-baselined twice, by owner decision: 2026-09-02 after T-03 (§13.1–§13.4), and 2026-09-03 after T-05 (§13.5).** Every superseded estimate is preserved rather than overwritten, because a budget that quietly rewrites its own history stops being a tripwire. **§13.5 is the live budget; §13.3 is superseded.**
+>
+> Per **KZ-008**, the 2026-09-02 correction fixed the **basis** — the per-task test:production ratio the original got wrong — not merely the total. The 2026-09-03 correction fixes what that one missed: it re-derives **every** metric, including the review-round count that the first re-baseline carried forward untouched and that turned out to be structurally unsatisfiable. See §13.5.
 
 ### 13.1 Superseded estimate (original, pre-execution)
 
@@ -375,7 +377,7 @@ The estimate priced **test code at roughly 1:1 against production code**. That i
 
 **Measured ratio across the three completed tasks: ~3:1 test:production**, not 1:1. Production LOC is in fact tracking close to the original estimate; the entire overrun is test code, and it is buying the falsifiability that has already caught two real defects (the empty-survivor wipe and the missing per-element validator).
 
-### 13.3 Revised estimate
+### 13.3 First revision — 2026-09-02 (superseded by §13.5)
 
 Actuals for T-01 … T-03 are measured; T-04 … T-07 are re-estimated on the corrected 3:1 basis.
 
@@ -402,9 +404,66 @@ Actuals for T-01 … T-03 are measured; T-04 … T-07 are re-estimated on the co
 
 Depth re-check: **Standard still stands.** The revised figure reflects evidence density, not scope growth — the task count, file count, and requirement set are all unchanged, and no migration, auth, or cross-package work has appeared.
 
-### 13.4 The tripwire that remains armed
+### 13.4 The tripwire armed by the first revision (fired 2026-09-03)
 
 This re-baseline resets the threshold; it does not disarm the mechanism. **A further overrun against §13.3 is still escalated, not absorbed.** The specific figures to watch: T-05 above ~350 total, T-06 above ~240, or a fifth review round.
+
+**Outcome: fired on 2026-09-03, on two of its three figures at once** — T-05 came in at ~612 against ~350, and T-05's review pass would have been the fifth. Escalated to the owner *before* the Reviewer was spawned, because spawning it would itself have consumed the second threshold. Owner decision: **re-baseline again** (§13.5).
+
+### 13.5 Second revision — 2026-09-03, after T-05 (**live budget**)
+
+Actuals for T-01 … T-05 are measured; T-06 and T-07 are re-estimated.
+
+| Task | Prod LOC | Test LOC | Total | Source |
+| --- | --- | --- | --- | --- |
+| T-01 | 12 | 78 | 90 | **actual** |
+| T-02 | 32 | 111 | 143 | **actual** |
+| T-03 | 135 | 351 | 486 | **actual** |
+| T-04 | 23 | 137 | 160 | **actual** |
+| T-05 | 56 | ~556 | ~612 | **actual** |
+| T-06 | 0 | ~400 | ~400 | estimate — **re-derived**, see below |
+| T-07 | ~10 | 0 | ~10 | estimate — lint `--fix` formatting only |
+| **Total** | **~268** | **~1,633** | **~1,901** | |
+
+| Metric | Original | 1st revision | **2nd revision (live)** | Note |
+| --- | --- | --- | --- | --- |
+| Tasks | 7 | 7 | **7** | unchanged across both re-baselines — the decomposition was right from the start |
+| Production LOC | ~250 | ~310 | **~268** | **revised *down*** — the feature is smaller than either estimate |
+| Test LOC | ~250 | ~1,130 | **~1,633** | the entire variance, both times |
+| Total LOC | ~500 | ~1,440 | **~1,901** | |
+| **Rework** rounds | — | — | **4** | the metric below, re-derived |
+| ~~Review rounds~~ | ~~2~~ | ~~4~~ | **retired** | mis-specified; see below |
+
+#### What the first revision got wrong: the review-round metric
+
+The 2026-09-02 re-baseline corrected the LOC basis but **carried the review-round count forward without re-deriving it** — and that number was never satisfiable. Seven tasks each requiring one independent Reviewer pass puts the **floor at 7**; the original said 2 and the first revision said 4. The tripwire was therefore guaranteed to fire on this figure no matter how cleanly execution went, and on 2026-09-03 it did — on a spec with **zero rework**.
+
+**Correction: the metric is retired and replaced.** What is worth budgeting is not review passes (one per task is the *method*, not a cost overrun) but **rework rounds** — extra Implementer→Reviewer cycles beyond the first, which are the signal that a task was under-specified. Budget: **4 rework rounds.** Consumed through T-05: **0**.
+
+**This is KZ-008 recurring in a second form**, and the lesson needs widening: a re-baseline must re-derive **every** metric it restates, not only the one the triggering measurement concerned. An untouched metric carried through a correction is indistinguishable from a validated one, and it breaches at the next measurement exactly as an uncorrected basis does. Logged for the Kaizen step at `/akili-archive`.
+
+#### Why T-06 is re-estimated upward, from ~240 to ~400
+
+T-06 is a pure-test task, so it is priced directly off measured test-LOC density rather than off a ratio. Two measurements now bear on it: T-03 (351 test LOC for one handler pair) and T-05 (~556 for nine acceptance items). T-06's own acceptance list carries six items, every one of them a **multi-item mixed-year batch** fixture — the most expensive fixture shape in the spec, and the one KZ-004 most explicitly forbids sharing or defaulting. Its `Disqualifies` clause additionally requires each inertness assertion to prove the **sibling** `result_sdgs` and ALIGNMENT `result_contracts` rows survived, not merely that the new row is absent. ~240 was priced before any multi-item fixture had been measured.
+
+#### The diagnosis, unchanged across both re-baselines
+
+**Production LOC has now been revised *down* twice and is finishing 14% under the first revision's estimate.** The feature is the size it was designed to be; there has been no scope growth, no migration, no auth work, no cross-package spread. The whole variance — both times — is test code, and its cause is this spec's own evidence standard: the `Disqualifies` clauses that ban presence/length assertions and `toContain`, KZ-004's ban on shared fixtures, and KZ-001's ban on canned doubles. That standard has caught **three** defects before review (the empty-survivor wipe, the missing per-element validator, and — via a forward-pointer-predicted falsifier probe — the unconditional `discarded` loop).
+
+Depth re-check: **Standard still stands**, for the third time. Task count, file count and requirement set are unchanged.
+
+### 13.6 The tripwire that remains armed
+
+Re-baselining resets thresholds; it never disarms the mechanism. **A further overrun against §13.5 is escalated, not absorbed.** The figures to watch:
+
+| Figure | Threshold |
+| --- | --- |
+| T-06 total LOC | above **~400** |
+| T-07 total LOC | above **~60** |
+| Rework rounds | any **second** rework round on a single task, or **5** across the spec |
+| Production LOC | above **~300** spec-wide — this is the one that would indicate genuine scope growth rather than evidence density |
+
+The last row is the meaningful one. Test-LOC overruns on this spec have twice been evidence density; a *production* overrun would be a different finding and would warrant re-opening scope rather than the budget.
 
 ## 14. Open Questions
 

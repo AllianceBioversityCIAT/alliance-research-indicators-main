@@ -121,6 +121,8 @@ import {
 } from '../ai-reports/dto/create-ai-report.dto';
 import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
 import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
+import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
+import { PortfolioIdEnum } from './portfolio-handlers/enum/portfolio-id.enum';
 
 @Injectable()
 export class ResultsService {
@@ -166,6 +168,7 @@ export class ResultsService {
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
     private readonly _capdevBulkNotificationService: CapdevBulkNotificationService,
+    private readonly _resultSectionOrchestrator: ResultSectionOrchestratorService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -943,6 +946,56 @@ export class ResultsService {
           break;
       }
 
+      // Strategic objectives alignment (design.md §5.1). Step 1 is the
+      // load-bearing guard: an absent, null or empty list must return
+      // before the resolver or the orchestrator are ever called, which
+      // makes the destructive section-wide alignment save unreachable by
+      // construction rather than by care (R-RES-007, R-RES-004 AC.4).
+      if (!isEmpty(processedResult?.strategic_objectives)) {
+        // Same expression createResultFromAiRoar already persists onto the
+        // result row (R-RES-002 AC.4) — computed here too so the portfolio
+        // this step routes to always matches the result's own effective
+        // year, independent of how the caller populated `result.year`.
+        const effectiveYear = result.year ?? new Date().getFullYear();
+        const portfolio =
+          await this._portfolioService.findByYear(effectiveYear);
+
+        if (!portfolio) {
+          // No active portfolio covers the year → degrade the field, never
+          // fall back to a default portfolio (R-RES-006).
+          elementResultMetadata.missing_fields.push('strategic_objectives');
+          this.logger.warn(
+            `No active portfolio covers year ${effectiveYear}; strategic objectives were not saved for result ${newResult.result_id}.`,
+          );
+        } else {
+          const alignmentReport =
+            await this._resultSectionOrchestrator.saveStrategicObjectivesForPortfolio(
+              newResult.result_id,
+              portfolio.id as PortfolioIdEnum,
+              processedResult.strategic_objectives,
+            );
+
+          if (!alignmentReport.supported) {
+            // Terminating branch (R-RES-004): report.discarded is ignored
+            // entirely on this path — an unsupported portfolio never
+            // carries per-id entries alongside the field-level one.
+            elementResultMetadata.missing_fields.push('strategic_objectives');
+            this.logger.warn(
+              `Portfolio ${portfolio.id} does not support strategic objectives; not saved for result ${newResult.result_id}.`,
+            );
+          } else if (!isEmpty(alignmentReport.discarded)) {
+            elementResultMetadata.missing_fields.push(
+              ...alignmentReport.discarded.map(
+                (id) => `strategic_objectives:${id}`,
+              ),
+            );
+            this.logger.warn(
+              `Discarded strategic objective ids [${alignmentReport.discarded.join(', ')}] for result ${newResult.result_id} (portfolio ${portfolio.id}).`,
+            );
+          }
+        }
+      }
+
       const finalStatus = await this.customStatus(
         result.status,
         newResult.result_id,
@@ -952,7 +1005,7 @@ export class ResultsService {
       elementResultMetadata.final_status =
         finalStatus ?? newResult?.result_status_id;
       elementResultMetadata.result_id = newResult.result_id;
-      resultMetadata.push(elementResultMetadata);
+      resultMetadata?.push(elementResultMetadata);
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -977,7 +1030,7 @@ export class ResultsService {
         throw error;
       }
 
-      resultMetadata.push(elementResultMetadata);
+      resultMetadata?.push(elementResultMetadata);
 
       return {
         ...result,
@@ -1174,6 +1227,8 @@ export class ResultsService {
 
       tmpNewData.result = newResult;
     }
+
+    tmpNewData.strategic_objectives = result?.strategic_objectives;
 
     if (!isEmpty(result?.sdg_targets)) {
       const existingSdgs = await this.dataSource

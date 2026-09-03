@@ -340,9 +340,7 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
 
     it('AC.3 — rejects a comma-separated string in place of an array', async () => {
       const payload = {
-        results: [
-          { ...minimalResult, strategic_objectives: '1,3,5' as any },
-        ],
+        results: [{ ...minimalResult, strategic_objectives: '1,3,5' as any }],
       };
 
       await expect(
@@ -352,9 +350,7 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
 
     it('AC.3 — rejects an array containing a non-number element, naming the field', async () => {
       const payload = {
-        results: [
-          { ...minimalResult, strategic_objectives: [1, 'x'] as any },
-        ],
+        results: [{ ...minimalResult, strategic_objectives: [1, 'x'] as any }],
       };
 
       await expect(
