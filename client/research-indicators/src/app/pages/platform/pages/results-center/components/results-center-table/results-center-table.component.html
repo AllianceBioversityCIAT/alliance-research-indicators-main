@@ -2,7 +2,7 @@
 <div class="flex flex-col {{roundedBottom ? 'rounded-b-lg' : ''}}">
   @if (!hideFiltersToolbar) {
   <div class="flex flex-col px-5 py-4 bg-white">
-    @if (resultEntryContext === 'results-center') {
+    @if (showPlatformFilters) {
     <div class="mb-3">
       <app-project-platform-filters [enableFilter]="true"
         (platformClick)="onPlatformClick($event)"></app-project-platform-filters>
