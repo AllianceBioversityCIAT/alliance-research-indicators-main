@@ -236,18 +236,18 @@ No cycles.
   - **DC-9 (Q-2), and this is the first check rather than the last (KZ-007):** run one real mixed-year bulk upload against Dev using a payload captured from the actual AI extractor — not a hand-written one — and inspect `result_strategic_objectives` and `bulk_upload_results.missing_fields`. Automated gates verify the system against the spec's own description of itself; only this can falsify the assumption that the producer sends numeric ids (A-1).
   - **NFR-RES-004:** reviewed `grep -rn "/v1"` over this spec folder and `server/researchindicators/test`. Every hit must be a statement that a versioned path is *un*reachable; a hit presenting one as callable is a FAIL (KZ-006).
 - **Acceptance / done check:**
-  - [ ] `npm test -- --silent` green across the whole server package; coverage ≥ 60%.
-  - [ ] `npm run lint -- --quiet` clean; `git status` re-checked after.
-  - [ ] The alignment endpoint specs pass without modification.
-  - [ ] Dev `strategic_objectives` rows and ownership recorded in the spec (Q-1 closed).
-  - [ ] Migration `1783029013035` confirmed applied in the target environment (RK-6 closed) — or the rollout is blocked and escalated.
-  - [ ] A real-payload mixed-year upload run against Dev, with the observed rows and `missing_fields` recorded (Q-2 closed).
-  - [ ] The `/v1` sweep reviewed.
+  - [x] `npm test -- --silent` green across the whole server package; coverage ≥ 60%. — **328 suites / 2,269 tests green; coverage 84.17% stmts · 75.41% branch · 85.30% funcs · 84.18% lines.** Closes DC-6 / KZ-003 and the coverage figure owed since execution began.
+  - [x] `npm run lint -- --quiet` clean; `git status` re-checked after. — failed on first run with one `no-unused-vars` error from T-06 (`c5e21e0e`); fixed in one line and re-verified clean. See `execution.md` → T-07.
+  - [x] The alignment endpoint specs pass without modification. — all shared-chain suites green in the full run (registry, both handlers, `result-alignment-operations`, orchestrator, `portfolios`, `strategic-objectives`).
+  - [ ] Dev `strategic_objectives` rows and ownership recorded in the spec (Q-1 closed). — **BLOCKED:** no `.env` and no `mysql` client; needs owner-run read-only query.
+  - [x] Migration `1783029013035` confirmed applied in the target environment (RK-6 closed) — or the rollout is blocked and escalated. — **the rollout is blocked and escalated**, which is this clause's own stated alternative. RK-6 itself remains OPEN and gates deployment; T-06's rollback green is conditional on it.
+  - [ ] A real-payload mixed-year upload run against Dev, with the observed rows and `missing_fields` recorded (Q-2 closed). — **BLOCKED and reported OPEN, not passed**, per this task's `Disqualifies` clause: no hand-written payload was substituted. Needs a running Dev stack + a captured extractor payload + a human (KZ-007).
+  - [x] The `/v1` sweep reviewed. — 12 hits, all reviewed, none presents a versioned path as callable. One **stale citation** found in `test/results-ai-formalize-bulk.e2e-spec.ts:158` (a KZ-006 recurrence in the *backward* direction); passes the gate, left uncorrected as out of scope, surfaced to the owner.
 - **Verification:** `npm test -- --silent` and `npm run lint -- --quiet` from `server/researchindicators`; plus the manual steps above, evidenced in writing.
 - **Falsifying input:** a Dev `strategic_objectives` table whose rows are not all `portfolio_id = 2` would falsify R-RES-004's premise and send D-2 back for re-decision. A real extractor payload sending names instead of ids would falsify A-1 and require a T-01 change.
 - **Disqualifies:** a green targeted run standing in for the full suite. Also: reporting Q-2 as closed on a hand-written payload — that tests the spec's own assumption against itself, which cannot falsify it. If the real payload is unavailable, report Q-2 as **open**, not passed.
 - **Skills:** `systematic-debugging` (on any failure)
-- **Effort:** M · **Status:** todo
+- **Effort:** M · **Status:** `[~]` **PARTIAL** — automated gate CLOSED and green (full suite 328/328, coverage 84.17%, lint clean, `/v1` sweep reviewed); **manual Dev half BLOCKED** on environment access (no Docker, no `.env`, no `mysql` client) and requires the owner: Q-1, Q-2, RK-6, `/swagger`, R-RES-003 AC.2. See `execution.md` → T-07
 
 ---
 
@@ -346,8 +346,8 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: what to revi
 - [ ] T-01 … T-07 all `done`.
 - [ ] A human has exercised a real mixed-year bulk upload in Dev **before** `/akili-validate` issues a verdict (T-07, KZ-007).
 - [ ] Every requirement AC checked; every clause in §4 owned and green.
-- [ ] `npm test -- --silent` and `npm run lint -- --quiet` green; coverage ≥ 60%.
+- [x] `npm test -- --silent` and `npm run lint -- --quiet` green; coverage ≥ 60%. — 2026-09-03: 328 suites / 2,269 tests, coverage 84.17%, lint clean.
 - [ ] `/swagger` shows the new field on both endpoints.
 - [ ] No migration added; migration `1783029013035` confirmed applied where the change deploys.
 - [ ] Q-1, Q-2 and RB-1 resolved or explicitly carried forward.
-- [ ] Actuals compared against the `design.md` §13 budget; any overrun escalated rather than absorbed.
+- [x] Actuals compared against the `design.md` §13 budget; any overrun escalated rather than absorbed. — the tripwire fired twice (2026-09-02 after T-03, 2026-09-03 after T-05); both were escalated to the owner and re-baselined, never absorbed. §13.5 is the live budget.

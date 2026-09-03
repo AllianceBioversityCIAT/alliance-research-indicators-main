@@ -3844,7 +3844,10 @@ describe('ResultsService', () => {
       // test would go red (KZ-001 double fidelity).
       it('leaves every result_sdgs row and every ALIGNMENT result_contracts row active, alongside the new strategic-objectives row (R-RES-007 AC.3)', async () => {
         type FakeRow = {
-          table: 'result_sdgs' | 'result_contracts' | 'result_strategic_objectives';
+          table:
+            | 'result_sdgs'
+            | 'result_contracts'
+            | 'result_strategic_objectives';
           result_id: number;
           is_active: boolean;
         };
@@ -3920,7 +3923,7 @@ describe('ResultsService', () => {
             ids: number[],
           ) => {
             rows.push(
-              ...ids.map((id) => ({
+              ...ids.map((_id) => ({
                 table: 'result_strategic_objectives' as const,
                 result_id: resultId,
                 is_active: true,
@@ -4457,9 +4460,7 @@ describe('ResultsService', () => {
           mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
         ).toHaveBeenNthCalledWith(2, 602, PortfolioIdEnum.PORTFOLIO_1, [43]);
 
-        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(
-          601,
-        );
+        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(601);
         expect(soRows.filter((r) => r.result_id === 601)).toHaveLength(0);
 
         expect(output.results_errors).toHaveLength(1);

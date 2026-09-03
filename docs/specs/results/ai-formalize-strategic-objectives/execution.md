@@ -793,3 +793,128 @@ Nine findings. None acted on — the no-widening rule, plus the same reason as T
 None. No rework, no `PRODUCT_BUG`, no inconclusive verdict. The implementation T-05 committed survived a suite purpose-built to falsify it.
 
 **Constitution impact** — none. Test-only change to an existing spec file.
+
+---
+
+### T-07 — Full-suite gate, lint, and the manual Dev verification
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **`[~]` PARTIAL — the automated gate is closed and green; the manual Dev half is BLOCKED on environment access and requires the owner** |
+| **Date** | 2026-09-03 |
+| **Requirements covered** | NFR-RES-004, DC-6, DC-7 (closed) · DC-8, DC-9, RK-6 (**open**) |
+| **Model routing** | Leader-inline measurement (no delegated agent active — the correct window per root `CLAUDE.md` §4.3) · one Implementer T2 (`sonnet`, effort `low`) for the lint defect |
+| **Budget** | ~1 LOC of the ~60 armed threshold. Well under |
+
+#### Environment pre-check — run BEFORE dispatching anything, per Step 2.1
+
+`docs/infrastructure.md` → `## Local Environment` prescribes a `docker info` pre-check with a no-Docker fallback route. Both routes are unavailable here:
+
+| Probe | Result | Consequence |
+| --- | --- | --- |
+| `docker info` | **down / absent** | primary route unavailable |
+| `.env` at `server/researchindicators/` | **absent** | **the documented fallback route is also blocked** — `npm run dev` requires it (`ARI_PORT`, `ARI_MYSQL_*`, `ARI_MQ_*`, …) |
+| `mysql` client on PATH | **absent** | no route to the Dev DB for a read-only query |
+
+So the contract's "never block silently" instruction resolves to: **escalate**. The three manual checks are not merely inconvenient here — they are unreachable, and two of them additionally need credentials and a captured production payload that no agent possesses.
+
+#### Automated gate — CLOSED and green
+
+Measured on the **final tree**, after the lint fix below. The earlier run predated both the `--fix` reflow and the `_id` fix and was therefore discarded rather than reported — a gate measured on a superseded tree is not evidence.
+
+| Check | Command | Result |
+| --- | --- | --- |
+| **Full package suite** (not targeted — DC-6 / KZ-003) | `npm test -- --silent --coverage` | **328 suites / 2,269 tests / 1 snapshot — all passed.** Exit 0, zero failures |
+| **Coverage ≥ 60%** — *the figure owed since execution began* | same run | **Stmts 84.17 · Branch 75.41 · Funcs 85.30 · Lines 84.18.** No threshold violation |
+| **Lint clean** | `npm run lint -- --quiet` | **clean, zero problems** (after the fix below) |
+| **`git status` re-checked after lint** | `git status --porcelain` | one file, `results.service.spec.ts` — the expected `--fix` mutation, nothing stray |
+| **Alignment endpoint specs pass unmodified** | in the full run | all shared-chain suites present and green: `alignment-handler.registry`, `portfolio-1-alignment.handler`, `portfolio-2-alignment.handler`, `result-alignment-operations.service`, `result-section-orchestrator.service`, `portfolios.service`, `strategic-objectives.service`, `result-strategic-objectives.service` |
+
+**DC-6 / KZ-003 is now discharged.** Six targeted or module-scoped runs had accumulated across T-01…T-06 with **no coverage figure reported since execution began** — a gap all five lens Reviewers across T-05 and T-06 raised independently. The full-package run above is the first, and it clears the 60% floor by a wide margin on every metric.
+
+#### The gate caught a real defect — which is the entire reason it exists
+
+`npm run lint -- --quiet` **failed** on first run:
+
+```
+/…/src/domain/entities/results/results.service.spec.ts
+  3926:27  error  'id' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+```
+
+Traced by the Leader to **T-06, commit `c5e21e0e`** — an unused binding in the inertness test's orchestrator double, sitting **two lines below a correctly-prefixed `_portfolioId`** in the same function.
+
+**Leader's own share of the cause, recorded rather than elided.** T-06's Tester declined to run lint, reasoning it carried `--fix` and was not in its stated verification — **and the Leader's brief endorsed exactly that**, stating "T-07 owns the lint gate." The reasoning was defensible (an unscoped mutating command is a real hazard) but it was not free: a cheaper catch was available one task earlier, and the gate paid for it instead. Recorded for the Kaizen step as a process observation, not as a defect in the Tester's work.
+
+**Resolution.** Delegated as approved scope, not widening: making lint clean **is** T-07's acceptance item 2. Effort `low`, one line, with an explicit instruction **not** to change the double's row shape — a dedicated Reviewer lens had already audited that fidelity, and altering what it records would have invalidated the review.
+
+```diff
+-              ...ids.map((id) => ({
++              ...ids.map((_id) => ({
+```
+
+The Implementer matched the file's own local idiom (`_portfolioId` two lines above) rather than deleting the parameter. Also retained: two pure-prettier hunks `--fix` had already written to the same file (a union type wrapped across lines ~L3844, a `toHaveBeenCalledWith(601)` collapsed ~L4460). Targeted suite re-confirmed at **118/118**, unchanged by the reflow.
+
+No Reviewer was spawned for this one-line change. **Recorded as a deliberate Leader decision:** the edit is a rename of an unused binding, verified by the linter that demanded it and by the unchanged 118/118 suite count. Spawning an auditor for a mechanical rename that a tool both requested and validated would be delegation theatre. The substantive review of this code was T-06's two-lens pass, which stands unaffected — the binding is unused, so no assertion, no double behavior and no row shape changed.
+
+#### NFR-RES-004 / DC-7 — the `/v1` sweep, reviewed rather than counted
+
+`grep -rn "/v1"` over the spec folder and `server/researchindicators/test`. Pattern taken from the **claim** (`/v1`), not from the citation that surfaced it (`api/v1`) — KZ-006.
+
+**12 hits, every one reviewed. All pass:** ten in the spec folder (the sweep's own rules in `tasks.md`/`requirements.md`, the DC-7 risk row, the coverage table, and four `execution.md` records of the T-01 correction) plus two lines of one comment in `test/results-ai-formalize-bulk.e2e-spec.ts`. **Not one presents a versioned path as callable**; `requirements.md:422` states outright that `/api/v1/...` returns `404`, naming the PRD's `AC-API-Surface` as known, uncorrected baseline drift. Gate **PASSES**.
+
+**One stale citation found, and it is a KZ-006 recurrence in the opposite direction.** `test/results-ai-formalize-bulk.e2e-spec.ts:158-159` reads:
+
+> `POST /api/results/ai/formalize/bulk` (no `/v1` segment). design.md §5 documents `/api/v1/...`; that segment does not exist for this handler today.
+
+The comment's own claim about the route is **correct**, so it is not a FAIL. But its citation is stale: the referenced document — `docs/specs/archive/2026-08-11-results--capdev-bulk-upload-notification/design.md` §5 — was corrected in place on 2026-08-11 (D-T11-b) and now states plainly that the route does not exist. The comment therefore attributes to that document a claim it no longer makes.
+
+**Why this matters beyond a stale comment:** KZ-006 as written covers the *forward* direction — sweep the claim, not the citation. This is the **backward** direction from `/akili-specify`'s Correction Closure: *"grep references to the corrected sections — a document that cited the old text may now assert a falsehood."* The 2026-08-11 correction swept forward and missed a site that cited it. Notably, that same archived document already records the forward direction biting once (a bullet reading "Stays on `/v1`" survived an `api/v1` grep). **Same lesson, third distinct failure mode, across two specs.** Proposed for the Kaizen step:
+
+> KZ-006 should state both directions explicitly: sweep the claim forward across the corpus, **and** sweep references *to* the corrected section backward. A correction closed on its forward sweep alone has now failed in the field three times.
+
+**Not corrected here.** The file is outside this spec's touched surface, the hit passes T-07's gate on its own terms, and rewriting another spec's archived-citation comment is not this task's scope. Surfaced to the owner.
+
+#### Manual half — BLOCKED, and reported open rather than passed
+
+T-07's `Disqualifies` clause is explicit: *"reporting Q-2 as closed on a hand-written payload — that tests the spec's own assumption against itself, which cannot falsify it. If the real payload is unavailable, report Q-2 as **open**, not passed."* Honoured. No hand-written substitute was run, and none is recorded as evidence.
+
+| # | Check | State | What it needs |
+| --- | --- | --- | --- |
+| **Q-1 / DC-8** | Dev `strategic_objectives` rows and their `portfolio_id` ownership | **OPEN** | Read-only query against remote Dev MySQL. No `.env`, no `mysql` client. *(`portfolios` was already owner-confirmed 2026-09-02: P1 = 2010–2025, P2 = 2026–2030)* |
+| **RK-6** | Migration `1783029013035` applied in every target environment | **OPEN — rollout blocker, not a warning** | Same DB access. If absent, the compensating delete hits FK 1451 from inside the `catch` and aborts the whole batch (DD-6) |
+| **Q-2 / DC-9** | One real mixed-year bulk upload against Dev with a payload captured from the actual AI extractor | **OPEN** | A running server **and** a captured producer payload. Explicitly a human-at-the-screen check (KZ-007), scheduled *before* any validation verdict |
+| **R-RES-001 AC.4** | `/swagger` shows the field as an optional number array on both endpoints | **OPEN** | A running server at `http://localhost:3000/swagger`. Carried from T-01, which asserted the `@ApiProperty` reflect-metadata the document is generated from |
+| **R-RES-003 AC.2** | Audit columns populated from the current user | **OPEN** | Integration-level closure. Carried from T-03, discharged *by construction*; deliberately never ticked on inference |
+
+**Why the code is correct under either Q-1 outcome, so this blocks the verdict and not the build.** The design is written against *"the portfolio owns no active objectives"*, never against *"is portfolio 1"* (requirements §7, DD-4). A Dev table whose rows are not all `portfolio_id = 2` would falsify **R-RES-004's premise** and send D-2 back for re-decision — it would not make the implementation wrong.
+
+**One T-06 dependency worth stating plainly:** T-06's green *"no `result_strategic_objectives` row survives for the failed item"* rests on a `deleteFullResultById` double that models **post**-migration semantics. Correct per DD-6, but it makes that green **conditional on RK-6**. Both Lens A and Lens B flagged this independently. RK-6 must not be treated as covered by a green suite.
+
+#### Acceptance / done check
+
+| # | Item | State |
+| --- | --- | --- |
+| 1 | `npm test -- --silent` green package-wide; coverage ≥ 60% | ✅ **328/328, 2,269 tests, 84.17% stmts** |
+| 2 | `npm run lint -- --quiet` clean; `git status` re-checked | ✅ clean after the one-line fix; `git status` verified |
+| 3 | Alignment endpoint specs pass without modification | ✅ all shared-chain suites green in the full run |
+| 4 | Dev `strategic_objectives` rows and ownership recorded (Q-1) | ❌ **open** — no DB access |
+| 5 | Migration `1783029013035` confirmed applied (RK-6) | ❌ **open — rollout blocked and escalated**, which is the clause's own alternative |
+| 6 | Real-payload mixed-year upload against Dev (Q-2) | ❌ **open** — reported open, not passed, per `Disqualifies` |
+| 7 | The `/v1` sweep reviewed | ✅ 12 hits reviewed, all assert unreachability |
+
+#### Decisions made
+
+- **Ran the automated gate Leader-inline** rather than delegating it. It is measurement, not implementation, and root `CLAUDE.md` §4.3 requires measuring in a window with no delegated agent active — a delegated measurement would have to be trusted rather than observed.
+- **Discarded the first full-suite run** and re-measured after the lint fix. A gate measured on a superseded tree is not evidence.
+- **Delegated the lint defect** as approved scope (acceptance item 2), tightly bounded against touching the audited double.
+- **Skipped the Reviewer for that one line**, recorded above with reasoning.
+- **Reported Q-2 open rather than substituting a hand-written payload**, per the `Disqualifies` clause.
+- **Left the stale `/v1` citation uncorrected** — out of scope, passes the gate, surfaced instead.
+
+#### Issues encountered
+
+One: the lint gate failure, resolved above. No rework round consumed — it was a gate finding on prior work, not a FAIL of a delegated brief.
+
+**Constitution impact** — none.
