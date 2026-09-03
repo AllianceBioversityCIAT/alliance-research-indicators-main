@@ -2305,9 +2305,11 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   const GREY_200: Rgb = [232, 235, 237]; // --ac-grey-200
   const WHITE_1: Rgb = [255, 255, 255]; // --ac-white-1
   const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
-  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded (ACTORS/eyebrow pre-fix)
+  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded for the ACTORS callout body,
+  // but the LIVE token on the ACTOR #/ORGANIZATION # eyebrows since quick/innovation-use-eyebrow-grey (accepted 2.91:1)
   const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
-  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded (Add-button/stepper/org-link pre-fix)
+  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded for the stepper/org-link,
+  // but the LIVE token on the three Add-other buttons since quick/innovation-use-add-button-style (accepted 3.84:1)
   const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
   const LIGHT_BLUE_500: Rgb = [7, 75, 134]; // --ac-light-blue-500 — the grey-200-surface token
 
@@ -2544,41 +2546,64 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('Add-other buttons (actor/organization/measure): text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-add-button-style, 2026-09-03) — human-decided.
+  // These three buttons were realigned to innovation-dev's visual treatment (border, text and
+  // 7px radius all on --ac-light-blue-300 / #1689ca) for cross-section consistency. That KNOWINGLY
+  // reverts DD-17's text-token choice for this role: #1689ca on --ac-white-1 measures 3.84:1,
+  // which clears WCAG 1.4.11 non-text (>= 3:1, the border) but NOT 1.4.3 AA for the 15px label
+  // (>= 4.5:1). The four prose links in this template keep --ac-light-blue-400 and are unaffected.
+  // This test now PINS the exception so a future token sweep cannot silently re-break or
+  // "re-fix" it without a human reading this comment.
+  it('Add-other buttons (actor/organization/measure): text+border --ac-light-blue-300 on --ac-white-1, 3.84:1 accepted', () => {
     ['Add other actor', 'Add other organization', 'Add other measure'].forEach(label => {
       const btn = fixture.debugElement.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.includes(label));
       expect(btn).toBeTruthy();
-      expect((btn!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
-      expect((btn!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+      const className = (btn!.nativeElement as HTMLElement).className;
+      expect(className).toContain('text-[var(--ac-light-blue-300)]');
+      expect(className).toContain('border-[var(--ac-light-blue-300)]');
+      expect(className).toContain('rounded-[7px]');
+      expect(className).not.toContain('text-[var(--ac-light-blue-400)]');
     });
 
-    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
-    expect(ratio).toBeCloseTo(6.83, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    // Clears non-text contrast (the 2px border), documented as short of AA for the label.
+    expect(ratio).toBeGreaterThanOrEqual(3);
+    expect(ratio).toBeLessThan(4.5);
   });
 
-  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-eyebrow-grey, 2026-09-03) — human-decided, emphasized.
+  // The ACTOR # / ORGANIZATION # card eyebrows were realigned to innovation-dev's eyebrow colour
+  // (#8d9299 == --ac-grey-600) for cross-section consistency; the MEASURE # eyebrow in the SHARED
+  // quantification-item already hardcoded #8D9299, so it needed no edit and is not pinned here.
+  // This KNOWINGLY reverts DD-17's eyebrow token: --ac-grey-600 on --ac-grey-100 measures 2.91:1,
+  // which fails WCAG 1.4.3 AA (>= 4.5:1) and also the 3:1 large-text floor — and at 13px this text
+  // is not large. Deeper than the sibling Add-button exception (3.84:1). Pinned so a future token
+  // sweep cannot silently re-break or "re-fix" it without a human reading this comment.
+  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-600)] on --ac-grey-100, 2.91:1 accepted', () => {
     const eyebrow = fixture.debugElement
       .queryAll(By.css('app-innovation-use-actor-item span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ACTOR #'));
     expect(eyebrow).toBeTruthy();
-    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
   });
 
-  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-600)] on --ac-grey-100, 2.91:1 accepted', () => {
     const eyebrow = fixture.debugElement
       .queryAll(By.css('app-innovation-use-organization-item span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ORGANIZATION #'));
     expect(eyebrow).toBeTruthy();
-    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
   });
 
   it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
@@ -2618,7 +2643,11 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
 
   it('stepper unselected digits: text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
     const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
-    const unselected = buttons.filter(b => !(b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    // Filtered on the white fill the unselected branch actually sets, NOT on the absence of the
+    // selected fill: since quick/innovation-use-level-fill the selected button carries
+    // bg-[var(--ac-light-blue-300)], and a negative filter on the old -400 marker would silently
+    // reclassify it as unselected and then assert the wrong text token against it.
+    const unselected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-white-1)]'));
     expect(unselected.length).toBeGreaterThan(0);
     unselected.forEach(b => {
       expect((b.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
@@ -2629,22 +2658,32 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('stepper selected digit fill: text-[var(--ac-white-1)] on the re-derived --ac-light-blue-400 fill (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-level-fill, 2026-09-03) — human-decided.
+  // The selected level's fill was set to --ac-light-blue-300 (#1689ca) on request, reverting R3
+  // remediation F-1 / DD-17 which had re-derived it to --ac-light-blue-400 precisely because
+  // white-on-#1689ca measures 3.84:1. The digit is fs-[16] at normal weight, so it is NOT large
+  // text and 1.4.3 AA wants >= 4.5:1. It does clear 1.4.11 non-text (>= 3:1). Third exception in
+  // this template's family, alongside quick/innovation-use-add-button-style (3.84:1) and
+  // quick/innovation-use-eyebrow-grey (2.91:1). Pinned so a token sweep cannot silently flip it.
+  it('stepper selected digit fill: text-[var(--ac-white-1)] on the --ac-light-blue-300 fill, 3.84:1 accepted', () => {
     const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
-    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-300)]'));
     expect(selected.length).toBe(1);
     expect((selected[0].nativeElement as HTMLElement).className).toContain('text-[var(--ac-white-1)]');
-    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-300)]');
+    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-400)]');
 
-    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_400);
-    expect(ratio).toBeCloseTo(6.83, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_300);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    expect(ratio).toBeGreaterThanOrEqual(3);
+    expect(ratio).toBeLessThan(4.5);
   });
 
   // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
   // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
   // this block must be able to show — see the reverted-swap check run separately during verification.
-  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS/eyebrow pre-fix token) reports 2.91:1 and fails', () => {
+  // Still a falsifier for the ACTORS CALLOUT BODY (which keeps --ac-grey-800). For the two card
+  // eyebrows this same 2.91:1 is now the human-accepted exception — see the pinning tests above.
+  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS callout-body pre-fix token) reports 2.91:1 and fails AA', () => {
     const ratio = contrastRatio(GREY_600, GREY_100);
     expect(ratio).toBeCloseTo(2.91, 1);
     expect(ratio).toBeLessThan(4.5);
@@ -2656,7 +2695,11 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (Add-button/stepper pre-fix token) reports 3.84:1 and fails', () => {
+  // Still a falsifier for the stepper's UNSELECTED digit text (which keeps --ac-light-blue-400 on
+  // white). This same 3.84:1 pair is now the human-accepted exception in TWO live roles: the three
+  // Add-other buttons and the stepper's SELECTED fill (white-on-#1689ca) — see the pinning tests
+  // above. Kept because a discriminating falsifier for the -400 roles still has to measure it.
+  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (unselected-digit falsifier) reports 3.84:1 and fails AA', () => {
     const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
     expect(ratio).toBeCloseTo(3.84, 1);
     expect(ratio).toBeLessThan(4.5);
