@@ -208,18 +208,18 @@ No cycles.
   - **Inertness assertion (R-RES-007):** an item carrying both `sdg_targets` and `strategic_objectives`, asserting `is_active` on the resulting `result_sdgs` rows **and** the ALIGNMENT-role `result_contracts` rows. Absence of the new row is not evidence the old rows survived — that is the assertion that would have caught DC-2.
   - Cover `[]` and `null` alongside absent.
 - **Acceptance / done check:**
-  - [ ] Three-item mixed-year batch: 2026 and 2027 items each hold exactly their own ids; the 2025 item holds none and reports the field.
-  - [ ] Reversing item order yields the identical per-item outcome.
-  - [ ] No item's objectives are attached to another item's result id.
-  - [ ] After the 2026 item fails mid-way, no `result_strategic_objectives` row survives for it, and the 2025 item resolves on its own year.
-  - [ ] The both-fields item ends with every `result_sdgs` row and every ALIGNMENT `result_contracts` row `is_active = true`, plus the new row.
-  - [ ] The suite FAILs when run against an implementation that resolves the portfolio once per request — verify this deliberately before declaring the task done.
+  - [x] Three-item mixed-year batch: 2026 and 2027 items each hold exactly their own ids; the 2025 item holds none and reports the field.
+  - [x] Reversing item order yields the identical per-item outcome.
+  - [x] No item's objectives are attached to another item's result id.
+  - [x] After the 2026 item fails mid-way, no `result_strategic_objectives` row survives for it, and the 2025 item resolves on its own year.
+  - [x] The both-fields item ends with every `result_sdgs` row and every ALIGNMENT `result_contracts` row `is_active = true`, plus the new row.
+  - [x] The suite FAILs when run against an implementation that resolves the portfolio once per request — verify this deliberately before declaring the task done.
 - **Tests:** `results.service.spec.ts`.
 - **Verification:** `npm test -- --silent src/domain/entities/results/results.service.spec.ts`
 - **Falsifying input:** stated as a done check above — temporarily hoist the resolver call out of the per-item loop and confirm the suite goes red. A routing test that stays green under batch-wide resolution is not evidence, however green it reports.
 - **Disqualifies:** identical fixture years; identical objective lists across items; aggregate row-count assertions; an inertness case that omits the sibling-row `is_active` assertions. Any one of these makes the run inconclusive rather than passing — report it as inconclusive, do not commit it as a pass.
 - **Skills:** `tdd`, `nestjs-expert`
-- **Effort:** M · **Status:** todo
+- **Effort:** M (run at `xhigh`) · **Status:** done — PASS on attempt 1, unanimous across a two-lens parallel review (routing+probe / inertness+double-fidelity). Executed by the **Tester** role, not the Implementer, so a discovered defect could be reported as `PRODUCT_BUG` rather than fixed out of scope; see `execution.md` → T-06
 
 ---
 

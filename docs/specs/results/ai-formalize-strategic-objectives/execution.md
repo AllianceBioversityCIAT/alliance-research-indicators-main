@@ -674,3 +674,122 @@ None in the work. One process observation: the incidental `result-ai.dto.spec.ts
 **The full-package `npm test -- --silent` with a coverage figure (DC-6 / KZ-003) is still owed, and five targeted/module runs have now accumulated with no coverage number reported since execution began.** Three independent Reviewers flagging the same gap is the strongest form this log has for a carried obligation. T-07 must not inherit an "already green" assumption from the targeted runs.
 
 **Constitution impact** — none. No module created, no boundary moved. `ResultSectionOrchestratorService` gained a consumer, not a new public surface.
+
+---
+
+### T-06 — Prove per-item routing and inertness with fixtures that can fail
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** on attempt 1 of 3 — **unanimous across a two-lens parallel review** |
+| **Date** | 2026-09-03 |
+| **Requirements covered** | R-RES-008 (both scenarios, all clauses, AC.1–AC.4), R-RES-007 (scenario 1's `AND IT MUST`, scenario 2 and its `BUT`, AC.1, AC.3), R-RES-003 AC.3 (rollback) |
+| **Attempts** | 1 |
+| **Model routing** | **Tester** T2 (`sonnet`, effort **`xhigh`**) · Reviewers T3 (`opus`) × 2 in parallel lens mode. `author ≠ auditor` held; also `author ≠ tester` — the agent probing T-05's code is not the one that wrote it |
+| **Skills assigned** | `tdd`, `nestjs-expert` — as the task specifies; no deviation |
+| **Budget** | **395 LOC of the ~400 armed threshold — under.** The Tester reported the closeness itself rather than leaving it to be discovered |
+
+#### Role deviation — Tester, not Implementer (Leader decision, recorded)
+
+T-06 writes **no production code**; its purpose is to *falsify* the implementation T-05 committed. The `akili-tester` role was used instead of `akili-implementer` for two reasons:
+
+1. **Only the Tester role can report `PRODUCT_BUG`.** An Implementer that discovered a real defect would be under pressure to fix it — which is out of scope and would corrupt a diff three Reviewers had already signed off.
+2. **It preserves `author ≠ tester`** on the code under test.
+
+The `/akili-execute` triad is otherwise unchanged: the work still passed through the Reviewer gate before `[x]`.
+
+#### Attempt 1
+
+**Files changed:** `src/domain/entities/results/results.service.spec.ts` — **+395 / −0**, additive only. No other file. **Leader-verified independently:** one file in the diff, no `.only`, no `skip`, no leftover probe markers.
+
+**Verification**
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent src/domain/entities/results/results.service.spec.ts` | **PASS** 118/118 |
+| `npm test -- --silent src/domain/entities/results` (KZ-003 blast radius) | **PASS** 10 suites / 267 tests |
+| `npm run lint` | **deliberately not run** — it carries `--fix` and was not in T-06's stated verification. T-07 owns the lint gate |
+
+**Economy worth crediting.** Rather than duplicating T-05's coverage, the Tester **cited** it: R-RES-007 AC.2 (`[]`/`null`/absent) and the single-endpoint rollback shape are already proven, so T-06 added only the content-based row-survival proof neither could offer. On a spec whose budget has twice been broken by test volume, that is the right instinct.
+
+#### Acceptance / done check — all six closed
+
+| # | Item | Closed by |
+| --- | --- | --- |
+| 1 | 3-item mixed-year batch: 2026/2027 hold own ids, 2025 holds none + reports the field | `routes each item on its own year… (AC.1, AC.3)` |
+| 2 | Reversed order → identical per-item outcome | `…identical per-item outcome when item order is reversed (AC.2)` |
+| 3 | No item's objectives attached to another's result id | `assertMixedYearOutcome`'s cross-item leakage check |
+| 4 | 2026 item fails mid-way → no surviving row for it; 2025 resolves on its own year | `…continues the batch after the 2026 item fails mid-way…` |
+| 5 | Both-fields item: all `result_sdgs` + ALIGNMENT `result_contracts` rows active, **plus** the new row | `leaves every result_sdgs row and every ALIGNMENT result_contracts row active… (R-RES-007 AC.3)` |
+| 6 | Suite FAILs under batch-wide resolution | Falsifier probe — red, reverted, re-confirmed green |
+
+**`Disqualifies` — all four clauses clean** (this is the one task in the spec where a listed defect converts the run to *inconclusive* rather than merely losing a point): years differ (2025/2026/2027), objective lists differ and are **disjoint** (`[11]`, `[21,22]`, `[31,32,33]`, `[41,42]`, `[43]`), every assertion is keyed per `result_id` with **no aggregate row count anywhere** in the routing suite, and the inertness case asserts sibling `is_active` rather than mere absence of the new row.
+
+#### Lens A — Routing suite & the falsification probe · `STATUS: PASS`
+
+**Fixture discrimination, analysed past the checkbox.** 2026 and 2027 both resolve to `PORTFOLIO_2`, which looks like weak discrimination until the reason is visible: it is faithful to production (design §3 — P1 = 2010–2025, P2 = 2026–2030), and asserting a portfolio *difference* between them would encode a rule the spec does not state. The load-bearing property is instead that **no single batch-wide portfolio can satisfy both expectations** — constant P1 empties the 2026/2027 items, constant P2 gives the 2025 item rows it must not have. Both branches are asserted.
+
+**The mid-batch failure lands in the right statement.** The throw is triggered from `customStatus`, which is the *very next statement* after the alignment block (`results.service.ts` L997 → L999). A failure before the write would have proven nothing about rollback. The write itself is independently proven by `toHaveBeenNthCalledWith(1, 601, PORTFOLIO_2, [41, 42])`, and the survivor's routing by `(2, 602, PORTFOLIO_1, [43])` — the assertion scenario 2 exists for.
+
+**On item 6, Lens A was candid rather than accommodating**, and its finding is recorded in full because it qualifies the evidence:
+
+> **The probe is valid, and weaker than the mutation `tasks.md` specifies.** The Tester staged the defect test-side — `findByYear` memoizing on nothing and returning its first answer forever. Under a *literal* hoist, `findByYear` would be called **once**; the test-side mutation preserved three per-year calls, so the suite's only call-shape assertions were never exercised by it. The done check was discharged by a semantic equivalent, not by the stated mutation.
+>
+> **Why it is nonetheless sufficient, and why "stubbing the double proves only that the double is consulted" does not apply:** the three tests do not assert the double's return value or call log as primary evidence. They assert **production-produced downstream outcomes keyed per result id**, deliberately divergent across items. Any implementation yielding one portfolio for the whole batch violates at least one per-item expectation *regardless of the mechanism that produced the constant*. All three reported reds trace to specific assertions, and a literal hoist would break the same three — via outcome divergence rather than call count.
+
+**Leader adjudication.** Accepted as closing item 6, and the Leader could not rule otherwise: **the Tester used one of the two mutations this Leader's own brief authorized.** The brief stated the literal hoist had no in-method loop to hoist out of (`formalizeResult` is invoked once per item from `createResultFromAiBulk`) and offered the `findByYear` stub as an explicit alternative. Failing the task for following its instruction would be incoherent. Lens A's strengthening suggestion is recorded as advisory.
+
+Lens A also enumerated the broken implementations it checked the suite against — batch-wide resolution, wrong year either direction, objectives on the wrong result id, swapped id lists, `missing_fields` on the wrong item, rollback not invoked — all caught. The one mechanism these tests cannot see (an orchestrator that ignores its `portfolioId` argument and reads request-scoped `PortfolioUtil` — RK-2's actual mechanism) is **already closed by T-04**, whose done check uses `PortfolioUtil`/`ResultsUtil` doubles that *throw* on read. The no-leakage claim is jointly covered across T-04 and T-06, not left open.
+
+#### Lens B — Inertness assertion & double fidelity · `STATUS: PASS`
+
+This lens was spawned for one question, raised by the Tester's own `Not Done` disclosure: the fake ALIGNMENT `result_contracts` row is created by the `createResult` double and flipped (or not) by the destructive-save double — so **could the test be asserting that a double it controls did not flip a flag that same double owns?** A perfect tautology, green either way.
+
+**Answer: not tautological, traced four ways.** The flip is owned by a *different* double sitting on a genuinely reachable destructive path — `ResultsService` injects `_alignmentOperations` directly (`results.service.ts:167`) and the un-spied `updateResultAlignment` (L740-745) forwards straight to it. The assertion goes red under every plausible destructive implementation:
+
+| Destructive path the AI flow could plausibly take | Assertion that goes red |
+| --- | --- |
+| `_alignmentOperations.save(resultId, …)` directly | sibling `is_active` on both tables, **and** `save).not.toHaveBeenCalled()` |
+| `updateResultAlignment(resultId, …)` — real, un-spied, forwards to the same service | same |
+| `orchestrator.saveAlignment(…)` — the section-wide entry point | the orchestrator double's `Pick<>` shape makes the member `undefined` → `TypeError` → caught → `error: true`, failing `expect(error).toBe(false)` |
+| narrow save swapped for the section-wide one, SO row never written | the new-row presence assertion keyed to result id 700 |
+
+**Ordering holds** — the contracts row is pushed by `createResult`, the two SDG rows by `saveSdgAi`, and the alignment step runs after both (L899 → L907 → L954), so a flip at the alignment step reaches rows that already exist. And `expect(error).toBe(false)` is a real **liveness guard**: it prevents the "rows were never created because the flow aborted" vacuity that would otherwise let `.every()` pass on an empty array.
+
+**The destructive double is line-accurate, not a convenient boolean nudge.** Lens B read the real service: with a narrow `{strategic_objectives}` payload both arrays are `undefined`, so `BaseServiceSimple.create`'s `dataToSaveArray` is empty → `persistId` empty → `update({result_id, pk: Not(In([]))}, {is_active: false})` deactivates **every** existing row for that result and role. The double models exactly that, on exactly the two tables DD-1's own rationale names.
+
+**DD-1's boundary is covered by interaction *and* state** — `not.toHaveBeenCalled()` plus the surviving-row assertions plus the `Pick<>` shape. R-RES-007 AC.4 does not rest on inference here.
+
+#### Coverage closure recorded so T-07 does not re-litigate it
+
+`tasks.md` §4 assigns R-RES-007 scenario 1's and R-RES-003's `BUT NOT … levers / lever outcomes / lever sdg targets / impact outcomes` clauses to T-06, and the diff models only `result_contracts` and `result_sdgs`. **Lens B judged this correct rather than incomplete:** `formalizeResult` never writes lever or impact-outcome rows, so no such row exists at the alignment step, and a fixture row for one would model unreachable state. **The modeled surface equals the reachable surface.** Recorded explicitly per Lens B's request.
+
+#### ADVISORY (both lenses) — recorded, non-gating, **not convertible into tasks**
+
+Nine findings. None acted on — the no-widening rule, plus the same reason as T-05: the diff has been audited, and editing it post-PASS invalidates the reviewed artifact.
+
+| Lens | Finding |
+| --- | --- |
+| **A · RELIABILITY** | **The strongest advisory of this task.** The probe left the suite's only call-shape assertions unexercised. Asserting `findByYear.mock.calls.map(c => c[0])` equals the three distinct years in tests 1–2 would put the *hoist* shape under direct assertion instead of relying on outcome divergence — making AC.4 self-evident to the next reader without re-deriving Lens A's argument |
+| **A · RELIABILITY** | The mid-batch "no row survives" proves the rollback is **invoked** for the failing id after its write; that `full_delete_result_version` actually removes `result_strategic_objectives` is **RK-6 / T-07's gate**. Must not be read as covered by this green suite |
+| **A · READABILITY** | Test 3's `toHaveBeenNthCalledWith` on `findByYear` pins sequential in-array-order processing — an implementation detail of `createResultFromAiBulk`'s `for…of` loop that no requirement states, and R-RES-008 AC.2 in fact requires order-*independence* of the outcome. Faithful today and the clearest AC.3 evidence, so Lens A would not change it; it would break on a legitimate refactor to concurrent item processing |
+| **A · READABILITY** | The reversed-order case asserts `missing_fields` only for item 501, not 502/503. Row-level outcome is fully asserted for all three, so AC.2 is discharged; two lines would make "identical per-item outcome" literal rather than partial |
+| **B · RELIABILITY** | `result_contracts` gets `.every(is_active)` with **no companion length assertion**, unlike `result_sdgs` which has both. `[].every()` is `true`, so if the `createResult` double's push were ever dropped, the contracts half would pass **vacuously**. One `toHaveLength(1)` closes the asymmetry — the highest-value one-liner in this diff |
+| **B · READABILITY** | The fake store has no role column, and the `createResult` double omits the `result_sdgs` rows the real `createResult` also writes from `agressoContract.sdgs` (L468-482). Both omissions are conservative — the only contracts row in existence is the ALIGNMENT one, and the extra SDG rows would flip identically — but a note would stop a future reader adding a non-ALIGNMENT row and expecting correct role scoping |
+| **B · RISK** | The `deleteFullResultById` double encodes **post**-migration-`1783029013035` semantics. Correct per DD-6, but it makes the green "no row survives" conditional on **RB-1 / RK-6** being closed in the target environment — T-07's gate |
+| **B** | No double in the added lines fails to express what it stands in for; no assertion encodes a rule outside `requirements.md` (KZ-005 clean) |
+| **A** | KZ-005 clean in the routing scope — `expectedOwn = f.year === 2025 ? [] : f.objectives` is D-2 / R-RES-004; the `missing_fields` expectations follow from R-RES-004 AC.3 and R-RES-003 |
+
+#### Decisions made
+
+- **Tester role instead of Implementer** (justified above).
+- **Effort `xhigh`, above the task's stated `M`** — T-06 is correctness-critical (data loss), which the dial puts at `max`, but the tier ↔ effort rule forbids maxing a cheaper tier, so `xhigh` is the ceiling for T2.
+- **Two-lens split rather than the default checklist**, with a lens dedicated solely to the tautology risk the Tester itself disclosed. Justified by outcome: that question needed a four-way counterfactual trace to answer, and it is the assertion `tasks.md` says would have caught DC-2.
+- **The Tester was explicitly instructed not to absorb T-05's open per-id-append advisory**, so an unruled finding could not quietly become scope. It did not.
+- **No advisory acted on**, including Lens B's `toHaveLength(1)` one-liner and Lens A's call-args assertion — both genuinely valuable, both surfaced to the owner instead.
+
+#### Issues encountered
+
+None. No rework, no `PRODUCT_BUG`, no inconclusive verdict. The implementation T-05 committed survived a suite purpose-built to falsify it.
+
+**Constitution impact** — none. Test-only change to an existing spec file.
