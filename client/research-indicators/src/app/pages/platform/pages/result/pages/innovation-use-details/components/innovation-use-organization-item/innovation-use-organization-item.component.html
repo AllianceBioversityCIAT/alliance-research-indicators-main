@@ -65,6 +65,9 @@
         [ngModel]="body().institution_id"
         (onChange)="onInstitutionChange($event.value)"
         [options]="institutionsService.list()">
+        <ng-template pTemplate="selectedItem" let-institution>
+          <div class="min-w-0 truncate" [innerHTML]="institution.html_full_name"></div>
+        </ng-template>
         <ng-template pTemplate="item" let-institution>
           <div class="flex items-center whitespace-normal break-words gap-2" [innerHTML]="institution.html_full_name"></div>
         </ng-template>
@@ -147,19 +150,19 @@
           [disabled]="disabled"
           type="text" />
       }
-    }
 
-    <div class="rs-mt-[12]">
-      <app-input
-        [signal]="body"
-        [optionValue]="'organization_count'"
-        [label]="'Organization count'"
-        [type]="'number'"
-        [min]="0"
-        [maxFractionDigits]="0"
-        [disabled]="disabled"
-        placeholder="How many?"></app-input>
-    </div>
+      <div class="rs-mt-[12]">
+        <app-input
+          [signal]="body"
+          [optionValue]="'organization_count'"
+          [label]="'Organization count'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+      </div>
+    }
 
     @if (showNotIdentifiedMessage) {
       <ng-container *ngTemplateOutlet="notIdentifiedMessage"></ng-container>

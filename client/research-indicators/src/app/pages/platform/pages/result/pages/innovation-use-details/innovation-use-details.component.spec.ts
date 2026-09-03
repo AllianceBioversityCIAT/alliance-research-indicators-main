@@ -725,6 +725,59 @@ describe('InnovationUseDetailsComponent', () => {
       expect(payload.organizations[0].institution_type_id).toBeNull();
       expect(payload.organizations[0].sub_institution_type_id).toBeNull();
       expect(payload.organizations[0].institution_type_custom_name).toBeNull();
+      // R-IUC-002: a known-path row carries no organization count, regardless of whether
+      // institution_id is actually picked yet.
+      expect(payload.organizations[0].organization_count).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-IUC-002 — organization_count is nulled at the payload boundary on the known path, and
+  // round-trips verbatim on the unknown path. Nulling happens only for organization_count; it
+  // does not touch institution_id or row inclusion (organizationIdentitySatisfied is unchanged).
+  // ---------------------------------------------------------------------------------------------
+  describe('T-02 buildPayload() — R-IUC-002: organization_count is nulled at the payload boundary', () => {
+    it('nulls organization_count on a known-path row that also carries a real institution_id, while still sending institution_id', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501, organization_count: 12 }
+        ]
+      });
+
+      const row = component.buildPayload().organizations[0];
+
+      expect(row.organization_count).toBeNull();
+      expect(row.institution_id).toBe(501);
+    });
+
+    it('sends an unknown-path row\'s organization_count verbatim, with institution_id null', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          { ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 12 }
+        ]
+      });
+
+      const row = component.buildPayload().organizations[0];
+
+      expect(row.organization_count).toBe(12);
+      expect(row.institution_id).toBeNull();
+    });
+
+    it('builds both outcomes in one payload: known-path row nulled, unknown-path row verbatim (AC.3)', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501, organization_count: 12 },
+          { ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 7 }
+        ]
+      });
+
+      const [known, unknown] = component.buildPayload().organizations;
+
+      expect(known.organization_count).toBeNull();
+      expect(unknown.organization_count).toBe(7);
     });
   });
 
