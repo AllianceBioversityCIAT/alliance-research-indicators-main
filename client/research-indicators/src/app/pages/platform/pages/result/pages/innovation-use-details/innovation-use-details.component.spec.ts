@@ -2643,7 +2643,11 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
 
   it('stepper unselected digits: text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
     const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
-    const unselected = buttons.filter(b => !(b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    // Filtered on the white fill the unselected branch actually sets, NOT on the absence of the
+    // selected fill: since quick/innovation-use-level-fill the selected button carries
+    // bg-[var(--ac-light-blue-300)], and a negative filter on the old -400 marker would silently
+    // reclassify it as unselected and then assert the wrong text token against it.
+    const unselected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-white-1)]'));
     expect(unselected.length).toBeGreaterThan(0);
     unselected.forEach(b => {
       expect((b.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
@@ -2654,16 +2658,24 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('stepper selected digit fill: text-[var(--ac-white-1)] on the re-derived --ac-light-blue-400 fill (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-level-fill, 2026-09-03) — human-decided.
+  // The selected level's fill was set to --ac-light-blue-300 (#1689ca) on request, reverting R3
+  // remediation F-1 / DD-17 which had re-derived it to --ac-light-blue-400 precisely because
+  // white-on-#1689ca measures 3.84:1. The digit is fs-[16] at normal weight, so it is NOT large
+  // text and 1.4.3 AA wants >= 4.5:1. It does clear 1.4.11 non-text (>= 3:1). Third exception in
+  // this template's family, alongside quick/innovation-use-add-button-style (3.84:1) and
+  // quick/innovation-use-eyebrow-grey (2.91:1). Pinned so a token sweep cannot silently flip it.
+  it('stepper selected digit fill: text-[var(--ac-white-1)] on the --ac-light-blue-300 fill, 3.84:1 accepted', () => {
     const buttons = fixture.debugElement.queryAll(By.css('app-innovation-use-level-stepper button'));
-    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-400)]'));
+    const selected = buttons.filter(b => (b.nativeElement as HTMLElement).className.includes('bg-[var(--ac-light-blue-300)]'));
     expect(selected.length).toBe(1);
     expect((selected[0].nativeElement as HTMLElement).className).toContain('text-[var(--ac-white-1)]');
-    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-300)]');
+    expect((selected[0].nativeElement as HTMLElement).className).not.toContain('bg-[var(--ac-light-blue-400)]');
 
-    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_400);
-    expect(ratio).toBeCloseTo(6.83, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(WHITE_1, LIGHT_BLUE_300);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    expect(ratio).toBeGreaterThanOrEqual(3);
+    expect(ratio).toBeLessThan(4.5);
   });
 
   // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
@@ -2683,9 +2695,11 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  // Still a falsifier for the STEPPER (which keeps --ac-light-blue-400). For the three Add-other
-  // buttons this same 3.84:1 is now the human-accepted exception — see the pinning test above.
-  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (stepper pre-fix token) reports 3.84:1 and fails AA', () => {
+  // Still a falsifier for the stepper's UNSELECTED digit text (which keeps --ac-light-blue-400 on
+  // white). This same 3.84:1 pair is now the human-accepted exception in TWO live roles: the three
+  // Add-other buttons and the stepper's SELECTED fill (white-on-#1689ca) — see the pinning tests
+  // above. Kept because a discriminating falsifier for the -400 roles still has to measure it.
+  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (unselected-digit falsifier) reports 3.84:1 and fails AA', () => {
     const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
     expect(ratio).toBeCloseTo(3.84, 1);
     expect(ratio).toBeLessThan(4.5);
