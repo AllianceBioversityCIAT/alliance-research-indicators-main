@@ -2305,7 +2305,8 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   const GREY_200: Rgb = [232, 235, 237]; // --ac-grey-200
   const WHITE_1: Rgb = [255, 255, 255]; // --ac-white-1
   const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
-  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded (ACTORS/eyebrow pre-fix)
+  const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded for the ACTORS callout body,
+  // but the LIVE token on the ACTOR #/ORGANIZATION # eyebrows since quick/innovation-use-eyebrow-grey (accepted 2.91:1)
   const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
   const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded for the stepper/org-link,
   // but the LIVE token on the three Add-other buttons since quick/innovation-use-add-button-style (accepted 3.84:1)
@@ -2571,28 +2572,38 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-eyebrow-grey, 2026-09-03) — human-decided, emphasized.
+  // The ACTOR # / ORGANIZATION # card eyebrows were realigned to innovation-dev's eyebrow colour
+  // (#8d9299 == --ac-grey-600) for cross-section consistency; the MEASURE # eyebrow in the SHARED
+  // quantification-item already hardcoded #8D9299, so it needed no edit and is not pinned here.
+  // This KNOWINGLY reverts DD-17's eyebrow token: --ac-grey-600 on --ac-grey-100 measures 2.91:1,
+  // which fails WCAG 1.4.3 AA (>= 4.5:1) and also the 3:1 large-text floor — and at 13px this text
+  // is not large. Deeper than the sibling Add-button exception (3.84:1). Pinned so a future token
+  // sweep cannot silently re-break or "re-fix" it without a human reading this comment.
+  it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-600)] on --ac-grey-100, 2.91:1 accepted', () => {
     const eyebrow = fixture.debugElement
       .queryAll(By.css('app-innovation-use-actor-item span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ACTOR #'));
     expect(eyebrow).toBeTruthy();
-    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
   });
 
-  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  it('organization card eyebrow "ORGANIZATION # n": text-[var(--ac-grey-600)] on --ac-grey-100, 2.91:1 accepted', () => {
     const eyebrow = fixture.debugElement
       .queryAll(By.css('app-innovation-use-organization-item span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes('ORGANIZATION #'));
     expect(eyebrow).toBeTruthy();
-    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+    expect((eyebrow!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_600, GREY_100);
+    expect(ratio).toBeCloseTo(2.91, 1);
+    expect(ratio).toBeLessThan(4.5);
   });
 
   it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
@@ -2658,7 +2669,9 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
   // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
   // this block must be able to show — see the reverted-swap check run separately during verification.
-  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS/eyebrow pre-fix token) reports 2.91:1 and fails', () => {
+  // Still a falsifier for the ACTORS CALLOUT BODY (which keeps --ac-grey-800). For the two card
+  // eyebrows this same 2.91:1 is now the human-accepted exception — see the pinning tests above.
+  it('falsifying input: --ac-grey-600 on --ac-grey-100 (ACTORS callout-body pre-fix token) reports 2.91:1 and fails AA', () => {
     const ratio = contrastRatio(GREY_600, GREY_100);
     expect(ratio).toBeCloseTo(2.91, 1);
     expect(ratio).toBeLessThan(4.5);
