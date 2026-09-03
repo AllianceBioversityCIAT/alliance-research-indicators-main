@@ -65,6 +65,9 @@
         [ngModel]="body().institution_id"
         (onChange)="onInstitutionChange($event.value)"
         [options]="institutionsService.list()">
+        <ng-template pTemplate="selectedItem" let-institution>
+          <div class="min-w-0 truncate" [innerHTML]="institution.html_full_name"></div>
+        </ng-template>
         <ng-template pTemplate="item" let-institution>
           <div class="flex items-center whitespace-normal break-words gap-2" [innerHTML]="institution.html_full_name"></div>
         </ng-template>
