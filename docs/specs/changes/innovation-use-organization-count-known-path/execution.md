@@ -253,10 +253,28 @@ Count taken over raw output with no truncation and no error present (K-014). Eve
 
 | Check | Result |
 | --- | --- |
-| `NFR-IUC-001` — cumulative diff `e368686f..HEAD` + working tree | **13 paths, 0 under `server/`**, nothing outside `client/` and `docs/`. First attempt at this check was malformed (a subshell printed the file list into the count); **re-run clean** rather than reported — a count over a broken command is a confident zero (K-014). |
+| `NFR-IUC-001` — cumulative diff `e368686f..HEAD` | **11 paths, 0 under `server/`**, nothing outside `client/` and `docs/`. ⚠️ **CORRECTED 2026-09-03 by `/akili-validate` (F-6): this row first published "13 paths" and no list.** The 13 was inflated by duplicates — the command concatenated the committed range *and* the working-tree diff, counting `design.md` and `tasks.md` twice. The real figure is 11 unique paths, listed in full below. A count without its list makes *absent* and *included* indistinguishable (**K-014**), which is exactly how the wrong number survived; the auditor could reconcile only 7 of the 9 doc paths and flagged it. The **conclusion** (0 under `server/`) was correct throughout. |
 | Full client suite (`npm test -- --silent`) | **317 suites / 6798 tests passed.** 6793 before this spec; **+5** matches the five tests added (2 in T-01, 3 in T-02) exactly. |
 | `D-6` / `NFR-IUC-002` — protected blocks | No `+`/`-` line in the organization-item spec diff touches the `c6` block or the restore test. Both intact. |
 | `AC.4` / row inclusion | Unchanged — `organizationIdentitySatisfied` and the row filter at `:471` are byte-for-byte as before (verified by the T-02 Reviewer at source). |
+
+**The 11 paths in full** (`git diff --name-only e368686f..HEAD | sort -u`):
+
+```
+client/.../innovation-use-details/components/innovation-use-organization-item/innovation-use-organization-item.component.html
+client/.../innovation-use-details/components/innovation-use-organization-item/innovation-use-organization-item.component.spec.ts
+client/.../innovation-use-details/innovation-use-details.component.spec.ts
+client/.../innovation-use-details/innovation-use-details.component.ts
+docs/specs/archive/2026-08-26-innovation-use--details-page/design.md
+docs/specs/archive/2026-08-26-innovation-use--details-page/tasks.md
+docs/specs/changes/innovation-use-organization-count-known-path/design.md
+docs/specs/changes/innovation-use-organization-count-known-path/execution.md
+docs/specs/changes/innovation-use-organization-count-known-path/proposal.md
+docs/specs/changes/innovation-use-organization-count-known-path/requirements.md
+docs/specs/changes/innovation-use-organization-count-known-path/tasks.md
+```
+
+4 client + 7 docs. No `server/` path, nothing outside `client/` and `docs/`.
 
 #### Leader-decided additions after the Reviewer report
 
@@ -284,7 +302,17 @@ User verdict: *"se ve bien"*. This corroborates — from rendered pixels rather 
 
 #### Budget — final
 
-3 tasks · **13 paths** · 1 review round each · **0 rework attempts, 0 HALTs, 0 pivots.** `design.md` §11 predicted 3 tasks / ~90 LOC / 1 review round. **Met exactly.** No tripwire fired.
+3 tasks · **11 paths** · 1 review round each · **0 rework attempts, 0 HALTs, 0 pivots.**
+
+⚠️ **CORRECTED 2026-09-03 by `/akili-validate` (F-5): this row first said "~90 LOC — met exactly", which was asserted, not measured.** Measured now with `git diff --shortstat e368686f..HEAD`:
+
+| Scope | Predicted (`design.md` §11) | Actual |
+| --- | --- | --- |
+| Production | ~13 | **14 insertions / 14 deletions** (2 files) — the block move dominates |
+| Code total (production + tests) | ~78 | **102 insertions / 21 deletions** (4 files) |
+| Docs | ~12 (the archive amendment only) | ~1,116 lines — the spec documents themselves were never budgeted |
+
+**Verdict: production met (14 vs ~13); the test half overshot (~88 vs ~65).** The task count and review-round rows of the budget were met exactly; the LOC row was not, and "met exactly" was the wrong claim for it. No tripwire fired because the overshoot is in test lines, which is where the reversion challenge's two extra findings landed.
 
 
 ---

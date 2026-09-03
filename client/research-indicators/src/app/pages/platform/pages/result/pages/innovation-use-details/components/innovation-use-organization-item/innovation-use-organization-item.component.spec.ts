@@ -192,6 +192,14 @@ describe('InnovationUseOrganizationItemComponent', () => {
       expect(selectByAria('Select the organization type')).toBeTruthy();
       expect(selectByAria('Select the organization')).toBeFalsy();
       expect(fixture.debugElement.query(By.directive(PartnerSelectedItemComponent))).toBeFalsy();
+
+      // R-IUC-001 Sc.2: the moved block must be unchanged on the path that keeps it. `c6` proves
+      // [min]/[maxFractionDigits] behaviourally; these close the rest of the clause — the
+      // placeholder, and the BUT-NOT ("must not become required"). Without them, deleting
+      // placeholder="How many?" or adding [isRequired] from the moved markup would ship green.
+      const countInput = appInputLabelled('Organization count')!;
+      expect(countInput.placeholder).toBe('How many?');
+      expect(countInput.isRequired).toBe(false);
     });
 
     // R-IUC-001 AC.3: the discriminator is is_organization_known ALONE — a ticked box with no
@@ -447,6 +455,14 @@ describe('InnovationUseOrganizationItemComponent', () => {
 
       const specifyOther = specifyOtherInput();
       expect(specifyOther.nativeElement.disabled).toBe(true);
+
+      // Restores the coverage that `execution.md` decision E-1 recorded as lost: removing the
+      // known-path `forEach` left the count field's [disabled] binding asserted nowhere, because
+      // this sibling only ever checked the two selects and Specify-other. The field now lives on
+      // THIS path, so its binding belongs here. Deleting [disabled]="disabled" from the moved
+      // block would otherwise ship green.
+      const countDe = appInputs().find(de => (de.componentInstance as InputComponent).label === 'Organization count')!;
+      expect(inputNumberInside(countDe).disabled).toBe(true);
     });
 
     it('renders the remove affordance and enables controls when not disabled', () => {

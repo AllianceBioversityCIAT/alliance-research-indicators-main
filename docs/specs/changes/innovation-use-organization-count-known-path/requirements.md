@@ -176,12 +176,14 @@ Named per the specify contract: each class this spec can produce, and the comman
 
 ## 8. Requirement ID index
 
+> ⚠️ **CORRECTED 2026-09-03 by `/akili-validate` (finding F-1).** This table previously mapped `NFR-IUC-001` and `NFR-IUC-002` to a **`T-04` that never existed** — the spec has three tasks and `design.md` §11 budgets three — and disagreed with `tasks.md` §4 on `R-IUC-001`. `tasks.md` §4 is the authoritative closure table; this index now agrees with it.
+
 | ID | Title | Tasks |
 | --- | --- | --- |
-| `R-IUC-001` | The count field renders only when the organization is not known | T-01, T-03 |
-| `R-IUC-002` | A known-path row persists no organization count | T-02, T-03 |
-| `NFR-IUC-001` | The server tier is untouched | T-04 |
-| `NFR-IUC-002` | Numeric hygiene survives on the surviving surface | T-03, T-04 |
+| `R-IUC-001` | The count field renders only when the organization is not known | T-01 |
+| `R-IUC-002` | A known-path row persists no organization count | T-02 (`AC.4` → T-03) |
+| `NFR-IUC-001` | The server tier is untouched | T-03 |
+| `NFR-IUC-002` | Numeric hygiene survives on the surviving surface | T-03 |
 
 ---
 
