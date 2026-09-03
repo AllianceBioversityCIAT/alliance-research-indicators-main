@@ -2307,7 +2307,8 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
   const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded (ACTORS/eyebrow pre-fix)
   const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
-  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded (Add-button/stepper/org-link pre-fix)
+  const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded for the stepper/org-link,
+  // but the LIVE token on the three Add-other buttons since quick/innovation-use-add-button-style (accepted 3.84:1)
   const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
   const LIGHT_BLUE_500: Rgb = [7, 75, 134]; // --ac-light-blue-500 — the grey-200-surface token
 
@@ -2544,17 +2545,30 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('Add-other buttons (actor/organization/measure): text-[var(--ac-light-blue-400)] on --ac-white-1 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-add-button-style, 2026-09-03) — human-decided.
+  // These three buttons were realigned to innovation-dev's visual treatment (border, text and
+  // 7px radius all on --ac-light-blue-300 / #1689ca) for cross-section consistency. That KNOWINGLY
+  // reverts DD-17's text-token choice for this role: #1689ca on --ac-white-1 measures 3.84:1,
+  // which clears WCAG 1.4.11 non-text (>= 3:1, the border) but NOT 1.4.3 AA for the 15px label
+  // (>= 4.5:1). The four prose links in this template keep --ac-light-blue-400 and are unaffected.
+  // This test now PINS the exception so a future token sweep cannot silently re-break or
+  // "re-fix" it without a human reading this comment.
+  it('Add-other buttons (actor/organization/measure): text+border --ac-light-blue-300 on --ac-white-1, 3.84:1 accepted', () => {
     ['Add other actor', 'Add other organization', 'Add other measure'].forEach(label => {
       const btn = fixture.debugElement.queryAll(By.css('button')).find(b => (b.nativeElement as HTMLElement).textContent?.includes(label));
       expect(btn).toBeTruthy();
-      expect((btn!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-light-blue-400)]');
-      expect((btn!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-light-blue-300)]');
+      const className = (btn!.nativeElement as HTMLElement).className;
+      expect(className).toContain('text-[var(--ac-light-blue-300)]');
+      expect(className).toContain('border-[var(--ac-light-blue-300)]');
+      expect(className).toContain('rounded-[7px]');
+      expect(className).not.toContain('text-[var(--ac-light-blue-400)]');
     });
 
-    const ratio = contrastRatio(LIGHT_BLUE_400, WHITE_1);
-    expect(ratio).toBeCloseTo(6.83, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
+    expect(ratio).toBeCloseTo(3.84, 1);
+    // Clears non-text contrast (the 2px border), documented as short of AA for the label.
+    expect(ratio).toBeGreaterThanOrEqual(3);
+    expect(ratio).toBeLessThan(4.5);
   });
 
   it('actor card eyebrow "ACTOR # n": text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
@@ -2656,7 +2670,9 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (Add-button/stepper pre-fix token) reports 3.84:1 and fails', () => {
+  // Still a falsifier for the STEPPER (which keeps --ac-light-blue-400). For the three Add-other
+  // buttons this same 3.84:1 is now the human-accepted exception — see the pinning test above.
+  it('falsifying input: --ac-light-blue-300 on --ac-white-1 (stepper pre-fix token) reports 3.84:1 and fails AA', () => {
     const ratio = contrastRatio(LIGHT_BLUE_300, WHITE_1);
     expect(ratio).toBeCloseTo(3.84, 1);
     expect(ratio).toBeLessThan(4.5);
