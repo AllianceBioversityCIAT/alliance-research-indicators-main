@@ -109,7 +109,10 @@ export class ResultAiAssistantComponent {
       
       // Load contracts with filter when modal is open and step is 1 (this component)
       if (isOpen && step === 1 && this.lastStep !== 1) {
-        void this.getContractsService.mainForAiAssistant();
+        // Fill the field first, request second: gating the carried project on the contracts
+        // response left the select visibly empty for as long as that round trip took.
+        this.applyCarriedContractId();
+        void this.getContractsService.mainForAiAssistant().then(() => this.clearContractIdIfNotSelectable());
       }
       
       this.lastStep = step;
@@ -120,6 +123,48 @@ export class ResultAiAssistantComponent {
   onContractIdChange(newContractId: string | null) {
     this.contractId = newContractId;
     this.body.update(b => ({ ...b, contract_id: newContractId }));
+    // Keep the carried value in step with the field, so going Back to the create-result
+    // form restores what is selected here rather than what arrived from there.
+    this.createResultManagementService.setCarriedContractId(newContractId);
+  }
+
+  /**
+   * Re-selects the Reporting Project chosen on the create-result form, synchronously, so the
+   * field is already filled when this step paints. Whether that project is actually offered
+   * here is settled afterwards by `clearContractIdIfNotSelectable`.
+   */
+  private applyCarriedContractId(): void {
+    const carriedContractId = this.createResultManagementService.carriedContractId();
+    if (!carriedContractId || this.body().contract_id) {
+      return;
+    }
+
+    this.contractId = carriedContractId;
+    this.body.update(b => ({ ...b, contract_id: carriedContractId }));
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Drops the selected project once the options are known and it is not among them.
+   *
+   * This step loads contracts with `exclude-pooled-funding`, so a pooled-funded project —
+   * selectable on the create-result form for OICRs — is not reportable here; leaving it in
+   * place would enable "Analyze file" for a project this step cannot accept. An empty list
+   * means the request returned nothing, which is not evidence of exclusion.
+   */
+  private clearContractIdIfNotSelectable(): void {
+    const selectedContractId = this.body().contract_id;
+    const options = this.getContractsService.aiAssistantList();
+    if (!selectedContractId || options.length === 0) {
+      return;
+    }
+    if (options.some(contract => String(contract.agreement_id) === String(selectedContractId))) {
+      return;
+    }
+
+    this.contractId = null;
+    this.body.update(b => ({ ...b, contract_id: null }));
+    this.cdr.markForCheck();
   }
 
   goBack() {
