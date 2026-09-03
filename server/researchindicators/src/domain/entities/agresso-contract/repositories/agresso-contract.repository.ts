@@ -310,11 +310,11 @@ export class AgressoContractRepository
 
   /**
    * Distinct active results per contract; used for contract-level count_results and count-results sort.
+   * @akili-spec docs/specs/bugfix/my-projects-result-count-scope
+   * Contract-wide by construction: this helper takes no `user` parameter, so the count
+   * cannot depend on the requesting user (R-MPC-001). Row visibility is handled elsewhere.
    */
-  private buildContractTotalResultsCountSql(user?: User): string {
-    const userFilter = user?.sec_user_id
-      ? `AND r_ord.created_by = ${user.sec_user_id}`
-      : '';
+  private buildContractTotalResultsCountSql(): string {
     return `(SELECT COUNT(DISTINCT r_ord.result_id)
         FROM results r_ord
         INNER JOIN result_contracts rc_ord ON rc_ord.result_id = r_ord.result_id
@@ -323,7 +323,7 @@ export class AgressoContractRepository
           AND r_ord.is_snapshot = FALSE
           AND rc_ord.is_active = 1
           AND rc_ord.is_primary = TRUE
-          ${userFilter})`;
+          )`;
   }
 
   orderBy(field: string, direction: 'ASC' | 'DESC' = 'ASC'): string {
@@ -399,7 +399,7 @@ export class AgressoContractRepository
 
     const dateFilterClause = this.buildDateFilterClause(filter);
     const indicators = await this.dataSource.getRepository(Indicator).find();
-    const contractTotalResultsSelectSql = `, (${this.buildContractTotalResultsCountSql(user)}) AS contract_total_results`;
+    const contractTotalResultsSelectSql = `, (${this.buildContractTotalResultsCountSql()}) AS contract_total_results`;
 
     const operationOrder = isEmpty(orderFields)
       ? `FIELD(ifnull(ac.contract_status, 'non'), 'ongoing', 'completed', 'suspended', 'discontinued', 'non')`
@@ -411,6 +411,19 @@ export class AgressoContractRepository
       pagination.page =
         pagination.page < 1 || isEmpty(pagination.page) ? 1 : pagination.page;
       offset = (pagination.page - 1) * pagination.limit;
+    }
+
+    const queryUserCarnet = `SELECT aus.carnet 
+                              from sec_users su 
+                              inner join alliance_user_staff aus on LOWER(TRIM(aus.email)) = LOWER(TRIM(su.email)) 
+                              where su.sec_user_id = ${user?.sec_user_id}
+                              limit 1`;
+
+    let userCarnet = null;
+    if (user?.sec_user_id) {
+      userCarnet = await this.query(queryUserCarnet).then(
+        (response) => response[0]?.carnet || null,
+      );
     }
 
     const userContracts = (userId?: number) =>
@@ -433,7 +446,7 @@ export class AgressoContractRepository
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(user?.sec_user_id)}
     WHERE 1=1
-    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
+    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
     ${validFilter(queryConditions, `AND (${queryConditions})`)}
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
@@ -458,6 +471,9 @@ export class AgressoContractRepository
       };
     }
 
+    // @akili-spec docs/specs/bugfix/my-projects-result-count-scope
+    // The `result_counts` LEFT JOIN below carries no requester-scoping predicate (R-MPC-003),
+    // so the per-indicator breakdown stays consistent with `contract_total_results`.
     const newQuery = `
     SELECT 
         paginated_contracts.agreement_id,
@@ -513,7 +529,7 @@ export class AgressoContractRepository
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
         ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL` : ''}
-        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR (ac.project_lead_description like '%${user.first_name}%' AND ac.project_lead_description like '%${user.last_name}%'))` : ''}
+        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}
@@ -537,7 +553,6 @@ export class AgressoContractRepository
           AND r.is_snapshot = FALSE 
           AND rc.is_active = 1
           AND rc.is_primary = TRUE
-          ${user?.sec_user_id ? `AND r.created_by = ${user?.sec_user_id}` : ''}
         GROUP BY rc.contract_id, r.indicator_id
         HAVING COUNT(r.result_id) > 0 
     ) result_counts ON result_counts.contract_id = paginated_contracts.agreement_id;
