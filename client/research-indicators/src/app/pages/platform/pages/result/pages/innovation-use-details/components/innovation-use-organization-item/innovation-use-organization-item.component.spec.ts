@@ -180,8 +180,9 @@ describe('InnovationUseOrganizationItemComponent', () => {
       expect(selectByAria('Select the organization type')).toBeFalsy();
       expect(selectByAria('Select the organization sub-type')).toBeFalsy();
       expect(specifyOtherInput()).toBeFalsy();
-      // §5.5 / Fix 3 (Lens B issue 2): organization_count renders on BOTH identity paths.
-      expect(appInputLabelled('Organization count')).toBeTruthy();
+      // R-IUC-001 (docs/specs/changes/innovation-use-organization-count-known-path): the count
+      // field belongs to the unknown-organization path only — it must NOT render here.
+      expect(appInputLabelled('Organization count')).toBeFalsy();
     });
 
     it('unknown path renders the organization-type select and no known-path controls', () => {
@@ -191,6 +192,34 @@ describe('InnovationUseOrganizationItemComponent', () => {
       expect(selectByAria('Select the organization type')).toBeTruthy();
       expect(selectByAria('Select the organization')).toBeFalsy();
       expect(fixture.debugElement.query(By.directive(PartnerSelectedItemComponent))).toBeFalsy();
+    });
+
+    // R-IUC-001 AC.3: the discriminator is is_organization_known ALONE — a ticked box with no
+    // institution chosen yet is still the known path, so the count field stays hidden.
+    it('known path with institution_id still unset also hides the count field', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: undefined };
+      fixture.detectChanges();
+
+      expect(appInputLabelled('Organization count')).toBeFalsy();
+    });
+  });
+
+  // R-IUC-001 scenario 3 / D-5 / KZ-015: visibility must be verified as a TRANSITION on an
+  // already-rendered fixture, never by re-instantiating the fixture in the end state.
+  describe('R-IUC-001 Sc.3 — the count field tracks a live toggle of the checkbox', () => {
+    it('toggling "Is the organization known?" on a rendered fixture hides then restores the count field', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      expect(appInputLabelled('Organization count')).toBeTruthy();
+
+      component.onKnownToggle(true);
+      fixture.detectChanges();
+      expect(appInputLabelled('Organization count')).toBeFalsy();
+
+      component.onKnownToggle(false);
+      fixture.detectChanges();
+      expect(appInputLabelled('Organization count')).toBeTruthy();
     });
   });
 
@@ -363,7 +392,7 @@ describe('InnovationUseOrganizationItemComponent', () => {
 
   // c8 — disabled hides add/remove and makes every control non-interactive.
   describe('c8 — disabled hides remove and disables every control', () => {
-    it('known path: hides remove, disables checkbox, organization select, count and the request-partner button', async () => {
+    it('known path: hides remove, disables checkbox, organization select and the request-partner button', async () => {
       component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
       component.disabled = true;
       fixture.detectChanges();
@@ -378,11 +407,10 @@ describe('InnovationUseOrganizationItemComponent', () => {
       const selectDe = selectByAria('Select the organization')!;
       expect((selectDe.componentInstance as Select).disabled).toBe(true);
 
+      // R-IUC-001: the count field belongs to the unknown-organization path only, so it must be
+      // absent here — not merely disabled.
       const inputs = appInputs();
-      // Fix 3 (Lens B issue 2): length-guard so this assertion cannot pass vacuously on an
-      // empty list — it must actually find the count field and check it.
-      expect(inputs.length).toBe(1);
-      inputs.forEach(de => expect(inputNumberInside(de).disabled).toBe(true));
+      expect(inputs.length).toBe(0);
 
       const buttons = fixture.debugElement.queryAll(By.css('button'));
       const requestButton = buttons.find(b => (b.nativeElement.textContent || '').includes('here'));
