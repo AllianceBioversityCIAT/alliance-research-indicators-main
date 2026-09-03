@@ -144,16 +144,16 @@ No cycles.
   - Pass no `EntityManager` (DD-8): the step runs in its own transaction like every other write in `formalizeResult`.
   - Leave `saveAlignment` / `findAlignment` untouched — the `PATCH`/`GET` path keeps request-based resolution.
 - **Acceptance / done check:**
-  - [ ] Called with portfolio 2, it invokes the portfolio-2 handler's narrow save; with portfolio 1, the portfolio-1 handler's.
-  - [ ] With `PortfolioUtil` and `ResultsUtil` doubles whose getters **throw**, the method still completes — proving no request-scoped read.
-  - [ ] An unregistered portfolio id surfaces the registry's existing `NotFoundException` rather than a new error type.
-  - [ ] `saveAlignment` and `findAlignment` specs pass unmodified.
+  - [x] Called with portfolio 2, it invokes the portfolio-2 handler's narrow save; with portfolio 1, the portfolio-1 handler's.
+  - [x] With `PortfolioUtil` and `ResultsUtil` doubles whose getters **throw**, the method still completes — proving no request-scoped read.
+  - [x] An unregistered portfolio id surfaces the registry's existing `NotFoundException` rather than a new error type.
+  - [x] `saveAlignment` and `findAlignment` specs pass unmodified.
 - **Tests:** `result-section-orchestrator.service.spec.ts` — new describe block.
 - **Verification:** `npm test -- --silent src/domain/entities/results/portfolio-handlers/application`
 - **Falsifying input:** doubles for `PortfolioUtil`/`ResultsUtil` whose getters throw. An implementation that reuses `resolvePortfolioId()` or spreads `this.resultsUtil.result` FAILs immediately — this is the check that makes DD-3 enforceable rather than aspirational.
 - **Disqualifies:** doubles that return `{}` instead of throwing. A permissive double lets a request-scoped read pass unnoticed, which is precisely the defect this task guards, and the suite would certify its absence while it is present.
 - **Skills:** `nestjs-expert`
-- **Effort:** S · **Status:** todo
+- **Effort:** S · **Status:** done
 
 ---
 

@@ -339,3 +339,110 @@ These are recorded here because a forward pointer is carried by the brief that c
 ### Recommended resume path
 
 `/akili-resume`, or `/akili-execute results/ai-formalize-strategic-objectives` — the latter rebuilds state from this log and selects T-04 automatically.
+
+---
+
+## Session Resume — 2026-09-03
+
+Resumed via `/akili-execute results/ai-formalize-strategic-objectives`. State rebuilt from this log: T-01…T-03 `[x]`, working tree clean at `2a9a1f70`, no delegation outstanding. Selected **T-04** as next eligible. Approval mode `gated` — unchanged.
+
+---
+
+### T-04 — Add the explicit-portfolio entry point to the orchestrator
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** on attempt 1 of 3 |
+| **Date** | 2026-09-03 |
+| **Requirements covered** | R-RES-008 (scenario 2 clause: no inherited portfolio state), R-RES-003 (delegation path); DD-3, DD-8 |
+| **Implementer attempts** | 1 |
+| **Model routing** | Implementer T2 (`sonnet`, effort `medium`) · Reviewer T3 (`opus`, Lens-checklist mode) — `author ≠ auditor` held on both axes |
+| **Skills assigned** | `nestjs-expert` (as recommended by the task) **+ `tdd` — Leader deviation.** T-04 adds two lines of production logic; its entire value is a test that can go red on a request-scoped read. `tdd` was added so the falsifier probe was authored as a first-class obligation rather than an afterthought. Recorded per the Delegation Discipline rule that deviations from the `## Skill Map` defaults are logged |
+
+#### Attempt 1
+
+**Files changed**
+
+| File | Kind | LOC |
+| --- | --- | --- |
+| `src/domain/entities/results/portfolio-handlers/application/result-section-orchestrator.service.ts` | production | **+23** (1 import + the method with its DD-3/DD-8 doc comment) |
+| `.../application/result-section-orchestrator.service.spec.ts` | test | **+137** (1 import + one new `describe` block, 4 tests) |
+| | **total** | **+160** |
+
+Only the two files the task authorized. `resolvePortfolioId`, `buildContext`, `findAlignment` and `saveAlignment` are byte-identical — the Reviewer confirmed this from the hunk headers (`@@ -148,4 +149,139 @@` is a pure append; nothing touches lines 10–148 where the seven pre-existing tests live).
+
+**What was implemented**
+
+```ts
+async saveStrategicObjectivesForPortfolio(
+  resultId: number,
+  portfolioId: PortfolioIdEnum,
+  ids: number[],
+): Promise<StrategicObjectivesSaveReport> {
+  const handler = this.alignmentRegistry.get(portfolioId);
+  return handler.saveStrategicObjectives(resultId, ids);
+}
+```
+
+Two lines, and that is the point: under T-03's frozen handler signature there is no `PortfolioHandlerContext` to build, so DD-3 and DD-8 hold **by construction** rather than by discipline — there is nothing to tempt a `{ ...this.resultsUtil.result }` spread and no `EntityManager` parameter to thread. The `design.md` §2.1 orchestrator signature is unchanged.
+
+**Verification**
+
+`npm test -- --silent src/domain/entities/results/portfolio-handlers/application` from `server/researchindicators`:
+
+```
+PASS src/domain/entities/results/portfolio-handlers/application/result-section-orchestrator.service.spec.ts
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+```
+
+**Falsifier probe — red confirmed.** A temporary `const FALSIFIER_PROBE = this.resultsUtil.result;` at the top of the method took the suite from 11 passed to **4 failed / 7 passed**, then was reverted. The arithmetic is itself corroborating evidence: 4 failed is exactly the four new tests — including the `NotFoundException` test, which flips to `BadRequestException` because the injected read happens before the registry lookup — and 7 passed is exactly the untouched pre-existing set, which re-confirms acceptance item 4 held *during* the probe.
+
+**Reviewer verdict — `STATUS: PASS`**
+
+> The explicit-portfolio entry point conforms to DD-3 and DD-8 exactly — no request-scoped read, no `EntityManager`, no transaction wrapper — and the four new tests are a real falsifier, not a certifying one: the registry double faithfully mirrors the real `NotFoundException`, and the two handler doubles are distinguishable so a hardcoded portfolio cannot pass. `saveAlignment` / `findAlignment` are byte-identical.
+
+The Reviewer verified the two double-fidelity questions **at the source** rather than accepting the diff's own comments:
+
+- **The registry double is not tautological.** `AbstractSectionHandlerRegistry.get` genuinely throws `NotFoundException(\`No handler registered for portfolio ${portfolioId} in ${this.constructor.name}\`)`, and the double reproduces both the type and the message shape — hardcoding `AlignmentHandlerRegistry`, which is what `this.constructor.name` actually yields for that subclass. `999` is genuinely unregistered, since the registry maps only `PORTFOLIO_1` / `PORTFOLIO_2`. The test's real content is that the orchestrator neither catches, wraps, nor substitutes a fallback — and the diff contains no `try` and no fallback.
+- **The throwing getters match production exactly** — `BadRequestException('Portfolio not found')` (`portfolio.util.ts:85-89`) and `BadRequestException('Result not found')` (`results.util.ts:81-84`). KZ-001 satisfied: the doubles evaluate what they stand in for.
+- **KZ-004 satisfied** — two distinguishable jest mocks returning *different* reports, plus mutual `not.toHaveBeenCalled()` assertions, so a hardcoded or constant-portfolio implementation cannot pass either delegation test.
+
+**Acceptance / done check — all four closed**
+
+| # | Item | Evidence |
+| --- | --- | --- |
+| 1 | Portfolio 2 → portfolio-2 handler; portfolio 1 → portfolio-1 handler | Two tests, distinguishable mocks + reports, mutual `not.toHaveBeenCalled()` |
+| 2 | Completes with throwing `PortfolioUtil` / `ResultsUtil` getters | Test 3; falsifier probe proved it goes red on a `resultsUtil.result` read |
+| 3 | Unregistered id surfaces the registry's existing `NotFoundException` | Test 4; Reviewer verified the real registry throw at source |
+| 4 | `saveAlignment` / `findAlignment` specs pass unmodified | Hunk headers show a pure append; 7 pre-existing tests green, including during the probe |
+
+**Coverage of DD-3's forbidden surface (Reviewer's analysis).** DD-3 names three things the method must not do, and all three are armed — though by two mechanisms: `.portfolio` and `.result` by throwing getters, and `resolvePortfolioId()` *indirectly*, because it reads `portfolioUtil.nullPortfolioId` (plain `undefined` on the double → falsy → the orchestrator's own `BadRequestException`). The third arm is therefore live but coupled to the production guard's internals rather than to the double. See the first advisory.
+
+**Decisions made**
+
+- **`tdd` added to the assigned skills** (deviation, justified above).
+- **No `@akili-spec` marker added.** Step 3.4 asks for spec references in *critical or complex* additions; a two-line delegation whose doc comment already cites DD-3, DD-8 and R-RES-008 by name is neither, and the surrounding file uses prose doc comments as its idiom. Consistent with T-01…T-03.
+- **The Reviewer's advisories were recorded, not acted on** — see the rule below.
+
+**Issues encountered** — none. No rework, no ambiguity escalation, no environment blocker. The task needed no running stack.
+
+#### ADVISORY (4R lens) — recorded, non-gating
+
+Per the Advisory Never Gates / Advisory Never Becomes A Task rules, none of these consumed an attempt, none widened T-04, and none may mint a new task in this spec.
+
+| Lens | Finding |
+| --- | --- |
+| **RELIABILITY** | `nullPortfolioId` is left permissive (`undefined`) on the `PortfolioUtil` double, so the `resolvePortfolioId()` arm of the falsifier fires only because `resolvePortfolioId` itself converts falsy to a throw. It works today, but it is the one arm coupled to production-guard internals rather than to the double. Arming `nullPortfolioId` as a throwing getter would make that arm self-sufficient, using the same one-line idiom already present for `.portfolio` |
+| **RISK** | The doubles arm only `.portfolio` / `.result`. The real utils have five more throwing getters (`portfolioId`, `portfolioName`, `portfolioDescription`, `resultId`, `resultCode`); a bare read of one would pass this suite silently. Outside DD-3's named scope, so not a conformance gap — but this block is not a *general* DD-3 gate, only a gate on the three surfaces DD-3 names |
+| **RISK** | Test 4 asserts the exception type only, not the message. A hand-rolled `NotFoundException` thrown by the orchestrator would satisfy it. No such throw exists in the diff, and the acceptance item's own wording is "error type", so this is literal-AC-compliant |
+| **RESILIENCE** | Because the registry is doubled, this suite cannot notice if the real `AbstractSectionHandlerRegistry.get` ever stops throwing. DC-6 already mandates a full-suite run for the shared alignment chain — that is where this closes, not here |
+| **READABILITY** | The new block uses `{} as PortfolioUtil` + `Object.defineProperty`, while the existing block uses `as unknown as PortfolioUtil` on an object literal. Cosmetic; the KZ-001 comment already explains the intent |
+
+**Explicitly not carried forward as an obligation.** The second RISK advisory reads as a conditional caution ("*if* T-05 or later widens what the orchestrator may touch"). It is **not** injected into T-05's brief: T-05 does not widen the orchestrator's surface, and turning an advisory into a downstream acceptance item is exactly the scope growth the Advisory Never Becomes A Task rule forbids. Recorded here and it dies here.
+
+**Budget.** +160 LOC (23 prod / 137 test) against the re-baselined ~1,440 total; cumulative production LOC now ~202 of ~310. Review rounds consumed: still 1 per task, 0 rework. The armed tripwire thresholds — T-05 above ~350 total, T-06 above ~240, or a fifth review round — are untouched. **The ~3:1 test-to-production ratio the re-baseline established held again here (137:23 ≈ 6:1 on a task that is almost entirely test), consistent with the corrected basis rather than with the superseded one.**
+
+**Constitution impact** — none. No module created, no boundary moved, no public surface change beyond one method on an existing internal service. No child-guide or `## Module Guides` update needed.
