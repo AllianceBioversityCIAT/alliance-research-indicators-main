@@ -653,20 +653,14 @@ describe('ProjectDashboardComponent', () => {
       expect(contacts.layout).toBe('rows-stacked-lever');
       expect(contacts.itemHeightPx).toBe(43);
       expect(contacts.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
-
-      const contributors = getCardByTitle('Contributing projects');
-      expect(contributors.items).toEqual(component.contributorItems());
-      expect(contributors.layout).toBe('rows-stacked-lever');
-      expect(contributors.itemHeightPx).toBe(43);
-      expect(contributors.visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
     });
 
-    it('should render the four renamed chart titles exactly as specified by R-PDB-007', async () => {
+    it('should render the three renamed chart titles exactly as specified by R-PDB-007', async () => {
       await setup();
 
       const titles = getCardDebugElements().map(element => (element.componentInstance as ProjectDashboardCardStubComponent).title);
 
-      expect(titles).toEqual(['Results Partners', 'Primary Levers', 'Main contact person', 'Contributing projects']);
+      expect(titles).toEqual(['Results Partners', 'Main contact person', 'Primary Levers']);
       for (const title of titles) {
         expect(title.startsWith('Top ')).toBe(false);
       }
@@ -695,10 +689,9 @@ describe('ProjectDashboardComponent', () => {
       expect(afterExpand.has('partners')).toBe(true);
       expect(getCardByTitle('Results Partners').visibleLimit).toBeNull();
 
-      // AC.4: expanding one card leaves the other three collapsed.
+      // AC.4: expanding one card leaves the other two collapsed.
       expect(getCardByTitle('Primary Levers').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
       expect(getCardByTitle('Main contact person').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
-      expect(getCardByTitle('Contributing projects').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
 
       const beforeCollapse = component.expanded();
       getCardByTitle('Results Partners').expandToggled.emit();
@@ -716,10 +709,10 @@ describe('ProjectDashboardComponent', () => {
       fixture.detectChanges();
 
       getCardByTitle('Results Partners').expandToggled.emit();
-      getCardByTitle('Contributing projects').expandToggled.emit();
+      getCardByTitle('Main contact person').expandToggled.emit();
       fixture.detectChanges();
 
-      expect(component.expanded()).toEqual(new Set(['partners', 'contributors']));
+      expect(component.expanded()).toEqual(new Set(['partners', 'contacts']));
 
       // Drive the mock through the real retry transitions
       // (get-full-contract-reports.service.ts:39-65): a transient failure
@@ -742,11 +735,10 @@ describe('ProjectDashboardComponent', () => {
       reportsMock.payload.set(mockContractFullReports());
       fixture.detectChanges();
 
-      expect(component.expanded()).toEqual(new Set(['partners', 'contributors']));
+      expect(component.expanded()).toEqual(new Set(['partners', 'contacts']));
       expect(getCardByTitle('Results Partners').visibleLimit).toBeNull();
-      expect(getCardByTitle('Contributing projects').visibleLimit).toBeNull();
+      expect(getCardByTitle('Main contact person').visibleLimit).toBeNull();
       expect(getCardByTitle('Primary Levers').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
-      expect(getCardByTitle('Main contact person').visibleLimit).toBe(COLLAPSED_ITEM_LIMIT);
     });
 
     it('should derive every ranked id from a payload identifier and keep homonymous contacts distinct with no track collision (R-PDB-005)', async () => {
@@ -1071,19 +1063,18 @@ describe('ProjectDashboardComponent', () => {
    * `(expandToggled)` from Primary Levers / Main contact person, or `(retry)`
    * from Primary Levers, left the whole suite green. The existing seam test
    * only ever toggles "Results Partners", so it structurally cannot catch a
-   * dead binding on any of the other three cards. These loops close that gap
+   * dead binding on any of the other cards. These loops close that gap
    * per-card rather than per-mechanism.
    */
   describe('per-card output-binding coverage (A-07.6)', () => {
     const CARDS: ReadonlyArray<{ title: string; key: ChartKey }> = [
       { title: 'Results Partners', key: 'partners' },
       { title: 'Primary Levers', key: 'levers' },
-      { title: 'Main contact person', key: 'contacts' },
-      { title: 'Contributing projects', key: 'contributors' }
+      { title: 'Main contact person', key: 'contacts' }
     ];
 
     for (const { title, key } of CARDS) {
-      it(`should flip only the "${key}" chart key when "${title}" emits expandToggled, leaving the other three collapsed`, async () => {
+      it(`should flip only the "${key}" chart key when "${title}" emits expandToggled, leaving the other charts collapsed`, async () => {
         await setup();
 
         getCardByTitle(title).expandToggled.emit();
@@ -1098,14 +1089,14 @@ describe('ProjectDashboardComponent', () => {
       });
     }
 
-    it('should call reports.update() once per card when each of the four cards emits retry, reaching a call count of 4', async () => {
+    it('should call reports.update() once per card when each card emits retry, reaching a call count of CARDS.length', async () => {
       await setup();
 
       for (const { title } of CARDS) {
         getCardByTitle(title).retry.emit();
       }
 
-      expect(reportsMock.update).toHaveBeenCalledTimes(4);
+      expect(reportsMock.update).toHaveBeenCalledTimes(CARDS.length);
     });
   });
 

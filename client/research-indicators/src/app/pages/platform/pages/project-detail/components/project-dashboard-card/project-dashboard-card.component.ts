@@ -58,6 +58,7 @@ export class ProjectDashboardCardComponent {
   readonly errorMessage = input('We could not load this data. Please try again.');
   readonly emptyMessage = input('No data available for this project yet.');
   readonly iconClass = input('pi pi-chart-bar');
+  readonly notice = input('');
   readonly retry = output<void>();
   /** Emitted when the (T-03) toggle is activated. The card holds no expansion state itself (DD-1r). */
   readonly expandToggled = output<void>();
