@@ -18,7 +18,10 @@
            showJustification() or isEditableStatus() (AC.5). Mirrors the ACTORS callout's bg-/border-l-/
            rs-p-* shape (design.md §5.8) but NOT its color: --ac-grey-600 measures 2.91:1 and fails AA.
            DD-17: body --ac-grey-800 (7.44:1), link --ac-light-blue-400 (6.35:1) on --ac-grey-100. -->
-      <div data-testid="use-level-guidance" class="bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
+      <div
+        data-testid="use-level-guidance"
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
+        <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
         <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
           <li class="fs-[14] text-[var(--ac-grey-800)]">
             In case the innovation use level differs across countries or regions, we advise to assign the highest current
@@ -65,22 +68,27 @@
            level and in a non-editable status. "Click here to go there" is a <button>, never a
            document href (R-IUP-021 scenario) — it calls goToEvidence(), which issues a
            Router.navigate carrying `version`/`from` forward (DD-16). -->
-      <div data-testid="evidence-callout" class="bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[16] rs-mb-[16]">
-        <p class="fs-[14] text-[var(--ac-grey-800)] rs-mb-[12]"
-          >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
-          necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
-          section of the form (<button
-            type="button"
-            class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
-            (click)="goToEvidence()"
-            >Click here to go there</button
-          >)</p
-        >
-        <p class="fs-[14] text-[var(--ac-grey-800)]"
-          >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data
-          paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication
-          materials that provide evidence of the current development/ maturity stage of the innovation.</p
-        >
+      <div
+        data-testid="evidence-callout"
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
+        <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
+        <div class="flex flex-col">
+          <p class="fs-[14] text-[var(--ac-grey-800)] rs-mb-[12]"
+            >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
+            necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
+            section of the form (<button
+              type="button"
+              class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
+              (click)="goToEvidence()"
+              >Click here to go there</button
+            >)</p
+          >
+          <p class="fs-[14] text-[var(--ac-grey-800)]"
+            >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data
+            paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication
+            materials that provide evidence of the current development/ maturity stage of the innovation.</p
+          >
+        </div>
       </div>
 
       @if (showJustification()) {
@@ -124,8 +132,8 @@
     <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
       <h2 class="section-title">ACTORS</h2>
 
-      <div class="flex items-start rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-300)] rs-p-[12] rs-mb-[16]">
-        <i class="material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-300)]">info</i>
+      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
+        <i class="shrink-0 material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-500)]">info</i>
         <div class="flex flex-col rs-gap-[4]">
           <span class="fs-[14] text-[var(--ac-grey-800)]">List every actor group using this innovation.</span>
           <!-- Youth guidance: the sex/age disaggregation fields below split each actor group into
