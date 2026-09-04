@@ -764,6 +764,8 @@ This lens was spawned for one question, raised by the Tester's own `Not Done` di
 
 `tasks.md` §4 assigns R-RES-007 scenario 1's and R-RES-003's `BUT NOT … levers / lever outcomes / lever sdg targets / impact outcomes` clauses to T-06, and the diff models only `result_contracts` and `result_sdgs`. **Lens B judged this correct rather than incomplete:** `formalizeResult` never writes lever or impact-outcome rows, so no such row exists at the alignment step, and a fixture row for one would model unreachable state. **The modeled surface equals the reachable surface.** Recorded explicitly per Lens B's request.
 
+> **Appended 2026-09-04 (cross-spec, DC-8 — `docs/specs/results/ai-formalize-primary-levers` T-07). Not an edit to the paragraph above; a dated note appended beside it, per this log's append-only rule.** The premise "`formalizeResult` never writes lever or impact-outcome rows, so no such row exists at the alignment step" is **superseded**: the sibling spec's T-05 now writes `result_levers` rows for the same `formalizeResult` call, via `primary_levers`, through an independent narrow save that does not route through this spec's section-wide save and does not participate in this requirement's reconciliation. This does **not** reopen T-06 or invalidate its PASS — Lens B's conclusion here was scoped to what `formalizeResult` wrote **at the time T-06 ran**, and the modeled surface (`result_contracts`, `result_sdgs`) still equals the reachable surface **for this spec's own write**. `result_levers` inertness toward the sibling field's own write is now `[PL] R-RES-007`'s guarantee, proven in that spec's T-03/T-06, not this one's. See `requirements.md` R-RES-007's amended scenario clause and AC.1.
+
 #### ADVISORY (both lenses) — recorded, non-gating, **not convertible into tasks**
 
 Nine findings. None acted on — the no-widening rule, plus the same reason as T-05: the diff has been audited, and editing it post-PASS invalidates the reviewed artifact.
@@ -1001,3 +1003,42 @@ The example payload materially advances the open question, but **does not close 
 | `"primary_levers": [11, 12]` | Numeric ids, same shape |
 
 **Q-2 stays OPEN.** T-07's `Disqualifies` clause forbids closing it on a payload that may be hand-written, and the Leader asked the owner for provenance without an answer yet. Even if captured, the *"run it against Dev and inspect the rows and `missing_fields`"* half remains outstanding. **Recorded as partial evidence only, never as closure.**
+
+---
+
+## Amendment Landed — 2026-09-04 (appended by the sibling spec's T-07; does not modify any entry above)
+
+The "Cross-spec obligation" note above (under *Scope Extension Request — 2026-09-04*) anticipated this amendment before the sibling spec implemented it. It has now landed. Recorded here, append-only, so a reader of this log does not have to infer completion from a forward-looking note alone.
+
+**What changed, in `docs/specs/results/ai-formalize-strategic-objectives/requirements.md`:**
+- R-RES-007's scenario 1 `BUT` clause: `result_levers` struck from the list of tables it guarantees untouched, with a dated `>` note restating the guarantee jointly (absence of **both** AI alignment fields leaves every other alignment table untouched, and neither new write disturbs the other).
+- R-RES-007 AC.1: struck and restated, narrowed to `result_contracts` / `result_sdgs`. `result_levers` is no longer in this AC's scope.
+- **AC.4 (no code path reaches the section-wide alignment save) is unchanged**, per the sibling spec's own stated requirement.
+- §1's "Must stay inert" context-table row and `tasks.md` §4's coverage-table row for this scenario were struck/annotated the same way, for the same reason.
+- The `result_levers` mentions inside **R-RES-003**'s scenario clause (line ~174) and `design.md`'s data-model table (line ~138) were reviewed and left **unchanged** — they assert that *this spec's own write* (`strategic_objectives`) does not touch `result_levers`, which remains true regardless of the sibling field, so no amendment applies there.
+
+**What did not change, and why it is safe:** T-06's `[x]` on the (now-amended) AC.1 stands. T-06's diff never modeled a lever row — Lens B ruled that correct at the time because no lever row could exist at the alignment step it exercised. The amendment narrows the requirement's *text* to match exactly what T-06 already *proved*; it does not retract a proof.
+
+**Where the `result_levers` half of the guarantee now lives:** `docs/specs/results/ai-formalize-primary-levers/requirements.md`, bare `R-RES-007` — "The AI write cannot reach a lever it did not create" — proven by that spec's T-03 (handler-boundary inertness) and T-06 (routing/inertness/composition suites), per that spec's T-07 gate.
+
+**Two-direction sweep run for this amendment (recorded here for traceability, evidenced in full in the sibling spec's `tasks.md` T-07 entry):** forward `grep -rn "result_levers"` over this entire spec folder — **9 hits total**, broken down as: **3 amended/annotated** (`requirements.md` — the "Must stay inert" row, the scenario `BUT` clause, and AC.1); **2 reviewed and left unchanged** (`requirements.md` R-RES-003's own scenario clause; `design.md`'s data-model table — both assert *this spec's own write* is inert toward `result_levers`, which the sibling field does not falsify); **4 left untouched as historical quotation** (the four `result_levers` mentions inside this file's own pre-existing "Cross-spec obligation" note above, which quotes the pre-amendment wording verbatim as a forward-looking prediction — left as the historical record of what was anticipated, not edited, per this log's append-only rule). Backward sweep covered `tasks.md` (the §4 coverage-table row, and T-06's "Requirements covered" line) and this file (the "Coverage closure" paragraph in the T-06 entry, appended to rather than edited, above).
+
+---
+
+## Correction — 2026-09-04 (T-07 rework attempt 2; append-only, does not edit any section above)
+
+**H-1 correction.** The *"Amendment Landed — 2026-09-04"* section above, under **"Where the `result_levers` half of the guarantee now lives"**, names the sibling spec's bare `R-RES-007` as the carrier. **That is the wrong requirement.** `[PL] R-RES-007` guarantees only that the lever write cannot touch rows **it did not create** — satisfied by construction via DD-6 — and is **silent on what happens to `result_levers` when `primary_levers` is absent**, which is precisely the clause struck above.
+
+The actual carriers, per the sibling spec's own `requirements.md` §7 (*"which is what this spec's R-RES-008 and R-RES-010 now carry jointly"*), verified at source:
+- **`[PL] R-RES-008`** — "Absence of the field leaves every other alignment table untouched" — its **AC.1** names `result_levers` explicitly for a payload without the field. Carries the **absence** half.
+- **`[PL] R-RES-010`** — "Both AI alignment fields on one item do not disturb each other." Carries the **mutual non-disturbance** half.
+
+`[PL] R-RES-007` may still be cited as an additional, narrower guarantee about which rows the lever write may touch — it is **not** the carrier of the struck clause.
+
+The corresponding pointer inside `requirements.md`'s dated `>` note under R-RES-007 Scenario 1 (that note is not append-only) has been corrected in place to name these two requirements.
+
+**H-2 addition.** A claim-based re-sweep (patterns: `leaves every other alignment table`, `alignment tables untouched`, `stay inert`, `untouched` — not the `result_levers` token, which neither site below contains) found two further prose restatements of the pre-amendment, now-overbroad guarantee, both now annotated in `requirements.md`:
+- The `R-RES-007` section heading (`requirements.md:279`) — appended a dated parenthetical noting the scope narrowing; the heading text itself is unchanged, since it is a section anchor other documents link to.
+- The §13 Requirement ID Index row for `R-RES-007` (`requirements.md:560`) — the original title cell is struck through, not deleted, with a note pointing to the amendment.
+
+Neither change is a silent rewrite, and neither reopens T-06's `[x]`.

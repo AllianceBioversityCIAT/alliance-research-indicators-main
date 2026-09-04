@@ -2,14 +2,14 @@
 
 - **Module:** results
 - **Spec id:** 2026-09-ai-formalize-primary-levers
-- **Status:** in-progress — **T-03 blocked on a Pivot** (owner decision pending)
+- **Status:** **T-01…T-06 done · T-07 `[~]` PARTIAL** — automated gate CLOSED and green; the manual Dev/rollout half is **BLOCKED on environment access** and needs the owner
 - **Owner:** David Felipe Casañas Hernández
 - **Depth:** Standard
 - **Linked requirements:** `./requirements.md` · **Linked design:** `./design.md` · **Proposal:** `./proposal.md`
 - **Citation convention:** `[SO] R-RES-NNN` = predecessor spec · bare `R-RES-NNN` = this spec (`requirements.md` §2)
 - **Budget (design.md §13):** 7 tasks · ~252 prod LOC + ~1,558 test LOC (~1,810 total) · **4 rework rounds** (not review passes). Priced on the predecessor's *measured* ~6:1 test:production basis from day one, per **KZ-008**
 - **⚠️ RE-BASELINED 2026-09-04 after T-04 (owner-approved) — `design.md` §13.2:** live total **~2,404** (T-05 → ~700, T-06 → ~580). The tripwire fired on T-03 (764 vs ~600 armed). The basis, not the sum, was corrected: it priced falsifiability hardening and pivot discovery at zero. **Production LOC threshold held at ~300 deliberately** — it is the scope-growth signal, and it is still the binding one (238 used, ~298 projected). Rework rounds: **1 of 4 used**
-- **Last updated:** 2026-09-04 *(R-RES-007 AC.2 amended — Pivot, T-03)*
+- **Last updated:** 2026-09-04 *(T-07: full-suite gate green + coverage reported, lint clean, `[SO] R-RES-007` amended with both sweep directions evidenced, `/v1` sweep reviewed; manual Dev checks blocked — see `execution.md` → T-07)*
 
 - **Execution log:** `./execution.md`
 ---
@@ -254,21 +254,21 @@ No cycles.
   - **RK-6 / D-3:** confirm migration `1783029013035` is applied in every target environment. If it is not, the compensating delete hits FK 1451 from inside the `catch` and aborts the whole batch (§11). **Rollout blocker, not a warning.**
   - **DC-10 (Q-4), and this is the first check rather than the last (KZ-007):** one real mixed-year bulk upload against Dev using a payload captured from the **actual** extractor, inspecting `result_levers` (rows, roles, `is_primary`) and `bulk_upload_results.missing_fields`.
 - **Acceptance / done check:**
-  - [ ] `npm test -- --silent` green across the whole server package; **coverage ≥ 60% reported, not assumed**.
-  - [ ] `npm run lint -- --quiet` clean; `git status` re-checked after.
-  - [ ] The alignment endpoint specs pass without modification.
-  - [ ] `/swagger` shows `primary_levers` as an optional number array on both endpoints (R-RES-001 AC.5).
-  - [ ] `[SO] R-RES-007` amended, with both sweep directions run and evidenced.
-  - [ ] The `/v1` sweep reviewed.
-  - [ ] Dev `clarisa_levers` ownership recorded in the spec (Q-3 closed).
-  - [ ] Migration `1783029013035` confirmed applied (RK-6 closed) — **or the rollout is blocked and escalated**.
-  - [ ] A real-payload mixed-year upload run against Dev, with observed rows, roles, `is_primary` values and `missing_fields` recorded (Q-4 closed).
-  - [ ] Audit columns confirmed at integration level for both roles (R-RES-003 AC.3, R-RES-004 AC.3).
+  - [x] `npm test -- --silent` green across the whole server package; **coverage ≥ 60% reported, not assumed**. — **328 suites / 2,320 tests green; coverage 84.23% stmts · 75.55% branch · 85.38% funcs · 84.25% lines.** Re-run independently by the Leader, not accepted from the worker.
+  - [x] `npm run lint -- --quiet` clean; `git status` re-checked after. — exit 0; `git status` **byte-identical before and after**, so `--fix` mutated **zero** files. Nothing to commit separately.
+  - [x] The alignment endpoint specs pass without modification. — the registry, both handler specs and `result-alignment-operations.service.spec.ts` are all green inside the full run, and no diff across this spec's commit range touches `server/researchindicators/test/**`.
+  - [ ] `/swagger` shows `primary_levers` as an optional number array on both endpoints (R-RES-001 AC.5). — **BLOCKED.** `main.ts` builds the document against the full `AppModule`, which eagerly imports `TypeOrmModule.forRoot(...)` with a real MySQL `DataSource`. Needs a booted app with DB access. **Not attempted; not inferred from T-01's reflect-metadata assertion**, which proves the declaration, not the render.
+  - [x] `[SO] R-RES-007` amended, with both sweep directions run and evidenced. — amended over two attempts; the first named the **wrong** sibling carrier (RB-7 materialising) and was corrected to `[PL] R-RES-008` + `[PL] R-RES-010`. AC.4 byte-identical; append-only discipline held (**41 additions / 0 deletions**); the claim-based re-sweep reproduces independently at exactly 2 further sites.
+  - [x] The `/v1` sweep reviewed. — 9 hits across this spec's folder and `server/researchindicators/test`, **independently reproduced by the Reviewer**; every hit either states `/api/v1/...` returns `404` or is meta about the sweep. None presents a versioned path as callable.
+  - [ ] Dev `clarisa_levers` ownership recorded in the spec (Q-3 closed). — **BLOCKED. Q-3 stays OPEN.** No `.env`, no `mysql` client, `docker info` unavailable. Needs an owner-run **read-only** query in Dev.
+  - [ ] Migration `1783029013035` confirmed applied (RK-6 closed) — **or the rollout is blocked and escalated**. — **BLOCKED, and escalated per this clause's own alternative. RB-3 stays OPEN and gates deployment.** Explicitly **not** inferred from T-06's green rollback suite, which models *post*-migration semantics; and **not** from Lens D having traced the migration's *content* — confirming what a migration contains is not confirming it is applied.
+  - [ ] A real-payload mixed-year upload run against Dev, with observed rows, roles, `is_primary` values and `missing_fields` recorded (Q-4 closed). — **BLOCKED and reported OPEN, not passed**, per this task's own Disqualifies clause. **No hand-written payload was substituted** — that would test the spec's assumption against itself and could not falsify it. Needs a running Dev stack, a payload captured from the **actual extractor**, and a human.
+  - [ ] Audit columns confirmed at integration level for both roles (R-RES-003 AC.3, R-RES-004 AC.3). — **BLOCKED.** True by construction via `BaseServiceSimple`, but integration-level closure needs a booted app + DB to read `created_by`/`created_at` off real rows for both portfolios.
 - **Verification:** `npm test -- --silent` and `npm run lint -- --quiet` from `server/researchindicators`; plus the manual steps above, **evidenced in writing**.
 - **Falsifying input:** a Dev `clarisa_levers` table whose id 11/12 rows are **not** `portfolio_id = 2` would falsify this spec's reading of the owner's payload and send DD-2 back for re-decision. A real extractor payload sending lever **names** instead of ids would falsify A-3 and require a T-01 change.
 - **Disqualifies:** a green targeted run standing in for the full suite. Also: **reporting Q-4 as closed on a hand-written payload** — that tests the spec's own assumption against itself and cannot falsify it. If the real payload is unavailable, report Q-4 as **open**, not passed. Also: treating a green T-06 as evidence for RK-6 — T-06's rollback assertion models **post**-migration semantics and is conditional on it.
 - **Skills:** `systematic-debugging` (on any failure)
-- **Estimated effort:** M · **Status:** todo
+- **Estimated effort:** M · **Status:** `[~]` **PARTIAL** — **automated gate CLOSED and green** (full suite 328/328 suites · 2,320/2,320 tests, coverage 84.23%/75.55%/85.38%/84.25%, lint clean with zero files mutated, `[SO] R-RES-007` amended with both Correction Closure directions evidenced, `/v1` sweep reviewed). **Manual Dev/rollout half BLOCKED** on environment access (no Docker, no `.env`, no `mysql` client) and requires the owner: **Q-3, Q-4, RB-3/RK-6, `/swagger` AC.5, and R-RES-003 AC.3 / R-RES-004 AC.3 integration closure.** PASS on attempt 2 for the half that could close; see `execution.md` → T-07
 
 ---
 

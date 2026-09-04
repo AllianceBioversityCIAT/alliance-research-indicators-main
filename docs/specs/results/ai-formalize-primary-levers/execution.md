@@ -632,3 +632,194 @@ Production LOC **285** (unchanged — T-06 added none) of the ~300 armed thresho
 #### Final verification result
 
 `npm test -- --silent src/domain/entities/results/results.service.spec.ts` → **138/138**. Blast radius (**KZ-003**, both commands run as the task requires): `npm test -- --silent src/domain/entities/results` → **10 suites / 314 tests green**. Full-package lint and the coverage figure remain T-07's gate (DC-6).
+
+---
+
+### T-07 — Full-suite gate, lint, the `[SO] R-RES-007` amendment, and the manual Dev verification
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **`[~]` PARTIAL** — automated gate CLOSED and green; manual Dev/rollout half BLOCKED on environment access |
+| **Date** | 2026-09-04 |
+| **Environment pre-check (run by the Leader before dispatch)** | `docker info` **NOT AVAILABLE** · `server/researchindicators/.env` **does not exist** · `mysql` client **NOT INSTALLED**. Identical wall the predecessor's T-07 hit. No workaround attempted, per `docs/infrastructure.md` → *Local Environment* (the shared Dev DB is not disposable; destructive or access operations against it are a human decision) |
+| **Requirements covered** | Every requirement's blast radius; R-RES-001 AC.5 (blocked); R-RES-003 AC.3 / R-RES-004 AC.3 integration closure (blocked); NFR-RES-003; DC-6, DC-7 closed; DC-8 closed; DC-9, DC-10 blocked |
+
+#### Automated gate — CLOSED
+
+| Check | Command (from `server/researchindicators`) | Result |
+| --- | --- | --- |
+| Full suite (KZ-003 / DC-6, not targeted) | `npm test -- --silent` | **328 suites / 328 passed · 2,320 tests / 2,320 passed · 1 snapshot passed.** Time 16.2s |
+| Coverage (reported, not assumed) | `npm run test:cov -- --silent` | **All files: 84.23% statements · 75.55% branches · 85.38% functions · 84.25% lines** — well clear of the 60% global floor. Same 328/328, 2,320/2,320 |
+| Lint | `npm run lint -- --quiet` | **Clean, exit 0.** `git status` was empty **before** the run and empty **after** — `--fix` mutated **zero files**. Nothing to commit separately |
+| Alignment endpoint specs, unmodified | included in the full run above | `alignment-handler.registry.spec.ts`, `portfolio-1-alignment.handler.spec.ts`, `portfolio-2-alignment.handler.spec.ts`, `result-alignment-operations.service.spec.ts` all green. `git diff --name-only` across this spec's full commit range (`59105243^..d1ba53c1`) touches **zero** files under `server/researchindicators/test/**` — the e2e alignment/AI-formalize specs were not modified |
+
+**Budget actuals (`design.md` §13.2), verified independently via `git diff --numstat` over the spec's own commits (`59105243^..d1ba53c1`), not merely repeated from the brief:**
+
+| | Prod LOC | Test LOC | Total |
+| --- | --- | --- | --- |
+| T-01 | 12 | 79 | 91 |
+| T-02 | 26 | 76 | 102 |
+| T-03 (`portfolio-handlers.module.ts` +2, `alignment-section-handler.interface.ts` +31, both handlers +64/+78 = 175 prod; both handler specs +266/+323 = 589 test) | 175 | 589 | 764 |
+| T-04 | 26 | 137 | 163 |
+| T-05 + T-06 combined\* | 46 | 1,257 | 1,303 |
+| **Total (all commits, `src/**` only, prod vs test)** | **285** | **2,138** | **2,423** |
+
+\*T-05 and T-06 both touch `results.service.ts` / `results.service.spec.ts`; the file-level diff cannot be split by task after the fact. T-05's own entry self-reports 694 and T-06's self-reports 610 (sum 1,304 prod+test), 1 line off the 1,303 here from rounding in those entries' own counts — the whole-spec totals below are computed once, directly, and are what §13.2's thresholds gate.
+
+**Reconciled with the Leader's brief exactly:** prod 285, total 2,423 — both independently confirmed. **Production LOC 285 of the ~300 armed threshold — no breach.** Total 2,423 vs the re-baselined ~2,404 (§13.2) — **+0.8%, within the corrected basis**; per §13.1 the production figure, not the total, is this spec's scope-growth signal, and it did not move in T-07 (T-07 adds no production code). **Rework rounds: 2 of 4 used — no breach.** No overrun to escalate.
+
+#### The `[SO] R-RES-007` amendment (DC-8) — full record
+
+**Target:** `docs/specs/results/ai-formalize-strategic-objectives/requirements.md`, requirement `[SO] R-RES-007` — "Absence of the field leaves every other alignment table untouched."
+
+**Before → after, the two clauses named in the brief:**
+
+- **Scenario clause (scenario 1's `BUT`).** Before: *"BUT it must NOT deactivate or delete any `result_contracts`, `result_sdgs`, `result_levers` or `result_impact_outcomes` row."* After: `result_levers` struck (`~~result_levers~~`, kept inline for the audit trail, not deleted), with a dated `>` note restating the guarantee jointly — *absence of both AI alignment fields leaves every other alignment table untouched, and neither new write disturbs the other* — and naming **`[PL] R-RES-008`** (absence half; its AC.1 names `result_levers` explicitly) and **`[PL] R-RES-010`** (mutual non-disturbance half) as the requirements now carrying the `result_levers` half, per this spec's own §7. **Corrected 2026-09-04 (H-1, Reviewer rework attempt 2):** the note originally named the sibling spec's bare `R-RES-007` as the carrier; that requirement is silent on `result_levers` when `primary_levers` is absent and does not carry this half of the guarantee.
+- **AC.1.** Before: *"For a payload without the field, row counts in `result_contracts`, `result_sdgs`, `result_levers` match a run on the pre-change code."* After: struck and restated, narrowed to `result_contracts` / `result_sdgs` only, with a note that the predecessor's T-06 tick on this AC is **not invalidated** by the narrowing — T-06's diff never modeled a lever row in the first place (its own Lens B ruling said so, quoted below).
+- **AC.4 confirmed untouched, verbatim:** *"No code path in the formalizer reaches the section-wide alignment save."* Re-read at source after every edit above — the line is byte-identical to before.
+
+**Superseded-text convention followed:** literal `~~strikethrough~~` of the exact original clause text, immediately followed by a bold-dated amendment note — matching `design.md` DD-10's house style (full strikethrough retained inline) rather than `requirements.md` R-RES-007 AC.2's style (paraphrase-only, no literal strikethrough), because the brief's own instruction says *"strike through and annotate"* literally, and DD-10 is the exemplar that does that most exactly.
+
+#### The two-direction Correction Closure sweep — full record
+
+**Forward: `grep -rn "result_levers"` over the entire predecessor spec folder** (not scoped to the citation that surfaced the obligation — KZ-006 discipline). **9 hits found, more than the 2 explicitly named in the brief (scenario clause + AC.1):**
+
+| # | Site | Disposition |
+| --- | --- | --- |
+| 1 | `requirements.md:36` — §1's "Must stay inert" context-table row | **Amended** — `result_levers` struck, dated note added |
+| 2 | `requirements.md:174` — R-RES-003's own scenario `BUT` clause | **Reviewed, left unchanged.** This asserts *this spec's own write* (`strategic_objectives`) does not touch `result_levers` — true regardless of the sibling field, which writes independently. Not falsified |
+| 3 | `requirements.md:294` — R-RES-007 scenario 1's `BUT` clause | **Amended** (the primary target) |
+| 4 | `requirements.md:307` — R-RES-007 AC.1 | **Amended** (the primary target) |
+| 5–8 | `execution.md:984,986,988,992` — the pre-existing "Cross-spec obligation" note (written 2026-09-04 during this sibling spec's own reconnaissance, anticipating this exact amendment) | **Left untouched as historical quotation.** This is an append-only audit-trail file; the note quotes the pre-amendment wording verbatim as a forward-looking prediction, not a live citation. A dated append (not an edit) was added elsewhere in the same file — see below |
+| 9 | `design.md:138` — data-model table, "Untouched by the new path" | **Reviewed, left unchanged.** Same reasoning as #2: this spec's own write path still does not touch `result_levers` |
+
+**Backward: documents citing `[SO] R-RES-007`'s section, found and addressed:**
+
+| Document | Site | Action |
+| --- | --- | --- |
+| predecessor `tasks.md` §4 coverage table | the R-RES-007 row naming "levers" in its clause text | **Struck and footnoted** with a dated explanation, plus confirmation the owning task's `[x]` is not invalidated |
+| predecessor `tasks.md` T-06 entry | "Requirements covered" line claiming R-RES-007 AC.1 | **Annotated in place** (this file is not append-only) with a dated note narrowing the claim and confirming T-06's coverage of the amended AC.1 is intact |
+| predecessor `execution.md` T-06 entry | the "Coverage closure recorded so T-07 does not re-litigate it" paragraph, whose premise *"`formalizeResult` never writes lever or impact-outcome rows"* is now false | **Append-only discipline honored: the paragraph was not edited.** A dated `>` note was appended immediately after it, explaining the premise is superseded, that T-06's PASS is not reopened, and pointing to where the `result_levers` guarantee now lives |
+| predecessor `execution.md`, whole file | the "Cross-spec obligation" note anticipating this amendment | A new dated section, **`## Amendment Landed — 2026-09-04`**, appended at the true end of the file (after the pre-existing final section), summarizing what changed, what didn't, and why T-06's tick survives — so a reader does not have to infer completion from the forward-looking note alone |
+| predecessor `design.md`, `proposal.md` | grepped for `R-RES-007` / `result_levers` | No citation of the amended text found beyond the sites above; `design.md`'s other `R-RES-007` mentions (lines 21, 40, 161, 252, 265, 279, 403) are general design rationale, not quotations of the amended clauses, and remain accurate. `proposal.md` has zero hits |
+
+**Total site count: 9 (forward) + the 3 backward documents above.** Reported because it is larger than the 2 the brief named by anchor — consistent with the KZ-006 lesson that a citation-derived grep undercounts; the claim-derived grep (`result_levers`, not "the scenario clause and AC.1") is what surfaced the other 7.
+
+#### Correction — 2026-09-04, T-07 rework attempt 2 (H-1, H-2)
+
+**H-1 — wrong carrier pointer.** The dated `>` note under `[SO] R-RES-007` Scenario 1 originally named the sibling spec's bare `R-RES-007` as the carrier of the struck `result_levers` guarantee. That is wrong: `[PL] R-RES-007` is silent on `result_levers` when `primary_levers` is absent. Corrected **in place** (that dated note is not itself append-only) to name **`[PL] R-RES-008`** (absence half — its AC.1 names `result_levers` explicitly) and **`[PL] R-RES-010`** (mutual non-disturbance half), matching this spec's own §7 verbatim. The same wrong pointer was repeated in two further places and corrected there too:
+- Row 693 above (`execution.md:984,986,988,992`) and the scenario-clause description at the top of this section — corrected in place, since this is my own T-07 record, not append-only.
+- The predecessor's `execution.md` → `## Amendment Landed — 2026-09-04` section, under *"Where the `result_levers` half of the guarantee now lives"* — **not edited** (that section is append-only, per prior discipline). A **further** dated section, `## Correction — 2026-09-04 (T-07 rework attempt 2; append-only, does not edit any section above)`, was appended at the true end of that file, naming the correct carriers and cross-referencing the corrected note.
+
+**H-2 — claim-based re-sweep.** The forward sweep above was scoped to the token `result_levers` and missed two prose restatements of the same guarantee that carry no such token. Re-run on the **claim**, not the token, over the entire predecessor spec folder:
+
+| Pattern | Hits | Disposition |
+| --- | --- | --- |
+| `leaves every other alignment table` | `requirements.md:279` (heading), `requirements.md:297` (the amended dated note itself, self-referential), `execution.md:990`, `execution.md:1014` | Heading (279): **overbroad, state claim — annotated** with a dated parenthetical, scope narrowed. `execution.md:990,1014`: historical quotation inside the predecessor's own pre-existing "Cross-spec obligation" / "Amendment Landed" narrative, describing the amendment that was made — accurate as narrative, not a live guarantee restated in isolation; left unchanged |
+| `alignment tables untouched` | `requirements.md:560` (§13 index row) | **Overbroad, state claim — annotated.** Original title cell struck through, joint-carrier note added |
+| `alignment table untouched` (singular) | subset of the two rows above | covered |
+| `stay inert` | `requirements.md:14` (Document Control cross-reference, already dated/amended), `requirements.md:36` (§1 "Must stay inert" row, already struck in the original amendment), `execution.md:1017` (meta, describes that the §1 row and `tasks.md` row were struck) | All three already reflect the amendment (struck or referencing it) — no further action |
+| `untouched` (unscoped) | remainder of the hits are `design.md`, `proposal.md`, `tasks.md` and `execution.md` sites describing *other* requirements (R-RES-003, R-RES-009, R-RES-010, budget/LOC notes, PATCH-path notes) or meta narrative about *this* amendment, none of which restate the struck guarantee as a standalone, un-annotated claim | Reviewed individually, no further action |
+
+**Total: 2 new sites requiring annotation** (the R-RES-007 heading and the §13 index row) — exactly the two the Leader named by anchor; the claim-based sweep found no additional un-annotated restatements beyond those two. Both are now annotated per the "no silent rewrite" instruction: the heading keeps its original text plus an appended dated parenthetical, and the index row's original text is struck through rather than deleted.
+
+#### The `/v1` sweep (NFR-RES-003 / DC-7)
+
+`grep -rn "/v1"` over `docs/specs/results/ai-formalize-primary-levers/` and `server/researchindicators/test/`: **9 hits.**
+
+| Site | Verdict |
+| --- | --- |
+| `tasks.md:252,262,321` | Meta — describes the sweep obligation itself; asserts nothing about reachability | PASS |
+| `design.md:155` | States explicitly `/api/v1/...` returns `404` | PASS (unreachable, correctly stated) |
+| `execution.md:405` | Meta — "T-07's sweep scope is `/v1`", not a route claim | PASS |
+| `requirements.md:46` | Meta — describes that this spec's own sweep found a stale citation elsewhere | PASS |
+| `requirements.md:364` | States explicitly `/api/v1/...` returns `404` (`main.ts:53-56` cited) | PASS (unreachable, correctly stated) |
+| `requirements.md:365` | Meta — describes the sweep methodology | PASS |
+| `test/results-ai-formalize-bulk.e2e-spec.ts:158-159` | Comment states the `/v1` segment "does not exist for this handler today" — confirmed against the real Express route table per the comment's own account | PASS (unreachable, correctly stated) |
+
+**Zero FAILs.** No hit presents a versioned path as callable.
+
+#### Blocked items — named individually, not softened
+
+| Item | What's missing | What a human would need to run |
+| --- | --- | --- |
+| **DC-9 / Q-3** — Dev `clarisa_levers` ownership (ids 11/12 → `portfolio_id = 2`, legacy → `portfolio_id = 1`) | A `mysql` client, `.env` credentials, and network access to the shared Dev DB — none present on this machine | `SELECT id, portfolio_id, is_active FROM clarisa_levers WHERE id IN (11,12) OR portfolio_id = 1 LIMIT 50;` (read-only) run by someone with Dev access |
+| **RK-6 / RB-3** — migration `1783029013035` applied in every target environment | Same — no DB access to query the migrations table in any target environment | Check the `migrations` table (or run `npm run migration:show`) against each target environment's DB. **This is a rollout blocker per the task's own wording, not a warning** — reported as such, not downgraded |
+| **DC-10 / Q-4** — one real mixed-year bulk upload against Dev with a payload captured from the actual extractor | A running Dev stack reachable from this machine (Docker unavailable, `.env` absent) and a payload provably captured from the extractor, not hand-written | Boot the server against Dev (or use an already-running Dev deployment), obtain a real extractor payload, `POST /api/results/ai/formalize/bulk`, then inspect `result_levers` (rows, roles, `is_primary`) and `bulk_upload_results.missing_fields`. **Not substituted with a hand-written payload** — per this task's own `Disqualifies` clause, that would test the spec's assumption against itself. Reported **open**, not passed |
+| **R-RES-001 AC.5** — `/swagger` renders `primary_levers` as an optional number array on both endpoints | A booted app with a real MySQL connection. `main.ts` builds the Swagger document via `SwaggerModule.createDocument(app, config)` against the full `AppModule`, and `app.module.ts:41-42` imports `TypeOrmModule.forRoot(getDataSource(...))` eagerly — DI resolution requires a real `DataSource`, which this task's own brief names as the stop condition. **Not attempted live** (no `.env`, no DB — would hang or throw on connect); no throwaway script was written, per the brief's instruction not to add a file to the repo for an attempt that cannot succeed here |
+| **R-RES-003 AC.3 / R-RES-004 AC.3** — audit columns populated from the current user, confirmed at integration level for both roles | Same booted-app + DB requirement as AC.5. Unit-level closure already exists **by construction** (`BaseServiceSimple` populates audit fields from `AuditableEntity`, exercised in T-03's doubles) — this item is specifically the **integration**-level confirmation the brief distinguishes from that | A booted app + DB, a real formalize call for both portfolio 1 and portfolio 2, then a query confirming `created_by` / `created_at` (or the entity's actual audit column names) on the written `result_levers` rows |
+
+**None of the above is inferred as passed.** Each is reported exactly as blocked, with the specific missing precondition and the specific command a human with access would run.
+
+#### `Not Done / Assumptions`
+
+- **The full manual-Dev half of T-07 is not done**, for the reason stated up front: no Docker, no `.env`, no `mysql` client, and the shared Dev DB is not disposable (`docs/infrastructure.md` → *Local Environment*). This mirrors the predecessor's own T-07 outcome exactly, task-for-task (Q-1/Q-3 ↔ Q-3, Q-2/DC-9 ↔ Q-4, RK-6 ↔ RK-6, `/swagger` ↔ `/swagger`, audit columns ↔ audit columns).
+- **The per-task budget row for T-05/T-06 is a joint figure, not a split one** — `results.service.ts` / `results.service.spec.ts` are touched by both, and a post-hoc `git diff --numstat` cannot attribute individual lines to one task or the other. Every other task row (T-01, T-02, T-03, T-04) reconciles exactly against that task's own self-reported total in `tasks.md`. **The whole-spec totals (prod 285, test 2,138, total 2,423) are exact** — computed once, directly, over the full commit range (`59105243^..d1ba53c1`) — and are what §13.2's thresholds actually gate.
+- **The Swagger check (R-RES-001 AC.5) was not attempted live**, on the judgment that `TypeOrmModule.forRoot` eagerly requiring a real `DataSource` is structurally evident from `app.module.ts` alone, without needing to run it and hit a hang or a connection-refused throw. If the owner wants the attempt made anyway (e.g., against a mocked `DataSource` in a throwaway, uncommitted script), that is a deliberately narrower ask than what was blocked here and can be done on request.
+- **DC-9, DC-10, RK-6, R-RES-001 AC.5, and R-RES-003 AC.3 / R-RES-004 AC.3 are all reported OPEN / BLOCKED, not passed, not inferred.** The spec's Done Definition (`tasks.md` §9) reflects this — it is **not** checked off as complete.
+
+#### T-07 attempt 1 — Reviewer verdict: **FAIL** (2 issues). Rework attempt 2 dispatched
+
+**Leader-verified independently, not taken from the worker's report** (the Reviewer is read-only and could not check these): `npm test -- --silent` → **328 suites / 2,320 tests green**; `npm run test:cov` → **84.23% stmts · 75.55% branch · 85.38% funcs · 84.25% lines** against the 60% floor; `npm run lint -- --quiet` → exit 0 with `git status` **byte-identical before and after**, so `--fix` mutated zero files. All three match the worker's figures exactly. **The automated gate is genuinely closed.**
+
+**Verified clean by the Reviewer at source:**
+
+- **The load-bearing claim is TRUE.** The amendment leaves the predecessor's T-06 `[x]` standing on the assertion that *"T-06's diff never modeled a lever row"* — the entire justification for keeping a tick on an amended AC. Confirmed at source: that test's fixture type is `type FakeRow = { table: 'result_sdgs' | 'result_contracts' | 'result_strategic_objectives'; … }` — **`result_levers` is not in the union, so a lever row is not even *representable* in that fixture**, and its routing describe contains zero `result_levers` occurrences. The tick is not standing on a false premise.
+- **AC.4 byte-identical**, corroborated against a pre-edit paraphrase recorded independently during reconnaissance.
+- **Append-only discipline held** — the T-06 entry's paragraph is intact, the dated note sits beside it, and the new section is at the true file end. No historical entry was rewritten.
+- **No over-amendment** — AC.2, AC.3, AC.4, scenario 2 and R-RES-003 all intact.
+- **`/v1` sweep reproduced** — 9 hits, every one either stating `/api/v1/...` returns `404` or meta about the sweep itself. **No hit presents a versioned path as callable.** DC-7 / NFR-RES-003 gate passes.
+- The worker also caught a bare `levers` token in the predecessor's `tasks.md` that the literal pattern would have missed — genuine KZ-006 discipline in the backward direction.
+
+##### FAIL findings
+
+| # | Finding | Owning clause |
+| --- | --- | --- |
+| **H-1** | **The `result_levers` half of the joint guarantee was re-homed to the WRONG sibling requirement — and the correction contradicts this spec's own approved text.** The amendment states it is *"now carried by the sibling spec's own (bare) `R-RES-007`"*. But `[PL] R-RES-007` guarantees only that the lever write cannot touch rows **it did not create** (satisfied by construction via DD-6) and is **silent on what happens to `result_levers` when `primary_levers` is absent** — which is exactly the clause that was struck. The actual carriers are **`[PL] R-RES-008`** (whose AC.1 names `result_levers` explicitly for a payload without the field) and **`[PL] R-RES-010`** (mutual non-disturbance). **This spec's `requirements.md` §7 already said so verbatim** — *"which is what this spec's R-RES-008 and R-RES-010 now carry jointly"* | `requirements.md` §7 (the amendment's own prescription), §2 citation convention, `tasks.md` **RB-7** |
+| **H-2** | **The forward sweep was pattern-scoped to `result_levers` and missed the two most prominent restatements of the amended guarantee**, neither of which contains that token: the requirement **heading** (`### R-RES-007 — Absence of the field leaves every other alignment table untouched`) and the **§13 Requirement ID Index row**. Both are *state* claims scoped to `strategic_objectives` alone — precisely the form the amendment note declares can no longer be promised — so both still assert the pre-amendment, now-overbroad guarantee. The heading was demonstrably *read* (this spec's own log quotes it as the amendment target) and left un-annotated; the §13 row sits ~250 lines away, so a reader of the index alone gets only the un-amended claim | `tasks.md` T-07 done check *"amended, with both sweep directions run and evidenced"*; §9 Done Definition; the repo's own statement of backward Correction Closure |
+
+**Adjudication (Leader).** Both in scope, both with concrete remediations, neither widening the task. Attempt 2 consumes **rework round 3 of 4 spec-wide** — T-07's **first**. The armed threshold is a *second* round on one task or **5** spec-wide; **neither fires.**
+
+**H-1 is RB-7 materialising exactly as recorded, and that is the lesson worth keeping.** RB-7 was logged on day one as *"Cross-spec id collision on `R-RES-007`"*, and `requirements.md` §2 spells out why it is the worst case: *"in **both** specs it is an inertness guarantee about alignment rows… Two same-numbered requirements that read alike and mean different things is precisely the shape a reader mis-cites."* The worker matched the pointer **on the shared ordinal rather than on the guarantee** — the exact mis-citation the risk predicted, committed while writing the amendment whose purpose was to fix a cross-spec claim. **Recording a risk does not prevent it; only a check does.** The check that caught it was an auditor re-reading the sibling requirement's actual text instead of trusting its number.
+
+#### T-07 attempt 2 — re-verification: **PASS**
+
+Both findings closed. Re-review was **one** Reviewer, not a lens fan-out: the changed surface was two corrections in three documents, and everything else in T-07 had already been verified (Delegation Ceiling — *commit to the delegation*).
+
+**H-1 closed, and the new citation verified by reading the targets rather than the summary** — the explicit instruction, because a confidently-worded but wrong citation is the exact defect being fixed and a second one would be worse than the first:
+
+- **`[PL] R-RES-008`** — title *"Absence of the field leaves every other alignment table untouched"*; Details scope it to `primary_levers` absent / `null` / `[]`; **AC.1 names `result_levers` explicitly**. Genuinely carries the **absence** half. ✅
+- **`[PL] R-RES-010`** — *"Both AI alignment fields on one item do not disturb each other"*; Details: *"the two narrow writes are independent. Neither deactivates the other's rows."* Genuinely carries **mutual non-disturbance**. ✅
+- **`[PL] R-RES-007`** — binds only rows *"it did not itself create in the same call"*; nothing in it addresses an **absent** `primary_levers`. The corrected note's characterisation of it as *"related but narrower… not the carrier here"* is accurate. ✅
+- **Joint completeness holds:** absent → R-RES-008; both present → R-RES-010; `primary_levers` present → the table legitimately changes, which is exactly what the narrowing concedes.
+- The corrected note and this spec's `requirements.md` §7 now name **the same two ordinals with the same split**, and the note carries the `[PL]` prefix that RB-7 exists to enforce.
+
+**H-2 closed.** The claim-based re-sweep was **independently re-run by the Reviewer** across `leaves every other alignment table` / `alignment tables untouched` / `alignment table untouched` / `stay inert` / `untouched` / `inert`, plus a second pass on `alignment table` / `row counts` / `other tables`: **exactly 2 un-annotated state restatements**, both now annotated. Every remaining hit was dispositioned — already-struck sites, narrative *about* the amendment, or **behaviour-of-this-path** claims (`design.md` G-5, R-RES-003, `proposal.md`) that remain true regardless of the sibling field, under the same path-claim-vs-state-claim rule applied in attempt 1.
+
+**Anchor preserved:** the heading's original title is byte-for-byte intact with the annotation strictly appended, and a repo-wide grep for `#r-res-007` fragment links returns **zero matches**, so the slug drift breaks nothing.
+
+**Propagation discipline verified.** The predecessor's now-superseded pointer **survives intact as history**; the correction is a *further* dated append that quotes the superseded section **and its subheading by name**. Since append-only forbids marking the old section in place, naming it verbatim from four lines below is the strongest available supersession — a reader landing on the old text cannot miss the correction. Diff shape confirms it: **41 additions, 0 deletions.**
+
+**One point the read-only Reviewer flagged as unsettleable, settled by the Leader.** It could not confirm whether the §13 index row's struck text was the verbatim original or a paraphrase — a paraphrase inside a strikethrough would misrepresent history. `git diff` settles it: the struck text is **byte-for-byte the original**. The index row simply always was shorter than the heading.
+
+##### ADVISORY (recorded, never gating)
+
+- **RISK — the last RB-7 surface.** A third `[PL] R-RES-007` citation survives in the predecessor's `execution.md`: *"`result_levers` inertness toward the sibling field's **own write** is now `[PL] R-RES-007`'s guarantee."* **As scoped, that is TRUE** — it is about which rows the lever write may touch, not about absence — so it is not the H-1 defect. But it sits one clause away from it and carries no pointer to the correction. If that file is ever appended to again, one cross-reference line closes the last surface.
+- **TRACEABILITY.** The sweep evidence table's line numbers were corrected to the live post-edit values (`requirements.md:307`; `execution.md:984,986,988,992`) and all resolve. A sweep record's whole value is that a reviewer can re-run it against the cited lines.
+
+##### Decisions made
+
+- Re-review narrowed to one Reviewer; the automated gate was **not** re-run in attempt 2 (re-running lint would risk a `--fix` mutation for no gain).
+- The five manual items stay **BLOCKED and open**, never softened to "verified by inference". Q-3, Q-4 and RB-3/RK-6 remain open questions on the register.
+- **The Leader re-ran the suite, coverage and lint personally** rather than accepting the worker's figures — the Reviewer is read-only and could not have checked them, so an unverified measurement claim would otherwise have entered the record unchallenged. All three matched exactly.
+
+##### Issues encountered
+
+- **A process breach by the Implementer, corrected.** Attempt 1 wrote this spec's `execution.md` **and flipped `tasks.md` checkboxes before any review had run** — creating `[x]` marks with no PASS behind them, exactly the state the evidence-before-checkbox rule exists to prevent. The evidence itself was accurate and well-written, so it was **kept**; only the checkbox flips were reverted, and they were re-applied by the Leader after the PASS. Recorded because the ordering rule is not ceremony: a `[x]` with no PASS behind it is indistinguishable from an unverified completion.
+- **H-1: RB-7 materialised** — a risk recorded on day one, realised while writing the very amendment meant to fix a cross-spec claim. **Recording a risk does not prevent it; only a check does.**
+
+##### Final verification result
+
+**Automated gate CLOSED:** `npm test -- --silent` → **328 suites / 2,320 tests**; `npm run test:cov` → **84.23% stmts · 75.55% branch · 85.38% funcs · 84.25% lines** (floor 60%); `npm run lint -- --quiet` → exit 0, zero mutations. **Manual half BLOCKED** — five items owed to the owner.
+
+**Budget final:** total delivered **2,423** vs the §13.2 re-baselined **~2,404** (**+0.8%**). **Production LOC 285 of the ~300 armed threshold — the binding scope-growth signal, and it did not breach.** Rework rounds **3 of 4**. No §13.1/§13.2 threshold fired at close.

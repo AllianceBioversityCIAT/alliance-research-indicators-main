@@ -11,7 +11,7 @@
 - **Linked tickets:** —
 - **Extends:** `docs/specs/results/capdev-bulk-upload-notification` (shares `createResultFromAiBulk`; notification stage untouched)
 - **Proposal:** `./proposal.md` (approved 2026-09-02, decisions D-1 … D-4)
-- **Last updated:** 2026-09-02
+- **Last updated:** 2026-09-02 · **R-RES-007 amended 2026-09-04** (cross-spec, `docs/specs/results/ai-formalize-primary-levers` T-07/DC-8 — see the requirement itself, §1's "Must stay inert" row, and `execution.md`'s dated append)
 
 ---
 
@@ -33,7 +33,7 @@ Accepting the field is only half the work. Strategic objectives belong to the **
 | Reference data | `portfolios`, `strategic_objectives` |
 | Write target | `result_strategic_objectives` (role `ALIGNMENT` = 1) |
 | Reporting | `CreateBulkUploadResultsDto.missing_fields` → `bulk_upload_results` |
-| Must stay inert | ALIGNMENT-role `result_contracts`, `result_sdgs`, `result_levers`, the CapDev notification stage |
+| Must stay inert | ALIGNMENT-role `result_contracts`, `result_sdgs`, ~~`result_levers`~~, the CapDev notification stage — **amended 2026-09-04 (cross-spec, DC-8):** `result_levers` struck because a sibling AI-write field, `primary_levers` (`docs/specs/results/ai-formalize-primary-levers`), now writes that table independently of `strategic_objectives`. Its inertness is no longer this spec's to guarantee alone; see R-RES-007 below |
 
 **Explicitly not changing:** the request/response shape of `PATCH`/`GET /api/results/:result-code/alignments`; the bulk role guard; the CapDev notification stage; the `portfolios` and `strategic_objectives` seed data.
 
@@ -276,7 +276,7 @@ Accepting the field is only half the work. Strategic objectives belong to the **
 
 ---
 
-### R-RES-007 — Absence of the field leaves every other alignment table untouched
+### R-RES-007 — Absence of the field leaves every other alignment table untouched *(scope narrowed 2026-09-04, cross-spec DC-8; see the amendment note under Scenario 1)*
 
 - **As a** Result Contributor (PRD §3.1)
 - **I want** the new code path to be inert when the field is absent
@@ -291,8 +291,10 @@ Accepting the field is only half the work. Strategic objectives belong to the **
 - GIVEN an item with no `strategic_objectives` key
 - WHEN the item is formalized
 - THEN the resulting database state is identical to the state produced by the current code for the same payload
-- BUT it must NOT deactivate or delete any `result_contracts`, `result_sdgs`, `result_levers` or `result_impact_outcomes` row
+- BUT it must NOT deactivate or delete any `result_contracts`, `result_sdgs`, ~~`result_levers`~~ or `result_impact_outcomes` row
 - AND IT MUST behave the same for `strategic_objectives: []` and `strategic_objectives: null`
+
+> **Amended 2026-09-04 (cross-spec, DC-8 — `docs/specs/results/ai-formalize-primary-levers` T-07).** `result_levers` is struck from this scenario's `BUT` clause: a sibling AI-write field, `primary_levers`, now writes `result_levers` independently of `strategic_objectives`, so a scenario scoped to `strategic_objectives` alone can no longer promise that table untouched — it never claimed to guard against the sibling field, only against itself, and the sibling field did not exist when this line was written. **The guarantee is restated jointly:** absence of **both** AI alignment fields leaves every other alignment table untouched, and neither new write disturbs the other. **Correction 2026-09-04 (H-1, Reviewer rework):** the carrier pointer below originally named the sibling spec's bare `R-RES-007`; that requirement is silent on `result_levers` when `primary_levers` is absent and does not carry this half of the guarantee. Corrected to the actual carriers, per that spec's own §7. The `result_levers` half of that joint guarantee is now carried jointly by the sibling spec's `[PL] R-RES-008` — "Absence of the field leaves every other alignment table untouched" (its AC.1 names `result_levers` explicitly for a payload without the field) — for the **absence** half, and by `[PL] R-RES-010` — "Both AI alignment fields on one item do not disturb each other" — for the **mutual non-disturbance** half; not by this one. (The sibling's bare `R-RES-007` — "The AI write cannot reach a lever it did not create" — is a related but narrower guarantee about which rows the lever write may touch; it is not the carrier here.) **AC.4 below (no code path reaches the section-wide alignment save) survives unchanged**, and binds both narrow writes now, not just this one.
 
 #### Scenario: A portfolio-2 item's SDGs survive the new write
 
@@ -302,7 +304,7 @@ Accepting the field is only half the work. Strategic objectives belong to the **
 - BUT it must NOT leave any `result_sdgs` row with `is_active = 0`
 
 **Acceptance criteria**
-- [ ] AC.1 — For a payload without the field, row counts in `result_contracts`, `result_sdgs`, `result_levers` match a run on the pre-change code.
+- [ ] AC.1 — ~~For a payload without the field, row counts in `result_contracts`, `result_sdgs`, `result_levers` match a run on the pre-change code.~~ **Amended 2026-09-04 (cross-spec, DC-8).** For a payload without `strategic_objectives`, row counts in `result_contracts` and `result_sdgs` match a run on the pre-change code. `result_levers` is removed from this AC's scope — see the amended scenario clause above. **This AC was ticked as proven by the predecessor's T-06; that tick is not invalidated by this narrowing** (T-06's diff modeled only `result_contracts` and `result_sdgs` — see `execution.md`'s dated append to the T-06 entry), but must not be read as still covering `result_levers`.
 - [ ] AC.2 — `[]` and `null` behave as absent.
 - [ ] AC.3 — A portfolio-2 item with both `sdg_targets` and `strategic_objectives` ends with all of both active.
 - [ ] AC.4 — No code path in the formalizer reaches the section-wide alignment save.
@@ -555,7 +557,7 @@ None blocking. Proposal OQ-1 and OQ-2 were resolved by the owner on 2026-09-02 a
 | R-RES-004 | Portfolio owning no objectives ignores and reports the field | D-2 | High |
 | R-RES-005 | Unknown / inactive / foreign ids discarded and reported | D-3 | High |
 | R-RES-006 | Unresolvable year behaves as R-RES-004 | D-4 | Medium |
-| R-RES-007 | Absence of the field leaves other alignment tables untouched | proposal H-1 | **Highest** |
+| R-RES-007 | ~~Absence of the field leaves other alignment tables untouched~~ — **narrowed 2026-09-04 (cross-spec DC-8):** now joint with `[PL] R-RES-008`/`R-RES-010`; see the amendment note under Scenario 1 | proposal H-1 | **Highest** |
 | R-RES-008 | Per-item routing with no leakage between items | proposal §10 B1 | High |
 | R-RES-009 | Single formalize endpoint succeeds on a valid payload | proposal §3.5 | Medium |
 | R-RES-010 | Portfolio-2 handler hardened against absent arrays | proposal H-2 | Medium |

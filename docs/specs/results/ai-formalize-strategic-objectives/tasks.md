@@ -196,7 +196,7 @@ No cycles.
 
 ### T-06 — Prove per-item routing and inertness with fixtures that can fail
 
-- **Requirements covered:** R-RES-008 (both scenarios, all clauses, AC.1–AC.4), R-RES-007 (scenario 1 `AND IT MUST`, scenario 2 and its `BUT`, AC.1, AC.3), R-RES-003 (AC.3 rollback)
+- **Requirements covered:** R-RES-008 (both scenarios, all clauses, AC.1–AC.4), R-RES-007 (scenario 1 `AND IT MUST`, scenario 2 and its `BUT`, AC.1, AC.3), R-RES-003 (AC.3 rollback) — **R-RES-007 AC.1 amended 2026-09-04 (cross-spec, DC-8): narrowed to `result_contracts`/`result_sdgs` only, `result_levers` removed from its scope. This task's coverage of the amended AC.1 is unaffected — its diff never modeled a lever row (see `execution.md`'s dated append to this entry)**
 - **Files touched (intended):**
   - `src/domain/entities/results/results.service.spec.ts`
 - **Description:** The two specs the rest of the spec exists to make true. One proves each bulk item routes on its own year; the other proves the new write disturbs nothing else. Both are written to be capable of failing on a plausible wrong implementation.
@@ -273,7 +273,7 @@ Closure is at **scenario and clause** granularity, not requirement ID. Every sce
 | R-RES-005 | Every id invalid | `BUT NOT` deactivate pre-existing rows | T-03 |
 | R-RES-006 | A year outside every range | `BUT NOT` throw; `BUT NOT` default to any portfolio | T-05 |
 | R-RES-006 | " | `AND IT MUST` log a warning naming the year | T-05 |
-| R-RES-007 | Absent field is byte-identical to today | `BUT NOT` deactivate contracts / sdgs / levers / impact outcomes | T-06 |
+| R-RES-007 | Absent field is byte-identical to today | `BUT NOT` deactivate contracts / sdgs / ~~levers~~ / impact outcomes [^amend-2026-09-04] | T-06 |
 | R-RES-007 | " | `AND IT MUST` treat `[]` and `null` as absent | T-05, T-06 |
 | R-RES-007 | Portfolio-2 item's SDGs survive | `BUT NOT` leave any `result_sdgs` row inactive | T-06 |
 | R-RES-008 | A mixed-year batch | `BUT NOT` cross-attach objectives between items | T-06 |
@@ -290,6 +290,8 @@ Closure is at **scenario and clause** granularity, not requirement ID. Every sce
 | NFR-RES-004 | reviewed `/v1` sweep | — | T-07 |
 
 No clause is discharged by citing a different requirement. Every row above quotes the clause it covers.
+
+[^amend-2026-09-04]: **Amended 2026-09-04 (cross-spec, DC-8 — `docs/specs/results/ai-formalize-primary-levers` T-07).** `levers` struck: a sibling AI-write field, `primary_levers`, now writes `result_levers` independently, so this clause (scoped to `strategic_objectives`) can no longer promise that table untouched on its own. See `requirements.md` R-RES-007's amended scenario clause and AC.1, and `execution.md`'s dated append to the T-06 entry. T-06's `[x]` for this row is **not** invalidated — its diff never modeled a lever row (see that append).
 
 ---
 
