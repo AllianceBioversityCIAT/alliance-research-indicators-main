@@ -15,7 +15,7 @@
 
 ## 1. Context
 
-The AI formalizer today **silently drops** `primary_levers`. The field is absent from `ResultRawAi`, and `ValidationPipe` runs with `whitelist: true`, so ids the extractor already resolved never reach the database and a human must re-enter them through `PATCH /api/results/:result-code/alignments`. This is the same gap the predecessor spec closed for `strategic_objectives`, requested by the owner on 2026-09-04 with a real payload.
+The AI formalizer today **rejects any payload carrying** `primary_levers`. The field is absent from `ResultRawAi`, and `ValidationPipe` runs with `whitelist: true` **and `forbidNonWhitelisted: true`**, so the request fails with `400 property primary_levers should not exist` — the ids the extractor already resolved never reach the database and a human must re-enter them through `PATCH /api/results/:result-code/alignments`. This is the same gap the predecessor spec closed for `strategic_objectives`, requested by the owner on 2026-09-04 with a real payload.
 
 The field's meaning is **portfolio-dependent**, and the two portfolios disagree — which is why this is a spec and not a one-line DTO addition:
 

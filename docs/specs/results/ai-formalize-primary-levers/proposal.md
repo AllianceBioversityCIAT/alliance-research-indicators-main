@@ -32,7 +32,7 @@ The owner supplied a real payload showing the field in position:
 
 ## 3. Problem / Current Behavior
 
-Today the AI formalizer **silently drops `primary_levers`**. The field is not on `ResultRawAi`, and `ValidationPipe` runs with `whitelist: true`, so the ids the extractor resolved never reach the database. A human must re-enter them by hand through `PATCH /api/results/:result-code/alignments`, which is exactly the gap the predecessor spec closed for strategic objectives.
+Today the AI formalizer **rejects any payload carrying `primary_levers`**. The field is not on `ResultRawAi`, and `ValidationPipe` runs with `whitelist: true` **and `forbidNonWhitelisted: true`**, so the request fails with `400 property primary_levers should not exist` and the ids the extractor resolved never reach the database. A human must re-enter them by hand through `PATCH /api/results/:result-code/alignments`, which is exactly the gap the predecessor spec closed for strategic objectives.
 
 **Two facts make this worth specifying rather than patching.**
 
