@@ -918,3 +918,86 @@ T-07's `Disqualifies` clause is explicit: *"reporting Q-2 as closed on a hand-wr
 One: the lint gate failure, resolved above. No rework round consumed — it was a gate finding on prior work, not a FAIL of a delegated brief.
 
 **Constitution impact** — none.
+
+---
+
+## Scope Extension Request — 2026-09-04: `primary_levers`
+
+**Owner asked to extend scope with a sibling AI-formalize field `primary_levers: number[]`, supplied with a real example payload.** Handled as a **scope decision, not a Pivot** — nothing in this spec is wrong or unviable; the owner wants adjacent capability. Recorded here because the reconnaissance below was paid for by this spec's session and the sibling spec must not re-derive it.
+
+**Owner decisions (2026-09-04):**
+
+| # | Decision |
+| --- | --- |
+| 1 | **Portfolio 2 persists `primary_levers` as research areas** — `lever_role_id = RESEARCH_AREAS_ALIGNMENT (3)`, `is_primary = true`, ids validated against portfolio 2 |
+| 2 | **Portfolio 1 persists them as levers** — `lever_role_id = ALIGNMENT (1)`, `is_primary = true` explicitly set, ids validated against portfolio 1 |
+| 3 | **The work lives in a new sibling spec via `/akili-propose`**, not as T-08…T-1x here |
+
+Decision 3 keeps this spec's audit trail intact: it is code-complete, its budget has been re-baselined twice, and T-07 is `[~]` awaiting owner-only checks. Reopening it a third time to mix closed and new work was declined in favour of a sibling that reuses the approved architecture.
+
+### Reconnaissance (Leader-run, file:line evidence) — hand this to the sibling proposal
+
+A scout subagent was dispatched and **failed on a runtime stall** (no progress for 600s). Per the runtime-failure fallback the Leader did not improvise a second scout; the map below was gathered with targeted extractions instead, which is cheaper than a retry for a known file set.
+
+**1. The routing is *inverted* relative to `strategic_objectives`, and both portfolios support the field.**
+
+| | `strategic_objectives` | `primary_levers` |
+| --- | --- | --- |
+| Portfolio 1 (2010–2025) | ❌ `supported: false` | ✅ role `ALIGNMENT (1)` + `is_primary = true` |
+| Portfolio 2 (2026–2030) | ✅ supported | ✅ but as **research areas**, role `RESEARCH_AREAS_ALIGNMENT (3)` |
+
+So the sibling spec has **no `supported: false` branch** — which removes this spec's single most expensive forward obligation (T-03 → T-05's terminating branch) and should reduce its test budget materially.
+
+**2. The decisive evidence — the ids in the payload are portfolio-2 research areas.** Migration `1782402733402-InsertNewResearchAreas`:
+
+```sql
+INSERT INTO clarisa_levers (id, full_name, portfolio_id) VALUES
+  (10, 'Food Environments and Consumer Behavior', 2),
+  (11, 'Multifunctional Landscapes',              2),
+  (12, 'Climate Action',                          2), … (17, …, 2)
+```
+
+Legacy levers were all set to `portfolio_id = 1` by `1782337004400-AddedPortfolioIdClarisaLevers` (`UPDATE clarisa_levers SET portfolio_id = 1`). The owner's payload is `year: "2026"` → portfolio 2, carrying `primary_levers: [11, 12]` = *Multifunctional Landscapes* + *Climate Action*, consistent with the item's "Eje 5" title and climate-change description. **The payload is coherent; the field name is portfolio-agnostic and each portfolio interprets it** — which is DD-4's pattern, already approved here.
+
+**3. Portfolio 2 deliberately discards the section-save form of the field** (`portfolio-2-alignment.handler.ts:45-56`): `payload.primary_levers = []`, `payload.contributor_levers = []`, then `delete alignment?.primary_levers`. It writes `research_areas` instead (`:60-73`) via `resultLeversService.create(resultId, saveResearchAreas, 'lever_id', LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT, manager, ['is_primary','custom_lever_name'])`. Portfolio 1's handler has **no lever mention at all** — it delegates wholesale to `ResultAlignmentOperationsService.save`, which handles `primary_levers`/`contributor_levers` at `:33-69` with `is_primary: true` / `false` respectively.
+
+**4. `ResultLever` (`result-levers/entities/result-lever.entity.ts`), the write surface.** Extends `AuditableEntity`. NOT NULL: `result_id`, `lever_id`, `lever_role_id`, `is_primary`. Nullable: `custom_lever_name`. Plus two `OneToMany` children — `result_lever_strategic_outcomes`, `result_lever_sdg_targets`.
+
+**5. `LeverRolesEnum`** (`lever-roles/enum/lever-roles.enum.ts`): `ALIGNMENT = 1`, `OICR_ALIGNMENT = 2`, `RESEARCH_AREAS_ALIGNMENT = 3`.
+
+**6. `clarisa_levers` has `portfolio_id` (nullable FK) — so the three-part predicate this spec's `findActiveByIdsForPortfolio` uses is expressible for levers too.** Whether an id-filtered, portfolio-scoped, active-only lever finder already exists was **not** confirmed; the sibling spec must check, since `StrategicObjectivesService` needed one added (this spec's T-03 authorized deviation).
+
+### Hazards the sibling spec must price in — these are the real divergences
+
+| # | Hazard | Why it matters |
+| --- | --- | --- |
+| H-1 | **`is_primary` is NOT NULL with DB default `false`.** A narrow save that omits it silently writes a **contributor** lever instead of a primary one | A **DC-4-class silent-wrong-data** defect. No row count, no exception, no `missing_fields` entry would reveal it. Needs an explicit assertion on the written `is_primary`, not just on the row's existence |
+| H-2 | **`lever_id` is `bigint` typed as `string`** in the entity, and the existing code does `parseInt(researchArea?.lever_id) as unknown as string` (`portfolio-2-alignment.handler.ts:62`) | An AI payload sends `number`. Either replicate the dirty cast or clean it — a decision to record, not to improvise |
+| H-3 | **Nested children are unrepresentable from a plain id array.** The section save threads `result_lever_strategic_outcomes` and `result_lever_sdg_targets` per lever | A narrow save writes levers with no outcomes and no SDG targets. Confirm with the owner that this is acceptable, or the AI path produces structurally poorer rows than the `PATCH` path |
+| H-4 | **Duplicate-id precedence.** The section save runs `filterByUniqueKeyWithPriority(..., 'lever_id')` so primary wins over contributor on a repeated `lever_id` (`result-alignment-operations.service.ts:67-69`) | A narrow primary-only save must not deactivate or demote pre-existing **contributor** rows for the same result. This is the same shape as the empty-survivor wipe T-03 caught here |
+| H-5 | **`payload?.research_areas?.map(...)` is unguarded** (`portfolio-2-alignment.handler.ts:61`) | The same class of bug R-RES-010 hardened here for `strategic_objectives` and `impact_outcomes` — `research_areas` was left out. **Pre-existing and out of this spec's scope**, but the sibling spec touches this exact method and should either harden it or record why not |
+
+### Cross-spec obligation — R-RES-007 must be amended, and it cannot be done silently
+
+**This spec's highest-severity requirement names `result_levers` explicitly**, and the sibling spec breaks it as written:
+
+> **Scenario clause:** BUT it must NOT deactivate or delete any `result_contracts`, `result_sdgs`, **`result_levers`** or `result_impact_outcomes` row
+>
+> **AC.1** — For a payload without the field, row counts in `result_contracts`, `result_sdgs`, **`result_levers`** match a run on the pre-change code.
+
+Once `primary_levers` writes lever rows, AC.1 is **no longer true as written** — and it is currently ticked as proven by T-06. The amendment belongs to the sibling spec's proposal and must restate the guarantee as: *absence of **both** fields leaves every other alignment table untouched, and neither new write disturbs the other.* **AC.4 (no code path reaches the section-wide alignment save) survives unchanged and becomes more important, not less**, since there are now two narrow writes that must both avoid it.
+
+Recorded here so `/akili-validate` on **this** spec does not read a green T-06 as still covering `result_levers` once the sibling lands.
+
+### Q-2 / DC-9 — the owner's payload is partial evidence, and its provenance is unconfirmed
+
+The example payload materially advances the open question, but **does not close it**:
+
+| Observation | Bears on |
+| --- | --- |
+| `"strategic_objectives": [3]` — **numeric ids** | **Confirms A-1.** The extractor sends ids, not names. T-01 needs no change |
+| `"year": "2026"` — a **string**, not a number | **Confirms Lens A's T-05 advisory**: `ResultRawAi.year` is declared `number` but validated `@IsOptional() @IsString()`. The real producer sends a string and the code tolerates it (MySQL coerces identically for both the `findByYear` predicate and `report_year_id`) |
+| `"metadata": { "missing_fields": ["trainees_description"], "manually_edited": true }` | The reporting channel's shape is as designed. Note `manually_edited: true` — **a field the spec never considered**; worth checking whether a manually-edited item should route differently |
+| `"primary_levers": [11, 12]` | Numeric ids, same shape |
+
+**Q-2 stays OPEN.** T-07's `Disqualifies` clause forbids closing it on a payload that may be hand-written, and the Leader asked the owner for provenance without an answer yet. Even if captured, the *"run it against Dev and inspect the rows and `missing_fields`"* half remains outstanding. **Recorded as partial evidence only, never as closure.**
