@@ -39,7 +39,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-01 `app-input` requiredMode + precedence | `[x]` | PASS attempt 1. Spec gap escalated — see Pivot Record |
 | T-02 `app-input` DD-10 token sweep | `[x]` | PASS attempt 1. Visual claims INCONCLUSIVE → T-16 gate 3 |
 | T-03 `quantification-item` 5 inputs | `[x]` | PASS attempt 1. Branch RED until T-12 (measured) |
-| T-04 actor disaggregated counts + total msg | `[ ]` | forward pointer filed (scope the cohort spy) |
+| T-04 actor disaggregated counts + total msg | `[x]` | PASS attempt 3 of 3. Pointers → T-16, T-19 |
 | T-05 actor aggregate path | `[ ]` | |
 | T-06 actor custom name trimmed | `[ ]` | |
 | T-07 org known path + DD-9 precedence | `[ ]` | |
@@ -47,14 +47,14 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[ ]` | |
-| T-12 details measure wiring | `[ ]` | pivot input + **forward pointer: must REWRITE c10, restores build** |
+| T-12 details measure wiring | `[ ]` | pivot input · REWRITE c10 · restores build · **+ cohort spy (re-routed from T-04)** |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
 | T-17 RSK-2 population sizing | `[ ]` | |
 | T-18 migration + migration spec | `[ ]` | |
-| T-19 executed truth table | `[ ]` | |
+| T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
 
 ---
@@ -353,7 +353,13 @@ Leader-measured and Reviewer-confirmed independently: `--ac-grey-600` is `#8d929
 4. *Readability* — the negative `:30` test asserts only the spy's absence, so it would also pass if the input never rendered; one `expect(query(By.css('input[pInputText]'))).toBeTruthy()` makes it non-vacuous. Its title says "clears on fill" but it constructs the valid state rather than transitioning into it (`KZ-015`) — **not a gate here**, because `tasks.md:506` assigns "S1 amber appears and clears" to T-01 (logic) and T-02 owns only the token.
 5. *Risk* — `fs-[14]` is px where `text-sm` was rem, so message text no longer scales with a user's browser default font size. **Not a deviation** — `requirements.md:163` mandates `fs-[14]` by name and `docs/ux-ui/design.md:376` sanctions `.fs-[n]` as the per-element override — but it is the one a11y-adjacent consequence of `G-3` worth having on the record.
 
-> **FORWARD POINTER → T-04 (Leader-owned; must be copied into T-04's brief).** Scope the prototype-wide `border` setter spy at `innovation-use-details.component.spec.ts:2542-2545` to the specific element. Since T-02, `'2px solid var(--ac-warning-1)'` has a second emitter in that fixture (`app-input` `:30` via `quantification-item`), and the spy's `toContainEqual` can no longer prove the assertion belongs to the actor-type `p-select`. T-04 already owns the actor card's `p-select` border assertions, so this falls inside its existing scope — it is a precision fix to an assertion T-04 must rely on, not new scope.
+> **FORWARD POINTER → ~~T-04~~ → T-12 — RE-ROUTED 2026-09-04 at the T-04 dispatch gate.** Scope the prototype-wide `border` setter spy at `innovation-use-details.component.spec.ts:2542-2545` to the specific element.
+>
+> **Why re-routed (Leader, verified at source before rewriting this record — `KZ-007`):** T-02's Reviewer suggested T-04 take this, reasoning that T-04 owns the actor card's `p-select` border assertions. But the spy in question lives in **`innovation-use-details.component.spec.ts`**, which is **not** in T-04's `Files` list (T-04 owns `innovation-use-actor-item/*` only). Assigning it to T-04 would have widened an approved task's file scope to absorb an advisory — exactly what the Advisory rules forbid.
+>
+> **T-12 is the correct owner on both counts.** It owns that spec file, *and* it is the task that **creates** the collision: `app-input` defaults to `type='text'` (`input.component.ts:32`), so `quantification-item`'s `Unit` field renders the `pInputText` branch whose `[style]` border T-02 tokenized — and T-12's `[unitRequiredMode]="'filled'"` binding is what first makes an empty `Unit` invalid, firing that second emitter of `'2px solid var(--ac-warning-1)'` inside this fixture. Before T-12 the string has one emitter there; after T-12 it has two, and `toContainEqual` can no longer attribute the write to the actor-type `p-select`.
+>
+> **Not applicable to the actor card's own spec.** Within `innovation-use-actor-item.component.spec.ts` the `[style]` emitters are both card-owned — the `p-select` (`.html:35`) and the "Specify other" `pInputText` (`.html:54`) — and the four counts are `type="number"`, which after T-02 carry the **class** mechanism and emit no style border at all. The in-tree exemplar at `:291`/`:298` is therefore still sound today, but only because a fresh `InnovationUseActor()` leaves `actor_type_id` unset, so the `@if` at `.html:50` never renders the second emitter. **Any new test that sets `actor_type_id` to OTHER makes `toContainEqual` ambiguous in this file too** — carried into T-04's and T-06's briefs as a caution. Since T-02, `'2px solid var(--ac-warning-1)'` has a second emitter in that fixture (`app-input` `:30` via `quantification-item`), and the spy's `toContainEqual` can no longer prove the assertion belongs to the actor-type `p-select`. T-04 already owns the actor card's `p-select` border assertions, so this falls inside its existing scope — it is a precision fix to an assertion T-04 must rely on, not new scope.
 
 > **FORWARD POINTER → T-16 (Leader-owned; cumulative, now three items).** Gate 3 must name **in words** (`KZ-002`): (a) the amber border on a **text** field (`:30`, `[style]` mechanism), (b) the amber border on a **number** field (`:49`, class mechanism), (c) the message rows' line-height after the `fs-[14] leading-[1.25rem]` swap. Plus the two T-15 doc claims already filed. Gate 3 is the **only** owner of every visual claim in T-01 and T-02.
 
@@ -451,3 +457,105 @@ The Reviewer predicted two collateral reds structurally, having no execution too
 **Requirements covered** — `R-IUR-010` AC.1, AC.3, **AC.5** (both OICR call sites) · S1's `BUT it must NOT change the OICR measure card` · `R-IUR-013` AC.1.
 
 **Cannot prove (`KZ-017`)** — **paint** (`DC-7`): presence of the asterisk and message nodes is not visual verification; T-16 gate 3 owns it. The `tsc` set diff was **restricted to `quantification-item.component`** and structurally cannot see a new error elsewhere; the Reviewer closed that gap by grep instead (the only surviving `fieldsRequired` references outside the rewritten spec are a *comment* at `innovation-use-details.component.spec.ts:378` and the *template* binding at `:227`, and `tsconfig.spec.json` type-checks neither — the binding is caught by `ng build`, which the Leader has now measured as red). The **Reviewer executed nothing** — read-only wrapper, so every red it named was structural reasoning, explicitly not observation; the Leader measured both of its predictions and they held.
+
+---
+
+### T-04 — Actor card, disaggregated path: four required counts and one total message
+
+**PASS on attempt 3 of 3.** Attempt 1 FAILED (no discriminating test for the guard); attempt 2 FAILED (a `KZ-014` red-claim in a comment) while discharging attempt 1's issue and correctly disproving an authorized advisory; attempt 3 PASSED.
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-04 |
+| Effort assigned | attempt 1 `high` (task said `M`) |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max`, **`tdd`** (Leader addition — the three falsifying inputs form a cross-field truth table where red-first pays) |
+
+**Leader pre-dispatch findings briefed to the Implementer (absent from the task file)**
+
+1. **The collision is sharper than `tasks.md` states.** `total()` (`.ts:59-68`) sums only *present* counts, so `total() === 0` is true for **both** `0/0/0/0` (→ one total message, zero required) **and** a single `0` with three absent (→ three required, no total). Opposite UI from the same value. The guard must be `allFilled && total() === 0`, gated to the disaggregated path since `total()` returns `actors_count` in aggregate mode.
+2. **This card is the inverse of `quantification-item` on asterisks.** The four counts *do* pass `[label]`, so `app-input` renders its own asterisk once `requiredMode` is set. A card-side asterisk would double it — the opposite of T-03, where no `[label]` is passed and the card owns them.
+3. **Border mechanism splits per control.** The counts are `type="number"`, so after T-02 their border is a Tailwind class and the setter spy **cannot fire** for them (`P-1`); the spy is valid only for the `p-select`. Also pointed at the Angular style **memoization** trap (`innovation-use-details.component.spec.ts:2530-2546`): a spy installed after the state is rendered records zero calls, which reads as "not bound" but means "not changed."
+
+**Forward-pointer re-routing (Leader, at this dispatch gate)** — T-02's Reviewer had suggested T-04 scope the weakened cohort spy at `innovation-use-details.component.spec.ts:2542`. **Re-routed to T-12**: that spy is outside T-04's `Files` list, and assigning it here would have widened an approved task to absorb an advisory. T-12 owns the file *and* creates the collision. Full reasoning recorded at the T-02 entry's forward-pointer block.
+
+#### Attempt 1 — Reviewer `STATUS: FAIL`, 1 issue
+
+**The implementation was correct. The test that proves it does not exist.**
+
+`showTotalNotPositive` = `!aggregate && allFilled && total() === 0` is right on every reachable input. But **deleting the `allFilled &&` conjunct leaves all 33 tests green** while the forbidden state renders. The Reviewer enumerated every fixture in the file under that mutation:
+
+| Fixture | `total()` | Total msg with `allFilled` removed | Test result |
+| --- | --- | --- | --- |
+| `0/5/0/0` (T-04 #1) | `5` | none | green |
+| `0/0/0/0` (T-04 #2) | `0` | 1 (expected) | green |
+| `3/–/–/–` (T-04 #3) | `3` | none | green |
+| all four absent (#4, c4) | `null` | none | green |
+| aggregate (#5) | n/a | none | green |
+| c10 #1 — `setValue(0)`, three absent | `0` | **1, alongside 3 required messages** | green — c10 asserts only `emitted.women_youth_count` and `totalText()` |
+
+**No fixture sets exactly one count to `0` with the other three absent** — the only input that separates the two readings of `total() === 0`. It is trivially reachable (add a row, type `0` in `Women youth`, tab away), and under the mutation it renders **one total message plus three required messages**: `DD-2`'s explicitly forbidden state.
+
+**The root cause is a documented inversion.** The work order's third falsifying input reads *"One filled, three empty — three required messages, no total message."* The Implementer instantiated it with `3` and recorded the reason at `.spec.ts:631` as *"with a non-zero value, so `total()` is also non-zero — isolating this case from the total-positivity rule entirely."* **That is exactly backwards:** the coupling it removed was the only thing making "no total message" a measurement rather than a tautology. The T-04 block's own header comment asserts the correct condition — *"must therefore be 'all four filled AND total() === 0', never total() alone"* — but no `it()` in the block tests it.
+
+**Consequently none of the three reported reds is evidence for the guard.** `0/0/0/0 → Expected: 1, Received: 0` and the asterisk red fire because the `@if` block and the `[requiredMode]` binding did not exist at baseline; `three empty → Expected: 3, Received: 0` fires because `requiredMode` did not exist. **All three stay green with the guard deleted.**
+
+*Violated:* `design.md` `DD-2` (*"One message, never five"*) · `requirements.md` `R-IUR-004` S1's `AND IT MUST` (`0` satisfies "filled") combined with S3 (*"WHEN only `Women youth` is filled THEN the other three fields each render the amber treatment"*) — with `0` a legal fill value, `0/–/–/–` **is** an instance of S3 and it is the untested one · **`KZ-001`** (a cohort assertion that doesn't evaluate what it stands in for) · **`KZ-014`** (a red that would pass with the defect reintroduced is not evidence).
+
+*Remediation ordered:* add one `it()` with `women_youth_count: 0` and three absent, asserting 3 required messages and 0 total messages; keep the existing `3/–/–/–` case; correct the `:631` comment. Prove red first by deleting `allFilled &&`. **No production change required.**
+
+**Reviewer rulings on the other seven named questions (all clean)**
+
+- **Guard correctness:** could not falsify on any reachable input. `5/-5/0/0` → message renders, which is correct (sum is not `> 0`). `null`/`undefined`/`0` handled identically to `app-input`'s `isFilled()` on the reachable domain.
+- **`requiredMode` without `isRequired`:** conforms to `DD-1`'s precedence paragraph (*"the only field where both are legitimately live is a `'off'`-mode field"*). Asterisk renders via `@if (isRequired || requiredMode !== 'off')` with `[label]` present.
+- **`c9` rescoping:** **(a) in scope** — broke as a direct, unavoidable consequence of T-04, the file is in scope, and both original assertions are preserved. **(b) advisory, not a defect** — the selector is fragile (the new total-message div does carry `rs-mt-[4]`, as the Leader flagged) but the collision is benign for c9's two assertions, since the total message's text matches neither. Risk is confined to a future *count* assertion built on that cohort.
+- **Message assertions discriminate per source;** `.actor-total-required-message` is a legitimate test seam with in-tree precedent (`.actor-total`, used the same way by c3/c5/c6).
+- **Border mechanism:** both choices correct per `DD-3`'s per-control row. **The finding no test can produce: none** — the diff adds no `border-*` utility anywhere; the only new styling is token-only on a plain `div` PrimeNG does not style.
+- **RED disclosure:** `KZ-014`-compliant. Of the two volunteered vacuous cases, `0/5/0/0` **does** discriminate now (mutating to `'positive'` reddens the border assertion — though the *message* half alone would not, since `'positive'` emits different text); the aggregate-gating case **does not** — template placement plus the absent counts doubly protect it, so it would take two simultaneous mutations. Advisory.
+- **Copy faithful,** no user decision needed: `requirements.md:206` asks only for *"a distinct message stating the total must be greater than zero"*, and being deliberately **not** identical to `app-input`'s `'positive'` string is correct — S2's point is that the user can tell the two causes apart.
+- **Scope confirmed** at file level by repo-wide grep: `requiredMode` in only three components, `actor-total-required-message` in only the two actor-item files, aggregate `@else` and `otherNameMissing` untouched, `[min]="0"` preserved on all five counts.
+
+**`ADVISORY` from attempt 1 (recorded, non-gating)**
+
+1. *Reliability* — `showTotalNotPositive` uses `total() === 0` where §3.1 rule 4 and the migration are `SUM(...) > 0`. **A negative sum is invalid server-side and silent client-side** — the `DC-3` shape, and `R-IUR-004` AC.6 demands client/server identity. **Not reachable through the product** (`[min]="0"` reaches `p-inputNumber`'s clamp, c11 pins pasted `-1`, and the write DTO carries `@IsInt() @Min(0)` on all four counts); only a direct DB write or legacy row reaches it, the column being signed `int`. `total()! <= 0` closes it permanently for one token. **Whoever implements the AC.6 parity task must be told the client predicate is currently narrower than the SQL** — carried to T-19.
+2. *Reliability* — strengthen the aggregate-gating test so it *can* fail: set `sex_age_disaggregation_not_apply: true` **and** all four counts to `0` alongside `actors_count: 0`.
+3. *Readability* — harden c9's selector against the `rs-mt-[4]` collision (`&& !cn.includes('actor-total-required-message')`).
+4. *Readability* — `showTotalNotPositive` re-derives emptiness that `InputComponent.isFilled()` now owns publicly; documented in the JSDoc, but the two definitions must be kept in step by hand.
+
+**Reviewer could not reach** — no `git` access, so the scope ruling rests on full file reads plus repo-wide greps and cannot see an unrelated edit introducing none of those tokens. It re-ran **no** command. Paint unproven (`DC-7`/`DC-1`, T-16); **the new total message's colour and `fs-[14]` are asserted nowhere in this diff** — token-identical to the covered `#requiredMessage` template, but that is inference, so the human browser check should include this message. Server-side parity (`R-IUR-004` AC.6) not audited beyond establishing the SQL predicate.
+
+#### Attempt 2 — Reviewer `STATUS: FAIL`, 1 issue (a `KZ-014` violation in a comment)
+
+Attempt 2 **discharged attempt 1's FAIL**: it added the collision test (`women_youth_count: 0`, three absent) and **observed the red genuinely** — mutation `return allFilled && this.total() === 0` → `return this.total() === 0` produced `Expected: 0, Received: 1` on `totalMessages().length`; conjunct restored byte-for-byte; 34/34 green. Attempt 3's Reviewer independently re-derived that red from source by call-graph necessity and confirmed it is attributable to the `allFilled` conjunct **specifically**.
+
+**It also disproved an advisory the Leader had authorized — correctly.** Told to apply `ADVISORY 2` (strengthen the aggregate-gating test so it can fail), it applied the prescribed mutation and the test **stayed green**. Instead of trying other mutations until one reddened, it found the cause: `innovation-use-actor-item.component.html:77` gates the **entire** disaggregated subtree — the four counts *and* the `showTotalNotPositive` `@if` at `:140-145` — behind `@if (!body().sex_age_disaggregation_not_apply)`, closed by the `@else` at `:146`. In aggregate mode Angular never instantiates that subtree, so the getter is never evaluated from the DOM. **The prior Reviewer's advisory was simply wrong**, and attempt 2 refused to fabricate the red (`K-004`/`KZ-014`).
+
+> **This is the review layer being wrong, not the implementation** — the direction this methodology is weakest at catching, because a mistaken advisory arrives wearing the same authority as a sound one. Recorded deliberately.
+
+**The FAIL:** attempt 2 nonetheless left an in-code comment asserting the opposite of what it had measured — *"so the message renders and this test reddens"* — a red it had explicitly watched **not** happen. `KZ-014` names this case verbatim: *"If the red has not been seen, it may not be asserted — **not in a comment** …"*. Attempt 2's Reviewer strengthened the finding by checking the **converse** mutation too: removing the *template* gate alone also leaves the test green, because the getter's early return still returns `false`. **The test has no single-mutation discriminating power at all** — precisely what the comment told the next maintainer it did have. *Violated:* `KZ-014`, compounded by `KZ-001` and `KZ-017`. *Remediation:* no production change; replace the comment with supplied wording stating the measured truth and the structural limit.
+
+#### Attempt 3 — Reviewer `STATUS: PASS`
+
+Single comment block replaced with the supplied wording, verbatim. One `Edit` call. Verified by the Leader before dispatch of the confirmation pass: `grep -c "this test reddens"` → **0**; both markers of the supplied text present; `.html` **+11** and `.ts` **+33**, byte-identical to attempts 1–2; guard intact at `.ts:126`; the only two remaining occurrences of "redden" both state the negative. `npx eslint` clean; **34/34**, count unchanged.
+
+The confirmation pass verified every structural claim in the replacement comment against source — the `.html:77-146` nesting, the four counts at `:93-138`, the total-message `@if` at `:140-145`, `total()` returning `actors_count` on the aggregate path (`.ts:74-76`), and that `showTotalNotPositive` has **exactly one call site** in the whole client tree with no test invoking it directly. That last fact makes the two mutation claims **structurally necessary rather than merely reported** — a stronger check than re-execution. It also re-confirmed no drift in the input-4 test, the input-3 comment, `c9`, the helpers, or the `.actor-total-required-message` class, and that advisories 1, 3 and 4 all remain unapplied.
+
+**Two documentation amendments assigned to the Leader by the auditor, applied in this commit**
+
+The confirmation pass was told to verify the supplied wording rather than trust it — precisely because it came from the review chain and `KZ-007` makes a correction the highest-risk artifact class. It found one factual error **inside that supplied wording**:
+
+| Site | Was | Now | Why |
+| --- | --- | --- | --- |
+| `.spec.ts:675` | `// R-IUR-001 S2 gate:` | `// R-IUR-004 S2 gate:` | `R-IUR-001` S2 is *"one started row invalidates its section"* (`requirements.md:108-114`) — nothing about the aggregate path. The clause this test gates is **`R-IUR-004` S2**, *"All four zeros fail the positivity rule, not the fill rule"* (`:200-207`), scoped to the disaggregated path by R-IUR-004's preamble (`:189`). The block's own header already cited `R-IUR-004 S1/S2/S3` correctly — a single-digit typo in the review chain's own text |
+| `.spec.ts:573` | `.ts:59-68` | `.ts:66-81` | Pre-existing staleness, audited clean twice. `total()`'s doc block is `:66-71` and the computed `:72-81`; `:59-68` mostly covers the `body` signal's doc. Leader-verified against source before amending |
+
+**Why the Leader amended these rather than opening attempt 4** (recorded for the audit trail, since it touches the no-code rule): both are comment-only factual citations with **zero behavioural surface**, the auditor identified them and explicitly assigned them to the Leader as *"a required one-token amendment rather than a blocking issue"*, and the rework loop had already returned `PASS`. The auditor's stated reasoning, which the Leader accepts: they are not the attempt-2 defect class (no claim about evidence or test strength, so `KZ-014`/`K-004` are satisfied), not an implementation-conformance violation, they **originate in the review chain rather than the Implementer's judgment**, and on attempt 3 of 3 a FAIL would have rolled back verified-correct production code over one character. `npx jest` re-run after the amendment: **34/34**, unchanged.
+
+**Requirements covered** — `R-IUR-004` **in full**: S1 + its `AND IT MUST` (`0` is a value), **S2 + its `BUT it must NOT report the four fields as empty`**, S3, AC.1–AC.5 · `R-IUR-001` S2.
+
+**Cannot prove (`KZ-017`)** — **paint** (`DC-7`/`DC-1`, T-16 gate 3): jsdom observes no rendered border, and `hostEl.className` proves only that the utility is on the host. **The new total message's colour and `fs-[14]` are asserted nowhere in this diff** — token-identical to the already-covered `#requiredMessage` template, but that is inference, not measurement, so **T-16 gate 3 must include this message**. The aggregate-gating test has **no single-mutation discriminating power** and now says so in-file. Neither Reviewer executed any command (read-only wrappers); the `34/34`, eslint and mutation reds are the Implementer's, with the Leader re-measuring the final state and the confirmation pass deriving the mutation outcomes structurally.
+
+> **FORWARD POINTER → T-19 (Leader-owned; must be copied into T-19's brief).** **The client predicate is currently NARROWER than the SQL.** `showTotalNotPositive` tests `total() === 0`, while §3.1 rule 4 and the migration are `SUM(...) > 0` — so a **negative** sum is invalid server-side and **silent** client-side, the `DC-3` shape. `R-IUR-004` **AC.6** demands client/server identity, and T-19 owns that parity proof: it must **not** be told the two surfaces already agree. Reachability: attempt 1's Reviewer could not construct a product path (`[min]="0"` reaches `p-inputNumber`'s clamp, a pasted `-1` is pinned by existing test c11, and the write DTO carries `@IsInt() @Min(0)` on all four counts), so only a direct DB write or a legacy row reaches it — the column is signed `int`. Not reachable, therefore not gated here; `total()! <= 0` would close it for one token if T-19's parity work wants it.
+
+> **FORWARD POINTER → T-16 (cumulative, now four items).** Gate 3 must name in words: (a) the amber border on a **text** field (`app-input :30`, `[style]`), (b) the amber border on a **number** field (`app-input :49`, class), (c) the message rows' line-height after the `fs-[14] leading-[1.25rem]` swap, (d) **T-04's new total-positivity message** (colour and `fs-[14]` asserted nowhere automatically). Plus gate 3b's dark-theme helper-text look and the two T-15 doc claims.
+
+**`ADVISORY` carried forward, unapplied (recorded, non-gating, none becomes a task in this spec)** — 1: `total() <= 0` (see the T-19 pointer). 3: harden `c9`'s `rs-mt-[4]` selector against the collision it now shares with the total message. 4: `showTotalNotPositive` re-derives emptiness that `InputComponent.isFilled()` now owns publicly; the two definitions must be kept in step by hand.

@@ -41,7 +41,8 @@ describe('InnovationUseActorItemComponent', () => {
 
   const appInputLabelled = (label: string) => appInputInstances().find(i => i.label === label);
 
-  const inputNumberInside = (de: ReturnType<typeof appInputs>[number]): InputNumber => de.query(By.directive(InputNumber)).componentInstance as InputNumber;
+  const inputNumberInside = (de: ReturnType<typeof appInputs>[number]): InputNumber =>
+    de.query(By.directive(InputNumber)).componentInstance as InputNumber;
 
   it('should create', () => {
     fixture.detectChanges();
@@ -112,53 +113,47 @@ describe('InnovationUseActorItemComponent', () => {
 
   // c2 — Switching modes clears the departing mode's fields in the emitted row.
   describe('c2 — mode switch clears the departing mode', () => {
-    it(
-      'disaggregated -> aggregate clears the four counts in the emitted row',
-      fakeAsync(() => {
-        component.actor = {
-          ...new InnovationUseActor(),
-          sex_age_disaggregation_not_apply: false,
-          women_youth_count: 4,
-          men_youth_count: 2
-        };
-        fixture.detectChanges();
-        tick();
-        flush();
-        const emitSpy = jest.spyOn(component.update, 'emit');
+    it('disaggregated -> aggregate clears the four counts in the emitted row', fakeAsync(() => {
+      component.actor = {
+        ...new InnovationUseActor(),
+        sex_age_disaggregation_not_apply: false,
+        women_youth_count: 4,
+        men_youth_count: 2
+      };
+      fixture.detectChanges();
+      tick();
+      flush();
+      const emitSpy = jest.spyOn(component.update, 'emit');
 
-        component.onModeChange(true);
-        tick();
-        flush();
-        fixture.detectChanges();
+      component.onModeChange(true);
+      tick();
+      flush();
+      fixture.detectChanges();
 
-        const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
-        expect(emitted.sex_age_disaggregation_not_apply).toBe(true);
-        expect(emitted.women_youth_count).toBeUndefined();
-        expect(emitted.women_not_youth_count).toBeUndefined();
-        expect(emitted.men_youth_count).toBeUndefined();
-        expect(emitted.men_not_youth_count).toBeUndefined();
-      })
-    );
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
+      expect(emitted.sex_age_disaggregation_not_apply).toBe(true);
+      expect(emitted.women_youth_count).toBeUndefined();
+      expect(emitted.women_not_youth_count).toBeUndefined();
+      expect(emitted.men_youth_count).toBeUndefined();
+      expect(emitted.men_not_youth_count).toBeUndefined();
+    }));
 
-    it(
-      'aggregate -> disaggregated clears actors_count in the emitted row',
-      fakeAsync(() => {
-        component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 9 };
-        fixture.detectChanges();
-        tick();
-        flush();
-        const emitSpy = jest.spyOn(component.update, 'emit');
+    it('aggregate -> disaggregated clears actors_count in the emitted row', fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 9 };
+      fixture.detectChanges();
+      tick();
+      flush();
+      const emitSpy = jest.spyOn(component.update, 'emit');
 
-        component.onModeChange(false);
-        tick();
-        flush();
-        fixture.detectChanges();
+      component.onModeChange(false);
+      tick();
+      flush();
+      fixture.detectChanges();
 
-        const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
-        expect(emitted.sex_age_disaggregation_not_apply).toBe(false);
-        expect(emitted.actors_count).toBeUndefined();
-      })
-    );
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
+      expect(emitted.sex_age_disaggregation_not_apply).toBe(false);
+      expect(emitted.actors_count).toBeUndefined();
+    }));
   });
 
   // c3 — Entering 3 and 2 in two disaggregated fields renders a LIVE total of 5.
@@ -218,37 +213,34 @@ describe('InnovationUseActorItemComponent', () => {
   // c7 — Actor type 5 reveals a mandatory Specify other; changing away from 5 clears
   // actor_type_custom_name in the emitted row.
   describe('c7 — OTHER reveals Specify other; leaving OTHER clears the custom name', () => {
-    it(
-      'shows the Specify other input only when actor_type_id === 5, and clears the name on change away',
-      fakeAsync(() => {
-        component.actor = new InnovationUseActor();
-        fixture.detectChanges();
-        tick();
-        flush();
-        const emitSpy = jest.spyOn(component.update, 'emit');
+    it('shows the Specify other input only when actor_type_id === 5, and clears the name on change away', fakeAsync(() => {
+      component.actor = new InnovationUseActor();
+      fixture.detectChanges();
+      tick();
+      flush();
+      const emitSpy = jest.spyOn(component.update, 'emit');
 
-        expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeNull();
 
-        component.onActorTypeChange(5);
-        fixture.detectChanges();
-        expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeTruthy();
+      component.onActorTypeChange(5);
+      fixture.detectChanges();
+      expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeTruthy();
 
-        component.onCustomNameChange('local cooperatives');
-        tick();
-        flush();
-        fixture.detectChanges();
-        let emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
-        expect(emitted.actor_type_custom_name).toBe('local cooperatives');
+      component.onCustomNameChange('local cooperatives');
+      tick();
+      flush();
+      fixture.detectChanges();
+      let emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
+      expect(emitted.actor_type_custom_name).toBe('local cooperatives');
 
-        component.onActorTypeChange(2);
-        tick();
-        flush();
-        fixture.detectChanges();
-        emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
-        expect(emitted.actor_type_custom_name).toBeUndefined();
-        expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeNull();
-      })
-    );
+      component.onActorTypeChange(2);
+      tick();
+      flush();
+      fixture.detectChanges();
+      emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
+      expect(emitted.actor_type_custom_name).toBeUndefined();
+      expect(fixture.debugElement.query(By.css('input[placeholder="Specify other"]'))).toBeNull();
+    }));
   });
 
   // c8 — A row with no actor type shows the inline required message and the error border.
@@ -291,7 +283,7 @@ describe('InnovationUseActorItemComponent', () => {
       const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
       fixture.detectChanges();
 
-      expect((fixture.nativeElement.textContent as string)).toContain('This field is required');
+      expect(fixture.nativeElement.textContent as string).toContain('This field is required');
 
       // AC.1 / AC.5 (T-04) — scenario 1 THEN, border half: the invalid p-select's `[style]`
       // binding assigns a real 2px `var(--ac-warning-1)` inline border.
@@ -389,15 +381,27 @@ describe('InnovationUseActorItemComponent', () => {
   });
 
   // c9 — duplicateType = true renders the duplicate message instead of the generic required message.
+  //
+  // T-04 note: this assertion was originally a whole-card `textContent` search for "This field is
+  // required". T-04 makes that search unsound (KZ-001 / the task's own Disqualifier) — the four
+  // count fields legitimately render their OWN "This field is required" messages on a fresh
+  // `InnovationUseActor()` (they are empty), and that is correct, unrelated behavior. The
+  // card-level messages (the actor-type required/duplicate template at `.html:2-7`, reused for
+  // "Specify other") are rendered with the `rs-mt-[4]` class; `app-input`'s own internal message
+  // uses `mt-1` instead (`input.component.html:64`) — scoping to `rs-mt-[4]` isolates exactly the
+  // actor-type slot c9 is about from the four counts' per-field messages.
   describe('c9 — duplicateType renders the duplicate message, not the generic one', () => {
     it('renders the duplicate message and not the generic required message', () => {
       component.actor = new InnovationUseActor();
       component.duplicateType = true;
       fixture.detectChanges();
 
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('already been reported on another row');
-      expect(text).not.toContain('This field is required');
+      const cardLevelMessages = fixture.debugElement
+        .queryAll(By.css('div'))
+        .filter(d => (d.nativeElement as HTMLElement).className.includes('rs-mt-[4]'));
+      const cardLevelText = cardLevelMessages.map(d => (d.nativeElement as HTMLElement).textContent?.trim()).join(' ');
+      expect(cardLevelText).toContain('already been reported on another row');
+      expect(cardLevelText).not.toContain('This field is required');
 
       // T-11 c3 — icon AND text, never text alone.
       const icon = fixture.debugElement.query(By.css('i.material-symbols-rounded'));
@@ -547,23 +551,152 @@ describe('InnovationUseActorItemComponent', () => {
   // completion report, not this block. This block instead covers the Implementation-note
   // invariant (design.md §5.2 / requirements A4): result_actors_id is passed through unchanged.
   describe('result_actors_id is passed through unchanged (T-05 Implementation notes / §5.2)', () => {
-    it(
-      'does not include result_actors_id in any mutation helper, and passes it through unchanged on emit',
-      fakeAsync(() => {
-        component.actor = { ...new InnovationUseActor(), result_actors_id: 77, actor_type_id: 1 };
-        fixture.detectChanges();
-        tick();
-        flush();
-        const emitSpy = jest.spyOn(component.update, 'emit');
+    it('does not include result_actors_id in any mutation helper, and passes it through unchanged on emit', fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), result_actors_id: 77, actor_type_id: 1 };
+      fixture.detectChanges();
+      tick();
+      flush();
+      const emitSpy = jest.spyOn(component.update, 'emit');
 
-        component.onActorTypeChange(2);
-        tick();
-        flush();
-        fixture.detectChanges();
+      component.onActorTypeChange(2);
+      tick();
+      flush();
+      fixture.detectChanges();
 
-        const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
-        expect(emitted.result_actors_id).toBe(77);
-      })
-    );
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseActor;
+      expect(emitted.result_actors_id).toBe(77);
+    }));
+  });
+
+  // T-04 (R-IUR-004 S1/S2/S3, DD-2) — the four required counts and the one cross-field total
+  // message. THE CENTRAL TRAP: total() === 0 is ALSO true when exactly one count is filled with
+  // 0 and the other three are absent (see the class doc on total(), .ts:66-81) — driving the
+  // total message off `total() === 0` alone would render it ALONGSIDE three per-field required
+  // messages, exactly the forbidden state DD-2's "One message, never five" rules out. The
+  // condition under test must therefore be "all four filled AND total() === 0", never total()
+  // alone.
+  //
+  // Disqualifier guard: message-count assertions here are scoped either to one field's own
+  // app-input container (fieldRequiredMessage, queried within that app-input's own DebugElement)
+  // or to the total message's own distinguishing class (.actor-total-required-message) — never a
+  // whole-card warning-icon count, which cannot tell "one total message" from "one leftover
+  // required message" apart (KZ-001).
+  describe('T-04 — four required counts and one cross-field total-positivity message', () => {
+    const fieldRequiredMessage = (de: ReturnType<typeof appInputs>[number]): boolean =>
+      de.queryAll(By.css('span')).some(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This field is required');
+
+    const totalMessages = () => fixture.debugElement.queryAll(By.css('.actor-total-required-message'));
+
+    // Falsifying input 1 (DC-2): a real, non-zero-sum row where one count is a deliberate 0 must
+    // be entirely valid — no per-field required message, no total message, no amber border on
+    // any of the four p-inputNumber hosts.
+    it('0 / 5 / 0 / 0 is valid: no per-field required message, no total message, no amber border', () => {
+      component.actor = {
+        ...new InnovationUseActor(),
+        sex_age_disaggregation_not_apply: false,
+        women_youth_count: 0,
+        women_not_youth_count: 5,
+        men_youth_count: 0,
+        men_not_youth_count: 0
+      };
+      fixture.detectChanges();
+
+      appInputs().forEach(de => expect(fieldRequiredMessage(de)).toBe(false));
+      expect(totalMessages().length).toBe(0);
+      appInputs().forEach(de => {
+        const hostEl = de.query(By.directive(InputNumber)).nativeElement as HTMLElement;
+        expect(hostEl.className).not.toContain('border-[var(--ac-warning-1)]');
+      });
+      expect(totalText()).toBe('5');
+    });
+
+    // Falsifying input 2: all four filled with 0 must render EXACTLY one total message and ZERO
+    // required messages — the state the naive `total() === 0` implementation collides with.
+    it('0 / 0 / 0 / 0 renders exactly one total message and zero required messages', () => {
+      component.actor = {
+        ...new InnovationUseActor(),
+        sex_age_disaggregation_not_apply: false,
+        women_youth_count: 0,
+        women_not_youth_count: 0,
+        men_youth_count: 0,
+        men_not_youth_count: 0
+      };
+      fixture.detectChanges();
+
+      const requiredCount = appInputs().filter(de => fieldRequiredMessage(de)).length;
+      expect(requiredCount).toBe(0);
+      expect(totalMessages().length).toBe(1);
+    });
+
+    // Falsifying input 3: one field filled (Women youth = 3, a non-zero value), three empty, must
+    // render three required messages and no total message — this covers R-IUR-004 S3 with a
+    // non-zero fill. The sibling test below (falsifying input 4) covers the same shape with a 0
+    // fill instead, which is the one that discriminates the `allFilled` conjunct in
+    // `showTotalNotPositive`: with 0, `total() === 0` is ALSO true, so only the `allFilled` guard
+    // stops the total message from rendering alongside the three required messages.
+    it('one filled (Women youth = 3), three empty: three required messages, no total message', () => {
+      component.actor = {
+        ...new InnovationUseActor(),
+        sex_age_disaggregation_not_apply: false,
+        women_youth_count: 3
+      };
+      fixture.detectChanges();
+
+      const requiredCount = appInputs().filter(de => fieldRequiredMessage(de)).length;
+      expect(requiredCount).toBe(3);
+      expect(totalMessages().length).toBe(0);
+    });
+
+    // Falsifying input 4 (the collision input): one field filled with 0, three empty — the input
+    // that separates the two readings of `total() === 0` (all four filled and summing to 0, vs.
+    // one 0 and three absent). Without `allFilled &&` in `showTotalNotPositive`, `total() === 0`
+    // is true here too, and the total message would render ALONGSIDE the three required
+    // messages — exactly DD-2's forbidden "one message, never five" violation.
+    it('one filled with 0 (Women youth = 0), three empty: three required messages and NO total message', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: false, women_youth_count: 0 };
+      fixture.detectChanges();
+      expect(appInputs().filter(de => fieldRequiredMessage(de)).length).toBe(3);
+      expect(totalMessages().length).toBe(0);
+    });
+
+    // R-IUR-004 AC.1: each of the four fields carries a red asterisk (rendered by app-input
+    // itself via `[label]` + `requiredMode !== 'off'`, per the Structural fact in the brief — the
+    // card must NOT also render its own asterisk for these fields, which would double it).
+    it('each of the four counts carries exactly one red asterisk (rendered by app-input, not the card)', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: false };
+      fixture.detectChanges();
+
+      appInputs().forEach(de => {
+        const asterisks = de.queryAll(By.css('span.text-red-500')).filter(s => (s.nativeElement as HTMLElement).textContent?.trim() === '*');
+        expect(asterisks.length).toBe(1);
+      });
+    });
+
+    // R-IUR-004 S2 gate: the total-positivity message must never fire on the aggregate path,
+    // where total() returns actors_count (T-05's 'positive'-mode concern, not this one's).
+    // WHAT THIS TEST CANNOT REACH (KZ-017): no single-guard mutation reddens it. The template
+    // gates the ENTIRE disaggregated subtree — the four counts AND the showTotalNotPositive
+    // @if — behind `@if (!body().sex_age_disaggregation_not_apply)` (.html:77-146), so in
+    // aggregate mode Angular never instantiates the total-message @if and never evaluates the
+    // getter. Removing the getter's early return was MEASURED not to redden this test; removing
+    // the template gate alone does not either, because the early return still returns false.
+    // The getter's early return is defense-in-depth against a call site that does not currently
+    // exist and is untestable from the DOM by design. The four disaggregated counts are set to 0
+    // here only to state the full collision shape explicitly — not because that gives this test
+    // discriminating power, which it does not.
+    it('does not render the total message on the aggregate path, even when actors_count is 0', () => {
+      component.actor = {
+        ...new InnovationUseActor(),
+        sex_age_disaggregation_not_apply: true,
+        actors_count: 0,
+        women_youth_count: 0,
+        women_not_youth_count: 0,
+        men_youth_count: 0,
+        men_not_youth_count: 0
+      };
+      fixture.detectChanges();
+
+      expect(totalMessages().length).toBe(0);
+    });
   });
 });

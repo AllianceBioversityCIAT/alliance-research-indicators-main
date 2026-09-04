@@ -1,5 +1,18 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-05 — innovation use actor card)
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, effect, inject, signal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+  computed,
+  effect,
+  inject,
+  signal,
+  WritableSignal
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
@@ -93,6 +106,24 @@ export class InnovationUseActorItemComponent implements OnInit, OnChanges {
 
   get otherNameMissing(): boolean {
     return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name;
+  }
+
+  /**
+   * T-04 (R-IUR-004 S2, DD-2) — the four-count cross-field total-positivity message.
+   * `total()` (above) returns `0` in TWO situations that require opposite UI: all four counts
+   * filled with `0` (this message, and ONLY this message), or exactly one count filled with `0`
+   * while the other three are absent (three per-field required messages, and NOT this one).
+   * Consuming `total()`'s sum alone therefore cannot drive this message — it must also require
+   * all four counts to be filled, matching `requiredMode="filled"`'s own definition of filled
+   * (`null`/`undefined` are empty; `0` is filled). Gated to the disaggregated path only: on the
+   * aggregate path `total()` returns `actors_count`, which is T-05's `'positive'`-mode concern.
+   */
+  get showTotalNotPositive(): boolean {
+    const current = this.body();
+    if (current.sex_age_disaggregation_not_apply) return false;
+    const counts = [current.women_youth_count, current.women_not_youth_count, current.men_youth_count, current.men_not_youth_count];
+    const allFilled = counts.every(count => count !== null && count !== undefined);
+    return allFilled && this.total() === 0;
   }
 
   /** Selecting away from OTHER clears `actor_type_custom_name` (R-IUP-010 AC.3). */

@@ -99,6 +99,7 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
         <app-input
@@ -109,6 +110,7 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
         <app-input
@@ -119,6 +121,7 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
         <app-input
@@ -129,9 +132,17 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
       </div>
+
+      @if (showTotalNotPositive) {
+        <div class="actor-total-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+          <i class="material-symbols-rounded !text-[14px]">warning</i>
+          <span class="fs-[14]">The total must be greater than 0</span>
+        </div>
+      }
     } @else {
       <div class="rs-pt-[12]">
         <app-input
