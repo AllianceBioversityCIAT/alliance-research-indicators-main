@@ -360,3 +360,13 @@ Leader-measured and Reviewer-confirmed independently: `--ac-grey-600` is `#8d929
 **Requirements covered** — `R-IUR-003` AC.1–AC.3 (`app-input` half) and S1's `BUT`/`AND IT MUST NOT` pair · `NFR-IUR-002`. **All at token-compliance level only.**
 
 **Cannot prove (`KZ-017`)** — **paint.** No check here observes a painted border or a computed line-height; jsdom computes no layout. `border-[var(--ac-warning-1)]` and `text-[var(--ac-grey-600)]` rely on Tailwind v4's arbitrary-value type inference defaulting to *colour* for an un-inferable `var()`; the Leader corroborated the idiom is established (91 `border-[var(--…)]`, 141 `text-[var(--…)]`, 139 `leading-[…]` occurrences in shipped templates) but **corroboration is not observation**. Additionally the Reviewer flagged that `index.html:9` loads `colors.css` from an **external S3 bucket** which, if it redefines `--ac-*`, means the effective runtime values are not the committed SCSS ones — neither agent could fetch it. That cuts *in favour* of this diff (a hardcoded hex bypasses the override entirely), but the Q4 numbers are from committed SCSS only. Per this task's Disqualifier, **its visual claims are INCONCLUSIVE, never passing, until T-16 gate 3 runs.**
+
+### T-16 gate 3b added — user ruling at the T-02 execution gate, 2026-09-04
+
+**Ruling:** widen T-16 gate 3 by one item rather than shipping the dark-theme delta on recorded reasoning alone.
+
+`tasks.md` T-16 now carries **gate 3b** — one dark-theme look at an `app-input` carrying `helperText` — with its reason inline, plus gate 3's field list made explicit (text-field border, number-field border, message line-height, and the two T-15 doc claims). §7's Definition of Done gained the matching checkbox.
+
+**Why this is recorded as a user decision and not a Leader edit.** The Advisory rules forbid a Leader minting work from an advisory or widening an approved task to absorb one — advisories are the least-vetted findings in a run and that path grows scope fastest from the weakest evidence. This addition came from T-02's `ADVISORY 1`, so the Leader escalated it at the gate instead of applying it. The user chose to add it. The alternative offered and declined was leaving gate 3 light-theme-only and relying on `DD-10`'s recorded reasoning; a third option (reopening the whole visual-coverage question via the Pivot Protocol) was also offered and declined as disproportionate.
+
+**Budget impact:** none — no new task, no LOC. Gate 3 is a human observation the user already performs; this adds one look while they are already in a browser.
