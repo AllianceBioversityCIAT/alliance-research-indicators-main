@@ -2,10 +2,11 @@
 
 - **Module:** client (`innovation-use-details` + 2 shared components) · server (1 migration)
 - **Spec id:** 2026-09-innovation-use-required-fields
-- **Status:** not-started
+- **Status:** in-progress — **per-task status lives in [`./execution.md`](./execution.md) §1.2 (status board)**, since §4 below carries no per-task checkbox
 - **Owner:** D. Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) — **revision 6**
+- **Linked execution:** [`./execution.md`](./execution.md)
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
 - **Last updated:** 2026-09-04
 - **Depth:** Full

@@ -685,6 +685,217 @@ describe('InputComponent', () => {
       });
     });
   });
+
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode precedence)
+  // Falsifying inputs and boundaries from design.md DD-1/DD-2 and requirements.md R-IUR-004/005/009/010.
+  // `inputValid()` is driven through the SIGNAL input (via the mocked `getNestedProperty`), exactly
+  // as `inputValid()` itself reads (`getNestedProperty(this.signal(), ...)`). `isInvalid()` is driven
+  // through `body()` directly, exactly as `isInvalid()` itself reads — the two sources are asserted
+  // separately on purpose (KZ-015 disqualifier: a same-source test would hide the divergence).
+  describe('T-01 — requiredMode precedence and boundaries', () => {
+    it('defaults to "off"', () => {
+      expect(component.requiredMode).toBe('off');
+    });
+
+    describe('mode "filled"', () => {
+      it('FALSIFYING (precedence) — isRequired=true AND requiredMode="filled" holding 0 renders NO amber and NO message', () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+        component.body.set({ value: 0 });
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it('FALSIFYING — a whitespace-only string is treated as empty and reddens', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '   ' });
+        utilsService.getNestedProperty.mockReturnValue('   ');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('empty string is invalid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '' });
+        utilsService.getNestedProperty.mockReturnValue('');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('a non-blank value is valid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 'hello' });
+        utilsService.getNestedProperty.mockReturnValue('hello');
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "positive"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is filled-but-not-positive: a distinct positivity message, not the required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be greater than 0');
+      });
+
+      it('1 ⇒ valid', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 1 });
+        utilsService.getNestedProperty.mockReturnValue(1);
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "nonzero"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is invalid with a zero message, distinct from the required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be different from 0');
+      });
+
+      it('FALSIFYING — a negative value (-5) is valid; negatives are accepted', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: -5 });
+        utilsService.getNestedProperty.mockReturnValue(-5);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+      });
+    });
+
+    describe('isInvalid() honors requiredMode precedence, driven through body()', () => {
+      it("mode 'off' leaves the legacy isRequired falsy-0 behavior untouched (regression guard)", () => {
+        component.isRequired = true;
+        component.requiredMode = 'off';
+        component.body.set({ value: 0 });
+        // Pre-existing latent DC-2 behavior for 'off' mode — explicitly NOT this task's scope to fix.
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING (precedence) — mode 'filled' with isRequired=true and value 0: isInvalid() is false", () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it("mode 'positive' with value 0: isInvalid() is true", () => {
+        component.requiredMode = 'positive';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING — mode 'nonzero' with value -5: isInvalid() is false", () => {
+        component.requiredMode = 'nonzero';
+        component.body.set({ value: -5 });
+        expect(component.isInvalid()).toBe(false);
+      });
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode asterisk)
+// A separate top-level suite for the same reason as the rendered p-inputNumber suite above: the
+// outer `describe('InputComponent', ...)` overrides the template with '', so the real label/asterisk
+// markup never renders there. The asterisk render condition (`:6`) must be asserted on the REAL
+// rendered template (KZ-001) — a presence check on `component.isRequired`/`component.requiredMode`
+// would prove the inputs were set, not that the template's `@if` reads them.
+describe('InputComponent — rendered asterisk (T-01 requiredMode)', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+
+  async function render(config: { isRequired?: boolean; requiredMode?: 'off' | 'filled' | 'positive' | 'nonzero' }): Promise<void> {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.label = 'Test label';
+    // `type: 'number'` avoids the `text` branch's `appSaveOnWriting` directive, which resolves a
+    // DI chain (ActionsService -> ApiService -> ToPromiseService -> HttpClient) not provided by this
+    // harness and unrelated to the asterisk being asserted — same reason the pre-existing "rendered
+    // p-inputNumber" suite above renders as `type: 'number'`.
+    component.type = 'number';
+    if (config.isRequired !== undefined) component.isRequired = config.isRequired;
+    if (config.requiredMode !== undefined) component.requiredMode = config.requiredMode;
+    fixture.detectChanges();
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('renders no asterisk when isRequired=false and requiredMode="off"', async () => {
+    await render({});
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).toBeNull();
+  });
+
+  it('FALSIFYING — renders the asterisk when requiredMode is active even with isRequired=false', async () => {
+    await render({ requiredMode: 'filled' });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
+
+  it('still renders the asterisk for the legacy isRequired=true, requiredMode="off" case', async () => {
+    await render({ isRequired: true });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
 });
 
 // @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
