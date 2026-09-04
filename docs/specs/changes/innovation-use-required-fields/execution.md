@@ -38,7 +38,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | --- | --- | --- |
 | T-01 `app-input` requiredMode + precedence | `[x]` | PASS attempt 1. Spec gap escalated — see Pivot Record |
 | T-02 `app-input` DD-10 token sweep | `[x]` | PASS attempt 1. Visual claims INCONCLUSIVE → T-16 gate 3 |
-| T-03 `quantification-item` 5 inputs | `[ ]` | `unitRequiredMode` added by pivot |
+| T-03 `quantification-item` 5 inputs | `[x]` | PASS attempt 1. Branch RED until T-12 (measured) |
 | T-04 actor disaggregated counts + total msg | `[ ]` | forward pointer filed (scope the cohort spy) |
 | T-05 actor aggregate path | `[ ]` | |
 | T-06 actor custom name trimmed | `[ ]` | |
@@ -47,7 +47,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[ ]` | |
-| T-12 details measure wiring | `[ ]` | `[unitRequiredMode]="'filled'"` added by pivot |
+| T-12 details measure wiring | `[ ]` | pivot input + **forward pointer: must REWRITE c10, restores build** |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
@@ -370,3 +370,84 @@ Leader-measured and Reviewer-confirmed independently: `--ac-grey-600` is `#8d929
 **Why this is recorded as a user decision and not a Leader edit.** The Advisory rules forbid a Leader minting work from an advisory or widening an approved task to absorb one — advisories are the least-vetted findings in a run and that path grows scope fastest from the weakest evidence. This addition came from T-02's `ADVISORY 1`, so the Leader escalated it at the gate instead of applying it. The user chose to add it. The alternative offered and declined was leaving gate 3 light-theme-only and relying on `DD-10`'s recorded reasoning; a third option (reopening the whole visual-coverage question via the Pivot Protocol) was also offered and declined as disproportionate.
 
 **Budget impact:** none — no new task, no LOC. Gate 3 is a human observation the user already performs; this adds one look while they are already in a browser.
+
+---
+
+### T-03 — `quantification-item`: replace `fieldsRequired` with five per-field inputs
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1). Leaves the branch **intentionally red** until T-12 — see *Collateral state* below |
+| Date | 2026-09-04 |
+| Implementer attempts | **1** |
+| Effort assigned | `high` (task said `M`; raised because `DC-5` makes a silent OICR regression the failure mode, the only instrument able to prove AC.5 is the very suite being rewritten, and `DC-8` means stale spec references survive `ts-jest` silently) |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max`, **`tdd`** |
+| Skill deviation | **`tdd` added** — not to drive red-green, but for its **anti-pattern** guidance (implementation-coupled, tautological, blind-double tests). This task's Disqualifier is a textbook blind-double trap and the spec rewrite is where that guidance pays. Recorded per `.agents/leader.md` → *Delegation Discipline*. |
+
+**Files changed** — `quantification-item.component.ts` (+5 inputs, −1) · `.html` (3 `@if` conditions + 2 bindings) · `.spec.ts` (describe block rewritten wholesale)
+
+| Site | Before → After |
+| --- | --- |
+| `.html:16→17` Number | `@if (fieldsRequired)` → `@if (numberRequired)`; `[isRequired]="numberRequired" [requiredMode]="numberRequiredMode"`, `[validateEmpty]` **removed** |
+| `.html:22→23` Unit | `@if (fieldsRequired)` → `@if (unitRequired)`; `[isRequired]="unitRequired" [requiredMode]="unitRequiredMode"`, `[validateEmpty]` **removed** |
+| `.html:30→31` Comments | `@if (fieldsRequired)` → `@if (commentsRequired)`; `[isRequired]="commentsRequired"` on `app-textarea` (**no** `requiredMode` — that input exists only on `app-input`, per `DD-4`) |
+| `.ts` | `fieldsRequired` removed; `numberRequired`/`unitRequired`/`commentsRequired` = `true`, `numberRequiredMode`/`unitRequiredMode` = `'off'` |
+
+**Two structural facts the Leader verified and briefed, absent from the task file**
+
+1. **The card owns all three asterisks.** They are rendered by the card's own `<h2 class="label">…@if (…) {*}</h2>`, not by `app-input` — because no call site passes `[label]` and `app-input`'s asterisk sits inside `@if (label)`. So T-01's asterisk change is inert here, converting the card's three conditions is what discharges AC.1, and adding a `[label]` binding would render **two** asterisks per field. Reviewer confirmed no `[label]` was introduced and that both children gate their own asterisk behind `@if (label)`; also that `By.css('h2.label span')` is structurally safe because the children emit `<label class="label">`, never an `h2`.
+2. **`Comments` is an `app-textarea`, not an `app-input`** — so `commentsRequired` is boolean-only with no mode to pass. Correct by design (`DD-4`), not an omission. Briefed explicitly so no mode input would be invented on `app-textarea`.
+
+**Verification**
+
+- `npx eslint` on the `.ts` and `.html` → clean, no output.
+- `npx jest quantification-item.component.spec --coverage=false --silent` → **48/48 PASS**.
+- `npm test -- --silent -- quantification-item.component.spec` → 48/48 pass, **exit 1** on coverage floors (`statements 5.26%`) — the documented `K-020` false negative, independently confirmed by the Leader at `client/research-indicators/src/CLAUDE.md:152`.
+- `npx jest oicr-details.component.spec --coverage=false --silent` → **56/56 PASS**, reported and recorded as a *"did not break OICR outright"* sanity check and **explicitly not** as AC.5 evidence.
+- `npx tsc -p tsconfig.spec.json --noEmit`, normalized and restricted to `quantification-item.component`, true-before (`HEAD` files) vs. true-after → **identical sets**, both exactly the 5 pre-existing `TS2552: Cannot find name 'SimpleChanges'`. No new errors.
+
+**AC.5 evidence — the hard part of this task**
+
+`R-IUR-010` AC.5 cannot be proven from OICR's own suite: `oicr-details.component.spec.ts:872-880` stubs the card with an empty-template `FakeQuantificationItemComponent`, so a green OICR run is compatible with all three asterisks having vanished (`KZ-001`, and this feature has already paid for it once — `C-3`/`S-7`). The proof therefore lives in `quantification-item.component.spec.ts`, against the **real** component in its **default, no-inputs-passed** configuration.
+
+**The Reviewer independently confirmed that configuration is byte-for-byte the OICR call-site shape**, reading the source rather than accepting the claim: `oicr-details.component.html:60-62` binds only `[quantification]`, `[quantNumber]`, `[disabled]`, `(update)`, `(delete)`; `:81-84` adds only `[headerLabel]`. Neither passes any of the five required-related inputs, nor `[label]`, nor `[min]`/`[max]`/`[maxFractionDigits]`/`[placeholder]`. It found a **second, independent witness**: the stub's own declared input list (`quantification`, `quantNumber`, `headerLabel`, `disabled` + two outputs) corroborates what the real template binds.
+
+**Mutation evidence (the task's falsifying input):** `commentsRequired`'s default flipped to `false` → **6 failures**, including `Expected: 3, Received: 2` on the three-messages test; reverted; 48/48 green again. The Reviewer checked the failure **count** for internal consistency against the code and derived exactly 6 (defaults, forwarding, three-asterisks, three-messages, and the two sibling per-field tests dropping 2→1, while the `commentsRequired=false` test itself keeps passing since it expects 2 either way) — arithmetic a fabricated or mis-scoped count would not match.
+
+**Mode-forwarding discrimination — record this precisely (`KZ-014`)**
+
+The two mode-forwarding tests set a **non-default** value (`numberRequiredMode='nonzero'`, `unitRequiredMode='filled'`) and assert the child received it plus that the sibling stayed `'off'`. Since `app-input`'s own default is `'off'` (`input.component.ts:50`), they **discriminate a deleted or cross-wired `[requiredMode]` binding by construction** — deletion drops the child to `'off'` and reddens the assertion; cross-wiring reddens the paired sibling assertion.
+
+**This red is reasoned structurally, NOT observed.** It must never be recorded as observed RED. The Implementer's own report *understated* its evidence here, claiming these tests "cannot produce a self-contained red from a source mutation without re-editing"; the Leader challenged that reading and the Reviewer ruled the challenge correct. An implementer being too hard on itself is not a defect, but the record must be accurate either way (`KZ-007`). The complementary mutation class — changing the defaults — is covered by the separate defaults test, so the mode inputs are pinned on both axes.
+
+**Record correction (`KZ-007`)** — the Implementer labelled its `3 failed / 39 passed` baseline run *"before touching anything."* **That label is impossible and is corrected here.** Those three tests were green in the Leader's post-T-02 full-suite run (6823/6823, exit 0), which included this spec file; they can only redden **after** the `.ts`/`.html` edit. The run is valid and its blast-radius finding stands — the correct label is **after the source edit, before the spec rewrite**, which is also what the in-code comment at `.spec.ts:108-110` says. Caught by the Reviewer, confirmed by the Leader against its own prior measurement.
+
+**Coverage question — ruled: no loss, a strict upgrade.** The old suite had one test asserting `fieldsRequired = false` dropped **all three** asterisks (`length === 0`); the rewrite replaces it with three independent per-field tests (`length === 2` each). Neither `DD-4` nor `R-IUR-010` names an all-three-off case and no call site produces one (`DD-4` gives OICR `true/true/true` and Innovation Use `true/true/false`). The old assertion was a **cohort assertion** that could not attribute any asterisk to any flag — `KZ-001`'s exact failure mode — whereas each new test pins one flag *and* asserts the sibling child's `isRequired` is untouched. Raised by the Leader as a possible regression; ruled an upgrade over an unreachable configuration.
+
+**`R-IUR-013` AC.1 — OICR byte-identical, traced not assumed.** Every new input defaults to `true`/`true`/`true`/`'off'`/`'off'`. The Reviewer traced `inputValid()` after T-01 per value class (`null`, `''`, `0`, `'   '`, non-empty): with `requiredMode === 'off'`, `:222` `isRequired && (!value || value.length === 0)` returns the required message first, and `:225`'s `validateEmpty && !value` is only reachable when `value` is truthy — at which point `!value` is false. So the branch is **unreachable while `isRequired` is `true`** (OICR, both fields) and inert while false; removing the bindings changes nothing OICR sees. `isInvalid()` never reads `validateEmpty` at all. `validateEmpty` itself is untouched on `app-input`, as `DD-1`/`S-8` require.
+
+**Consumer enumeration by what renders (`KZ-002`)** — repo-wide, unfiltered: `app-quantification-item` has exactly **three** call sites (`oicr-details.component.html:60`, `:81`, `innovation-use-details.component.html:222`). Only the third binds `fieldsRequired`. No fourth consumer, no `.ts`-side reference outside the rewritten spec.
+
+### Collateral state — the branch is intentionally RED until T-12 lands
+
+The Reviewer predicted two collateral reds structurally, having no execution tools. **The Leader measured both.** Neither is a T-03 defect; both are the spec's own T-03→T-12 sequencing, which `tasks.md` §2 orders, §3 bundles into one PR gated only at T-16, and `design.md`'s `S-5` paragraph anticipates.
+
+| Predicted | Leader measurement |
+| --- | --- |
+| `innovation-use-details.component.spec.ts` c10 reddens — the measures card now falls back to `true` defaults while `:227` still binds the removed input | **CONFIRMED.** `npx jest innovation-use-details.component.spec --coverage=false --silent` → **1 failed / 150 passed**, failing at exactly the predicted line `:383` `expect(hasAsteriskTextNode(quantificationsCard)).toBe(false)` — `Expected: false, Received: true` |
+| `npm run build` red with NG8002, so T-16's gates are unreachable until T-12 | **CONFIRMED.** `✘ [ERROR] NG8002: Can't bind to 'fieldsRequired' since it isn't a known property of 'app-quantification-item'. Error occurs in the template of component InnovationUseDetailsComponent.` · `Application bundle generation failed. [5.428 seconds]` · build exit **1**. *(`K-014` note: the grep pipeline reported exit 0 while the build itself exited 1 — the raw output is the signal, not the pipeline's status.)* |
+
+`innovation-use-details.component.html:227` (`[fieldsRequired]="false"`) was left deliberately, flagged by the Implementer in its `Not Done`, and ruled the correct intermediate state by the Reviewer: T-12's Files line explicitly owns that template **and** its spec, so repairing it inside T-03 would be scope leakage.
+
+> **FORWARD POINTER → T-12 (Leader-owned; must be copied into T-12's brief).** T-12 must **rewrite** the c10 assertion at `innovation-use-details.component.spec.ts:357`–`:384`, not merely restore it to green. `R-IUR-010` AC.1 **deliberately reverses** what that test asserts — measures now *do* carry asterisks on `Number` and `Unit`, and `Comments` does not. A T-12 that makes the suite green by re-satisfying the old expectation has re-implemented the behaviour the requirement removes. Also: `npm run build` and the full client suite are **both red in this window** and only T-12 restores them, so neither red may be read as a new defect before T-12 lands.
+
+**`ADVISORY` (4R — recorded, non-gating; none becomes a task in this spec)**
+
+1. *Reliability* — the three per-field tests assert the asterisk **count** (`2`), not which label lost its asterisk, so a hypothetical Number↔Unit swap of the two `@if` conditions would keep every count intact and pass. **Not reachable in this diff** (Reviewer read the template; wiring is correct per field) — test-strength, not a defect. Cheap hardening: key on the `h2.label` whose `textContent` starts with `Number`/`Unit`/`Comments`.
+2. *Reliability* — the card's asterisk conditions are the bare booleans, so a consumer passing `numberRequired=false` **with** `numberRequiredMode='nonzero'` would get a required field with **no** asterisk, diverging from `DD-1`'s `isRequired || requiredMode !== 'off'` rule. **Could not construct such a call site** from anything current or spec-mandated (`DD-4` pairs every non-`'off'` mode with `required=true`). Closing it would read `@if (numberRequired || numberRequiredMode !== 'off')` — but that is a **`DD-4` change, not an implementation liberty**, so it is left alone.
+3. *Risk / token compliance* — `.html:17`/`:23`/`:31` were rewritten this task and still carry `text-[#CF0808]`. **No new hex is introduced** (the literal is preserved verbatim) and `R-IUR-003`/`DD-10`/T-02 scope tokenization to `app-input` only, which is why this is advisory rather than a FAIL under the root guide's hex rule. Whether it belongs in a later sweep is a Leader/user decision, deliberately not taken here.
+4. *Readability* — the `'off' | 'filled' | 'positive' | 'nonzero'` union is now duplicated in `quantification-item.component.ts` and `input.component.ts`. `app-input` exports no type alias; exporting `export type RequiredMode = …` would make a future fifth mode a one-line change instead of a three-site sweep.
+
+**Requirements covered** — `R-IUR-010` AC.1, AC.3, **AC.5** (both OICR call sites) · S1's `BUT it must NOT change the OICR measure card` · `R-IUR-013` AC.1.
+
+**Cannot prove (`KZ-017`)** — **paint** (`DC-7`): presence of the asterisk and message nodes is not visual verification; T-16 gate 3 owns it. The `tsc` set diff was **restricted to `quantification-item.component`** and structurally cannot see a new error elsewhere; the Reviewer closed that gap by grep instead (the only surviving `fieldsRequired` references outside the rewritten spec are a *comment* at `innovation-use-details.component.spec.ts:378` and the *template* binding at `:227`, and `tsconfig.spec.json` type-checks neither — the binding is caught by `ng build`, which the Leader has now measured as red). The **Reviewer executed nothing** — read-only wrapper, so every red it named was structural reasoning, explicitly not observation; the Leader measured both of its predictions and they held.
