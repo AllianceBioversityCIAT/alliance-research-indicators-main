@@ -144,3 +144,83 @@ catch fix-caused defects and found **twelve**, two of them severe. Self-certifyi
 2. **`OQ-4` is blocking** — who applies the migration, and when (`K-015`).
 3. The `text-sm` → `fs-[14]` line-height decision (`N-8`) is left to the implementer with a browser check.
 4. The revision-3 delta is unjudged. A third opinion before `/akili-execute` is available and was not spent.
+
+---
+
+# Round 3 — final scoped re-judgment (budget exhausted)
+
+Scope: are the round-2 fix-caused defects closed, are the three PARTIALs closed, and did revision 3
+introduce new defects. Both judges were also asked for an explicit readiness verdict.
+
+## ⚠️ The judges CONTRADICTED each other
+
+| | Judge A | Judge B |
+| --- | --- | --- |
+| New severe | **0** | **3** |
+| Closure | 13 closed, 2 partial | 10 closed, 3 partial |
+| Readiness | No — blocker: `R-IUR-014` has no site-2 scenario/AC | No — blocker: `DD-8` site-2 traps the user |
+
+Per the protocol a contradiction escalates to a human. But the disagreement rested on **one
+checkable fact**, so the orchestrator verified it directly rather than handing over a coin-flip.
+
+## Orchestrator adjudication — Judge B is correct on all three
+
+| Check | Command / evidence | Result |
+| --- | --- | --- |
+| Does `p-inputNumber` declare `style` as an `@Input`? | `primeng-inputnumber.mjs:1677` | **Yes** — `style: "style"` in the `inputs` map |
+| Does it ever apply it? | `grep -c styleMap` → **0**; `grep -o "this\.style[^C]"` → **zero matches**; host bindings are `ɵɵattribute`×2 + `ɵɵclassMap` | **No — never applied** |
+| Does `onKnownToggle` clear the inactive path? | `innovation-use-organization-item.component.ts:130-133`, comment: *"Neither path clears the other's fields"* | **No** |
+| Is the inactive path reachable in the UI? | `@if (body().is_organization_known)` at `.html:36`, `@else` at `:79`; no `[showClear]` on any select | **No — not rendered, not clearable** |
+
+**Judge A's `N-2: CLOSED` was wrong.** It reasoned that `cssstyle`'s `setProperty` delegates to the
+accessor, so the spy generalizes. True in isolation, but irrelevant: the value never reaches the DOM
+at all, because Angular shadows the binding into the directive input that PrimeNG then ignores. A
+answered *"can the spy observe a DOM write?"* and never asked *"is there a DOM write?"* — `KZ-017`,
+in the round whose job was catching exactly that.
+
+## Verified-and-UNFIXED severe findings
+
+| ID | Finding | Status |
+| --- | --- | --- |
+| **P-1** | `DD-3`'s setter-spy gate cannot fire for rules 3, 5, 9, 10 — the `[style]` binding it observes is never applied | **OPEN** — fix budget exhausted |
+| **P-2** | `DD-10` orders `input.component.html:49` deleted on a false premise; it is plausibly the **only** mechanism painting the amber border on every number field, app-wide. `.p-inputnumber` has no competing border rule, so the inertness argument does not transfer. **Requires a browser measurement no judge, and no test in this repo, can supply.** | **OPEN** |
+| **P-3** | `DD-8`'s "either direction" site-2 gate creates a permanently unsaveable organization row whose only escape is deletion | **OPEN** |
+
+## Confirmed by both judges (non-severe, unfixed)
+
+- **`C-7` is still half-open** (A): `R-IUR-014` has **no scenario and no AC for site 2** — `:453-475` are all site-1. The gate this whole revision exists to make constructible would decompose into no task and no falsifier. *One-clause fix.*
+- **`P-5`** — `DC-2b` / `DC-8` registered in `requirements.md` §4 but absent from the §11 requirement→class index.
+- **`P-7`** — `R-IUR-010` AC.7 (an **actor**-card rule) is filed under the **measures** requirement; A adds that it also collides with `R-IUR-003` AC.1's asterisk sweep and silently answers the still-open `OQ-2`.
+- **`P-6`** — §6 and §10 point at each other for the `NFR-IUR-003` narrowing; the substance is in `requirements.md`, and §10 still has no row for it.
+- **`P-8`** — the §11 budget was not re-baselined for revision 3.
+
+## Terminal receipt
+
+| Field | Value |
+| --- | --- |
+| Rounds used | **2 fix rounds, 2 scoped re-judgments — budget fully exhausted** |
+| Round 1 | 15 confirmed · 9 suspect · 0 contradictions |
+| Round 2 | 21 closed · 3 partial · 12 fix-caused (2 severe, both confirmed) |
+| Round 3 | 13/10 closed · 2/3 partial · **judges contradicted** · 3 severe, orchestrator-verified |
+| Readiness | **Both judges: NO**, for different blocking reasons |
+| Final document | revision 3 + a DO-NOT-IMPLEMENT block on `DD-3`, `DD-10`, `DD-8` site-2 |
+
+## **JUDGMENT: ESCALATED ⚠️ — terminal**
+
+Three severe defects are **verified and unfixed**. The document carries a prominent
+DO-NOT-IMPLEMENT block so `/akili-execute` cannot act on them unknowingly, but the spec is **not**
+ready for task decomposition.
+
+**What this review actually bought.** Across three rounds it found a stored-function rewrite that
+would have silently dropped the level and justification rules; a green check that would have gone
+permanently false on every soft-deleted row; a save gate that could not fire; a gate that trapped
+the user; and an ordered deletion that would have removed a live visual affordance app-wide. None
+was reachable by any automated gate in this repo.
+
+**The recurring lesson, three rounds running:** every severe finding was an **inertness or parity
+claim asserted from the design's own frame without checking the mechanism** — `DC-3` and `KZ-017`,
+the two classes this design named as dominant and then reproduced in each of its own revisions,
+including inside the corrections written to close them.
+
+**Blocking before `/akili-execute`:** `P-1`, `P-2`, `P-3`, `C-7`'s open half, `OQ-4`, `OQ-6`.
+`P-2` needs a **browser measurement**, not another review round.

@@ -13,12 +13,27 @@
 > **Revision 3 note.** Round 1: 15 confirmed findings — the structure survived, the **factual layer**
 > did not; five were the same mistake, asserting parity between surfaces that are not in parity
 > (`DC-3`, the class this design named dominant). Round 2 re-judged the correction and returned
-> **21 closed, 3 partial, 0 regressed — plus 9 defects caused by the fix itself**, two of them severe:
+> **21 closed, 3 partial, 0 regressed — plus 12 defects caused by the fix itself**, two of them severe:
 > the `DD-8` actor scenario was not constructible (`N-1`), and `DD-3` and `DD-10` cancelled each other
 > (`N-2`). Both are resolved below. Corrections carry their finding ID; `N-*` are round 2.
 >
-> **This revision has NOT been independently judged** — the review budget (2 fix rounds, 2 scoped
-> re-judgments) is spent. Terminal state is **ESCALATED**, not approved. See [`judgment.md`](./judgment.md).
+> **Round 3 judged this revision and the budget is now spent.** Terminal state: **ESCALATED**.
+>
+> ## ⚠️ DO NOT IMPLEMENT `DD-3`, `DD-10`, OR `DD-8`'s SITE-2 GATE AS WRITTEN
+>
+> Round 3's judges **contradicted each other**, and the orchestrator's own verification found the
+> dissenting judge correct on all three counts. Three severe defects are **VERIFIED AND UNFIXED** —
+> the fix budget was exhausted before they were found. They are recorded in
+> [`judgment.md`](./judgment.md) round 3 and require a user decision before any task touches them:
+>
+> | ID | Verified fact | What breaks if implemented as written |
+> | --- | --- | --- |
+> | **P-1** | `p-inputNumber` declares `style` as an `@Input` (`primeng-inputnumber.mjs:1677`) and **never applies it** — `0` occurrences of `styleMap`, `0` of `this.style`; host bindings are `attribute`×2 + `classMap` only. | `DD-3`'s setter-spy gate **cannot fire** for rules 3, 5, 9, 10 — the four fields it was written for. The implementer would read the silence as their own bug. |
+> | **P-2** | Therefore the `[style]` binding at `input.component.html:55` **is a no-op and has never painted anything.** The Tailwind class at `:49` is the only candidate mechanism, and `.p-inputnumber` carries no competing border rule (`primeng-inputnumber.mjs:15-18`), so it is not inert. | `DD-10` orders `:49` **deleted** on a premise now proven false. That would remove the **only** amber border on every `type="number"` field across all 18 consumers — precisely the `DC-1` outcome this spec exists to prevent. **Needs a browser measurement, which no judge and no test in this repo can supply.** |
+> | **P-3** | `onKnownToggle` clears nothing by explicit design (`innovation-use-organization-item.component.ts:130-133`), the inactive path's controls are not rendered (`@if`/`@else` at `.html:36`/`:79`), and no select sets `[showClear]`. | `DD-8`'s "either direction" site-2 gate produces a **permanently unsaveable row** whose only escape is deleting it — destroying more data than the block protects. The failure `DD-8` exists to close, inverted. |
+>
+> `DD-8`'s site-1 gate, `DD-0`, `DD-5`, `DD-5b`, `DD-6`, `DD-7`, `DD-9` and the rule table are
+> unaffected by these three and were confirmed closed by both judges.
 
 ---
 
