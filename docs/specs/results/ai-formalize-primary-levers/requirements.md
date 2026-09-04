@@ -9,7 +9,7 @@
 - **Extends:** `docs/specs/results/ai-formalize-strategic-objectives` — architecturally. Reuses its portfolio resolver, reporting channel, guard pattern and handler-registry route. **Amends its `[SO] R-RES-007`** (see §7)
 - **Proposal:** `./proposal.md` (owner decisions 1–3, risks R-1…R-6, questions Q-1…Q-5)
 - **Depth:** Standard
-- **Last updated:** 2026-09-04
+- **Last updated:** 2026-09-04 *(R-RES-007 AC.2 amended — Pivot, T-03)*
 
 ---
 
@@ -243,22 +243,24 @@ An unprefixed id in a *cross-spec* context is a defect, not a shorthand. Recorde
 
 **Acceptance criteria:**
 - [ ] AC.1 — The alignment step is reached only for a result created in the same `formalizeResult` call — asserted against the code path, not inferred.
-- [ ] AC.2 — Given a double that reports a pre-existing contributor lever for the target result, the write still leaves that row active with `is_primary = false`. **This is the falsifying test**: it must fail against an implementation that hands the reconciler only the primary rows.
+- [ ] AC.2 — **Amended 2026-09-04 (Pivot, T-03).** The write hands the reconciler **exactly** the validated survivor rows and nothing else: the handler never queries `result_levers`, never merges a pre-existing row into the array it persists, and never issues a deactivation of its own. **This is the falsifying test**: it must fail against an implementation that reads existing rows, that widens the persisted array beyond the survivors, or that deactivates anything itself. *(The superseded wording asserted that a pre-existing contributor row stays active after a portfolio-1 write. That is not achievable — `BaseServiceSimple.create` deactivates every `(result_id, role)` row absent from the persisted set, `base-service.ts:174-189` — and it contradicted this requirement's own falsifier. Same-role survival is guaranteed by **unreachability** per DD-6, not by handler code.)*
 - [ ] AC.3 — A portfolio-2 write leaves every `lever_role_id = 1` row for that result untouched.
-- [ ] AC.4 — Asserting only the presence of the new primary rows does **not** satisfy this requirement; the untouched pre-existing row must be asserted directly.
+- [ ] AC.4 — Asserting only the presence of the new primary rows does **not** satisfy this requirement. For **portfolio 2**, the untouched `lever_role_id = 1` row must be asserted directly. For **portfolio 1**, the arguments handed to the reconciler must be asserted directly — that the persisted array holds exactly the survivors, and that the handler issued no deactivation of its own.
 
 #### Scenario: The write is inert toward rows it did not create
 
-- GIVEN a result reaching the AI alignment step, with a contributor lever at `lever_role_id = 1`, `is_primary = false`, present in the persistence double
+- GIVEN a result reaching the AI alignment step — which, per DD-6, is always created by the same `formalizeResult` call, so **no `result_levers` row can pre-exist for it**
 - WHEN `primary_levers` carrying valid ids is written for that result
 - THEN the new primary rows exist at role 1 with `is_primary = true`
-- AND the pre-existing contributor row is still active with `is_primary = false`
-- BUT it must NOT deactivate, delete, promote, or demote that contributor row
-- AND IT MUST hold for a portfolio-2 item, whose role-3 write leaves every role-1 row untouched
+- AND the array the handler hands the reconciler contains **exactly** those survivor rows — no row it did not create, and no row it read back
+- BUT it must NOT query `result_levers`, merge a pre-existing row into what it persists, or issue any deactivation of its own
+- AND IT MUST hold for a portfolio-2 item, whose role-3 write leaves every role-1 row untouched — **and here genuine row survival is directly assertable**, because reconciliation scopes by `lever_role_id`
 
 > **Why this requirement survives even though its hazard is unreachable.** The write primitive reconciles by deactivating every row for `(result_id, lever_role_id)` **absent from the incoming array**, and within role `ALIGNMENT (1)` primary and contributor levers **share the role** — `is_primary` distinguishes them, not the role. A primary-only reconciliation at role 1 would therefore wipe every contributor row for that result. That is the shape of the empty-survivor wipe the predecessor caught during execution.
 >
-> **Today the AI path cannot trigger it, because the result is always brand new.** The requirement is kept, and stated as an inertness property rather than a preservation duty, for two reasons: the guarantee should not silently depend on an incidental fact about `formalizeResult`, and if that method ever gains an update path the hazard returns with no test standing between it and production. AC.2 is written so the guarantee is **falsifiable now** rather than only auditable later — the same treatment the predecessor gave its request-scoped-read ban, which was also unreachable by construction and was still proven with throwing doubles.
+> **Today the AI path cannot trigger it, because the result is always brand new.** The requirement is kept, and stated as an inertness property rather than a preservation duty, for two reasons: the guarantee should not silently depend on an incidental fact about `formalizeResult`, and if that method ever gains an update path the hazard returns with no test standing between it and production.
+>
+> **Amended 2026-09-04 (Pivot, T-03) — what is provable, and where.** The original AC.2 demanded that a pre-existing contributor row *stay active* after a portfolio-1 write. It cannot: the reconciler deactivates every `(result_id, role)` row absent from the persisted set, and primary and contributor levers share role 1. The clause also contradicted its own falsifier, which required the assertion to go **red** against the very implementation the design mandates. The requirement is therefore restated at the boundary the handler actually controls — *what it hands the reconciler* — which is falsifiable now, while **same-role survival is carried by unreachability (DD-6)** and remains on the risk register as **RK-2 / RB-2** rather than being claimed as tested. Portfolio 2 keeps the stronger, directly assertable guarantee, since role 3 cannot reach role 1. Full analysis and the rejected alternatives: `execution.md` → *Pivot Record: T-03*.
 >
 > Proposal R-4 (severity revised — see §8); defect class **DC-2** in §6.
 
@@ -387,7 +389,7 @@ Named before the verification commands were chosen, because a gate that passes w
 | # | Defect class | Why an ordinary gate misses it | Gate that actually catches it |
 | --- | --- | --- | --- |
 | **DC-1** | **A lever written as contributor instead of primary.** `is_primary` is `NOT NULL` default `false`, so omitting it writes a valid row with wrong meaning | No exception, no unusual row count, no `missing_fields` entry. A test asserting "a row exists for lever 11" passes | **A value assertion on the written `is_primary`** (R-RES-003 AC.2). Presence-of-row assertions are explicitly disqualified |
-| **DC-2** | **Contributor levers wiped by a primary-only write.** Reconciliation scopes by role, and role 1 holds both kinds | The new rows are all present and correct; only the *absent* pre-existing rows reveal it, and nothing counts them. **Unreachable today** — `formalizeResult` always creates a fresh result — so it is invisible to any test that goes through the real code path | **A double that reports a pre-existing contributor row** (R-RES-007 AC.2), which makes the guarantee falsifiable rather than merely true-by-accident. Row counts of the new write cannot see this |
+| **DC-2** | **Contributor levers wiped by a primary-only write.** Reconciliation scopes by role, and role 1 holds both kinds | The new rows are all present and correct; only the *absent* pre-existing rows reveal it, and nothing counts them. **Unreachable today** — `formalizeResult` always creates a fresh result — so it is invisible to any test that goes through the real code path | **An argument-level assertion on what the handler hands the reconciler** (R-RES-007 AC.2, amended 2026-09-04): exactly the survivors, no read-back, no self-issued deactivation. A *survival* assertion was tried first and is not achievable at role 1 — the reconciler deactivates same-role rows absent from the persisted set — so the residual exposure is carried by DD-6's unreachability and by **RK-2**, not by a test. Portfolio 2 is directly assertable. Row counts of the new write cannot see any of this |
 | **DC-3** | **A wrong-portfolio id written** because validation filtered on id + active but not on ownership | The id exists and is active, so any two-part predicate accepts it | A fixture with an id that is **valid in the other portfolio** (R-RES-005 AC.2) |
 | **DC-4** | **The section-wide save reached**, wiping SDGs and contracts the same method just wrote | The item still succeeds; the loss is in rows nobody asserted | Assert **sibling** row survival, not just absence of the new row (R-RES-008, R-RES-010 AC.2) |
 | **DC-5** | **Batch-wide portfolio resolution** passing as per-item, because every fixture item shares a year | With identical fixtures a constant and a correct implementation are indistinguishable | A mixed-year fixture varying year **and** ids **and** title, asserted per `result_id` *(KZ-004)*. Plus a falsifier: the suite must go red when the portfolio is resolved once for the batch |
@@ -455,7 +457,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | # | Risk | Severity | Handling |
 | --- | --- | --- | --- |
 | RK-1 | DC-1 — the `is_primary` default | **High** | R-RES-003 AC.2 as a value assertion |
-| RK-2 | DC-2 — contributor wipe | **Low** *(revised down 2026-09-04 from High)* — unreachable via the AI path, since the result is always newly created. It stays on the register because the guarantee would silently depend on that incidental fact | R-RES-007 AC.2's falsifying double, which proves the inertness now instead of trusting it |
+| RK-2 | DC-2 — contributor wipe | **Low** *(revised down 2026-09-04 from High)* — unreachable via the AI path, since the result is always newly created. It stays on the register because the guarantee would silently depend on that incidental fact | R-RES-007 AC.2 (amended 2026-09-04) proves the **handler's** inertness — exactly the survivors handed over, no read-back, no self-issued deactivation. It deliberately does **not** claim same-role row survival, which the reconciler makes unachievable; that half rests on DD-6's unreachability and is why this risk stays open |
 | RK-3 | `lever_id` is a `bigint` column typed as `string`, and shipped code casts with `parseInt(x) as unknown as string` | Medium | An explicit design decision in `design.md` — replicate for consistency or clean locally. Not to be improvised |
 | RK-4 | `payload?.research_areas?.map(...)` is unguarded in the portfolio-2 handler — the same class the predecessor's `[SO] R-RES-010` hardened for two sibling arrays, which left this one out | Low; **pre-existing, not caused here** | This spec touches that method. Either harden it as a stated in-scope addition or record why not — do not leave it unremarked |
 | RK-5 | Amending a spec with a closed audit trail | Medium | §7, with the two-direction sweep |
@@ -480,7 +482,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | Role | Name | Status | Date |
 | --- | --- | --- | --- |
 | Spec owner | D. Casañas | pending | — |
-| Requirements approved | — | **pending — Q-1 only.** Q-2 closed as moot on 2026-09-04 | — |
+| Requirements approved | 2026-09-04 | **Approved.** Q-1 closed by owner decision on 2026-09-04 — assumption **A-1 accepted** (AI-created levers carry no nested strategic outcomes or lever SDG targets; bare rows, no marker). Q-2 closed as moot on 2026-09-04. **R-RES-007 AC.2 amended 2026-09-04** by owner-approved Pivot (option A) during T-03 execution — see `execution.md` → *Pivot Record: T-03* | D. Casañas |
 
 **Requirement ID index**
 

@@ -8,7 +8,7 @@
 - **Linked requirements:** `./requirements.md` · **Linked design:** `./design.md` · **Proposal:** `./proposal.md`
 - **Citation convention:** `[SO] R-RES-NNN` = predecessor spec · bare `R-RES-NNN` = this spec (`requirements.md` §2)
 - **Budget (design.md §13):** 7 tasks · ~252 prod LOC + ~1,558 test LOC (~1,810 total) · **4 rework rounds** (not review passes). Priced on the predecessor's *measured* ~6:1 test:production basis from day one, per **KZ-008**
-- **Last updated:** 2026-09-04
+- **Last updated:** 2026-09-04 *(R-RES-007 AC.2 amended — Pivot, T-03)*
 
 - **Execution log:** `./execution.md`
 ---
@@ -126,7 +126,7 @@ No cycles.
   - [ ] Either portfolio: `[11, 999, 4]` → rows only for the owned+active ids, `discarded` names the rest, **no throw** (R-RES-005 scenario 1's `BUT`).
   - [ ] Either portfolio: every id discarded → **zero rows written and no pre-existing row for that result and role deactivated** (R-RES-005 scenario 2's `BUT`).
   - [ ] Either portfolio: a repeated id produces one row.
-  - [ ] **R-RES-007's falsifying test:** with a persistence double reporting a pre-existing contributor row (role 1, `is_primary = false`) for the target result, that row is still active and still `is_primary = false` afterwards — and the same holds for a portfolio-2 write (the `AND IT MUST` clause).
+  - [ ] **R-RES-007's falsifying test (amended 2026-09-04 — Pivot, T-03):** the array handed to the reconciler holds **exactly** the validated survivors, asserted by value; the handler never queries `result_levers`; and it issues no deactivation of its own. For a **portfolio-2** write, additionally assert directly that every `lever_role_id = 1` row for that result is still active (the `AND IT MUST` clause) — role 3 cannot reach role 1, so there the survival assertion *is* achievable. **Do not assert same-role survival for portfolio 1**: the reconciler deactivates every `(result_id, role)` row absent from the persisted set, so that assertion cannot pass and its absence is covered by DD-6 + RK-2.
   - [ ] Audit columns populated from the current user — *by construction via `BaseServiceSimple`; carried to T-07 for integration-level closure, deliberately not ticked on inference.*
   - [ ] Both handlers' existing section `save` / `find` specs pass **unmodified**.
   - [ ] DD-10: the section `save` returns normally for a payload omitting `research_areas`, and its behavior for a populated payload is unchanged.
@@ -135,7 +135,7 @@ No cycles.
 - **Falsifying inputs (three, each must be shown red before done):**
   1. **Omit `is_primary`** from the portfolio-1 write → the value assertion must go red. Without this probe, DC-1 is untested and the DB default silently writes contributors.
   2. **An id valid in the other portfolio** → a two-part predicate writes it and FAILs.
-  3. **A double reporting a pre-existing contributor row**, against an implementation that hands `create` only the primary rows → the inertness assertion must go red. This is what makes R-RES-007 falsifiable rather than true-by-accident (DD-6).
+  3. **Amended 2026-09-04 (Pivot, T-03).** An implementation that **reads `result_levers` and merges a pre-existing row into what it persists**, or that issues its own deactivation → the boundary assertion must go red. *(The superseded probe demanded red from a double reporting a pre-existing contributor row against "an implementation that hands `create` only the primary rows" — which is the mandated implementation, so it contradicted acceptance check 8. See `execution.md` → *Pivot Record: T-03*.)*
   4. For DD-10: a payload omitting `research_areas`, run against the **unmodified** handler, to confirm the guard's test can fail.
 - **Disqualifies:** a `ResultLeversService` double that does not record `lever_role_id` **and** `is_primary` per row — then DC-1 and DC-2 are untestable however green the suite *(KZ-001)*. Also: asserting that `create` **was called** rather than asserting its arguments. A call proves delegation, not a row at role 1 with `is_primary = true`; the role and the flag are exactly what can be wrong while the call is right.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
@@ -301,7 +301,7 @@ No cycles.
 | " | `BUT` no fallback portfolio, must not raise | T-05 (falsifier 1) |
 | " | `AND IT MUST` log one warning naming the year | T-05 |
 | R-RES-007 | scenario "inert toward rows it did not create" | T-03 (falsifier 3) |
-| " | `BUT` must not deactivate/delete/promote/demote | T-03 |
+| " | `BUT` must not query, merge, or self-deactivate *(amended 2026-09-04)* | T-03 |
 | " | `AND IT MUST` hold for a portfolio-2 item | T-03 |
 | " | AC.1 reached only for a same-call result | **T-06** |
 | R-RES-008 | scenario "payload without the field is byte-identical" | T-06 |
@@ -365,7 +365,7 @@ PR descriptions follow `cognitive-doc-design` review-empathy rules: what to revi
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-09-04 | **DC-1** — `is_primary` NOT NULL default `false`; an omitted flag silently writes a contributor | R-RES-003 AC.2 as a value assertion + T-03 falsifier 1 | Implementer | open |
-| RB-2 | 2026-09-04 | **DC-2** — a primary-only reconciliation at role 1 would wipe contributors. Unreachable today (DD-6) but resting on an incidental fact | T-03 falsifier 3 makes the inertness falsifiable now | Implementer | open |
+| RB-2 | 2026-09-04 | **DC-2** — a primary-only reconciliation at role 1 would wipe contributors. Unreachable today (DD-6) but resting on an incidental fact | T-03 falsifier 3 (amended 2026-09-04) proves the **handler** hands over only survivors and self-deactivates nothing. Same-role survival is **not** test-covered — it is unachievable at role 1 — so this risk stays genuinely open, mitigated by unreachability alone | Implementer | **open — accepted residual** |
 | RB-3 | 2026-09-04 | Migration `1783029013035` not applied in a target environment | T-07; rollout blocker | D. Casañas | **open** |
 | RB-4 | 2026-09-04 | **Q-1 unanswered** — nested lever children unrepresentable from an id array | Design assumes A-1. If the owner needs them, T-03 and the DTO both change | D. Casañas | **open** |
 | RB-5 | 2026-09-04 | **Q-6 unanswered** — DD-10 widens scope by one expression | T-03's DD-10 bullet is written to be droppable with no other change | D. Casañas | **open** |

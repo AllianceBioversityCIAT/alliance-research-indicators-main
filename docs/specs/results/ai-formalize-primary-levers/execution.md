@@ -213,3 +213,25 @@ Every row for `(result_id, role)` whose primary key is absent from the newly per
 **Leader recommendation: A.** It makes the spec say what the system actually guarantees, which is the point of the requirement, and it leaves RB-2 visible as the open risk it genuinely is. B is a real improvement in robustness and has shipped precedent, but it is a design change and belongs to the owner, not to an execution loop — and adopting it silently would be exactly the scope growth the methodology forbids.
 
 **Blocked pending owner approval.** No spec document has been amended yet: which amendment to write is determined by the decision. Per the protocol, the correction will then be closed with the **two-direction sweep** — forward for every surviving statement of the superseded guarantee, backward for documents citing the amended sections (including `tasks.md` §4's coverage rows for `R-RES-007` and, under option B, DD-6 and DD-3).
+
+### Pivot Resolution: T-03 — option A, owner-approved 2026-09-04
+
+**Decision: A** — amend the acceptance criteria to state what the system actually guarantees. Options B (`notDeleteIds` defensive close) and C (drop the clause) were declined; B remains recorded in the Pivot Record as a viable future hardening with shipped precedent.
+
+**Amendment applied, then closed with the two-direction Correction Closure sweep.** The pivot analysis itself cited 3 sites. The sweep found **13** — which is the whole reason the sweep exists (*KZ-006*: sweep the claim, not the citation):
+
+| Document | Sites amended |
+| --- | --- |
+| `requirements.md` | R-RES-007 **AC.2** (restated at the handler boundary), **AC.4** (split: portfolio 2 asserts row survival directly, portfolio 1 asserts the reconciler's arguments), the **scenario** (`AND` / `BUT` / `AND IT MUST` clauses), the *"Why this requirement survives"* note (amendment rationale added), **DC-2** detection cell, **RK-2** mitigation cell |
+| `design.md` | **DD-6** (amendment rationale + the rejected option B and its precedent), §10's **falsifier-probes** row |
+| `tasks.md` | T-03 **acceptance check 8**, T-03 **falsifying input #3**, §4 coverage row (`BUT` clause), **RB-2** (now marked *accepted residual*) |
+| `proposal.md` | **R-4** mitigation cell — it asserted what AC.2 requires, which the amendment made false |
+
+- **Forward sweep** (`still active` / `stays active` / `is preserved` across the folder): no surviving statement of the superseded guarantee. Remaining hits are the new amendment text describing it *as* superseded, the already-struck **A-2**, and `R-RES-010` AC.2's unrelated sibling-table clause.
+- **Backward sweep** (documents citing the amended sections): all four documents above; `design.md:126` (fact #2) was checked and **left unchanged** — it states the reconciler's mechanism accurately and is now the *evidence* for the amendment rather than a casualty of it.
+
+**What changed substantively, in one line.** R-RES-007 no longer claims a pre-existing contributor row survives a portfolio-1 write; it claims the handler hands the reconciler exactly the survivors, reads nothing back, and deactivates nothing itself. Portfolio 2 keeps the stronger, directly assertable guarantee. The residual same-role exposure is carried by DD-6's unreachability and stays open as **RK-2 / RB-2 (accepted residual)** — visible on the register rather than laundered through a test that could not fail.
+
+Also closed at this gate: **Q-1** recorded as approved in `requirements.md` §Approvals (A-1 accepted), which had been left `pending` there even after the pre-execution gate.
+
+**Consequence for the delivered T-03 diff.** The implementation was written to the boundary property the amendment now specifies, so it is expected to conform — but **the amended falsifier #3 has never been run**: the Implementer staged the *superseded* probe. Whether the kept tests can actually fail at the boundary is therefore open and is the first question put to the deferred audit. T-03 stays `[~]` pending that verdict.

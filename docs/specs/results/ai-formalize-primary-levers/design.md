@@ -7,7 +7,7 @@
 - **Depth:** Standard
 - **Requirements:** `./requirements.md` · **Proposal:** `./proposal.md`
 - **Citation convention:** `[SO] R-RES-NNN` = predecessor spec · bare `R-RES-NNN` = this spec (`requirements.md` §2)
-- **Last updated:** 2026-09-04
+- **Last updated:** 2026-09-04 *(R-RES-007 AC.2 amended — Pivot, T-03)*
 
 ---
 
@@ -242,7 +242,7 @@ Same evidence standard as the predecessor, which caught three defects before rev
 | **Double fidelity** *(KZ-001, recurrence 5)* | The `findByYear` double must route by year (a year→portfolio map), never a constant. The lever-finder double must evaluate the **three-part** predicate — id, portfolio ownership, active — or DC-3 goes untested. The persistence double must record `lever_role_id` **and** `is_primary` per row, or DC-1 and DC-2 are untestable |
 | **Discriminating fixtures** *(KZ-004)* | A mixed-year fixture varies year **and** ids **and** title per item, with disjoint id sets, asserted per `result_id`. Shared defaults cannot distinguish per-item routing from a batch-wide constant |
 | **Value assertions, not presence** | `is_primary` and `lever_role_id` are asserted **by value** on every written row. A test asserting only "a row exists for lever 11" is explicitly disqualified (R-RES-003 AC.2) |
-| **Falsifier probes** | Every acceptance clause needs a case that provably goes red. Three are named in `tasks.md`: batch-wide portfolio resolution, a primary-only reconciliation at role 1, and an omitted `is_primary` |
+| **Falsifier probes** | Every acceptance clause needs a case that provably goes red. Three are named in `tasks.md`: batch-wide portfolio resolution, an implementation that reads or widens what it hands the reconciler (R-RES-007 AC.2, amended 2026-09-04), and an omitted `is_primary` |
 | **Blast radius** *(KZ-003)* | Both handlers, the registry and the orchestrator are shared with `PATCH`/`GET .../alignments`. A targeted run confirms the brief was followed, not that the shared chain is clean — T-07 runs the full package with a coverage figure |
 | **Human gate** *(KZ-007)* | Q-3 and Q-4 need a real mixed-year upload against Dev **before** any validation verdict. An automated gate verifies the system against the spec's own description of itself |
 
@@ -315,7 +315,9 @@ Same evidence standard as the predecessor, which caught three defects before rev
 
 **Why that is safe.** `formalizeResult` has no update path (§2.3 fact 1): the result is created milliseconds earlier in the same method, so there are no pre-existing lever rows to preserve. A read-merge-write would be dead code justified by a state that cannot occur, and it would add a query per item.
 
-**Why the guarantee is still tested.** Within role `ALIGNMENT (1)`, primary and contributor levers **share the role** — `is_primary` distinguishes them, not the role — so a primary-only reconciliation *would* wipe contributors if such rows ever existed. The safety therefore rests on an incidental fact about a method this spec does not own. R-RES-007 AC.2 requires a **double that reports a pre-existing contributor row**, so the inertness is falsifiable now rather than discovered later if `formalizeResult` ever gains an update path.
+**Why the guarantee is still tested.** Within role `ALIGNMENT (1)`, primary and contributor levers **share the role** — `is_primary` distinguishes them, not the role — so a primary-only reconciliation *would* wipe contributors if such rows ever existed. The safety therefore rests on an incidental fact about a method this spec does not own.
+
+**Amended 2026-09-04 (Pivot, T-03).** R-RES-007 AC.2 originally required a double reporting a pre-existing contributor row to show that row **still active** afterwards. Execution proved that unachievable: `BaseServiceSimple.create` deactivates every `(result_id, role)` row absent from the persisted set (`base-service.ts:174-189`), so *any* implementation handing the reconciler only the survivors — which this design mandates — deactivates it. AC.2 now asserts the **handler-boundary** property instead: exactly the survivor rows are handed over, `result_levers` is never queried, and no deactivation is issued by the handler. Same-role survival is carried by the unreachability argument above and stays open as **RK-2 / RB-2**; it is not claimed as tested. Portfolio 2's role-3 write keeps the stronger, directly assertable guarantee. The rejected alternative — reading pre-existing role-1 rows and passing them as `create`'s `notDeleteIds` (shipped precedent: `result-actors.service.ts:62-84`) — would close the hazard defensively but widens this design; see `execution.md` → *Pivot Record: T-03*.
 
 **Precedent.** The predecessor's ban on request-scoped reads was also unreachable by construction and was still proven with doubles whose getters throw. Same treatment, same reason.
 
