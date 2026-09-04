@@ -36,6 +36,7 @@ export class ResultAiDto {
   sdgs?: ResultSdg[];
   ipRights?: UpdateIpRightDto;
   strategic_objectives?: number[];
+  primary_levers?: number[];
 }
 
 export class CountryAreas {

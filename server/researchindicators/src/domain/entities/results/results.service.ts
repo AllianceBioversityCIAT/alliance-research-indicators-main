@@ -996,6 +996,51 @@ export class ResultsService {
         }
       }
 
+      // Primary levers alignment (design.md §5.1). Same load-bearing guard
+      // as strategic objectives: an absent, null or empty list must return
+      // before the resolver or the orchestrator are ever called, which
+      // makes the destructive section-wide alignment save unreachable by
+      // construction rather than by care (R-RES-008). Placed above
+      // `customStatus` — an `APPROVED` item's snapshot copies
+      // `result_levers`, so below this point would silently omit levers
+      // from it (design.md §5.4).
+      if (!isEmpty(processedResult?.primary_levers)) {
+        // Same expression createResultFromAiRoar already persists onto the
+        // result row — computed here too so the portfolio this step routes
+        // to always matches the result's own effective year, independent
+        // of how the caller populated `result.year` (R-RES-002).
+        const effectiveYear = result.year ?? new Date().getFullYear();
+        const portfolio =
+          await this._portfolioService.findByYear(effectiveYear);
+
+        if (!portfolio) {
+          // No active portfolio covers the year → degrade the field, never
+          // fall back to a default portfolio (R-RES-006). No `if` on a
+          // portfolio id here or below — each portfolio's own handler
+          // decides what a primary lever means (DD-2).
+          elementResultMetadata.missing_fields.push('primary_levers');
+          this.logger.warn(
+            `No active portfolio covers year ${effectiveYear}; primary levers were not saved for result ${newResult.result_id}.`,
+          );
+        } else {
+          const leversReport =
+            await this._resultSectionOrchestrator.saveLeversForPortfolio(
+              newResult.result_id,
+              portfolio.id as PortfolioIdEnum,
+              processedResult.primary_levers,
+            );
+
+          if (!isEmpty(leversReport.discarded)) {
+            elementResultMetadata.missing_fields.push(
+              ...leversReport.discarded.map((id) => `primary_levers:${id}`),
+            );
+            this.logger.warn(
+              `Discarded primary lever ids [${leversReport.discarded.join(', ')}] for result ${newResult.result_id} (portfolio ${portfolio.id}).`,
+            );
+          }
+        }
+      }
+
       const finalStatus = await this.customStatus(
         result.status,
         newResult.result_id,
@@ -1229,6 +1274,7 @@ export class ResultsService {
     }
 
     tmpNewData.strategic_objectives = result?.strategic_objectives;
+    tmpNewData.primary_levers = result?.primary_levers;
 
     if (!isEmpty(result?.sdg_targets)) {
       const existingSdgs = await this.dataSource

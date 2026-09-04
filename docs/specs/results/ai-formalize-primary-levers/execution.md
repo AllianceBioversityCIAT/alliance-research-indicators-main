@@ -497,3 +497,59 @@ The constant `mockResolvedValue` doubles elsewhere in the new tests are all **si
 **Root cause worth recording as a briefing lesson, not just a code fix.** The weak assertion at `:4148-4150` is a **faithful copy of the shipped strategic-objectives test** at `:3561-3563`. That exemplar was written against the predecessor's weaker clause — *"A warning line names the year"* (`ai-formalize-strategic-objectives/requirements.md:275`) — whereas **this spec deliberately tightened it** to *"Exactly one warning is logged, naming the year."* The Leader's brief instructed mirroring the shipped step, and the Implementer mirrored it exactly, inheriting an assertion that predates the tightening. **A shipped pattern does not license an assertion that cannot fail; when a requirement is tightened relative to its predecessor, the exemplar must be re-read against the new clause rather than copied.** Future briefs that mandate an exemplar should name the clauses where this spec diverges from it — as was done successfully for the `supported` flag (DD-8) and for the amended `R-RES-007`.
 
 **Test count corrected before it entered the record.** The Implementer reported "15 new tests (13 + 2)". Lens F counted **14** — 12 cases in the levers describe (10 `it` invocations, one an `it.each` over 3) plus the 2 carrier tests. **14 is recorded.**
+
+#### T-05 attempt 2 — re-verification, 2026-09-04
+
+Re-review scope was deliberately narrow: **one** Reviewer, not three lenses. Attempt 2 changed **four assertions in one file** (+4 / −3), and Lens D's surface was untouched — the Leader verified `git diff --numstat` on `results.service.ts` and `result-ai.dto.ts` returns **empty**, so production is byte-identical to the attempt-1 code Lens D already cleared. Re-running three lenses over an unchanged surface would have been the Delegation Ceiling's "commit to the delegation" violated.
+
+**Verdict: `STATUS: PASS`.** Both findings closed.
+
+| # | Fix | Reddening mutant |
+| --- | --- | --- |
+| **G-1** | `expect(warnSpy).toHaveBeenCalledTimes(1)` + content asserted off `mock.calls[0][0]` instead of `.some(...)` | **Observed red:** an over-emitting year branch → `Expected: 1, Received: 2` |
+| **G-2** | `toContain('502')` on the year message; `toContain('505')` on the discard message | **Observed red on both:** dropping `for result ${newResult.result_id}` from each message in turn |
+
+#### The Implementer's disclosure, and the ruling that settled it
+
+Attempt 2 reported, **unprompted**, that the Reviewer's *literal* G-1 mutant does not redden: with a single-element fixture (`primary_levers: [11]`), a per-id `forEach` emits exactly one warn and is indistinguishable from a single correct call. Rather than claim a red it had not observed, it disclosed the limit and demonstrated the assertion's real power with the *other* mutant the same finding names (two warns → red). **That honesty is what made the following ruling possible.**
+
+The Leader inferred from this that NFR-RES-002's *"never one per id"* half might be unfalsifiable, and that the minimal fix was widening the fixture to `[11, 12]`. **The Reviewer ruled that inference wrong, with a better reading of the requirement:**
+
+- **"Exactly one"** is pinned **fixture-independently** by `toHaveBeenCalledTimes(1)` — it reddens at 0 and at ≥2. The Reviewer further verified the assertion is neither vacuous nor brittle: every other reachable `logger.warn` in `formalizeResult` is either in the strategic-objectives step (unreachable here — the fixture carries no `strategic_objectives`) or inside `createResult` (mocked in both tests). **The count is 1 by behaviour, not by accident.**
+- **"Never one per id"** is worded in the requirement against **discarded** ids — NFR-RES-002 reads *"never one per **discarded** id"*, `tasks.md` attaches it to the `discarded` non-empty branch, and `design.md` §9 places the per-id hazard in the *Ids discarded* row. It **is** discriminably discharged, by the discarded-ids test's **three-id fixture** (`[1, 2, 3]`) plus `toHaveBeenCalledTimes(1)`: a per-id loop yields 3 calls and reddens.
+- The year branch **has no discarded ids at all**, so the only conceivable per-id loop there is over the input array — and at **R-RES-006's own prescribed fixture**, which states the GIVEN verbatim as *"carrying `primary_levers: [11]`"*, such a loop emits exactly one warn, which is compliant for that input. The clause constrains the warn **count for that item**, not the implementation's loop shape.
+
+**Conclusion: the fixture change was NOT required, and would have departed from the fixture the requirement itself specifies.** Recorded as a Leader lesson: an inferred gap is a hypothesis, not a finding. Dispatching a third attempt on it would have consumed a rework round *and* fired the armed *"second rework round on one task"* threshold — for a defect that did not exist. **The budget cost was disclosed to the Reviewer explicitly, with the instruction to rule on evidence and not on cost.**
+
+#### The other three adjudications
+
+1. **No unfalsifiable assertion introduced.** All four have a reddening mutant, three observed live. `toContain('2035')` off `mock.calls[0][0]` is **strictly stronger** than the `.some(...)` form it replaced: `.some` is satisfied by a run containing an extra or duplicate warn, whereas the new pair reddens on any such run — and the "first warn came from an unrelated step" hazard is pre-empted by the `times(1)` on the preceding line, which fires first.
+2. **No pre-existing test modified.** A repo-wide grep for `warnSpy.mock.calls` returns exactly three sites: the two levers tests and the shipped strategic-objectives test, **correctly left alone** — it carries the identical original weakness but belongs to the predecessor spec, and fixing it here would be cross-spec scope creep.
+3. **§9's second observability row is satisfied.** The implementation carries all three components (`results.service.ts:1038` interpolates `(portfolio ${portfolio.id})`). The *verification* obligation is NFR-RES-002's How-verified, whose content target names only the result id — both it and the count are pinned. §9's table has no verification clause and no acceptance checkbox demands the portfolio id. **This is precisely the distinction that made G-2 a real FAIL and this one not:** NFR-RES-002 names the result id as required *content*; nothing names the portfolio id as a required *assertion*.
+
+#### Test count — verified, and the earlier figure corrected
+
+**14**, independently enumerated twice (Lens F, then the re-verification Reviewer): 10 `it` invocations in the levers describe of which one is an `it.each` over 3 cases → **12 cases**, plus the **2** carrier tests in the `createResultFromAiRoar` describe. Attempt 1's report claimed 15; **that was arithmetic error and 14 is what the record holds.**
+
+#### ADVISORY (recorded, never gating; none may mint or widen a task)
+
+- **RELIABILITY.** Dropping `(portfolio ${portfolio.id})` from the discard warn is currently invisible to the suite. One line (`toContain` on the portfolio literal) would close it. Free to fold into T-06/T-07 if either reopens the file; **not actioned here** — no requirement names it as a required assertion (see adjudication 3).
+- **RELIABILITY.** If the owner ever wants the year branch shape-pinned beyond its stated requirement, widening that fixture to `[11, 12]` would redden a per-id loop there — at the cost of departing from R-RES-006's literal GIVEN. Recorded as an owner option, not a defect.
+- **RELIABILITY (inherited, out of scope).** §5.1 branches only on `findByYear` returning `null`. A portfolio row that exists but has **no registered handler** — a future portfolio 3 — makes the registry throw `NotFoundException`, so the item lands in `results_errors` with **no** `missing_fields` entry rather than degrading as R-RES-006 prescribes. That is T-04's orchestrator shape, not T-05's wiring, and no requirement covers it. Recorded so a reference-data change does not rediscover it.
+- **READABILITY.** The effective-year expression now exists in three places (`:1275` in `createResultFromAiRoar`, `:959` strategic objectives, `:1012` levers) and only the first persists. A future change to the rule must land in all three. `design.md` §5.1 step 2 mandates this exact expression, so it is not a violation.
+- **READABILITY (pre-existing).** `results.service.spec.ts:3329`'s title promises `'call deleteFullResultById'` but never asserts it — and could not, since `resultExists` is `null` when `createResultFromAiRoar` rejects. Harmless, but a future reader may cite it as rollback coverage it does not provide.
+
+#### Decisions made
+
+- Re-review narrowed to **one** Reviewer because the changed surface was four assertions in one file and production was byte-identical (Delegation Ceiling).
+- Effort held at `xhigh` for attempt 2 rather than raised to `max` — the tier↔effort rule forbids `max` on a T2 tier, and escalating the tier would collapse `author ≠ auditor`.
+- The fixture widening was **declined** on the Reviewer's ruling, not adopted on the Leader's inference.
+
+#### Issues encountered
+
+- **A Leader error, corrected.** The attempt-1 audit was committed with `git add -A`, which swept T-05's 693 uncommitted source lines — code that had just **FAILED** review — into a commit whose subject read `docs(spec): record T-05 attempt 1 lens audit`. Nothing had been pushed, so the commit was soft-reset, the source unstaged, and the docs re-committed alone; the implementation returned to its correct uncommitted state pending PASS. Original SHA `8aafd263` remains in the reflog. **Two failures in one action:** a commit message that misrepresented its contents, and failed code committed under a docs label — in a spec whose entire value is traceability. Remedy adopted for the rest of the run: **stage explicit paths, never `-A`.**
+- Two in-scope observability assertion gaps (G-1, G-2), consuming rework round **2 of 4 spec-wide** (round 1 on T-05). The armed threshold — a *second* round on one task, or 5 spec-wide — **did not fire**.
+
+#### Final verification result
+
+`npm test -- --silent src/domain/entities/results/results.service.spec.ts` → **132/132 green**. Attempt 1 additionally ran the **full package suite**: `328 suites / 2,314 tests` green. Lint clean. **Delivered 694 lines against the §13.2 re-baselined ~700 — the corrected basis is holding.** Production LOC now **285** of the ~300 armed threshold, with ~5 to come in T-07. Full-suite blast radius and the reported coverage figure remain T-07's gate (DC-6 / KZ-003).

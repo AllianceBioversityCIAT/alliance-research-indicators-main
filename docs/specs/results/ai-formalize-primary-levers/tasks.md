@@ -185,17 +185,17 @@ No cycles.
   - Contains **no** portfolio branching. **If an `if` on a portfolio id appears in this file, the task is wrong** (DD-2).
   - The metadata sink is already optional at both `push` sites (shipped). Do not re-guard it.
 - **Acceptance / done check:**
-  - [ ] Portfolio-1-year item with valid ids → rows written; item in `results_created`.
-  - [ ] Portfolio-2-year item with valid ids → rows written at role 3; item in `results_created`.
-  - [ ] Year 2035 (no covering portfolio) → item created, zero rows, field-level entry present, warn names the year, **no exception, no fallback portfolio, item not in `results_errors`**.
-  - [ ] Discarded ids appear as `primary_levers:<id>`, distinguishable from the field-level entry, **asserted by content equality** on `missing_fields`.
-  - [ ] Absent / `[]` / `null` → the resolver and the orchestrator are **never called** (assert zero interactions, not just zero rows).
-  - [ ] The AI's own `missing_fields` entries survive alongside the new ones (R-RES-005 AC.5's `AND IT MUST`).
-  - [ ] An item with **no** `year` resolves via the current calendar year, asserted against a fixture whose covering portfolio **differs from its sibling's**, so a hardcoded default cannot pass unnoticed (R-RES-002's `AND IT MUST`).
-  - [ ] A batch of N items over D distinct years issues at most D `findByYear` calls (NFR-RES-001).
-  - [ ] One warn per item per case, never one per id (NFR-RES-002).
-  - [ ] Single endpoint: a valid payload returns the created result and it persists; an unknown `contract_code` still rolls back and rethrows.
-  - [ ] Bulk metadata output unchanged: one `bulk_upload_results` row per item, same fields.
+  - [x] Portfolio-1-year item with valid ids → rows written; item in `results_created`.
+  - [x] Portfolio-2-year item with valid ids → rows written at role 3; item in `results_created`.
+  - [x] Year 2035 (no covering portfolio) → item created, zero rows, field-level entry present, warn names the year, **no exception, no fallback portfolio, item not in `results_errors`**.
+  - [x] Discarded ids appear as `primary_levers:<id>`, distinguishable from the field-level entry, **asserted by content equality** on `missing_fields`.
+  - [x] Absent / `[]` / `null` → the resolver and the orchestrator are **never called** (assert zero interactions, not just zero rows).
+  - [x] The AI's own `missing_fields` entries survive alongside the new ones (R-RES-005 AC.5's `AND IT MUST`).
+  - [x] An item with **no** `year` resolves via the current calendar year, asserted against a fixture whose covering portfolio **differs from its sibling's**, so a hardcoded default cannot pass unnoticed (R-RES-002's `AND IT MUST`).
+  - [x] A batch of N items over D distinct years issues at most D `findByYear` calls (NFR-RES-001).
+  - [x] One warn per item per case, never one per id (NFR-RES-002).
+  - [x] Single endpoint: a valid payload returns the created result and it persists; an unknown `contract_code` still rolls back and rethrows.
+  - [x] Bulk metadata output unchanged: one `bulk_upload_results` row per item, same fields.
 - **Tests:** `results.service.spec.ts` — extend the `formalizeResult` and `createResultFromAiRoar` describes.
 - **Verification:** `npm test -- --silent src/domain/entities/results/results.service.spec.ts`
 - **Falsifying inputs:**
@@ -203,7 +203,7 @@ No cycles.
   2. A payload with **no** field, asserted with zero-interaction spies on the resolver and orchestrator. An implementation calling the step unconditionally FAILs even though no rows would be written — which is the point: **the row count alone cannot see that defect.**
 - **Disqualifies:** asserting `missing_fields` **length** or presence rather than content. A length assertion passes while the entry names the wrong thing, and DC-4 is silent data loss that a presence check is blind to. Also: a `findByYear` double returning a **constant** rather than routing by year — then per-item routing is untested and NFR-RES-001's call-count assertion is meaningless *(KZ-001)*.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging` (on any failure)
-- **Estimated effort:** L · **Status:** todo
+- **Estimated effort:** L (run at `xhigh`) · **Status:** **done** — PASS on attempt 2, after a three-lens parallel review (D placement/guard/DD-2 PASS; E reporting and F falsifiability each FAILing on the same two observability assertion gaps, found independently). Delivered **694 lines vs the §13.2 re-baselined ~700**. See `execution.md` → T-05
 
 ---
 
