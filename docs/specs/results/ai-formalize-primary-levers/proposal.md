@@ -68,7 +68,7 @@ So the extractor emits one portfolio-agnostic field name and **each portfolio de
 | O-4 | An unresolvable year writes nothing, reports the field, and warns — **no fallback portfolio** |
 | O-5 | Absent / `[]` / `null` performs no alignment call at all, leaving every other alignment table untouched |
 | O-6 | Each bulk item routes on **its own** year, with no leakage between items |
-| O-7 | **Existing contributor levers survive a primary-only write** — the sharpest new obligation, see R-4 |
+| O-7 | **The write is inert toward any lever row it did not create** — see R-4, whose severity was revised down on 2026-09-04 once it was confirmed that `formalizeResult` always creates the result it formalizes |
 
 ---
 
@@ -94,7 +94,7 @@ So the extractor emits one portfolio-agnostic field name and **each portfolio de
 
 **Out of scope**
 
-- `contributor_levers` — the AI payload carries only the primary form. **Preserving** existing contributor rows is in scope (O-7); *writing* them is not.
+- `contributor_levers` — the AI payload carries only the primary form. Not **writing** them is out of scope; being **inert toward** them is in scope (O-7).
 - Nested `result_lever_strategic_outcomes` / `result_lever_sdg_targets` — see Q-2.
 - Any migration, schema change, or seed change.
 - Any change to the alignment endpoints' request/response contract.
@@ -144,7 +144,7 @@ So the extractor emits one portfolio-agnostic field name and **each portfolio de
 - Portfolio 2 persists the ids as research areas at role `RESEARCH_AREAS_ALIGNMENT`.
 - Ids failing the three-part predicate (`id IN (…)` AND `portfolio_id = mine` AND `is_active = true`) are discarded and reported per id.
 - An unresolvable year reports the field and warns, with no fallback portfolio.
-- **A primary-only write must not deactivate or demote pre-existing contributor levers** (new, and specific to portfolio 1 — see R-4).
+- **The AI lever write must not deactivate, delete, promote or demote any `result_levers` row it did not itself create** (new — see R-4). Unreachable today by construction, and kept as a falsifiable guarantee rather than an incidental fact.
 
 ### MODIFIED
 
@@ -219,7 +219,7 @@ Three properties make it cheaper than the predecessor:
 | **R-1** | **`is_primary` is `NOT NULL` with a DB default of `false`.** A write that omits it silently creates a **contributor** lever where a primary was intended | **High — DC-4-class silent wrong data.** No row count, no exception and no `missing_fields` entry would reveal it | Requirements must assert the written `is_primary` value, not merely the row's existence. A test asserting "a row exists for lever 11" passes while the data is wrong |
 | **R-2** | `lever_id` is a `bigint` column typed as `string` on the entity, and the shipped code casts with `parseInt(x) as unknown as string` (`portfolio-2-alignment.handler.ts:62`) | Medium | An explicit design decision: replicate the existing cast for consistency, or clean it locally. Not a decision to improvise mid-implementation |
 | **R-3** | Reconciliation is scoped by `lever_role_id` (`ResultLeversService` → `super(ResultLever, …, 'lever_role_id')`), so a role-1 write cannot disturb role-3 rows and vice versa | Low — this is *protective* | Record it as a design fact: the two portfolios' writes are mutually inert by construction |
-| **R-4** | **But within role `ALIGNMENT (1)`, primary and contributor levers share the role** — `is_primary` distinguishes them, not the role. So a primary-only reconciliation at role 1 would **deactivate every existing contributor lever** for that result | **High, and portfolio-1-specific.** This is the same shape as the empty-survivor wipe the predecessor's T-03 caught. Portfolio 2 is unaffected: role 3 holds only research areas, with no contributor concept | The portfolio-1 handler cannot simply call `create` with the primary ids. The design must preserve existing contributors — and a test must prove a pre-existing contributor row survives. **This is the single hardest thing in this spec** |
+| **R-4** | **But within role `ALIGNMENT (1)`, primary and contributor levers share the role** — `is_primary` distinguishes them, not the role. So a primary-only reconciliation at role 1 would **deactivate every existing contributor lever** for that result | **Low** — *revised down 2026-09-04 from High.* `formalizeResult` has no update path: it always calls `createResult` and uses the returned row only as a rollback handle (`results.service.ts:879-901`). The result reaching the alignment step is milliseconds old, so no lever row can pre-exist for it. Portfolio 2 is doubly unaffected — role 3 cannot reach role-1 rows | The portfolio-1 handler **may** call `create` with just the primary ids. But the guarantee must not rest on that incidental fact: `[PL] R-RES-007` AC.2 requires a double reporting a pre-existing contributor row, so the inertness is **falsifiable now** rather than merely true today |
 | **R-5** | `payload?.research_areas?.map(...)` is unguarded (`portfolio-2-alignment.handler.ts:61`) — the same class of bug the predecessor's R-RES-010 hardened for `strategic_objectives` and `impact_outcomes`, which left `research_areas` out | Low; pre-existing, not caused here | Out of scope as written, but this spec touches that exact method. Either harden it as an explicit in-scope addition or record why not — do not leave it unremarked |
 | **R-6** | Amending the predecessor's R-RES-007 touches a spec with a closed, validated audit trail | Medium | The amendment is already recorded as a cross-spec obligation. `/akili-specify` must apply the two-direction Correction Closure sweep, and `/akili-validate` on the predecessor must not read its green T-06 as still covering `result_levers` |
 
@@ -235,7 +235,7 @@ Three properties make it cheaper than the predecessor:
 | --- | --- | --- | --- |
 | **Q-1** | Are lever ids 11/12 in the owner's payload actually `portfolio_id = 2` **in Dev**, and are legacy levers still all `portfolio_id = 1`? | The migration says yes; Dev state is unverified. Same shape as the predecessor's Q-1 | No — the design is written against *"the portfolio owns the id"*, never against a hardcoded id range. Gates the **verdict**, not the build |
 | **Q-2** | Should the AI path write levers with **no** `result_lever_strategic_outcomes` and no `result_lever_sdg_targets`? | A plain id array cannot express them, so AI-created levers would be structurally poorer than `PATCH`-created ones. That may be entirely acceptable — or may need the AI path to leave a marker | **Specify-blocking.** Needs one owner answer before design |
-| **Q-3** | For a **portfolio-1** item, may a primary-only AI write coexist with contributor levers a human added earlier? | This is R-4's product side. "Preserve them" is the safe default and is what O-7 assumes, but it should be the owner's stated intent, not an inference | **Specify-blocking** |
+| ~~Q-3~~ | ~~For a portfolio-1 item, may a primary-only AI write coexist with contributor levers a human added earlier?~~ | **CLOSED — moot, 2026-09-04.** The situation cannot arise; the result is always created by the same call that formalizes it. Closed by code evidence, not by a decision | — |
 | **Q-4** | Is the owner's example payload **captured from the real extractor** or hand-written? | It already confirms A-1 (numeric ids) and the year-as-string advisory. If captured, it materially advances DC-9 for *both* specs; if hand-written, it cannot | No, but it changes what the predecessor's T-07 may record |
 | **Q-5** | The payload carries `metadata.manually_edited: true` — a field **neither spec has considered.** Should a manually-edited item route or report differently? | An owner-edited item may warrant different treatment from a purely AI-extracted one | No — but it must not be discovered later as a surprise |
 
@@ -246,7 +246,7 @@ Three properties make it cheaper than the predecessor:
 - [ ] `primary_levers: [11, 12]` on a 2026 item produces two `result_levers` rows at `lever_role_id = 3` for that result, and the item lands in `results_created`.
 - [ ] The same ids on a 2025 item are **discarded and reported** — they are portfolio-2 ids.
 - [ ] Portfolio-1-owned ids on a 2025 item produce rows at `lever_role_id = 1` with **`is_primary = true` asserted explicitly** (R-1).
-- [ ] **A pre-existing contributor lever for the same result survives a primary-only AI write** (R-4 / O-7).
+- [ ] **A contributor lever reported by a persistence double survives the AI primary write** (R-4 / O-7) — the falsifying test for an inertness that is otherwise unreachable.
 - [ ] An unresolvable year writes nothing, reports the field, warns naming the year, and selects **no** fallback portfolio.
 - [ ] Absent / `[]` / `null` calls neither the resolver nor the orchestrator — asserted as **zero interactions**, not zero rows.
 - [ ] A mixed-year batch attaches each item's levers to that item's own result id, and reversing item order changes nothing.
@@ -263,4 +263,4 @@ Three properties make it cheaper than the predecessor:
 /akili-specify results/ai-formalize-primary-levers
 ```
 
-**Standard depth**, matching the predecessor. Answer **Q-2 and Q-3 first** — both are specify-blocking, and Q-3 is the product side of this spec's hardest technical risk.
+**Standard depth**, matching the predecessor. Answer **Q-2 first** — it is the one remaining specify-blocking question. *(Q-3 was closed as moot on 2026-09-04 during Phase 2 exploration.)*

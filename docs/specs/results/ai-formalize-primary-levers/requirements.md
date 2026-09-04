@@ -34,7 +34,7 @@ The field's meaning is **portfolio-dependent**, and the two portfolios disagree 
 
 Ids follow the constitutional form `R-RES-<NNN>`, ordinal within *this* spec, per `docs/specs/general-setup/requirements.md` §2.
 
-**This creates a real collision hazard and it is controlled here rather than left to chance.** Two sibling specs in module `results` are live simultaneously, they cross-reference each other's requirements, and their ordinals overlap. Worse, the collision lands on the two most important requirements in each: `R-RES-007` is *inertness* in the predecessor and *contributor survival* here.
+**This creates a real collision hazard and it is controlled here rather than left to chance.** Two sibling specs in module `results` are live simultaneously, they cross-reference each other's requirements, and their ordinals overlap. The collision is at its worst on `R-RES-007`, which in **both** specs is an inertness guarantee about alignment rows — `[SO] R-RES-007` is *"absence of the field leaves every other alignment table untouched"*, and `[PL] R-RES-007` is *"the AI write cannot reach a lever it did not create"*. Two same-numbered requirements that read alike and mean different things is precisely the shape a reader mis-cites.
 
 **Convention — binding on every document in this spec, and on any review or execution log that cites across the pair:**
 
@@ -230,34 +230,37 @@ An unprefixed id in a *cross-spec* context is a defect, not a shorthand. Recorde
 
 ---
 
-### R-RES-007 — A primary-only write leaves pre-existing contributor levers intact
+### R-RES-007 — The AI write cannot reach a lever it did not create
 
-- **As a** Result Contributor who added contributor levers by hand
-- **I want** a later AI formalization not to erase them
-- **So that** re-running the AI over my result does not silently destroy my own work
+- **As a** Result Contributor
+- **I want** the AI lever write to be incapable of touching alignment data a human entered
+- **So that** formalization can never silently destroy someone's own classification work
 
 **Details:**
-- Behavior: for a portfolio-1 item, writing primary levers must leave every pre-existing `lever_role_id = ALIGNMENT (1)` row with `is_primary = false` **active and still `is_primary = false`** — neither deactivated nor promoted.
-- Scope: portfolio-1-specific by construction. Portfolio 2 writes at role 3, which holds only research areas and has no contributor concept, so the hazard cannot arise there.
+- Behavior: the AI lever write must not deactivate, delete, or reclassify **any** `result_levers` row it did not itself create in the same call. In particular it must never demote or promote a row's `is_primary`.
+- **Satisfied by construction, and that construction must be proven.** `formalizeResult` has no update path: it always calls `createResult` and assigns the returned row to `resultExists` purely as a rollback handle (`results.service.ts:879-901`). The result reaching the alignment step was therefore created milliseconds earlier in the same method, so **no lever row of any kind can pre-exist for it** — no contributor to wipe, no primary to demote, no id to collide with.
+- Scope: the requirement binds both portfolios. Portfolio 2 writes at role 3 and additionally cannot reach role-1 rows at all, since reconciliation scopes by `lever_role_id`.
 
 **Acceptance criteria:**
-- [ ] AC.1 — A result with one pre-existing contributor lever (role 1, `is_primary = false`) still has that row **active** after a primary-only AI write.
-- [ ] AC.2 — That row's `is_primary` is still `false` — it was not promoted.
-- [ ] AC.3 — The new primary rows coexist with it at the same role.
-- [ ] AC.4 — Asserting only the presence of the new primary row does **not** satisfy this requirement; the pre-existing contributor row must be asserted directly.
+- [ ] AC.1 — The alignment step is reached only for a result created in the same `formalizeResult` call — asserted against the code path, not inferred.
+- [ ] AC.2 — Given a double that reports a pre-existing contributor lever for the target result, the write still leaves that row active with `is_primary = false`. **This is the falsifying test**: it must fail against an implementation that hands the reconciler only the primary rows.
+- [ ] AC.3 — A portfolio-2 write leaves every `lever_role_id = 1` row for that result untouched.
+- [ ] AC.4 — Asserting only the presence of the new primary rows does **not** satisfy this requirement; the untouched pre-existing row must be asserted directly.
 
-#### Scenario: A human's contributor lever survives an AI primary write
+#### Scenario: The write is inert toward rows it did not create
 
-- GIVEN a portfolio-1 result that already has a contributor lever at `lever_role_id = 1` with `is_primary = false`
-- WHEN that result is formalized with `primary_levers` carrying different, valid portfolio-1 ids
+- GIVEN a result reaching the AI alignment step, with a contributor lever at `lever_role_id = 1`, `is_primary = false`, present in the persistence double
+- WHEN `primary_levers` carrying valid ids is written for that result
 - THEN the new primary rows exist at role 1 with `is_primary = true`
 - AND the pre-existing contributor row is still active with `is_primary = false`
-- BUT it must NOT deactivate, delete, or promote that contributor row
-- AND IT MUST hold when the AI's id list and the contributor's id are disjoint **and** when they overlap
+- BUT it must NOT deactivate, delete, promote, or demote that contributor row
+- AND IT MUST hold for a portfolio-2 item, whose role-3 write leaves every role-1 row untouched
 
-> **This is the hardest requirement in the spec, and it exists because of a structural detail.** The write primitive scopes its reconciliation by `lever_role_id`. That makes the two portfolios' writes mutually inert — a role-3 write cannot disturb role-1 rows, and vice versa, which is protective. **But within role 1, primary and contributor levers share the role**; they are distinguished by `is_primary`, not by role. So a naive primary-only reconciliation at role 1 deactivates every contributor row for that result. Proposal R-4; defect class **DC-2** in §6.
+> **Why this requirement survives even though its hazard is unreachable.** The write primitive reconciles by deactivating every row for `(result_id, lever_role_id)` **absent from the incoming array**, and within role `ALIGNMENT (1)` primary and contributor levers **share the role** — `is_primary` distinguishes them, not the role. A primary-only reconciliation at role 1 would therefore wipe every contributor row for that result. That is the shape of the empty-survivor wipe the predecessor caught during execution.
 >
-> **Depends on open question Q-2** (§9). This requirement is written on the assumption that contributor levers are *preserved*. If the owner decides the AI write should own the whole ALIGNMENT role, this requirement inverts.
+> **Today the AI path cannot trigger it, because the result is always brand new.** The requirement is kept, and stated as an inertness property rather than a preservation duty, for two reasons: the guarantee should not silently depend on an incidental fact about `formalizeResult`, and if that method ever gains an update path the hazard returns with no test standing between it and production. AC.2 is written so the guarantee is **falsifiable now** rather than only auditable later — the same treatment the predecessor gave its request-scoped-read ban, which was also unreachable by construction and was still proven with throwing doubles.
+>
+> Proposal R-4 (severity revised — see §8); defect class **DC-2** in §6.
 
 ---
 
@@ -384,7 +387,7 @@ Named before the verification commands were chosen, because a gate that passes w
 | # | Defect class | Why an ordinary gate misses it | Gate that actually catches it |
 | --- | --- | --- | --- |
 | **DC-1** | **A lever written as contributor instead of primary.** `is_primary` is `NOT NULL` default `false`, so omitting it writes a valid row with wrong meaning | No exception, no unusual row count, no `missing_fields` entry. A test asserting "a row exists for lever 11" passes | **A value assertion on the written `is_primary`** (R-RES-003 AC.2). Presence-of-row assertions are explicitly disqualified |
-| **DC-2** | **Contributor levers wiped by a primary-only write.** Reconciliation scopes by role, and role 1 holds both kinds | The new rows are all present and correct; only the *absent* pre-existing rows reveal it, and nothing counts them | **Assert the pre-existing contributor row directly** — active and still `is_primary = false` (R-RES-007). Row counts of the new write cannot see this |
+| **DC-2** | **Contributor levers wiped by a primary-only write.** Reconciliation scopes by role, and role 1 holds both kinds | The new rows are all present and correct; only the *absent* pre-existing rows reveal it, and nothing counts them. **Unreachable today** — `formalizeResult` always creates a fresh result — so it is invisible to any test that goes through the real code path | **A double that reports a pre-existing contributor row** (R-RES-007 AC.2), which makes the guarantee falsifiable rather than merely true-by-accident. Row counts of the new write cannot see this |
 | **DC-3** | **A wrong-portfolio id written** because validation filtered on id + active but not on ownership | The id exists and is active, so any two-part predicate accepts it | A fixture with an id that is **valid in the other portfolio** (R-RES-005 AC.2) |
 | **DC-4** | **The section-wide save reached**, wiping SDGs and contracts the same method just wrote | The item still succeeds; the loss is in rows nobody asserted | Assert **sibling** row survival, not just absence of the new row (R-RES-008, R-RES-010 AC.2) |
 | **DC-5** | **Batch-wide portfolio resolution** passing as per-item, because every fixture item shares a year | With identical fixtures a constant and a correct implementation are indistinguishable | A mixed-year fixture varying year **and** ids **and** title, asserted per `result_id` *(KZ-004)*. Plus a falsifier: the suite must go red when the portfolio is resolved once for the batch |
@@ -434,7 +437,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | # | Assumption | If wrong |
 | --- | --- | --- |
 | **A-1** | **AI-created levers carry no nested `result_lever_strategic_outcomes` or `result_lever_sdg_targets`** — a plain id array cannot express them, so this path writes bare lever rows | AI-created levers are structurally poorer than `PATCH`-created ones. May need a marker, or the field may need a richer shape. **Q-1** |
-| **A-2** | **Pre-existing contributor levers are preserved** by a primary-only AI write | R-RES-007 **inverts**: the AI write would own the whole ALIGNMENT role and deliberately clear contributors. **Q-2** |
+| ~~A-2~~ | ~~Pre-existing contributor levers are preserved by a primary-only AI write~~ — **retired 2026-09-04 by implementation discovery.** `formalizeResult` has no update path, so no lever row can pre-exist for a result reaching the alignment step. R-RES-007 was rewritten as an inertness property satisfied by construction; the assumption it rested on no longer exists | n/a |
 | **A-3** | The extractor sends numeric ids, not names | Confirmed for `strategic_objectives` by the owner's payload; assumed to hold for `primary_levers`, which the same payload shows as `[11, 12]`. Fully closed only by Q-4 |
 | **A-4** | `year` arriving as a string (`"2026"`) is acceptable | Observed in the owner's payload. `ResultRawAi.year` is declared `number` but validated `@IsOptional() @IsString()` — pre-existing drift. MySQL coerces identically for both the `findByYear` predicate and `report_year_id`, so this path is unaffected |
 
@@ -452,7 +455,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | # | Risk | Severity | Handling |
 | --- | --- | --- | --- |
 | RK-1 | DC-1 — the `is_primary` default | **High** | R-RES-003 AC.2 as a value assertion |
-| RK-2 | DC-2 — contributor wipe | **High** | R-RES-007 in full, with its own scenario |
+| RK-2 | DC-2 — contributor wipe | **Low** *(revised down 2026-09-04 from High)* — unreachable via the AI path, since the result is always newly created. It stays on the register because the guarantee would silently depend on that incidental fact | R-RES-007 AC.2's falsifying double, which proves the inertness now instead of trusting it |
 | RK-3 | `lever_id` is a `bigint` column typed as `string`, and shipped code casts with `parseInt(x) as unknown as string` | Medium | An explicit design decision in `design.md` — replicate for consistency or clean locally. Not to be improvised |
 | RK-4 | `payload?.research_areas?.map(...)` is unguarded in the portfolio-2 handler — the same class the predecessor's `[SO] R-RES-010` hardened for two sibling arrays, which left this one out | Low; **pre-existing, not caused here** | This spec touches that method. Either harden it as a stated in-scope addition or record why not — do not leave it unremarked |
 | RK-5 | Amending a spec with a closed audit trail | Medium | §7, with the two-direction sweep |
@@ -465,7 +468,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | # | Question | Blocking? | Owner |
 | --- | --- | --- | --- |
 | **Q-1** | Should AI-created levers be written with **no** nested strategic outcomes and no lever SDG targets (A-1)? Or does the AI path need to leave a marker that these are incomplete? | **Blocks design sign-off.** R-RES-003/004 are written on A-1 | D. Casañas |
-| **Q-2** | For a portfolio-1 item, may a primary-only AI write **coexist** with contributor levers a human added earlier (A-2)? "Preserve" is the safe default and is what R-RES-007 asserts — but it should be stated intent, not inference | **Blocks design sign-off.** R-RES-007 inverts if the answer is "the AI owns the role" | D. Casañas |
+| ~~Q-2~~ | ~~For a portfolio-1 item, may a primary-only AI write coexist with contributor levers a human added earlier?~~ | **CLOSED — moot, 2026-09-04.** The situation cannot arise: `formalizeResult` always creates the result it formalizes, so there are never earlier contributor levers to coexist with. Closed by code evidence (`results.service.ts:879-901`), not by a decision | — |
 | **Q-3** | In **Dev**, are lever ids 11/12 actually `portfolio_id = 2`, and are legacy levers still all `portfolio_id = 1`? | No — gates the verdict, not the build (DC-9) | D. Casañas |
 | **Q-4** | Is the example payload **captured from the real extractor** or hand-written? | No — but it decides whether A-3 is evidence or assumption, for **both** specs (DC-10) | D. Casañas |
 | **Q-5** | The payload carries `metadata.manually_edited: true`, which **neither spec has considered.** Should a manually-edited item route or report differently? | No — recorded so it is not discovered later as a surprise | D. Casañas |
@@ -477,7 +480,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | Role | Name | Status | Date |
 | --- | --- | --- | --- |
 | Spec owner | D. Casañas | pending | — |
-| Requirements approved | — | **pending — Q-1 and Q-2 must be answered first** | — |
+| Requirements approved | — | **pending — Q-1 only.** Q-2 closed as moot on 2026-09-04 | — |
 
 **Requirement ID index**
 
@@ -489,7 +492,7 @@ The amendment must run the **two-direction Correction Closure sweep** — forwar
 | R-RES-004 | Portfolio 2 persists as research areas | **Q-1** (A-1) |
 | R-RES-005 | Unowned ids discarded and reported | — |
 | R-RES-006 | Unresolvable year writes nothing and says so | — |
-| R-RES-007 | Primary-only write leaves contributor levers intact | **Q-2** (A-2) — inverts if answered otherwise |
+| R-RES-007 | The AI write cannot reach a lever it did not create | — *(was Q-2-dependent; Q-2 closed as moot)* |
 | R-RES-008 | Absence leaves every other alignment table untouched | — |
 | R-RES-009 | Per-item routing, no leakage, clean rollback | — |
 | R-RES-010 | Both AI alignment fields compose | — |
