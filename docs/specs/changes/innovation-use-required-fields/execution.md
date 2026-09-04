@@ -37,9 +37,9 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | Task | Status | Notes |
 | --- | --- | --- |
 | T-01 `app-input` requiredMode + precedence | `[x]` | PASS attempt 1. Spec gap escalated — see Pivot Record |
-| T-02 `app-input` DD-10 token sweep | `[ ]` | |
+| T-02 `app-input` DD-10 token sweep | `[x]` | PASS attempt 1. Visual claims INCONCLUSIVE → T-16 gate 3 |
 | T-03 `quantification-item` 5 inputs | `[ ]` | `unitRequiredMode` added by pivot |
-| T-04 actor disaggregated counts + total msg | `[ ]` | |
+| T-04 actor disaggregated counts + total msg | `[ ]` | forward pointer filed (scope the cohort spy) |
 | T-05 actor aggregate path | `[ ]` | |
 | T-06 actor custom name trimmed | `[ ]` | |
 | T-07 org known path + DD-9 precedence | `[ ]` | |
@@ -51,7 +51,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
-| T-16 CLIENT GATES suite + tsc + browser | `[ ]` | |
+| T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
 | T-17 RSK-2 population sizing | `[ ]` | |
 | T-18 migration + migration spec | `[ ]` | |
 | T-19 executed truth table | `[ ]` | |
@@ -283,3 +283,80 @@ Raw output read for errors before counting, no truncation (`K-014`). **Both post
 **Budget impact:** **no new task** — the task count stays at 20, still the `RB-8` re-baselined figure. T-03 and T-12 each grow by roughly one input and one test case; LOC stays inside the re-baselined ~1,650. Review rounds +1 to +2 across the two amended tasks. **No tripwire escalation owed.**
 
 **No ADR affected** — `DD-4` is a spec-local design decision, not a TRD architecture decision, so no superseding `ADR-NNN` is owed to `/akili-archive`'s constitution sync.
+
+---
+
+### T-02 — `app-input`: tokenize the five live literals, delete the dead `[style]`
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1) — **token compliance passes; VISUAL claims recorded INCONCLUSIVE** pending T-16 gate 3, per this task's own Disqualifier |
+| Date | 2026-09-04 |
+| Implementer attempts | **1** |
+| Effort assigned | `medium` (task said `S`; raised for the `P-2` inversion trap, two near-identical `[style]` lines where confusing them is destructive, and a decision requiring reasoning) |
+| Skills assigned | `ui-ux-pro-max`, `angular-developer` (task's own list, unchanged) |
+
+**Files changed** — `input.component.html` (6 sites) · `input.component.spec.ts` (+225 lines, 1 import)
+
+| Site | Branch | Before → After |
+| --- | --- | --- |
+| `:30` | `pInputText` (text) — **LIVE** | `[style]` `#E69F00` → `var(--ac-warning-1)` — **converted, kept** |
+| `:49` | `p-inputNumber` — **LIVE** | class `border-[#E69F00]` → `border-[var(--ac-warning-1)]` — **converted, kept** |
+| `:55` | `p-inputNumber` — **DEAD** (`P-1`) | **deleted entirely** |
+| `:59` | helper text | `text-[#8D9299]` → `text-[var(--ac-grey-600)]` |
+| `:65` / `:71` | amber messages | `text-[#E69F00] text-sm` → `text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]` |
+
+**Zero hex literals remain in the file** (Leader-measured: `grep -c 'E69F00'` → 0, `grep -c '8D9299'` → 0).
+
+**The `P-2` inversion held.** `:30` and `:55` were both amber-border `[style]` bindings and near-identical; converting the wrong one removes the only amber border from every text field in the application, and revisions 3–4 of the design ordered exactly that mistake. The Implementer read each enclosing `@if`/`@else if` before touching either and quoted both branches back; the Reviewer re-verified against the current file. Matches `DD-10`'s corrected "two lines swap fates" table.
+
+**The `text-sm` decision (`N-8`) — option (b), explicitly recorded**
+
+`fs-[14]` **paired with `leading-[1.25rem]`**. The Implementer justified it from the shipped exemplar rather than preference: the actor and organization cards already use `fs-[14]` for required-message text, and `requirements.md:163` names `fs-[14]` by name. Recorded three ways in-tree (block comment, `describe` title, `it` title) and asserted both positively (`toContain('leading-[1.25rem]')`) and negatively (`not.toContain('text-sm')`).
+
+Equivalence verified rather than asserted — the Leader confirmed `.fs-[14]` emits a plain `font-size: 14px` (`responsive-size.scss:18`, no fluid scale), and the Reviewer closed the two seams the Leader had flagged as open:
+
+- **No root font-size override exists** — repo-wide grep for `^\s*html\s*[,{]`, `html, body`, `font-size: 62.5%` → **0 matches**, no `tailwind.config.*`, no `@theme` block. So the 16px default holds and `0.875rem === 14px`.
+- **The `md:` `!important` concern does not materialize** — `responsive-size.scss:112` generates `.md\:fs-\[14\]` as a **separate class name**; the diff authors only `fs-[14]`, so nothing fires in the `(orientation: landscape) and (height <= 768px)` block.
+- One mechanism change neither the Leader nor the Implementer named, found by the Reviewer: Tailwind v4.1.6 emits `text-sm`'s line-height as the **unitless ratio** `calc(1.25 / 0.875)` (inherits as a factor) whereas `leading-[1.25rem]` is an absolute length. The only descendant with its own font-size is the `!text-base` icon, unaffected either way. Identical in every case constructible → advisory, not a defect.
+
+**Verification**
+
+- `npx eslint <.html> <.spec.ts>` → 0 errors on the `.html`; one expected "File ignored" warning on the spec.
+- `npx jest input.component.spec --coverage=false --silent` → **123/123**, 3 suites.
+- `npm test -- --silent -- input.component.spec` → 123/123 pass, **exit 1** on project-wide coverage floors — the documented `K-020` false negative (`client/research-indicators/src/CLAUDE.md:152`), independently confirmed by the Leader.
+- `npx tsc -p tsconfig.spec.json --noEmit` filtered to the two touched files → **0 lines**.
+- **RED observed** (`K-004`): `:30`'s token reverted to `#E69F00` produced `Expected value: ["2px solid var(--ac-warning-1)"] / Received array: [["2px solid #E69F00"]]` — the spy fires once with the real value and the matcher rejects the wrong one, so the gate **discriminates by value**, not merely by presence.
+- **LEADER FULL-SUITE RE-MEASURE**, run in the worker-idle window per `.agents/leader.md` (no worker active, no concurrent full-suite run): `npm test -- --silent` from `client/research-indicators/` → **317 suites passed, 6823 tests passed, 0 failed, exit 0**. Coverage: statements 98.21%, branches 96.33%, functions 97.82%, lines 98.5%. **No consumer regression** across the template's 18 consumers from T-01 or T-02. This is evidence toward `R-IUR-013` AC.2 but does **not** discharge T-16 gate 1, which owns the formal gate and must run after every client change has landed.
+
+**The cascade rule — the finding no test can produce**
+
+`DD-3` / `R-IUR-003` S1's `AND IT MUST NOT`: **CLEAN** on the Reviewer's reading. The `pInputText` element carries only `text-[14px]` (pre-existing), `[class]="inputValid().class"` (which emits `ng-invalid ng-dirty` only — `input.component.ts:199`, never a `border-*`), and the `[style]` object. No `border-*` utility reached it; `p-select` does not appear in this template at all. The single `border-*` utility in the diff sits on `p-inputNumber`, the documented exception (`requirements.md:174`, `design.md:272`). The Implementer explicitly declined to manufacture a test appearing to cover this and stated it rests on review — **the `KZ-014`-compliant behavior**, since no red is available (`DC-1`).
+
+**Assertion placement (`KZ-001`)** — both new mechanisms land on generated DOM output, not on a call sequence. The Reviewer established that Angular's `DefaultDomRenderer2.setStyle` writes non-dash-case props as `el.style[prop] = value`, so the `CSSStyleDeclaration.prototype.border` **setter spy** intercepts the element's own style write. `element.style.border` is **never read** (grep returns one hit, inside a comment) — correct, because `cssstyle@2.3.0` drops a shorthand carrying `var()` and would read back empty whether the binding were right or broken. `:49` is asserted on the rendered class string off the `InputNumber` host.
+
+**Scope** — T-01's two `describe` blocks survive intact, as do all pre-existing suites. Every sibling custom-field still carries its own hex (`select`, `multiselect`, `radio-button`, `textarea`, `calendar-input`) — correctly left to their own tasks. No T-03/T-12 leakage. The new `ActionsService` import/mock is a **justified necessity**, verified at source: `save-on-writing.directive.ts:9` does `inject(ActionsService)`, the directive applies only on the `type === 'text'` branch, and `ActionsService`'s constructor calls `validateToken()` — so `:30` could not be rendered at all without it, and every pre-existing suite in this file avoided `type: 'text'` for exactly that reason.
+
+**Dark-theme `--ac-grey-600` delta — the one behavioural change this task introduces**
+
+Leader-measured and Reviewer-confirmed independently: `--ac-grey-600` is `#8d9299` in `:root` (`colors.scss:33`) but **`#949494`** in `[data-theme='dark']` (`colors.scss:148`, block opens `:122`). `--ac-warning-1` is `#e69f00` in both (`:48`, `:156`), so the four amber conversions are genuinely zero-delta in both themes; **the grey is zero-delta in light only.**
+
+`design.md` asserted *"Both colour changes are zero-delta by registry"* — **false as written**, and corrected in this commit (`DD-10`) rather than left standing, per `KZ-007` and the root guide's ban on letting docs and code drift. The earlier citation pair `:33` / `:108` never named the dark block; `:108` is the `$colors` SCSS map entry, which only generates class names. That omission is how the light-only claim came to read as universal.
+
+**Ships as ordered, no spec amendment needed** (Reviewer ruling, Leader concurring): `DD-10` names `--ac-grey-600` unambiguously, a hardcoded hex cannot respond to `data-theme` at all so tokenizing is the point of `G-3`, `#949494` is strictly better contrast on the dark surface, and root `CLAUDE.md` §4.2 mandates relying on tokens over branching on `isDarkMode()`. Reachability confirmed: `DarkModeService` sets `data-theme` on `document.documentElement`, and the payload is every `app-input` with `helperText` — `innovation-details.component.html:31`, `oicr-form-fields.component.html:20`, `submit-result-content.component.html:58`, `evidence.component.html:10`.
+
+**`ADVISORY` (4R lens — recorded, non-gating; per the Advisory rules none of these becomes a task in this spec)**
+
+1. *Risk / Readability* — the dark-theme grey delta lands in the only theme T-16 gate 3 does not inspect (gate 3 is scoped *light theme*). Recorded above and in `DD-10`; **whether gate 3 gains a dark-theme helper-text look is escalated to the user at this gate**, not widened silently.
+2. *Reliability* — T-02 makes `'2px solid var(--ac-warning-1)'` reachable from a **second** emitter inside `innovation-use-details.component`'s fixture (`app-input`'s `:30`, via `quantification-item`). The prototype-wide cohort spy at `innovation-use-details.component.spec.ts:2542-2545` uses `toContainEqual`, so its power to discriminate the actor-type `p-select` binding is now weaker than its name claims (`KZ-001`). Reviewer verdict: **plausibly reachable, could not construct or execute it** (read-only, no `Bash`). The two `not.toHaveBeenCalled()` assertions at `innovation-use-actor-item.component.spec.ts:350`/`:386` are **not** at risk — this diff changes the setter's argument, never whether it is called. → **forward pointer filed to T-04**, below.
+3. *Readability* — `:59`'s helper row now mixes idioms (`text-[14px]`) against the two rows below it (`fs-[14] leading-[1.25rem]`). Outside T-02's ordered scope (`DD-10` ordered only `text-sm` converted). The identical `text-[#E69F00] text-sm` pair at `radio-button.component.html:33` should reuse T-02's line-height decision verbatim whenever a task tokenizes it.
+4. *Readability* — the negative `:30` test asserts only the spy's absence, so it would also pass if the input never rendered; one `expect(query(By.css('input[pInputText]'))).toBeTruthy()` makes it non-vacuous. Its title says "clears on fill" but it constructs the valid state rather than transitioning into it (`KZ-015`) — **not a gate here**, because `tasks.md:506` assigns "S1 amber appears and clears" to T-01 (logic) and T-02 owns only the token.
+5. *Risk* — `fs-[14]` is px where `text-sm` was rem, so message text no longer scales with a user's browser default font size. **Not a deviation** — `requirements.md:163` mandates `fs-[14]` by name and `docs/ux-ui/design.md:376` sanctions `.fs-[n]` as the per-element override — but it is the one a11y-adjacent consequence of `G-3` worth having on the record.
+
+> **FORWARD POINTER → T-04 (Leader-owned; must be copied into T-04's brief).** Scope the prototype-wide `border` setter spy at `innovation-use-details.component.spec.ts:2542-2545` to the specific element. Since T-02, `'2px solid var(--ac-warning-1)'` has a second emitter in that fixture (`app-input` `:30` via `quantification-item`), and the spy's `toContainEqual` can no longer prove the assertion belongs to the actor-type `p-select`. T-04 already owns the actor card's `p-select` border assertions, so this falls inside its existing scope — it is a precision fix to an assertion T-04 must rely on, not new scope.
+
+> **FORWARD POINTER → T-16 (Leader-owned; cumulative, now three items).** Gate 3 must name **in words** (`KZ-002`): (a) the amber border on a **text** field (`:30`, `[style]` mechanism), (b) the amber border on a **number** field (`:49`, class mechanism), (c) the message rows' line-height after the `fs-[14] leading-[1.25rem]` swap. Plus the two T-15 doc claims already filed. Gate 3 is the **only** owner of every visual claim in T-01 and T-02.
+
+**Requirements covered** — `R-IUR-003` AC.1–AC.3 (`app-input` half) and S1's `BUT`/`AND IT MUST NOT` pair · `NFR-IUR-002`. **All at token-compliance level only.**
+
+**Cannot prove (`KZ-017`)** — **paint.** No check here observes a painted border or a computed line-height; jsdom computes no layout. `border-[var(--ac-warning-1)]` and `text-[var(--ac-grey-600)]` rely on Tailwind v4's arbitrary-value type inference defaulting to *colour* for an un-inferable `var()`; the Leader corroborated the idiom is established (91 `border-[var(--…)]`, 141 `text-[var(--…)]`, 139 `leading-[…]` occurrences in shipped templates) but **corroboration is not observation**. Additionally the Reviewer flagged that `index.html:9` loads `colors.css` from an **external S3 bucket** which, if it redefines `--ac-*`, means the effective runtime values are not the committed SCSS ones — neither agent could fetch it. That cuts *in favour* of this diff (a hardcoded hex bypasses the override entirely), but the Q4 numbers are from committed SCSS only. Per this task's Disqualifier, **its visual claims are INCONCLUSIVE, never passing, until T-16 gate 3 runs.**

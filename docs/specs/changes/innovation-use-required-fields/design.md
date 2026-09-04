@@ -562,8 +562,31 @@ dead `[style]` binding at `:55`**, and convert `text-sm` to `fs-[14]`. A **sixth
 `var(--ac-grey-600)`, NOT to `--ac-warning-1`**: `#8d9299` is the grey registered at
 `colors.scss:33` / `:108`, and the blanket "convert the literals to `var(--ac-warning-1)`" of
 revisions 3–4 would have repainted the helper text amber. *(Corrected at the Phase 3 gate.)*
-`--ac-warning-1` **is** `#e69f00` (`colors.scss:48`, `:156`), so the amber change at `:30`, `:49`,
-`:65`, `:71` is **zero-delta**; the `:59` grey change is zero-delta against `--ac-grey-600`.
+`--ac-warning-1` **is** `#e69f00` in **both** themes (`colors.scss:48` `:root`, `:156` inside
+`[data-theme='dark']`), so the amber change at `:30`, `:49`, `:65`, `:71` is **zero-delta in both
+themes**.
+
+**The `:59` grey change is zero-delta in LIGHT THEME ONLY** — corrected 2026-09-04 at the T-02
+execution gate, measured by the Leader and independently confirmed by the Reviewer. `--ac-grey-600`
+is `#8d9299` in `:root` (`colors.scss:33`) but **`#949494`** inside `[data-theme='dark']`
+(`colors.scss:148`, a block opening at `:122` that the earlier citation pair — `:33` / `:108` — never
+named; `:108` is the `$colors` **SCSS map** entry, which only generates class *names*). So converting
+`:59`'s hardcoded `text-[#8D9299]` **changes the dark-theme helper-text colour** from `#8d9299` to
+`#949494`.
+
+**This is intended, not a regression, and the conversion ships as ordered.** A hardcoded hex cannot
+respond to `data-theme` at all, so tokenizing it is precisely the point of `G-3`; `#949494` is
+strictly better contrast on the dark surface; and root `CLAUDE.md` §4.2 mandates relying on tokens
+rather than branching on `isDarkMode()`. Reachability is confirmed, not theoretical: `DarkModeService`
+sets `data-theme` on `document.documentElement` (`docs/ux-ui/design.md:359`), which is what the dark
+block matches, and the payload is every `app-input` carrying `helperText` — e.g.
+`innovation-details.component.html:31`, `oicr-form-fields.component.html:20`,
+`submit-result-content.component.html:58`, `evidence.component.html:10`.
+
+**The recorded consequence for `T-16`:** gate 3 is scoped *light theme* (`tasks.md` §4, T-16), so the
+one behavioural change this task introduces falls in the only theme the human gate does not inspect.
+That asymmetry is deliberate and now recorded rather than latent; whether gate 3 gains a dark-theme
+helper-text look is a user decision taken at the T-02 gate, not a silent widening of an approved task.
 
 **The `text-sm` → `fs-[14]` half is NOT zero-delta (`N-8`)** and the earlier blanket claim was wrong:
 `.fs-[14]` sets `font-size` only (`responsive-size.scss:17-21`), while `text-sm` also sets

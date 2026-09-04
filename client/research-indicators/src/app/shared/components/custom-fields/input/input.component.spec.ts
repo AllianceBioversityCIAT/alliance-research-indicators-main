@@ -7,6 +7,7 @@ import { WordCountService } from '../../../services/word-count.service';
 import { By } from '@angular/platform-browser';
 import { InputNumber } from 'primeng/inputnumber';
 import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
+import { ActionsService } from '../../../services/actions.service';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -1273,6 +1274,230 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
 
       expect(inputNumber.input.nativeElement.value).toBe('5'); // clamped on the rendered DOM value
       expect(inputNumber.value).toBe(5); // clamped on the real PrimeNG instance
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-02 — app-input: tokenize the
+// five live literals, delete the dead [style])
+//
+// DD-10 (INVERTED by P-2) + DD-3's per-control gate. Per DD-3's resolution table:
+//   - pInputText branch (:30) LIVE mechanism is the `[style]` object binding — asserted with a
+//     `CSSStyleDeclaration.prototype.border` setter spy, exactly as the in-tree exemplar
+//     (innovation-use-actor-item.component.spec.ts:291) does, and for the SAME reason: cssstyle
+//     @2.3.0 drops a shorthand carrying var(), so `element.style.border` reads back empty
+//     whether the binding is correct or broken (KZ-017 — this is what that check CANNOT reach).
+//   - p-inputNumber branch (:49) LIVE mechanism is the Tailwind utility CLASS — the `[style]` at
+//     the old :55 was PROVEN DEAD by P-1 (`p-inputNumber` declares `style` as an `@Input` and
+//     never applies it) and has been DELETED, not converted. Asserted on the rendered class
+//     string, never on style.
+// Neither assertion proves PAINT (DC-7) — T-16's human browser check is the gate for that
+// (DC-1); these assertions are token-compliance only.
+describe('InputComponent — T-02: tokenized amber/grey literals (DD-10, DD-3)', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  describe(':30 — pInputText [style] binding is CONVERTED (kept, not deleted)', () => {
+    async function renderTextType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? '' : 'some value'),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+      // appSaveOnWriting (@if (type === 'text') branch) injects ActionsService — mocked here so
+      // the real `type: 'text'` template can render at all (the pre-existing sibling suites in
+      // this file avoid type: 'text' entirely for exactly this DI reason and render type:
+      // 'number' instead; :30 lives only on the text branch, so it cannot be avoided here).
+      const mockActionsService: Partial<ActionsService> = { saveCurrentSection: jest.fn() };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService },
+          { provide: ActionsService, useValue: mockActionsService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? '' : 'some value' });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'text';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('sets a warning-token inline-style border on the invalid text input (R-IUR-003 AC.2)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(true);
+
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('does not set the warning-token border when the field is valid (R-IUR-003 AC.2, clears on fill)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(false);
+
+      expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+  });
+
+  describe(':49/:55 — p-inputNumber CLASS is CONVERTED (LIVE); the dead [style] is DELETED (P-1/P-2)', () => {
+    async function renderNumberType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // Drive `body` through the REAL mechanism (the `onChange` effect reads
+      // `getNestedProperty(signal(), optionValue)`) rather than calling `body.set()` directly —
+      // the effect's first run fires synchronously within this single `detectChanges()` and would
+      // clobber a directly-set `body` value back to whatever this mock returns.
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? null : 5),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? null : 5 });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('renders the warning-token border-color utility class when invalid (isInvalid() true)', async () => {
+      const localFixture = await renderNumberType(true);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).toContain('border-[var(--ac-warning-1)]');
+      expect(hostEl.className).not.toContain('#E69F00');
+    });
+
+    it('renders no border utility class when valid (isInvalid() false)', async () => {
+      const localFixture = await renderNumberType(false);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).not.toContain('border-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':58 — helper text is CONVERTED to --ac-grey-600 (not --ac-warning-1)', () => {
+    async function renderWithHelperText(): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(null),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({});
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.helperText = 'Helper copy';
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('applies the grey token, never the amber token, to the helper text row', async () => {
+      const localFixture = await renderWithHelperText();
+      // Matched by class, not by exact textContent equality: the outer wrapping <div>s have no
+      // text of their own when no label/description is set, so an exact-equality match on
+      // trimmed textContent picks up the FIRST ancestor div in traversal order instead of the
+      // helper row itself. The grey token is unique to this row (the warning-token rows below
+      // never carry it), so it is an unambiguous discriminator.
+      const helperDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-grey-600'));
+
+      expect(helperDiv).toBeTruthy();
+      expect((helperDiv!.nativeElement as HTMLElement).textContent).toContain('Helper copy');
+      expect((helperDiv!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+      expect((helperDiv!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':64/:70 — amber required/max-reached messages keep the warning token and the fs-[14] decision', () => {
+    async function renderMessage(kind: 'required' | 'maxReached'): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // 'maxReached' is driven through the REAL threshold in `updateMaxReachedMessage` (an
+      // 18-character value, `MAX_SAFE_INTEGER`) via the mocked `getNestedProperty` — not by
+      // calling `showMaxReachedMessage.set(true)` directly, which the effect's own first,
+      // synchronous run (within this same `detectChanges()`) recomputes and overwrites from
+      // `body().value` regardless of what was set beforehand.
+      const value = kind === 'required' ? '' : '9'.repeat(18);
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(value),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: value });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      if (kind === 'required') {
+        localComponent.isRequired = true;
+      }
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it.each([
+      { kind: 'required' as const, text: 'This field is required' },
+      { kind: 'maxReached' as const, text: 'Maximum reached' }
+    ])('the $kind message div carries the warning token, fs-[14], and an explicit 1.25rem line-height (text-sm decision, T-02)', async ({ kind, text }) => {
+      const localFixture = await renderMessage(kind);
+      // `.includes`, not exact equality: the div's own textContent concatenates the icon
+      // ligature text ("warning") with the message span's text (e.g. "warningThis field is
+      // required"), so an exact match against just the message string never matches.
+      const messageDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-warning-1') && (d.nativeElement as HTMLElement).textContent?.includes(text));
+
+      expect(messageDiv).toBeTruthy();
+      const className = (messageDiv!.nativeElement as HTMLElement).className;
+      expect(className).toContain('text-[var(--ac-warning-1)]');
+      expect(className).toContain('fs-[14]');
+      expect(className).toContain('leading-[1.25rem]');
+      expect(className).not.toContain('#E69F00');
+      expect(className).not.toContain('text-sm');
     });
   });
 });
