@@ -379,6 +379,17 @@ export class ResultRawAi {
   strategic_objectives?: number[];
 
   @ApiProperty({
+    type: Number,
+    isArray: true,
+    description: 'Primary levers associated with the result',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  primary_levers?: number[];
+
+  @ApiProperty({
     type: String,
     description: 'Training category if applicable',
     required: false,

@@ -2,7 +2,7 @@
 
 - **Module:** results
 - **Spec id:** 2026-09-ai-formalize-primary-levers
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Felipe Casañas Hernández
 - **Depth:** Standard
 - **Linked requirements:** `./requirements.md` · **Linked design:** `./design.md` · **Proposal:** `./proposal.md`
@@ -10,6 +10,7 @@
 - **Budget (design.md §13):** 7 tasks · ~252 prod LOC + ~1,558 test LOC (~1,810 total) · **4 rework rounds** (not review passes). Priced on the predecessor's *measured* ~6:1 test:production basis from day one, per **KZ-008**
 - **Last updated:** 2026-09-04
 
+- **Execution log:** `./execution.md`
 ---
 
 ## 1. Task Numbering
@@ -58,17 +59,17 @@ No cycles.
   - `@ApiProperty` is required (root `CLAUDE.md` §4.1) and is what the Swagger document is generated from.
   - Do **not** touch `RootAi`, and do **not** add id-validity checking here — ownership and activeness are T-03's, against the resolved portfolio (DD-4).
 - **Acceptance / done check:**
-  - [ ] `primary_levers: [11, 12]` passes validation.
-  - [ ] `"11,12"` fails with `primary_levers` named in `errors`.
-  - [ ] `[11, "x"]` fails with the field named — the **per-element** rule.
-  - [ ] Absence passes, and requires no other new field (the `BUT it must NOT` clause).
-  - [ ] The `@ApiProperty` reflect-metadata declares an optional number array.
+  - [x] `primary_levers: [11, 12]` passes validation.
+  - [x] `"11,12"` fails with `primary_levers` named in `errors`.
+  - [x] `[11, "x"]` fails with the field named — the **per-element** rule.
+  - [x] Absence passes, and requires no other new field (the `BUT it must NOT` clause).
+  - [x] The `@ApiProperty` reflect-metadata declares an optional number array.
 - **Tests:** `result-ai.dto.spec.ts` — extend the existing describe, running payloads through the **real** `endpointValidationPipe` configuration (`whitelist` + `forbidNonWhitelisted` + `transform`), not a hand-rolled validator.
 - **Verification:** `npm test -- --silent src/domain/entities/results/dto/result-ai.dto.spec.ts`
 - **Falsifying input:** `[11, "x"]`. Run it against the DTO **before** adding the per-element validator and confirm it passes — that is what proves the test can fail. An array-only decorator is the defect this check exists for.
 - **Disqualifies:** asserting the property exists on the class, or that a `@ApiProperty` decorator is present, instead of running a payload through the pipe. **A presence-assertion on a decorator proves declaration, not validation** — it cannot distinguish `@IsNumber({}, { each: true })` from `@IsArray()` alone, which is the entire point of this task.
 - **Skills:** `nestjs-expert`, `api-design-principles`
-- **Estimated effort:** S · **Status:** todo
+- **Estimated effort:** S · **Status:** done — PASS on attempt 1 (lens-checklist review, 5 advisories recorded, none gating); see `execution.md` → T-01
 
 ---
 

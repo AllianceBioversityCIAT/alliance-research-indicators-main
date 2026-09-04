@@ -382,4 +382,83 @@ describe('result-ai DTOs (class-transformer + class-validator)', () => {
       expect(meta.required).toBe(false);
     });
   });
+
+  describe('ResultRawAi.primary_levers (R-RES-001) under the endpoint ValidationPipe', () => {
+    const bodyMetadata = { type: 'body' as const, metatype: RootAi, data: '' };
+
+    it('AC.1 — accepts a numeric array and does not reject the request', async () => {
+      const payload = {
+        results: [{ ...minimalResult, primary_levers: [11, 12] }],
+      };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result).toBeInstanceOf(RootAi);
+      expect(result.results[0].primary_levers).toEqual([11, 12]);
+    });
+
+    it('AC.4 — does not require the field to be present, and requires no other new field', async () => {
+      const payload = { results: [minimalResult] };
+
+      const result = await endpointValidationPipe.transform(
+        payload,
+        bodyMetadata,
+      );
+
+      expect(result.results[0].primary_levers).toBeUndefined();
+    });
+
+    it('AC.2 — rejects a comma-separated string in place of an array, naming the field', async () => {
+      const payload = {
+        results: [{ ...minimalResult, primary_levers: '11,12' as any }],
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          message: expect.arrayContaining([
+            expect.stringContaining('primary_levers'),
+          ]),
+        }),
+      });
+    });
+
+    it('AC.3 — rejects an array containing a non-number element, naming the field (per-element rule)', async () => {
+      const payload = {
+        results: [{ ...minimalResult, primary_levers: [11, 'x'] as any }],
+      };
+
+      await expect(
+        endpointValidationPipe.transform(payload, bodyMetadata),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({
+          message: expect.arrayContaining([
+            expect.stringContaining('primary_levers'),
+          ]),
+        }),
+      });
+    });
+
+    it('AC.5 — Swagger documents `primary_levers` as an optional number array on ResultRawAi', () => {
+      const properties: string[] = Reflect.getMetadata(
+        'swagger/apiModelPropertiesArray',
+        ResultRawAi.prototype,
+      );
+      expect(properties).toContain(':primary_levers');
+
+      const meta = Reflect.getMetadata(
+        'swagger/apiModelProperties',
+        ResultRawAi.prototype,
+        'primary_levers',
+      );
+      expect(meta).toBeDefined();
+      expect(meta.type).toBe(Number);
+      expect(meta.isArray).toBe(true);
+      expect(meta.required).toBe(false);
+    });
+  });
 });
