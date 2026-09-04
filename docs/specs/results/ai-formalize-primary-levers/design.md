@@ -351,11 +351,15 @@ Same evidence standard as the predecessor, which caught three defects before rev
 
 ---
 
-### DD-10 — The unguarded `research_areas` map is hardened, as a scoped exception
+### DD-10 — The unguarded `research_areas` map is made type-honest, as a scoped exception
 
 **Decision.** Treat an absent/`null` `research_areas` array as empty inside the existing portfolio-2 section `save`. Scope is one expression; the OICR / indicator gates around it stay byte-identical.
 
-**Why.** `payload?.research_areas?.map(...)` currently yields `undefined` when the key is absent, which is then handed to `create` — the same shape as the empty-survivor wipe that could deactivate every research area for the result. The predecessor's `[SO] R-RES-010` hardened exactly this pattern for `strategic_objectives` and `impact_outcomes` and **left `research_areas` out**, so the gap is a known omission rather than a new discovery.
+**Amended 2026-09-04 (second Pivot, T-03) — this decision is behaviour-neutral, and the original *Why* below was wrong.** Execution proved the guard cannot change any outcome: `create`'s only consumer of that argument is `formatDataToArray` (`base-service.ts:130-132`), and `isNotEmpty` (`array.util.ts:89-93`) returns `false` for `undefined`/`null` **and** for an empty array, so both inputs converge to `[]` one call before anything downstream matters. What DD-10 actually buys is **type honesty and sibling consistency**: the declared `Partial<ResultLever>[]` no longer holds `undefined` at runtime, and the expression now matches the shape `[SO] R-RES-010` already applies to `strategic_objectives` and `impact_outcomes`. It is kept on that basis. It must **not** be described, commented, or tested as removing a wipe hazard.
+
+**Why — superseded 2026-09-04, retained for the record.** ~~`payload?.research_areas?.map(...)` currently yields `undefined` when the key is absent, which is then handed to `create` — the same shape as the empty-survivor wipe that could deactivate every research area for the result.~~ The premise held that `undefined` and `[]` reach `create` differently. They do not (see the amendment above). The predecessor's `[SO] R-RES-010` did harden this pattern for `strategic_objectives` and `impact_outcomes` and **left `research_areas` out**, so the omission was real — but those sibling guards are inert for the same reason, so DD-10 restores consistency rather than closing a hazard.
+
+**The hazard named above is real, pre-existing, and NOT addressed by this spec.** Because `create` is invoked unconditionally in the section `save`, an absent/`null` key reconciles the result's whole `(result_id, role)` set against an empty array and deactivates every active row for that role. It applies to `research_areas`, `strategic_objectives` and `impact_outcomes` alike, it lives in `PATCH .../alignments` rather than the AI path, and `proposal.md` declares that contract out of scope. Recorded as a discovered finding in `execution.md` → *Pivot Record: T-03 (second)*; owner decision 2026-09-04 was to record it and route it to its own proposal later, **not** to annex it here.
 
 **Why in scope at all**, given `proposal.md` listed it out of scope: this spec's tasks edit that exact method to add the narrow save. Leaving a known wipe hazard in a method the spec is already opening, one line from the new code, trades a one-expression fix for a latent data-loss bug. **This widening is deliberate and recorded here for the owner to overrule** — it is the only place this design exceeds the proposal's stated scope.
 
@@ -365,7 +369,7 @@ Same evidence standard as the predecessor, which caught three defects before rev
 
 ### Step 2.3 — Reversion challenge: not triggered
 
-No decision in this log removes, disables, or inverts behavior the codebase already ships. DD-10 **adds** a guard; DD-7 deliberately **declines** to change existing behavior; every other decision adds a new path alongside the old one. The challenge is therefore recorded as not applicable rather than skipped silently.
+No decision in this log removes, disables, or inverts behavior the codebase already ships. DD-10 changes **no** behavior at all (amended 2026-09-04 — it is a type-honesty alignment, not a guard); DD-7 deliberately **declines** to change existing behavior; every other decision adds a new path alongside the old one. The challenge is therefore recorded as not applicable rather than skipped silently.
 
 ---
 
@@ -417,7 +421,7 @@ No decision in this log removes, disables, or inverts behavior the codebase alre
 | Q-3 | In **Dev**, are lever ids 11/12 actually `portfolio_id = 2`, and legacy levers still `portfolio_id = 1`? | No — gates the verdict, not the build. No id range is hardcoded |
 | Q-4 | Is the example payload captured from the real extractor or hand-written? | No — decides whether A-3 is evidence or assumption, for both specs |
 | Q-5 | `metadata.manually_edited: true` is carried by the payload and considered by **neither** spec. Should such an item route or report differently? | No — recorded so it is not a later surprise |
-| **Q-6** | **DD-10 widens scope by one expression** beyond what `proposal.md` declared out of scope. Accept, or leave the `research_areas` wipe hazard in place? | **Owner call at the Phase 2 gate** |
+| ~~Q-6~~ | ~~**DD-10 widens scope by one expression** beyond what `proposal.md` declared out of scope. Accept, or leave the `research_areas` wipe hazard in place?~~ | **CLOSED 2026-09-04.** Accepted at the pre-execution gate, then **amended after execution proved the guard behaviour-neutral** — it is kept as a type-honesty alignment. The wipe hazard was never closed by it and is routed to its own proposal (second Pivot, T-03) |
 
 ---
 
