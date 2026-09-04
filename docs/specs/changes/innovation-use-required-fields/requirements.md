@@ -361,7 +361,6 @@ A measure row SHALL require `Number` and `Unit`. `Comments` SHALL remain optiona
 - [ ] AC.4 — `Number` = `0` ⇒ **invalid**, with a message distinguishable from the required message; `Number` = `-5` ⇒ **valid**. Falsifying inputs: `0` must redden, `-5` must not. *(Corrected by user ruling 2026-09-04 — the previous AC had `0` valid.)*
 - [ ] AC.5 — **OICR's measure card renders all three asterisks and all three required messages, unchanged**, for **both** OICR call sites (`oicr-details.component.html:60` "Actual count" and `:81` "EXTRAPOLATED ESTIMATES" — three call sites exist across two files, not two). Falsifying input for `DC-5`. **This CANNOT be proven by OICR's own suite**, which stubs the card with an empty-template `FakeQuantificationItemComponent` (`oicr-details.component.spec.ts:872-880`) and is structurally blind to every property this AC names; it must be proven in `quantification-item.component.spec.ts` against the default (no-inputs-passed) configuration. *(Corrected at Judgment Day round 1, findings `C-3` and `S-7`.)*
 - [ ] AC.6 — Whitespace-only `Unit` ⇒ amber treatment; green check `false`. Falsifying input: `'   '`.
-- [ ] AC.7 — The same holds for `Specify other` on an actor row of type `5` (`actor_type_custom_name`). It is owned by the actor card, not `app-input`, so it needs its **own** trimmed check — `requiredMode` will never reach it. *(Added at Judgment Day round 2, `N-11`.)*
 
 ---
 
@@ -444,6 +443,17 @@ during the `design.md` reversion challenge. See `design.md` `DD-8`.)*
 
 The system SHALL NOT discard user-entered data on save without telling the user.
 
+**Scope (2026-09-04).** This requirement governs the **row-drop** path only. A second destruction
+path — `buildActorPayload` / `buildOrganizationPayload` nulling the inactive path's fields — **ceases
+to exist** once `R-IUR-015` clears on toggle, because there is then nothing hidden left to null. It
+must NOT be given a save-blocking gate: doing so produced a row that could neither be saved nor
+repaired (`P-3`).
+
+**Scope limit — session data only.** This requirement protects values the user typed **in this
+session and can still see**. A legacy row written directly to the database carrying both paths
+populated is still nulled on save, and no client gate can distinguish it from a fresh one. Recorded
+as an explicit exclusion rather than left as an implied absolute (`P-6`).
+
 **Context.** `buildPayload()` drops any row that lacks the identity field the server requires: an
 actor row without `actor_type_id`, an organization row without an institution or institution type.
 Combined with `R-IUR-011`, this creates a trap that does not exist today — a dropped row leaves
@@ -471,8 +481,81 @@ typed values are gone.
 - [ ] AC.2 — Organization row with `organization_count` or `sub_institution_type_id` filled and no identity ⇒ save blocked, user informed.
 - [ ] AC.3 — Entirely blank row ⇒ save proceeds, no message, row discarded.
 - [ ] AC.4 — Measure rows never block: the existing drop rule is already content-aware, so no loss case exists.
+- [ ] AC.4b — **No gate is raised over the inactive path of either card.** `R-IUR-015` removes the hidden state; a gate there would trap the user (`P-3`). Falsifying input: fill the unknown path, tick `Is the organization known?`, pick an institution, save — the save must **succeed**.
 - [ ] AC.5 — The existing duplicate-actor-type save block still blocks. **It is silent today** — when `hasDuplicateActorType()` is true the save body is skipped and execution falls to `navigateTo()`, raising no toast (verified, `innovation-use-details.component.ts:584`, `:588`, `:600`). This spec introduces the *first* blocked-save message; there is no prior message to preserve. *(Corrected at Judgment Day round 1, finding `S-2`.)*
 - [ ] AC.6 — **Falsifying input:** four counts + no actor type. Before the fix this saves and loses the counts; after it, the save is blocked.
+
+---
+
+### R-IUR-016 — The actor custom name must be non-blank
+
+*(Relocated 2026-09-04 from `R-IUR-010` AC.7, where it had been misfiled under the **measures**
+requirement despite being an **actor-card** rule — `P-7`. Task decomposition by requirement would
+have routed it to `quantification-item`.)*
+
+When an actor row's type is `5` (OTHER), `Specify other` (`actor_type_custom_name`) SHALL be
+non-blank.
+
+#### Scenario: Whitespace-only custom name
+
+- GIVEN an actor row with `Actor type` = OTHER
+- WHEN `Specify other` contains only whitespace
+- THEN the field is invalid and the green check returns **false**
+- BUT it must NOT be implemented through `requiredMode` — this field is a plain `pInputText` owned by
+  the actor card (`innovation-use-actor-item.component.ts:95`), never an `app-input`, so it needs its
+  own trimmed check
+- AND IT MUST match the server, whose `valid_text` already strips whitespace — the two are out of
+  parity today
+
+**Acceptance criteria**
+
+- [ ] AC.1 — `'   '` ⇒ invalid; green check `false`. Falsifying input: `'   '`.
+- [ ] AC.2 — A non-blank name ⇒ valid.
+- [ ] AC.3 — **No asterisk is added by this requirement.** `OQ-2` (whether `Specify other` gets a red `*`) stays open and is **not** answered here — `R-IUR-003` AC.1's sweep covers `R-IUR-004`…`R-IUR-010` and deliberately does not reach this requirement.
+
+---
+
+### R-IUR-015 — Toggling a path clears the path being left
+
+*(Added 2026-09-04 to resolve `P-3`. See `design.md` `DD-12`.)*
+
+When the user toggles `Is the organization known?`, the system SHALL clear the fields of the path
+being left, exactly as the actor card already does when `Sex and age disaggregation does not apply`
+is toggled.
+
+**Why.** Today the organization card deliberately keeps both paths' values
+(`onKnownToggle` clears nothing). Because the inactive path's controls are **not rendered**, a row
+can hold values the user cannot see and cannot reach — and `buildOrganizationPayload` then nulls
+them on save. Any save-blocking gate over that hidden state produces a row that can neither be saved
+nor repaired, only deleted.
+
+#### Scenario: Leaving the unknown path
+
+- GIVEN an organization row on the unknown path with `Organization type`, `Sub-type` and `Organization count` filled
+- WHEN the user ticks `Is the organization known?`
+- THEN those three fields are cleared in the same change-detection cycle
+- AND the row carries no hidden values on the inactive path
+- BUT it must NOT clear the fields of the path being **entered**
+- AND IT MUST behave symmetrically in the other direction — leaving the known path clears `institution_id`
+
+#### Scenario: The toggle is not a data-loss event to be blocked
+
+- GIVEN the clearing above
+- WHEN the user saves
+- THEN the save proceeds normally
+- AND no blocked-save message is raised for this row
+- BUT it must NOT be confused with `R-IUR-014`'s rule: clearing happens **at the toggle**, visibly and
+  as the direct result of a user action, whereas `R-IUR-014` blocks a save that would destroy values
+  the user can still see on screen
+
+**Acceptance criteria**
+
+- [ ] AC.1 — Ticking the box clears `institution_type_id`, `sub_institution_type_id`, `institution_type_custom_name`, `organization_count`.
+- [ ] AC.2 — Unticking clears `institution_id`.
+- [ ] AC.3 — The entered path's fields are untouched.
+- [ ] AC.4 — After a toggle, `buildOrganizationPayload`'s nulling of the inactive path is a no-op — it writes `null` over values that are already absent.
+- [ ] AC.5 — The existing toggle test (control visibility across a live toggle) still passes.
+- [ ] AC.6 — **Falsifying input:** fill the unknown path, tick the box, untick it — the three fields are empty, not restored.
 
 ---
 
@@ -565,11 +648,13 @@ No schema change. One new migration replacing a stored function.
 | `R-IUR-007` | Unknown path: type required | both | DC-3 |
 | `R-IUR-008` | Unknown path: sub-type conditional | both | DC-3 |
 | `R-IUR-009` | Unknown path: count required and positive | both | DC-2, DC-3 |
-| `R-IUR-010` | Measures: number + unit required | both | DC-2, DC-5 |
+| `R-IUR-010` | Measures: number (`≠ 0`) + unit required | both | DC-2, **DC-2b**, DC-5 |
 | `R-IUR-011` | Remove "at least one actor" | both | DC-4 |
 | `R-IUR-012` | Green check parity | server | DC-3, DC-4, DC-6, DC-7 |
-| `R-IUR-013` | Shared components opt-in | client | DC-5 |
-| `R-IUR-014` | No silent data loss on save | client | DC-3 |
+| `R-IUR-013` | Shared components opt-in | client | DC-5, **DC-8** |
+| `R-IUR-014` | No silent data loss on save (row-drop path; session data) | client | DC-3 |
+| `R-IUR-015` | Toggling a path clears the path being left | client | DC-3 |
+| `R-IUR-016` | Actor custom name non-blank | both | **DC-2b**, DC-3 |
 | `NFR-IUR-001` | Deployment safety | server | DC-6 |
 | `NFR-IUR-002` | A11y of the required signal | client | — |
 | `NFR-IUR-003` | Draft saves stay permissive | both | — |

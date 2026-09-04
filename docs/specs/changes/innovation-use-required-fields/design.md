@@ -2,7 +2,7 @@
 
 - **Module:** client (`innovation-use-details` + 2 shared components) · server (1 migration)
 - **Spec id:** 2026-09-innovation-use-required-fields
-- **Status:** draft — **revision 3**, after Judgment Day round 2 (final bounded fix)
+- **Status:** draft — **revision 4**, after Judgment Day round 3 + user evidence 2026-09-04
 - **Owner:** D. Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
@@ -19,18 +19,21 @@
 >
 > **Round 3 judged this revision and the budget is now spent.** Terminal state: **ESCALATED**.
 >
-> ## ⚠️ DO NOT IMPLEMENT `DD-8`'s SITE-2 GATE — `DD-3` / `DD-10` are now RESOLVED
+> ## ✅ All three round-3 severe findings are now RESOLVED
 >
 > Round 3's judges **contradicted each other**; orchestrator verification found the dissenting judge
-> correct on all three. **Two are now closed** — `P-1` by a corrected per-control gate, `P-2` by a
-> browser measurement the user supplied on 2026-09-04 that no judge and no test in this repo could
-> produce. One remains open. Full record in [`judgment.md`](./judgment.md) round 3.
+> correct on all three. All three are now closed — `P-1` by a per-control gate, `P-2` by a browser
+> measurement the user supplied (which no judge and no test in this repo could produce), `P-3` by
+> `DD-12`. Full record in [`judgment.md`](./judgment.md).
+>
+> **Still open and blocking:** `OQ-4` (who applies the migration) and `OQ-6` (remove vs. suppress
+> `showNotIdentifiedMessage`). Both are user decisions, not design gaps.
 >
 > | ID | Verified fact | What breaks if implemented as written |
 > | --- | --- | --- |
 > | **P-1** | ✅ **RESOLVED 2026-09-04.** `p-inputNumber` declares `style` as an `@Input` (`primeng-inputnumber.mjs:1677`) and never applies it, so the setter spy cannot fire for rules 3, 5, 9, 10. | `DD-3` now specifies a **per-control gate**: setter spy for `p-select`/`p-inputtext`, **class assertion** for `p-inputNumber`. |
 > | **P-2** | ✅ **RESOLVED 2026-09-04 by browser evidence.** The user supplied a screenshot of an `app-input type="number"` rendering the amber border; with `:55` proven a no-op and no global CSS in play, **`:49` is the live mechanism** — the opposite of what revision 3 asserted. | `DD-10` **inverted**: `:49` is converted (not deleted) and the dead `:55` is deleted. Revision 3 would have removed the only amber border on every numeric field app-wide. |
-> | **P-3** | ⚠️ **STILL OPEN.** `onKnownToggle` clears nothing by explicit design (`innovation-use-organization-item.component.ts:130-133`), the inactive path's controls are not rendered (`@if`/`@else` at `.html:36`/`:79`), and no select sets `[showClear]`. | `DD-8`'s "either direction" site-2 gate produces a **permanently unsaveable row** whose only escape is deleting it. **Do not implement this gate until it is redesigned.** |
+> | **P-3** | ✅ **RESOLVED 2026-09-04.** The inactive path's controls are not rendered (`@if`/`@else` at `.html:36`/`:79`) and no select sets `[showClear]`, so a gate over hidden state could not be escaped. | **`DD-12`** clears the path being left on toggle, mirroring the actor card. The hidden state is removed at its source, so `DD-8`'s site-2 gate is **withdrawn** rather than repaired. |
 >
 > `DD-8`'s site-1 gate, `DD-0`, `DD-5`, `DD-5b`, `DD-6`, `DD-7`, `DD-9` and the rule table are
 > unaffected by these three and were confirmed closed by both judges.
@@ -47,7 +50,7 @@
 | G-2 | `0` is a value; "empty", "blank" and "not positive" are three distinct states | `R-IUR-004`, `R-IUR-005`, `R-IUR-009` |
 | G-3 | Every new required field renders the amber treatment **in the registered token**, and is proven painted | `R-IUR-003` |
 | G-4 | No consumer outside this page changes behavior | `R-IUR-013` |
-| G-5 | No user-entered data is silently destroyed by a save — across **both** destruction sites | `R-IUR-014` |
+| G-5 | No data the user typed **in this session and can still see** is silently destroyed by a save. Legacy rows carrying hidden state are an explicit, recorded exclusion (`P-6`) | `R-IUR-014`, `R-IUR-015` |
 
 **Non-goals**
 
@@ -394,9 +397,15 @@ elsewhere, committed inside its own correction record.
 | Blocks | Does not block |
 | --- | --- |
 | Site 1 — a row carrying typed data but lacking its identity field | An entirely blank row |
-| Site 2 — an **organization** row whose inactive path still carries typed values (either direction) | A toggle with the inactive path empty |
-| — | **Actor** rows at site 2 — the card already clears on toggle, so nothing is left to destroy (`N-1`) |
-| — | Measures — no loss case at either site |
+| — | **Site 2 — nothing.** `DD-12` makes both cards clear on toggle, so no hidden state survives to be nulled. A gate here **trapped the user** (`P-3`) and is withdrawn |
+| — | Measures — no loss case |
+
+**Site 2 was withdrawn, not weakened (`P-3`).** Revision 3 gated the organization card in "either
+direction". Because the inactive path's controls are **not rendered** (`@if`/`@else` at `.html:36`,
+`:79`) and no select sets `[showClear]`, the user had no way to clear the values the gate objected
+to: the row could neither be saved nor repaired, only deleted — destroying more than the gate
+protected. `DD-12` removes the hidden state at its source instead, which is strictly better than
+gating it: nothing to detect, nothing to explain, nothing to trap.
 
 A blank row is dropped harmlessly and must not block, preserving `R-IUD-001`'s permissive-draft
 behavior. The rule is exactly: **block iff saving would destroy something the user typed.**
@@ -502,6 +511,29 @@ browser check must look at it.
 | `docs/ux-ui/design.md` | 560 | details-page `DD-10`'s blank starter card → mark **superseded** by `DD-7` |
 | `docs/specs/innovation-use/family.md` | 113 | describes `innovation_use_validation` as **"frozen"** — a live, non-archived manifest this change falsifies |
 
+### DD-12 — The organization card clears the path being left *(reversion — challenged)*
+
+**What is reverted.** `onKnownToggle` currently updates only the flag
+(`innovation-use-organization-item.component.ts:130-133`), under the comment *"Neither path clears
+the other's fields — mirrors the reference card's own rule (§5.5)."*
+
+**Step 2.3 challenge — what does clearing break?**
+
+| Checked | Finding |
+| --- | --- |
+| Does a test assert value preservation across the toggle? | **No.** The one toggle test (`innovation-use-organization-item.component.spec.ts:217-232`) asserts the **control's visibility** across a live toggle, not its value. Clearing leaves it green. |
+| Does a requirement mandate non-clearing? | **No.** The archived §5.5 says the card mirrors *the reference card's rules*; the behavior is inherited from innovation-dev, not required by any AC. |
+| Is the section internally consistent today? | **No** — the **actor** card in the same section already clears on toggle (`onModeChange`, `R-IUP-007`). The two cards disagree, and this makes them agree. |
+| What does clearing cost? | The user loses the other path's values when they toggle. **This is still data loss** — but immediate, visible, and the direct result of an explicit action, not a silent casualty at save time. It is the tradeoff the actor card already ships. |
+| Divergence from innovation-dev? | **Yes, and deliberate.** Recorded here rather than inherited silently. That card has the same latent trap; fixing it is not in this spec's scope. |
+
+**Outcome: proceed.** Clearing dissolves `P-3` at its source and removes destruction site 2
+altogether, which lets `DD-8` shrink to one rule instead of gaining a second one that could not be
+escaped.
+
+**Symmetry requirement.** Both directions clear (`R-IUR-015` AC.1/AC.2), otherwise the mirror case
+(`institution_id` nulled at `:527`) survives as a one-sided trap.
+
 ---
 
 ## 5. Data Model
@@ -535,7 +567,7 @@ the surviving half ("the API is untouched") as proof of the whole.
 | `input` (shared) | field border + message for rules 3, 5, 9, 10, 11; token compliance (`DD-10`) | anything cross-field |
 | `quantification-item` (shared) | which of its three fields are required | the zero policy (passed in) |
 | `actor-item` | rules 1, 2; rule 4's total message; `p-select` border | field-level count messages (delegated) |
-| `organization-item` | rules 6, 7, 8, 8b; message precedence (`DD-9`); three `p-select` borders | rule 9's message (delegated) |
+| `organization-item` | rules 6, 7, 8, 8b; message precedence (`DD-9`); **path clearing on toggle (`DD-12`)**; three `p-select` borders | rule 9's message (delegated) |
 | `details` page | the `DD-8` save gate + blocked-save toast; measure wiring; no seeding | row-level messages |
 
 **Design tokens.** No new tokens; `--ac-warning-1` everywhere after `DD-10`. The red asterisk is
@@ -605,22 +637,27 @@ Revision 1 claimed to read back "every" `AND IT MUST` / `BUT it must NOT` clause
 | `R-IUR-012` | **must preserve level + justification verbatim** | **`DD-6` constraint 1**, rules 14–15 |
 | `R-IUR-013` | full suite, not targeted | §12 |
 | `R-IUR-014` | **must NOT block an entirely blank row** | `DD-8` decision table |
-| `R-IUR-014` | **same rule for organization rows** | `DD-8` sites 1 and 2 |
+| `R-IUR-014` | **same rule for organization rows** | `DD-8` site 1 |
+| `NFR-IUR-003` | **narrowed deliberately** — `DD-8` blocks a class of saves client-side | `DD-8`; the narrowing is stated in `requirements.md` `NFR-IUR-003` itself, **not** only here (`P-6`) |
+| `R-IUR-016` | **must NOT be implemented through `requiredMode`** | §3.3 / `DD-1` — rule 2 is card-owned |
+| `R-IUR-015` | **must NOT clear the path being entered** | `DD-12` symmetry requirement |
+| `R-IUR-015` | **must NOT be confused with `R-IUR-014`'s blocking rule** | `DD-12` — clearing is at the toggle, blocking is at the save |
 
 **Cross-check against module constraints:** the actor card's `lg:` breakpoint rationale, the
 `app-textarea` no-edit constraint, `R-IUD-001`'s permissive-save decision, and the create migration's
-`level`-vs-`id` header note were all read. `DD-8` narrows `R-IUD-001` and `NFR-IUR-003` deliberately
-and says so in §6.
+`level`-vs-`id` header note were all read. `DD-8` narrows `R-IUD-001` and `NFR-IUR-003` deliberately;
+the narrowing is written into `requirements.md` `NFR-IUR-003` itself, with the row above as its
+read-back (`P-6` — revision 3 had §6 and §10 pointing at each other and the substance in neither).
 
 ---
 
 ## 11. Budget (Step 2.4 tripwire) — re-baselined
 
-| Metric | Revision 1 | **Revision 2** | Why |
-| --- | --- | --- | --- |
-| Tasks | 13 | **16** | +`DD-5b`, +`DD-10` token sweep, +`quantification-item` spec rewrite (`S-5`) |
-| LOC | ~1,150 | **~1,500** | test tier was under-budgeted (`S-4`, `C-4`): the fixture truth table, the catalog enumeration, and the `c2` seed test were all missed |
-| Review rounds | ~20 | **~24** | — |
+| Metric | Rev 1 | Rev 2 | **Rev 4** | Why |
+| --- | --- | --- | --- | --- |
+| Tasks | 13 | 16 | **18** | +`DD-12` path clearing, +`R-IUR-016` (relocated, now its own task), +the `'nonzero'` mode; −the withdrawn site-2 gate |
+| LOC | ~1,150 | ~1,500 | **~1,600** | `DD-12` and its spec are small; the `DD-9` and `c2` spec rewrites remain the bulk |
+| Review rounds | ~20 | ~24 | **~24** | unchanged |
 
 **Depth stays Full.** A tripwire, not a cap; `/akili-execute` escalates on breach.
 

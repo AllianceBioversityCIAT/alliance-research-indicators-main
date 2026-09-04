@@ -286,3 +286,59 @@ stay `> 0`, because a count of people or organizations cannot be negative. Only 
 
 **Terminal state remains ESCALATED** — but the blocking set is down from six items to four, and the
 one that needed a measurement no longer does.
+
+---
+
+# `P-3` and `C-7` — closed 2026-09-04
+
+## `P-3` — resolved by removing the hidden state, not by gating it
+
+`DD-8`'s site-2 gate was withdrawn and replaced with **`DD-12`**: the organization card now clears
+the path being left on toggle, exactly as the actor card already does.
+
+**Step 2.3 challenge on the reversion** (`onKnownToggle`'s *"Neither path clears the other's fields"*):
+
+| Checked | Finding |
+| --- | --- |
+| Test asserting value preservation across the toggle? | **No** — `innovation-use-organization-item.component.spec.ts:217-232` asserts the **control's visibility**, not its value. Clearing leaves it green. |
+| Requirement mandating non-clearing? | **No** — archived §5.5 says the card mirrors *the reference card's rules*; inherited from innovation-dev, required by no AC. |
+| Section internally consistent today? | **No** — the actor card already clears (`onModeChange`, `R-IUP-007`). The two cards disagree; this makes them agree. |
+| Cost | Toggling discards the other path's values. Still data loss, but **immediate, visible, and user-initiated** — the tradeoff the actor card already ships. |
+| Divergence from innovation-dev | **Yes, deliberate and recorded.** That card carries the same latent trap; out of scope here. |
+
+**Why this beats gating.** With the inactive path's controls unrendered and no `[showClear]`, a gate
+over hidden state left the user unable to save *or* repair the row — only delete it. `DD-12` removes
+the state at its source: nothing to detect, nothing to explain, nothing to trap. `DD-8` shrinks to
+one rule instead of gaining an inescapable second.
+
+## `C-7` — closed by elimination
+
+The gap was *"`R-IUR-014` has no scenario and no AC for site 2"*. With `DD-12`, **site 2 ceases to
+exist**, so the correct closure is not to add a scenario for it but to record its removal:
+
+- `R-IUR-014` is scoped to the **row-drop** path, with `AC.4b` forbidding any gate over the inactive path (falsifying input: fill unknown path → tick known → pick institution → save must **succeed**).
+- **`R-IUR-015`** (new) owns the clearing behavior, with 6 ACs and its own falsifying input.
+- `G-5` is scoped to **session data**, with the legacy-row exclusion recorded explicitly rather than left as an implied absolute (`P-6`, Judge A).
+
+## Bookkeeping findings closed in the same pass
+
+| ID | Fix |
+| --- | --- |
+| `P-5` | `DC-2b` / `DC-8` added to the §11 requirement→class index |
+| `P-6` | §10 gains a row for `NFR-IUR-003`; the narrowing lives in `requirements.md`, no longer in a §6↔§10 loop |
+| `P-7` | `R-IUR-010` AC.7 (an **actor** rule under the **measures** requirement) relocated to a new **`R-IUR-016`**. Its AC.3 states explicitly that it does **not** answer `OQ-2` — revision 3's placement had silently pulled `Specify other` into `R-IUR-003` AC.1's asterisk sweep |
+| `P-8` | Budget re-baselined: **18 tasks / ~1,600 LOC / ~24 rounds** |
+
+## Status
+
+| Item | State |
+| --- | --- |
+| `P-1`, `P-2`, `P-3` | ✅ closed |
+| `C-7` | ✅ closed by elimination |
+| `P-5`…`P-8` | ✅ closed |
+| **`OQ-4`** | ⚠️ open — who applies the migration, and when |
+| **`OQ-6`** | ⚠️ open — remove or suppress `showNotIdentifiedMessage` |
+
+**No design gap remains.** Both open items are user decisions. Revision 4 has not been
+independently judged — the review budget closed at round 3 — so the terminal state stays
+**ESCALATED**, now on two user decisions rather than on defects.
