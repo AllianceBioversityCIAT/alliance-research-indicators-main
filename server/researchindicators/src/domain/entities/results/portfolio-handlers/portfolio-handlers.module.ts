@@ -12,6 +12,7 @@ import { ResultSdgsModule } from '../../result-sdgs/result-sdgs.module';
 import { ResultStrategicObjectivesModule } from '../../result-strategic-objectives/result-strategic-objectives.module';
 import { ResultImpactOutcomesModule } from '../../result-impact-outcomes/result-impact-outcomes.module';
 import { StrategicObjectivesModule } from '../../strategic-objectives/strategic-objectives.module';
+import { ClarisaLeversModule } from '../../../tools/clarisa/entities/clarisa-levers/clarisa-levers.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { StrategicObjectivesModule } from '../../strategic-objectives/strategic-
     ResultStrategicObjectivesModule,
     ResultImpactOutcomesModule,
     StrategicObjectivesModule,
+    ClarisaLeversModule,
   ],
   providers: [
     ResultAlignmentOperationsService,

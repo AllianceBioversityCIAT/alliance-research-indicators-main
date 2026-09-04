@@ -119,17 +119,17 @@ No cycles.
   - **DD-10, amended 2026-09-04 (second Pivot) — a type-honesty alignment, NOT a wipe guard.** Treat an absent/`null` `research_areas` as empty inside the existing portfolio-2 section `save`. One expression. Keep the OICR / indicator gates byte-identical. Q-6 is **closed: accepted**. **The expression is behaviour-neutral** — `formatDataToArray` maps `undefined` and `[]` alike to `[]` (`array.util.ts:89-93`) — so it must not be commented or named in a test as preventing data loss. The real, pre-existing `PATCH` hazard is recorded in `execution.md` and routed to its own proposal.
   - `lever_id` is written as the entity models it, matching the existing convention (DD-7). Do not clean the type modelling here.
 - **Acceptance / done check:**
-  - [ ] Portfolio 1: valid ids → rows at `lever_role_id = 1`, **every row asserted `is_primary === true` by value**.
-  - [ ] Portfolio 1: **no row is written with `is_primary` false or null** (the `BUT it must NOT` clause).
-  - [ ] Portfolio 2: valid ids → rows at `lever_role_id = 3`, and **no row at `lever_role_id = 1`** (R-RES-004's `BUT`).
-  - [ ] Portfolio 2: every `lever_role_id = 1` row already attached to that result is untouched (R-RES-004's `AND IT MUST`).
-  - [ ] Either portfolio: `[11, 999, 4]` → rows only for the owned+active ids, `discarded` names the rest, **no throw** (R-RES-005 scenario 1's `BUT`).
-  - [ ] Either portfolio: every id discarded → **zero rows written and no pre-existing row for that result and role deactivated** (R-RES-005 scenario 2's `BUT`).
-  - [ ] Either portfolio: a repeated id produces one row.
-  - [ ] **R-RES-007's falsifying test (amended 2026-09-04 — Pivot, T-03):** the array handed to the reconciler holds **exactly** the validated survivors, asserted by value; the handler never queries `result_levers`; and it issues no deactivation of its own. For a **portfolio-2** write, additionally assert directly that every `lever_role_id = 1` row for that result is still active (the `AND IT MUST` clause) — role 3 cannot reach role 1, so there the survival assertion *is* achievable. **Do not assert same-role survival for portfolio 1**: the reconciler deactivates every `(result_id, role)` row absent from the persisted set, so that assertion cannot pass and its absence is covered by DD-6 + RK-2.
+  - [x] Portfolio 1: valid ids → rows at `lever_role_id = 1`, **every row asserted `is_primary === true` by value**.
+  - [x] Portfolio 1: **no row is written with `is_primary` false or null** (the `BUT it must NOT` clause).
+  - [x] Portfolio 2: valid ids → rows at `lever_role_id = 3`, and **no row at `lever_role_id = 1`** (R-RES-004's `BUT`).
+  - [x] Portfolio 2: every `lever_role_id = 1` row already attached to that result is untouched (R-RES-004's `AND IT MUST`).
+  - [x] Either portfolio: `[11, 999, 4]` → rows only for the owned+active ids, `discarded` names the rest, **no throw** (R-RES-005 scenario 1's `BUT`).
+  - [x] Either portfolio: every id discarded → **zero rows written and no pre-existing row for that result and role deactivated** (R-RES-005 scenario 2's `BUT`).
+  - [x] Either portfolio: a repeated id produces one row.
+  - [x] **R-RES-007's falsifying test (amended 2026-09-04 — Pivot, T-03):** the array handed to the reconciler holds **exactly** the validated survivors, asserted by value; the handler never queries `result_levers`; and it issues no deactivation of its own. For a **portfolio-2** write, additionally assert directly that every `lever_role_id = 1` row for that result is still active (the `AND IT MUST` clause) — role 3 cannot reach role 1, so there the survival assertion *is* achievable. **Do not assert same-role survival for portfolio 1**: the reconciler deactivates every `(result_id, role)` row absent from the persisted set, so that assertion cannot pass and its absence is covered by DD-6 + RK-2.
   - [ ] Audit columns populated from the current user — *by construction via `BaseServiceSimple`; carried to T-07 for integration-level closure, deliberately not ticked on inference.*
-  - [ ] Both handlers' existing section `save` / `find` specs pass **unmodified**.
-  - [ ] DD-10: the section `save` returns normally for a payload omitting `research_areas`, and its behavior for a populated payload is unchanged. **Test names and comments must claim type honesty / sibling consistency, not wipe prevention** (amended 2026-09-04).
+  - [x] Both handlers' existing section `save` / `find` specs pass **unmodified**.
+  - [x] DD-10: the section `save` returns normally for a payload omitting `research_areas`, and its behavior for a populated payload is unchanged. **Test names and comments must claim type honesty / sibling consistency, not wipe prevention** (amended 2026-09-04).
 - **Tests:** `portfolio-1-alignment.handler.spec.ts`, `portfolio-2-alignment.handler.spec.ts` — extend both.
 - **Verification:** `npm test -- --silent src/domain/entities/results/portfolio-handlers`
 - **Falsifying inputs (three, each must be shown red before done):**
@@ -139,7 +139,7 @@ No cycles.
   4. For DD-10, **amended 2026-09-04:** a payload omitting `research_areas`, run against the **unmodified** handler, confirms only that `create` receives `undefined` rather than `[]` — a shape difference, not an outcome difference. State that limit when reporting the probe; the superseded wording implied it falsified a data-loss hazard, which no test at this seam can do.
 - **Disqualifies:** a `ResultLeversService` double that does not record `lever_role_id` **and** `is_primary` per row — then DC-1 and DC-2 are untestable however green the suite *(KZ-001)*. Also: asserting that `create` **was called** rather than asserting its arguments. A call proves delegation, not a row at role 1 with `is_primary = true`; the role and the flag are exactly what can be wrong while the call is right.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
-- **Estimated effort:** L · **Status:** `[~]` **BLOCKED — Pivot** (attempt 1 delivered, uncommitted). `R-RES-007` AC.2 / check 8 contradict falsifying input #3: `BaseServiceSimple.create` deactivates same-role rows absent from the persisted set, so the survival assertion cannot be green on the mandated implementation. Awaiting owner decision A/B/C; see `execution.md` → *Pivot Record: T-03*
+- **Estimated effort:** L (run at `xhigh`) · **Status:** **done** — PASS on attempt 2, **unanimous across a re-verified parallel lens review** (A roles/flags · B portfolio-2/DD-10 · C falsifiability). Two owner-approved Pivots landed during execution: `R-RES-007` AC.2 restated, and DD-10 restated as type honesty. One rework round of 4 budgeted, on four assertions that could not fail. Audit-column closure and `R-RES-007` AC.1 deliberately **not** ticked here; see `execution.md` → T-03
 
 ---
 
@@ -303,7 +303,7 @@ No cycles.
 | R-RES-007 | scenario "inert toward rows it did not create" | T-03 (falsifier 3) |
 | " | `BUT` must not query, merge, or self-deactivate *(amended 2026-09-04)* | T-03 |
 | " | `AND IT MUST` hold for a portfolio-2 item | T-03 |
-| " | AC.1 reached only for a same-call result | **T-06** |
+| " | AC.1 reached only for a same-call result | **T-06** — *explicitly NOT closed by T-03; a T-03 test title cites AC.1 but cannot assert it (advisory, 2026-09-04)* |
 | R-RES-008 | scenario "payload without the field is byte-identical" | T-06 |
 | " | `BUT` must not touch the five named tables | **T-06** |
 | " | `AND IT MUST` treat `[]` and `null` as absent | T-05 |

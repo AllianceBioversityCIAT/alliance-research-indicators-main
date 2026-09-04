@@ -361,9 +361,9 @@ Same evidence standard as the predecessor, which caught three defects before rev
 
 **The hazard named above is real, pre-existing, and NOT addressed by this spec.** Because `create` is invoked unconditionally in the section `save`, an absent/`null` key reconciles the result's whole `(result_id, role)` set against an empty array and deactivates every active row for that role. It applies to `research_areas`, `strategic_objectives` and `impact_outcomes` alike, it lives in `PATCH .../alignments` rather than the AI path, and `proposal.md` declares that contract out of scope. Recorded as a discovered finding in `execution.md` → *Pivot Record: T-03 (second)*; owner decision 2026-09-04 was to record it and route it to its own proposal later, **not** to annex it here.
 
-**Why in scope at all**, given `proposal.md` listed it out of scope: this spec's tasks edit that exact method to add the narrow save. Leaving a known wipe hazard in a method the spec is already opening, one line from the new code, trades a one-expression fix for a latent data-loss bug. **This widening is deliberate and recorded here for the owner to overrule** — it is the only place this design exceeds the proposal's stated scope.
+**Why in scope at all — superseded 2026-09-04 (second Pivot), retained for the record.** ~~this spec's tasks edit that exact method to add the narrow save. Leaving a known wipe hazard in a method the spec is already opening, one line from the new code, trades a one-expression fix for a latent data-loss bug.~~ The trade described here does not exist: the expression closes no hazard, so nothing was bought and nothing widened. What remains true is the premise — this spec's tasks do edit that method — and the residual justification is consistency with the sibling guards, which is why the expression is kept. **The hazard was never in scope and is now tracked as `tasks.md` RB-8.** With this correction, no part of this design exceeds `proposal.md`'s stated scope.
 
-**Not a reversion.** It adds a guard; it removes nothing.
+**Not a reversion.** It changes no behaviour at all *(corrected 2026-09-04 — the original claim that it "adds a guard" was falsified by the amendment above)*; it removes nothing.
 
 ---
 

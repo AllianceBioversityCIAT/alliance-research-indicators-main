@@ -21,9 +21,24 @@ export interface StrategicObjectivesSaveReport {
 }
 
 /**
+ * Outcome of a narrow levers-only save (design.md DD-1/DD-2/DD-8, §5.1).
+ * Unlike `StrategicObjectivesSaveReport`, this report carries **no**
+ * `supported` flag: both portfolios support `primary_levers` — they simply
+ * disagree about what it means (DD-2) — so "not applicable to this
+ * portfolio" never arises here. The handler reports *what happened*; the
+ * caller (e.g. the AI formalizer) decides how to surface it (DD-8).
+ */
+export interface LeversSaveReport {
+  /** Deduplicated ids that were actually written. */
+  saved: number[];
+  /** Ids that were unknown, inactive, or owned by another portfolio. */
+  discarded: number[];
+}
+
+/**
  * Contract for the alignment section's per-portfolio handlers. Extends the
  * generic `PortfolioSectionHandler` (rather than widening that generic
- * itself — DD-1) with a method scoped to strategic objectives only, so the
+ * itself — DD-1) with methods scoped to a single sub-section each, so the
  * AI-formalize path never has to go through the section-wide `save`.
  */
 export interface AlignmentSectionHandler
@@ -40,4 +55,19 @@ export interface AlignmentSectionHandler
     resultId: number,
     ids: number[],
   ): Promise<StrategicObjectivesSaveReport>;
+
+  /**
+   * Persists only the levers sub-section for `resultId`. Both portfolios
+   * implement this with real writes — unlike `saveStrategicObjectives`,
+   * there is no "unsupported" portfolio here (DD-2) — but each writes at
+   * its own role and its own `is_primary` value: portfolio 1 at
+   * `lever_role_id = ALIGNMENT` with `is_primary = true` explicit on every
+   * row (DD-5); portfolio 2 at `lever_role_id = RESEARCH_AREAS_ALIGNMENT`,
+   * the same role its own section `save` uses for `research_areas` (DD-9).
+   * Same signature discipline as `saveStrategicObjectives` — raw
+   * `(resultId, ids)`, no `PortfolioHandlerContext`, no `EntityManager`
+   * (DD-3, DD-8) — so "no request-scoped read" and "no threaded
+   * transaction" hold by construction.
+   */
+  saveLevers(resultId: number, ids: number[]): Promise<LeversSaveReport>;
 }

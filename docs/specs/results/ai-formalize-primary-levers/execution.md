@@ -298,3 +298,70 @@ Every downstream step is therefore byte-identical before and after the change. *
 | **C** | Revert the DD-10 expression entirely (treat Q-6 as retroactively vetoed) | Smallest | Loses a harmless type-honesty improvement and leaves the declared type lying at runtime. Also discards the discovery's paper trail |
 
 **Leader recommendation: A**, plus routing the `PATCH` wipe to the owner as a candidate for its own proposal. B is the only option that actually fixes the data loss, and it is genuinely worth doing — but it edits a shipped endpoint's semantics across three fields and two specs, which is exactly the scope an execution loop must not annex.
+
+### Pivot Resolution: T-03 (second) — option A, owner-approved 2026-09-04
+
+*(Section added after Lens B's re-verification flagged its absence: the first pivot had a paired Resolution and this one did not, leaving the owner's decision recorded only indirectly through `design.md` DD-10, `tasks.md` RB-5/RB-8 and `requirements.md` RK-4.)*
+
+**Decision: A** — restate DD-10 as a type-honesty / sibling-consistency alignment, keep the expression, and route the real hazard to its own proposal. Option B (skip the `create` call when the key is absent) was declined as a contract change to a shipped endpoint; option C (revert the expression) was declined.
+
+**Amendment applied, then closed with the two-direction sweep** — 13 sites across `design.md` (DD-10 decision + the superseded *Why*, struck through not deleted; the §12 reversion-challenge note; the §14 Q-6 row), `tasks.md` (T-03's DD-10 bullet, its acceptance check, falsifier #4, RB-5 closed, **RB-8 added**), `requirements.md` (RK-4 resolved) and `proposal.md` (R-5 resolved).
+
+**Sweep completed in a second pass.** Lens B's re-verification found that the first pass missed `design.md` DD-10's *"Why in scope at all"* paragraph, which still described the change as trading "a one-expression fix for a latent data-loss bug" — a claim the amendment two paragraphs above had falsified. Reading it surfaced a second miss immediately below: *"Not a reversion. It adds a guard; it removes nothing."* Both are now corrected, and a re-sweep for `adds a guard` / `one-expression fix for a latent` returns only the struck-through record. **Recorded as a process observation, not just a fix: this is the same failure the first pivot's sweep was praised for avoiding, repeated one pivot later at lower stakes — the sweep pattern only works when the grep terms come from the *claim* (KZ-006), and "wipe" alone did not match a paragraph that said "data-loss bug".**
+
+**RB-8 (new, out of scope).** `PATCH .../alignments` deactivates every active row for a role when that role's key is absent from the payload — `research_areas`, `strategic_objectives` and `impact_outcomes` alike, since `create` is invoked unconditionally and `formatDataToArray` maps `undefined` and `[]` both to `[]`. Owner decision: record and route to its own proposal. **No task minted here** — an advisory may not grow approved scope.
+
+---
+
+#### T-03 attempt 2 — re-verification by the two failing lenses, 2026-09-04
+
+Lens A was **not** re-run: its surface is portfolio-1 production logic, which attempt 2 was forbidden to touch and which the Leader confirmed byte-identical (mutants staged and fully reverted; final diff vs. attempt 1 is zero for `portfolio-1-alignment.handler.ts`).
+
+| Lens | Verdict | Finding closed |
+| --- | --- | --- |
+| **B** re-verify | **PASS** | B-1 / F-3, and the DD-10 reframing |
+| **C** re-verify | **PASS** | F-1, F-2, F-4, the tautologies, and "no new unfalsifiable assertion" |
+
+**Files changed in attempt 2:** both handler spec files, plus `portfolio-2-alignment.handler.ts` **comment-only** (the DD-10 expression is byte-identical — verified by the Leader in the diff, and independently by Lens B at `:76-78`). Cumulative diff vs. `HEAD`: **+764 / −11** across 6 files.
+
+**How each finding was closed, with the mutant that reddens it:**
+
+| # | Fix | Reddening mutant (each named, and the first two actually staged and observed red) |
+| --- | --- | --- |
+| **F-1** | `toHaveBeenCalledTimes(1)` + `alignmentOperations.save` negative, in both files' boundary tests, backed by a stateful role-scoped reconciler fake replacing `mockResolvedValue([])` | **Staged, observed red:** clear-then-write → `Times(1)` received 2, in both files. Lens C additionally verified the *"wipe **instead of** write"* single-call mutant is caught — by the co-located exact-args assertion, not the count: `Times(1)` + `toHaveBeenCalledWith` together mean *the only call `create` receives is the survivor write* |
+| **F-2** | `create.mock.calls.map(c => c[3])` → `toEqual([RESEARCH_AREAS_ALIGNMENT])` | **Staged, observed red:** role constant swapped to `ALIGNMENT` → `[1]` vs `[3]`, reddening this plus 4 other role-pinning tests. Both lenses independently confirmed it also reddens on a dropped role (`[undefined]`), an extra call (`[3, x]`), and **zero calls** (`[]` fails on length — so it is not vacuous for a no-write implementation) |
+| **F-3** | tautology replaced by `expect(preExistingAlignmentRow.is_active).toBe(true)` against the fake | Omitted role argument (`base-service.ts:178` drops the role key, letting `Not(In(persistId))` reach every role) → `is_active` false → red. Also red on a wrong-role write and on clear-then-write |
+| **F-4** | `alignmentOperations.save` negative in both, plus `resultStrategicObjectivesService.create` negative in portfolio 2 | Any DD-1 violation — a direct `alignmentOperations.save(...)` or a `this.save(ctx, {research_areas})` delegation — reddens the first; the payload-delegation variant reddens both. Lens C judged this the strongest form R-RES-008 AC.4 can take at this layer; §5 correctly still routes the integration half to T-06 |
+| **Tautologies** | both `toEqual(snapshot)` assertions deleted | n/a — removal. Lens C confirmed no `toEqual(snapshot)` and no `expect.anything()` survives in either file |
+| **DD-10** | handler comment + both test titles + the in-test falsifier comment reframed as type honesty; expression untouched | Probe #4 still reddens against the reverted expression (`undefined` ≠ `[]` at argument 2) — and the comment now states that this is a **shape** difference only, which is its real limit |
+
+**The Leader's two sharpest questions were both answered against source, not asserted.**
+
+1. **Was the tautology merely relocated?** No. `buildReconcilerFake([preExistingAlignmentRow])` binds `seedRows` to an array whose single element is the **same object reference** the assertion reads (`:716-727` → `:743`) — no spread, clone or re-literal on that path, and the fake mutates `row.is_active` in place. Lens B checked this explicitly because a fake receiving a copy would have made the replacement just as vacuous and harder to spot.
+2. **Is the fake faithful, or a new KZ-001 instance?** Faithful on every axis the claims depend on, and both flagged divergences are benign — **proved, not assumed**:
+   - *`lever_id` vs primary-key `Not(In(persistId))`*: `existData` is fetched with `[generalCompareKey] In(incoming values)` (`:150-152`), so `persistId` can only ever hold PKs of pre-existing rows whose `lever_id` is in the incoming set. The deactivation therefore reduces **exactly** to *"deactivate every row in the `(result_id[, role])` scope whose `lever_id` is absent from the incoming array"* — which is what the fake computes. The PK is an indirection, not part of the discriminating predicate. The fake's key assumption is itself pinned by the `'lever_id'` positional in the same `toHaveBeenCalledWith`.
+   - *Re-activation*: **not a divergence at all.** Real `create` does reactivate — `updateArray` (`array.util.ts:36-47`) sets `is_active: true` on any row matched by the comparison key, and `save` persists it. The fake mirrors that in both directions. Both tests seed `is_active: true` and never include the seed's id in the incoming array, so the branch is unexercised anyway.
+   - *The `!dataRole` branch* matches `base-service.ts:178` exactly, and `LeverRolesEnum` has no `0` member, so its truthiness semantics match the primitive's own check.
+
+**Implementer report inaccuracy, corrected here rather than propagated.** The attempt-2 report claimed the portfolio-2 fake seeds "a role-1 row **and a role-3 row**". Lens B verified only `preExistingAlignmentRow` (role 1) is seeded (`:716-727`) and flagged the claim as false. **The role-3 seed does not exist and is deliberately not recorded as if it did.** Its absence is the basis of advisory A-2 below.
+
+##### ADVISORY — attempt 2 (recorded, never gating; none may mint or widen a task)
+
+- **RELIABILITY — the fake has no positive control (Lens B).** No seeded row is ever mutated under the *correct* implementation, so an inversion of the fake's own predicate would go unnoticed. Adding the role-3 seed the report wrongly claimed (`{ lever_id: 77, lever_role_id: RESEARCH_AREAS_ALIGNMENT, is_active: true }`, asserted `false` afterwards) would exercise the mutating branch on the green path **and** pin that the role-3 write reconciles within its own role. Not required by check 8; cheap if the file is reopened.
+- **RELIABILITY — the fake's return contract diverges (both lenses, independently).** It returns surviving *seed* rows, never the newly persisted ones, where real `create` returns saved rows filtered to `is_active === true` (`base-service.ts:199-201`). Inert today because both `saveLevers` methods discard the return value — but actively misleading if the helper is reused against the section `save`, which assigns that return to `responseData.research_areas`. A one-line scoping comment would prevent it.
+- **TRACEABILITY — a test title overclaims, and the Leader has honoured the warning (Lens C).** The portfolio-1 boundary test is titled `(R-RES-007 AC.1/AC.2, amended 2026-09-04)`. **AC.1** is *"the alignment step is reached only for a result created in the same `formalizeResult` call"* — a `results.service.ts` property this handler test neither asserts nor can assert. The clause it actually discharges is **AC.4**. `R-RES-007 AC.1 is NOT ticked by T-03` and remains T-06's per §4; the title is cosmetically wrong and is left for the owner rather than edited by the Leader (a test-file edit is Implementer work, and an advisory may not become a task).
+- **RISK — requirement gap, re-stated for the owner (Lens B, KZ-005, unchanged by attempt 2).** `is_primary: true` on the **portfolio-2 role-3** write is mandated by **no** requirement or AC: R-RES-004 AC.1–AC.4 specify role 3, no role-1 row, audit columns and dedup, and nothing else; DD-5 is explicitly portfolio-1-scoped; DD-9 mentions only the write primitive and the role. The value is defensible — it matches what the shipped section `save` writes for `research_areas` — but it is currently justified **only by the handler's own docstring**. Either R-RES-004 or DD-9 should state it, or the flag should be dropped. **This needs the owner, not an Implementer**, and it is the one advisory of this task the Leader recommends acting on.
+
+##### Decisions made
+
+- Attempt 2's effort held at `xhigh` rather than bumped to `max`: the tier↔effort rule forbids `max` on a T2 tier and prescribes escalating the tier instead, which would have put the Implementer on the auditor's model and collapsed `author ≠ auditor` — a correctness constraint, not an efficiency one. The rework rule's premise ("a failed fix is usually under-thinking") also did not apply: the findings arrived with prescriptive remediations and an in-file exemplar.
+- Only the two **failing** lenses were re-run. Re-running Lens A would have re-audited a byte-identical surface — the Delegation Ceiling's "commit to the delegation".
+- `R-RES-007` AC.1 deliberately **not** ticked; audit-column closure deliberately **not** ticked (carried to T-07 at integration level, as the task itself instructs).
+
+##### Issues encountered
+
+Two spec defects, both found by execution rather than by review of the documents, both escalated and resolved by owner decision without consuming a rework attempt: the `R-RES-007` AC.2 contradiction (first Pivot) and DD-10's false premise (second Pivot). One rework round consumed of the 4 budgeted, on four genuine test-falsifiability defects.
+
+##### Final verification result
+
+`npm test -- --silent src/domain/entities/results/portfolio-handlers` from `server/researchindicators` → **`Test Suites: 5 passed, 5 total · Tests: 56 passed, 56 total`** (up from 40 at baseline). `npm run lint -- --quiet` clean; `git status` re-checked after — only the 6 intended files, no `--fix` collateral. `npm run build` clean (module wiring changed). Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).
