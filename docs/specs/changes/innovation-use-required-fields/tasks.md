@@ -55,7 +55,7 @@ LOC re-baselined to **~1,650**; review rounds unchanged at **~24**. **Depth stay
 graph TD
   subgraph PR1["PR 1 — client"]
     T01["T-01 app-input: requiredMode + precedence"] --> T02["T-02 app-input: DD-10 token sweep"]
-    T01 --> T03["T-03 quantification-item: 4 inputs"]
+    T01 --> T03["T-03 quantification-item: 5 inputs"]
     T01 --> T04["T-04 actor: disaggregated counts + total msg"]
     T04 --> T05["T-05 actor: aggregate path"]
     T05 --> T06["T-06 actor: custom name trimmed"]
@@ -145,19 +145,19 @@ migration **does not self-apply** (`K-015`).
 
 ---
 
-### T-03 — `quantification-item`: replace `fieldsRequired` with four per-field inputs
+### T-03 — `quantification-item`: replace `fieldsRequired` with five per-field inputs
 
 - **Requirements covered:** `R-IUR-010` AC.1, AC.3, **AC.5** (OICR unchanged, both call sites) · `R-IUR-010` S1's `BUT it must NOT change the OICR measure card` · `R-IUR-013` AC.1
-- **Design:** `DD-4` (rev 6: `numberRequiredMode`, **not** `numberAllowsZero`)
+- **Design:** `DD-4` (rev 6: `numberRequiredMode`, **not** `numberAllowsZero`; **`unitRequiredMode` added 2026-09-04 by pivot**)
 - **Defect classes:** `DC-5`, `DC-8`
 - **Files:** `client/.../quantification-item/quantification-item.component.ts` · `.html` · **`.spec.ts` (rewrite in scope)**
-- **Description:** Remove `fieldsRequired`; add `numberRequired` (`true`), `unitRequired` (`true`), `commentsRequired` (`true`), `numberRequiredMode` (`'off'`). Pass `numberRequiredMode` straight through to `app-input`'s `requiredMode`. Remove the two dead `[validateEmpty]` bindings.
+- **Description:** Remove `fieldsRequired`; add `numberRequired` (`true`), `unitRequired` (`true`), `commentsRequired` (`true`), `numberRequiredMode` (`'off'`), **`unitRequiredMode` (`'off'`)**. Pass **both** modes straight through to the respective `app-input`'s `requiredMode`. Remove the two dead `[validateEmpty]` bindings.
 - **Implementation notes:**
   - **`numberAllowsZero` from revisions 1–4 does not exist and must not be created.** A boolean cannot express the corrected rule: `numberAllowsZero = true` makes `0` **valid**, the exact opposite of `R-IUR-010` AC.4. Three states are needed — OICR's falsy check, `'nonzero'`, and `off`.
   - OICR passes nothing at all (`oicr-details.component.html:60`, `:81`) and must receive every default.
   - The `[validateEmpty]` bindings at `.html:17`/`:23` are **provably dead**: both bind the same `fieldsRequired` as `[isRequired]`, so the `validateEmpty` branch (`input.component.ts:187`) is unreachable when `true` and inert when `false`.
   - **The removal is NOT self-gating** (`S-5`). `quantification-item.component.spec.ts:130`/`:134` reference `fieldsRequired` as a **TypeScript property**, which no template compiler sees.
-- **Verify:** `npm test -- --silent -- quantification-item.component.spec`, asserting the **default, no-inputs-passed** configuration renders all three asterisks and all three required messages.
+- **Verify:** `npm test -- --silent -- quantification-item.component.spec`, asserting the **default, no-inputs-passed** configuration renders all three asterisks and all three required messages, **and that both `numberRequiredMode` and `unitRequiredMode` default to `'off'`** so OICR keeps its untrimmed falsy behavior (`R-IUR-010` AC.5).
 - **Falsifying input:** an OICR measure card with `Comments` empty, rendered through the **real** component — it must still show its required message. Flip `commentsRequired`'s default to `false` and this must redden.
 - **Disqualifier:** **a green OICR suite is not evidence here and must never be cited as such.** `oicr-details.component.spec.ts:872-880` stubs the card with an empty-template `FakeQuantificationItemComponent`, so it is structurally blind to every property AC.5 names — a green OICR run is compatible with all three asterisks vanishing (`C-3`, `S-7`).
 - **Cannot prove:** the rendered *appearance* of the asterisks (presence ≠ paint, `DC-7`). Stale spec references are caught only by T-16's normalized `tsc` diff, not by this suite — `ts-jest` runs `isolatedModules` with no type-checking.
@@ -309,17 +309,17 @@ migration **does not self-apply** (`K-015`).
 
 ---
 
-### T-12 — Details page: wire the measure card's four new inputs
+### T-12 — Details page: wire the measure card's five new inputs
 
-- **Requirements covered:** `R-IUR-010` AC.1–AC.4 (client half), incl. AC.4's corrected boundary (`0` invalid, `-5` valid) · `R-IUR-010` S1
-- **Design:** `DD-4`, `DD-2` (`'nonzero'`)
+- **Requirements covered:** `R-IUR-010` AC.1–AC.4 (client half), incl. AC.4's corrected boundary (`0` invalid, `-5` valid) · **AC.6 + S1's `AND IT MUST` reject a whitespace-only `Unit`** *(reassigned from `T-01` 2026-09-04 by pivot)* · `R-IUR-010` S1
+- **Design:** `DD-4`, `DD-2` (`'nonzero'`), §3.3 + `DD-1` `'filled'` (the `Unit` half)
 - **Files:** `client/.../innovation-use-details.component.html` (`:227`) · `.spec.ts`
-- **Description:** Replace the `[fieldsRequired]` binding with `[numberRequired]="true"`, `[unitRequired]="true"`, `[commentsRequired]="false"`, `[numberRequiredMode]="'nonzero'"`.
+- **Description:** Replace the `[fieldsRequired]` binding with `[numberRequired]="true"`, `[unitRequired]="true"`, `[commentsRequired]="false"`, `[numberRequiredMode]="'nonzero'"`, **`[unitRequiredMode]="'filled'"`**.
 - **Implementation notes:**
   - **`'nonzero'`, not `'positive'`.** `quantification_number` is a signed decimal by `changes/measure-number-signed-decimal`, so a negative measure is legitimate and only `0` is not. Any implementation that rejects `-5` has built `> 0` and is wrong.
   - `:227` is the **only** template that binds the old input; OICR's two call sites pass nothing and would not redden if this were missed (`N-9`).
 - **Verify:** `npm test -- --silent -- innovation-use-details.component.spec`.
-- **Falsifying input:** `Number = 0` must redden with a message distinguishable from the required message; `Number = -5` must **not** redden. `Comments` empty must render no asterisk and no message.
+- **Falsifying input:** `Number = 0` must redden with a message distinguishable from the required message; `Number = -5` must **not** redden. `Comments` empty must render no asterisk and no message. **`Unit = '   '` (whitespace only) must redden** — before the pivot this saved silently and the row was unsubmittable with nothing on screen (`DC-2b` + `DC-3`); drop `[unitRequiredMode]` and this must go green again, which is the observation that proves the binding is load-bearing (`K-004`).
 - **Disqualifier:** a green suite after removing `fieldsRequired` is not evidence the new bindings arrived — a stale binding on the **one** template that carries it does redden, but the *absence* of a new binding is silent. Assert the child component's resolved input values.
 - **Cannot prove:** OICR's unchanged behavior (T-03 owns AC.5, against the real component).
 - **Deps:** T-03, T-11 (same file) · **Effort:** S · **Skills:** `angular-developer`
@@ -524,7 +524,7 @@ clause has a named owner below. A gap is never discharged by citing a different 
 | `R-IUR-010` | S1 measure row started · AC.1–AC.3 | T-03 + **T-12** |
 | `R-IUR-010` | S1 `BUT` must not change OICR · AC.5 both call sites | **T-03** |
 | `R-IUR-010` | S1 `AND IT MUST` reject `0`, accept negatives · AC.4 | T-01 + **T-12** |
-| `R-IUR-010` | S1 `AND IT MUST` reject whitespace-only `Unit` · AC.6 | **T-01** + T-19 |
+| `R-IUR-010` | S1 `AND IT MUST` reject whitespace-only `Unit` · AC.6 | **T-03 + T-12** + T-19 *(reassigned from `T-01` 2026-09-04 — see the Pivot Record in `execution.md`; `T-01` built the trimming mechanism but its three-file scope cannot route `Unit` into it)* |
 | `R-IUR-011` | S1 the message is gone · AC.1 | **T-11** |
 | `R-IUR-011` | S1 `BUT` per-row actor rules retained | **T-11** (+ T-04/T-05 retain them) |
 | `R-IUR-011` | S1 `AND IT MUST` `INNOVATION_DEV` untouched · AC.4 | **T-18** |

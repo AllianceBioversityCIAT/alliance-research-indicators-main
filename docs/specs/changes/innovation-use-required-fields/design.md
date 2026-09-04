@@ -109,7 +109,7 @@ Two facts drive most of this design:
 | Path | Change |
 | --- | --- |
 | `shared/components/custom-fields/input/input.component.{ts,html}` | **+1 input** `requiredMode`; **5** live hex literals tokenized — 4 amber (`:30`, `:49`, `:65`, `:71`) → `var(--ac-warning-1)` + 1 grey (`:59`) → `var(--ac-grey-600)`; **1 dead `[style]` binding deleted at `:55`** (`C-14`, `N-3`, corrected by `P-2`). *(Revisions 3–4 read "1 dead **Tailwind border utility** deleted" — the pre-`P-2` framing, exactly backwards: the Tailwind utility at `:49` is the live renderer and is KEPT. Backward-sweep miss caught at the Phase 3 gate.)* |
-| `shared/components/quantification-item/quantification-item.component.{ts,html}` + `.spec.ts` | `fieldsRequired` → 4 per-field inputs; spec rewrite is **in scope** (`S-5`) |
+| `shared/components/quantification-item/quantification-item.component.{ts,html}` + `.spec.ts` | `fieldsRequired` → **5** per-field inputs (`unitRequiredMode` added 2026-09-04 by pivot); spec rewrite is **in scope** (`S-5`) |
 | `.../innovation-use-actor-item/*.{ts,html,spec.ts}` | count required states + total-positivity message |
 | `.../innovation-use-organization-item/*.{ts,html,spec.ts}` | required states on 4 fields, message precedence |
 | `.../innovation-use-details.component.{ts,html,spec.ts}` | remove message + seed, wire measures, save gate, blocked-save toast |
@@ -280,7 +280,7 @@ rather than by inference. The human browser check remains the gate for `DC-1`.
 It still does not prove **paint** — record that limit next to it (`DC-7`); the human browser check
 remains the gate for `DC-1`.
 
-### DD-4 — `quantification-item` splits `fieldsRequired` into four inputs
+### DD-4 — `quantification-item` splits `fieldsRequired` into five inputs
 
 | Input | Default | Innovation Use passes |
 | --- | --- | --- |
@@ -288,6 +288,25 @@ remains the gate for `DC-1`.
 | `unitRequired` | `true` | `true` |
 | `commentsRequired` | `true` | **`false`** |
 | `numberRequiredMode` | `'off'` | **`'nonzero'`** |
+| `unitRequiredMode` | `'off'` | **`'filled'`** |
+
+**`unitRequiredMode` added 2026-09-04 by user ruling at the T-01 execution gate** (Pivot Record in
+`execution.md`). The revision-6 table carried **four** inputs and gave a mode only to `Number`, so
+`Unit` reached `app-input` through the boolean `unitRequired` → `isRequired`, whose branch is
+`!value || value.length === 0`. A whitespace-only `'   '` is truthy with `length === 3` and therefore
+evaluated **valid** — leaving `R-IUR-010`'s S1 `AND IT MUST` clause and **AC.6** with no owner on the
+client, while `tasks.md` §5 credited them to `T-01`, whose three-file scope
+(`input.component.{ts,html,spec.ts}`) structurally cannot discharge them. T-01 built and proved the
+trimming mechanism (`isFilled()` trims strings, §3.3); nothing routed `Unit` into it. The gap was
+**reachable**: type spaces into `Unit`, the client renders no amber and saves, then SQL's `valid_text`
+rejects the row and the green check returns `false` **with nothing on screen** — `DC-2b` + `DC-3`
+together, the exact failure pair Judgment Day finding `C-2` was raised to close, re-created inside
+the decision written to close it.
+
+`'filled'` is the correct mode, **not** `'positive'` or `'nonzero'`: `Unit` is a free-text string and
+the only rule on it is non-blankness after trimming, matching the server's
+`LENGTH(TRIM(REGEXP_REPLACE(text,'\s+','')))>0` (§3.3). Both new modes default to `'off'`, so OICR's
+byte-for-byte behavior below covers this input too.
 
 `fieldsRequired` is removed, along with the two dead `[validateEmpty]` bindings (`DD-1`) — confirmed
 dead in the template: `:17` and `:23` bind `[isRequired]` and `[validateEmpty]` to the **same**
@@ -301,7 +320,7 @@ Use's `≠ 0` (`0` invalid, **`-5` valid**), and `off`. `numberAllowsZero = true
 **valid**, which is the opposite of `R-IUR-010` AC.4. It is passed straight through to `app-input`'s
 `requiredMode` (`DD-1`), so `quantification-item` holds no zero policy of its own.
 
-OICR passes nothing, receives `'off'`, and keeps its existing falsy `isRequired` behavior byte-for-byte.
+OICR passes nothing, receives `'off'` for **both** modes, and keeps its existing untrimmed falsy `isRequired` behavior byte-for-byte.
 
 **The removal is NOT self-gating** (`S-5`). Revision 1 claimed a stale binding becomes a template
 compile error. True for the **one** template that binds it (`innovation-use-details.component.html:227`; OICR's two call sites pass nothing and would not redden — `N-9`) — but `quantification-item.component.spec.ts:130`
@@ -678,9 +697,9 @@ Revision 1 claimed to read back "every" `AND IT MUST` / `BUT it must NOT` clause
 | `R-IUR-008` | same source of truth on both surfaces | **`DD-5`** |
 | `R-IUR-008` | **must NOT leave a stale sub-type contributing to validity** | **`DD-5b`** |
 | `R-IUR-009` | `0` filled-but-not-positive | `DD-1` `'positive'` mode |
-| `R-IUR-010` | **must NOT change OICR** | `DD-4` defaults — `numberRequiredMode` defaults to `'off'` |
+| `R-IUR-010` | **must NOT change OICR** | `DD-4` defaults — `numberRequiredMode` **and `unitRequiredMode`** both default to `'off'` |
 | `R-IUR-010` | **`0` is REJECTED as a `Number`, negatives accepted** | `DD-4` `numberRequiredMode='nonzero'` → `DD-1` `'nonzero'`, rule 10. *(Corrected 2026-09-04: revisions 1–4 read "`0` is a valid `Number`" here, honored by a `numberAllowsZero` that asserted the opposite of the user's ruling. Backward-sweep miss from the `97acf54d` correction, caught at the Phase 3 gate.)* |
-| `R-IUR-010` | **whitespace-only `Unit` rejected** | §3.3, `DD-1` |
+| `R-IUR-010` | **whitespace-only `Unit` rejected** | §3.3, `DD-1` `'filled'` ← routed by **`DD-4` `unitRequiredMode='filled'`**. *(Corrected 2026-09-04: this row previously cited only §3.3 + `DD-1` — the trimming **mechanism** — while `DD-4` had no input to route `Unit` into it, so the clause and AC.6 had no client owner. Phantom coverage found at the T-01 execution gate; see the Pivot Record in `execution.md`.)* |
 | `R-IUR-011` | **must NOT remove per-row actor rules** | rules 1–5 retained |
 | `R-IUR-011` | **must NOT touch another validation function** | §5 |
 | `R-IUR-012` | not verified by string assertion | `DD-6` constraint 3 |

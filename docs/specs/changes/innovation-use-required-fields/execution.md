@@ -38,7 +38,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | --- | --- | --- |
 | T-01 `app-input` requiredMode + precedence | `[x]` | PASS attempt 1. Spec gap escalated — see Pivot Record |
 | T-02 `app-input` DD-10 token sweep | `[ ]` | |
-| T-03 `quantification-item` 4 inputs | `[ ]` | |
+| T-03 `quantification-item` 5 inputs | `[ ]` | `unitRequiredMode` added by pivot |
 | T-04 actor disaggregated counts + total msg | `[ ]` | |
 | T-05 actor aggregate path | `[ ]` | |
 | T-06 actor custom name trimmed | `[ ]` | |
@@ -47,10 +47,10 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[ ]` | |
-| T-12 details measure wiring | `[ ]` | |
+| T-12 details measure wiring | `[ ]` | `[unitRequiredMode]="'filled'"` added by pivot |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
-| T-15 doc sweep DD-11 | `[~]` | attempt 1 FAIL (2 issues); attempt 2 delivered, re-audit in flight |
+| T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | |
 | T-17 RSK-2 population sizing | `[ ]` | |
 | T-18 migration + migration spec | `[ ]` | |
@@ -131,7 +131,7 @@ Rulings on the six audit questions the Leader named:
 
 **Raised by:** T-01's Reviewer, filed deliberately outside its `ADVISORY` block as a blocking note.
 **Verified independently by the Leader against source before this record was written (`KZ-007`).**
-**Status: OPEN — awaiting user ruling. Execution paused at this gate.**
+**Status: RESOLVED 2026-09-04 by user ruling — see the resolution block below.**
 
 ### The blocker
 
@@ -198,3 +198,88 @@ Symmetric with the `numberRequiredMode` precedent already in `DD-4`, so it intro
 language, `DC-3` is the exact defect class the requirement was added to close, and the failure is
 silent — the user sees a complete-looking row that cannot be submitted. This is the user's call, not
 the Leader's, and it is offered here only so the choice is visible.
+
+---
+
+### T-15 — Documentation sweep (`DD-11`)
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 2 of 3) |
+| Date | 2026-09-04 |
+| Implementer attempts | **2** |
+| Effort assigned | attempt 1 `low` → attempt 2 **`medium`** (bumped one level per the rework rule — a failed fix is usually under-thinking) |
+| Skills assigned | `cognitive-doc-design` (task's own list, unchanged) |
+
+**Files changed** — `docs/ux-ui/design.md` (`:441`, `:560`, plus a new dated entry at the bottom of §12.2) · `docs/specs/innovation-use/family.md` (`:113`). No path under `docs/specs/archive/` touched.
+
+#### Attempt 1 — Reviewer `STATUS: FAIL`, 2 issues
+
+All three ordered edits landed, and the Reviewer explicitly upheld the `:560` supersede mechanics, the `R-IUR-006`…`R-IUR-009` citation choice, the `family.md` correction, and the judgment to leave `family.md:36` alone. It failed on two:
+
+1. **`:441` was internally self-contradicting.** The edit replaced the *"Every field on this card is optional"* sentence but left the earlier clause in the **same line** reading *"OTHER name, **an optional count**"* — so the line declared the count optional, then required, then that everything else was optional. The stale claim `DD-11` exists to remove survived in a second clause, landing on the one field rule 9 governs. *Violated:* `DD-11` row 1 + §3.1 rule 9.
+2. **The new decision entry asserted a falsehood.** It closed with *"The 2026-08-21 entry above is left unedited"* — false, since the same diff adds a `SUPERSEDED` marker to that entry's `:560` sub-bullet. *Violated:* `KZ-007` (a correction record read as settled fact, rarely re-verified, written directly beside the edit contradicting it) + the cited convention at `design.md:512`.
+
+#### Attempt 2 — Reviewer `STATUS: PASS`
+
+Both remediations taken as written: `an optional count` → `and a count`, and the false sentence replaced with *"The 2026-08-21 entry's decision and rationale prose are preserved verbatim; only a SUPERSEDED marker pointing here was added…"*, with the rot-prone in-prose `line 512` citation dropped in favour of quoting the convention text itself.
+
+**Verification**
+
+| Check | Pre-edit | Post-edit |
+| --- | --- | --- |
+| `grep -n "an optional count" docs/ux-ui/design.md` | match at `:441`, exit 0 | no match, **exit 1** |
+| `grep -n "left unedited" docs/ux-ui/design.md` | match at `:563`, exit 0 | no match, **exit 1** |
+| `grep -n "Every field on this card is optional" …` (attempt 1) | match at `:441`, exit 0 | no match, exit 1 |
+| `grep -n "would change the frozen" family.md` (attempt 1) | match at `:113`, exit 0 | no match, exit 1 |
+
+Raw output read for errors before counting, no truncation (`K-014`). **Both post-edit greps re-measured independently by the Leader**, not taken on the Implementer's word.
+
+**Reviewer's source verification (attempt 2)**
+
+- `:441` maps 1:1 onto §3.1 rules 6–9 — *neither broader nor narrower* — and the cited `R-IUR-006`…`R-IUR-009` map 1:1 to those rules. It further confirmed at `innovation-use-organization-item.component.html:154-164` that `Organization count` renders only inside the unknown-path `@else`, so the path-scoping is correct.
+- Issue 2's replacement sentence is **exactly** true: within the 2026-08-21 entry the diff touches only `:560`, only inside the spec-ID parenthetical; the bolded decision statement and every word after `*Rationale:*` are byte-identical; `:558`/`:559`/`:561` are untouched context. Nothing overclaimed, nothing concealed.
+- The quoted convention is verbatim at `design.md:512`, and the new entry is appended last in §12.2, so the convention it cites is also obeyed.
+- `family.md:36`'s "frozen" refers to the inter-chunk **API contract**, not `innovation_use_validation` — leaving it unedited was correct.
+- The surviving *"every field here is optional — no asterisks"* strings live only at `docs/specs/archive/2026-08-26-innovation-use--details-page/{design,tasks}.md` (explicitly out of scope) and in this spec's own quotations of the stale text. **No paraphrase of either failed claim survives in a live document.**
+
+**`ADVISORY` (non-gating)**
+
+- *Risk* — **doc claims lead the code inside PR 1.** `innovation-use-details.component.ts:353` still seeds `[new InnovationUseActor()]`, so the new entry's present-tense *"The client no longer creates a blank actor row"* is not yet true of the working tree; `:441`'s required-field description likewise precedes T-07…T-09. This is **authorized** — `tasks.md:86` makes T-15 independent and runnable at any point in PR 1, and `tasks.md:97` bundles T-01…T-16 into one PR whose definition of done requires all of them — and it is categorically unlike attempt 1's defect, which no later task could have made true.
+- *Readability, pre-existing and out of scope* — §12.2 carries a verbatim duplicated 2026-07-28 entry at `:554`/`:556`, and the 2026-07-28 entries sit below the 2026-08-12/13 ones, against the section's own bottom-append convention. Neither introduced nor worsened by this diff.
+
+> **FORWARD POINTER → T-16 (Leader-owned; must be copied into T-16's brief).** Fold a re-read of two doc claims into T-16's gate: `docs/ux-ui/design.md:441` (per-path required fields) and the 2026-09-04 §12.2 entry (*"no longer creates a blank actor row"*). Both are true only once T-07…T-09 and T-11 have landed. If T-11 is dropped or descoped, these become **false statements of fact on a live blueprint**. Raised by T-15's Reviewer as a recommendation for the Leader, explicitly not for the Implementer.
+
+**Requirements covered** — `R-IUR-002` **AC.4**, in full.
+
+**Cannot prove (`KZ-017`)** — nothing about code behavior, paint, or rendered appearance; documentation-only, and the diff makes no visual claim (no tokens or CSS touched, so the design-token and budget lenses are structurally inapplicable). The Reviewer holds `Read`/`Grep`/`Glob` and **no shell**, so it could not independently observe the pre-edit red for either grep — it corroborated that half from the diff's own `-` lines plus the Implementer's and Leader's measurements, and instead verified the stronger property for issue closure (no literal or paraphrased survival in any live document). `family.md`'s *"no longer frozen"* is verified against `design.md` §5's stated migration plan, **not** against a migration file — T-18 is unwritten and T-20 has not run; the claim holds under a governance reading, and is PR-2-pending under a shipped-code reading.
+
+**Runtime failure recorded (not a work FAIL).** The attempt-2 Reviewer dispatch terminated on an API rate limit (`session limit`, HTTP 429) before emitting any `STATUS:` line. Recorded as a runtime failure per the non-delivery rule rather than read as a clean result; the agent was resumed once with its context intact and its priority ruling named, and then delivered the verdict above. No inline Leader review was performed.
+
+### Pivot Record: T-01 — RESOLVED 2026-09-04 (user ruling: amend `DD-4`, T-03, T-12)
+
+**Ruling:** the user selected the amendment option at the T-01 gate. Applied in full; nothing deferred.
+
+| # | Edit | Site |
+| --- | --- | --- |
+| 1 | `DD-4` table gains a fifth row — `unitRequiredMode` · default `'off'` · Innovation Use passes **`'filled'`** — plus a rationale paragraph recording why the four-input table could not satisfy AC.6, why `'filled'` (not `'positive'`/`'nonzero'`) is the correct mode for a free-text field, and that OICR receives `'off'` for both modes | `design.md` `DD-4` |
+| 2 | T-03: title, `Design` line, `Description` (both modes passed through), and `Verify` (assert **both** modes default to `'off'` so OICR stays untrimmed, `R-IUR-010` AC.5) | `tasks.md` T-03 |
+| 3 | T-12: title, `Design` line, `Description` (`[unitRequiredMode]="'filled'"`), `Requirements covered` (AC.6 + S1's clause added), and a **falsifying input** — `Unit = '   '` must redden, and dropping the binding must turn it green again, which is the observation that proves it load-bearing (`K-004`) | `tasks.md` T-12 |
+| 4 | §5 closure table line 527 reassigned: `R-IUR-010` S1 whitespace clause + AC.6 from **T-01** → **T-03 + T-12** + T-19, with the reason inline | `tasks.md` §5 |
+| 5 | §10 cross-check row for *"whitespace-only `Unit` rejected"* corrected — it cited only §3.3 + `DD-1` (the trimming **mechanism**) with no routing, which is how the phantom coverage passed the Phase 3 gate | `design.md` §10 |
+
+**Correction closure — both directions (`KZ-005`), with the miss recorded**
+
+*Forward* (the superseded claim in every phrasing, not only the literal string): five live sites carried a four-input count — `DD-4`'s heading, `tasks.md` §2's mermaid node, T-03's title, T-12's title, and **`design.md` §2.1's composition row**. All five corrected to five.
+
+**§2.1 was missed by the first forward grep** and found only on the second pass. The first sweep searched `four inputs`, `four per-field`, `four new inputs`, `into four`, `4 inputs`; §2.1 reads **`4 per-field inputs`** — a phrasing none of those patterns matched. This is `KZ-005` demonstrating itself inside the very sweep written to honour it: *sweep the claim, not the string.* The closing sweep used the pattern `(four|4) (per-field|new |live )?inputs?` case-insensitively across all four spec documents and returns **exit 1, zero hits**.
+
+*Backward* (documents citing `DD-4` or the reassigned §5 line): `design.md:239` (`DD-4` removes the dead `[validateEmpty]` bindings) and `design.md:249` (`DD-2`'s `numberRequiredMode` reference) re-read and confirmed **still true** — neither asserts an input count. `design.md:51` and `judgment.md:31`/`:61` are point-in-time correction and finding records about a *different* correction (`numberAllowsZero` → `numberRequiredMode`) and are correctly left unchanged, per the same convention that leaves `docs/specs/archive/` alone.
+
+*Second direction* (`KZ-005`'s re-grep for the value the correction itself introduces): `unitRequiredMode` now appears at 4 sites in `design.md`, 5 in `tasks.md`, 7 in `execution.md` — no orphan reference, no site naming it without defining or consuming it.
+
+**Requirements impact:** none. `R-IUR-010` S1 and AC.6 are unchanged — they were always correct; the design was incomplete relative to them. `requirements.md` was not edited, which is the right outcome: this pivot corrected a design and a decomposition, not an intent.
+
+**Budget impact:** **no new task** — the task count stays at 20, still the `RB-8` re-baselined figure. T-03 and T-12 each grow by roughly one input and one test case; LOC stays inside the re-baselined ~1,650. Review rounds +1 to +2 across the two amended tasks. **No tripwire escalation owed.**
+
+**No ADR affected** — `DD-4` is a spec-local design decision, not a TRD architecture decision, so no superseding `ADR-NNN` is owed to `/akili-archive`'s constitution sync.
