@@ -266,7 +266,7 @@ proposal time.)*
 
 - [ ] AC.1 — Red `*` on `Organization` when the known path is active.
 - [ ] AC.2 — Empty ⇒ amber treatment; green check `false`.
-- [ ] AC.3 — Exactly one message renders for an unidentified known-path row — never zero, never two.
+- [ ] AC.3 — Exactly one message renders for an unidentified known-path row — never zero, never two. **The row-level `This row does not identify an organization yet` is SUPPRESSED, not deleted** (user ruling 2026-09-04, `OQ-6`): its getter and `ng-template` remain and only the render condition is gated, so the decision is reversible in one line. Note the branch is unreachable in practice under immediate messaging — accepted.
 - [ ] AC.4 — Filled ⇒ valid.
 
 ---
@@ -565,7 +565,8 @@ nor repaired, only deleted.
 
 - **Category:** reliability
 - **Target:** the application behaves correctly in **both** orders — code deployed before the migration is applied, and after.
-- **How verified:** reasoned in `design.md` and stated in `tasks.md` as an explicit human step. Between deploy and apply, the UI will demand fields the green check does not enforce; this is **safe** (the UI is stricter than the gate) and must be confirmed to be the direction of the skew, not the reverse.
+- **Owner:** **D. Casañas runs the migration manually** (user ruling 2026-09-04, `OQ-4`). It is not a pipeline step and not an Implementer step.
+- **How verified:** reasoned in `design.md` and stated in `tasks.md` as an explicit, owner-named human step. Between deploy and apply, the UI will demand fields the green check does not enforce; this is **safe** (the UI is stricter than the gate) and must be confirmed to be the direction of the skew, not the reverse.
 - **Note:** `K-015` — the pipeline deploys code only; a merged migration can sit unapplied indefinitely.
 
 ### NFR-IUR-002 — Accessibility of the required signal
@@ -631,7 +632,7 @@ No schema change. One new migration replacing a stored function.
 | **OQ-1** | Immediate vs. deferred validation messages. Adding an actor row will paint up to 5 amber messages at once. `ASM-2` assumes immediate, for consistency with `Actor type`. Confirm at the Phase 1 gate. | D. Casañas | Phase 1 approval |
 | **OQ-2** | Should `Specify other` (custom name for actor type `5` / organization type "other") also carry a red `*`? It is already enforced in the green check for actors but shows no asterisk — a pre-existing inconsistency this spec neither creates nor, currently, fixes. | D. Casañas | Phase 1 approval |
 | **OQ-3** | Should the `app-input` falsy-`0` bug be audited across the other 15 templates? Recommended as a **separate** proposal. | D. Casañas | after this spec |
-| **OQ-4** | Who applies the migration, and to which environments, and when relative to the code deploy? (`NFR-IUR-001`) | D. Casañas | before execution |
+| ~~OQ-4~~ | ~~Who applies the migration~~ — **CLOSED 2026-09-04:** D. Casañas, manually, after the client PR deploys. | D. Casañas | ✅ closed |
 
 ---
 

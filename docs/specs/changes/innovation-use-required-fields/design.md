@@ -2,7 +2,7 @@
 
 - **Module:** client (`innovation-use-details` + 2 shared components) · server (1 migration)
 - **Spec id:** 2026-09-innovation-use-required-fields
-- **Status:** draft — **revision 4**, after Judgment Day round 3 + user evidence 2026-09-04
+- **Status:** draft — **revision 5**; all Judgment Day findings closed, all open questions decided
 - **Owner:** D. Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
@@ -26,8 +26,9 @@
 > measurement the user supplied (which no judge and no test in this repo could produce), `P-3` by
 > `DD-12`. Full record in [`judgment.md`](./judgment.md).
 >
-> **Still open and blocking:** `OQ-4` (who applies the migration) and `OQ-6` (remove vs. suppress
-> `showNotIdentifiedMessage`). Both are user decisions, not design gaps.
+> **Both remaining decisions were taken by the user on 2026-09-04:** `OQ-4` — D. Casañas runs the
+> migration manually (§9 step 3); `OQ-6` — `showNotIdentifiedMessage` is **suppressed, not removed**
+> (`DD-9`). **No blocking item remains.**
 >
 > | ID | Verified fact | What breaks if implemented as written |
 > | --- | --- | --- |
@@ -441,21 +442,27 @@ paths — so it competes with rule 6 *and* rule 7.
 | Identity missing, row **touched** | The **new required message** on the specific empty field. `showNotIdentifiedMessage` is suppressed — it names the row, the required message names the field, and the field-level one is more actionable. |
 | Identity missing, row **untouched** | The **new required message**, still. This closes AC.3's "never zero" half: today an untouched known-path row loaded without an institution shows nothing, because the old message is gated on `touched()`. The new messages are not gated on `touched()` (`DD-9` immediacy). |
 
-`showNotIdentifiedMessage` therefore becomes unreachable and is **removed**, not left dormant.
+`showNotIdentifiedMessage` is therefore **SUPPRESSED, not removed** — user ruling, 2026-09-04
+(`OQ-6` closed).
 
-**Blast radius of this removal (`N-5`)** — enumerated here because `DD-7` was corrected in round 1
-for exactly this omission, and revision 2 repeated it on a *new* reversion:
+**What suppression means concretely.** The getter, the `ng-template #notIdentifiedMessage`
+(`.html:2-7`) and its render site all **stay**. The render condition gains one clause: it does not
+render while any field-level required message is showing on the same row. Nothing is deleted.
+
+**Blast radius — stated honestly, including what suppression does NOT save:**
 
 | Item | Effect |
 | --- | --- |
-| `innovation-use-organization-item.component.spec.ts:302-316` | **Breaks.** Asserts the message text at `:309` and exactly one `warning` icon at `:313-315`. Rewritten, not deleted. |
-| `:299`, `:325` | Negative assertions — survive. |
-| `ng-template #notIdentifiedMessage` (`.html:2-7`) | Removed with its only consumer. |
-| Archived `R-IUP-012` AC.5 (details-page spec) | This message discharged it. Removing it retires a shipped, user-visible affordance. |
+| `innovation-use-organization-item.component.spec.ts:302-316` | **Breaks anyway.** It fills `Organization count` on an unknown-path row with no type, then asserts the message text (`:309`) and exactly one `warning` icon (`:313-315`). Under `R-IUR-007` that row now shows a required message on `Organization type`, so the row-level message is suppressed. **Removal and suppression break this test identically** — rewritten, not deleted. |
+| `:299`, `:325` | Negative assertions — survive either way. |
+| `ng-template` + getter | **Survive** under suppression. This is the whole difference. |
+| Archived `R-IUP-012` AC.5 | The affordance is retained in code, so the archived AC's implementation is not retired — only gated. |
 
-**No requirement authorizes the removal** — `R-IUR-006` forbids *two* messages for one cause, which
-suppression also satisfies. `OQ-6` is therefore raised to **blocking**: removal versus suppression is
-a user decision, not an implementer's.
+**The honest caveat.** With `DD-9`'s immediate messages, a missing identity *always* raises a
+field-level required message, so the suppressed branch is **unreachable in practice** — it becomes
+dead-but-reversible code. That is the accepted cost of the user's choice, and the reason for the
+choice is sound: gating is reversible in one line, deletion is not, and no requirement demanded
+removal (`R-IUR-006` forbids *two* messages, which suppression satisfies).
 
 ### DD-10 — `app-input`'s amber moves to the token (`C-14`)
 
@@ -595,8 +602,8 @@ inconsistent in the codebase today (`text-red-500` in the innovation-use cards, 
 | --- | --- | --- |
 | 1 | CI/CD | Deploy client + migration file. **The migration does not run** (`K-015`). |
 | 2 | *(window)* | UI stricter than the gate. **Safe.** |
-| 3 | Human | `npm run typeorm migration:run -- -d ./src/db/config/mysql/orm.config.ts` |
-| 4 | Human | `migration:show` — **read the raw output for an error before counting**; the passthrough emits ANSI escapes, so `grep '^\[ \]'` reads a pending migration as zero pending (`K-014`). |
+| 3 | **D. Casañas** | `npm run typeorm migration:run -- -d ./src/db/config/mysql/orm.config.ts` — **owner assigned by user ruling 2026-09-04 (`OQ-4` closed).** Not a pipeline step, not an Implementer step |
+| 4 | **D. Casañas** | `migration:show` — **read the raw output for an error before counting**; the passthrough emits ANSI escapes, so `grep '^\[ \]'` reads a pending migration as zero pending (`K-014`). |
 
 **The reverse order is unsafe:** migration first ⇒ the gate demands fields the UI does not mark, and
 Submit is disabled with no on-screen explanation.
@@ -623,7 +630,7 @@ Revision 1 claimed to read back "every" `AND IT MUST` / `BUT it must NOT` clause
 | `R-IUR-004` | **`0` satisfies "filled" for all four** | `DD-1` `'filled'` mode |
 | `R-IUR-004` | four zeros ⇒ total message, not four required messages | `DD-2` |
 | `R-IUR-005` | the inactive path is not evaluated | §3.2 NULL-safe branch on `not_apply` |
-| `R-IUR-006` | exactly one message, never zero, never two | **`DD-9`** precedence table |
+| `R-IUR-006` | exactly one message, never zero, never two | **`DD-9`** precedence table — the row-level message is **suppressed**, never deleted (`OQ-6`, user ruling) |
 | `R-IUR-007` | not evaluated on the known path | §3.2 branch on `is_known` |
 | `R-IUR-008` | same source of truth on both surfaces | **`DD-5`** |
 | `R-IUR-008` | **must NOT leave a stale sub-type contributing to validity** | **`DD-5b`** |
@@ -714,6 +721,6 @@ the browser; no test will redden).
 | `OQ-1` | Immediate vs. deferred messages (`DD-9`) | no |
 | `OQ-2` | Asterisk on `Specify other` | no |
 | `OQ-3` | Audit `app-input`'s falsy-`0` across the other 15 templates | no — separate proposal |
-| `OQ-4` | Who applies the migration, and when (§9) | **yes, before execution** |
+| ~~`OQ-4`~~ | ~~Who applies the migration~~ — **CLOSED 2026-09-04:** D. Casañas runs it manually, after the client PR deploys (§9 step 3). | closed |
 | ~~`OQ-5`~~ | ~~`R-IUR-014` must be added~~ — **CLOSED**: it already exists (`requirements.md` §5, `R-IUR-014`, indexed in §11, mitigated as `RSK-5`). Revision 1 carried it as blocking against a satisfied condition (`C-9`). *(Line citations dropped at round 2 — `A-N4`: they had already rotted two lines because the citing and cited files shared an edit window.)* | closed |
-| **`OQ-6`** | `DD-9` **removes** `showNotIdentifiedMessage`, a shipped message discharging archived `R-IUP-012` AC.5, breaking one test. No requirement authorizes removal over suppression. | **yes** — raised from non-blocking at round 2 (`N-5`) |
+| ~~`OQ-6`~~ | ~~Remove or suppress `showNotIdentifiedMessage`~~ — **CLOSED 2026-09-04: SUPPRESS.** The getter and template stay; only the render condition is gated. The `:302-316` test breaks either way. | closed |

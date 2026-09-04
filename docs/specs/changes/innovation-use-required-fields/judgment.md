@@ -342,3 +342,43 @@ exist**, so the correct closure is not to add a scenario for it but to record it
 **No design gap remains.** Both open items are user decisions. Revision 4 has not been
 independently judged — the review budget closed at round 3 — so the terminal state stays
 **ESCALATED**, now on two user decisions rather than on defects.
+
+---
+
+# Open questions closed by user ruling — 2026-09-04
+
+| ID | Decision | Applied to |
+| --- | --- | --- |
+| **`OQ-4`** | **D. Casañas runs the migration manually**, after the client PR deploys. Not a pipeline step, not an Implementer step. | `design.md` §9 steps 3–4 (owner column), `requirements.md` `NFR-IUR-001` (new **Owner** line), both OQ tables |
+| **`OQ-6`** | **SUPPRESS `showNotIdentifiedMessage`, do not remove it.** The getter and `ng-template` stay; only the render condition is gated. | `design.md` `DD-9`, `requirements.md` `R-IUR-006` AC.3, §10 read-back row |
+
+**Correction to the recommendation that preceded the ruling.** The orchestrator recommended
+suppression partly on the grounds that removal *"breaks a test"*. That was imprecise and is corrected
+in `DD-9`: **`innovation-use-organization-item.component.spec.ts:302-316` breaks identically under
+both options**, because the row it arranges now raises a field-level required message that suppresses
+the row-level one either way. What suppression actually buys is the surviving code and one-line
+reversibility — not test preservation. The decision stands on that basis.
+
+**Accepted cost, recorded:** under `DD-9`'s immediate messaging a missing identity always raises a
+field-level message, so the suppressed branch is **unreachable in practice** — dead-but-reversible
+code. Named here rather than left for a reviewer to discover.
+
+## Final status — revision 5
+
+| Category | State |
+| --- | --- |
+| Round-1 findings (`C-1`…`C-15`, `S-1`…`S-9`) | ✅ all closed |
+| Round-2 fix-caused (`N-1`…`N-11`, `A-N4`) | ✅ all closed |
+| Round-3 severe (`P-1`, `P-2`, `P-3`) | ✅ all closed |
+| Round-3 bookkeeping (`P-5`…`P-8`) | ✅ all closed |
+| Open questions (`OQ-1`…`OQ-6`) | ✅ all decided or non-blocking |
+| **Blocking items** | **none** |
+
+**Terminal state: ESCALATED (unchanged, and now for one reason only)** — revisions 4 and 5 have not
+been independently judged; the review budget closed at round 3. Every *known* defect is closed and
+every decision is taken. The residual risk is exactly the one this review measured three times: a
+correction record is the artifact class most likely to carry a fresh defect, and the last two
+revisions are correction records.
+
+**Recommended before `/akili-execute`:** none required. If a further check is wanted, the highest-yield
+target is `DD-12` — the newest reversion, written after the last judge had already reported.
