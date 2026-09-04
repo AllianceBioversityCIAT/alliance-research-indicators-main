@@ -435,3 +435,65 @@ None. No rework, no environment blocker. **PR 1 (the persistence contract: T-01�
 **Also holding:** the predecessor's measured ~6:1 test:production ratio (KZ-008's correction) — 881 test : 238 production ≈ 3.7:1 so far, trending toward 6:1 as T-06 adds pure test mass. This re-baseline corrects a *different*, previously unpriced factor.
 
 **Re-armed:** T-05 → ~800, T-06 → ~700, production → ~300 (unchanged), rework rounds → unchanged (**1 of 4 used**).
+
+### T-05 — Wire the levers step into `formalizeResult`, with reporting
+
+| Field | Value |
+| --- | --- |
+| **Status after attempt 1** | **FAIL** — two in-scope observability assertion gaps; rework attempt 2 dispatched |
+| **Date** | 2026-09-04 |
+| **Review mode** | **Parallel lens reviewers** (effort `xhigh`) — D placement/guard/DD-2 · E reporting/observability · F falsifiability/doubles |
+| **Skills assigned** | `nestjs-expert`, `error-handling-patterns`, `tdd`, `systematic-debugging` (as recommended; no deviation) |
+| **Effort** | `xhigh` |
+| **Delivered** | 3 files, **+693 / −1** — against the §13.2 re-baselined estimate of **~700**. The corrected basis is holding |
+
+#### Attempt 1 — lens verdicts
+
+| Lens | Verdict |
+| --- | --- |
+| **D** placement, guard & DD-2 | **PASS** |
+| **E** reporting & observability | **FAIL** — 2 issues |
+| **F** falsifiability & double fidelity | **FAIL** — the **same 2 issues, found independently** |
+
+**The single deletion is benign.** It widens `mockResultSectionOrchestrator`'s `Pick<>` type union to admit `saveLeversForPortfolio`. Lens F noted this *strengthens* double fidelity: the double is now compile-checked against the real service, so every `mockResolvedValue({ saved, discarded })` is validated against `LeversSaveReport` and **cannot grow a phantom `supported` flag**.
+
+#### Lens D — placement verified to the storage layer, not accepted from a comment
+
+`design.md` §5.4 asserts that placing the step below `customStatus` would omit levers from an approved item's snapshot. Lens D traced the whole chain rather than trusting the claim: `customStatus` (`:1110-1124`) → `_greenCheckRepository.createSnapshot` → `CALL SP_versioning` → and inside migration **`1783029013035`** (`UpdateDeleteAndVersionSp.ts:8`), lines **382-410** genuinely `INSERT INTO result_levers (...) SELECT rl.lever_role_id, rl.lever_id, rl.is_primary ... WHERE rl.is_active = TRUE AND rl.result_id = temp_result_id`.
+
+**The ordering is load-bearing and the comment's mechanism is real.** Cross-link worth carrying: this independently confirms the *content* of migration `1783029013035`, which is exactly **RB-3**'s subject — T-07 must still confirm it is *applied* in every target environment, but its relevance is no longer inferred.
+
+Also confirmed by Lens D: `isEmpty` (`object.utils.ts:77-85`) returns `true` for `undefined`, `null` **and** `[]`, so all three R-RES-008 cases skip the block **structurally** — both the resolver and the orchestrator are unreachable, not merely unreached. `effectiveYear` is byte-identical to the shipped step's expression and reads `result.year`, the same value `createResultFromAiRoar` persists as `report_year_id` — so routing cannot diverge from the row. DD-2 holds: `if (!portfolio)` is an existence check, and no `if`/`switch`/ternary on a portfolio **id** exists anywhere in `results.service.ts`.
+
+#### `Not Done / Assumptions` adjudication (Lens F) — item 1 **DISCHARGED**
+
+The Implementer declined to add a levers-specific test for the acceptance check's *"an unknown `contract_code` still rolls back and rethrows"* half. **Ruled discharged, and the check's own wording corrected:**
+
+- `createResultFromAiRoar` is awaited at `:888`; the levers step is at `:1007`, 119 lines below in the same `try`, and its only input `processedResult` is **never bound** when `:888` throws. The step is unreachable on that path **by control flow**, so its presence cannot alter that path's behavior.
+- Discharged by two pre-existing, unmodified tests that mock `createResultFromAiRoar` to reject — `:3354` (rethrow) and `:3329` (bulk partition) — entering the `catch` from exactly the site an unknown `contract_code` throws from (proven separately at `:5115`).
+- **Correction to the acceptance check:** for an unknown `contract_code` there is **nothing to roll back**. `resultExists` is still `null` (assigned only at `:900`), so `catch` skips `deleteFullResultById` entirely and goes to the rethrow at `:1075`. The *rollback* half is discharged instead by the new levers-specific test at `:4506`, which forces a throw **after** creation and asserts `deleteFullResultById` was called with `507`. Both halves are covered; a levers-titled duplicate would have added zero discriminating power. **Scope discipline was correct.**
+
+Items 2 and 3 of the `Not Done` field required no adjudication: R-RES-009's mixed-year/mid-batch scenario is **T-06's** per §4, and "no product/spec conflict found" is a null statement.
+
+#### NFR-RES-001 does not rest on a test double at all
+
+The Leader flagged a suspicion that the memoization making NFR-RES-001 true might live in the *double* rather than in production. Resolved twice over:
+
+- **Production memoizes** — `portfolios.service.ts:78-94` checks a `portfolioByYear` Map first, hits `mainRepo.findOne` only on a miss, and caches a `null` result too (`portfolio ?? null`). Verified by the Leader.
+- **The double is faithful** — it gates on `cache.has(year)` rather than truthiness, so it caches negative answers the same way. Verified by Lens F.
+- **And the requirement is independently proven at its own seam**, by pre-existing tests Lens F located: `portfolios.service.spec.ts:293` (*"memoizes by year: a 10-call sequence over 2 distinct years issues 2 repository calls"*) and `:308` (*"memoizes negative results too, so repeated unresolvable years issue one repository call"*). NFR-RES-001's requirement text names this inheritance explicitly and prescribes verification by **repository-call count**, which is what those tests do.
+
+The constant `mockResolvedValue` doubles elsewhere in the new tests are all **single-item, single-year** cases where routing has nothing to distinguish, so the Disqualifies clause — which scopes the constant-double defect to per-item routing and the NFR count — is not tripped.
+
+#### In-scope FAIL findings → rework attempt 2
+
+| # | Finding | Owning clause |
+| --- | --- | --- |
+| **G-1** | **The unresolvable-year warn is asserted for presence only, never count.** `:4148-4150` uses `warnSpy.mock.calls.some(call => String(call[0]).includes('2035'))`, so an implementation logging that warning **twice** — or once per lever id in that branch — stays green. The *discarded* case **is** pinned (`:4467`, `toHaveBeenCalledTimes(1)`, observed red at 3), so only one of NFR-RES-002's two degradation cases is actually gated. Lens F: this is the one clause in the levers describe with **no reddening mutant** | `requirements.md` R-RES-006 **AC.3** (*"Exactly one warning is logged, naming the year"*) + its scenario's `AND IT MUST`; **NFR-RES-002**; `tasks.md` §4 row *"R-RES-006 \| `AND IT MUST` log one warning naming the year \| T-05"* and T-05's check *"One warn per item per case"* |
+| **G-2** | **NFR-RES-002's "carrying the result id" is implemented at both warn sites but asserted at neither.** `:1023` and `:1038` both interpolate `result ${newResult.result_id}`, yet `:4149` pins only `'2035'` and `:4468` only `'1, 2, 3'`. Dropping the result id from either message is invisible to all 132 tests — and it is the only thing making a bulk log line attributable to an item | `requirements.md` **NFR-RES-002** (*"carrying the result id… **How verified:** unit test asserting call counts **and message content**"*); `design.md` **§9** observability table (*"result id + the effective year"*; *"result id + the resolved portfolio id + the discarded ids"*) |
+
+**Adjudication (Leader).** Both are in scope: R-RES-006 and NFR-RES-002 are named in T-05's own *Requirements covered* list, both findings are one-line test additions, and neither widens the task. **Two independent lenses reached them separately**, which raises confidence that these are real rather than stylistic. Attempt 2 consumes **rework round 2 of 4 spec-wide** (T-03 used one); the armed threshold is a *second round on one task* or *5 spec-wide*, so **no tripwire fires**.
+
+**Root cause worth recording as a briefing lesson, not just a code fix.** The weak assertion at `:4148-4150` is a **faithful copy of the shipped strategic-objectives test** at `:3561-3563`. That exemplar was written against the predecessor's weaker clause — *"A warning line names the year"* (`ai-formalize-strategic-objectives/requirements.md:275`) — whereas **this spec deliberately tightened it** to *"Exactly one warning is logged, naming the year."* The Leader's brief instructed mirroring the shipped step, and the Implementer mirrored it exactly, inheriting an assertion that predates the tightening. **A shipped pattern does not license an assertion that cannot fail; when a requirement is tightened relative to its predecessor, the exemplar must be re-read against the new clause rather than copied.** Future briefs that mandate an exemplar should name the clauses where this spec diverges from it — as was done successfully for the `supported` flag (DD-8) and for the amended `R-RES-007`.
+
+**Test count corrected before it entered the record.** The Implementer reported "15 new tests (13 + 2)". Lens F counted **14** — 12 cases in the levers describe (10 `it` invocations, one an `it.each` over 3) plus the 2 carrier tests. **14 is recorded.**
