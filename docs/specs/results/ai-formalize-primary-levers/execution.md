@@ -235,3 +235,66 @@ Every row for `(result_id, role)` whose primary key is absent from the newly per
 Also closed at this gate: **Q-1** recorded as approved in `requirements.md` §Approvals (A-1 accepted), which had been left `pending` there even after the pre-execution gate.
 
 **Consequence for the delivered T-03 diff.** The implementation was written to the boundary property the amendment now specifies, so it is expected to conform — but **the amended falsifier #3 has never been run**: the Implementer staged the *superseded* probe. Whether the kept tests can actually fail at the boundary is therefore open and is the first question put to the deferred audit. T-03 stays `[~]` pending that verdict.
+
+#### T-03 attempt 1 — parallel lens audit (3 reviewers), 2026-09-04
+
+Review mode: **parallel lens reviewers**, mandated by `/akili-execute` §2.3 for a task touching data-loss surfaces (RB-1 `is_primary` contributor-wipe, RB-2 empty-survivor wipe) and selected by the owner at the T-03 gate. Lenses were partitioned so the 676-line diff was not sent three times: each received the complete **production** diff inline plus full deletion accounting (11 deletion lines, all enumerated), and read the purely additive test files directly.
+
+| Lens | Scope | Verdict |
+| --- | --- | --- |
+| **A** | portfolio-1 roles, flags, dedup, zero-survivor guard, bigint | **PASS** |
+| **B** | portfolio-2 (DD-1 / DD-9) + the DD-10 hardening | **FAIL** — 2 issues |
+| **C** | falsifiability, double fidelity (KZ-001), fixture power (KZ-004), the amended AC.2 | **FAIL** — 2 issues |
+
+**Lens A's most valuable verification.** `['is_primary']` in `create`'s `otherAttributes` slot is not merely *correctly positioned* — it is the **only** mechanism by which the flag persists. `base-service.ts:154-159` rebuilds every row from role + `otherAttributes` + the two keys and discards everything else, so dropping that argument would silently discard the literal `is_primary: true` and let the DB default `false` apply. That is DC-1 exactly, and it is why the omit-probe reddened 5 tests. Lens A also confirmed DI resolvability end to end (`ClarisaLeversModule` exports the service; no new module cycle) — a real risk for handlers unit-tested by direct construction.
+
+**Three lenses independently found the same tautology, which is the clearest vindication of running them in parallel.** `expect(preExistingContributorRow).toEqual(snapshot)` (portfolio-1 spec `:324`) and `expect(preExistingAlignmentRow).toEqual(snapshot)` (portfolio-2 spec `:697`) compare a local literal against a shallow clone of itself, taken before an operation that is never handed the object. **They cannot fail under any implementation, correct or broken** — and they read to a future maintainer as *the* inertness proof. Lens A flagged it, Lens C recorded it, Lens B escalated it to a FAIL because for portfolio 2 the assertion it replaces is genuinely achievable.
+
+##### In-scope FAIL findings → rework attempt 2 (round 1 of the 4 budgeted)
+
+| # | Finding | Owning clause |
+| --- | --- | --- |
+| **F-1** | **The amended AC.2's third conjunct is untested.** `toHaveBeenCalledWith` is satisfied by *any* matching call and neither spec contains a single `toHaveBeenCalledTimes`. A clear-then-write mutant — `create(resultId, [], …ALIGNMENT…)` followed by the real survivor write — passes **every** kept test in both files while wiping the whole `(result_id, role)` pair in production | `tasks.md` T-03 check 8 + amended falsifier #3; `requirements.md` R-RES-007 AC.2; DC-2 |
+| **F-2** | **The "no row at `lever_role_id = 1`" assertion is decorative.** `expect.anything()` matches anything *except* `null`/`undefined`, and `saveLevers` passes `undefined` as `create`'s 5th argument — so the 6-matcher `not.toHaveBeenCalledWith(...)` chain (portfolio-2 spec `:539-546`) never matches any call this method can make, and the `not.` passes **regardless of the role written**, including a role-1 write | `tasks.md` T-03 check 3; `requirements.md` R-RES-004 AC.2; `design.md` §10 falsifier-probes |
+| **F-3** | **The portfolio-2 role-1 survival assertion is vacuous** (the tautology above). R-RES-007 AC.3/AC.4 survived the amendment *because* role-3 reconciliation provably cannot reach role 1 (`base-service.ts:143-152` + `175-179` scope both the lookup and the deactivation by role) — so here the direct survival assertion **is** achievable and is what AC.4 demands. The achievable standard already ships in the same file: the `saveStrategicObjectives` empty-survivor test (`:446-488`) installs a stateful `create.mockImplementation` that mutates the seeded row | `requirements.md` R-RES-007 AC.3/AC.4; `tasks.md` T-03 checks 4 and 8 |
+| **F-4** | **R-RES-008 AC.4 / DC-4 is unasserted at this layer.** `tasks.md` §4 attributes it to "T-03 (double shape)", but every collaborator is a bare `jest.fn()`, so nothing about the double's shape would reveal a call into the section-wide save. A `saveLevers` that additionally routed through it stays green — `alignmentOperations.save` returns `undefined` and does not even throw | `tasks.md` §4 coverage row; `requirements.md` R-RES-008 AC.4; DD-1 |
+
+**Adjudication (Leader).** All four are in scope: each is named by a T-03 acceptance check or falsifying input, none widens the task, and none is an advisory promoted to a gate. Attempt 2 is therefore warranted and consumes rework round 1 of 4. **The amended falsifier #3 has still never been observed red on any surface** — the Implementer staged the superseded probe, whose red observation is what triggered the first Pivot. Running it is part of attempt 2's remit, not optional.
+
+**Effort for attempt 2 stays `xhigh`, deliberately not bumped to `max`.** The rework rule bumps one level, but `## Model Routing`'s tier↔effort rule forbids `max` on a T2 tier and says escalate the tier instead — and escalating the Implementer to the auditor's model would collapse `author ≠ auditor`, which is a correctness constraint, not an efficiency one. The rule's premise also does not hold here: a failed fix is usually under-thinking, but these findings arrive with prescriptive remediations **and an in-file exemplar** (`:446-488`), so attempt 2 is specified work rather than a thinking problem.
+
+---
+
+## Pivot Record: T-03 (second) — DD-10 is behaviorally inert
+
+**Trigger.** Lens B's issue 2, independently verified by the Leader at source before escalation.
+
+**The finding.** DD-10's guard changed `payload?.research_areas?.map(...)` to `(payload?.research_areas ?? []).map(...)`, moving `create`'s argument from `undefined` to `[]`. **Those are the same input.** `create`'s only consumer of that argument is `formatDataToArray` (`base-service.ts:130-132`), and `isNotEmpty` (`array.util.ts:89-93`) returns `false` for `undefined`/`null` **and** for an empty array — so `formatDataToArray` returns `[]` for both:
+
+```ts
+export const isNotEmpty = <T>(array: T | T[]): boolean => {
+  let response = true;
+  if (array === undefined || array === null) response = false;
+  if (Array.isArray(array) && !array.length) response = false;   // ← [] is also "not not-empty"
+  return response;
+};
+```
+
+Every downstream step is therefore byte-identical before and after the change. **The guard is provably inert**, and this conclusion needs no assumption about `In([])` semantics — the two inputs converge one call earlier.
+
+**Two consequences, and the second is the serious one.**
+
+1. **The shipped comment asserts a guarantee it does not provide.** The in-diff comment says the unguarded form "is the same shape as the empty-survivor wipe that can deactivate every research area for the result" — implying the guard removes that. It does not. The two new DD-10 tests assert only that `create` received `[]` rather than `undefined`; they are true, they mirror the implementation, and they cover **no behavioral difference**. That is why the Implementer's red-then-reverted probe reddened them while proving nothing about the hazard — a probe can only falsify the claim a test actually makes.
+2. **The hazard DD-10 named is real, pre-existing, and remains open.** Because `create` is invoked unconditionally in the section `save`, an absent/`null` `research_areas` in a `PATCH .../alignments` payload reconciles the result's whole role-3 set against an empty array. Per Lens B, TypeORM renders an empty `In` as `0=1`, so `Not(In([]))` matches every row and the update deactivates **every active role-3 row for that result**. By the same mechanism the predecessor's shipped `strategic_objectives` / `impact_outcomes` guards are equally inert. **This is outside this spec's scope** — it is `PATCH` behavior, not the AI path, and `proposal.md` declares the alignment endpoints' contract unchanged.
+
+**What this validates.** The same mechanism proves the handlers' **zero-survivor early return is genuinely load-bearing**, not defensive decoration: had `saveLevers` handed `create` an empty survivor array, it would have wiped the entire `(result_id, role)` pair. Both handlers return before the call. That part of the design is confirmed correct by this analysis.
+
+**Alternatives put to the owner.**
+
+| # | Option | Cost | Consequence |
+| --- | --- | --- | --- |
+| **A** | **Restate DD-10 as what it is** — a type-honesty/consistency alignment with the sibling `[SO] R-RES-010` guards (the declared `Partial<ResultLever>[]` no longer lies at runtime) — fix the handler comment and the two test names, and put the **real** residual hazard on the risk register as a finding for its own spec | Doc + comment + test-name edits, folded into attempt 2 | Honest. Keeps the harmless, behavior-neutral expression. The `PATCH` wipe is recorded and routed out of this spec rather than silently absorbed. Consistent with the predecessor's precedent |
+| **B** | **Actually close the hazard** — skip the `create` call entirely when the key is absent/`null`, distinguishing absent from an explicit `[]` | Changes `PATCH .../alignments` semantics; exceeds DD-10's declared "one expression… it adds a guard, it removes nothing"; contradicts the non-goal forbidding a refactor of either section-wide `save`; would need the same treatment for the two predecessor fields to be coherent | Real fix, but it is a **contract change to a shipped endpoint** and belongs in its own spec with its own approval — not inside a levers execution loop |
+| **C** | Revert the DD-10 expression entirely (treat Q-6 as retroactively vetoed) | Smallest | Loses a harmless type-honesty improvement and leaves the declared type lying at runtime. Also discards the discovery's paper trail |
+
+**Leader recommendation: A**, plus routing the `PATCH` wipe to the owner as a candidate for its own proposal. B is the only option that actually fixes the data loss, and it is genuinely worth doing — but it edits a shipped endpoint's semantics across three fields and two specs, which is exactly the scope an execution loop must not annex.
