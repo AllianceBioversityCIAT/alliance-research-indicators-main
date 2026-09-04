@@ -365,3 +365,57 @@ Two spec defects, both found by execution rather than by review of the documents
 ##### Final verification result
 
 `npm test -- --silent src/domain/entities/results/portfolio-handlers` from `server/researchindicators` → **`Test Suites: 5 passed, 5 total · Tests: 56 passed, 56 total`** (up from 40 at baseline). `npm run lint -- --quiet` clean; `git status` re-checked after — only the 6 intended files, no `--fix` collateral. `npm run build` clean (module wiring changed). Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).
+
+### T-04 — Add the explicit-portfolio levers entry point to the orchestrator
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** — first attempt, no rework |
+| **Date** | 2026-09-04 |
+| **Implementer attempts** | 1 |
+| **Review mode** | Lens checklist (effort `medium`) |
+| **Requirements covered** | R-RES-009 — the **no-inherited-portfolio-state clause only** (`requirements.md:302`); R-RES-003 / R-RES-004 delegation path; design **DD-3**. R-RES-009 AC.1–AC.4 (per-item routing, ordering, mid-batch rollback) remain **T-06's** and are not claimed here |
+| **Skills assigned** | `nestjs-expert` (as recommended; no deviation) |
+| **Effort** | `medium` |
+
+#### Attempt 1
+
+- **Files changed:** `.../portfolio-handlers/application/result-section-orchestrator.service.ts` (+26) and `.spec.ts` (+137). Two statements added — registry lookup, delegate:
+  ```ts
+  async saveLeversForPortfolio(resultId, portfolioId: PortfolioIdEnum, ids): Promise<LeversSaveReport> {
+    const handler = this.alignmentRegistry.get(portfolioId);
+    return handler.saveLevers(resultId, ids);
+  }
+  ```
+- **Verification:** `npm test -- --silent src/domain/entities/results/portfolio-handlers/application` → **15/15** (11 shipped + 4 new). Lint clean, `git status` unchanged by `--fix`.
+- **Falsifying probe (actually run red).** A mutant reading `this.resultsUtil.result` was staged inside the method before the registry lookup: **all 4 new tests went red** — the throwing getter propagated `BadRequestException: Result not found`, so the "completes with throwing doubles" case rejected instead of resolving, and the `NotFoundException` case failed because a `BadRequestException` was raised first. Reverted; 15/15 green.
+- **Reviewer verdict:** `STATUS: PASS`.
+
+#### Leader-requested adjudications (all six resolved against source)
+
+1. **Is the registry double faithful (KZ-001)?** **Yes — verified, not assumed.** `abstract-section-handler.registry.ts:16-26` genuinely throws `NotFoundException` with the message `No handler registered for portfolio ${portfolioId} in ${this.constructor.name}`, and `AlignmentHandlerRegistry` inherits it unchanged with only portfolios 1 and 2 registered. The double even reproduces what `this.constructor.name` resolves to. Acceptance check 3 is therefore verified against fact. The test proves only "does not catch or wrap" — but since the real seam throws exactly that type, that is the strongest claim available at this boundary.
+2. **The separate orchestrator instance is faithful mirroring, not divergence.** The shipped `saveStrategicObjectivesForPortfolio` describe (`:184-225`) builds its own instance the identical way and for the identical reason: the **suite-level** utils are *permissive* (`portfolioUtil = { nullPortfolioId, portfolio: mockPortfolio }`) — precisely the disqualified double. Nothing is bypassed: the outer `beforeEach` still runs first, so `dataSource` is freshly mocked per test.
+3. **The fixture self-checks are legitimate, and materially unlike T-03's defect.** `expect(() => throwingPortfolioUtil.portfolio).toThrow(BadRequestException)` **can go red** — it fails the moment anyone weakens the double to `{}`, which is exactly what this task's first Disqualifies clause forbids. That is fixture-integrity guarding, not a literal compared against its own clone. And they are not load-bearing for the acceptance clause: that is discharged by `resolves.toEqual(portfolio2Report)`, which the live mutant reddened. The Implementer's own classification was accurate.
+4. **DD-3 / DD-8 hold by construction.** No `resolvePortfolioId()`, no `portfolioUtil` / `resultsUtil` read, no `buildContext`, no `EntityManager`, no `dataSource.transaction`. `buildContext`, `resolvePortfolioId`, `findAlignment`, `saveAlignment` and the shipped `saveStrategicObjectivesForPortfolio` are byte-identical.
+5. **R-RES-009's clause is discharged at this layer and no more** — the throwing-doubles test proves "no request-scoped portfolio state is read or mutated by this path"; the per-item routing half is correctly left to T-06.
+6. **The `PortfolioIdEnum` parameter type is right, and the `999 as PortfolioIdEnum` cast is not a signal of an over-narrow signature.** The already-shipped production caller does the same: `results.service.ts:974` passes `portfolio.id as PortfolioIdEnum` from the `findByYear` lookup. **T-05 will cast identically** — recorded here so T-05 does not re-derive it. Widening to `number` would diverge from the sibling and lose documentation value.
+
+#### ADVISORY (recorded, never gating; none may mint or widen a task)
+
+- **READABILITY — a wrong doc citation, inherited from the mandated exemplar.** The new doc comment cites `design.md DD-8` for the no-`EntityManager` rationale, but **DD-8 in this spec is "The handler reports; the caller formats"**. The transaction point lives in **DD-3's Consequence** (`design.md:288`), which itself cites the predecessor's `[SO] DD-8`. The citation was copied verbatim from the exemplar the brief mandated, so it is *inherited rather than introduced* — but a reader following the pointer lands on the wrong decision. Suggested: `DD-3 / [SO] DD-8`, here and on the sibling. **Not actioned:** an advisory may not widen this task, and T-07's sweep scope is `/v1` and the `[SO] R-RES-007` amendment — extending it would widen T-07. Flagged to the owner.
+- **READABILITY — a citation collision worth a future sweep.** Two adjacent 12-line doc comments now differ only in one requirement id: the sibling's unprefixed `R-RES-008` is the **predecessor's** numbering, the new one's `R-RES-009` is this spec's. Both correct, but the collision invites a misread — exactly the hazard `requirements.md` §2's citation convention and **RB-7** exist for. An `[SO]` prefix on the sibling would disambiguate.
+- **RELIABILITY — an untested true-by-construction claim.** Neither describe asserts `expect(dataSource.transaction).not.toHaveBeenCalled()`. "Do not wrap in `dataSource.transaction`" (`tasks.md:155`) is true by construction and no acceptance check demands a test, but that one line is the cheapest guard against a future wrap, and the `dataSource` mock is already in scope per test.
+- **RISK — the deferral is fail-closed, recorded so T-05 does not re-derive it.** With no `portfolioId` guard here (correctly deferred to T-05 step 3, `design.md:167`), an `undefined` portfolio arriving from a future caller fails **loudly** as `NotFoundException` from the registry rather than silently writing to a wrong portfolio. That is why the deferral is safe, and it closes out T-02's caller-side forward pointer.
+
+#### Decisions made
+
+- No `portfolioId` guard added, per T-02's forward pointer and `design.md` §5.1 step 3 — the responsibility sits in T-05, which returns before calling this method when no portfolio resolves.
+- `LeversSaveReport` imported and returned unchanged — **no `supported` flag** (DD-8), consistent with T-03.
+
+#### Issues encountered
+
+None. No rework, no environment blocker. **PR 1 (the persistence contract: T-01–T-04) is now complete.**
+
+#### Final verification result
+
+`npm test -- --silent src/domain/entities/results/portfolio-handlers/application` → **15/15 green**, lint clean, no `--fix` collateral. Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).

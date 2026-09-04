@@ -155,16 +155,16 @@ No cycles.
   - Pass no `EntityManager`; do not wrap in `dataSource.transaction`.
   - Leave `saveAlignment`, `findAlignment`, `resolvePortfolioId`, `buildContext` and the shipped `saveStrategicObjectivesForPortfolio` untouched.
 - **Acceptance / done check:**
-  - [ ] Called with portfolio 2 it invokes the portfolio-2 handler's `saveLevers`; with portfolio 1, the portfolio-1 handler's.
-  - [ ] With `PortfolioUtil` and `ResultsUtil` doubles whose getters **throw**, the method still completes — proving no request-scoped read.
-  - [ ] An unregistered portfolio id surfaces the registry's existing `NotFoundException` rather than a new error type.
-  - [ ] `saveAlignment`, `findAlignment` and `saveStrategicObjectivesForPortfolio` specs pass unmodified.
+  - [x] Called with portfolio 2 it invokes the portfolio-2 handler's `saveLevers`; with portfolio 1, the portfolio-1 handler's.
+  - [x] With `PortfolioUtil` and `ResultsUtil` doubles whose getters **throw**, the method still completes — proving no request-scoped read.
+  - [x] An unregistered portfolio id surfaces the registry's existing `NotFoundException` rather than a new error type.
+  - [x] `saveAlignment`, `findAlignment` and `saveStrategicObjectivesForPortfolio` specs pass unmodified.
 - **Tests:** `result-section-orchestrator.service.spec.ts` — new describe block.
 - **Verification:** `npm test -- --silent src/domain/entities/results/portfolio-handlers/application`
 - **Falsifying input:** doubles for `PortfolioUtil`/`ResultsUtil` whose getters throw. An implementation reusing `resolvePortfolioId()` or spreading `this.resultsUtil.result` FAILs immediately.
 - **Disqualifies:** doubles that return `{}` instead of throwing. A permissive double lets a request-scoped read pass unnoticed, which is precisely the defect this task guards, and the suite would certify its absence while it is present. Also: two handler doubles that return **identical** reports — then a hardcoded handler passes both routing assertions *(KZ-004)*.
 - **Skills:** `nestjs-expert`
-- **Estimated effort:** S · **Status:** todo
+- **Estimated effort:** S · **Status:** **done** — PASS on attempt 1; registry double confirmed faithful to the real `AbstractSectionHandlerRegistry.get()`, and the throwing-getter probe observed red. See `execution.md` → T-04
 
 ---
 

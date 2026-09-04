@@ -6,7 +6,10 @@ import { PortfolioUtil } from '../../../../shared/utils/portfolio.util';
 import { ResultsUtil } from '../../../../shared/utils/results.util';
 import { PortfolioIdEnum } from '../enum/portfolio-id.enum';
 import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
-import { StrategicObjectivesSaveReport } from '../sections/alignment/alignment-section-handler.interface';
+import {
+  LeversSaveReport,
+  StrategicObjectivesSaveReport,
+} from '../sections/alignment/alignment-section-handler.interface';
 
 describe('ResultSectionOrchestratorService', () => {
   let service: ResultSectionOrchestratorService;
@@ -277,6 +280,139 @@ describe('ResultSectionOrchestratorService', () => {
 
       await expect(
         orchestrator.saveStrategicObjectivesForPortfolio(
+          explicitResultId,
+          unregisteredPortfolioId,
+          ids,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('saveLeversForPortfolio', () => {
+    const explicitResultId = 88;
+    const ids = [2, 4, 6];
+
+    // KZ-001: these doubles must actually throw on access, not merely be
+    // `undefined` — a permissive double would let a request-scoped read
+    // pass unnoticed, which is exactly the defect this task guards against.
+    let throwingPortfolioUtil: PortfolioUtil;
+    let throwingResultsUtil: ResultsUtil;
+
+    // KZ-004: the two handlers are distinguishable — different jest mocks
+    // returning different reports — so a hardcoded handler cannot pass.
+    let portfolio1Handler: { saveLevers: jest.Mock };
+    let portfolio2Handler: { saveLevers: jest.Mock };
+    let explicitRegistry: { get: jest.Mock };
+    let orchestrator: ResultSectionOrchestratorService;
+
+    const portfolio1Report: LeversSaveReport = {
+      saved: ids,
+      discarded: [],
+    };
+    const portfolio2Report: LeversSaveReport = {
+      saved: [],
+      discarded: ids,
+    };
+
+    beforeEach(() => {
+      throwingPortfolioUtil = {} as PortfolioUtil;
+      Object.defineProperty(throwingPortfolioUtil, 'portfolio', {
+        get: () => {
+          throw new BadRequestException('Portfolio not found');
+        },
+      });
+
+      throwingResultsUtil = {} as ResultsUtil;
+      Object.defineProperty(throwingResultsUtil, 'result', {
+        get: () => {
+          throw new BadRequestException('Result not found');
+        },
+      });
+
+      portfolio1Handler = {
+        saveLevers: jest.fn().mockResolvedValue(portfolio1Report),
+      };
+      portfolio2Handler = {
+        saveLevers: jest.fn().mockResolvedValue(portfolio2Report),
+      };
+      explicitRegistry = {
+        get: jest.fn((portfolioId: PortfolioIdEnum) => {
+          if (portfolioId === PortfolioIdEnum.PORTFOLIO_1) {
+            return portfolio1Handler;
+          }
+          if (portfolioId === PortfolioIdEnum.PORTFOLIO_2) {
+            return portfolio2Handler;
+          }
+          throw new NotFoundException(
+            `No handler registered for portfolio ${portfolioId} in AlignmentHandlerRegistry`,
+          );
+        }),
+      };
+
+      orchestrator = new ResultSectionOrchestratorService(
+        dataSource as unknown as DataSource,
+        explicitRegistry as unknown as AlignmentHandlerRegistry,
+        throwingPortfolioUtil,
+        throwingResultsUtil,
+      );
+    });
+
+    it('delegates to the portfolio-2 handler narrow save when called with portfolio 2', async () => {
+      const report = await orchestrator.saveLeversForPortfolio(
+        explicitResultId,
+        PortfolioIdEnum.PORTFOLIO_2,
+        ids,
+      );
+
+      expect(explicitRegistry.get).toHaveBeenCalledWith(
+        PortfolioIdEnum.PORTFOLIO_2,
+      );
+      expect(portfolio2Handler.saveLevers).toHaveBeenCalledWith(
+        explicitResultId,
+        ids,
+      );
+      expect(portfolio1Handler.saveLevers).not.toHaveBeenCalled();
+      expect(report).toEqual(portfolio2Report);
+    });
+
+    it('delegates to the portfolio-1 handler narrow save when called with portfolio 1', async () => {
+      const report = await orchestrator.saveLeversForPortfolio(
+        explicitResultId,
+        PortfolioIdEnum.PORTFOLIO_1,
+        ids,
+      );
+
+      expect(explicitRegistry.get).toHaveBeenCalledWith(
+        PortfolioIdEnum.PORTFOLIO_1,
+      );
+      expect(portfolio1Handler.saveLevers).toHaveBeenCalledWith(
+        explicitResultId,
+        ids,
+      );
+      expect(portfolio2Handler.saveLevers).not.toHaveBeenCalled();
+      expect(report).toEqual(portfolio1Report);
+    });
+
+    it('completes with PortfolioUtil/ResultsUtil doubles whose getters throw, proving no request-scoped read', async () => {
+      await expect(
+        orchestrator.saveLeversForPortfolio(
+          explicitResultId,
+          PortfolioIdEnum.PORTFOLIO_2,
+          ids,
+        ),
+      ).resolves.toEqual(portfolio2Report);
+
+      expect(() => throwingPortfolioUtil.portfolio).toThrow(
+        BadRequestException,
+      );
+      expect(() => throwingResultsUtil.result).toThrow(BadRequestException);
+    });
+
+    it('surfaces the registry NotFoundException for an unregistered portfolio id', async () => {
+      const unregisteredPortfolioId = 999 as PortfolioIdEnum;
+
+      await expect(
+        orchestrator.saveLeversForPortfolio(
           explicitResultId,
           unregisteredPortfolioId,
           ids,
