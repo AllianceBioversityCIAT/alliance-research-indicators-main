@@ -2,8 +2,10 @@
 
 - **Module:** client (`innovation-use-details`) + server (`db/migrations` stored function)
 - **Spec id:** 2026-09-innovation-use-required-fields
-- **Status:** draft
+- **Status:** **specified** — requirements + design + tasks complete; Judgment Day closed; ready for `/akili-execute`
 - **Owner:** D. Casañas
+- **Linked design:** [`./design.md`](./design.md) (revision 6)
+- **Linked tasks:** [`./tasks.md`](./tasks.md) (20 tasks, 2 PRs)
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Results reporting completeness
 - **Linked tickets:** —
 - **Last updated:** 2026-09-04
@@ -168,7 +170,8 @@ Every field this spec makes required SHALL render the amber treatment, identical
 - THEN it renders a red `*`, an amber border, and the amber required message
 - WHEN the user supplies any value, **including `0`**
 - THEN the border and the message disappear in the same change detection cycle
-- BUT it must NOT colour a PrimeNG control's border with a Tailwind utility class — PrimeNG injects unlayered CSS and Tailwind v4 emits `@layer utilities`, so a utility loses the cascade unconditionally and paints nothing (`D-8`)
+- BUT it must NOT colour the border of a PrimeNG control **that PrimeNG itself styles unlayered** (`p-select`, `p-inputtext`) with a Tailwind utility class — PrimeNG injects those border rules unlayered and Tailwind v4 emits `@layer utilities`, so the utility loses the cascade unconditionally and paints nothing (`D-8`)
+- AND IT MUST NOT be read as a blanket ban on utilities over every PrimeNG element. **`p-inputNumber` is the proven exception:** `.p-inputnumber` carries no competing border rule at all (`primeng-inputnumber.mjs:15-18` is `display:inline-flex; position:relative`), so with nothing to lose the cascade to, the utility at `input.component.html:49` **is** the live mechanism — established from a real-browser screenshot at Judgment Day round 3 (`P-2`), against which the blanket reading had ordered that line deleted, removing the only amber border on every numeric field in the application. *(Narrowed 2026-09-04 at the Phase 3 gate: the design has carried this since `DD-10`'s inversion; this requirement had not.)*
 - AND IT MUST be confirmed rendering in a real browser, because no automated gate in this repo can observe a painted border (`DC-1`)
 
 **Acceptance criteria**
@@ -629,7 +632,7 @@ No schema change. One new migration replacing a stored function.
 
 | ID | Question | Owner | Target |
 | --- | --- | --- | --- |
-| **OQ-1** | Immediate vs. deferred validation messages. Adding an actor row will paint up to 5 amber messages at once. `ASM-2` assumes immediate, for consistency with `Actor type`. Confirm at the Phase 1 gate. | D. Casañas | Phase 1 approval |
+| ~~OQ-1~~ | ~~Immediate vs. deferred validation messages~~ — **CLOSED 2026-09-04 at the Phase 3 gate: IMMEDIATE.** Decided by `design.md` `DD-9` and consistent with `ASM-2` and today's `Actor type`. Closed explicitly because `tasks.md` **structurally depends** on it: `T-07` closes `R-IUR-006` AC.3's "never zero" half precisely by *not* gating the new messages on `touched()`, which only works under immediate messaging. Under `DD-7` a fresh result renders no rows, so the "5 messages at once" concern applies only to a row the user deliberately added. | D. Casañas | ✅ closed |
 | **OQ-2** | Should `Specify other` (custom name for actor type `5` / organization type "other") also carry a red `*`? It is already enforced in the green check for actors but shows no asterisk — a pre-existing inconsistency this spec neither creates nor, currently, fixes. | D. Casañas | Phase 1 approval |
 | **OQ-3** | Should the `app-input` falsy-`0` bug be audited across the other 15 templates? Recommended as a **separate** proposal. | D. Casañas | after this spec |
 | ~~OQ-4~~ | ~~Who applies the migration~~ — **CLOSED 2026-09-04:** D. Casañas, manually, after the client PR deploys. | D. Casañas | ✅ closed |

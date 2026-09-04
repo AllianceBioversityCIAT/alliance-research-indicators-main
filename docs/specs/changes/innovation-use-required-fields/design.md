@@ -2,7 +2,7 @@
 
 - **Module:** client (`innovation-use-details` + 2 shared components) · server (1 migration)
 - **Spec id:** 2026-09-innovation-use-required-fields
-- **Status:** draft — **revision 5**; all Judgment Day findings closed, all open questions decided
+- **Status:** draft — **revision 6**; all Judgment Day findings closed, all open questions decided, Phase 3 correction-closure sweep applied
 - **Owner:** D. Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Findings ledger:** [`./judgment.md`](./judgment.md)
@@ -38,6 +38,26 @@
 >
 > `DD-8`'s site-1 gate, `DD-0`, `DD-5`, `DD-5b`, `DD-6`, `DD-7`, `DD-9` and the rule table are
 > unaffected by these three and were confirmed closed by both judges.
+>
+> ## Revision 6 — Phase 3 correction-closure sweep
+>
+> The Phase 3 gate ran the **backward** sweep the methodology mandates on every Adjust round, over
+> the two corrections that landed in `requirements.md` without one. It found **four** sites where
+> this design still asserted the superseded value — none of them cited by the finding that caused
+> the correction, which is precisely how a stale claim survives:
+>
+> | Site | Asserted | Corrected to | Would have caused |
+> | --- | --- | --- | --- |
+> | `DD-4` table + rationale | `numberAllowsZero` (`true` for Innovation Use ⇒ `0` **valid**) | **`numberRequiredMode`** (`'nonzero'` ⇒ `0` **invalid**, `-5` valid) | An implementer building the exact **opposite** of `R-IUR-010` AC.4 from a boolean that cannot express the corrected three-state rule |
+> | §10 cross-check | "**`0` is a valid `Number`**" | "`0` is REJECTED, negatives accepted" | The read-back table certifying the inverted rule as honored |
+> | §2.1 | "**1 dead Tailwind border utility** deleted" | "1 dead **`[style]` binding** deleted at `:55`"; the utility at `:49` is KEPT | Deleting the only amber border on every numeric field app-wide — the `P-2` defect, resurrected from the composition table after `DD-10` was inverted |
+> | `DD-10` | convert `:59`'s `text-[#8D9299]` "to `var(--ac-warning-1)`" | **`var(--ac-grey-600)`** (`colors.scss:33`) | Repainting the grey helper text amber |
+>
+> Two design gaps were also closed, both required for a correct decomposition: `DD-1` now states
+> **mode precedence** (`requiredMode` bypasses the legacy `isRequired`/`validateEmpty` branches —
+> left additive, it re-creates `DC-2`), and `DD-4` records the evidence that the two
+> `[validateEmpty]` bindings are dead. All line citations in `DD-10`/`DD-1` were re-verified against
+> the working tree at this gate.
 
 ---
 
@@ -88,7 +108,7 @@ Two facts drive most of this design:
 
 | Path | Change |
 | --- | --- |
-| `shared/components/custom-fields/input/input.component.{ts,html}` | **+1 input** `requiredMode`; **4** live hex literals → `var(--ac-warning-1)`, **1 dead** Tailwind border utility deleted (`C-14`, `N-3`) |
+| `shared/components/custom-fields/input/input.component.{ts,html}` | **+1 input** `requiredMode`; **5** live hex literals tokenized — 4 amber (`:30`, `:49`, `:65`, `:71`) → `var(--ac-warning-1)` + 1 grey (`:59`) → `var(--ac-grey-600)`; **1 dead `[style]` binding deleted at `:55`** (`C-14`, `N-3`, corrected by `P-2`). *(Revisions 3–4 read "1 dead **Tailwind border utility** deleted" — the pre-`P-2` framing, exactly backwards: the Tailwind utility at `:49` is the live renderer and is KEPT. Backward-sweep miss caught at the Phase 3 gate.)* |
 | `shared/components/quantification-item/quantification-item.component.{ts,html}` + `.spec.ts` | `fieldsRequired` → 4 per-field inputs; spec rewrite is **in scope** (`S-5`) |
 | `.../innovation-use-actor-item/*.{ts,html,spec.ts}` | count required states + total-positivity message |
 | `.../innovation-use-organization-item/*.{ts,html,spec.ts}` | required states on 4 fields, message precedence |
@@ -205,6 +225,15 @@ Revision 1's truncated quotation dropped that guard.
 
 Asterisk renders when `isRequired || requiredMode !== 'off'`.
 
+**Precedence is mandatory, not incidental (added at the Phase 3 gate).** When `requiredMode !== 'off'`
+the mode **owns the verdict outright** and the legacy `isRequired` / `validateEmpty` emptiness
+branches (`input.component.ts:179`, `:184`, `:187`) MUST be bypassed for that field. Left additive,
+a call site passing both `isRequired` and `requiredMode="filled"` would still hit `isRequired &&
+!value` and redden a deliberate `0` — **re-creating `DC-2` inside the decision written to close it**,
+and rendering two messages for one cause. The only field where both are legitimately live is a
+`'off'`-mode field. Falsifying input: a field with `isRequired=true` and `requiredMode="filled"`
+holding `0` — it must render **no** amber and **no** message.
+
 **`validateEmpty` is left alone and must not be passed alongside `requiredMode`** (`S-8`): it is
 already unreachable whenever `isRequired` is true, so `quantification-item`'s two existing
 `[validateEmpty]="fieldsRequired"` bindings are dead code today. `DD-4` removes them rather than
@@ -217,7 +246,7 @@ it in would hide a data-quality fix inside a UI-consistency change (`OQ-3`).
 ### DD-2 — Positivity placement
 
 - **Single-field positivity** (rules 5, 9) → `requiredMode="positive"`; the field owns border + message.
-- **Non-zero** (rule 10, measures) → `requiredMode="nonzero"`. Distinct from `'positive'` **by user ruling 2026-09-04**: a measure may legitimately be negative, so the rule is `≠ 0`, never `> 0`. `numberAllowsZero` on `quantification-item` (`DD-4`) is therefore renamed/retired — Innovation Use now passes `'nonzero'` and OICR keeps its existing falsy `isRequired`.
+- **Non-zero** (rule 10, measures) → `requiredMode="nonzero"`. Distinct from `'positive'` **by user ruling 2026-09-04**: a measure may legitimately be negative, so the rule is `≠ 0`, never `> 0`. The `numberAllowsZero` boolean of revisions 1–4 is therefore **retired and replaced** by `numberRequiredMode` on `quantification-item` (`DD-4`) — Innovation Use passes `'nonzero'` and OICR keeps its existing falsy `isRequired`.
 - **Cross-field positivity** (rule 4) → the **actor card** renders one message beneath the four fields, **no** border on any of them, driven by the existing `total()`.
 
 When all four are filled and sum to `0`, no field may render `This field is required` — all four
@@ -258,11 +287,21 @@ remains the gate for `DC-1`.
 | `numberRequired` | `true` | `true` |
 | `unitRequired` | `true` | `true` |
 | `commentsRequired` | `true` | **`false`** |
-| `numberAllowsZero` | `false` | **`true`** |
+| `numberRequiredMode` | `'off'` | **`'nonzero'`** |
 
-`fieldsRequired` is removed, along with the two dead `[validateEmpty]` bindings (`DD-1`).
-`numberAllowsZero` exists because OICR's `Number` must keep rejecting `0` while Innovation Use must
-accept it; collapsing them would silently change OICR.
+`fieldsRequired` is removed, along with the two dead `[validateEmpty]` bindings (`DD-1`) — confirmed
+dead in the template: `:17` and `:23` bind `[isRequired]` and `[validateEmpty]` to the **same**
+`fieldsRequired` value, so the `validateEmpty` branch (`input.component.ts:187`) is unreachable
+whenever it is `true` and inert whenever it is `false`.
+
+**`numberRequiredMode` replaces the `numberAllowsZero` of revisions 1–4** (superseded by the user
+ruling of 2026-09-04 that made rule 10 `≠ 0`, not `> 0`). A boolean cannot express the corrected
+rule: the three states now needed are OICR's existing falsy check (`0` reads as empty), Innovation
+Use's `≠ 0` (`0` invalid, **`-5` valid**), and `off`. `numberAllowsZero = true` would have made `0`
+**valid**, which is the opposite of `R-IUR-010` AC.4. It is passed straight through to `app-input`'s
+`requiredMode` (`DD-1`), so `quantification-item` holds no zero policy of its own.
+
+OICR passes nothing, receives `'off'`, and keeps its existing falsy `isRequired` behavior byte-for-byte.
 
 **The removal is NOT self-gating** (`S-5`). Revision 1 claimed a stale binding becomes a template
 compile error. True for the **one** template that binds it (`innovation-use-details.component.html:227`; OICR's two call sites pass nothing and would not redden — `N-9`) — but `quantification-item.component.spec.ts:130`
@@ -500,8 +539,12 @@ and `.p-inputnumber` carries no competing border rule at all (`primeng-inputnumb
 
 **Decision.** Convert the live literals — including `:49` — to `var(--ac-warning-1)`, **delete the
 dead `[style]` binding at `:55`**, and convert `text-sm` to `fs-[14]`. A **sixth** literal exists at
-`:59` (`text-[#8D9299]`, helper text, a plain `div` — live) and is converted too (`P-4`). `--ac-warning-1` **is** `#e69f00` (`colors.scss:48`,
-`:156`), so the colour change is **zero-delta**.
+`:59` (`text-[#8D9299]`, helper text, a plain `div` — live) and is converted too (`P-4`) — **to
+`var(--ac-grey-600)`, NOT to `--ac-warning-1`**: `#8d9299` is the grey registered at
+`colors.scss:33` / `:108`, and the blanket "convert the literals to `var(--ac-warning-1)`" of
+revisions 3–4 would have repainted the helper text amber. *(Corrected at the Phase 3 gate.)*
+`--ac-warning-1` **is** `#e69f00` (`colors.scss:48`, `:156`), so the amber change at `:30`, `:49`,
+`:65`, `:71` is **zero-delta**; the `:59` grey change is zero-delta against `--ac-grey-600`.
 
 **The `text-sm` → `fs-[14]` half is NOT zero-delta (`N-8`)** and the earlier blanket claim was wrong:
 `.fs-[14]` sets `font-size` only (`responsive-size.scss:17-21`), while `text-sm` also sets
@@ -635,8 +678,8 @@ Revision 1 claimed to read back "every" `AND IT MUST` / `BUT it must NOT` clause
 | `R-IUR-008` | same source of truth on both surfaces | **`DD-5`** |
 | `R-IUR-008` | **must NOT leave a stale sub-type contributing to validity** | **`DD-5b`** |
 | `R-IUR-009` | `0` filled-but-not-positive | `DD-1` `'positive'` mode |
-| `R-IUR-010` | **must NOT change OICR** | `DD-4` defaults + `numberAllowsZero` |
-| `R-IUR-010` | **`0` is a valid `Number`** | `DD-4` `numberAllowsZero`, rule 10 |
+| `R-IUR-010` | **must NOT change OICR** | `DD-4` defaults — `numberRequiredMode` defaults to `'off'` |
+| `R-IUR-010` | **`0` is REJECTED as a `Number`, negatives accepted** | `DD-4` `numberRequiredMode='nonzero'` → `DD-1` `'nonzero'`, rule 10. *(Corrected 2026-09-04: revisions 1–4 read "`0` is a valid `Number`" here, honored by a `numberAllowsZero` that asserted the opposite of the user's ruling. Backward-sweep miss from the `97acf54d` correction, caught at the Phase 3 gate.)* |
 | `R-IUR-010` | **whitespace-only `Unit` rejected** | §3.3, `DD-1` |
 | `R-IUR-011` | **must NOT remove per-row actor rules** | rules 1–5 retained |
 | `R-IUR-011` | **must NOT touch another validation function** | §5 |
@@ -660,11 +703,11 @@ read-back (`P-6` — revision 3 had §6 and §10 pointing at each other and the 
 
 ## 11. Budget (Step 2.4 tripwire) — re-baselined
 
-| Metric | Rev 1 | Rev 2 | **Rev 4** | Why |
-| --- | --- | --- | --- | --- |
-| Tasks | 13 | 16 | **18** | +`DD-12` path clearing, +`R-IUR-016` (relocated, now its own task), +the `'nonzero'` mode; −the withdrawn site-2 gate |
-| LOC | ~1,150 | ~1,500 | **~1,600** | `DD-12` and its spec are small; the `DD-9` and `c2` spec rewrites remain the bulk |
-| Review rounds | ~20 | ~24 | **~24** | unchanged |
+| Metric | Rev 1 | Rev 2 | Rev 4 | **Rev 6** | Why |
+| --- | --- | --- | --- | --- | --- |
+| Tasks | 13 | 16 | 18 | **20** | **+2 breach, declared at the Phase 3 gate** (`tasks.md` §1.1): `T-14` (catalog equivalence — folded into a sibling it would have been discharged by the very mock `DD-5` rejects) and `T-16` (the three post-change client gates, which had no owner among the feature tasks). Rev 4's own deltas stand: +`DD-12` path clearing, +`R-IUR-016`, +the `'nonzero'` mode; −the withdrawn site-2 gate |
+| LOC | ~1,150 | ~1,500 | ~1,600 | **~1,650** | Re-baselined for the two extra tasks; the `DD-9` and `c2` spec rewrites remain the bulk |
+| Review rounds | ~20 | ~24 | ~24 | **~24** | unchanged |
 
 **Depth stays Full.** A tripwire, not a cap; `/akili-execute` escalates on breach.
 
@@ -718,7 +761,7 @@ the browser; no test will redden).
 
 | ID | Question | Blocking? |
 | --- | --- | --- |
-| `OQ-1` | Immediate vs. deferred messages (`DD-9`) | no |
+| ~~`OQ-1`~~ | ~~Immediate vs. deferred messages~~ — **CLOSED 2026-09-04 at the Phase 3 gate: IMMEDIATE**, as `DD-9` already decided. Closed explicitly because `tasks.md` `T-07` depends on it. | closed |
 | `OQ-2` | Asterisk on `Specify other` | no |
 | `OQ-3` | Audit `app-input`'s falsy-`0` across the other 15 templates | no — separate proposal |
 | ~~`OQ-4`~~ | ~~Who applies the migration~~ — **CLOSED 2026-09-04:** D. Casañas runs it manually, after the client PR deploys (§9 step 3). | closed |
