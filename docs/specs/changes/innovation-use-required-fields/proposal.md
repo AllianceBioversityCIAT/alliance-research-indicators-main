@@ -271,6 +271,10 @@ Recommended depth: **Standard** — not Lite. Three reasons: it crosses the clie
 it carries an append-only migration with a human apply step, and it edits two components shared with
 another live page.
 
+> **Superseded 2026-09-04 at `design.md` Step 2.4: the depth was raised to Full.** The finished design
+> resolved to 13 tasks / ~1,150 LOC, and Phase 2 found a data-loss defect (`DD-8`) that no requirement
+> anticipated. This proposal's estimate stands as the point-in-time record.
+
 ---
 
 ## References
