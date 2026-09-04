@@ -553,3 +553,82 @@ The Leader inferred from this that NFR-RES-002's *"never one per id"* half might
 #### Final verification result
 
 `npm test -- --silent src/domain/entities/results/results.service.spec.ts` → **132/132 green**. Attempt 1 additionally ran the **full package suite**: `328 suites / 2,314 tests` green. Lint clean. **Delivered 694 lines against the §13.2 re-baselined ~700 — the corrected basis is holding.** Production LOC now **285** of the ~300 armed threshold, with ~5 to come in T-07. Full-suite blast radius and the reported coverage figure remain T-07's gate (DC-6 / KZ-003).
+
+### T-06 — Prove per-item routing, inertness, and cross-field composition
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** — first attempt, no rework |
+| **Date** | 2026-09-04 |
+| **Review mode** | **Parallel lens reviewers** (effort `xhigh`) — G routing/leakage/mid-batch · H techniques/inertness/`Not Done` |
+| **Verdicts** | **G: PASS · H: PASS** |
+| **Requirements covered** | R-RES-002 (`BUT`), R-RES-007 **AC.1**, R-RES-008 (scenario, `BUT`, AC.1, AC.4), R-RES-009 (scenario, both clauses, AC.1–AC.4), R-RES-010 (scenario, both clauses, AC.1–AC.4) |
+| **Skills assigned** | `tdd`, `nestjs-expert` (as recommended; no deviation) |
+| **Delivered** | **1 file, +610 / −0.** No production code. 6 new tests (138 total, from 132) |
+
+**Leader safeguard, since the Implementer role was used rather than the Tester.** The brief made the `PRODUCT_BUG` route explicit: *if a test reveals a genuine production defect, stop and report it — do not fix it*, because fixing it inside a test task hides a real defect in a green suite and bypasses the review loop. **Outcome: no `PRODUCT_BUG` found.** The one gap discovered was in the Implementer's own first draft and was a test-authoring gap, correctly fixed in-task.
+
+#### The central falsifier worked — and caught a defect in the test suite itself
+
+Staged using the **second** form the task names (the `findByYear` double returning its first answer for every subsequent year). **All three routing tests observed red.**
+
+The probe exposed a real, non-obvious gap in the first draft: **the orchestrator double ignores `_portfolioId` by construction**, so row-content assertions are *portfolio-blind* — under the batch-wide mutant every written row is byte-identical, and the suite would have stayed green while certifying the exact bug R-RES-009 exists to prevent. Only `toHaveBeenCalledWith(resultId, portfolio, ids)` can see it. The Implementer added that pin and re-ran green; Lens G traced the mutant by hand and independently confirmed all three tests *must* redden and that the pin is provably the only assertion able to detect it.
+
+**This is the falsifying-probe discipline paying for itself.** A green suite was, at first draft, not evidence — and the probe is what revealed it.
+
+#### Lens G — the sharpest discriminator in the suite is undocumented
+
+`assertMixedYearOutcome` keys every assertion to that item's own `resultId`; the only row-count assertion is scoped to a single `result_id`; the reversed case uses a genuinely fresh fixture (901/902/903, independent literals, `[...items].reverse()` copying before reversing). **The Disqualifies sweep found nothing — the run is a pass, not inconclusive.**
+
+Two findings the Implementer did not report:
+
+1. **The same-portfolio pair strengthens the proof.** Items 2024 and 2010 both route to `PORTFOLIO_1`. With three items over two portfolios a repeat is unavoidable, and *this* repeat is the useful one: two different years landing on the same portfolio separates *"resolved per item from its own year"* from *"resolved once per distinct portfolio"*. Combined with the reversed run's P2,P1,P1 sequence it also kills a per-index alternating mutant the forward fixture alone would pass.
+2. **⚠️ The reversed fixture's `2027 → PORTFOLIO_1` deliberately contradicts the documented ranges** (`requirements.md` §5: P2 = 2026–2030). That contradiction is the **only** fixture entry where a table-driven answer and a hardcoded `year >= 2026 ? P2 : P1` threshold disagree — so it is what makes a threshold router (a DD-2 violation) go red. **Nothing in the file says so.** A maintainer will read it as a typo, "fix" it to P2, and silently delete the discriminator. One comment line closes it. Recorded as **RB-9** below.
+
+Mid-batch fidelity verified rather than trusted: `deleteFullResultById`'s double genuinely filters and rewrites `leverRows` (not a call-count no-op), the purged rows demonstrably existed first, and the throw is staged **after** the lever write — confirmed against production (`results.service.ts:1007-1042` levers step, `:1044` `customStatus`, `:1060` the catch's delete). The survivor assertion pins a *different* portfolio than the failed item's, so any carry-over reddens it.
+
+#### Lens H — the two unusual techniques, ruled
+
+**Technique 1 — the source-text assertion for `R-RES-007` AC.1: DISCHARGED.**
+AC.1 demands a property of the code path, *"asserted against the code path, not inferred"*, and the property is **universally quantified** over call sites. A behavioural test samples one execution and shows the id *happened* to match; the `matchAll` assertion enumerates **every** `saveLeversForPortfolio` call site in the method body and reddens if any other id is ever fed in. Premises verified verbatim at source (`results.service.ts:899` creation, `:900` rollback handle, `:1027-1028` the call, `:1132` the next method bounding the slice). Each assertion has a reddening mutant: an update path aligning a pre-existing result; a levers call hoisted above creation; a second creation or rebound handle. The brittleness objection is real but is **cost, not invalidity** — a rename produces a *loud* false red, never a silent green — and the behavioural half is pinned separately in the same file, so AC.1 rests on structural **and** behavioural evidence jointly. **No KZ-005 escalation: the AC's wording is not the problem.**
+
+**Technique 2 — the reversed step order for `R-RES-010` AC.3: accepted as a MODELLED proof, with a binding condition.**
+Lens H did not soften the weakness: the reversed arm invokes the two narrow-save doubles directly, **exercises no production code, and has zero detection power over a production defect** — its only reddening mutant is a mutation of the test's own double. It is nonetheless not a gate failure, for three reasons: (a) the clause is **not behaviourally provable at the seam T-06 was scoped to** — §5.4 fixes production's order and T-06 may write no production code, so the gap is between the task's instruction and the seam it named, i.e. **a scope defect, not an Implementer failure**, and FAILing would burn a rework round on something unfixable in file scope; (b) the limit is **disclosed in the artifact itself**, in the test title and an in-file comment — which is exactly what made T-03's `toEqual(snapshot)` tautologies FAILs, since those *"read to a future maintainer as the inertness proof"*; (c) the substance is proven by tests that **do** exercise production — `portfolio-2-alignment.handler.spec.ts:699-745` and `:325-494` show each narrow save calls `create` exactly once with exactly its own rows at its own role and touches neither the other's table nor the section-wide save, so the effects are disjoint and order-independence follows.
+
+> **The condition, honoured in `tasks.md`:** that check is ticked **only with an explicit MODELLED qualifier**. Recording it as an ordinary behavioural green would launder an assertion that cannot fail for a production defect — *the exact class this spec has already paid two rework rounds to remove*. Behavioural closure, if the owner wants it, is a **handler-seam composition test** (both narrow saves, both orders, real handler instances plus the existing `buildReconcilerFake`) — **a task-scope amendment, not rework.**
+
+**Inertness — not inconclusive.** Every sibling-row assertion the Disqualifies clause demands exists and is **`is_active`-valued, not presence-only**: `result_sdgs` (length + `every`), ALIGNMENT `result_contracts` (`every`), `result_strategic_objectives` (length + `every`), the new `result_levers` (content + `every`), plus `alignmentOperations.save` asserted **not** called (R-RES-008 AC.4 / DD-1). Double fidelity is what makes it falsifiable: `mockResultAlignmentOperationsService.save` performs the **real destructive reconciliation** it stands in for, so a production path reaching the section-wide save flips every sibling row inactive and reddens the case *even if the negative assertion were deleted* — the opposite of T-03 attempt 1's inert doubles.
+
+#### `Not Done / Assumptions` — all three adjudicated
+
+| # | Item | Ruling |
+| --- | --- | --- |
+| 1 | Full-package lint skipped; file-scoped `eslint --fix` run instead | **DISCHARGED.** T-06's *Verification* names only the two `npm test` commands; **T-07 owns the full-package lint gate.** Root `CLAUDE.md` §4.3 warns the script mutates the tree, so scoping to the one touched file was the lower-blast-radius choice. **Leader confirmed `git status` shows only `results.service.spec.ts`.** |
+| 2 | AC.3 proven by invoking the narrow-save mocks in reverse | **Ruled once, above** — modelled, with the recording obligation. Not a second finding |
+| 3 | AC.4 discharged by existing single-field tests rather than a new test | **VERIFIED TRUE at source, both directions** — levers-present/SO-absent asserts the write **and** `missing_fields).toEqual([])`; SO-present/levers-absent does the same and runs against *current* production, so a spurious levers entry would redden it. `baseProcessedResult` defaults **neither** field, so neither fixture is contaminated, and both use content equality. **One correction to the Implementer's wording, recorded rather than propagated: the SO-present direction is carried by the _predecessor's_ shipped test, not by this spec's T-05.** Not a coverage gap |
+
+#### Budget — a naming ambiguity of the Leader's, clarified
+
+Lens G flagged the two budget documents as disagreeing on T-06's allowance (`tasks.md` ~580 vs `execution.md` ~700). **They do not disagree — they are different quantities, and the §13.2 re-baseline did not label them clearly enough:**
+
+- **~580 is T-06's re-baselined *estimate*.**
+- **~700 is T-06's re-armed *tripwire threshold*.**
+
+**Delivered 610 — 5% over estimate, comfortably under the threshold. No tripwire fires.** Recorded so T-07's actuals comparison in the Done Definition cannot pick whichever number is convenient.
+
+#### Running totals
+
+Production LOC **285** (unchanged — T-06 added none) of the ~300 armed threshold. Rework rounds **2 of 4**. Cumulative delivered **2,423** against the §13.2 re-baselined **~2,404** — **within 1%**, four tasks after the correction.
+
+#### ADVISORY (recorded, never gating; none may mint or widen a task)
+
+- **RISK — RB-9, the one worth acting on.** The `2027 → PORTFOLIO_1` fixture entry is the suite's only defence against a hardcoded year-threshold router, and it looks like a typo. Undocumented, it will not survive contact with a maintainer. One comment line.
+- **TRACEABILITY — two test titles overclaim, same family as T-03's AC.1 title advisory.** (a) A title claims each item holds its ids *"at the role its own portfolio dictates"*, but **no role is observable at this seam** — the double records none; the real chain is the portfolio-argument pin here plus T-03's role assertions. (b) A title cites `R-RES-008 AC.1`, but AC.1 is scoped to *"a payload **without** the field"* while that fixture carries `primary_levers: [11, 12]`; AC.1's literal case is discharged by T-05's absent/`[]`/`null` zero-interaction `it.each`. **Substance is covered in both; only the pointers are wrong.**
+- **RELIABILITY.** `of('result_contracts').every(...)` has no length pin, and `every` is green on an empty array — non-vacuous today only because the `createResult` double pushes the row unconditionally. One line removes the dependency on that incidental fact.
+- **RELIABILITY.** The source-text test counts the creation and rollback-handle assignments but does not exclude a **later rebinding**. A count assertion on `/newResult\s*=/` and `/resultExists\s*=/` closes the one hole a future update path could slip through.
+- **READABILITY.** The source-text test couples to production identifier names and formatting — bounded to one method and failing loud, but worth a comment naming `results.service.ts:899` / `:1027` as its anchors so a future renamer understands why it broke.
+- **READABILITY.** `LeverRow.is_active` is written on every row in the routing describe and never read there — dead at that seam (inertness is where it is asserted).
+
+#### Final verification result
+
+`npm test -- --silent src/domain/entities/results/results.service.spec.ts` → **138/138**. Blast radius (**KZ-003**, both commands run as the task requires): `npm test -- --silent src/domain/entities/results` → **10 suites / 314 tests green**. Full-package lint and the coverage figure remain T-07's gate (DC-6).
