@@ -823,3 +823,22 @@ Both findings closed. Re-review was **one** Reviewer, not a lens fan-out: the ch
 **Automated gate CLOSED:** `npm test -- --silent` → **328 suites / 2,320 tests**; `npm run test:cov` → **84.23% stmts · 75.55% branch · 85.38% funcs · 84.25% lines** (floor 60%); `npm run lint -- --quiet` → exit 0, zero mutations. **Manual half BLOCKED** — five items owed to the owner.
 
 **Budget final:** total delivered **2,423** vs the §13.2 re-baselined **~2,404** (**+0.8%**). **Production LOC 285 of the ~300 armed threshold — the binding scope-growth signal, and it did not breach.** Rework rounds **3 of 4**. No §13.1/§13.2 threshold fired at close.
+
+---
+
+## RB-3 / RK-6 — migration `1783029013035`: **CLOSED for `alliancereportingdb`**, owner-run 2026-09-04
+
+**Evidence supplied by the owner** (TypeORM against `alliancereportingdb`):
+
+```
+query: SELECT VERSION() AS `version`
+query: SELECT * FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE `TABLE_SCHEMA` = 'alliancereportingdb' AND `TABLE_NAME` = 'migrations'
+query: SELECT * FROM `alliancereportingdb`.`migrations` `migrations` ORDER BY `id` DESC
+No migrations are pending
+```
+
+**Why this closes it, stated as an argument rather than asserted.** *"No migrations are pending"* means every migration **file present in the repository** has a corresponding row in that database's `migrations` table. The Leader confirmed the premise the inference rests on: `src/db/migrations/1783029013035-UpdateDeleteAndVersionSp.ts` **is** in the repository (one of 306), and migrations with **later** timestamps (`1786043523207`, `1786044600000`, `1786045516418`) are also not pending. Had `1783029013035` not been applied, it would necessarily have been reported as pending. **It is applied in `alliancereportingdb`.**
+
+This also retires the §11 rollout hazard **for that environment**: the compensating delete in the `catch` cannot hit FK 1451, because the `SP_versioning` redefinition the constraint depends on is in place. Cross-links to Lens D's independent finding during T-05, which read that migration's body and confirmed it copies `result_levers` into an approved item's snapshot (lines 382-410) — **content and deployment are now both established, by two separate checks.** They are different claims and were deliberately kept apart until each had its own evidence.
+
+**Still open, and deliberately not closed by this.** RB-3's wording is *"applied in **every target environment**"*. This evidence covers **one** database. If Production is a separate schema, it needs the same check before rollout. **Question put to the owner: is `alliancereportingdb` Dev, Production, or shared?**
