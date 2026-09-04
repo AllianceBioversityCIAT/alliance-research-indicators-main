@@ -2,7 +2,7 @@
 
 - **Module:** results
 - **Spec id:** 2026-09-ai-formalize-primary-levers
-- **Status:** in-progress
+- **Status:** in-progress — **T-03 blocked on a Pivot** (owner decision pending)
 - **Owner:** David Felipe Casañas Hernández
 - **Depth:** Standard
 - **Linked requirements:** `./requirements.md` · **Linked design:** `./design.md` · **Proposal:** `./proposal.md`
@@ -139,7 +139,7 @@ No cycles.
   4. For DD-10: a payload omitting `research_areas`, run against the **unmodified** handler, to confirm the guard's test can fail.
 - **Disqualifies:** a `ResultLeversService` double that does not record `lever_role_id` **and** `is_primary` per row — then DC-1 and DC-2 are untestable however green the suite *(KZ-001)*. Also: asserting that `create` **was called** rather than asserting its arguments. A call proves delegation, not a row at role 1 with `is_primary = true`; the role and the flag are exactly what can be wrong while the call is right.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
-- **Estimated effort:** L · **Status:** todo
+- **Estimated effort:** L · **Status:** `[~]` **BLOCKED — Pivot** (attempt 1 delivered, uncommitted). `R-RES-007` AC.2 / check 8 contradict falsifying input #3: `BaseServiceSimple.create` deactivates same-role rows absent from the persisted set, so the survival assertion cannot be green on the mandated implementation. Awaiting owner decision A/B/C; see `execution.md` → *Pivot Record: T-03*
 
 ---
 

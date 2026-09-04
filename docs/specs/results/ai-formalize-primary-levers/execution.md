@@ -154,3 +154,62 @@ None. No rework, no environment blocker.
 #### Final verification result
 
 `npm test -- --silent src/domain/tools/clarisa/entities/clarisa-levers` -> **44/44 green**, lint clean, tree free of `--fix` collateral. Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).
+
+### T-03 — Add the narrow levers save to both alignment handlers
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **`[~]` PARKED — Pivot Protocol triggered.** Not a FAIL, not a HALT: no rework attempt was consumed and no Reviewer was spawned |
+| **Date** | 2026-09-04 |
+| **Implementer attempts** | 1 (implementation delivered; the blocker is in the spec, not the diff) |
+| **Effort** | `xhigh` (Leader-raised from the task's `L`, per the owner's Phase-gate decision) |
+| **Review mode** | Parallel lens reviewers were selected but **deliberately not spawned** — see *Why no review ran* below |
+| **Skills assigned** | `nestjs-expert`, `tdd`, `error-handling-patterns` (as recommended; no deviation) |
+
+**Work delivered in the tree (uncommitted, 6 files, +676 / -11):** `LeversSaveReport { saved, discarded }` on the interface with **no `supported` flag** (DD-8 — the shipped exemplar carries one, and the Leader's brief flagged copying it as the spec violation it would be); `saveLevers` implemented in **both** handlers — portfolio 1 at `LeverRolesEnum.ALIGNMENT (1)` with `is_primary: true` explicit on every row and `is_primary` in `create`'s `otherAttributes` (DD-5), portfolio 2 at `RESEARCH_AREAS_ALIGNMENT (3)` without ever constructing a `research_areas` payload (DD-1/DD-9); zero-survivor early return before `create` is reached; bigint/string id normalization via `Number(...)` on both sides of every comparison, with a string-id (`'11'`) double in each spec so T-02's forward-pointed defect is falsifiable; DD-10 guard applied (Q-6 accepted). Verification reported green: `npm test -- --silent src/domain/entities/results/portfolio-handlers` -> **5 suites / 56 tests passed**; lint clean; `npm run build` clean (module wiring changed).
+
+Three of the four mandated falsifying probes were staged and observed red, then reverted: (1) omitting `is_primary` reddened 5 tests; (2) the two-part predicate reddened T-02's foreign-portfolio test at its own layer; (4) reverting the DD-10 guard reddened the two new DD-10 tests. **Probe (3) is the blocker below.**
+
+---
+
+## Pivot Record: T-03
+
+**Trigger.** The Implementer's `Not Done / Assumptions` field was non-empty — which under `/akili-execute` Step 2.3.0 alone bars the task from `[x]` — and its content is evidence that **the approved spec is internally contradictory**, not that the implementation fell short. Per the Pivot Protocol the loop was stopped immediately rather than spending rework attempts on a spec defect.
+
+**The contradiction.** Two approved clauses describe the *same* implementation and demand opposite outcomes:
+
+| Clause | Demands of the kept implementation |
+| --- | --- |
+| `tasks.md` T-03 acceptance check 8 / `requirements.md` **R-RES-007 AC.2** | with a double reporting a pre-existing contributor row (role 1, `is_primary = false`), that row is **still active** afterwards -> the assertion must be **GREEN** |
+| `tasks.md` T-03 **falsifying input #3** | "a double reporting a pre-existing contributor row, **against an implementation that hands `create` only the primary rows** -> the inertness assertion **must go red**" |
+
+The kept implementation *is* "an implementation that hands `create` only the primary rows" — the spec's own Implementation notes mandate exactly that. So the falsifier demands red and the acceptance check demands green, on the same code, with the same double.
+
+**Independently verified by the Leader at source** (not accepted on the worker's report). `BaseServiceSimple.create` — `src/domain/shared/global-dto/base-service.ts:174-189`:
+
+```ts
+const updateWhere = {
+  [this.resultKey]: resultId,
+  [this.primaryKey]: Not(In(persistId)),
+  ...(dataRole ? { [this.roleKey]: dataRole } : {}),
+};
+await entityManager.update(updateWhere, { is_active: false });
+```
+
+Every row for `(result_id, role)` whose primary key is absent from the newly persisted set is deactivated. A pre-existing contributor lever at role 1 is therefore **deactivated by construction** whenever portfolio 1 writes primaries at that same role. The Implementer reached this by building a throwaway stateful fake replicating `create`'s real semantics (role-scoped `existData` + `Not(In(persistId))`), observing the contributor row flip to `is_active = false`, then deleting the fake — it was never committed. The Leader confirmed the same conclusion by reading the primitive directly.
+
+**Why this is a spec defect and not a product defect.** DD-6's construction argument still holds on every reachable path: `formalizeResult` always *creates* the result it formalizes, so no lever row can pre-exist (`results.service.ts:879-901`; this is also what closed Q-2 as moot and downgraded RK-2 to Low on 2026-09-04). The code is correct for reality. What is wrong is **AC.2's wording**, which asserts a positive survival guarantee the handler's code cannot deliver and DD-6 never claimed — DD-6 says "satisfied by construction... proven anyway", and the acceptance check silently upgraded that into "proven by the handler."
+
+**Why no review ran.** A Reviewer handed self-contradictory acceptance criteria produces an unreliable verdict in **both** directions: a FAIL would be indistinguishable from a real implementation defect and would burn a rework attempt on unfixable scope, and a PASS would launder an AC that the code demonstrably does not satisfy. The audit is deferred until the criteria are coherent; it is owed on whatever implementation the decision below selects.
+
+**Alternatives put to the owner.**
+
+| # | Option | Cost | Consequence |
+| --- | --- | --- | --- |
+| **A** | **Amend `R-RES-007` AC.2 + T-03 check 8 + falsifying input #3** to state what is true and provable: the handler contributes no additional risk (never reads, never merges, hands `create` only validated survivors), and inertness holds *by unreachability* per DD-6 — not by handler code | Doc-only; the delivered diff stands and goes straight to review | Honest and consistent with DD-6 and RK-2. DC-2 stays closed by construction, resting on `formalizeResult` never gaining an update path — the incidental fact RB-2 already flags |
+| **B** | **Make AC.2 literally true in code** — portfolio 1 reads pre-existing role-1 rows and passes their ids as `notDeleteIds` (`create`'s 8th parameter) so reconciliation cannot touch them. **Shipped precedent exists**: `result-actors.service.ts:62-84` does exactly this | New read + re-implementation of portfolio 1, new tests, amends **DD-6** and arguably DD-3 | Closes DC-2 defensively rather than incidentally — the wipe becomes impossible even if `formalizeResult` later gains an update path. Widens T-03 beyond the approved design |
+| **C** | Drop AC.2's positive-survival clause entirely and rely on T-06's inertness suite | Doc-only, smallest | Loses the clause without replacing it. **Not recommended** — R-RES-007 exists precisely to make this falsifiable, and this is the option that quietly removes the guarantee |
+
+**Leader recommendation: A.** It makes the spec say what the system actually guarantees, which is the point of the requirement, and it leaves RB-2 visible as the open risk it genuinely is. B is a real improvement in robustness and has shipped precedent, but it is a design change and belongs to the owner, not to an execution loop — and adopting it silently would be exactly the scope growth the methodology forbids.
+
+**Blocked pending owner approval.** No spec document has been amended yet: which amendment to write is determined by the decision. Per the protocol, the correction will then be closed with the **two-direction sweep** — forward for every surviving statement of the superseded guarantee, backward for documents citing the amended sections (including `tasks.md` §4's coverage rows for `R-RES-007` and, under option B, DD-6 and DD-3).
