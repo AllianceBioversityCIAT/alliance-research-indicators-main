@@ -19,18 +19,18 @@
 >
 > **Round 3 judged this revision and the budget is now spent.** Terminal state: **ESCALATED**.
 >
-> ## ⚠️ DO NOT IMPLEMENT `DD-3`, `DD-10`, OR `DD-8`'s SITE-2 GATE AS WRITTEN
+> ## ⚠️ DO NOT IMPLEMENT `DD-8`'s SITE-2 GATE — `DD-3` / `DD-10` are now RESOLVED
 >
-> Round 3's judges **contradicted each other**, and the orchestrator's own verification found the
-> dissenting judge correct on all three counts. Three severe defects are **VERIFIED AND UNFIXED** —
-> the fix budget was exhausted before they were found. They are recorded in
-> [`judgment.md`](./judgment.md) round 3 and require a user decision before any task touches them:
+> Round 3's judges **contradicted each other**; orchestrator verification found the dissenting judge
+> correct on all three. **Two are now closed** — `P-1` by a corrected per-control gate, `P-2` by a
+> browser measurement the user supplied on 2026-09-04 that no judge and no test in this repo could
+> produce. One remains open. Full record in [`judgment.md`](./judgment.md) round 3.
 >
 > | ID | Verified fact | What breaks if implemented as written |
 > | --- | --- | --- |
-> | **P-1** | `p-inputNumber` declares `style` as an `@Input` (`primeng-inputnumber.mjs:1677`) and **never applies it** — `0` occurrences of `styleMap`, `0` of `this.style`; host bindings are `attribute`×2 + `classMap` only. | `DD-3`'s setter-spy gate **cannot fire** for rules 3, 5, 9, 10 — the four fields it was written for. The implementer would read the silence as their own bug. |
-> | **P-2** | Therefore the `[style]` binding at `input.component.html:55` **is a no-op and has never painted anything.** The Tailwind class at `:49` is the only candidate mechanism, and `.p-inputnumber` carries no competing border rule (`primeng-inputnumber.mjs:15-18`), so it is not inert. | `DD-10` orders `:49` **deleted** on a premise now proven false. That would remove the **only** amber border on every `type="number"` field across all 18 consumers — precisely the `DC-1` outcome this spec exists to prevent. **Needs a browser measurement, which no judge and no test in this repo can supply.** |
-> | **P-3** | `onKnownToggle` clears nothing by explicit design (`innovation-use-organization-item.component.ts:130-133`), the inactive path's controls are not rendered (`@if`/`@else` at `.html:36`/`:79`), and no select sets `[showClear]`. | `DD-8`'s "either direction" site-2 gate produces a **permanently unsaveable row** whose only escape is deleting it — destroying more data than the block protects. The failure `DD-8` exists to close, inverted. |
+> | **P-1** | ✅ **RESOLVED 2026-09-04.** `p-inputNumber` declares `style` as an `@Input` (`primeng-inputnumber.mjs:1677`) and never applies it, so the setter spy cannot fire for rules 3, 5, 9, 10. | `DD-3` now specifies a **per-control gate**: setter spy for `p-select`/`p-inputtext`, **class assertion** for `p-inputNumber`. |
+> | **P-2** | ✅ **RESOLVED 2026-09-04 by browser evidence.** The user supplied a screenshot of an `app-input type="number"` rendering the amber border; with `:55` proven a no-op and no global CSS in play, **`:49` is the live mechanism** — the opposite of what revision 3 asserted. | `DD-10` **inverted**: `:49` is converted (not deleted) and the dead `:55` is deleted. Revision 3 would have removed the only amber border on every numeric field app-wide. |
+> | **P-3** | ⚠️ **STILL OPEN.** `onKnownToggle` clears nothing by explicit design (`innovation-use-organization-item.component.ts:130-133`), the inactive path's controls are not rendered (`@if`/`@else` at `.html:36`/`:79`), and no select sets `[showClear]`. | `DD-8`'s "either direction" site-2 gate produces a **permanently unsaveable row** whose only escape is deleting it. **Do not implement this gate until it is redesigned.** |
 >
 > `DD-8`'s site-1 gate, `DD-0`, `DD-5`, `DD-5b`, `DD-6`, `DD-7`, `DD-9` and the rule table are
 > unaffected by these three and were confirmed closed by both judges.
@@ -136,7 +136,7 @@ not rendered and therefore cannot be fixed.
 | 8 | org row | `sub_institution_type_id` | unknown mode **and** the type is **active, root, and has children** (`C-1`) | — | card | see `DD-5` |
 | 8b | org row | `sub_institution_type_id` | whenever set on the unknown path | **must belong to the chosen type** (`C-11`) | card | join `parent_code = institution_type_id` |
 | 9 | org row | `organization_count` | unknown mode | filled **and > 0** | `app-input` | `IS NOT NULL AND > 0` |
-| 10 | measure row | `quantification_number` | always | filled (`0` valid, no positivity) | `app-input` | `IS NOT NULL` |
+| 10 | measure row | `quantification_number` | always | filled **and `≠ 0`** — negatives valid (`≠ 0`, **not** `> 0`) | `app-input` | `IS NOT NULL AND <> 0` |
 | 11 | measure row | `unit` | always | **non-blank** (`C-2`) | `app-input` | `valid_text(unit)` |
 | 12 | measure row | `description` | **never** | — | — | — |
 | 13 | result | actor row count | **never** (`R-IUR-011`) | — | — | *clause deleted* |
@@ -190,13 +190,14 @@ an optional one.
 innovation-use count fields passes today — so the defect is **latent at these sites, not active**.
 Revision 1's truncated quotation dropped that guard.
 
-**Decision.** Add `requiredMode: 'off' | 'filled' | 'positive'`, defaulting to `'off'`.
+**Decision.** Add `requiredMode: 'off' | 'filled' | 'positive' | 'nonzero'`, defaulting to `'off'`.
 
 | Mode | Invalid when | Message |
 | --- | --- | --- |
 | `'off'` | *(existing `isRequired` / `validateEmpty` logic, untouched)* | existing |
 | `'filled'` | `null`, `undefined`, `''`, **or whitespace-only for string values** (`C-2`) | `This field is required` |
 | `'positive'` | not filled → required message; filled and `≤ 0` → positivity message | `This field is required` / `Must be greater than 0` |
+| `'nonzero'` | not filled → required message; filled and `= 0` → zero message. **Negatives are valid.** | `This field is required` / `Must be different from 0` |
 
 Asterisk renders when `isRequired || requiredMode !== 'off'`.
 
@@ -212,6 +213,7 @@ it in would hide a data-quality fix inside a UI-consistency change (`OQ-3`).
 ### DD-2 — Positivity placement
 
 - **Single-field positivity** (rules 5, 9) → `requiredMode="positive"`; the field owns border + message.
+- **Non-zero** (rule 10, measures) → `requiredMode="nonzero"`. Distinct from `'positive'` **by user ruling 2026-09-04**: a measure may legitimately be negative, so the rule is `≠ 0`, never `> 0`. `numberAllowsZero` on `quantification-item` (`DD-4`) is therefore renamed/retired — Innovation Use now passes `'nonzero'` and OICR keeps its existing falsy `isRequired`.
 - **Cross-field positivity** (rule 4) → the **actor card** renders one message beneath the four fields, **no** border on any of them, driven by the existing `total()`.
 
 When all four are filled and sum to `0`, no field may render `This field is required` — all four
@@ -229,15 +231,18 @@ self-defeating: `DD-10` tokenizes exactly that literal, and `cssstyle@2.3.0` dro
 carrying `var()`. The two decisions cancelled each other, on the primary automatable gate for
 `R-IUR-003`.
 
-**Resolution — neither decision is dropped.** Assert through the **setter spy** the codebase already
-uses, which is value-agnostic and survives tokenization:
-`jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set')`, then assert the captured call
-(`innovation-use-actor-item.component.spec.ts:291`, `:298` — it captures
-`'2px solid var(--ac-warning-1)'` today). Never read `element.style.border`.
+**Resolution — the gate differs by control type (corrected by `P-1`/`P-2`).**
 
-This also sidesteps an unmeasured question: the number control's literal carries `!important`
-**inside** the shorthand (`input.component.html:55`), and whether `cssstyle` accepts that form was
-never verified. The setter spy does not care.
+| Control | Mechanism that renders | Automated assertion |
+| --- | --- | --- |
+| `p-select`, `p-inputtext` (cards, rules 1, 2, 6, 7, 8) | `[style]` object binding, applied to the DOM | **Setter spy** — `jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set')`, then assert the captured call. Value-agnostic, survives tokenization; in-tree exemplar at `innovation-use-actor-item.component.spec.ts:291`, `:298` |
+| `p-inputNumber` via `app-input` (rules 3, 5, 9, 10) | **the CLASS at `input.component.html:49`** — the `[style]` at `:55` is never applied | **Assert the class**, not the style. The setter spy **cannot fire here** and an implementer who used it would read the silence as their own bug (`P-1`) |
+
+Never read `element.style.border`: `cssstyle@2.3.0` drops a shorthand carrying `var()`.
+
+**What neither assertion proves is paint** (`DC-7`) — but `P-2` established empirically, from a real
+browser, that the class at `:49` *does* paint, so a class assertion is now backed by a measurement
+rather than by inference. The human browser check remains the gate for `DC-1`.
 
 It still does not prove **paint** — record that limit next to it (`DC-7`); the human browser check
 remains the gate for `DC-1`.
@@ -450,14 +455,36 @@ a user decision, not an implementer's.
 promises "the established amber treatment" — defined in `requirements.md` as
 `var(--ac-warning-1)` + `fs-[14]`. The root guide makes a hex literal in a component a FAIL.
 
-**There are five hex sites, not four (`N-3`).** The fifth is `input.component.html:49`:
-`'border-2 rounded-[8px] border-[#E69F00]'` — a hex literal **and** a Tailwind `border-*` utility on
-a PrimeNG control, i.e. exactly the inert-border pattern `DD-3` forbids. It paints nothing today and
-has never painted. It is **deleted**, not converted; the `[style]` binding at `:55` is what actually
-renders that border.
+**INVERTED 2026-09-04 by browser evidence (`P-2`).** Revision 3 said `input.component.html:49` was
+inert and ordered it **deleted**, with `:55` named as the real renderer. **That is backwards, and
+deleting `:49` would have removed the only amber border on every numeric field in the application.**
 
-**Decision.** Convert the four live literals to `var(--ac-warning-1)`, delete the dead utility at
-`:49`, and convert `text-sm` to `fs-[14]`. `--ac-warning-1` **is** `#e69f00` (`colors.scss:48`,
+The user supplied a screenshot of Capacity sharing's `Total participants?` — an `app-input` with
+`type="number"` and `[isRequired]="true"` (`capacity-sharing.component.html:92-94`) — **rendering the
+amber border**. The chain is then closed:
+
+| Step | Evidence |
+| --- | --- |
+| The number branch has exactly two candidates | `:49` (Tailwind class) and `:55` (`[style]`) |
+| `:55` is a **no-op** | `p-inputNumber` declares `style` as an `@Input` (`primeng-inputnumber.mjs:1677`) and never applies it — `0` `styleMap`, `0` `this.style`, host bindings are `attribute`×2 + `classMap` |
+| No global CSS paints invalid inputs amber | `grep` over `src/styles/*.scss` returns only the token definitions |
+| The border **does** paint | the user's screenshot |
+| ⇒ | **`:49` is the live mechanism** |
+
+`DD-3`'s inertness argument never applied here: it is scoped to elements PrimeNG styles **unlayered**,
+and `.p-inputnumber` carries no competing border rule at all (`primeng-inputnumber.mjs:15-18` is
+`display:inline-flex; position:relative`). With nothing to lose the cascade to, the utility wins.
+
+**Corrected decision — the two lines swap fates:**
+
+| Line | Revision 3 said | **Now** |
+| --- | --- | --- |
+| `:49` (`border-2 rounded-[8px] border-[#E69F00]`) | delete (inert) | **CONVERT** the hex to the token, keep the utility — it is what renders |
+| `:55` (`[style]` with `!important`) | keep, it renders | **DELETE** — provably never applied, dead since it was written |
+
+**Decision.** Convert the live literals — including `:49` — to `var(--ac-warning-1)`, **delete the
+dead `[style]` binding at `:55`**, and convert `text-sm` to `fs-[14]`. A **sixth** literal exists at
+`:59` (`text-[#8D9299]`, helper text, a plain `div` — live) and is converted too (`P-4`). `--ac-warning-1` **is** `#e69f00` (`colors.scss:48`,
 `:156`), so the colour change is **zero-delta**.
 
 **The `text-sm` → `fs-[14]` half is NOT zero-delta (`N-8`)** and the earlier blanket claim was wrong:

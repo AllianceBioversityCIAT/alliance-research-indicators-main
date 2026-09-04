@@ -350,7 +350,7 @@ A measure row SHALL require `Number` and `Unit`. `Comments` SHALL remain optiona
 - WHEN both are filled and `Comments` is empty
 - THEN the row is valid and `Comments` renders **no** `*` and **no** message
 - BUT it must NOT change the OICR measure card, which requires all three fields today and must keep doing so (`DC-5`)
-- AND IT MUST accept `0` as a valid `Number` — this field is a signed decimal by `changes/measure-number-signed-decimal`, and zero is a legitimate measurement
+- AND IT MUST **reject `0`** as a `Number` while **accepting negative values**. The rule is `≠ 0`, **not** `> 0`: this field is a signed decimal by `changes/measure-number-signed-decimal`, so a negative measure is legitimate and a zero measure is not. *(User correction, 2026-09-04 — this reverses the earlier AC.4, which had `0` valid because no rule had been stated.)*
 - AND IT MUST reject a **whitespace-only** `Unit`. The server's `valid_text` strips whitespace before measuring length, so `'   '` is invalid in SQL; the client does not trim anywhere today. Client and server MUST apply the same trimmed test, or a row renders complete, saves, and is unsubmittable with no message (`DC-3`). *(Added at Judgment Day round 1, finding `C-2`.)*
 
 **Acceptance criteria**
@@ -358,7 +358,7 @@ A measure row SHALL require `Number` and `Unit`. `Comments` SHALL remain optiona
 - [ ] AC.1 — `Number` and `Unit` carry a red `*`; `Comments` does not.
 - [ ] AC.2 — Either empty ⇒ amber treatment; green check `false`.
 - [ ] AC.3 — Both filled, `Comments` empty ⇒ valid.
-- [ ] AC.4 — `Number` = `0` ⇒ valid (no positivity rule here; the user did not ask for one).
+- [ ] AC.4 — `Number` = `0` ⇒ **invalid**, with a message distinguishable from the required message; `Number` = `-5` ⇒ **valid**. Falsifying inputs: `0` must redden, `-5` must not. *(Corrected by user ruling 2026-09-04 — the previous AC had `0` valid.)*
 - [ ] AC.5 — **OICR's measure card renders all three asterisks and all three required messages, unchanged**, for **both** OICR call sites (`oicr-details.component.html:60` "Actual count" and `:81` "EXTRAPOLATED ESTIMATES" — three call sites exist across two files, not two). Falsifying input for `DC-5`. **This CANNOT be proven by OICR's own suite**, which stubs the card with an empty-template `FakeQuantificationItemComponent` (`oicr-details.component.spec.ts:872-880`) and is structurally blind to every property this AC names; it must be proven in `quantification-item.component.spec.ts` against the default (no-inputs-passed) configuration. *(Corrected at Judgment Day round 1, findings `C-3` and `S-7`.)*
 - [ ] AC.6 — Whitespace-only `Unit` ⇒ amber treatment; green check `false`. Falsifying input: `'   '`.
 - [ ] AC.7 — The same holds for `Specify other` on an actor row of type `5` (`actor_type_custom_name`). It is owned by the actor card, not `app-input`, so it needs its **own** trimmed check — `requiredMode` will never reach it. *(Added at Judgment Day round 2, `N-11`.)*

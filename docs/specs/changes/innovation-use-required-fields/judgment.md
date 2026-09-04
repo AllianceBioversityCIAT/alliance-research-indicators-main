@@ -224,3 +224,65 @@ including inside the corrections written to close them.
 
 **Blocking before `/akili-execute`:** `P-1`, `P-2`, `P-3`, `C-7`'s open half, `OQ-4`, `OQ-6`.
 `P-2` needs a **browser measurement**, not another review round.
+
+---
+
+# Post-judgment — user evidence, 2026-09-04
+
+Two changes arrived from the user after the review budget closed. Neither is a self-correction round;
+both are new external input, which legitimately reopens a frozen target.
+
+## `P-2` and `P-1` — CLOSED by browser evidence
+
+The user supplied a screenshot of **Capacity sharing → `Total participants?`** — an `app-input` with
+`type="number"` and `[isRequired]="true"` (`capacity-sharing.component.html:92-94`) — **rendering the
+amber border**. This is the browser measurement the round-3 receipt named as the one thing no judge
+and no test in this repo could supply.
+
+| Step | Evidence | Verdict |
+| --- | --- | --- |
+| The number branch has two border candidates | `input.component.html:49` (Tailwind class) and `:55` (`[style]`) | — |
+| `:55` is never applied | `p-inputNumber` declares `style` as `@Input` (`primeng-inputnumber.mjs:1677`); `0` `styleMap`, `0` `this.style`; host bindings `attribute`×2 + `classMap` | **no-op** |
+| No global CSS paints invalid inputs amber | `grep` over `src/styles/*.scss` → only token definitions | — |
+| The border **does** paint | the user's screenshot | — |
+| **⇒ `:49` is the live mechanism** | | **`P-2` confirmed; revision 3 was backwards** |
+
+**Consequence.** `DD-10` ordered `:49` deleted. That would have removed the **only** amber border on
+every `type="number"` field in the application — `DC-1`, caused by the decision written to prevent
+`DC-1`. `DD-10` is **inverted**: `:49` is converted to the token, and the dead `:55` is deleted.
+
+`P-1` closes with it: the assertion gate is now **per control** — setter spy for
+`p-select`/`p-inputtext`, **class assertion** for `p-inputNumber`, whose `[style]` never reaches the
+DOM.
+
+**Judge B was right on both, against Judge A, and against the author.** The distinguishing question
+was not *"can the spy observe a DOM write?"* but *"is there a DOM write?"* — `KZ-017` again, now
+settled by measurement instead of argument.
+
+## Requirement change — measure `Number` must be `≠ 0`, not `> 0`
+
+User ruling: the measures `Number` is a **signed decimal** (per archived
+`changes/measure-number-signed-decimal`), so a **negative measure is legitimate** and the rule is
+`≠ 0` — never `> 0`.
+
+| | Before | After |
+| --- | --- | --- |
+| `R-IUR-010` AC.4 | `0` ⇒ **valid** ("no positivity rule; the user did not ask for one") | `0` ⇒ **invalid**; `-5` ⇒ **valid** |
+| Rule 10 SQL | `IS NOT NULL` | `IS NOT NULL AND <> 0` |
+| `requiredMode` | `'off' \| 'filled' \| 'positive'` | **+ `'nonzero'`** — required message, or `Must be different from 0` |
+
+`'nonzero'` is deliberately distinct from `'positive'`: rules 5 and 9 (actor and organization counts)
+stay `> 0`, because a count of people or organizations cannot be negative. Only rule 10 is `≠ 0`.
+
+## Status after user evidence
+
+| Item | State |
+| --- | --- |
+| `P-1`, `P-2` | ✅ closed |
+| **`P-3`** | ⚠️ **open** — `DD-8`'s site-2 gate traps the user; needs redesign, most likely by clearing the inactive path on toggle exactly as the actor card already does |
+| `C-7` open half | ⚠️ open — `R-IUR-014` still has no site-2 scenario or AC |
+| `OQ-4`, `OQ-6` | ⚠️ open — user decisions |
+| `P-5`, `P-6`, `P-7`, `P-8` | open, non-blocking bookkeeping |
+
+**Terminal state remains ESCALATED** — but the blocking set is down from six items to four, and the
+one that needed a measurement no longer does.
