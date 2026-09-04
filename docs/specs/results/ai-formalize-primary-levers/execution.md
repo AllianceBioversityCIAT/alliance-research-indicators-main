@@ -97,3 +97,60 @@ The T-01 advisory was escalated and the owner approved the correction. Applied w
 - **Backward** (documents citing §1 Context / restating the symptom): no other restatement. `design.md:262` matched on "never reaches" but is DD-1's unrelated title.
 
 Both sites now read: the formalizer **rejects** such a payload with `400 property primary_levers should not exist`, because `forbidNonWhitelisted: true` is set alongside `whitelist: true`. No requirement, AC, design decision or task changed — the end-user outcome (ids never persisted) and the fix are identical. Committed separately from task work.
+
+### T-02 — Add an id-filtered, portfolio-scoped, active-only lever finder
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** — first attempt, no rework |
+| **Date** | 2026-09-04 |
+| **Implementer attempts** | 1 |
+| **Review mode** | Lens checklist (effort `medium`) |
+| **Requirements covered** | R-RES-005 — the predicate producing AC.1–AC.3 (the *reporting* half of both scenarios stays with T-05); design **DD-4** |
+| **Skills assigned** | `nestjs-expert` (as recommended; no deviation) |
+| **Effort** | `medium` |
+
+#### Attempt 1
+
+- **Files changed:**
+  - `.../clarisa/entities/clarisa-levers/clarisa-levers.service.ts` — added `findActiveByIdsForPortfolio(ids, portfolioId)`; `In` added to the typeorm import.
+  - `.../clarisa-levers.service.spec.ts` — new describe block, four cases.
+  - `git diff --stat`: 2 files, +102 / -1. **Zero deletion lines in the spec file** — no existing test was modified.
+- **The predicate** (DD-4's three discard causes in one query):
+  ```ts
+  if (!ids?.length) return [];            // guard sits ABOVE the query — no IN () is ever issued
+  return this.mainRepo.find({ where: { id: In(ids), portfolio_id: portfolioId, is_active: true } });
+  ```
+- **Verification:** `npm test -- --silent src/domain/tools/clarisa/entities/clarisa-levers` from `server/researchindicators` -> `Test Suites: 3 passed, 3 total | Tests: 44 passed, 44 total` (up from 40). `npm run lint -- --quiet` clean; its `--fix` made one cosmetic reformat, re-confirmed green after. **`git status` re-checked: only the two intended files were mutated, no `--fix` collateral.**
+- **Falsifying probe (actually run red).** A two-part predicate was staged — `portfolio_id` dropped, leaving `id: In(ids), is_active: true`. The foreign-portfolio case went **red**: `find` was called with a `where` missing `portfolio_id: 2`, so id 4 (active, portfolio-1) was no longer excluded. Reverted and confirmed byte-identical by `diff`; all 44 green.
+- **Reviewer verdict:** `STATUS: PASS`.
+- **Reviewer summary:** the finder mirrors the shipped `StrategicObjectivesService` equivalent and expresses DD-4's three-part predicate in one `find` with the `IN ()` guard above the query; the new block uses a real `where` evaluator whose portfolio and `is_active` cases were shown red against a staged two-part predicate, and it adds nothing to and removes nothing from the existing specs.
+
+#### Leader-requested adjudications (all five resolved against source)
+
+1. **`is_active: true` vs. real column semantics — the Leader's hypothesis was wrong, and is now evidenced rather than assumed.** The Leader raised a possible silent-data-loss hazard: if a real `clarisa_levers` row could hold `NULL` in `is_active`, the predicate would discard a valid owned lever, invisibly to every double-driven test. **Not representable.** The column was created `is_active tinyint NOT NULL DEFAULT 1` (`src/db/migrations/1726504510058-createdResultEntities.ts:23`) and no later migration touches it; `auditable.entity.ts:34-41` declares `type: 'boolean', nullable: false, default: true`. It is also the exact term both shipped siblings use (`clarisa-levers.service.ts:45-52`, `strategic-objectives.service.ts:41-55`) and the term R-RES-005 and DD-4 mandate verbatim. Any other expression would have been the deviation.
+2. **Double fidelity (KZ-001 / the Disqualifies clause) — sound, not an assumption that happens to hold.** `type` and `value` are **public getters on `FindOperator.prototype`**, so `'type' in condition` resolves through the prototype chain — true for every `FindOperator`, false for the plain scalars. `expect.objectContaining({ type: 'in', value: [...] })` is prototype-chain aware and reads through those public getters; it does **not** reach the private `_value`. Throwing on any non-`in` operator is fail-loud, correct for a double. `Object.entries(where).every(...)` only tests terms the implementation actually supplied — which is exactly why the staged two-part predicate went red. The canned-array disqualifier does not apply.
+3. **Discriminating power (KZ-004) — five of six checks proven, one thin but not vacuous.** The Leader flagged two fixtures as possibly too thin. The inactive case (single-row fixture) **is** falsifiable: drop the `is_active` term and the evaluator matches the row, so `toEqual([])` goes red — a one-row fixture suffices when the row *is* the counterexample. The unknown-id case (empty fixture) is genuinely the weak one: no predicate defect changes an empty fixture's output. It is not vacuous — it still falsifies the plausible defect for that clause, a finder that **throws** on an unresolvable id (`findOneOrFail`-per-id, or a `survivors.length !== ids.length` guard) — and the clause reads *"does not return **and does not throw**"*. Judged closed; the strengthening is recorded as advisory rather than gated on.
+4. **Scope + the `IN ()` guard — clean.** One import edit plus one inserted method. `findAllWithPortfolio`, `create`, `update`, `remove`, `findByShortName`, `homologatedData` untouched. The guard sits above the `find` call, and `expect(mockMainRepo.find).not.toHaveBeenCalled()` proves no query is issued rather than merely proving an early return. Done-check 6 closed.
+5. **The `// @akili-spec` marker is not a project convention — not a finding.** It appears exactly once in the repo, and as a record of *not* adopting it (`ai-formalize-strategic-objectives/execution.md:427`: *"the surrounding file uses prose doc comments as its idiom"*). The shipped predecessor's finder cites `design.md §3 / DD-1` in prose exactly as this one cites DD-4. Consistent with precedent.
+
+#### ADVISORY (recorded, never gating; none may mint or widen a task in this spec)
+
+- **RISK — forward pointer, owned by T-03. This is the highest-value finding of the task and MUST be copied into the T-03 brief.** The finder returns `ClarisaLever[]` whose `id` is *declared* `number` on a `@PrimaryGeneratedColumn({ type: 'bigint' })` column. **TypeORM hydrates `bigint` properties as strings**, and `requirements.md` RK-3 records shipped code already coping with exactly that (`parseInt(x) as unknown as string`); `orm.config.ts:53`'s `bigNumberStrings: false` governs the driver layer only, not TypeORM's bigint hydration. So T-03 must **not** compute survivors/discards by strict identity against the incoming numeric ids: `ids.filter(id => !survivors.map(l => l.id).includes(id))` would classify **every id as discarded while the query was perfectly correct** — zero rows written, every id reported discarded, no exception raised. Remedy for T-03: normalize with `Number(...)` on both sides, **and make the T-03 double return string ids in at least one case so the defect is falsifiable there.** Nothing changes in T-02 — DD-7 explicitly forbids cleaning the type modelling here.
+- **RISK — note for T-03/T-04 callers, unreachable today.** `portfolioId` is unguarded, and an `undefined` reaching it degrades the predicate to the two-part form DC-3 describes, because TypeORM drops `portfolio_id: undefined` from the `where` (the shipped `findAllWithPortfolio(undefined)` test relies on that behavior). `design.md` §5.1 step 3 already makes it unreachable — no portfolio, no orchestrator call — so this is a caller-side note, not a change to the finder.
+- **RELIABILITY.** Fold the unknown id into the multi-row case as the predecessor did (`[11, 12, 4, 999]` against the same three-row fixture). That makes "unknown id does not return" discriminating instead of resting on an empty fixture, at the cost of one array element.
+- **READABILITY.** `evaluateWhere` / `fakeFind` is now duplicated verbatim in two spec files, and T-03 will likely want a third variant. Left duplicated deliberately; if a third copy appears, promote it to a shared test helper rather than copying again.
+- **RELIABILITY — pre-existing, not introduced.** `beforeEach` uses `jest.clearAllMocks()`, which clears calls but **not** implementations, so a `mockImplementation` on `mockMainRepo.find` leaks into later describes. Harmless today (later describes never call `find`), but this block installs implementations where the file previously used only `mockResolvedValue`, raising the cost of that latent trap slightly.
+
+#### Decisions made
+
+- The service addition was **pre-authorized by the task** rather than rediscovered mid-run, per the predecessor's identical gap on `StrategicObjectivesService`. No deviation had to be negotiated.
+- No `// @akili-spec` marker added — adjudication 5 establishes prose doc comments as the file's shipped idiom.
+
+#### Issues encountered
+
+None. No rework, no environment blocker.
+
+#### Final verification result
+
+`npm test -- --silent src/domain/tools/clarisa/entities/clarisa-levers` -> **44/44 green**, lint clean, tree free of `--fix` collateral. Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).

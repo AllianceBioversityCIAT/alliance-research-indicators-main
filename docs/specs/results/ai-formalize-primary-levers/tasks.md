@@ -86,18 +86,18 @@ No cycles.
   - An empty `ids` array must return an empty result **without** issuing a query whose `IN ()` matches everything.
   - Do not change `findAllWithPortfolio`, `create`, `update`, `remove` or `findByShortName`.
 - **Acceptance / done check:**
-  - [ ] Given ids `[11, 12, 4]` and portfolio 2, only 11 and 12 return (4 is a portfolio-1 record).
-  - [ ] An id that exists and is active but belongs to the **other** portfolio does not return.
-  - [ ] An id in the right portfolio with `is_active = 0` does not return.
-  - [ ] An unknown id does not return and does not throw.
-  - [ ] `ids: []` returns empty and matches nothing.
-  - [ ] The existing `findAllWithPortfolio` spec passes unmodified.
+  - [x] Given ids `[11, 12, 4]` and portfolio 2, only 11 and 12 return (4 is a portfolio-1 record).
+  - [x] An id that exists and is active but belongs to the **other** portfolio does not return.
+  - [x] An id in the right portfolio with `is_active = 0` does not return.
+  - [x] An unknown id does not return and does not throw.
+  - [x] `ids: []` returns empty and matches nothing.
+  - [x] The existing `findAllWithPortfolio` spec passes unmodified.
 - **Tests:** `clarisa-levers.service.spec.ts` — new describe block.
 - **Verification:** `npm test -- --silent src/domain/tools/clarisa/entities/clarisa-levers`
 - **Falsifying input:** an active `clarisa_levers` row whose `portfolio_id` is the **other** portfolio. An implementation filtering only on `id IN (…)` and `is_active` returns it and FAILs. Confirm the test goes red against a two-part predicate before declaring done.
 - **Disqualifies:** a repository double that returns a canned array without evaluating the `where` clause. Then the predicate is untested however green the suite *(KZ-001)* — the double must inspect the `where` it is handed, including the `In(...)`/`is_active` operators, the way the predecessor's `findByYear` double parsed its `FindOperator` internals.
 - **Skills:** `nestjs-expert`
-- **Estimated effort:** S · **Status:** todo
+- **Estimated effort:** S · **Status:** done — PASS on attempt 1; `is_active` NULL hazard disproved at the schema (tinyint NOT NULL DEFAULT 1) and a bigint-hydration risk handed forward to T-03; see `execution.md` → T-02
 
 ---
 
