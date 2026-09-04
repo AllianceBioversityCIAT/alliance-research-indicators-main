@@ -8,6 +8,7 @@
 - **Linked requirements:** `./requirements.md` · **Linked design:** `./design.md` · **Proposal:** `./proposal.md`
 - **Citation convention:** `[SO] R-RES-NNN` = predecessor spec · bare `R-RES-NNN` = this spec (`requirements.md` §2)
 - **Budget (design.md §13):** 7 tasks · ~252 prod LOC + ~1,558 test LOC (~1,810 total) · **4 rework rounds** (not review passes). Priced on the predecessor's *measured* ~6:1 test:production basis from day one, per **KZ-008**
+- **⚠️ RE-BASELINED 2026-09-04 after T-04 (owner-approved) — `design.md` §13.2:** live total **~2,404** (T-05 → ~700, T-06 → ~580). The tripwire fired on T-03 (764 vs ~600 armed). The basis, not the sum, was corrected: it priced falsifiability hardening and pivot discovery at zero. **Production LOC threshold held at ~300 deliberately** — it is the scope-growth signal, and it is still the binding one (238 used, ~298 projected). Rework rounds: **1 of 4 used**
 - **Last updated:** 2026-09-04 *(R-RES-007 AC.2 amended — Pivot, T-03)*
 
 - **Execution log:** `./execution.md`

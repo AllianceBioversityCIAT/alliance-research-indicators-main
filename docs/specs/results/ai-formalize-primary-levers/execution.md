@@ -419,3 +419,19 @@ None. No rework, no environment blocker. **PR 1 (the persistence contract: T-01�
 #### Final verification result
 
 `npm test -- --silent src/domain/entities/results/portfolio-handlers/application` → **15/15 green**, lint clean, no `--fix` collateral. Full-suite blast radius and the coverage figure remain T-07's gate (DC-6 / KZ-003).
+
+## Budget Tripwire — 2026-09-04, after T-04
+
+**Fired on T-03: 764 added lines against a ~510 estimate and a ~600 armed threshold** (`design.md` §13.1). Escalated to the owner with the delta and the cause; decision was **re-baseline and continue**. Recorded in `design.md` §13.2 and the `tasks.md` header.
+
+**Recorded honestly: the check belonged at the T-03 gate and ran one task late.** The Budget Tripwire rule says stop and escalate when execution exceeds the budget; T-03 was finalized and T-04 started before the armed thresholds were consulted. No harm resulted — T-04 landed on estimate — but the escalation reached the owner later than the rule intends.
+
+**Measured (source files only, `git diff --numstat` added lines):** T-01 90 (est 90) · T-02 102 (est 115) · T-03 **764** (est 510) · T-04 163 (est 165) → PR 1 **1,119** vs ~880 (**+27%**). **Three of four tasks hit estimate almost exactly; the whole overrun is T-03.**
+
+**Cause, and why it is not scope growth.** The original basis priced "write the code, write the tests once" and priced at zero: (1) **falsifiability hardening after review** — T-03's lens audit found four assertions that could not fail, and fixing them cost stateful reconciler fakes in two files, string-id bigint cases, call-count assertions and argument-level role pins; (2) **pivot discovery** — two owner-approved Pivots landed inside T-03, both spec defects surfaced by execution rather than by document review. The extra mass is evidence that the review worked, not features nobody asked for.
+
+**The decisive figure is production LOC: 238 of the ~252 originally estimated for all seven tasks**, with ~60 left to come (T-05 ~55, T-07 ~5) → **~298, still under the ~300 threshold.** §13.1's own rule is that a *test* overrun on this pair of specs has repeatedly been evidence density while a *production* overrun would mean genuine scope growth and should reopen scope rather than the budget. So the re-baseline raises the total to **~2,404** and **holds the production threshold at ~300 unchanged** — deliberately, so the real alarm stays armed. If production crosses 300, scope reopens; the LOC total is no longer the signal.
+
+**Also holding:** the predecessor's measured ~6:1 test:production ratio (KZ-008's correction) — 881 test : 238 production ≈ 3.7:1 so far, trending toward 6:1 as T-06 adds pure test mass. This re-baseline corrects a *different*, previously unpriced factor.
+
+**Re-armed:** T-05 → ~800, T-06 → ~700, production → ~300 (unchanged), rework rounds → unchanged (**1 of 4 used**).

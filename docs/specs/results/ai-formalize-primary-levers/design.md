@@ -388,6 +388,8 @@ No decision in this log removes, disables, or inverts behavior the codebase alre
 | T-07 full gate + `[SO] R-RES-007` amendment | ~5 | 0 | ~5 |
 | **Total** | **~252** | **~1,558** | **~1,810** |
 
+> ⚠️ **RE-BASELINED 2026-09-04 after T-04 — see §13.2.** The table above is the original estimate, retained for comparison. The live figure is **~2,404**. The basis was wrong, not just the total.
+
 | Metric | Estimate |
 | --- | --- |
 | Tasks | **7** |
@@ -409,6 +411,53 @@ No decision in this log removes, disables, or inverts behavior the codebase alre
 | T-06 total | above **~500** |
 | **Production LOC, spec-wide** | above **~300** — the meaningful one. Test overruns on this pair of specs have twice been evidence density; a *production* overrun would indicate genuine scope growth and should reopen scope, not the budget |
 | Rework rounds | any **second** rework round on one task, or **5** spec-wide |
+
+### 13.2 Re-baseline — 2026-09-04, after T-04 (owner-approved)
+
+**The tripwire fired on T-03: 764 actual against a ~510 estimate and a ~600 armed threshold.** Escalated to the owner, who chose to re-baseline and continue. Recorded one task late — the check belonged at the T-03 gate.
+
+**Measured, four tasks in** (added lines, `git diff --numstat`, source files only):
+
+| Task | Estimate | Actual | Delta |
+| --- | --- | --- | --- |
+| T-01 | ~90 | **90** | on target |
+| T-02 | ~115 | **102** | −11% |
+| T-03 | ~510 | **764** | **+50%** |
+| T-04 | ~165 | **163** | on target |
+| **PR 1 subtotal** | **~880** | **1,119** | **+27%** |
+
+**Three of four tasks hit their estimate almost exactly. The entire overrun is T-03**, so the per-item basis is not uniformly wrong — it is wrong about one specific thing.
+
+#### The basis error, corrected (KZ-008: correct the basis, not the sum)
+
+The original basis priced *"write the production code, write the tests once"*. It priced at **zero** the two things that actually consumed T-03:
+
+1. **Falsifiability hardening after review.** T-03's review found four assertions that could not fail. Fixing them cost stateful reconciler fakes in two files, string-id bigint cases, call-count assertions and argument-level role pins — test mass that exists *because* the review worked. The corrected basis prices **one hardening round for any task whose test estimate exceeds ~350 LOC** (large, behaviour-dense, many-clause tasks — the class the review is most likely to find something in).
+2. **Pivot discovery.** Two owner-approved Pivots landed inside T-03 (`R-RES-007` AC.2's self-contradiction; DD-10's false premise). Both were spec defects found by *execution*, which no per-task LOC estimate can foresee. Priced as a **spec-level risk, not a per-task line** — the corrected total carries it; individual tasks do not.
+
+Note what did **not** move: the ~6:1 test:production ratio inherited from the predecessor's measurement is **holding** (881 test : 238 production across four tasks ≈ 3.7:1 so far, trending toward 6:1 as T-06 adds pure test mass). KZ-008's correction to the *ratio* was sound; this correction is to a different, previously unpriced factor.
+
+#### Re-baselined figures
+
+| Task | Original | Re-baselined | Basis |
+| --- | --- | --- | --- |
+| T-01…T-04 | ~880 | **1,119 (actual)** | measured |
+| T-05 formalizer wiring | ~505 | **~700** | +40% — test estimate ~450 exceeds the 350 threshold, so one hardening round is now priced in |
+| T-06 routing / inertness / composition | ~420 | **~580** | +38% — same rule; it is pure test mass and the most clause-dense suite in the spec |
+| T-07 full gate + amendment | ~5 | **~5** | unchanged; almost entirely manual verification, no code |
+| **Total** | **~1,810** | **~2,404** | **+33%** |
+
+#### Re-armed thresholds
+
+| Figure | Old | New |
+| --- | --- | --- |
+| T-05 total | ~600 | **~800** |
+| T-06 total | ~500 | **~700** |
+| **Production LOC, spec-wide** | ~300 | **~300 — DELIBERATELY UNCHANGED** |
+| Rework rounds | 2nd on one task, or 5 spec-wide | unchanged (**1 used**, on T-03) |
+
+**The production threshold is the one that must not move, and that is the whole point of this re-baseline.** §13.1 already states the rule: *test* overruns on this pair of specs have repeatedly been evidence density, while a **production** overrun would indicate genuine scope growth and should reopen scope rather than the budget. Production stands at **238** of the ~252 originally estimated for all seven tasks, with ~60 projected to come (T-05 ~55, T-07 ~5) → **~298, just under the threshold.** So this overrun is, by the spec's own criterion, evidence density — and raising the total while holding production at 300 keeps the real scope-growth alarm armed. If production crosses 300, scope reopens; the LOC total is no longer the signal.
+
 
 ---
 
