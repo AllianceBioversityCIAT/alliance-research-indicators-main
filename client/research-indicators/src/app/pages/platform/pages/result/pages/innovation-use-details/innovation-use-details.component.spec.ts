@@ -306,9 +306,13 @@ describe('InnovationUseDetailsComponent', () => {
       expect(textareaEl.nativeElement.textContent).toContain('Justification');
       expect(textareaEl.nativeElement.textContent).toContain('This field is required');
       // REWORK (T-02 rework, c5 / R-IUD-003 AC.5): the asterisk is proven as a rendered text
-      // node, scoped to the `app-textarea` instance itself — not by `.text-red-500` class
-      // (disqualified elsewhere in this file, see c10's REWORK at :361-366) and not page-wide
-      // (the level stepper's own label also renders a bare `*` and would pass vacuously).
+      // node, scoped to the `app-textarea` instance itself — not by an unscoped `.text-red-500`
+      // class query and not by an unscoped page-wide text search. Both would also match the level
+      // stepper's own bare `*` asterisk (its label uses the same class —
+      // `innovation-use-details.component.html:15`) and pass vacuously regardless of which
+      // asterisk actually rendered. (Attempt-4: the prior parenthetical here pointed at a same-
+      // file REWORK block that a later diff removed — `A-N4` — replaced with a self-contained
+      // rationale that names no in-file line.)
       const hasAsteriskTextNode = Array.from((textareaEl.nativeElement as HTMLElement).querySelectorAll('span')).some(
         span => (span.textContent || '').trim() === '*'
       );
@@ -2725,8 +2729,8 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       // and `'filled'` covers empty AND whitespace-only via `isFilled()`'s `trim()`.
       // `[unitRequired]` drives only the asterisks (`quantification-item.component.html:23`,
       // `input.component.html:6`), not the `[style]` write.
-      // This describe's own `beforeEach` (`:2533`) resolves `quantifications: []` and this
-      // test never adds a row, so no `app-quantification-item` — and therefore no Unit
+      // This describe's own `beforeEach` (above, in this same describe block) resolves
+      // `quantifications: []` and this test never adds a row, so no `app-quantification-item` — and therefore no Unit
       // `app-input` — exists in THIS fixture: the hazard is precautionary, not currently
       // reachable, and this rescope is defensive against a future fixture in this describe that
       // renders a measure row. Spying on the p-select's own native `.style` object keeps the

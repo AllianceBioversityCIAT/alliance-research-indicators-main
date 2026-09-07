@@ -43,7 +43,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
 | T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
 | T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
-| T-08 org unknown type + count | `[~]` | **HALTED 2026-09-07 — 3 of 3 attempts FAILED.** Production code correct and green; all findings are in the in-code claim layer (~6 lines). **Tree NOT rolled back** (would reinstate an unmeasured binding). Awaiting a user ruling — see `## HALT: T-08` |
+| T-08 org unknown type + count | `[x]` | **PASS attempt 4 of 4** (ceiling lifted by one on user ruling; HALT at attempt 3 recorded and resolved). 3 pointers filed → T-09/T-10, 1 → T-16 |
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
@@ -1259,3 +1259,85 @@ Reviewer verified both discharged), and the branch (green).
 deterministic downstream cost:** left as committed, the type-10 fixture makes T-09 turn this test red
 for an unrelated reason, with a comment that misdirects the diagnosis. That is the one finding that
 does not keep.
+
+### User ruling on the HALT — rework ceiling lifted by one (2026-09-07)
+
+**Ruling:** run a **4th attempt** with the Leader's brief corrected. Chosen from four options presented
+at the HALT gate (4th attempt · Leader-inline fix then review · fix only finding 1 and accept 2–3 ·
+park T-08). The ceiling is a methodology guardrail, not a law of the run; **lifting it is the user's
+call and it was made explicitly.** Recorded here because an attempt beyond the ceiling would otherwise
+read as the loop having quietly ignored its own limit.
+
+**The rollback stays declined** — the option to revert was on the table and was not taken. The tree
+remains green with attempt 3's committed work in place.
+
+**What the corrected brief changes, and why each change traces to a measured cause:**
+
+| Correction | Cause it addresses |
+| --- | --- |
+| **Sweep every comment and title in BOTH files end to end**, with a per-file completeness line including zeros | Attempt 3's brief said *"sweep the whole `c10` block"*; findings 3(ii) and the `c6` breakage sit outside `c10`. **`KZ-017`, Leader-owned** |
+| **No comment may carry a `:NNN` citation to a location in its own file** — cite tests by title; grep for survivors after the edit and report the count | Issue 3(i) was invalidated by the same insertion that wrote it. Third firing of the `A-N4` family in this spec; line citations cannot survive their own edit |
+| **Issue 2 remediation ordered (a) → (b) → (c), stop at the first one PROVEN**, with the Reviewer's `removeStyle` mechanism explicitly labelled a claim the worker must observe rather than repeat | `KZ-014`/`KZ-007`: the Reviewer's remediation contains an unobserved mechanism assertion. Relaying it as fact would be the same defect one layer up |
+| **Scope fence: the advisory's `.organization-type-required-message` length-`0` assertion is FORBIDDEN** | `tasks.md:507` assigns `R-IUR-003` S1's clearing clause to T-01+T-02+T-16, not T-08. An advisory may not grow this task |
+| **Read `SUB_TYPES_BY_TYPE` yourself; take neither the Leader's nor the Reviewer's word for which type is sub-typed** | Issue 1 was a false claim *about the file* made without re-reading the file. The brief must not reproduce that shape |
+| Effort **`medium` → `high`** | First bump in this task. The held-`medium` ruling was correct for attempts 1–3 (causes were false premises and brief gaps); attempt 3 added a genuine carefulness component, and this is a post-ceiling attempt |
+
+---
+
+#### T-08 attempt 4 — Reviewer `STATUS: PASS` ✅ **task complete**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-07 |
+| Effort assigned | `high` (bumped from the held `medium`; first bump in this task — post-ceiling attempt with a genuine carefulness component) |
+| Skills | `angular-developer` |
+| Scope | tests and comments only — **no production code**, Leader-verified |
+| Files changed | `innovation-use-organization-item.component.spec.ts` (+37/−10) · `innovation-use-details.component.spec.ts` (+10/−6) |
+| Attempts consumed | **4** (ceiling of 3 lifted by one on explicit user ruling — see the ruling record above) |
+
+**What closed each attempt-3 issue.**
+
+- **Issue 1 (wrong fixture + self-falsified comment)** — fixture switched `onInstitutionTypeChange(10)` → `(20)` after the worker read `SUB_TYPES_BY_TYPE` itself rather than trusting the Leader's or the Reviewer's account of it. The comment now states the fixture facts accurately. **Reviewer verified at the source:** `SUB_TYPES_BY_TYPE` (`:28-34`) maps `10` → two rows, `20` → `[]`; `INSTITUTION_TYPES:24` and `OTHER_INSTITUTION_TYPE_ID = 78` (`.ts:36`) make `20` neither OTHER nor sub-typed; `c2`'s first test (`:236`) says what the comment claims; and the T-09 forward claim holds — `design.md:662` gives `organization-item` three `p-select` borders and `tasks.md:520` assigns rule 8 to T-09.
+- **Issue 2 (a negative test that could not fail)** — landed remediation **(a)**: `not.toContainEqual(['2px solid var(--ac-warning-1)'])` → `toContainEqual([''])`, asserting the **clearing** write positively. Red observed with `.html:116` forced unconditionally amber:
+
+```
+● … › AC.2 negative: filling the organization type clears the amber-border write
+    expect(received).toContainEqual(expected) // deep equality
+    Expected value: [""]
+    Received array: []
+      404 |         expect(borderSetSpy.mock.calls).toContainEqual(['']);
+Tests: 1 failed, 37 passed, 38 total
+```
+
+  reverted after, green 38/38. **Attribution is clean, and the Reviewer established this rather than assuming it** — it enumerated every `border` writer on the unknown path: `.html:116` is the only `[style]`-bound border; the sub-type select (`.html:144-171`) and `Specify other` (`.html:175-183`) carry none and do not render at type `20`; and the `Organization count` `app-input` **cannot** contribute because `input.component.html:30`'s `[style]` border sits on the `type === 'text'` branch while this field is `[type]="'number'"`, which uses the class at `:49`. So the prototype-wide spy has exactly one possible source here.
+- **Issue 3 (two broken cross-references)** — both repointed to drift-proof forms: the exemplar is now cited by **describe title** (verified present verbatim at `:433`, its two AC.2 tests at `:487`/`:505`, genuinely below the citing comment), and the details-spec parenthetical is now self-contained with one accurate cross-file pointer (`innovation-use-details.component.html:15` does render `<span class="text-red-500">*</span>`). **Same-file `:NNN` citation survivors: 0 in both files**, independently re-grepped by the Reviewer. It also found the worker's self-inflicted drift was **worse than reported**: the prior `:2533` pointer was *already* wrong before this attempt (the `beforeEach` is at `:2546`).
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent -- innovation-use-organization-item.component.spec` | 38/38 passed |
+| `npm test -- --silent -- innovation-use-details.component.spec` | 156/156 passed |
+| Reddening mutation for remediation (a) | **Red observed, verbatim above**; reverted, green after |
+| **Full client suite, Leader-re-measured in a quiet tree** | **317 suites / 6859 tests / 0 failed**, exit 0 · coverage 98.2 / 96.3 / 97.82 / 98.5 |
+| `git diff --exit-code` on `…organization-item.component.html` | **exit 0** — mutation fully reverted, no production file in the diff (Leader-verified) |
+| `K-020` citation the worker used to dismiss a targeted run's exit code | **Real** — `client/research-indicators/src/CLAUDE.md:152`. Leader-verified rather than accepted |
+| `npx eslint` | **Cannot reach this diff** (`KZ-017`) — both files are `*.spec.ts`, ignored here (`K-002`) |
+| `npx tsc -p tsconfig.spec.json` normalized set-diff | **Not run for this attempt.** Safe (a numeric literal and a string literal), and the gate is **T-16 gate 2**, still outstanding for the spec |
+
+**Requirements covered — Reviewer-verified discharged, not merely claimed.** `R-IUR-007` AC.1 (`c4`'s two-asterisk unknown-path test with label containment, `:295-305`), AC.2's client half (amber positive `:354` + message count `:319`/`:546`/`:580`), AC.3 (container-absence falsifier `:313` + `c4`'s one-asterisk known-path test). `R-IUR-009` AC.1–AC.3 (`c4` + the empty-vs-`0` message test `:414`) and S1's `AND IT MUST`. **Deferred, correctly:** paint → **T-16 gate 3**; the SQL halves of `R-IUR-007` AC.2 and `R-IUR-009` AC.4 → **T-19** (`tasks.md:253`).
+
+**Leader adjudication of the Implementer's `Not Done / Assumptions` (Step 2.3 item 0 — a task with outstanding scope never reaches `[x]`, even on a PASS).** Four items were declared; **none is T-08 scope still owed**:
+1. *Did not exhaustively read the ~2080 out-of-scope lines of the details spec beyond a keyword grep.* — **Not a gap.** `tasks.md:247` scopes T-08's touch of that file to *"`c10`'s `organizationsCard` assertion only"*; the worker read ~1050 lines end to end, which is **above** assigned scope. The Reviewer ruled on this independently (Q5) and confirmed the unread region is `R-MSD-*`/contrast material that T-07/T-08/T-12 do not falsify.
+2. *Left pre-existing out-of-scope citations untouched.* — Correct; see the carried item below.
+3. *Added no message-absence assertion.* — The **Leader's own fence**, honored. Not a gap.
+4. *Did not commit.* — The Leader's job, done below.
+
+**`ADVISORY` — recorded, never gating, and explicitly NOT minted as tasks:**
+1. **The fixture-correction comment over-claims its consequence.** It says type 10 *"would redden this test once T-09 lands"*; the Reviewer **constructed that sequence (type 10 + T-09 landed) and it passes** — an extra amber write cannot falsify `toContainEqual([''])`, because the type select still writes `''` either way. The fixture change remains correct (type 20 removes a confound any future amber-negative strengthening would trip on); only the strength of the claim is wrong. Suggested wording is in the verdict. **Same comment-accuracy family that consumed attempts 2–4 — routed as a pointer to T-09/T-10, both of which touch this file, not reopened here.**
+2. The negative test's title omits the card-wide caveat its positive sibling carries. Harmless — attribution is clean per Q2 — but asymmetric.
+3. The negative proves *a* border cleared, not that the *amber* one did. The Reviewer **could not construct a reachable defect** satisfying `['']` while breaking AC.2 with the positive also running. `toEqual([['']])` would close it belt-and-braces.
+4. Pre-existing stale **cross-file** citations survive in the details spec at `:2615-2627` (`justificationError()` `:114` → now `.ts:283`; `unaddressedSaveErrors()` `:249` → `:296`; `saveErrors.set` `:599` → `:583`/`:600`). Out of T-08's scope. Reviewer suggests an `/akili-quick` line-number purge over that file rather than rework here — **a suggestion for the user, not a task in this spec.**
+5. `innovation-use-details.component.spec.ts:2733` is ~135 chars against the block's ~120 wrap. No gate catches it (prettier does not reflow comments; eslint ignores `*.spec.ts`).
+
+**Carried forward, with owners:** advisory (b) from attempt 3 (the `organizationTypeMissing` doc-comment overstatement in production code) → **T-09/T-10**; advisories 1–3 above → **T-09/T-10**; the `tsc` set-diff → **T-16 gate 2**; **the amber border on a `p-select`, organization card, BOTH paths → T-16 gate 3's named field list** (still the run's `NO-PAINT-OWNER` gap, and still not on that list).

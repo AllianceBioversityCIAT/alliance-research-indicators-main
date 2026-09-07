@@ -330,9 +330,12 @@ describe('InnovationUseOrganizationItemComponent', () => {
     // Attempt-3 remediation (Reviewer attempt-2 Issue 1): the amber-border half of AC.2 was
     // implemented at `.html:116` (`[style]="organizationTypeMissing ? { border: '2px solid
     // var(--ac-warning-1)' } : {}"`) but asserted nowhere in this file — deleting that binding
-    // left the org-card suite green. Mirrors the known-path exemplar at :407-421 (positive) and
-    // :425-434 (negative), for the unknown path's organization-TYPE select instead of the
-    // organization select.
+    // left the org-card suite green. Mirrors the known-path exemplar tests below, in the
+    // "R-IUR-006 — known path: institution required, with message precedence (T-07)" describe
+    // (its "AC.2" positive test and its "AC.2 negative" test), for the unknown path's
+    // organization-TYPE select instead of the organization select. Cited by title, not by line
+    // number (attempt-4: a prior line-number citation here was invalidated by this same diff's
+    // own insertion, twice over — `A-N4`).
     //
     // Mechanism (same three traps as the exemplar, and all load-bearing here too):
     // 1. Angular memoizes the last style value it wrote per property — a spy installed AFTER the
@@ -362,21 +365,43 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
 
     // Negative half, arranged via the TRANSITION the product performs (KZ-015): fill the type
-    // through `onInstitutionTypeChange(10)` — a type that is neither OTHER (78) nor sub-typed,
-    // already used this way elsewhere in this file (e.g. the c2 describe above) — AFTER the
-    // initial pass has settled, so `organizationTypeMissing` goes false and no further amber write
-    // can occur. A fresh spy is opened only after that first `detectChanges()`, so the
-    // construction-time write the positive test above exercises cannot leak into this window.
-    it('AC.2 negative: filling the organization type stops writing the amber border', async () => {
+    // through `onInstitutionTypeChange(20)` AFTER the initial pass has settled, so
+    // `organizationTypeMissing` goes false. A fresh spy is opened only after that first
+    // `detectChanges()`, so the construction-time write the positive test above exercises cannot
+    // leak into this window.
+    //
+    // Fixture correction (attempt-4, Reviewer attempt-3 Issue 1): type **20**, not type 10. Per
+    // `SUB_TYPES_BY_TYPE` at the top of this file, type 10 is the SUB-TYPED fixture (two rows —
+    // see c2's first test above) and type 20 is the one that resolves zero rows. Filling type 10
+    // here would render the sub-type select with an empty required value inside this spy window —
+    // a second, unrelated amber-border source (`R-IUR-008`/T-09 gives that control its own
+    // `[style]` write), which would redden this test once T-09 lands, for a reason that has
+    // nothing to do with what this test names. Type 20 reaches the same
+    // `organizationTypeMissing === false` end state with no sub-type select rendered at all.
+    //
+    // Strengthened to a positive assertion (Leader's ruling on Issue 2, remediation (a)). The
+    // prior version asserted `not.toContainEqual([amber])` — vacuously true whenever the amber
+    // value is never written at all, which is also true under the defect this test exists to
+    // catch (the write staying unconditional across the transition; see the mechanism note on the
+    // positive test above: Angular memoizes the last value written per style property, so an
+    // unconditional write and a correctly-cleared write are indistinguishable to a spy that only
+    // checks "was amber written", if nothing further gets written either way). Observed instead:
+    // Angular's style-map diff calls `removeStyle` for a property dropped from the bound object,
+    // and for a no-dash CSS property (`border` has none) that assigns `el.style.border = ''` —
+    // which the `CSSStyleDeclaration.prototype` setter spy below DOES record. Verified reddening:
+    // with `.html:116`'s `[style]` binding forced unconditionally amber
+    // (`[style]="{ border: '2px solid var(--ac-warning-1)' }"`), this assertion fails, because no
+    // `''` write ever occurs (see the attempt-4 report for the observed red).
+    it('AC.2 negative: filling the organization type clears the amber-border write', async () => {
       component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
       fixture.detectChanges();
 
       const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
       try {
-        await component.onInstitutionTypeChange(10);
+        await component.onInstitutionTypeChange(20);
         fixture.detectChanges();
 
-        expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+        expect(borderSetSpy.mock.calls).toContainEqual(['']);
       } finally {
         borderSetSpy.mockRestore();
       }
