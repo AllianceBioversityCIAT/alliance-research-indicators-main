@@ -231,6 +231,80 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
   });
 
+  // -----------------------------------------------------------------------------------------------
+  // T-10 (R-IUR-015, DD-12) — onKnownToggle now clears the fields of the path being left, in BOTH
+  // directions, on the EMITTED row (Disqualifier: the card's `effect` emits upward, so a local-
+  // state-only assertion would not catch a clear that never reaches the parent — asserted here via
+  // the spied `update` emitter; the cross-component propagation into the PARENT's `body()` is
+  // asserted separately in innovation-use-details.component.spec.ts, per this task's own Verify
+  // split). Every `toBeNull()` below is deliberately strict, not `toBeFalsy()`: DD-12's clearing
+  // must land as an explicit `null`, never `undefined` (DD-5b/T-09) — `undefined` would vanish
+  // from `JSON.stringify` and let a stale server value survive if the user toggles back to the
+  // just-cleared path before saving (see the parent-level DD-5b-interaction test for the
+  // serialized-payload proof of that failure mode).
+  // -----------------------------------------------------------------------------------------------
+  describe('T-10 (R-IUR-015, DD-12) — onKnownToggle clears the path being left, symmetrically, in the emitted row', () => {
+    it('AC.1 + AC.3: ticking clears institution_type_id, sub_institution_type_id, institution_type_custom_name and organization_count, and leaves institution_id (the path being ENTERED) untouched', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      await component.onInstitutionTypeChange(10);
+      component.onSubTypeChange(1);
+      component.onCustomNameChange('stale custom name');
+      appInputLabelled('Organization count')!.setValue(5);
+      fixture.detectChanges();
+      expect(component.body().institution_type_id).toBe(10);
+
+      const emitSpy = jest.spyOn(component.update, 'emit');
+      component.onKnownToggle(true);
+      fixture.detectChanges();
+
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseOrganization;
+      expect(emitted.institution_type_id).toBeNull();
+      expect(emitted.sub_institution_type_id).toBeNull();
+      expect(emitted.institution_type_custom_name).toBeNull();
+      expect(emitted.organization_count).toBeNull();
+      expect(emitted.institution_id).toBeUndefined();
+    });
+
+    it('AC.2 + AC.3: unticking clears institution_id, and leaves the unknown-path fields (the path being ENTERED) untouched', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      const emitSpy = jest.spyOn(component.update, 'emit');
+      component.onKnownToggle(false);
+      fixture.detectChanges();
+
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseOrganization;
+      expect(emitted.institution_id).toBeNull();
+      expect(emitted.institution_type_id).toBeUndefined();
+    });
+
+    // Falsifying input, named verbatim in requirements.md/tasks.md.
+    it('AC.6 falsifying input: fill the unknown path, tick, untick — the fields are empty, not restored', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      await component.onInstitutionTypeChange(10);
+      component.onSubTypeChange(1);
+      component.onCustomNameChange('stale custom name');
+      appInputLabelled('Organization count')!.setValue(5);
+      fixture.detectChanges();
+
+      const emitSpy = jest.spyOn(component.update, 'emit');
+      component.onKnownToggle(true);
+      fixture.detectChanges();
+      component.onKnownToggle(false);
+      fixture.detectChanges();
+
+      const emitted = emitSpy.mock.calls.at(-1)?.[0] as InnovationUseOrganization;
+      expect(emitted.institution_type_id).toBeNull();
+      expect(emitted.sub_institution_type_id).toBeNull();
+      expect(emitted.institution_type_custom_name).toBeNull();
+      expect(emitted.organization_count).toBeNull();
+    });
+  });
+
   // c2 — the sub-type select appears ONLY when the service returns rows for the chosen type.
   describe('c2 — sub-type control presence tracks the resolved rows, not the type selection itself', () => {
     it('type 10 resolves two rows -> the sub-type select is rendered', async () => {

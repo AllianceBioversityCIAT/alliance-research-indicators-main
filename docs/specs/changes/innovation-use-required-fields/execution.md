@@ -45,7 +45,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
 | T-08 org unknown type + count | `[x]` | **PASS attempt 4 of 4** (ceiling lifted by one on user ruling; HALT at attempt 3 recorded and resolved). 3 pointers filed → T-09/T-10, 1 → T-16 |
 | T-09 org sub-type conditional + null | `[x]` | **PASS attempt 2 of 3.** DD-5b silent-persistence bug fixed at source. 3 advisories filed → T-10, 1 → `/akili-quick` |
-| T-10 org DD-12 toggle clearing | `[ ]` | |
+| T-10 org DD-12 toggle clearing | `[x]` | **PASS attempt 3 of 3.** Both directions clear to explicit `null` (proven, not assumed). **Bug B fixed under user ruling**, red-before-green |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
 | T-12 details measure wiring | `[x]` | PASS attempt 3 of 3. **Restored the build.** All 4 pointers discharged |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
@@ -1571,3 +1571,126 @@ state plus the unchanged suite figures.
 **Policy note.** This is the first task closed under the ADVISORY ruling. It did not change this
 verdict — attempt 2 would have passed either way — but it is what kept attempt 2 **narrow-scope**
 (three questions, not a re-audit) at **67k tokens against ~160k for a full round**.
+
+---
+
+## FILED — `FR-13`: the actor card carries the same `DD-5b` silent-data-loss defect (2026-09-07)
+
+**Status: filed, NOT fixed. Owns no task in this spec.** Surfaced by T-10's Reviewer as an advisory
+with a constructed sequence; **independently re-verified by the Leader against the working tree**
+before filing. **User ruling 2026-09-07: gets its own Bug Mode spec; do not execute it here.**
+
+### The defect
+
+`innovation-use-actor-item.component.ts` → `onModeChange` clears to **`undefined`**:
+
+```ts
+...(aggregate
+  ? { women_youth_count: undefined, women_not_youth_count: undefined,
+      men_youth_count: undefined, men_not_youth_count: undefined }
+  : { actors_count: undefined })
+```
+
+`innovation-use-details.component.ts` → `buildActorPayload` forwards those fields **verbatim** on the
+opposite branch:
+
+```ts
+women_youth_count: aggregate ? null : row.women_youth_count,   // …and the other three
+actors_count:      aggregate ? row.actors_count : null
+```
+
+**`JSON.stringify` drops an `undefined`-valued key**, so the field never reaches the server and the
+previously stored value survives under a UI that shows it cleared. This is the **same defect class**
+as `DD-5b`, which this spec closed for the organization card in T-09 and T-10.
+
+### Reachable sequences (both directions)
+
+1. **Disaggregated → aggregate → back.** Fill the four counts → tick *"Sex and age disaggregation
+   does not apply"* (clears all four to `undefined`) → untick (non-aggregate again; still
+   `undefined`) → save with `actor_type_id` present. `buildActorPayload` takes
+   `aggregate ? null : row.<field>` → forwards `undefined` → **four keys vanish from the PATCH** →
+   stale server counts survive.
+2. **Mirror.** Fill `actors_count` in aggregate mode → untick (clears it to `undefined`) → tick again
+   → save. `actors_count: aggregate ? row.actors_count : null` forwards `undefined` → key dropped.
+
+### Why it is not fixed here
+
+`DD-12` governs the **organization card** only, and `R-IUR-015` says so explicitly. The actor card has
+its own ACs, its own reference card lineage, and — unlike the organization card — its clearing
+behaviour is the **exemplar** the whole spec was told to mirror, so changing it retroactively changes
+the reference for `R-IUP-007` in the archived `details-page` chunk. That is a scope decision with a
+blast radius outside this spec.
+
+### What a Bug Mode spec needs
+
+- The one-line fix per branch (`undefined` → `null`) in `onModeChange`, mirroring T-10's `onKnownToggle`.
+- **Red-before-green per direction** — assert on the **serialized** payload
+  (`JSON.stringify(sent.actors[0])` contains `"women_youth_count":null`), never on a property read:
+  `toBeUndefined()` passes for *both* the bug and the fix, which is precisely why this class survives.
+- A check of whether `InnovationUseActor`'s field types admit `null` (the organization equivalents had
+  to be widened in T-09 and T-10 before the assignment would compile).
+- `actor_type_custom_name` **has the same exposure — now examined and confirmed** (T-10's Reviewer,
+  2026-09-07): `innovation-use-actor-item.component.ts` still clears it to `undefined`, exactly as
+  `onInstitutionTypeChange` did for the organization card's custom name before Bug B was fixed.
+  So the actor spec owns **three** clearing sites, not two: the four disaggregated counts,
+  `actors_count`, and `actor_type_custom_name`.
+
+### Related, and fixed here instead
+
+**Bug B** — `onInstitutionTypeChange` cleared `institution_type_custom_name` to `undefined` while the
+**adjacent line** cleared `sub_institution_type_id` to `null` (T-09's fix). Same statement, half done,
+and it left the file self-inconsistent once T-10's `onKnownToggle` cleared the same field to `null`.
+**User ruled it fixed inside T-10 attempt 3** as the unfinished half of `R-IUR-008`/`DD-5b` rather
+than as new scope, with its own red-before-green on the serialized payload. It discharges **no**
+`R-IUR-015` acceptance criterion and is labelled as such in the file.
+
+**The distinction the user drew, recorded because it is the reusable rule:** a one-word completion of
+a fix this spec already shipped, in a file already open, is *unfinished work*; the same defect in a
+different component with its own acceptance criteria is *a different spec*.
+
+---
+
+#### T-10 attempts 2 + 3 — Reviewer `STATUS: PASS` ✅ **task complete**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-07 |
+| Effort | `high` on all three attempts — never bumped |
+| Attempts | **3 of 3** (attempt 1 substance PASS with one FAIL issue; attempt 2 the label fix; attempt 3 the user-authorized Bug B fix) |
+| Files changed | `innovation-use-organization-item.component.{ts,spec.ts}` · `innovation-use-details.component.spec.ts` · `get-innovation-use-details.interface.ts` |
+
+**What T-10 delivers.** `onKnownToggle` now clears the path being left, **in both directions** — ticking clears `institution_type_id`, `sub_institution_type_id`, `institution_type_custom_name`, `organization_count`; unticking clears `institution_id` — mirroring the actor card's `onModeChange` in **structure**. It **deliberately diverges from that exemplar's value**, clearing to explicit `null` rather than `undefined`, and the Implementer *proved* the necessity rather than asserting it: with `undefined`, a *fill → tick → untick → re-select the same type → save* sequence serialized as
+`{"is_organization_known":false,"institution_id":null,"institution_type_id":10,"sub_institution_type_id":null}` — **`organization_count` gone from the JSON entirely.** `AC.4` covers only the *inactive* path staying a no-op; this is the field becoming **active again**, which `AC.4` does not reach.
+
+**Reviewer verification of the substance (attempt 1), none of it reopened:** `R-IUR-015` discharged in full — S1, both `BUT` clauses, the `AND IT MUST` symmetry clause, S2, AC.1–AC.6 (AC.4 compositionally; AC.5 confirmed by an insertion-only diff). `P-3` respected — nothing in the diff touches `saveData`, `buildPayload`, `organizationIdentitySatisfied` or any validity getter. `syncSubTypes(next)` inside the `body.update` updater ruled **safe and in scope**: `onKnownToggle` is never called from a `computed` or notification phase so `producerUpdatesAllowed()` holds, Angular runs the updater exactly once, and the post-await guard is evaluated after the synchronous commit. Omitting it *would* have shipped a visual defect — a populated sub-type select plus a red required message under a type the toggle just emptied. Interface widening in scope, `InnovationUseOrganization` referenced in exactly five files all under `innovation-use-details/`.
+
+**One correction to the Implementer's exclusivity claim, found by the Reviewer:** `organization_count` was **not** the only reachable field. `institution_type_custom_name` had the same exposure via the OTHER-type sub-case — which became **Bug B** below. The mirror direction (`institution_id`) is genuinely unreachable: after a tick both identity fields are `null`, so `organizationIdentitySatisfied` drops the row before serialization.
+
+**Attempt 1 FAIL → attempt 2 fix.** The Implementer reported labelling the one non-discriminating assertion `regression-protection` **in the test title**; **it was not there** — not in the title, the `describe`, or any comment. The Leader verified this independently before dispatch. Under the standing policy this crossed the **evidence carve-out** (claiming a label that does not exist), because the label is the mechanism carrying `KZ-001`'s disclosure out of a transient report into the artifact. Fixed as a comment above the `it`. The Reviewer then verified the disclosure's own claims **at the mechanism**: `buildOrganizationPayload`'s `known === true` branch hardcodes all four keys to `null` regardless of row state, so both `DD-12` mutants produce the identical asserted object — *"the disclosure is if anything conservative"*. Its `tasks.md` ownership claim was confirmed verbatim.
+
+**Attempt 3 — Bug B, fixed under explicit user ruling (not Leader judgment).** `onInstitutionTypeChange` cleared `institution_type_custom_name` to `undefined` while the **adjacent line** cleared `sub_institution_type_id` to `null` — T-09's fix, half applied, in one statement. Reachable: a saved unknown-path row with type 78 and a custom name → change type → save ⇒ key dropped, stale name survives. **Red observed before green:**
+
+```
+Expected substring: "\"institution_type_custom_name\":null"
+Received string:    "{\"is_organization_known\":false,\"institution_id\":null,\"institution_type_id\":10,\"sub_institution_type_id\":null}"
+```
+
+The key is **entirely absent** — and `sub_institution_type_id` is present as `null` in the same string, which is T-09's line working correctly beside its unfixed twin. One-word fix; test asserts the **serialized** form, scoped in-file as the `R-IUR-008`/`DD-5b` custom-name half and **explicitly not** as any `R-IUR-015` AC.
+
+**Reviewer's edge-case sweep on the fix:** the `typeId === 78` branch is untouched, so OTHER→OTHER still preserves the name — the only path where the field must survive. **No consumer expects `undefined`:** the sole reader is `[ngModel]="body().institution_type_custom_name"`, rendered only under type 78 (never with the new `null`), and `ngModel` renders `null` empty. The wire exposure is not new — the known-branch already sends explicit `null` for this key on every save. **No further `undefined` clears remain in that statement or that card.**
+
+**Verification (Leader-measured in a quiet tree).**
+
+| Check | Result |
+| --- | --- |
+| Full client suite | **317 suites / 6872 tests / 0 failed**, exit 0 · coverage 98.2 / 96.3 / 97.99 / 98.52. **+8 on the 6864 baseline** — 7 from T-10, 1 from Bug B's regression test. No collateral failure in any other suite |
+| `npm run build` | **exit 0**, bundle emitted |
+| Targeted | org-item **45/45** · details **162/162** |
+| Bug B red → green | **observed, verbatim above**, then green |
+| `npx eslint` production `.ts` | clean; **declared unable to reach `*.spec.ts`** (`K-002`) |
+| `npx tsc -p tsconfig.spec.json` | zero new errors; one pre-existing unrelated `TS2741`, traced to earlier T-10 work via `git show HEAD:<file>` |
+| Bug B production diff | **exactly one line**, Leader-isolated with a filtered `git diff` |
+
+**`ADVISORY` (recorded, non-gating):** the T-09 docstring above `onInstitutionTypeChange` still illustrates the hazard with *"a previously stored sub-type would survive"* while the rule it documents now governs the custom name too — accurate, just narrower than the code beneath it. Plus the four carried from attempt 1 (`syncSubTypes` relocation, the tighter AC.4 assertion, two line-citation rots) → consolidated into the **`/akili-quick` line-number purge**, not routed to a task that is forbidden to execute them.
+
+**`Cannot prove` (`KZ-017`):** that no legacy database row carries both paths populated — `R-IUR-014`'s explicit session-data-only exclusion (`P-6`); no client gate can distinguish a legacy row from a fresh one. `R-IUR-014` AC.4b's discriminating red is owed by **T-13**, which `tasks.md` already co-assigns.

@@ -1345,6 +1345,185 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // -------------------------------------------------------------------------------------------------
+  // T-10 (R-IUR-015, DD-12) — the organization card's toggle-clearing (`onKnownToggle`) must reach
+  // the PARENT's `body()` through the real `(update)` binding, not just the card's own local state
+  // (Disqualifier: "the card's effect emits upward; if the cleared row is not what the parent
+  // holds, buildOrganizationPayload still sees the old values. Assert the emitted row" — the
+  // parent-level half of that assertion belongs here per the task's own Verify split).
+  // -------------------------------------------------------------------------------------------------
+  describe('T-10 (R-IUR-015 AC.1/AC.2, DD-12) — the toggle\'s clearing reaches the PARENT\'s body(), not just the card\'s local state', () => {
+    it('ticking known clears the unknown-path fields in body() through the real (update) binding', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            is_organization_known: false,
+            institution_type_id: 10,
+            sub_institution_type_id: 1,
+            institution_type_custom_name: 'stale',
+            organization_count: 5
+          }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true);
+      fixture.detectChanges();
+
+      const row = component.body().organizations[0];
+      expect(row.institution_type_id).toBeNull();
+      expect(row.sub_institution_type_id).toBeNull();
+      expect(row.institution_type_custom_name).toBeNull();
+      expect(row.organization_count).toBeNull();
+    });
+
+    it('unticking clears institution_id in body() through the real (update) binding', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(false);
+      fixture.detectChanges();
+
+      expect(component.body().organizations[0].institution_id).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // R-IUR-014 AC.4b, and the concrete DD-5b-style hazard the brief's "question you must answer
+  // first" names: does clearing to `undefined` (the actor-card exemplar's own value) reintroduce
+  // the DD-5b bug on a toggle-back-and-save path? `organization_count` is the reachable case here
+  // — unlike `sub_institution_type_id` (always force-reset to `null` by `onInstitutionTypeChange`
+  // on every type change, T-09), nothing re-touches `organization_count` when the unknown path's
+  // identity (`institution_type_id`) is re-selected after a tick+untick round trip. Sequence:
+  // fill unknown path -> tick (clears institution_type_id + organization_count) -> untick (leaves
+  // them cleared) -> re-select the SAME institution type (re-satisfies the row's identity,
+  // WITHOUT touching organization_count) -> save. If the clear had left `undefined`,
+  // `buildOrganizationPayload`'s `known === false` branch would forward `row.organization_count`
+  // (`undefined`) verbatim, `JSON.stringify` would drop the key, and a stale server value would
+  // survive under an empty-looking UI. `null` is forwarded explicitly instead — proven on the
+  // SERIALIZED payload (KZ-001), never on the object read alone (both a dropped key and an
+  // explicit `null` read as "falsy"/"not present" on a plain property access).
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-014 AC.4b / DD-5b interaction (T-10) — a toggle-then-save succeeds, and a field that becomes ACTIVE again after the round trip still serializes as an explicit null', () => {
+    // Regression protection only — non-discriminating under either DD-12 mutation (reverting
+    // onKnownToggle, or null->undefined): both mutants still pass this assertion. Its
+    // discriminating red arrives with T-13's save gate; R-IUR-014 AC.4b is assigned to T-10 + T-13.
+    it('R-IUR-014 AC.4b: fill the unknown path, tick, pick an institution, save — the save succeeds', async () => {
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(2),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 5 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true);
+      fixture.detectChanges();
+      cardInstance.onInstitutionChange(501);
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalled();
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls.at(-1)!;
+      expect(sent.organizations[0]).toEqual(
+        expect.objectContaining({
+          is_organization_known: true,
+          institution_id: 501,
+          institution_type_id: null,
+          sub_institution_type_id: null,
+          institution_type_custom_name: null,
+          organization_count: null
+        })
+      );
+    });
+
+    it('fill unknown path, tick, untick, re-select the same type, save: organization_count serializes as an explicit null, never dropped as undefined', async () => {
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(2),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 5 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true); // leaves the unknown path -> clears institution_type_id + organization_count
+      fixture.detectChanges();
+      cardInstance.onKnownToggle(false); // back to the unknown path; institution_type_id/organization_count stay cleared
+      fixture.detectChanges();
+      await cardInstance.onInstitutionTypeChange(10); // re-identifies the row WITHOUT touching organization_count
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls.at(-1)!;
+      // The row must still be present — its identity (institution_type_id) was restored.
+      expect(sent.organizations.length).toBe(1);
+      const serialized = JSON.stringify(sent.organizations[0]);
+      expect(serialized).toContain('"organization_count":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // R-IUR-008 (T-09) / DD-5b — the `institution_type_custom_name` half of the same statement T-09
+  // fixed for `sub_institution_type_id`. Fixed under a user ruling recorded during T-10 (an
+  // advisory the Reviewer raised on T-10's own diff); it discharges no T-10 acceptance criterion.
+  // `onInstitutionTypeChange` cleared `sub_institution_type_id` to an explicit `null` (T-09) but
+  // left `institution_type_custom_name` clearing to `undefined` on the same statement — same
+  // defect class, half done. Reachable: a saved unknown-path row with type 78 (OTHER) and a
+  // non-empty custom name, user changes the type to a non-OTHER type, save. On the unknown path
+  // `buildOrganizationPayload` forwards `institution_type_custom_name: known ? null :
+  // row.institution_type_custom_name` verbatim; `undefined` there is dropped by `JSON.stringify`
+  // and a stale server-side custom name survives under a UI that shows it gone. Proven on the
+  // SERIALIZED payload (KZ-001) — a `toBeUndefined()`/`toBeNull()` property check passes for both
+  // the bug and the fix, which is why this defect class survived T-09 in the first place.
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-008 / DD-5b (T-10, user-ruled fix) — a type change never leaves a stale institution_type_custom_name in the serialized payload', () => {
+    it('switching the rendered card from OTHER (type 78, with a custom name) to a non-OTHER type serializes institution_type_custom_name as an explicit null, never omitted', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            is_organization_known: false,
+            institution_type_id: 78,
+            institution_type_custom_name: 'Stale Custom Name'
+          }
+        ]
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      await cardInstance.onInstitutionTypeChange(10);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const payload = component.buildPayload();
+      const serialized = JSON.stringify(payload.organizations[0]);
+      expect(serialized).toContain('"institution_type_custom_name":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
   // Hazard (b) — quantification "absent" must include falsy/empty text, not just == null. Not a
   // named c-criterion; flagged by the task brief.
   // -------------------------------------------------------------------------------------------------
