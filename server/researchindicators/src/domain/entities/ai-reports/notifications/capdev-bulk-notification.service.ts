@@ -400,8 +400,8 @@ export class CapdevBulkNotificationService {
    * Batch-level aggregate for `persistProcessMetrics` (design.md §4.1).
    *
    * `total_capdev_results` is the **sum of the per-group training counts**
-   * (R-CBU-008 AC.1) — it deliberately excludes Q4's unattributed results,
-   * which belong to no group. `countries` is the batch-wide distinct set of
+   * from **eligible, attributed** CapDev results (R-CESF-004) — it deliberately
+   * excludes Q4's unattributed results, which belong to no group. `countries` is the batch-wide distinct set of
    * ISO alpha-2 codes across every group's Q3 row.
    *
    * `total_results` is the one column in §4.1 that is genuinely batch-wide —

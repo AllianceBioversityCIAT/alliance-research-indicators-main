@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { BulkUploadProcesses } from '../entities/bulk-upload-processes.entity';
 import { BulkUploadResults } from '../entities/bulk-upload-results.entity';
 import { ResultContract } from '../../result-contracts/entities/result-contract.entity';
@@ -7,6 +7,8 @@ import { AgressoContract } from '../../agresso-contract/entities/agresso-contrac
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultCountry } from '../../result-countries/entities/result-country.entity';
+import { Result } from '../../results/entities/result.entity';
+import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ClarisaCountry } from '../../../tools/clarisa/entities/clarisa-countries/entities/clarisa-country.entity';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -53,6 +55,27 @@ const MULTI_PRIMARY_RESULT_IDS_SELECT =
   'WHERE rc_dup.result_id = bur.result_id ' +
   'AND rc_dup.is_primary = TRUE AND rc_dup.is_active = TRUE' +
   ') > 1 THEN bur.result_id END)';
+
+/** Live statuses that qualify for CapDev notification email + metrics (R-CESF-001). */
+export const ELIGIBLE_RESULT_STATUSES: ResultStatusEnum[] = [
+  ResultStatusEnum.SUBMITTED,
+  ResultStatusEnum.APPROVED,
+];
+
+/**
+ * Inner-joins `results` and restricts to {@link ELIGIBLE_RESULT_STATUSES}.
+ * Single choke point for spine and unattributed reads (design §5.0).
+ */
+export function applyEligibleResultStatusFilter(
+  qb: SelectQueryBuilder<BulkUploadResults>,
+  resultAlias = 'r',
+): SelectQueryBuilder<BulkUploadResults> {
+  return qb
+    .innerJoin(Result, resultAlias, `${resultAlias}.result_id = bur.result_id`)
+    .andWhere(`${resultAlias}.result_status_id IN (:...eligibleStatuses)`, {
+      eligibleStatuses: ELIGIBLE_RESULT_STATUSES,
+    });
+}
 
 function toNullableNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -222,13 +245,14 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
 
   /**
    * The shared join spine: created, non-errored, CapDev results of the
-   * batch, joined to their (tie-broken) active primary contract. The
-   * CapDev filter is bound from `IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT`
+   * batch with live status Submitted or Approved, joined to their
+   * (tie-broken) active primary contract. The CapDev filter is bound from
+   * `IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT`
    * — never a literal `1` — because a colliding enum member elsewhere in the
    * codebase uses the same name for a different value.
    */
   private capdevSpineQuery(processId: number) {
-    return this.dataSource
+    const qb = this.dataSource
       .getRepository(BulkUploadResults)
       .createQueryBuilder('bur')
       .innerJoin(ResultContract, 'rc', ACTIVE_PRIMARY_CONTRACT_JOIN, {
@@ -242,6 +266,8 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
       .andWhere('bur.indicator_id = :capdevIndicator', {
         capdevIndicator: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
       });
+
+    return applyEligibleResultStatusFilter(qb);
   }
 
   /**
@@ -379,22 +405,26 @@ export class CapdevBulkNotificationRepository extends Repository<BulkUploadProce
    * Still one query regardless of batch size.
    */
   async findUnattributedResultIds(processId: number): Promise<number[]> {
-    const rows = await this.dataSource
-      .getRepository(BulkUploadResults)
-      .createQueryBuilder('bur')
-      .leftJoin(
-        ResultContract,
-        'rc',
-        'rc.result_id = bur.result_id AND rc.is_primary = :isPrimary AND rc.is_active = :isActive',
-        { isPrimary: true, isActive: true },
-      )
-      .where('bur.bulk_upload_process_id = :processId', { processId })
-      .andWhere('bur.result_id IS NOT NULL')
-      .andWhere('bur.error_message IS NULL')
-      .andWhere('bur.indicator_id = :capdevIndicator', {
-        capdevIndicator: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
-      })
-      .andWhere('rc.result_contract_id IS NULL')
+    const qb = applyEligibleResultStatusFilter(
+      this.dataSource
+        .getRepository(BulkUploadResults)
+        .createQueryBuilder('bur')
+        .leftJoin(
+          ResultContract,
+          'rc',
+          'rc.result_id = bur.result_id AND rc.is_primary = :isPrimary AND rc.is_active = :isActive',
+          { isPrimary: true, isActive: true },
+        )
+        .where('bur.bulk_upload_process_id = :processId', { processId })
+        .andWhere('bur.result_id IS NOT NULL')
+        .andWhere('bur.error_message IS NULL')
+        .andWhere('bur.indicator_id = :capdevIndicator', {
+          capdevIndicator: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        })
+        .andWhere('rc.result_contract_id IS NULL'),
+    );
+
+    const rows = await qb
       .select('bur.result_id', 'result_id')
       .getRawMany<{ result_id: number | string }>();
 
