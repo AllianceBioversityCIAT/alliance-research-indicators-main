@@ -54,7 +54,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
 | T-17 RSK-2 population sizing | `[x]` | **done.** Dev: 7 results, 3 passing, **1 affected** (rule 1). ⚠️ **Dev cannot support a Prod-covering `RB-1` sign-off** |
 | T-18 migration + migration spec | `[x]` | **PASS attempt 1 — STRUCTURE ONLY.** Never executed; `R-IUR-012` AC.1 is **not** discharged. ⚠️ **F17 will go red when applied — T-19 must INVERT it, not extend around it** |
-| T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
+| T-19 executed truth table | `[x]` | **PASS attempt 2.** `R-IUR-012` AC.1 **discharged** — real MySQL, new body provably live. Suite serialised (`FP-51` amended) after 3 spurious failures in 9 runs |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
 | T-21 actor: used type not selectable (`R-IUR-017`) | `[x]` | **PASS attempt 1.** Rendered-overlay assertions, not the derived array. PrimeNG's own self-exemption is inert here — ours is load-bearing |
 
@@ -2024,3 +2024,46 @@ The Leader's own read-only Dev probe before dispatch (**42 total · 9 root+activ
 **`ADVISORY`:** a collation prediction — `result_quantifications.unit` is `text` under the schema default collation while `valid_text`'s parameter declares `utf8mb4_unicode_ci`; assignment coercion should make it a non-event (the existing call on another `text` column works today), but *"Illegal mix of collations"* is runtime-only, so **rule 11 needs a real T-19 case with a non-empty `unit`**, not only a NULL one. Plus: a falsifier comment in the spec contradicts itself in its own sentence (says both assertions redden, then says the first does not — only the second does), and one header citation is off by one line.
 
 **Reviewer's own framing, kept verbatim because it is the honest limit:** *"This PASS is on T-18's scope, which explicitly excludes behavior. The migration is **not verified** — it has never executed. Only MySQL's own parser can confirm the grouping, only a run can confirm `IF()`-with-NULL takes the ELSE branch, and only a run can confirm `valid_text(rq.unit)` does not raise a collation error. Do not read this PASS as the gate `R-IUR-012` AC.1 asks for; T-19 is the only instrument that discharges it."*
+
+---
+
+#### T-19 — executed truth table ✅ **task complete** *(PASS attempt 1 on substance; attempt 2 closed two coverage gaps; the FAIL was the Leader's)*
+
+**`R-IUR-012` AC.1 is DISCHARGED.** This is the only instrument in the spec that proves the validation function's runtime behavior, and it now does so against real MySQL with the new body demonstrably live.
+
+**The disqualifier is cleared structurally, not on anyone's word.** The Reviewer established that **the suite discriminates the two function bodies by itself**: nine tests seed zero active role-2 actor rows and assert `1`, every one of which returns `0` under the old body (which required `tempFullActors > 0`). **A green run of this file against the old function is impossible.** The `SHOW CREATE FUNCTION` reading is corroboration, not the load-bearing evidence. And **37 was verified as genuinely 37** by reading every `it` — no `.skip`/`.only`/`.todo`, no `.each`, no conditional registration, no early return, every body ending in a real `SELECT innovation_use_validation(?)`. No mock anywhere; `DC-4` rejects nothing here.
+
+**Attempt 1's FAIL — two rules were "tested" by cases that failed for a different reason.** This is the finding that justified the whole rework:
+- **Rule 3** (four counts filled): its only fail case seeded all four NULL, so the **sum** term failed too. Deleting the entire four-way `IS NOT NULL` conjunction from the migration left **all 37 tests green**. The requirement's own scenario — *"when only `Women youth` is filled"* — was never executed.
+- **Rule 7** (type required on the unknown path): its fail case also left `organization_count` null, so rule 9 fired on the same row. Deleting the clause left it green.
+
+The table could not distinguish *"the rule is enforced"* from *"the clause was deleted"* on either.
+
+**Attempt 2 fixed both, and proved the fixes discriminate:**
+
+| Mutation on the migration | Observed red |
+| --- | --- |
+| delete the four-way `IS NOT NULL` conjunction | **only `F21b`** — `Expected: 0, Received: 1`; F9b/F20/F21 stayed green, exactly as predicted |
+| delete `rit.institution_type_id IS NULL` | **F25 and F41** — F25 **stayed green under this same mutation before the fix** |
+
+The Reviewer re-derived `F21b`'s isolation from the SQL: seed `5/null/0/0` makes the sum term **TRUE** (5 > 0) while the fill check is **FALSE**, so `NOT(FALSE AND TRUE)` fires — the fill check is the *only* clause that can produce the asserted `0`.
+
+**`F43` — an honest non-discriminator, volunteered rather than overclaimed.** The Implementer stated in the test's own comment that it closes a **wording** gap in `R-IUR-011` AC.2's traceability, not a behavioral one. The Reviewer agreed *and checked it*: it could not construct a single-clause mutation reddening F43 alone. Also confirmed level id `7` → level **6** through `ciul.level`, clearing this spec's documented `id = level + 1` trap.
+
+**Other results:** the collation risk T-18's review left open is **refuted by execution** (a real non-empty `unit` resolves clean). **F42 uses real catalog code 38** — one of the eight T-14 measured — and returns `1`, proving the migration took the root-only predicate, not the naive mirror. The parenthesis falsifier reddened **12 of 14** pass cases (not "every one" — F3 and F7 precede the first globally-violating row and survive; **the Reviewer re-derived that count analytically**, and the two survivors are evidence for the mechanism, not exceptions to it).
+
+### The attempt-2 FAIL was the Leader's, and is recorded as such
+
+I set `maxWorkers: 1` on `test/jest-fixtures.json` — and `server/researchindicators/src/CLAUDE.md` **FP-51 explicitly forbade exactly that**, with a warning glyph. I changed the code and left the guide contradicting it, which is the doc/code drift the root guide prohibits by name.
+
+**Why I made the change:** the Implementer reported the suite green "2 of 3 runs" and called the failure pre-existing and unrelated. **I measured instead of accepting it: 3 spurious FK failures in 9 runs (~33%)** — a race between this fixture and the T-14 catalog fixture over shared real catalog rows 37/38/39. After serialising: **6 consecutive green runs**, then 122/122 again after the comment corrections.
+
+**Why FP-51 was incomplete rather than wrong:** its prohibition rested on the premise that **DDL is the only shared-schema hazard**. It is not. Shared **catalog-row** contention is a second mechanism it never anticipated — and unlike the DDL case, it *did* trip. FP-51's DDL finding stands untouched and independently measured.
+
+**Fixed, all three Leader-owned:** FP-51 **amended, not deleted**, recording the second mechanism, the measurement, and the reversal — plus the note that serialisation closes the cross-file class **within** `test:fixtures` and **nothing outside it** (`test:integration`'s committed `DROP TABLE` is still reachable concurrently). My own config comment **narrowed** from *"the races throw"* to *"the observed failures all threw"* — nine runs show the observed failures threw; they do not prove no silent-green interleaving exists. And **two comments in the fixture that my change made false** (justifying the teardown asymmetry by "parallel file execution") corrected: the asymmetry is still right, but its reason is now single ownership of a shared row, not concurrency.
+
+**Declared limit:** these three fixes are **Leader-authored, executing the Reviewer's own verbatim remediation, and were not independently re-audited.** The Reviewer scoped the issue as documentation-only and explicitly said it need not cost a rework round. Recorded plainly because Leader-authored remediation going unaudited has burned this family before.
+
+**`ADVISORY` (recorded, not actioned):** the **measures** third of `DD-0` has no fixture — F32 and F39 pin the organization and actor predicates, but deleting `rq.is_active = TRUE` reddens nothing. · F40/F41 prove the NULL-mode row is **not vacuously valid** (`C-6`'s actual concern) but not *branch identity*; the Reviewer supplied exact seeds to isolate routing if ever wanted. · The header's *"F17 through F42"* ranges now stop one short of F43.
+
+**What remains unproven, precisely:** the measures `is_active` predicate · NULL-mode branch identity · **T-20's apply to Dev, and Production** — this is proven on the scratch schema only, and per `K-015` a merge ships code, not schema · client-verdict parity beyond the sub-type predicate, which is a client-side obligation.
