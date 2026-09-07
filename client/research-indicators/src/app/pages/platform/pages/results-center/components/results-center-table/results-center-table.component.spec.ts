@@ -1348,3 +1348,125 @@ describe('ResultsCenterTableComponent — real template DOM click (AC.1 title-li
     expect(router.url).toBe('/');
   });
 });
+// The suites above blank the template with `.overrideComponent(..., { set: { template: '' } })`,
+// so none of them can see whether `showPlatformFilters` actually gates the source chips in the
+// rendered DOM — the whole point of the input. This block renders the genuine template and drives
+// the chips the way a user does. Per KZ-015 it constructs in the product's initial state
+// (the input defaults to false), asserts the negative, and only then flips it.
+describe('ResultsCenterTableComponent — real template source-filter chips', () => {
+  let chipsFixture: ComponentFixture<ResultsCenterTableComponent>;
+  let chipsService: any;
+
+  const chipsQuery = () => chipsFixture.nativeElement.querySelector('app-project-platform-filters');
+
+  beforeEach(async () => {
+    TestBed.resetTestingModule();
+
+    const listSig = signal<any[]>([]);
+    chipsService = {
+      searchInput: signal(''),
+      list: listSig,
+      resultsListForTable: computed(() => listSig()),
+      resultsTablePaginatorFirst: signal(0),
+      resultsTablePaginatorRows: signal(10),
+      resultsTableTotalRecords: signal(0),
+      loading: signal(false),
+      primaryContractId: jest.fn().mockReturnValue('C-1'),
+      getActiveFilters: jest.fn(() => []),
+      tableColumns: signal([{ field: 'title', path: 'title', header: 'Title', getValue: (r: any) => r.title }]),
+      tableFilters: signal({ sources: [] }),
+      countTableFiltersSelected: jest.fn(() => 0),
+      countFiltersSelected: jest.fn(() => 0),
+      clearAllFilters: jest.fn(),
+      removeFilter: jest.fn(),
+      applyFilters: jest.fn(),
+      tableRef: signal<any>(undefined),
+      handleResultsTableLazyLoad: jest.fn(),
+      resultsTableSortField: signal(''),
+      resultsTableSortOrder: signal(1)
+    };
+
+    await TestBed.configureTestingModule({
+      providers: [
+        { provide: ResultsCenterService, useValue: chipsService },
+        {
+          provide: CacheService,
+          useValue: {
+            headerHeight: signal(0),
+            navbarHeight: signal(0),
+            tableFiltersSidebarHeight: signal(0),
+            hasSmallScreen: signal(false),
+            dataCache: signal({ user: {} })
+          }
+        },
+        {
+          provide: AllModalsService,
+          useValue: {
+            openModal: jest.fn(),
+            closeModal: jest.fn(),
+            isModalOpen: jest.fn(() => ({ isOpen: false })),
+            setResultInformationEntryContext: jest.fn(),
+            isAnyModalOpen: jest.fn(() => false)
+          }
+        },
+        { provide: ApiService, useValue: {} },
+        { provide: CreateResultManagementService, useValue: {} },
+        provideRouter([]),
+        provideHttpClientTesting()
+      ]
+    }).compileComponents();
+
+    chipsFixture = TestBed.createComponent(ResultsCenterTableComponent);
+    chipsFixture.detectChanges();
+  });
+
+  it('hides the source chips by default, so an embed that does not ask for them does not get them', () => {
+    expect(chipsQuery()).toBeNull();
+  });
+
+  it('renders the four source chips once showPlatformFilters is set (the project-results wiring)', () => {
+    chipsFixture.componentRef.setInput('showPlatformFilters', true);
+    chipsFixture.detectChanges();
+
+    const chips = chipsQuery();
+    expect(chips).toBeTruthy();
+    expect([...chips.querySelectorAll('button')].map((button: any) => button.textContent.trim())).toEqual([
+      'AICCRA',
+      'STAR',
+      'PRMS',
+      'TIP'
+    ]);
+  });
+
+  it('filters by source when a rendered chip is clicked, and clears it when the same chip is clicked again', () => {
+    chipsFixture.componentRef.setInput('showPlatformFilters', true);
+    chipsFixture.detectChanges();
+
+    const starChip = [...chipsQuery().querySelectorAll('button')].find((button: any) => button.textContent.trim() === 'STAR') as HTMLElement;
+    expect(starChip).toBeTruthy();
+
+    starChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    chipsFixture.detectChanges();
+
+    expect(chipsService.tableFilters().sources).toEqual([{ platform_code: 'STAR', name: 'STAR' }]);
+    expect(chipsService.applyFilters).toHaveBeenCalledTimes(1);
+
+    starChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    chipsFixture.detectChanges();
+
+    expect(chipsService.tableFilters().sources).toEqual([]);
+    expect(chipsService.applyFilters).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the project scope out of the source filter, so the chip narrows within the contract', () => {
+    chipsFixture.componentRef.setInput('showPlatformFilters', true);
+    chipsFixture.detectChanges();
+
+    const tipChip = [...chipsQuery().querySelectorAll('button')].find((button: any) => button.textContent.trim() === 'TIP') as HTMLElement;
+    tipChip.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    // `primaryContractId` is what scopes the query to the project; the chip must not touch it.
+    expect(chipsService.primaryContractId()).toBe('C-1');
+    expect(chipsService.tableFilters().sources).toEqual([{ platform_code: 'TIP', name: 'TIP' }]);
+  });
+});
