@@ -43,7 +43,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
 | T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
 | T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
-| T-08 org unknown type + count | `[~]` | **attempt 2 FAILED** (2 issues, both specified). Attempt 3 of 3 remains. Code green but one binding is **unasserted** |
+| T-08 org unknown type + count | `[~]` | **HALTED 2026-09-07 — 3 of 3 attempts FAILED.** Production code correct and green; all findings are in the in-code claim layer (~6 lines). **Tree NOT rolled back** (would reinstate an unmeasured binding). Awaiting a user ruling — see `## HALT: T-08` |
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
@@ -1010,6 +1010,13 @@ T-07's `Cannot prove` says to record the suppressed branch as unreachable-so-unt
 
 ## SESSION HANDOFF — 2026-09-07
 
+> **⚠ SUPERSEDED 2026-09-07 by `## HALT: T-08` at the end of this file.** This block was written
+> while T-08's attempt-2 verdict was still pending and instructs the reader to run *"attempt 3 of
+> 3"*. **Attempt 3 has since run and FAILED** — the rework ceiling is reached and T-08 is HALTED
+> pending a user ruling. Everything below remains accurate as a point-in-time record and as the
+> standing-decisions list; **its T-08 next-step instructions are spent.** Read the HALT block for
+> current state (`KZ-013` — a live document may not keep asserting a superseded next step).
+
 **Entry point for the next session: `/akili-resume`**, then read this file's §1.2 status board and the T-08 block above.
 
 ### Where the spec stands
@@ -1077,3 +1084,178 @@ T-01, T-02, T-07 and T-08 all recorded their visual claims as **`inconclusive`, 
 **`ADVISORY`** — (a) the dead `hasAsteriskTextNode` helper at `:415` is **ruled advisory, not FAIL** (no rule mandates removal, no assertion weakened) but should go in the same edit as issue 2, with its now-orphaned explanatory comment. (b) `organizationTypeMissing`'s comment overstates: dropping the leading conjunct changes **no observable behaviour today** because `!institutionMissing` co-suppresses on the known path, and **no test can redden for it** — an unwitnessed counterfactual (`KZ-014` territory). The accurate, still-valuable claim is that the conjunct is what makes `OQ-6`'s **per-path** reversibility real. (c) `c6`'s *"0 accepted"* titles now read ambiguously against `R-IUR-009`; the assertions are correct and needed (`0` must be **stored**, not dropped, which is what makes AC.2 verifiable) — one clause distinguishing *enterable and stored* from *valid* would prevent a misreading. (d) `c9`'s page-wide `not.toContain('This field is required')` survives T-08 **only** because its fixture is `organizations: []`; pre-existing, but T-08 widens the set of rows that would falsify it.
 
 > **⚠ PAINT OWNER GAP — Leader-owned, and the most important item to carry.** **Neither T-07's nor T-08's `p-select` amber border appears on T-16 gate 3's named field list.** Gate 3 currently names the `app-input` text-field border, the number-field border, the message line-height, gate 3b's dark-theme helper text, and T-04's total-positivity message. With `DC-1` explicitly substituted by gate 3 (`tasks.md:563`) and jsdom unable to paint, **these two borders currently have no paint owner at all** — and issue 1 shows one of them has no *automated* owner either. **Add "the amber border on a `p-select` (organization card, both paths)" to gate 3's field list** when T-16 is briefed.
+
+---
+
+#### T-08 attempt 3 of 3 — Reviewer `STATUS: FAIL`, 3 issues → **HALT** (rework ceiling reached)
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-07 |
+| Effort assigned | `medium` on all three attempts — **deliberately never bumped**; ruling recorded before dispatch (see the attempt-2 handoff note). Attempt 3's causes confirm it: none of the three findings is under-thinking |
+| Skills | `angular-developer` (task list, unmodified) |
+| Scope | **tests and comments only, no production code** — attempt 2's implementation passed and was left untouched |
+| Files changed | `innovation-use-organization-item.component.spec.ts` (+65/−4) · `innovation-use-details.component.spec.ts` (+11/−11). **No production file in the diff** |
+
+**What attempt 3 closed, and it did close it.** Attempt-2 Issue 1 — an amber border implemented at
+`.html:116` and asserted **nowhere**, the exact `D-8`/`DC-1` shape the `[style]` mechanism exists to
+prevent — is **genuinely closed** by a mutation-proven positive. The red was observed, verbatim:
+
+```
+● … › AC.2: an unfilled unknown-path row writes the amber border somewhere in the card on construction
+    expect(received).toContainEqual(expected) // deep equality
+    Expected value: ["2px solid var(--ac-warning-1)"]
+    Received array: []
+Tests:       1 failed, 37 passed, 38 total
+```
+
+with `.html:116` deleted, green after restoring it. Restored by scratchpad copy, **never `git stash`**
+(standing decision 1). Leader-verified independently: `git diff --exit-code` on the `.html` exits `0`.
+Attempt-2 Issue 2's three stale `c10` strings are **all correctly fixed**, and advisory (a) removed
+the right `hasAsteriskTextNode` while leaving the differently-scoped live one at `:312` intact.
+
+**Verification.**
+
+| Check | Result |
+| --- | --- |
+| `npm test -- --silent -- innovation-use-organization-item.component.spec` | 38/38 passed |
+| `npm test -- --silent -- innovation-use-details.component.spec` | 156/156 passed |
+| **Full client suite, Leader-re-measured in a quiet tree** (`npm test -- --silent`) | **317 suites / 6859 tests / 0 failed**, exit 0 · coverage 98.2 / 96.3 / 97.82 / 98.5. **+2 against the 6857 baseline — exactly the two new tests.** The cross-file gate that caught T-08's casualty last session is clean |
+| `npx tsc -p tsconfig.spec.json --noEmit`, normalized-diffed vs `git show HEAD:…` | error set identical before/after (one pre-existing unrelated `TS2741`) — no new type errors |
+| `npx eslint` | **Cannot reach this diff** (`KZ-017`) — both files are `*.spec.ts`, which eslint ignores here (`K-002`). Declared, not cited as clean |
+
+**Reviewer `STATUS: FAIL` — 3 issues, all in the in-code claim layer.**
+
+1. **The negative test's fixture is the wrong type, and the comment justifying it asserts a fact the
+   file falsifies six lines up.** `:365` claims `onInstitutionTypeChange(10)` is *"a type that is
+   neither OTHER (78) nor sub-typed, already used this way … (e.g. the `c2` describe above)"*. **Type
+   10 is the sub-typed fixture:** `SUB_TYPES_BY_TYPE` at `:28-33` gives it two rows under the comment
+   *"Type 10 resolves rows; type 20 resolves zero rows"*, and `c2`'s first test (`:236-244`) asserts
+   *"type 10 resolves two rows → the sub-type select is rendered"* — the inverse of the claim.
+   **Not merely false prose: it selects the wrong fixture.** `onInstitutionTypeChange` sets
+   `sub_institution_type_id: undefined` (`.ts:144`), so the type-10 arrangement renders a sub-type
+   select with an empty required value **inside the spy window** — and **T-09, `Deps: T-08`, adds the
+   amber `[style]` to exactly that control** (`design.md:662`). This card-wide
+   `not.toContainEqual([amber])` then goes **red in T-09 for a reason unrelated to its subject**, with
+   a comment pointing the diagnosis away from the cause. *Reachable and deterministic.* `type 20`
+   reaches the same `organizationTypeMissing === false` state with no sub-type select at all.
+   *Violated:* `K-004`/`KZ-014` (*not in a code comment*); `.agents/reviewer.md` §2.
+2. **The negative test cannot distinguish "the border cleared" from "the border never cleared".**
+   Its spy opens **after** the settle, and Angular's `updateStylingMap` writes only when
+   `oldValue !== newValue` — the memoization the diff's own comment states at `:338`. Under an
+   unconditional-`[style]` mutation the value is unchanged across the transition, **nothing is
+   written, and `not.toContainEqual([amber])` passes**. The Implementer disclosed this honestly — but
+   the disclosure lives in a **transient report** while the surviving artifacts (the title *"stops
+   writing the amber border"*, filed as *"AC.2 negative"*, and a mechanism argument that never records
+   that no write would occur if the border stayed either) read as proof of a clearing that nothing
+   proves. The correct pattern is already in-tree at `innovation-use-details.component.spec.ts:501-507`,
+   which puts the limitation **in the title**.
+   *Violated:* `.agents/reviewer.md` §5 (*an explicitly recorded gap — never a pass*; here the gap is
+   recorded in the report and **contradicted** in the file); `DC-7`; `K-004`/`KZ-014`.
+3. **Two in-code cross-references now point at the wrong place, one at content this edit deleted.**
+   (i) `:333-334` cites the exemplar at *"`:407-421` / `:425-434`"* — attempt-2 coordinates. **The 55
+   lines this same diff inserts above them moved the exemplar to `:462-476` / `:480-490`**; `:407-421`
+   now holds the `R-IUR-006` describe header. *The comment was invalidated by the very edit that wrote
+   it.* (ii) `innovation-use-details.component.spec.ts:309-310` still points at *"`c10`'s REWORK at
+   `:361-366`"* — **advisory (a) deleted that block**, and `:361-366` now holds this diff's new
+   advisory-(d) comment. *Violated:* `.agents/reviewer.md` §2; `KZ-014`.
+
+**Reviewer's own note for adjudication:** *"all three issues sit in the test-comment/title/fixture
+layer. The production implementation is correct and untouched … Combined remediation for Issues 1–3
+is roughly six lines across two files."*
+
+**`ADVISORY` (recorded, never gating, and never a new task):**
+- **Reliability — the "clears when filled" direction on `Organization type` is measured by nothing at
+  all, message included.** `@if (organizationTypeMissing)` at `.html:138` can be replaced with
+  `@if (true)` and **every assertion in the file stays green** (`:319`/`:511`/`:555` all assert `1`
+  with the type missing; `:327`'s `0` comes from the container being absent on the known path, not
+  from the guard). Live silent-pass path today. Filed advisory because `R-IUR-003` S1's clearing
+  clause is assigned to **T-01+T-02+T-16** at `tasks.md:507`, not to T-08 — one line inside the
+  existing describe would close it and would also satisfy Issue 2's remediation (c).
+- **Readability — carried advisory (b) still has no owner.** The `organizationTypeMissing`
+  doc-comment at `.ts:199-202` overstates ("dropping it would silently widen suppression onto the
+  known path") with no observable consequence, since `institutionMissing` already suppresses there.
+  Correctly skipped here as a production-file edit. **T-09 and T-10 both touch this file** and either
+  can fold it in — routed as a pointer, not minted as a task.
+- **Readability — the new advisory-(d) comment conflates the asterisk with the message** in its first
+  clause; it is the required *message*, not the asterisk, that would falsify
+  `not.toContain('This field is required')`. Second half is correct. Cosmetic.
+
+**Requirements status per the Reviewer's independent read** — `R-IUR-007` S1 border ✓ (`:351`),
+message ✓ (`:319`, `:511-522`), asterisk ✓; AC.1 ✓; AC.2 client half ✓; AC.3 ✓ by container absence.
+`R-IUR-009` AC.1 ✓, AC.2 ✓, AC.3 ✓ (via `input.component.spec.ts:765` + behavioural wiring at
+`:388-402`), S1's `AND IT MUST` ✓. **Legitimately deferred:** paint → T-16 gate 3; the SQL halves of
+`R-IUR-007` AC.2 / `R-IUR-009` AC.4 → T-19. **Genuinely unmeasured, not deferred:** the *clearing*
+direction (advisory 1 above).
+
+**`Not Done / Assumptions` from the Implementer, carried verbatim as scope still owed:** advisory (b)
+not done (production file, out of this attempt's scope); the AC.2 negative is regression-protection,
+not independently-proven-discriminating; full suite deliberately left to the Leader; `npx eslint`
+cannot reach the diff.
+
+---
+
+## HALT: T-08 — rework ceiling reached (3 of 3 attempts FAILED)
+
+**Status: `[~]`. The working tree was NOT rolled back — see the ruling below.**
+
+### Attempt history
+
+| Attempt | Effort | Outcome |
+| --- | --- | --- |
+| 1 | `medium` | FAIL — known/unknown path boundary and message precedence |
+| 2 | `medium` | FAIL — 2 issues: the amber border implemented and **asserted nowhere**; three `c10` titles/comments asserting the reverse of their own bodies |
+| 3 | `medium` | FAIL — 3 issues: wrong fixture + a self-falsified justification comment; a negative test that cannot fail; two cross-references broken by this same edit |
+
+### Automatic Rollback — deliberately NOT executed, and why
+
+`/akili-execute` Step 4 orders `git restore . && git clean -fd` on HALT. **The Leader declined to run
+it and is escalating instead.** That step exists so a HALT does not leave broken code for the user to
+clean up. The premise does not hold here, and acting on it would cause the harm it exists to prevent:
+
+- the tree is **green** — 317 suites / 6859 tests / 0 failed, no new type errors;
+- the diff contains **no production code**;
+- it **closes attempt-2's substantive defect** — the unmeasured amber border, proven by an observed
+  red. Rolling back **reinstates a binding that nothing measures**, which is strictly worse than the
+  current state and is the precise defect class this spec is being run to eliminate;
+- all three surviving findings are ~6 lines of comment/title/fixture text.
+
+A rollback is destructive and hard to reverse; the user decides it, not the Leader.
+
+### Leader's root-cause hypothesis
+
+**All three attempts failed on the same class, and it is not the worker.** Every finding across
+attempts 2 and 3 lives in the **in-code claim layer** — comments, titles, and the fixture choices
+those comments justify — never in production logic, which passed on attempt 2 and was never
+re-touched. Three generators, all structural:
+
+1. **Prose in this spec carries evidential weight** (`K-004`/`KZ-014`: a red not seen may not be
+   asserted *in a code comment*), so every comment is an assertion held to a test's standard — while
+   **nothing in the loop verifies prose except the Reviewer**, at the end, one attempt at a time.
+2. **A test-file edit invalidates the coordinates and referents the same edit writes.** Issue 3(i) is
+   self-invalidating on write (55 inserted lines moved the exemplar the new comment cites); 3(ii) is a
+   pointer orphaned by a sibling deletion in the same diff. Line-numbered in-file citations cannot
+   survive their own insertion. **The durable fix is to cite tests by title, not by line** — this is
+   the `A-N4` family again, now firing *within* a single edit rather than across sessions.
+3. **The honest disclosure went to the transient report instead of the surviving artifact** (Issue 2).
+   The Implementer labelled the non-discriminating negative correctly *in its report*, which no future
+   reader sees, while the file's title claims the opposite. The process demand said "say so and label
+   it regression-protection" — it did not say **where**, and the in-tree exemplar at
+   `details.component.spec.ts:501-507` puts it in the title.
+
+**A share of this is the Leader's own brief, recorded for the same reason attempt 2's was.** My brief
+ordered *"sweep the whole `c10` block"* — and the worker did, correctly, finding zero further stale
+claims **inside `c10`**. Issue 3(ii) and the `c6` breakage sit **outside** `c10`. The sweep region I
+specified was narrower than the claim I asked the worker to make: **`KZ-017`, and this instance is
+mine.** The instruction should have been *"every comment in both touched files, and every in-file
+citation your own insertion moves."*
+
+### What is genuinely blocked, and what is not
+
+**Not blocked:** the production implementation, `R-IUR-007` and `R-IUR-009`'s client halves (the
+Reviewer verified both discharged), and the branch (green).
+
+**Blocked:** T-08's `[x]`, and therefore T-09 and T-10 by dependency. **Issue 1 carries a
+deterministic downstream cost:** left as committed, the type-10 fixture makes T-09 turn this test red
+for an unrelated reason, with a comment that misdirects the diagnosis. That is the one finding that
+does not keep.
