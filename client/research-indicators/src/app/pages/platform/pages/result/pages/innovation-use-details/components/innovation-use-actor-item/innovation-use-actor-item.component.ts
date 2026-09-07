@@ -21,6 +21,7 @@ import { SelectModule } from 'primeng/select';
 import { InnovationUseActor } from '@shared/interfaces/get-innovation-use-details.interface';
 import { GetActorTypesService } from '@shared/services/control-list/get-actor-types.service';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { ActorType } from '@shared/interfaces/get-actor-types.interface';
 
 /**
  * CLARISA actor-type value reserved for "OTHER". A client-side literal, not an import:
@@ -48,11 +49,45 @@ export class InnovationUseActorItemComponent implements OnInit, OnChanges {
   @Input() actorNumber = 1;
   @Input() disabled = false;
   @Input() duplicateType = false;
+  /**
+   * R-IUR-017 / DD-18 (T-21): `actor_type_id`s already claimed by OTHER rows, computed by the
+   * parent (`InnovationUseDetailsComponent.usedActorTypeIdsExcluding`). This card is the one
+   * that decides how to act on it — see `typeOptions` below.
+   */
+  @Input() usedActorTypeIds: Set<number> = new Set<number>();
   @Output() update = new EventEmitter<InnovationUseActor>();
   @Output() remove = new EventEmitter<void>();
 
   actorService = inject(GetActorTypesService);
   readonly otherActorTypeId = OTHER_ACTOR_TYPE_ID;
+
+  /**
+   * R-IUR-017 / DD-18 (T-21): per-row options derived from the shared catalog
+   * (`actorService.list()`), never mutated (the catalog array is shared across every card on
+   * the page — mutating it would have cards fight over it). PrimeNG disables an option via
+   * `[optionDisabled]="'optionDisabled'"` on the `p-select` — a PROPERTY NAME on the option
+   * object, not a predicate — so each returned option carries its own resolved boolean instead
+   * of a shared computed function.
+   *
+   * Two exemptions are this card's own, regardless of what `usedActorTypeIds` reports:
+   *  - the row's own current value is never disabled (`R-IUR-017`'s BUT clause) — otherwise a
+   *    row renders its own selection greyed out, including in the pre-existing-duplicate-data
+   *    case where the parent legitimately reports this row's own type as "used elsewhere";
+   *  - `OTHER` (`otherActorTypeId`) is never disabled (`R-IUR-017`'s AND clause) — duplicates
+   *    there are keyed on type + trimmed lowercase custom name, so several OTHER rows are
+   *    legitimate.
+   *
+   * A plain getter, not a `computed`, because `@Input`s are not signals here (`ngOnChanges`,
+   * not `input()`) — the surrounding component has no `OnPush` strategy, so this re-evaluates
+   * on every change-detection pass, the same way `actorTypeMissing`/`otherNameMissing` do.
+   */
+  get typeOptions(): (ActorType & { optionDisabled: boolean })[] {
+    const currentTypeId = this.body().actor_type_id;
+    return this.actorService.list().map(option => ({
+      ...option,
+      optionDisabled: option.code !== this.otherActorTypeId && option.code !== currentTypeId && this.usedActorTypeIds.has(option.code)
+    }));
+  }
 
   /**
    * Local copy of the row. Never the parent's signal (DD-5), and never the parent's *object*

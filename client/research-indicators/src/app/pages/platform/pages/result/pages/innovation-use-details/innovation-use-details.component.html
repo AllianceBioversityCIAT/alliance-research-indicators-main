@@ -161,6 +161,7 @@
             [actorNumber]="$index + 1"
             [disabled]="!submission.isEditableStatus()"
             [duplicateType]="duplicateActorTypeIndexes().has($index)"
+            [usedActorTypeIds]="usedActorTypeIdsExcluding($index)"
             (update)="onActorUpdate($index, $event)"
             (remove)="removeActor($index)" />
         }

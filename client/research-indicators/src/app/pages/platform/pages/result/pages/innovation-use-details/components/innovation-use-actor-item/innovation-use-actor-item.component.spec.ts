@@ -888,4 +888,139 @@ describe('InnovationUseActorItemComponent', () => {
       expect(requiredMessage(howManyAfterZero)).toBe(false);
     }));
   });
+
+  // =================================================================================================
+  // T-21 (R-IUR-017/DD-18, T-13 Pivot) — an already-used actor type is not selectable.
+  //
+  // Disqualifier (tasks.md §T-21, verbatim): "asserting on the component's derived array rather
+  // than on the rendered options cannot show what the user can actually click (KZ-001). Assert the
+  // rendered option state." PrimeNG renders its option list in an overlay, on open — these tests
+  // call the real `Select.show()`, run change detection, and read the rendered `<li role="option">`
+  // elements' `p-disabled` class / `data-p-disabled` attribute off `document.body` (the overlay is
+  // appended there, not inside the component's own template root).
+  //
+  // jsdom DOES render this overlay for this PrimeNG version (19.0.6): confirmed by an existing spec
+  // in this repo doing exactly this (`sp-toc-alignment-block.component.spec.ts`, `select.show();
+  // fixture.detectChanges(); flush();`, then reading `document.body.querySelectorAll('.p-select-option')`
+  // and `.p-select-filter`) — jsdom's one precondition is a `window.matchMedia` stub, which
+  // PrimeNG's `Overlay` probes on open and which jsdom does not implement natively. So nothing here
+  // is downgraded to asserting the card's own derived array instead of the rendered option state.
+  // =================================================================================================
+  describe('T-21 (R-IUR-017/DD-18) — an already-used actor type is not selectable', () => {
+    let originalMatchMedia: PropertyDescriptor | undefined;
+
+    beforeAll(() => {
+      originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: jest.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          onchange: null,
+          addListener: jest.fn(),
+          removeListener: jest.fn(),
+          addEventListener: jest.fn(),
+          removeEventListener: jest.fn(),
+          dispatchEvent: jest.fn()
+        }))
+      });
+    });
+
+    afterAll(() => {
+      // Hygiene, matching the precedent spec: restore whatever the environment had (jsdom: nothing)
+      // so the stub never leaks into suites outside this describe.
+      if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+      } else {
+        delete (window as Partial<Window>).matchMedia;
+      }
+    });
+
+    afterEach(() => {
+      // The overlay is appended to document.body — drop any leftovers so DOM assertions never
+      // bleed across tests.
+      document.body.querySelectorAll('.p-select-overlay, .p-overlay').forEach(el => el.remove());
+    });
+
+    const actorTypeSelect = (): Select => fixture.debugElement.query(By.directive(Select)).componentInstance as Select;
+
+    /** The rendered `<li role="option">` from the OPEN overlay whose visible label matches. */
+    const renderedOption = (label: string): HTMLElement | undefined =>
+      (Array.from(document.body.querySelectorAll('li[role="option"]')) as HTMLElement[]).find(
+        li => (li.textContent || '').trim() === label
+      );
+
+    const isRenderedDisabled = (li: HTMLElement): boolean =>
+      li.classList.contains('p-disabled') || li.getAttribute('data-p-disabled') === 'true';
+
+    // Falsifying input (brief, verbatim, AC.1 half): row 1 = Farmers. Row 2's dropdown shows
+    // Farmers disabled.
+    it('AC.1 — a type held by another row renders disabled in the rendered overlay', fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 2 }; // this row currently holds NGOs
+      component.usedActorTypeIds = new Set([1]); // another row holds Farmers
+      fixture.detectChanges();
+
+      actorTypeSelect().show();
+      fixture.detectChanges();
+      flush();
+
+      const farmers = renderedOption('Farmers');
+      expect(farmers).toBeTruthy();
+      expect(isRenderedDisabled(farmers!)).toBe(true);
+    }));
+
+    // Falsifying input (brief, verbatim, AC.1/AC.2 together): row 1's OWN dropdown still shows
+    // Farmers enabled. Modelled here as the pre-existing-duplicate-data case (R-IUR-017 AC.5's
+    // backstop): the parent's set can legitimately name this row's own type when another row also
+    // (illegitimately) holds it — the card must still never disable its own current value.
+    it("AC.2 — the holding row's own dropdown still shows its current value enabled, even if usedActorTypeIds also names it", fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 1 }; // this row holds Farmers
+      component.usedActorTypeIds = new Set([1]);
+      fixture.detectChanges();
+
+      actorTypeSelect().show();
+      fixture.detectChanges();
+      flush();
+
+      const farmers = renderedOption('Farmers');
+      expect(farmers).toBeTruthy();
+      expect(isRenderedDisabled(farmers!)).toBe(false);
+    }));
+
+    // Falsifying input (brief, verbatim): two rows on OTHER — both stay enabled. Modelled here as
+    // usedActorTypeIds naming OTHER's code (5) directly — a state the parent should not actually
+    // produce (OTHER duplicates are keyed on custom name, not type), but the card must not trust
+    // that assumption; it must exempt OTHER unconditionally.
+    it('AC.3 — OTHER is never disabled, however many rows already use it', fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 2 };
+      component.usedActorTypeIds = new Set([5]);
+      fixture.detectChanges();
+
+      actorTypeSelect().show();
+      fixture.detectChanges();
+      flush();
+
+      const other = renderedOption('Other');
+      expect(other).toBeTruthy();
+      expect(isRenderedDisabled(other!)).toBe(false);
+    }));
+
+    it('a type used by no other row renders enabled (baseline — nothing over-disabled)', fakeAsync(() => {
+      component.actor = new InnovationUseActor();
+      component.usedActorTypeIds = new Set();
+      fixture.detectChanges();
+
+      actorTypeSelect().show();
+      fixture.detectChanges();
+      flush();
+
+      const farmers = renderedOption('Farmers');
+      const ngos = renderedOption('NGOs');
+      expect(farmers).toBeTruthy();
+      expect(ngos).toBeTruthy();
+      expect(isRenderedDisabled(farmers!)).toBe(false);
+      expect(isRenderedDisabled(ngos!)).toBe(false);
+    }));
+  });
 });

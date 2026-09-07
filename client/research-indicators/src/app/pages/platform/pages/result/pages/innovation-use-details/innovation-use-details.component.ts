@@ -275,6 +275,28 @@ export default class InnovationUseDetailsComponent {
   hasDuplicateActorType = computed<boolean>(() => this.duplicateActorTypeIndexes().size > 0);
 
   /**
+   * R-IUR-017 / DD-18 (T-21, T-13 Pivot): for the actor row at `index`, the `actor_type_id`s
+   * already claimed by every OTHER row — this row's own current selection is excluded from
+   * the computation (never merely exempted downstream), so a pre-existing duplicate (two rows
+   * already sharing a type) still reports correctly for both rows. Read live off
+   * `body().actors` on every call, never a cached set, so removing a row re-enables its type
+   * everywhere immediately (AC.4). This is a plain method, not a `computed`, precisely because
+   * it is parameterised per row — a `computed` here would need to be indexed itself and gains
+   * nothing over deriving directly on each template read (the same pattern this page already
+   * uses for `duplicateActorTypeIndexes().has($index)`).
+   *
+   * Exempting the row's own value and `OTHER` from disabling is the CARD's job (DD-18 /
+   * design.md §7 component table), not this method's — it only reports what other rows use.
+   */
+  usedActorTypeIdsExcluding(index: number): Set<number> {
+    const used = new Set<number>();
+    this.body().actors.forEach((row, i) => {
+      if (i !== index && row.actor_type_id) used.add(row.actor_type_id);
+    });
+    return used;
+  }
+
+  /**
    * §6.7 step 5: the one field on this page a save error can be addressed to by a stable name.
    * Array rows (actors/organizations/quantifications) have no server-assigned index in this
    * shape to bind an inline message to — every other message still reaches the user through the

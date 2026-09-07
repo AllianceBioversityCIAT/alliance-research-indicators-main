@@ -2041,6 +2041,90 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // =================================================================================================
+  // T-21 (R-IUR-017/DD-18, T-13 Pivot) — the parent computes which actor types are already taken
+  // (self excluded) and wires that set into each card as `usedActorTypeIds`. The disable/exemption
+  // logic itself is card-owned (asserted in innovation-use-actor-item.component.spec.ts against the
+  // RENDERED p-select overlay, per this task's Disqualifier) — these tests cover only the parent's
+  // half: does the right set reach the right row, and does it stay LIVE off `body().actors` (AC.4).
+  // =================================================================================================
+  describe('T-21 (R-IUR-017/DD-18) — usedActorTypeIds wiring', () => {
+    it('wires each row the OTHER rows\' actor_type_ids, excluding its own index', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 2 },
+          new InnovationUseActor()
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(3);
+      // Row 0 (type 1): sees row 1's type (2), never its own (1).
+      expect(cards[0].componentInstance.usedActorTypeIds).toEqual(new Set([2]));
+      // Row 1 (type 2): sees row 0's type (1), never its own (2).
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set([1]));
+      // Row 2 (blank): sees both other rows' types.
+      expect(cards[2].componentInstance.usedActorTypeIds).toEqual(new Set([1, 2]));
+    });
+
+    it('a blank actor_type_id on another row contributes nothing to the set', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [new InnovationUseActor(), { ...new InnovationUseActor(), actor_type_id: 1 }]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set());
+    });
+
+    // AC.4 (R-IUR-017) — falsifying input: removing the row that held a type must re-enable it on
+    // the surviving row's wiring. This is the "derive live, never cache" trap named in the brief —
+    // asserted here at the parent's own boundary (what reaches the card), which is exactly what a
+    // cached-set implementation would get wrong: a memoized Set built once from the original
+    // three-row body would still contain the removed row's type after the removal.
+    it('removing the row that held a type re-enables it everywhere (AC.4)', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 2 }
+        ]
+      });
+      fixture.detectChanges();
+      let cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set([1]));
+
+      component.removeActor(0);
+      fixture.detectChanges();
+
+      cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(1);
+      expect(cards[0].componentInstance.usedActorTypeIds).toEqual(new Set());
+    });
+
+    // AC.5 — this requirement adds no save-time gate: pre-existing duplicate data (two rows
+    // already sharing a type) must still save. Mirrors the T-13 test above, restated for R-IUR-017
+    // specifically since it is the requirement AC.5 names.
+    it('a result whose stored data already contains a duplicate still saves (AC.5, no client-side block)', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 2 }
+        ]
+      });
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // =================================================================================================
   // T-13 (R-IUR-014 AC.1-AC.4, AC.6, AC.7; DD-8 SECOND AMENDMENT; NFR-IUR-003 unnarrowed) —
   // nothing on this page gates saveData() any more. Every row buildPayload() drops still reaches
   // the PATCH for every OTHER row, and the user's only signal for the drop is the field-level

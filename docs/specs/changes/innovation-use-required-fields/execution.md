@@ -56,7 +56,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-18 migration + migration spec | `[ ]` | |
 | T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
-| T-21 actor: used type not selectable (`R-IUR-017`) | `[ ]` | **NEW — T-13 Pivot.** Replaces the withdrawn duplicate save-block |
+| T-21 actor: used type not selectable (`R-IUR-017`) | `[x]` | **PASS attempt 1.** Rendered-overlay assertions, not the derived array. PrimeNG's own self-exemption is inert here — ours is load-bearing |
 
 ---
 
@@ -1927,3 +1927,28 @@ The Leader's own read-only Dev probe before dispatch (**42 total · 9 root+activ
 4. **Recorded for T-18's benefit:** `getInstitutionTypesByDepthLevel` **drops the `code` filter entirely** when `institutionTypeId` is falsy, so id `0` would return every root's children server-side while the client's `getSubTypes` returns early on `!code`. Unreachable today (FK-constrained, rule 7 requires non-null, `0` is not a catalog code) — recorded **only so a future `IN (0, …)` is not written by accident**.
 
 **`R-IUR-008` AC.4:** the enumeration half is discharged. T-18 owns writing the clause into the migration; T-19 owns executing it. **The link between them is what advisory 1 says nobody currently owns.**
+
+---
+
+#### T-21 — Reviewer `STATUS: PASS` ✅ **task complete** *(new task, created by the T-13 Pivot)*
+
+**What it delivers.** An actor type already claimed by another row renders **disabled** in every other row's dropdown. The parent reports raw usage (`usedActorTypeIdsExcluding(index)`, derived live off `body().actors`); the **card** applies both exemptions — its own current value, and `OTHER` — matching `design.md` §7's ownership table rather than a worker preference. The shared CLARISA catalog is **never mutated**: `typeOptions` maps it into new objects carrying a resolved `optionDisabled` boolean, because PrimeNG's `[optionDisabled]` takes a **property name, not a predicate**.
+
+**Verification (Leader-measured, quiet tree):** full client suite **317 suites / 6885 tests / 0 failed**, `npm run build` exit 0, **+8 on the 6877 baseline — exactly the tests added**. Targeted: actor-item 46/46, details 171/171.
+
+**Three reddening mutations, all observed** — `OTHER` exemption dropped (`AC.3` red), own-value exemption dropped (`AC.2` red), and the parent's set memoized in a `Map` instead of derived live (`AC.4` red: `- Set {}` / `+ Set { 2 }`, exactly what an index-memoized map produces for the survivor at index 0).
+
+**The Disqualifier was met, not downgraded.** `tasks.md` demanded assertions on **rendered** option state, warning that the component's derived array *"cannot show what the user can actually click"*. The Implementer found an in-repo precedent, opened the real PrimeNG overlay in jsdom via `Select.show()`, and read the actual `<li role="option">` elements from `document.body`, checking the `p-disabled` class / `data-p-disabled` attribute it confirmed by reading `primeng-select.mjs`. The Reviewer verified it **cannot pass vacuously**: every test asserts the option was found before asserting its disabled state, so a failed overlay render fails the test rather than passing silently.
+
+**Two findings from the Reviewer worth more than the verdict:**
+
+1. **PrimeNG's own selected-option self-exemption is INERT under this configuration, so our exemption is load-bearing.** With `[optionValue]="'code'"` the library computes `getOptionValue(this.modelValue())` = `resolveFieldData(1, 'code')` → `undefined`, never equal to `option.code`; and its second disjunct carries a **misplaced parenthesis** (`getOptionLabel(modelValue() === getOptionLabel(option))`) that always resolves falsy. **That is precisely why the own-value mutation reddened.** A future reader who spots the library's version and "simplifies away" `option.code !== currentTypeId` breaks `AC.2` silently. **This warrants an in-code comment.**
+2. **"Not selectable" is real, not merely visual** — traced on both input paths: mouse clicks never fire because `.p-disabled { pointer-events: none }`, and every keyboard focus-index source (`findFirstOptionIndex`, `findNextOptionIndex`, `findLastOptionIndex`, and `isOptionMatched` for type-ahead) filters through `isValidOption` → `isOptionDisabled`. A greyed option still reachable by keyboard would have been a `KZ-001` fake.
+
+**Performance ruling — asked for explicitly, answered mechanically rather than waved through.** `usedActorTypeIdsExcluding($index)` is a template method call returning a new `Set` per row per change-detection pass, on a component without `OnPush`. **The churn is absorbed at the PrimeNG boundary:** `set options(val) { if (!deepEquals(val, this._options())) this._options.set(val); }` — so `_options`, `visibleOptions`, the scroller and the overlay do not re-run unless content actually changed. Real cost is `rows × (one Set alloc + one catalog map + one deepEquals)` over a ~dozen-entry catalog and single-digit rows — the same order as `duplicateActorTypeIndexes().has($index)`, `total()` and `actorTypeMissing`, which this page already evaluates every pass. **No `NG0100`:** Angular's `devModeEqual` treats two list-likes with object members as equal, consistent with 6885 green tests all running the check-no-changes pass. The Reviewer could not construct a realistic row count at which it matters.
+
+**`ADVISORY` (non-gating):**
+1. **Deviation from the task's `Verify` text, recorded so it is visible:** T-21's *Verify* asked for *"a details-level test that two rendered cards disagree on which options are disabled"*. That was **not written** — the details spec asserts the `usedActorTypeIds` **@Input** reaching each real (unstubbed) card instead. The chain is sound (both links join at the identical interface; the card-level tests assert the rendered overlay), and the Reviewer could not construct a defect this would catch that the two existing links miss. **The cross-row *rendered* composition is nonetheless unasserted.**
+2. The load-bearing own-value exemption (finding 1 above) should carry an in-code comment naming PrimeNG's inert equivalent.
+3. If the actor list ever grows past single digits, one `computed` producing a single "types in use" set — each card subtracting its own value — would remove the per-row allocation.
+4. **The `duplicateType` amber message is now reachable only from data written directly to the database**, since the UI can no longer create a duplicate. That is exactly what `DD-18` specifies (the computed stays; only its save-gate use is gone). **Noted so a future reader does not read it as dead code and delete it.**
