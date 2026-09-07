@@ -44,7 +44,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
 | T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
 | T-08 org unknown type + count | `[x]` | **PASS attempt 4 of 4** (ceiling lifted by one on user ruling; HALT at attempt 3 recorded and resolved). 3 pointers filed → T-09/T-10, 1 → T-16 |
-| T-09 org sub-type conditional + null | `[ ]` | |
+| T-09 org sub-type conditional + null | `[x]` | **PASS attempt 2 of 3.** DD-5b silent-persistence bug fixed at source. 3 advisories filed → T-10, 1 → `/akili-quick` |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
 | T-12 details measure wiring | `[x]` | PASS attempt 3 of 3. **Restored the build.** All 4 pointers discharged |
@@ -1341,3 +1341,233 @@ Tests: 1 failed, 37 passed, 38 total
 5. `innovation-use-details.component.spec.ts:2733` is ~135 chars against the block's ~120 wrap. No gate catches it (prettier does not reflow comments; eslint ignores `*.spec.ts`).
 
 **Carried forward, with owners:** advisory (b) from attempt 3 (the `organizationTypeMissing` doc-comment overstatement in production code) → **T-09/T-10**; advisories 1–3 above → **T-09/T-10**; the `tsc` set-diff → **T-16 gate 2**; **the amber border on a `p-select`, organization card, BOTH paths → T-16 gate 3's named field list** (still the run's `NO-PAINT-OWNER` gap, and still not on that list).
+
+---
+
+### T-09 attempt 1 — Reviewer `STATUS: FAIL`, 2 issues (both citation-layer)
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-07 |
+| Effort assigned | `high` (task said `M`; raised for a silent-persistence defect and a tight round budget) |
+| Skills | `angular-developer`, `systematic-debugging` |
+
+**Substance PASSED, verified at the source by the Reviewer, and none of it is reopened by the rework:**
+`R-IUR-008` S1, S2, the `BUT` clause and AC.1–AC.3 discharged on the client · `DD-9` precedence claim
+verified (two field-level messages **cannot** co-render: a non-empty `subTypeOptions()` implies a
+truthy `institution_type_id`, which forces `organizationTypeMissing` and `showNotIdentifiedMessage`
+false) · both new mock claims true, each checked in the file that makes it · unconditional asterisk
+ruled **conformant** (`R-IUR-003` AC.1 is unconditional; only border and message are state-driven) ·
+clearing on every type change ruled conformant (PrimeNG's `onOptionSelect` is guarded by
+`if (!this.isSelected(option))`, so re-picking the same type emits no `onChange` — no over-clearing
+path exists) · both `regression-protection` labels ruled correct · border-spy attribution established,
+not assumed. **All three of the Leader's scope rulings confirmed correct**, including the decision not
+to modify `innovation-use-details.component.ts` (`:530` already forwards the value and its payload
+type already declared `number | null`).
+
+**The `0`-falsy question the Leader raised — investigated and ruled acceptable, with reasoning.**
+`subTypeMissing` tests `!this.body().sub_institution_type_id`. The Reviewer **could not construct a
+reachable defect**: `code` is a CLARISA `bigint` `@PrimaryColumn` so `0` is representable, but no
+fixture, seed or baseline holds `code: 0` and no client path produces one. The spec's `0`-is-a-value
+requirements are scoped to **user-entered quantities** (`R-IUR-004`, `R-IUR-009`), never catalog ids,
+and the identical falsy test already ships **three times** for the same catalog — `institutionMissing`,
+`organizationTypeMissing`, and innovation-**dev**'s own `subTypeMissing`. Changing it here alone would
+*create* the inconsistency. **Routed to T-14's enumeration (does a code-0 type exist?) and T-19's
+truth table** — the surfaces that can actually answer it.
+
+**FAIL issue 1 — this diff rotted three cross-file citations and did not repair them.** The 11-line
+`#subTypeRequiredMessage` insertion pushed the `Organization type` `[style]` binding from
+`.html:116` → `.html:127`, falsifying three comments in the spec file the same diff edits. **Leader
+re-verified each:** `.html:116` is now `      }`, a closing brace, and the binding is at `:127`. Two
+of the three name **the mutation that produced an observed red** — evidence prose gone false. Fourth
+firing of the `A-N4` family in this spec.
+
+**FAIL issue 2 — the new HTML comment re-seeded two same-file `:NNN` citations** (`.html:9-12`,
+`:20-23`), against a standing rule this spec closed at T-08 attempt 4 on *"0 survivors"*.
+
+#### Leader error, recorded because the generator is mine and not the worker's
+
+My attempt-1 brief said: *"no comment may carry a `:NNN` reference to a location inside its own file.
+**Cross-file citations are allowed but verify each one.**"* The worker complied exactly — it verified
+`.html:116`, which was **true when it read it** — and then its own insertion moved it. **The rule drew
+the boundary in the wrong place.** The hazard is not the file boundary; it is the citing and cited
+files sharing an **edit window**, and in this spec the component, its template and its spec are always
+edited together.
+
+**Worse, and this is the part worth keeping: the repo had already made this exact correction, and I
+authored a weaker rule instead of reading it.** `server/researchindicators/src/CLAUDE.md:189`
+carries **FP-50**, whose own text records the amendment: *"cite by anchor, not by line number,
+whenever the cited file could move (added 2026-08-19; ~~'a cross-file line citation is fine'~~
+**AMENDED 2026-08-20**)"* — the struck clause is, almost verbatim, the permission I granted. FP-50
+even states it is *"a measurement, not a style preference: six of the originating spec's seven
+inaccurate citations were same-file line numbers invalidated by the very edit that introduced them."*
+
+**Corrected rule now in force for the rest of this spec:** *cite by name — symbol, test title,
+template name, or a quoted code fragment — **never** by line number, for any file this spec touches.*
+
+**Two Kaizen candidates, not actioned here:**
+1. **FP-50 lives only in the `server/` child guide** while the rule is package-neutral documentation
+   hygiene — and every one of its four firings in this spec has been in **client** files. It belongs
+   in root `CLAUDE.md` §4.3.
+2. **The Leader's `:NNN` sweep has been narrower than its claim twice.** T-08 attempt 4 closed on
+   "0 same-file survivors in **both files**" — the two **spec** files; the `.html` was never swept,
+   and it holds a pre-existing same-file citation (T-08's `#organizationTypeRequiredMessage` comment,
+   *"mirrors T-07's own rationale at :9-12"*) that the Leader found only now. `KZ-017`, third
+   instance, Leader-owned each time. **Attempt 2's sweep is specified over all five touched files.**
+
+**Effort held at `high`, not bumped.** Issue 1's generator is the Leader's rule; issue 2 is a
+mechanical miss of an instruction that *was* given. Neither is under-thinking, and bumping the dial to
+replace five strings with names buys nothing. Attempt 2's brief carries the corrected rule instead —
+plus the fourth, pre-existing `.html` instance, folded in with its reason stated, because the standing
+rule governs the file already under edit and leaving one behind guarantees a fifth firing.
+
+**Advisories recorded (not gating, not minted as tasks):** the AC.2 test's two structurally-guarded
+assertions want their `regression-protection` status in the **surviving artifact** rather than the
+transient report (T-08's generator 3 — **the Leader's process demand never said *where*; fixed for
+T-10 onward rather than charged to this worker**) · the `0` case → T-14/T-19 · the attempt-4 fixture
+comment's stale consequence clause → T-10 · the T-11 comment in the interface file citing
+`innovation-use-details.component.ts:80-85` for a payload type now at `:95-100`, rotted by T-12 →
+candidate for an `/akili-quick` line-number purge, not rework here.
+
+---
+
+## User ruling — comment/citation inaccuracy is ADVISORY, not FAIL (2026-09-07)
+
+**In force from T-09 attempt 2 onward, for the remainder of this spec.** Recorded as a Document
+Control-level change to how the Reviewer gate is applied, because it alters what consumes the rework
+budget — not a per-task decision.
+
+### The measurement that prompted it
+
+The user asked why the review loop was failing so often and what it was costing. The honest tally:
+
+| Metric | Value |
+| --- | --- |
+| Subagent tokens, this session, 6 completed runs | **1,015,321** |
+| Review rounds consumed | **20 of ~24** budgeted, with 9 tasks remaining |
+| Rounds spent on **production-logic** defects | **0** |
+| Rounds spent on the **in-code claim layer** (comments, titles, citations, fixture justifications) | **all of them** |
+
+Production logic passed on first presentation every time it was submitted: T-08's from attempt 2
+onward (attempts 3 and 4 changed **no** production line), T-09's on attempt 1. Of the six runs, two
+delivered the substantive value — T-08's mutation-proven border assertion (a binding that was
+implemented and measured by nothing) and T-09's `JSON.stringify` fix (a silent data-survival bug).
+The other four went to prose.
+
+### Why the loop generated this
+
+1. **This spec elevated comments to evidence.** `K-004`/`KZ-014` forbids asserting an unobserved red
+   *"not in a code comment"* — correct as a guard against fabricated evidence, but its consequence is
+   that each of ~100+ comment blocks per file becomes an auditable assertion held to a test's
+   standard, with nothing verifying prose except the Reviewer, at the end, one attempt at a time.
+2. **Line-number citations self-invalidate.** Four firings of the `A-N4` family, one *inside the
+   edit that wrote it*.
+3. **Three of the failures were generated by the Leader's briefs**, not the workers': the `c10`-only
+   sweep scope (T-08 attempt 3), ten audit questions that never asked whether the border was
+   *asserted* (T-08 attempt 2), and a citation rule authored from scratch that reinstated a
+   permission `FP-50` had already retracted (T-09 attempt 1).
+
+### The ruling
+
+**A comment, title or citation inaccuracy is `ADVISORY`, never `FAIL` — with one carve-out: prose
+that misstates the EVIDENCE for a requirement remains gate-worthy.** Naming a mutation that was not
+performed, or claiming a proof that does not exist, still FAILs. Ordinary descriptive drift does not.
+
+Unchanged and still FAIL-eligible: production logic, requirement conformance, design-decision
+violations, a non-discriminating assertion presented as evidence (`KZ-001`), and an unobserved red
+that is claimed (`K-004`/`KZ-014`).
+
+**Counterfactual, stated so the trade is explicit:** under this policy **T-08 attempt 3 and T-09
+attempt 1 would both have been `PASS`** — a saving of two rework rounds and roughly 400k tokens,
+against the cost that some descriptive prose in these files stays imprecise. The recorded mitigation
+is an `/akili-quick` line-number purge over the two spec files at the end, which the Reviewer had
+already recommended independently for the 14 unaudited citations in
+`innovation-use-details.component.spec.ts`.
+
+**Also now in force (Leader correction, superseding the attempt-1 brief):** *cite by name — symbol,
+test title, template name, or a quoted code fragment — **never** by line number, for any file this
+spec touches.* This is `FP-50` as amended on 2026-08-20, applied rather than re-derived.
+
+---
+
+#### T-09 attempt 2 — Reviewer `STATUS: PASS` ✅ **task complete**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-09-07 |
+| Effort | `high` on both attempts — **deliberately never bumped**; attempt 1's issue 1 was generated by the Leader's own citation rule, issue 2 was a mechanical miss. Neither was under-thinking |
+| Attempts | **2** (of 3) · **first task reviewed under the ADVISORY policy** |
+| Files changed | `innovation-use-organization-item.component.{ts,html,spec.ts}` · `innovation-use-details.component.spec.ts` · `get-innovation-use-details.interface.ts` |
+
+**What T-09 delivers.** `sub_institution_type_id` is required exactly when the sub-type select renders
+— gated on the template's own `subTypeOptions().length > 0`, never on a re-derived
+`is_active`/root/depth-2 predicate (`DD-5`) — with the asterisk, the `[style]` amber border (`DD-3`)
+and a `.organization-subtype-required-message` hook. And the `DD-5b` half: `onInstitutionTypeChange`
+now writes an explicit **`null`** instead of `undefined`, which `JSON.stringify` **dropped entirely**,
+so the key never reached the server and a previously stored sub-type survived under a type that no
+longer has one — invisible on screen and in the payload. Type widened to `number | null | undefined`
+to make that assignment legal.
+
+**Verification (Leader-measured in a quiet tree unless noted).**
+
+| Check | Result |
+| --- | --- |
+| Full client suite | **317 suites / 6864 tests / 0 failed**, exit 0 · coverage 98.2 / 96.3 / 97.88 / 98.51. **+5 on the 6859 baseline — exactly the 5 tests added**; byte-identical across attempts 1 and 2, which is itself the proof attempt 2 was comment-only |
+| `npm run build` | **exit 0**, bundle emitted |
+| Targeted suites | 42/42 org-item · 157/157 details — unchanged between attempts |
+| `npx tsc -p tsconfig.spec.json` set-diff | one pre-existing `TS2741`, verified identical against `git show HEAD:…`; details spec zero before and after |
+| `npx eslint` | clean on the production `.ts`/`.html`; **declared unable to reach `*.spec.ts`** (`K-002`), not cited as clean |
+| Line-citation sweep, org-item files | **zero** surviving `.html:NNN` or same-file `` `:NNN `` (Leader-verified independently); all four `<ng-template #…>` anchors exist, so both new name anchors resolve |
+| Reddening mutations | every new assertion mutated and its red observed; the one-line `null` revert reddens **both** spec files — the sufficiency proof for fixing at the source only |
+
+**Reviewer's substantive findings from attempt 1, all verified at the source and none reopened:**
+`R-IUR-008` S1, S2, the `BUT` clause and AC.1–AC.3 discharged · `DD-9` precedence intact and **two
+field-level messages provably cannot co-render** (a non-empty `subTypeOptions()` implies a truthy
+`institution_type_id`, forcing `organizationTypeMissing` and `showNotIdentifiedMessage` false) · both
+mock claims true, each checked in the file that makes it · unconditional asterisk **conformant**
+(`R-IUR-003` AC.1 is unconditional; only border and message are state-driven) · clearing on every type
+change conformant, because PrimeNG guards `onOptionSelect` with `if (!this.isSelected(option))`, so
+re-picking a type emits no `onChange` — **no over-clearing path exists** · both `regression-protection`
+labels correct · **all three Leader scope rulings confirmed**, including not modifying
+`innovation-use-details.component.ts` (it already forwards the value and its payload type already
+declared `number | null`).
+
+**The `0`-falsy question the Leader raised — ruled acceptable, not deferred.** `subTypeMissing` tests
+`!this.body().sub_institution_type_id`. The Reviewer **could not construct a reachable defect**: `code`
+is a CLARISA `bigint` `@PrimaryColumn` so `0` is representable, but no fixture, seed or baseline holds
+one and no client path produces one; this spec's `0`-is-a-value rules are scoped to **user-entered
+quantities** (`R-IUR-004`, `R-IUR-009`), never catalog ids; and the identical falsy test already ships
+**three times** for the same catalog, including innovation-**dev**'s own `subTypeMissing`. Changing it
+here alone would *create* the inconsistency. **Routed to T-14's enumeration and T-19's truth table.**
+
+**Blast radius of the interface widening — checked by the Leader and again by the Reviewer:**
+`sub_institution_type_id` is declared **separately** in `get-innovation-details.interface.ts`
+(innovation-**dev**, already `number | null`), so the widening cannot reach that feature. No other
+consumer client-wide.
+
+**`Cannot prove` (`KZ-017`)** — catalog-wide agreement between the client predicate and SQL → **T-14**
+(a mocked sub-types service cannot observe the `is_active` or root filters, and the in-code
+Disqualifier block says so explicitly) · paint → **T-16 gate 3** · AC.4 → T-14/T-19. **The attempt-2
+Reviewer declared its own limit:** holding no `Bash`, it read the working tree rather than the delta,
+and rested its comment-only finding on the surviving production logic matching attempt 1's confirmed
+state plus the unchanged suite figures.
+
+**`ADVISORY` (recorded, non-gating, not minted as tasks):**
+1. `innovation-use-organization-item.component.ts` carries a cross-**component** line citation into
+   `innovation-details/components/organization-item` (lines 92/173/189). The Implementer's per-file
+   sweep reported "0 citations" for that file — **true as scoped** (it matches neither the `.html:NNN`
+   nor the same-file pattern) but the same rot family. → **T-10**.
+2. `spec.ts` cites `primeng-select.mjs line 721` — a third-party line that drifts on any PrimeNG bump.
+   Pre-existing, out of scope.
+3. **A correction to this log's own earlier record:** the attempt-4 fixture comment's *"would redden
+   this test once T-09 lands"* was recorded here as flatly stale. The attempt-2 Reviewer reads it as a
+   **counterfactual about type 10**, not a claim about the code as written with type 20 — so its
+   staleness is **milder than this log stated**. Both readings are advisory; recording the narrower one
+   rather than leaving the harsher claim standing (`KZ-007` — a correction record is the highest-risk
+   artifact class). → **T-10**.
+4. The 14 unaudited line citations in `innovation-use-details.component.spec.ts` and the extra one in
+   the interface file → the recommended **`/akili-quick` line-number purge**, not rework here.
+
+**Policy note.** This is the first task closed under the ADVISORY ruling. It did not change this
+verdict — attempt 2 would have passed either way — but it is what kept attempt 2 **narrow-scope**
+(three questions, not a re-audit) at **67k tokens against ~160k for a full round**.

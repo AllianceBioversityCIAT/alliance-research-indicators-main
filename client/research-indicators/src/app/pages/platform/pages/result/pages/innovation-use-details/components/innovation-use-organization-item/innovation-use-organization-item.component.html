@@ -20,9 +20,20 @@
 <!-- R-IUR-007 (T-08) — unknown-path field-level required message for `Organization type`. Its
      own `.organization-type-required-message` class keeps it distinguishable from T-07's
      known-path `.organization-required-message` so message counts stay attributable per
-     source (mirrors T-07's own rationale at :9-12). -->
+     source (mirrors the `#institutionRequiredMessage` (T-07) per-source attribution rationale). -->
 <ng-template #organizationTypeRequiredMessage>
   <div class="organization-type-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
+<!-- R-IUR-008 (T-09) — Sub-type required message, rendered only when the sub-type select itself
+     renders (subTypeOptions().length > 0) AND it is empty. Own `.organization-subtype-required-
+     message` class hook, mirroring the `#institutionRequiredMessage` (T-07) and
+     `#organizationTypeRequiredMessage` (T-08) per-source attribution rationale. -->
+<ng-template #subTypeRequiredMessage>
+  <div class="organization-subtype-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
     <i class="material-symbols-rounded !text-[14px]">warning</i>
     <span class="fs-[14]">This field is required</span>
   </div>
@@ -140,7 +151,7 @@
       }
 
       @if (subTypeOptions().length > 0) {
-        <span class="label rs-mt-[12]">Sub-type</span>
+        <span class="label rs-mt-[12]">Sub-type<span class="text-red-500">*</span></span>
         <p-select
           [disabled]="disabled"
           [scrollHeight]="'218px'"
@@ -149,6 +160,7 @@
           placeholder="Select the organization sub-type"
           [ariaLabel]="'Select the organization sub-type'"
           class="fs-[14] w-full"
+          [style]="subTypeMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
           [ngModel]="body().sub_institution_type_id"
           (onChange)="onSubTypeChange($event.value)"
           [options]="subTypeOptions()">
@@ -169,6 +181,10 @@
             </div>
           </ng-template>
         </p-select>
+
+        @if (subTypeMissing) {
+          <ng-container *ngTemplateOutlet="subTypeRequiredMessage"></ng-container>
+        }
       }
 
       @if (body().institution_type_id === otherInstitutionTypeId) {

@@ -255,6 +255,101 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
   });
 
+  // R-IUR-008 (T-09) — Sub-type is required EXACTLY when the sub-type select renders, gated on
+  // the same `subTypeOptions().length > 0` predicate the template already uses for the select
+  // itself (DD-5) — never a re-derived is_active/root/depth-2 predicate. Type 10 resolves rows
+  // (SUB_TYPES_BY_TYPE), type 20 resolves zero.
+  describe('R-IUR-008 (T-09) — sub-type conditionally required, with amber border and message', () => {
+    it('AC.1: type 10 (has sub-types) with no sub-type chosen renders the asterisk, the amber border and the required message', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      try {
+        await component.onInstitutionTypeChange(10);
+        fixture.detectChanges();
+
+        expect(component.subTypeMissing).toBe(true);
+        expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      } finally {
+        borderSetSpy.mockRestore();
+      }
+
+      const subTypeLabel = fixture.debugElement.queryAll(By.css('span.label')).find(de => (de.nativeElement as HTMLElement).textContent?.startsWith('Sub-type'))!;
+      expect(subTypeLabel.query(By.css('.text-red-500'))).toBeTruthy();
+
+      const messages = fixture.debugElement.queryAll(By.css('.organization-subtype-required-message'));
+      expect(messages.length).toBe(1);
+      expect(messages[0].nativeElement.textContent as string).toContain('This field is required');
+    });
+
+    it('AC.1 negative: choosing a sub-type clears the amber border and the message while the asterisk stays (unconditional, matching Organization type)', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+      await component.onInstitutionTypeChange(10);
+      fixture.detectChanges();
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      try {
+        component.onSubTypeChange(101);
+        fixture.detectChanges();
+
+        expect(component.subTypeMissing).toBe(false);
+        expect(borderSetSpy.mock.calls).toContainEqual(['']);
+      } finally {
+        borderSetSpy.mockRestore();
+      }
+
+      expect(fixture.debugElement.queryAll(By.css('.organization-subtype-required-message')).length).toBe(0);
+      const subTypeLabel = fixture.debugElement.queryAll(By.css('span.label')).find(de => (de.nativeElement as HTMLElement).textContent?.startsWith('Sub-type'))!;
+      expect(subTypeLabel.query(By.css('.text-red-500'))).toBeTruthy();
+    });
+
+    it('AC.2: type 20 (no sub-types) never renders the Sub-type select, asterisk or message, and does not make the row invalid on that account', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      await component.onInstitutionTypeChange(20);
+      fixture.detectChanges();
+
+      expect(selectByAria('Select the organization sub-type')).toBeFalsy();
+      expect(fixture.debugElement.queryAll(By.css('.organization-subtype-required-message')).length).toBe(0);
+      expect(fixture.debugElement.queryAll(By.css('span.label')).some(de => (de.nativeElement as HTMLElement).textContent?.startsWith('Sub-type'))).toBe(false);
+      expect(component.subTypeMissing).toBe(false);
+    });
+
+    // AC.3 + DD-5b falsifying input: pick a sub-typed type, choose a sub-type, then switch to a
+    // type with no sub-types — the stale value must be cleared to an explicit `null`, never left
+    // as `undefined` (JSON.stringify drops `undefined`, so `undefined` here would let the value
+    // silently survive past `buildOrganizationPayload` on the unknown path — DD-5b).
+    it('AC.3 / DD-5b: switching from a sub-typed type to one without sub-types clears sub_institution_type_id to an explicit null, not undefined', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+      await component.onInstitutionTypeChange(10);
+      fixture.detectChanges();
+      component.onSubTypeChange(101);
+      fixture.detectChanges();
+      expect(component.body().sub_institution_type_id).toBe(101);
+
+      await component.onInstitutionTypeChange(20);
+      fixture.detectChanges();
+
+      expect(component.body().sub_institution_type_id).toBeNull();
+      expect(component.body().sub_institution_type_id).not.toBeUndefined();
+      // Disqualifier-safe: JSON.stringify is the actual mechanism DD-5b names — a `toBeNull()`
+      // check alone cannot show a key survives serialization, so assert that too.
+      expect(JSON.stringify({ sub_institution_type_id: component.body().sub_institution_type_id })).toContain('"sub_institution_type_id":null');
+      expect(selectByAria('Select the organization sub-type')).toBeFalsy();
+    });
+
+    // Disqualifier (per tasks.md T-09): this fake sub-types service cannot observe the is_active
+    // or root filters that the real predicate applies (DD-5) — it can only confirm the component
+    // reacts to whatever the mock returns. This suite proves the component's REACTION (asterisk /
+    // border / message / clearing) is wired to `subTypeOptions().length > 0`; it does NOT and
+    // cannot prove that predicate agrees with the SQL side's `getInstitutionTypesByDepthLevel`
+    // catalog (that equivalence is T-14's job, enumerated against the real service).
+  });
+
   // c3 — institution_type_id === 78 reveals the Specify other input.
   describe('c3 — OTHER (78) reveals Specify other; any other type hides it', () => {
     it('type 78 shows the Specify other input; type 10 does not', async () => {
@@ -328,8 +423,9 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
 
     // Attempt-3 remediation (Reviewer attempt-2 Issue 1): the amber-border half of AC.2 was
-    // implemented at `.html:116` (`[style]="organizationTypeMissing ? { border: '2px solid
-    // var(--ac-warning-1)' } : {}"`) but asserted nowhere in this file — deleting that binding
+    // implemented on the `Organization type` select's
+    // `[style]="organizationTypeMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"`
+    // binding but asserted nowhere in this file — deleting that binding
     // left the org-card suite green. Mirrors the known-path exemplar tests below, in the
     // "R-IUR-006 — known path: institution required, with message precedence (T-07)" describe
     // (its "AC.2" positive test and its "AC.2 negative" test), for the unknown path's
@@ -347,7 +443,8 @@ describe('InnovationUseOrganizationItemComponent', () => {
     //    element-scoped one — can observe it. That also means this assertion is CARD-WIDE: it
     //    proves the amber value was written somewhere in the card during this pass, not that it
     //    landed on the type select specifically. Attribution comes from the discriminating
-    //    mutation (deleting `.html:116`, run and observed red in the attempt-3 report), not from
+    //    mutation (deleting the `Organization type` select's `[style]` binding, run and observed
+    //    red in the attempt-3 report), not from
     //    this test alone — it is titled as a card-wide write, not an element-attributed one.
     // 3. `element.style.border` itself is unreadable here (`cssstyle@2.3.0` drops a shorthand
     //    carrying `var()`), which is why the setter spy exists instead of a direct style read.
@@ -389,7 +486,7 @@ describe('InnovationUseOrganizationItemComponent', () => {
     // Angular's style-map diff calls `removeStyle` for a property dropped from the bound object,
     // and for a no-dash CSS property (`border` has none) that assigns `el.style.border = ''` —
     // which the `CSSStyleDeclaration.prototype` setter spy below DOES record. Verified reddening:
-    // with `.html:116`'s `[style]` binding forced unconditionally amber
+    // with the `Organization type` select's `[style]` binding forced unconditionally amber
     // (`[style]="{ border: '2px solid var(--ac-warning-1)' }"`), this assertion fails, because no
     // `''` write ever occurs (see the attempt-4 report for the observed red).
     it('AC.2 negative: filling the organization type clears the amber-border write', async () => {

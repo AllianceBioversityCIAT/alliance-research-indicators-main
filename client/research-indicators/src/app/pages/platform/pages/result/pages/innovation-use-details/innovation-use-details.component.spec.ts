@@ -1299,6 +1299,52 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // -------------------------------------------------------------------------------------------------
+  // R-IUR-008 (T-09) / DD-5b — end-to-end through the emitted row: the card clears a stale
+  // sub-type to an explicit `null` on a type change, that `null` propagates through
+  // `onOrganizationUpdate` into `body()`, and `buildOrganizationPayload` forwards it into the
+  // PATCH body's serialized JSON rather than letting `JSON.stringify` drop it as `undefined`
+  // would be (DD-5b). This is the falsifying-input scenario named in tasks.md verbatim: select a
+  // type with sub-types, choose a sub-type, switch to a type without sub-types, save.
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-008 (T-09) / DD-5b — a type change never leaves a stale sub_institution_type_id in the serialized payload', () => {
+    it('switching the rendered card from a sub-typed type (with a chosen sub-type) to one without sub-types serializes sub_institution_type_id as an explicit null, never omitted', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10 }]
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      // Choose a sub-type (mock resolves `[{ code: 1, name: 'Sub A' }]` for type 10 — see
+      // `GET_SubInstitutionTypes` at the top of this file).
+      cardInstance.onSubTypeChange(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component.body().organizations[0].sub_institution_type_id).toBe(1);
+
+      // Switch to a type with no sub-types (any code other than 10 resolves zero rows here).
+      await cardInstance.onInstitutionTypeChange(20);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.body().organizations[0].sub_institution_type_id).toBeNull();
+
+      const payload = component.buildPayload();
+      const serialized = JSON.stringify(payload.organizations[0]);
+      // The disqualifying check the task brief calls out by name: a `toBeUndefined()`/property
+      // check passes for both the bug (value dropped to `undefined`) and the fix (value `null`),
+      // because both read as "not present"/"falsy" on a plain object read. Only the SERIALIZED
+      // form distinguishes them — `undefined` disappears from `JSON.stringify`, `null` does not.
+      expect(serialized).toContain('"sub_institution_type_id":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
   // Hazard (b) — quantification "absent" must include falsy/empty text, not just == null. Not a
   // named c-criterion; flagged by the task brief.
   // -------------------------------------------------------------------------------------------------

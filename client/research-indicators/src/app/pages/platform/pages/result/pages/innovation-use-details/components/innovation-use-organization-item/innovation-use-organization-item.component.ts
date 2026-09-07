@@ -136,12 +136,17 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
     this.body.update(current => ({ ...current, institution_id: institutionId }));
   }
 
-  /** Changing type resets the sub-type and, leaving OTHER, clears the custom name (mirrors §5.5). */
+  /**
+   * Changing type resets the sub-type and, leaving OTHER, clears the custom name (mirrors §5.5).
+   * R-IUR-008 `BUT` / DD-5b (T-09): the reset MUST be an explicit `null`, never `undefined` —
+   * `undefined` is dropped by `JSON.stringify`, so `buildOrganizationPayload` would omit the key
+   * entirely on the unknown path and a previously stored sub-type would survive on the server.
+   */
   async onInstitutionTypeChange(typeId: number): Promise<void> {
     this.body.update(current => ({
       ...current,
       institution_type_id: typeId,
-      sub_institution_type_id: undefined,
+      sub_institution_type_id: null,
       institution_type_custom_name: typeId === this.otherInstitutionTypeId ? current.institution_type_custom_name : undefined
     }));
     await this.loadSubTypes(typeId);
@@ -216,5 +221,19 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
    */
   get showNotIdentifiedMessage(): boolean {
     return this.touched() && !this.identitySatisfied && !this.institutionMissing && !this.organizationTypeMissing;
+  }
+
+  /**
+   * R-IUR-008 (T-09) — `sub_institution_type_id` is required exactly when the sub-type select
+   * renders. Gated on the SAME condition the template already uses for the select itself
+   * (`subTypeOptions().length > 0`), never on a re-derived `is_active`/root/depth-2 predicate of
+   * its own (`DD-5`): `subTypeOptions` is already the resolved output of that predicate via
+   * `syncSubTypes`/`loadSubTypes`, so restating it here would risk drifting from what the
+   * template actually renders. Independent of `identitySatisfied`/`showNotIdentifiedMessage` —
+   * a type can be chosen (identity satisfied) while its required sub-type is still missing, so
+   * this getter does not participate in the DD-9 precedence table.
+   */
+  get subTypeMissing(): boolean {
+    return this.subTypeOptions().length > 0 && !this.body().sub_institution_type_id;
   }
 }

@@ -27,7 +27,11 @@ export class InnovationUseOrganization {
   result_institution_type_id: number | undefined = undefined;
   institution_id: number | undefined = undefined;
   institution_type_id: number | undefined = undefined;
-  sub_institution_type_id: number | undefined = undefined;
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-09 — DD-5b)
+  // Widened from `number | undefined`: a type change must clear this to an explicit `null`
+  // (never `undefined`, which JSON.stringify drops), or a previously stored sub-type survives
+  // on the server after the row is re-saved under a type that no longer has one.
+  sub_institution_type_id: number | null | undefined = undefined;
   institution_type_custom_name: string | undefined = undefined;
   is_organization_known = false;
   organization_count: number | undefined = undefined;
