@@ -86,7 +86,7 @@
 
 ```
 ┌─ Client ──────────────────────────────────────────────────────┐
-│  innovation-use-details.component        page rules, save gate │
+│  innovation-use-details.component     page rules, dropped-row │
 │    ├── innovation-use-actor-item         actor row rules       │
 │    ├── innovation-use-organization-item  organization row rules│
 │    └── app-quantification-item  (SHARED) measure row rules     │
@@ -112,7 +112,7 @@ Two facts drive most of this design:
 | `shared/components/quantification-item/quantification-item.component.{ts,html}` + `.spec.ts` | `fieldsRequired` → **5** per-field inputs (`unitRequiredMode` added 2026-09-04 by pivot); spec rewrite is **in scope** (`S-5`) |
 | `.../innovation-use-actor-item/*.{ts,html,spec.ts}` | count required states + total-positivity message |
 | `.../innovation-use-organization-item/*.{ts,html,spec.ts}` | required states on 4 fields, message precedence |
-| `.../innovation-use-details.component.{ts,html,spec.ts}` | remove message + seed, wire measures, save gate, blocked-save toast |
+| `.../innovation-use-details.component.{ts,html,spec.ts}` | remove message + seed, wire measures, **dropped-row report toast** (no gate — T-13 Pivot), pass the used-type set to the actor cards (`DD-18`) |
 | `server/.../db/migrations/<ts>-updateInnovationUseValidation.ts` | **new**, append-only |
 | `server/.../test/fixtures/**/innovation-use-validation.fixture-spec.ts` | **extended** — the existing band-`900_100` fixture (`S-4`) |
 | `docs/ux-ui/design.md` · `docs/specs/innovation-use/family.md` | doc sweep (`DD-11`) |
@@ -451,13 +451,25 @@ Revision 2's flagship actor example was **not constructible**, which would have 
 unable to redden for actor rows for the reason it exists — the `K-004` failure this design flags
 elsewhere, committed inside its own correction record.
 
-**Decision.** Block the save when a row would lose typed data at **either** site:
+**Decision — REVISED 2026-09-07 by the T-13 Pivot (user ruling). Never block the save; report what
+was dropped.** Site 1's gate is **withdrawn**, on exactly the principle that already withdrew site 2
+(`P-3`): a gate the user cannot escape destroys more than it protects. Here the escape hatch existed —
+fill in the type — but the gate combined with the page's **pre-existing unconditional**
+`if (page) this.navigateTo(page)` to convert a **partial** loss into a **total** one: the level, the
+justification and every other edited row were discarded where they previously persisted, while the
+message named only the blocking row. Full sequence in `execution.md` → `Pivot Record: T-13`.
 
-| Blocks | Does not block |
+| Reports (save still proceeds) | Silent (nothing to report) |
 | --- | --- |
-| Site 1 — a row carrying typed data but lacking its identity field | An entirely blank row |
-| — | **Site 2 — nothing.** `DD-12` makes both cards clear on toggle, so no hidden state survives to be nulled. A gate here **trapped the user** (`P-3`) and is withdrawn |
-| — | Measures — no loss case |
+| Site 1 — a row carrying typed data but lacking its identity field, which `buildPayload()` drops | An entirely blank row — nothing to lose |
+| — | **Site 2 — nothing.** `DD-12` makes both cards clear on toggle, so no hidden state survives to be nulled (`P-3`) |
+| — | Measures — no loss case; the drop rule is already content-aware |
+| — | **Duplicate actor types — prevented at source by `DD-18`/`R-IUR-017`, no longer gated at save** |
+
+**Nothing blocks the save, and navigation is untouched.** `R-IUR-014`'s headline — *"SHALL NOT discard
+user-entered data on save **without telling the user**"* — is satisfied by the telling; blocking was
+only ever the mechanism this design chose, and it was the wrong one. `NFR-IUR-003` loses its `S-6`
+exception and returns to *"every rule gates submission, not saving"*.
 
 **Site 2 was withdrawn, not weakened (`P-3`).** Revision 3 gated the organization card in "either
 direction". Because the inactive path's controls are **not rendered** (`@if`/`@else` at `.html:36`,
@@ -475,7 +487,7 @@ blocked save would use *"the same `ActionsService` channel the duplicate-actor b
 `if (page) this.navigateTo(page)`; the only `showToast` calls are `:335`, `:588`, `:600`. Today a user
 with a duplicate row clicks Next, sees nothing, and navigates away.
 
-So this spec **introduces the first blocked-save message**, and it must cover the duplicate case too —
+So this spec **introduces the first save-time message of any kind**. *(Superseded in part by the T-13 Pivot: the message now reports what was **dropped** rather than what was blocked, and it no longer covers the duplicate case at all — `DD-18` prevents duplicates in the dropdown instead. The paragraph below is retained as the record of why no channel existed.)* It must cover the duplicate case too —
 otherwise `DD-8` ships a second silent block, trading silent data loss for silent save refusal, which
 is the failure it exists to close.
 
@@ -628,6 +640,32 @@ escaped.
 
 ---
 
+### DD-18 — Duplicate actor types are prevented in the dropdown, not gated at save
+
+*(Added 2026-09-07 by the T-13 Pivot — user ruling, superseding the Leader's proposal to keep the
+save block as a backstop.)*
+
+**The split is: the client prevents for UX, the server validates for correctness.** The client-side
+save block existed only because the prevention did not. With `R-IUR-017` disabling an already-used
+type in every other row's dropdown, a duplicate cannot be created through the UI at all.
+
+**The backstop argument was weak and is recorded as rejected.** The Leader proposed keeping the block
+for pre-existing duplicate data. But the server rejects duplicates, so such data **cannot have entered
+through the API** — only a direct database write produces it, and that case is already handled by the
+existing server-error toast (`extractErrorMessages` + error toast).
+
+**Two rules the implementation must honour, both trap-shaped:**
+
+| Rule | Why |
+| --- | --- |
+| The holding row's own dropdown keeps its own value **enabled** | Otherwise a row renders its own current selection as disabled |
+| **`OTHER` is never disabled** | Duplicates there are keyed on `type + trimmed lowercase custom name` (`duplicateActorTypeIndexes`), so several `OTHER` rows are legitimate |
+
+`hasDuplicateActorType()` **stops gating `saveData`**. The computed itself stays — it still drives the
+card's own duplicate message (`DD-5`, unchanged).
+
+---
+
 ## 5. Data Model
 
 No schema change. One new append-only migration replacing one stored function.
@@ -645,10 +683,7 @@ No schema change. One new append-only migration replacing one stored function.
 
 ## 6. API Surface
 
-**No API changes.** Draft saves stay permissive at the API — but see the `NFR-IUR-003` narrowing in
-§10 (`S-6`): `DD-8` blocks a defined class of saves **client-side**, so the requirement's target
-("a user may save an incomplete draft exactly as today") is deliberately narrowed. Revision 1 cited
-the surviving half ("the API is untouched") as proof of the whole.
+**No API changes.** Draft saves stay permissive at the API **and on the client**. *(Revisions 2–6 recorded an `S-6` narrowing here — `DD-8` blocked a defined class of saves client-side. *(T-13 Pivot, 2026-09-07)* **withdrew that gate**, so the narrowing is gone and `NFR-IUR-003` holds without exception.)* Revision 1 cited the surviving half ("the API is untouched") as proof of the whole; the whole is now true, but that reasoning was still invalid.
 
 ---
 
@@ -658,9 +693,9 @@ the surviving half ("the API is untouched") as proof of the whole.
 | --- | --- | --- |
 | `input` (shared) | field border + message for rules 3, 5, 9, 10, 11; token compliance (`DD-10`) | anything cross-field |
 | `quantification-item` (shared) | which of its three fields are required | the zero policy (passed in) |
-| `actor-item` | rules 1, 2; rule 4's total message; `p-select` border | field-level count messages (delegated) |
+| `actor-item` | rules 1, 2; rule 4's total message; `p-select` border; **the used-type disable (`DD-18`/`R-IUR-017`)** | field-level count messages (delegated) |
 | `organization-item` | rules 6, 7, 8, 8b; message precedence (`DD-9`); **path clearing on toggle (`DD-12`)**; three `p-select` borders | rule 9's message (delegated) |
-| `details` page | the `DD-8` save gate + blocked-save toast; measure wiring; no seeding | row-level messages |
+| `details` page | the `DD-8` **dropped-row report** toast (no gate — T-13 Pivot); the used-type set for `DD-18`; measure wiring; no seeding | row-level messages; the option-disable itself (card-owned) |
 
 **Design tokens.** No new tokens; `--ac-warning-1` everywhere after `DD-10`. The red asterisk is
 inconsistent in the codebase today (`text-red-500` in the innovation-use cards, `#CF0808` in
@@ -673,8 +708,8 @@ inconsistent in the codebase today (`text-red-500` in the innovation-use cards, 
 
 | Case | Behavior |
 | --- | --- |
-| Save blocked by `DD-8` (either site) | **New** toast naming the affected rows; no PATCH |
-| Save blocked by duplicate actor type | **Changed** — silent today, now uses the same new toast (`S-2`) |
+| A row would be dropped by `buildPayload()` while carrying typed data | **New** toast naming the affected rows. **The PATCH still fires** — `DD-8` reports, it does not block (T-13 Pivot) |
+| Duplicate actor type | **Prevented at source** — the option is disabled in every other row's dropdown (`DD-18`). No save-time block, no toast. A duplicate from a direct DB write is rejected by the server and surfaced by the existing error toast |
 | PATCH rejected | Unchanged |
 | Green check `false` | Submit disabled; existing mechanism |
 | Migration not yet applied | UI stricter than the gate — safe direction |
@@ -728,18 +763,20 @@ Revision 1 claimed to read back "every" `AND IT MUST` / `BUT it must NOT` clause
 | `R-IUR-012` | not verified by string assertion | `DD-6` constraint 3 |
 | `R-IUR-012` | **must preserve level + justification verbatim** | **`DD-6` constraint 1**, rules 14–15 |
 | `R-IUR-013` | full suite, not targeted | §12 |
-| `R-IUR-014` | **must NOT block an entirely blank row** | `DD-8` decision table |
-| `R-IUR-014` | **same rule for organization rows** | `DD-8` site 1 |
-| `NFR-IUR-003` | **narrowed deliberately** — `DD-8` blocks a class of saves client-side | `DD-8`; the narrowing is stated in `requirements.md` `NFR-IUR-003` itself, **not** only here (`P-6`) |
+| `R-IUR-014` | **must NOT block an entirely blank row** | `DD-8` — nothing blocks at all now *(T-13 Pivot, 2026-09-07)*; a blank row is additionally **silent**, raising no message |
+| `R-IUR-014` | **same rule for organization rows** | `DD-8` site 1's **report** (its gate withdrawn, *(T-13 Pivot, 2026-09-07)*) |
+| `NFR-IUR-003` | **no exception — the narrowing was REMOVED** *(T-13 Pivot, 2026-09-07)* | `DD-8`'s client-side gate is withdrawn, so nothing narrows draft permissiveness. `requirements.md` `NFR-IUR-003` carries the amendment history |
 | `R-IUR-016` | **must NOT be implemented through `requiredMode`** | §3.3 / `DD-1` — rule 2 is card-owned |
 | `R-IUR-015` | **must NOT clear the path being entered** | `DD-12` symmetry requirement |
-| `R-IUR-015` | **must NOT be confused with `R-IUR-014`'s blocking rule** | `DD-12` — clearing is at the toggle, blocking is at the save |
+| `R-IUR-015` | **must NOT be confused with `R-IUR-014`'s rule** | `DD-12` — clearing is at the toggle; `R-IUR-014` **reports** at the save. *(Both were once framed against "blocking at the save"; there is no blocking rule any more, *(T-13 Pivot, 2026-09-07)*.)* |
 
 **Cross-check against module constraints:** the actor card's `lg:` breakpoint rationale, the
 `app-textarea` no-edit constraint, `R-IUD-001`'s permissive-save decision, and the create migration's
-`level`-vs-`id` header note were all read. `DD-8` narrows `R-IUD-001` and `NFR-IUR-003` deliberately;
-the narrowing is written into `requirements.md` `NFR-IUR-003` itself, with the row above as its
-read-back (`P-6` — revision 3 had §6 and §10 pointing at each other and the substance in neither).
+`level`-vs-`id` header note were all read. `DD-8` **no longer narrows** `R-IUD-001` or `NFR-IUR-003`
+*(T-13 Pivot, 2026-09-07)*: its client-side gate is withdrawn, so `R-IUD-001`'s permissive draft save is honoured in full
+and `NFR-IUR-003` needs no exception. *(Revisions 2–6 recorded the narrowing here and in
+`requirements.md`; `P-6` had corrected revision 3, where §6 and §10 pointed at each other with the
+substance in neither. The amendment history is retained in `requirements.md` `NFR-IUR-003`.)*
 
 ---
 
@@ -749,7 +786,7 @@ read-back (`P-6` — revision 3 had §6 and §10 pointing at each other and the 
 | --- | --- | --- | --- | --- | --- |
 | Tasks | 13 | 16 | 18 | **20** | **+2 breach, declared at the Phase 3 gate** (`tasks.md` §1.1): `T-14` (catalog equivalence — folded into a sibling it would have been discharged by the very mock `DD-5` rejects) and `T-16` (the three post-change client gates, which had no owner among the feature tasks). Rev 4's own deltas stand: +`DD-12` path clearing, +`R-IUR-016`, +the `'nonzero'` mode; −the withdrawn site-2 gate |
 | LOC | ~1,150 | ~1,500 | ~1,600 | **~1,650** | Re-baselined for the two extra tasks; the `DD-9` and `c2` spec rewrites remain the bulk |
-| Review rounds | ~20 | ~24 | ~24 | ~~~24~~ **~37** | **RE-BASELINED 2026-09-07 by user ruling, mid-execution** (`RB-9`). Derived from measurement, not re-estimated: **24 rounds consumed across 13 completed tasks = 1.85/task**. Seven remain, of which **T-20 is a human migration step consuming no review round**, so 6 x 1.85 ~= 11 more, plus margin for T-13 (the heaviest remaining task, carrying `R-IUR-014` AC.4b's owed discriminating red). **This figure is the single home; every other site links here** (`KZ-005`) |
+| Review rounds | ~20 | ~24 | ~24 | ~~~24~~ **~37** | **RE-BASELINED 2026-09-07 by user ruling, mid-execution** (`RB-9`). Derived from measurement, not re-estimated: **24 rounds consumed across 13 completed tasks = 1.85/task**. Seven remain, of which **T-20 is a human migration step consuming no review round**, so 6 x 1.85 ~= 11 more, plus margin. *(Written before *(T-13 Pivot, 2026-09-07)*, which shrank T-13 from `L` to `M` — its gate is withdrawn and attempt 1's predicates survive — withdrew `R-IUR-014` AC.4b, and added `T-21`, taking the task count to 21. The round figure is unchanged: T-21 is small and T-13's rewrite reuses reviewed work.)*. **This figure is the single home; every other site links here** (`KZ-005`) |
 
 **Depth stays Full.** A tripwire, not a cap; `/akili-execute` escalates on breach.
 

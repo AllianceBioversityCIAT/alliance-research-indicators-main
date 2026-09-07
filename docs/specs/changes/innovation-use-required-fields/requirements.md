@@ -465,28 +465,63 @@ typed values are gone.
 
 #### Scenario: Counts typed, actor type left empty
 
+*(Rewritten 2026-09-07 by the T-13 Pivot — user ruling. The previous version blocked the save; it now
+reports. The requirement's headline sentence above is **unchanged**: it never said "block", it said
+"without telling the user". See `execution.md` → `Pivot Record: T-13`.)*
+
 - GIVEN an actor row whose four counts are filled and whose `Actor type` is empty
 - WHEN the user saves
-- THEN the save does not proceed
-- AND the user is told which row is blocking and why
-- BUT it must NOT block a save because of a row the user started and left **entirely** blank — such a row carries nothing to lose and must save harmlessly, preserving the permissive-draft behavior of `R-IUD-001`
+- THEN the save **proceeds** and the row is dropped, exactly as `buildPayload()` does today
+- AND the user is told which rows were not saved and why — **before** navigation carries them away
+- BUT it must NOT block the save, and must NOT make navigation conditional: a user may always save an
+  incomplete draft (`R-IUD-001`), and blocking converted a partial loss into a total one (the T-13
+  Pivot's constructed sequence — the level and the justification were lost too)
 - AND IT MUST apply the same rule to organization rows carrying a count or sub-type with no identity
 
-#### Scenario: A blank row does not block
+#### Scenario: A blank row does not produce a message
 
 - GIVEN the user clicks `Add other actor` and types nothing
 - WHEN the user saves
-- THEN the save proceeds normally and the blank row is discarded without a message
+- THEN the save proceeds normally and the blank row is discarded **without a message** — it carries
+  nothing to lose
 
 **Acceptance criteria**
 
-- [ ] AC.1 — Actor row with any count filled and no `actor_type_id` ⇒ save blocked, user informed.
-- [ ] AC.2 — Organization row with `organization_count` or `sub_institution_type_id` filled and no identity ⇒ save blocked, user informed.
-- [ ] AC.3 — Entirely blank row ⇒ save proceeds, no message, row discarded.
-- [ ] AC.4 — Measure rows never block: the existing drop rule is already content-aware, so no loss case exists.
-- [ ] AC.4b — **No gate is raised over the inactive path of either card.** `R-IUR-015` removes the hidden state; a gate there would trap the user (`P-3`). Falsifying input: fill the unknown path, tick `Is the organization known?`, pick an institution, save — the save must **succeed**.
-- [ ] AC.5 — The existing duplicate-actor-type save block still blocks. **It is silent today** — when `hasDuplicateActorType()` is true the save body is skipped and execution falls to `navigateTo()`, raising no toast (verified, `innovation-use-details.component.ts:584`, `:588`, `:600`). This spec introduces the *first* blocked-save message; there is no prior message to preserve. *(Corrected at Judgment Day round 1, finding `S-2`.)*
-- [ ] AC.6 — **Falsifying input:** four counts + no actor type. Before the fix this saves and loses the counts; after it, the save is blocked.
+- [ ] AC.1 — Actor row with any count filled and no `actor_type_id` ⇒ **save proceeds**, row dropped, user informed naming that row.
+- [ ] AC.2 — Organization row with `organization_count` or `sub_institution_type_id` filled and no identity ⇒ **save proceeds**, row dropped, user informed naming that row.
+- [ ] AC.3 — Entirely blank row ⇒ save proceeds, **no message**, row discarded.
+- [ ] AC.4 — Measure rows never produce a message: the existing drop rule is already content-aware, so no loss case exists.
+- [ ] ~~AC.4b~~ — **WITHDRAWN by the T-13 Pivot.** It forbade a gate over the inactive path; **no gate exists anywhere** now, so the criterion is trivially satisfied and its T-10 + T-13 co-assignment collapses. T-10's observed red for it (recorded in `execution.md`) stands as history, not as a live obligation.
+- [ ] AC.5 — **Duplicate actor types are prevented at source, not blocked at save.** See `R-IUR-017`. `hasDuplicateActorType()` no longer gates `saveData`; a duplicate that reaches the server (only possible from a direct database write) is rejected there and surfaced by the existing server-error toast.
+- [ ] AC.6 — **Falsifying input:** four counts + no actor type. The save proceeds, the row is dropped, **and a message names it**. A silent drop fails this criterion.
+
+---
+
+### R-IUR-017 — An actor type already in use is not selectable
+
+*(Added 2026-09-07 by the T-13 Pivot — user ruling. Replaces the save-blocking approach to duplicates
+with prevention at source.)*
+
+When an actor row's `Actor type` dropdown is opened, any type already chosen by **another** row SHALL
+be rendered disabled and SHALL NOT be selectable.
+
+#### Scenario: A second row cannot re-use a chosen type
+
+- GIVEN one actor row with `Actor type` = *Farmers*
+- WHEN the user opens the `Actor type` dropdown on a second row
+- THEN *Farmers* is shown disabled and cannot be chosen
+- BUT it must NOT be disabled in the dropdown of the row that **holds** it — a row must always render
+  and be able to re-select its own current value
+- AND IT MUST exempt `OTHER`: duplicates there are keyed on `type + trimmed lowercase custom name`, so
+  several `OTHER` rows are legitimate and the option stays enabled for every row
+
+**Acceptance criteria**
+
+- [ ] AC.1 — A type held by another row renders disabled and is not selectable.
+- [ ] AC.2 — The holding row's own dropdown still shows that type enabled and selectable.
+- [ ] AC.3 — `OTHER` is never disabled, in any row, however many rows already use it.
+- [ ] AC.4 — Removing the row that held a type re-enables it everywhere.
+- [ ] AC.5 — **This requirement adds no save-time gate.** Falsifying input: a result whose stored data already contains two rows with the same type still **saves**; the client raises no block.
 
 ---
 
@@ -581,10 +616,17 @@ nor repaired, only deleted.
 ### NFR-IUR-003 — No change to draft-save permissiveness
 
 - **Category:** reliability
-- **Target:** every rule in this spec gates **submission**, not saving — **with one deliberate, named exception.** `R-IUR-014` / `design.md` `DD-8` blocks the save **client-side** for a row that would lose typed data. So a user may save an incomplete draft exactly as today *except* where saving would destroy what they typed. **This narrowing was added at Judgment Day round 2 (`S-6`)**: revision 2 recorded it only in `design.md` §6, leaving this requirement asserting the opposite.
-- **How verified:** the API and its DTO validators are untouched, **and** a save of an incomplete row still returns `201`/`200` **for every case `DD-8` does not block**. The first half alone is not proof of the whole — it was cited as such in revision 2 and is exactly the half-proof this correction exists to remove.
-
----
+- **Target:** every rule in this spec gates **submission**, not saving. A user may save an incomplete
+  draft exactly as today. **No exceptions.**
+- **How verified:** the API and its DTO validators are untouched, **and** a save of an incomplete row
+  still returns `201`/`200`. The first half alone is not proof of the whole — it was cited as such in
+  revision 2 and that is the half-proof this requirement was corrected to remove.
+- **Amendment history.** Revision 2 recorded the narrowing only in `design.md` §6, leaving this
+  requirement asserting the opposite; Judgment Day round 2 (`S-6`) wrote the exception in here.
+  **The exception is now GONE:** the T-13 Pivot (2026-09-07, user ruling) withdrew `DD-8`'s
+  client-side save block entirely, so there is nothing left to except and this requirement returns to
+  its unnarrowed form. `R-IUR-014` is satisfied by **reporting** what was dropped, not by refusing to
+  save — which no longer touches draft permissiveness at all.
 
 ## 7. Data Requirements
 
@@ -622,7 +664,7 @@ No schema change. One new migration replacing a stored function.
 | **RSK-1** | **The submit gate becomes strictly weaker** (`R-IUR-011`). Results with no content at all become submittable. | User decision `D-1`; recorded here so it is visible to whoever owns Innovation Use reporting rather than buried in SQL. |
 | **RSK-2** | **The submit gate also becomes strictly stronger** (`R-IUR-004`, `R-IUR-005`). Results that pass today — one of four counts filled, or a zero count — will stop passing, with no notice and no data migration. **The population is unmeasured.** | Size it with a `SELECT` against Dev **before** execution; `tasks.md` owns this as a task, not an afterthought. |
 | **RSK-3** | The amber border can be inert (`DC-1`). Seven automated gates missed exactly this in the prior spec. | Mandatory `[style]` binding + human browser check. |
-| **RSK-5** | **`buildPayload()` silently drops rows lacking an identity field.** With `R-IUR-011` removing the zero-actor backstop, a dropped row makes the result *valid*, so typed data is lost and submission is unblocked at the same time. Found in Phase 2. | `R-IUR-014` / `design.md` `DD-8` — block the save exactly when it would destroy typed data. |
+| **RSK-5** | **`buildPayload()` silently drops rows lacking an identity field.** With `R-IUR-011` removing the zero-actor backstop, a dropped row makes the result *valid*, so typed data is lost and submission is unblocked at the same time. Found in Phase 2. | `R-IUR-014` / `design.md` `DD-8` — **report** exactly what the save dropped, naming the rows. *(Was "block the save"; the T-13 Pivot withdrew the gate — blocking converted a partial loss into a total one. `RSK-5`'s exposure is unchanged; only the mitigation's mechanism changed.)* |
 | **RSK-4** | `app-input` is used by 18 templates, 15 of which this spec does not touch. The falsy-`0` check is **gated by `isRequired`**, which none of the five innovation-use count fields passes today — so the bug is **latent at these sites, not active**, and may or may not be active elsewhere. | Out of scope by design — opt-in change here, separate proposal for the audit (`OQ-3`). *(Corrected at Judgment Day round 1, findings `C-8`, `S-8`.)* |
 | **DEP-1** | All three `innovation-use/family.md` chunks are `done` + archived. No blocking dependency. | — |
 
@@ -659,6 +701,7 @@ No schema change. One new migration replacing a stored function.
 | `R-IUR-014` | No silent data loss on save (row-drop path; session data) | client | DC-3 |
 | `R-IUR-015` | Toggling a path clears the path being left | client | DC-3 |
 | `R-IUR-016` | Actor custom name non-blank | both | **DC-2b**, DC-3 |
+| `R-IUR-017` | Actor type already in use is not selectable | client | — |
 | `NFR-IUR-001` | Deployment safety | server | DC-6 |
 | `NFR-IUR-002` | A11y of the required signal | client | — |
 | `NFR-IUR-003` | Draft saves stay permissive | both | — |

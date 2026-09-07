@@ -45,7 +45,7 @@ lands at **20 tasks**, a **+2 breach** the Leader must not absorb silently:
 | **T-14** — sub-type catalog equivalence | `R-IUR-008` AC.4 demands enumeration over the whole catalog against `getInstitutionTypesByDepthLevel`, the **real** service. Folded into T-09 it would have been discharged by the jsdom mock that `DD-5` explicitly says cannot observe either the `is_active` or the root filter |
 | **T-16** — client gate task | The three gates that can only run *after* every client change (full suite, normalized `tsc` set diff, human browser check) have no natural owner among the feature tasks, and a gate owned by everyone is owned by no one |
 
-LOC re-baselined to **~1,650**. **Review rounds: see `design.md` §11, the single home for this figure** (`KZ-005`) — **re-baselined 2026-09-07 to ~37** by user ruling at the T-10 gate, from measured throughput rather than re-estimation. **Depth stays Full.**
+LOC re-baselined to **~1,650**. **Task count re-baselined 2026-09-07 to 21** by the T-13 Pivot (user ruling) — `T-21` implements `R-IUR-017`, the dropdown rule that replaces the withdrawn save block; `T-13` shrank from `L` to `M` in the same ruling. **Review rounds: see `design.md` §11, the single home for this figure** (`KZ-005`) — **re-baselined 2026-09-07 to ~37** by user ruling at the T-10 gate, from measured throughput rather than re-estimation. **Depth stays Full.**
 
 ---
 
@@ -66,7 +66,8 @@ graph TD
     T09 --> T14["T-14 sub-type catalog equivalence"]
     T11["T-11 details: drop message + stop seeding"] --> T12["T-12 details: measure wiring"]
     T03 --> T12
-    T12 --> T13["T-13 details: DD-8 save gate + toast"]
+    T12 --> T13["T-13 details: DD-8 dropped-row report"]
+    T13 --> T21["T-21 actor: used type not selectable (R-IUR-017)"]
     T10 --> T13
     T15["T-15 doc sweep DD-11"]
     T02 --> T16["T-16 CLIENT GATES: suite + tsc + browser"]
@@ -274,7 +275,7 @@ migration **does not self-apply** (`K-015`).
 
 ### T-10 — Organization card: clear the path being left on toggle *(reversion — `DD-12`)*
 
-- **Requirements covered:** `R-IUR-015` **in full** — S1 + its `BUT it must NOT clear the path being entered` + its `AND IT MUST behave symmetrically`; S2 + its `BUT it must NOT be confused with R-IUR-014's rule`; AC.1–AC.6 · `R-IUR-014` AC.4b
+- **Requirements covered:** `R-IUR-015` **in full** — S1 + its `BUT it must NOT clear the path being entered` + its `AND IT MUST behave symmetrically`; S2 + its `BUT it must NOT be confused with R-IUR-014's rule`; AC.1–AC.6 · ~~`R-IUR-014` AC.4b~~ *(withdrawn *(T-13 Pivot, 2026-09-07)*; T-10's observed red is recorded in `execution.md` as history)*
 - **Design:** `DD-12`, `DD-8` (site 2 **withdrawn**)
 - **Files:** `client/.../innovation-use-organization-item/*.ts` · `.spec.ts`
 - **Description:** `onKnownToggle` clears the leaving path's fields in **both** directions, mirroring the actor card's `onModeChange`.
@@ -326,23 +327,46 @@ migration **does not self-apply** (`K-015`).
 
 ---
 
-### T-13 — Details page: block the save that would destroy typed data, and say so
+### T-13 — Details page: report what the save dropped *(REWRITTEN by the T-13 Pivot, 2026-09-07)*
 
-- **Requirements covered:** `R-IUR-014` — S1 + its `BUT it must NOT block an entirely blank row` + its `AND IT MUST apply the same rule to organization rows`; S2; AC.1, AC.2, AC.3, AC.4, AC.5, AC.6 · `NFR-IUR-003` (the deliberate narrowing)
-- **Design:** `DD-8` (**site 1 only**; site 2 withdrawn), §8
+> **Supersedes the save-blocking version.** Attempt 1 built and reviewed that version; the user ruled
+> it out. Most of attempt 1's code **survives** — its predicates compute *what would be dropped*, which
+> is exactly what the message needs. See `execution.md` → `Pivot Record: T-13`.
+
+- **Requirements covered:** `R-IUR-014` — S1 (rewritten) + its `BUT it must NOT block the save, and must NOT make navigation conditional` + its `AND IT MUST apply the same rule to organization rows`; S2; AC.1, AC.2, AC.3, AC.4, AC.5, AC.6 · `NFR-IUR-003` (now **unnarrowed** — no exception)
+- **Design:** `DD-8` (**revised — reports, never blocks**), `DD-18`, §8
 - **Files:** `client/.../innovation-use-details.component.ts` · `.spec.ts`
-- **Description:** Block the save when `buildPayload()` would drop a row that carries typed data but lacks its identity field, and raise the **first** blocked-save toast — covering the existing duplicate-actor-type block too.
+- **Description:** Let every save proceed. When `buildPayload()` drops a row that carried typed data, raise a toast naming those rows. Blank rows are silent. `hasDuplicateActorType()` no longer gates `saveData`.
 - **Implementation notes:**
-  - **Site 1 only.** Actor row with counts but no `actor_type_id`; organization row with `organization_count` or `sub_institution_type_id` but no identity. **No gate over the inactive path** — T-10 removed the hidden state (`P-3`).
-  - Measures never block: their drop rule is already content-aware.
-  - An **entirely blank** row must save harmlessly with no message, preserving `R-IUD-001`.
-  - **There is no existing toast channel to reuse** (`S-2`). Today a duplicate actor type skips the save body at `:584` and falls to `navigateTo()`, raising nothing — `showToast` exists only at `:335`, `:588`, `:600`. This task introduces the first blocked-save message and **must cover the duplicate case**, or it ships a second silent block: trading silent data loss for silent save refusal, the failure it exists to close.
-  - **AC.5 is not a preservation claim.** There is no prior message to preserve; the duplicate block is silent today.
-- **Verify:** `npm test -- --silent -- innovation-use-details.component.spec`, asserting **both** that no PATCH is issued and that the toast fires, naming the affected rows.
-- **Falsifying input:** four counts + no actor type — before the fix this saves and loses the counts; after it, the save is blocked. And the **negative** case: a row from `Add other actor` with nothing typed must save with no message.
-- **Disqualifier:** asserting only "the toast fired" leaves the destructive half unproven, and asserting only "no PATCH" ships a silent block. **Both halves or the reading is worthless.** A test that spies `buildPayload` rather than the HTTP call cannot tell a blocked save from a save of a filtered payload.
-- **Cannot prove:** legacy rows carrying hidden state (explicitly excluded, `P-6`). That the API still accepts incomplete drafts — `NFR-IUR-003`'s verification needs a real `201`/`200` for every case `DD-8` does **not** block; "the API is untouched" is the half-proof this requirement was corrected to remove.
-- **Deps:** T-10, T-12 · **Effort:** L · **Skills:** `angular-developer`, `error-handling-patterns`, `systematic-debugging`
+  - **Keep** `actorRowWouldLoseData`, `organizationRowWouldLoseData`, `hasCountValue` and the message-building computed from attempt 1 — all reviewed and correct. **Rename** the computed away from `blockedSaveRowMessages` (nothing is blocked).
+  - **Invert `saveData`'s `if/else`:** the PATCH always fires; the message is raised **alongside** it, not instead of it. Raise it **before** `await getData()`, so the user sees it before the refetch replaces the rows.
+  - **Remove** `hasDuplicateActorType()` from `saveData`'s guard and drop its messages from the toast — `DD-18` prevents duplicates at source. The computed itself stays; it still drives the card's own message.
+  - **Navigation is untouched** — the pivot removes the reason to change it.
+  - An entirely blank row stays silent (`AC.3` / `R-IUD-001`).
+- **Verify:** `npm test -- --silent -- innovation-use-details.component.spec`, asserting **both** that the PATCH **is** issued and that the toast names the dropped rows.
+- **Falsifying input:** four counts + no actor type — the save proceeds, the row is dropped, **and the toast names it**. A silent drop fails. And the negative: a blank row saves with **no** message.
+- **Disqualifier:** asserting only "the toast fired" leaves the save unproven, and asserting only "the PATCH fired" ships a silent drop — the exact defect this task exists to close. **Both halves or the reading is worthless.** A test spying `buildPayload` rather than the HTTP call cannot tell what was actually sent.
+- **Cannot prove:** legacy rows carrying hidden state (`P-6`). `NFR-IUR-003`'s second half — a real `201`/`200` — is unreachable from jsdom (`ApiService` is mocked); **carry it to T-16 / the human gate rather than ticking it here.**
+- **Deps:** T-10, T-12 · **Effort:** M *(reduced from `L` — the gate is gone and attempt 1's predicates survive)* · **Skills:** `angular-developer`, `systematic-debugging`
+
+---
+
+### T-21 — Actor card: an already-used actor type is not selectable *(NEW — T-13 Pivot, 2026-09-07)*
+
+- **Requirements covered:** `R-IUR-017` S1 + its `BUT it must NOT be disabled in the dropdown of the row that holds it` + its `AND IT MUST exempt OTHER`; AC.1–AC.5
+- **Design:** `DD-18`
+- **Files:** `client/.../innovation-use-actor-item/*.ts` · `.html` · `.spec.ts` · `client/.../innovation-use-details.component.{ts,html}` (pass the used-type set down)
+- **Description:** The parent computes which actor types are already taken and by which row; the card disables those options in its own `p-select`, excluding its own current value and excluding `OTHER`.
+- **Implementation notes:**
+  - PrimeNG `p-select` disables options via `[optionDisabled]` — a **property name on the option object**, not a predicate. The option list is a CLARISA-fed array, so the disabled flag must be **derived per row** rather than mutating the shared catalog array. **Do not mutate the service's array** — two rows would fight over it.
+  - **`OTHER` is never disabled**, in any row (`AC.3`).
+  - **A row never disables its own current value** (`AC.2`) — otherwise it renders its own selection greyed out.
+  - Removing a row must re-enable its type everywhere (`AC.4`) — derive from `body().actors`, never from a cached set.
+- **Verify:** `npm test -- --silent -- innovation-use-actor-item.component.spec` + a details-level test that two rendered cards disagree on which options are disabled.
+- **Falsifying input:** two rows, row 1 = *Farmers*. Row 2's dropdown shows *Farmers* disabled; **row 1's own dropdown still shows it enabled**. Add a third row on `OTHER` twice — both stay enabled.
+- **Disqualifier:** asserting on the component's derived array rather than on the **rendered** options cannot show what the user can actually click (`KZ-001`). Assert the rendered option state.
+- **Cannot prove:** that no stored result already contains duplicates (`AC.5` — such a result must still save; this task adds **no** save-time gate).
+- **Deps:** T-13 · **Effort:** M · **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ---
 
@@ -539,9 +563,9 @@ clause has a named owner below. A gap is never discharged by citing a different 
 | `R-IUR-014` | S1 counts typed, no actor type · AC.1, AC.6 | **T-13** |
 | `R-IUR-014` | S1 `BUT` must not block an entirely blank row · S2 · AC.3 | **T-13** |
 | `R-IUR-014` | S1 `AND IT MUST` same rule for organization rows · AC.2 | **T-13** |
-| `R-IUR-014` | AC.4 measures never block | **T-13** |
-| `R-IUR-014` | AC.4b no gate over the inactive path | **T-10** + T-13 |
-| `R-IUR-014` | AC.5 duplicate block still blocks, now with a message | **T-13** |
+| `R-IUR-014` | AC.4 measures never produce a message | **T-13** |
+| ~~`R-IUR-014`~~ | ~~AC.4b no gate over the inactive path~~ — **WITHDRAWN** *(T-13 Pivot, 2026-09-07)*: no gate exists anywhere, so the criterion is trivially satisfied. T-10's observed red stands as history | ~~T-10 + T-13~~ |
+| `R-IUR-014` | AC.5 duplicates **prevented at source**, not blocked at save | **T-21** (`R-IUR-017`/`DD-18`) *(T-13 Pivot, 2026-09-07)* |
 | `R-IUR-015` | S1 leaving the unknown path · AC.1, AC.6 | **T-10** |
 | `R-IUR-015` | S1 `BUT` must not clear the path being entered · AC.3 | **T-10** |
 | `R-IUR-015` | S1 `AND IT MUST` symmetric · AC.2 | **T-10** |
@@ -553,7 +577,7 @@ clause has a named owner below. A gap is never discharged by citing a different 
 | `R-IUR-016` | AC.3 **no asterisk added** (`OQ-2` stays open) | **T-06** |
 | `NFR-IUR-001` | deployment safety, human apply | **T-20** |
 | `NFR-IUR-002` | a11y of the required signal (+ accepted contrast gap) | **T-16** |
-| `NFR-IUR-003` | draft saves stay permissive, **as narrowed by `DD-8`** | **T-13** |
+| `NFR-IUR-003` | draft saves stay permissive, **no exception** — the `DD-8` narrowing was removed *(T-13 Pivot, 2026-09-07)*. Its second half (a real `201`/`200`) is unreachable from jsdom | **T-13** + carried to **T-16** |
 | `RSK-2` | population sizing before the rewrite | **T-17** |
 
 **Two clauses are deliberately NOT closed by a task**, and are recorded rather than hidden:
