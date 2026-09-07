@@ -104,8 +104,14 @@ export class InnovationUseActorItemComponent implements OnInit, OnChanges {
     return !this.body().actor_type_id;
   }
 
+  /**
+   * R-IUR-016 (T-06, §3.3 `N-11`): the second conjunct is trimmed to match the server's
+   * `valid_text` (`LENGTH(TRIM(REGEXP_REPLACE(text,'\s+','')))>0`). This field is a plain
+   * `pInputText` owned by the card, never an `app-input`, so `requiredMode`'s own trimming
+   * (`isFilled()`) never reaches it — this getter needs its own trimmed check.
+   */
   get otherNameMissing(): boolean {
-    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name;
+    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name?.trim();
   }
 
   /**

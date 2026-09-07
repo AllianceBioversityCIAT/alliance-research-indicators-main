@@ -41,7 +41,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-03 `quantification-item` 5 inputs | `[x]` | PASS attempt 1. Branch RED until T-12 (measured) |
 | T-04 actor disaggregated counts + total msg | `[x]` | PASS attempt 3 of 3. Pointers → T-16, T-19 |
 | T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
-| T-06 actor custom name trimmed | `[ ]` | **+ forward pointer from T-05** (narrow one comment aside) |
+| T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
 | T-07 org known path + DD-9 precedence | `[ ]` | |
 | T-08 org unknown type + count | `[ ]` | |
 | T-09 org sub-type conditional + null | `[ ]` | |
@@ -619,3 +619,90 @@ No other code was needed, and the brief said so up front: `'positive'` already d
 **Requirements covered** — `R-IUR-005` **in full**: S1 + its `BUT it must NOT evaluate the four disaggregated counts while this path is active`, AC.1–AC.5 including AC.5's no-stale-message-across-a-toggle.
 
 **Cannot prove (`KZ-017`)** — **paint** (T-16 gate 3). **The SQL half**: `R-IUR-005` AC.2/AC.3's green-check clauses are T-19's; `innovation_use_validation` is untouched here. The forbidden sibling-asterisk mutation (disclosed in-file). The Reviewer executed **nothing** — read-only wrapper, no `Bash`: it verified the supplied diff **verbatim against the working-tree files** and re-derived every mutation outcome analytically from `input.component.ts` and both templates; the `.ts` byte-identity it confirmed by **content**, with the Leader supplying the `git diff --quiet` measurement. `npm run build` remains unusable as a gate on this file until T-12 clears the `NG8002` from T-03.
+
+---
+
+### T-06 — Actor card: `Specify other` must be non-blank (trimmed)
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1) |
+| Date | 2026-09-07 |
+| Implementer attempts | **1** |
+| Effort assigned | `medium` (task said `S`) |
+| Skills assigned | `angular-developer`, **`tdd`** |
+
+**Production change — one expression** (`.ts` +8/-1: the change plus a JSDoc block; **`.html` zero diff**; `.spec.ts` +67/-2)
+
+```diff
+-    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name;
++    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name?.trim();
+```
+
+**Leader dispatch findings.** Fourth **stale citation** corrected: the work order cites `otherNameMissing` at `:95`; T-04/T-05 shifted it to `.ts:107-109` (`A-N4`). The exemplar was named from the same feature — `justificationMissing` (`innovation-use-details.component.ts:220`, `!value?.trim()`) — rather than leaving the shape to invention.
+
+**A misreading headed off.** The work order's line *"`justificationWhitespaceOnly()` exists solely because ... Do not build the second instance"* reads like an instruction to reuse a helper. It is not: that computed **surfaces** a client/server divergence so the page can render a distinct whitespace message. T-06 **prevents** the divergence at source, and `R-IUR-016` has **no** AC asking for a distinct whitespace-vs-empty message. The brief therefore forbade an `otherNameWhitespaceOnly` analogue explicitly. The Reviewer confirmed none was built, and added the structural reason it *cannot* recur here: the getter driving the message and the getter driving validity are **the same symbol**, so the asymmetry that forced the first instance (`app-textarea`'s untrimmed internal check) has no analogue for a card-owned `pInputText`.
+
+**Server parity — proved by subset argument, the Reviewer's own initiative**
+
+S1's `AND IT MUST match the server's valid_text` was not merely asserted. SQL is invalid iff every character matches ICU `\s`; JS is invalid iff every character is in `String.prototype.trim`'s set. **ICU `\s` is a strict subset of the JS trim set** (JS additionally strips U+000B, U+FEFF, U+2028 and U+2029), therefore **server-invalid implies client-invalid for every string** — the only direction `DC-3` cares about. The `TRIM()` wrapper in `valid_text` is redundant once `REGEXP_REPLACE(text,'\s+','')` has run, and `'  a  '` is valid under both.
+
+The residual asymmetry runs the **safe** way: U+000B (VT) and U+FEFF (BOM) are stripped by JS but not matched by ICU `\s`, so the **client is stricter** — a lone-BOM paste shows the required message while the server would accept it. Reachable by paste only, not by typing, and it **cannot** produce the failure mode this requirement exists to close (a client-valid row the green check silently rejects).
+
+**Verification** — `npx eslint` clean · `npx jest innovation-use-actor-item.component.spec --coverage=false --silent` → **42/42** (39 + 3 new) · `npm test -- --silent -- ...` → 42/42, exit 1 on project-wide coverage floors (`K-020`) · `npx tsc -p tsconfig.spec.json --noEmit` → 0 errors before and after · `npx prettier --write` reformatted one spec line, jest re-run 42/42.
+
+**RED evidence, with its citation caveat stated (`KZ-014` honesty)**
+
+```
+* ... > a whitespace-only custom name is invalid, matching the server's trimmed valid_text
+    Expected: true
+    Received: false
+  > 398 |       expect(component.otherNameMissing).toBe(true);
+```
+`1 failed, 41 passed` — AC.2/AC.3 green on `HEAD` as expected.
+
+**Caveat, raised by the Reviewer as `ADVISORY 3` and recorded rather than papered over:** the transcript cites line `398` while the committed assertion sits at `:410`, because the capture predates the final comment blocks. **The red itself is independently certain from the diff** — the removed line is `!this.body().actor_type_custom_name`, and `!'   '` is `false`, so the assertion *must* fail on `HEAD` — and the `1 failed / 41 passed` totals reconcile with the committed 42-test file. The Leader did **not** re-run the mutation to refresh the citation: that would mean mutating and reverting production code, which is Implementer work, and the analytic certainty plus reconciling totals already discharge the claim. The stale line number is disclosed here so no future reader treats the quotation as line-reproducible.
+
+**Reviewer rulings**
+
+- **Expression correct and complete.** Truth table by inspection: `undefined`/`null` short-circuit to `undefined` then invalid; `''` invalid; `'   '` trims to `''` invalid; non-blank valid. **No path lets a missing value read as valid** — that would require `?.` to yield something truthy, which it cannot.
+- **AC.3 honored.** `OQ-2` confirmed still open in `design.md` §13 ("Blocking? no"); nothing in the diff answers it; the decisive evidence is `.html`'s zero diff. The `span.label` assertion is a real but **partial** guard — see advisory 2.
+- **Disqualifier satisfied.** The input is whitespace, not `''`. And the getter assertion is **not** the only one: AC.1 also asserts the rendered card-level message (also `false` pre-change, so it too discriminates) and **AC.2 asserts the negative in the fixture where all four count messages *are* rendered** — that pairing, not a DOM-only rewrite, is what satisfies `KZ-001`.
+- **Message scoping sound for these fixtures.** `app-input`'s own message uses `mt-1`, never `rs-mt-[4]`, so the four count messages fall outside the cohort; T-04's total message shares the class but is excluded by text *and* by `showTotalNotPositive` being false on a fresh actor.
+- **Scope clean** — the four count bindings, `showTotalNotPositive` (still `=== 0`), `total()`, `onModeChange`, `onActorTypeChange`, `onCustomNameChange` and the aggregate binding all byte-identical to their T-04/T-05 state. No T-07 leakage. **T-04's three advisories not applied, and not *partially* applied either** — the new helper duplicates c9's filter rather than hardening it, which is correct for a non-gating advisory.
+- **T-05 forward pointer applied and now accurate.** The aside is narrowed to *"the `Actor type` field above it"*; verified against markup — `Actor type` carries a `span.label` with a `text-red-500` asterisk, while `Specify other` has no label or asterisk at all. **The pre-narrowing phrase was false about half its subject.** No T-05 assertion, fixture or `expect` changed.
+
+**`ADVISORY` (4R — recorded, non-gating)**
+
+1. *Reliability* — `cardLevelRequiredMessageShown()` cannot distinguish the **actor-type** slot's message from the **Specify other** slot's; both render the identical `#requiredMessage` template with the identical class. Correct here only because both fixtures set `actor_type_id: 5`, making `actorTypeMissing` false. A future edit blanking the fixture's actor type would make AC.1 pass **for the wrong reason**. Tighter: assert the cohort length is exactly `1`, or scope to the `div` immediately following `input[placeholder="Specify other"]`.
+2. *Reliability / Readability* — `expect(cardOwnLabelTexts).toEqual(['Actor type*', 'Total'])` couples an `OQ-2` guard to the **text and order** of two unrelated labels: a cosmetic rename (`Total` to `Total actors`) reddens it with no asterisk change, while **an asterisk added as a bare sibling `span.text-red-500` with no `span.label` wrapper would leave it green.** Consider `length).toBe(2)` plus an assertion that the Specify-other group contains no `span.text-red-500`.
+3. *Evidence hygiene* — the red's line citation, handled above.
+
+**Requirements covered** — `R-IUR-016` **in full**: S1 + its `BUT it must NOT be implemented through requiredMode` + its `AND IT MUST match the server's valid_text`; AC.1, AC.2, AC.3.
+
+**Cannot prove (`KZ-017`)** — **server parity is argued, not measured**: the subset proof is over the ICU `\s` and ECMAScript trim *specifications*, not a MySQL execution, and MySQL's actual `\s` under a non-ICU build or a different collation was not probed — `valid_text` remains **T-19's** gate. **No visual claim** (no asterisk renders); the amber border that `otherNameMissing` also drives is asserted nowhere in this task. **Ingress path:** both fixtures arrive via `ngOnInit`, not via a live `onCustomNameChange('   ')` typing transition — `KZ-015` is satisfied because a saved row *can* hold whitespace (the server stores it and only marks it invalid) and both paths converge on `body()`, but the typed transition itself is unexercised. The Reviewer executed **nothing** (read-only wrapper); every behavioural conclusion is derived from committed source.
+
+---
+
+## Incident: `git stash pop` applied an unrelated "DO NOT APPLY" stash (T-06 verification, 2026-09-07)
+
+**Recorded as a process incident, not a code defect. Fully recovered; nothing lost.**
+
+**What happened.** T-06's Implementer reached for `git stash` to take a before/after `tsc` measurement. It mis-ordered the `-m` flag (`git stash push -- <files> -m "..."`), the stash **failed**, and a follow-up `git stash pop` then applied **`stash@{0}`** — an unrelated stash from branch `AC-1672` whose own message reads *"REJECTED T-06 DD-14 attempt-1 ... **DO NOT APPLY**"*. It conflicted across three unrelated `project-dashboard*` files. The Implementer reset them with `git checkout HEAD --`, verified recovery, and **disclosed the whole sequence unprompted** in its report.
+
+**Leader independent verification** (not taken on the worker's word):
+
+| Check | Result |
+| --- | --- |
+| `stash@{0}` still present | **Yes** — git preserves a stash on a conflicted pop, so the DO-NOT-APPLY entry is intact at position 0 |
+| Working tree | **Only** the two T-06 files |
+| Conflict markers | **0 files**, `grep -rqE` exit **1** |
+| Untracked files | **0** |
+| `project-dashboard*` vs `HEAD` | clean |
+| `HEAD` | unmoved at T-05's commit |
+
+**A `K-014` slip in the Leader's own first check, recorded.** The initial conflict-marker probe read `$?` after a `grep ... | head` pipeline, which reports **`head`'s** status, not `grep`'s — a confident `exit 0` that measured nothing. Re-measured without the pipe (`grep -rlE ... | wc -l` gave `0`, plus `grep -rqE` exit `1`). The answer did not change, but the first measurement was not evidence. This is `K-014` reproducing itself inside the verification of an incident.
+
+**Standing decision, applied to every remaining Implementer brief in this spec:** **agents must not use `git stash` in this checkout.** The tree carries **18** stashes, one explicitly marked DO NOT APPLY at position `0`, so a mis-ordered flag followed by a pop is a live hazard — and it survived here only because the pop happened to conflict. T-01's Implementer had already avoided stash for the identical measurement and *said why* ("there are other in-flight, unrelated modifications in this working tree"), so the safe technique was already demonstrated in this run. The instruction from here: **copy files into the scratchpad and swap them back**, never stash. Also flagged to the user, whose call it is whether to clear or rename `stash@{0}` — a stash whose safety depends on a human reading its message is a hazard to any agent.
+
+**Kaizen candidate** for `/akili-archive`: a repo-level guard (guide line or hook) against `git stash` in an agent session, on the strength of this near-miss plus the two independent worker behaviours (one avoided it with a stated reason, one did not).

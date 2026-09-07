@@ -380,6 +380,69 @@ describe('InnovationUseActorItemComponent', () => {
     });
   });
 
+  // T-06 (R-IUR-016) — `Specify other` must be non-blank, trimmed, matching the server's
+  // `valid_text` (§3.3 / N-11). `otherNameMissing` is the field's own, card-owned check — it
+  // never flows through `requiredMode` (this is a plain `pInputText`, not an `app-input`).
+  // Disqualifier (verbatim from the brief): a test that passes `''` only proves nothing, since
+  // `''` is already caught by the pre-existing falsy check and is green on HEAD. The falsifying
+  // input below is whitespace, `'   '`, which is valid (non-invalid) on HEAD and must become
+  // invalid.
+  describe('T-06 — Specify other must be non-blank, trimmed (R-IUR-016)', () => {
+    // Scoped like c9 (KZ-001): the four disaggregated app-inputs legitimately render their OWN
+    // "This field is required" messages on a fresh InnovationUseActor(), unrelated to
+    // otherNameMissing. The card-level message (actor-type / "Specify other") is rendered from
+    // the shared #requiredMessage template, which carries the distinguishing `rs-mt-[4]` class —
+    // scoping to it isolates exactly the "Specify other" slot from the four counts' per-field
+    // messages, matching c9's existing pattern in this same file.
+    const cardLevelRequiredMessageShown = (): boolean =>
+      fixture.debugElement
+        .queryAll(By.css('div'))
+        .filter(d => (d.nativeElement as HTMLElement).className.includes('rs-mt-[4]'))
+        .some(d => (d.nativeElement as HTMLElement).textContent?.includes('This field is required'));
+
+    // AC.1 / Falsifying input: '   ' must be invalid. Observed RED on pre-change HEAD (see the
+    // completion report) — `otherNameMissing` returned `false` for a whitespace-only name because
+    // the untrimmed `!value` check treats a non-empty string of spaces as present.
+    it("a whitespace-only custom name is invalid, matching the server's trimmed valid_text", () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: '   ' };
+      fixture.detectChanges();
+
+      expect(component.otherNameMissing).toBe(true);
+
+      const specifyOther = fixture.debugElement.query(By.css('input[placeholder="Specify other"]'));
+      expect(specifyOther).toBeTruthy();
+      expect(cardLevelRequiredMessageShown()).toBe(true);
+    });
+
+    // AC.2 — a non-blank name must stay valid: the fix is a trim, not "always invalid".
+    it('a non-blank custom name is valid: no required message', () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: 'local cooperatives' };
+      fixture.detectChanges();
+
+      expect(component.otherNameMissing).toBe(false);
+      expect(cardLevelRequiredMessageShown()).toBe(false);
+    });
+
+    // AC.3 — no asterisk is added by this requirement (OQ-2 stays open, not answered here). The
+    // `Specify other` input carries no label/asterisk markup at all — it relies solely on its
+    // `placeholder`. Scoped to `span.label` (the markup shape an added asterisk would need,
+    // matching `Actor type`'s own `<span class="label">…<span class="text-red-500">*</span></span>`)
+    // rather than a whole-card asterisk count, which would also see the four disaggregated
+    // app-inputs' own (unrelated) asterisks — the same KZ-001 hazard as the message scoping above.
+    it('adds no label/asterisk markup for Specify other (AC.3 — OQ-2 stays open)', () => {
+      component.actor = { ...new InnovationUseActor(), actor_type_id: 5, actor_type_custom_name: '   ' };
+      fixture.detectChanges();
+
+      const specifyOther = fixture.debugElement.query(By.css('input[placeholder="Specify other"]'));
+      expect(specifyOther).toBeTruthy();
+      // Only `Actor type` and `Total` own a `span.label` in this card's own markup (the four
+      // counts' labels are rendered by app-input, a different component, not asserted here) —
+      // no third one for `Specify other`.
+      const cardOwnLabelTexts = fixture.debugElement.queryAll(By.css('span.label')).map(de => (de.nativeElement as HTMLElement).textContent?.trim());
+      expect(cardOwnLabelTexts).toEqual(['Actor type*', 'Total']);
+    });
+  });
+
   // c9 — duplicateType = true renders the duplicate message instead of the generic required message.
   //
   // T-04 note: this assertion was originally a whole-card `textContent` search for "This field is
@@ -766,8 +829,8 @@ describe('InnovationUseActorItemComponent', () => {
     // app-input DebugElement's own subtree (deliberately, matching T-04's anti-KZ-001 pattern),
     // so it cannot see markup outside that element. The guarantee against doubling here is
     // structural, not this test's: the aggregate branch (.html:146-159) has no `<span
-    // class="label">` wrapper of its own around `How many`, unlike the actor-type/other-name
-    // fields above it that do carry their own label+asterisk markup.
+    // class="label">` wrapper of its own around `How many`, unlike the `Actor type` field above it
+    // that does carry its own label+asterisk markup.
     it('How many carries exactly one red asterisk, rendered by app-input', () => {
       component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true };
       fixture.detectChanges();
