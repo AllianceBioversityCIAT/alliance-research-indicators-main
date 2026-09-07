@@ -423,10 +423,9 @@ export class ResultsService {
 
     const { description, indicator_id, title, contract_id, year } =
       createResult;
-
     await this.mainRepo
       .findOne({
-        where: { title, is_active: true },
+        where: { title: title?.trim() , is_active: true },
         relations: { indicator: true },
       })
       .then((result) => {
