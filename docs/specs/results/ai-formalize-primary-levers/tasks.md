@@ -384,9 +384,9 @@ The spec is complete when:
 - [ ] T-01 … T-07 all `done`.
 - [ ] **A human has exercised a real mixed-year bulk upload in Dev BEFORE `/akili-validate` issues a verdict** (T-07, KZ-007) — the first check, not the last.
 - [ ] Every requirement AC checked; **every scenario and clause in §4 owned and green.**
-- [ ] `npm test -- --silent` and `npm run lint -- --quiet` green; coverage ≥ 60% **reported**.
+- [x] `npm test -- --silent` and `npm run lint -- --quiet` green; coverage ≥ 60% **reported**. — **328 suites / 2,320 tests green; coverage 84.23% stmts reported; lint exit 0 with zero files mutated.** Re-run by the Leader independently of the worker's report (T-07).
 - [ ] `/swagger` shows the new field on both endpoints.
-- [ ] No migration added; migration `1783029013035` confirmed applied where the change deploys.
-- [ ] **`[SO] R-RES-007` amended, with both Correction Closure sweep directions evidenced.**
+- [~] No migration added; migration `1783029013035` confirmed applied where the change deploys. — **no migration added: confirmed.** Migration **applied in `alliancereportingdb`** (owner-run 2026-09-04, *"No migrations are pending"*). **Outstanding:** whether that is Dev, Production or shared — if Production is a separate schema it needs the same check before rollout (RB-3).
+- [x] **`[SO] R-RES-007` amended, with both Correction Closure sweep directions evidenced.** — done over two attempts; the first named the wrong sibling carrier (RB-7 materialising) and was corrected to `[PL] R-RES-008` + `[PL] R-RES-010`. AC.4 byte-identical; append-only held (41 additions / 0 deletions); the claim-based re-sweep reproduced independently.
 - [ ] Q-1, Q-3, Q-4, Q-5 and Q-6 resolved or explicitly carried forward.
-- [ ] Actuals compared against the `design.md` §13 budget; **any overrun escalated rather than absorbed.**
+- [x] Actuals compared against the `design.md` §13 budget; **any overrun escalated rather than absorbed.** — the T-03 tripwire fired, was **escalated to the owner rather than absorbed**, and the budget was re-baselined by owner decision (§13.2) correcting the *basis*, not just the sum. Final: 2,423 vs ~2,404 (+0.8%); production LOC 285 of the ~300 armed threshold — not breached.
