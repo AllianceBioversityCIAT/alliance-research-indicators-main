@@ -151,13 +151,9 @@
         </div>
       </div>
 
-      @if (body().actors.length === 0) {
-        <div class="flex items-center rs-gap-[8] rs-mb-[12] text-[var(--ac-warning-1)]">
-          <i class="material-symbols-rounded !text-[14px]">warning</i>
-          <span class="fs-[14]">At least one actor is required</span>
-        </div>
-      }
-
+      <!-- DD-7 (reversion) / R-IUR-011 AC.1: the "At least one actor is required" message is
+           removed entirely — it must render in no state, per R-IUR-001 S1's BUT clause (no amber
+           message on an untouched empty section) and R-IUR-011 (actors are no longer required). -->
       <div class="flex flex-col rs-gap-[16]">
         @for (actor of body().actors; track $index) {
           <app-innovation-use-actor-item

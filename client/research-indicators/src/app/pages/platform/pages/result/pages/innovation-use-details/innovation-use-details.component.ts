@@ -347,10 +347,11 @@ export default class InnovationUseDetailsComponent {
     const data = response.data ?? new GetInnovationUseDetails();
     this.body.set({
       ...data,
-      // DD-10: exactly one blank actor affordance on empty load. Organizations and
-      // quantifications stay empty — they are optional, and a blank row there is precisely the
-      // identity-less-row `400` chunk 2 added to stop.
-      actors: Array.isArray(data.actors) && data.actors.length > 0 ? data.actors : [new InnovationUseActor()],
+      // DD-7 (reversion of DD-10, R-IUR-002): no blank actor seed on an empty load. Actors are no
+      // longer required (R-IUR-011), so a seeded blank card would be a row the user never created
+      // that immediately fails validation and flips a valid empty result to invalid on first paint.
+      // Organizations and quantifications have always stayed empty here — same treatment now.
+      actors: Array.isArray(data.actors) ? data.actors : [],
       organizations: Array.isArray(data.organizations) ? data.organizations : [],
       quantifications: Array.isArray(data.quantifications) ? data.quantifications : []
     });

@@ -46,8 +46,8 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-08 org unknown type + count | `[ ]` | |
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
-| T-11 details drop message + stop seeding | `[ ]` | |
-| T-12 details measure wiring | `[ ]` | pivot input · REWRITE c10 · restores build · **+ cohort spy (re-routed from T-04)** |
+| T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
+| T-12 details measure wiring | `[ ]` | pivot input · **REWRITE c10** · restores build · cohort spy · +2 hygiene items from T-11 |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
@@ -706,3 +706,79 @@ The residual asymmetry runs the **safe** way: U+000B (VT) and U+FEFF (BOM) are s
 **Standing decision, applied to every remaining Implementer brief in this spec:** **agents must not use `git stash` in this checkout.** The tree carries **18** stashes, one explicitly marked DO NOT APPLY at position `0`, so a mis-ordered flag followed by a pop is a live hazard — and it survived here only because the pop happened to conflict. T-01's Implementer had already avoided stash for the identical measurement and *said why* ("there are other in-flight, unrelated modifications in this working tree"), so the safe technique was already demonstrated in this run. The instruction from here: **copy files into the scratchpad and swap them back**, never stash. Also flagged to the user, whose call it is whether to clear or rename `stash@{0}` — a stash whose safety depends on a human reading its message is a hazard to any agent.
 
 **Kaizen candidate** for `/akili-archive`: a repo-level guard (guide line or hook) against `git stash` in an agent session, on the strength of this near-miss plus the two independent worker behaviours (one avoided it with a stated reason, one did not).
+
+---
+
+### T-11 — Details page: drop the "at least one actor" message and the seeded blank row (reversion, `DD-7`)
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1) |
+| Date | 2026-09-07 |
+| Implementer attempts | **1** |
+| Effort assigned | `medium` (task said `M`) |
+| Skills assigned | `angular-developer`, **`tdd`** |
+
+**Ordering decision.** T-07 was next by document order; the Leader took **T-11** instead because T-12 follows it and **restores the build**, which has been red since T-03 four tasks earlier. Running that long without the full-suite or `npm run build` gates available was the larger risk. Both tasks were unblocked and approved, so this was a routine ordering call, not a scope change.
+
+**Production changes** (`.ts` 9 changed lines, `.html` 10, `.spec.ts` 40 — Leader-measured)
+
+```diff
+-      actors: Array.isArray(data.actors) && data.actors.length > 0 ? data.actors : [new InnovationUseActor()],
++      actors: Array.isArray(data.actors) ? data.actors : [],
+```
+
+and the entire `@if (body().actors.length === 0) { ... At least one actor is required ... }` block deleted from `.html`, replaced by a comment recording the reversion.
+
+**A coupling the work order does not state, found at dispatch.** The message was gated on `body().actors.length === 0`, which the seed made **nearly unreachable** — only a user deleting the last row could reach it. Removing the seed alone would therefore have made every empty result open with an amber error **on first paint**, which is precisely what `R-IUR-001` S1's `AND IT MUST` (*valid on first paint, no user action*) forbids and what `DD-7`'s reversion exists to fix. The two halves are coupled, so the brief required the **whole `@if` block** to go, not just the string.
+
+**`K-018` held twice over — and the task's own list was still wrong**
+
+The work order names likely casualties *and* warns that revision 1 of this spec got that list wrong (it missed `c2` and cited a blank line and an arrangement). **After that correction the list was still incomplete.** Deriving from the run produced **4** failures (3 new + the known baseline), and the fourth was on no list:
+
+| Casualty | On the work order's list? | Disposition |
+| --- | --- | --- |
+| `c2 — empty state` (`actorCards.length === 1`) | yes | **rewritten** to assert the empty state positively |
+| `c10` first test (message when empty) | yes | **inverted** to `not.toContain` |
+| `T-09 c6` (message rather than error state) | yes | **inverted**, keeping its `hasDuplicateActorType()` / `loadFailed()` / no-error-surface assertions |
+| **`c1 — loading state`** (skeletons in the actor card) | **NO — missed by both revisions** | **fixed** by arranging a one-actor mock |
+
+**Every casualty was rewritten, none deleted** — deleting a failing test to green a suite destroys the coverage its requirement depends on.
+
+**The `c1` ruling — the judgment call of this task, and the Reviewer went further than the Leader had**
+
+`c1` had been relying on the **seed** to produce an actor card for its skeletons to render inside. The Implementer fixed it by arranging a one-actor mock, arguing the test's intent is the skeleton mechanism rather than the empty-state behaviour `c2` owns. The Leader flagged this for an explicit ruling rather than assuming.
+
+**Ruled correct, not a mask — with a stronger reason than either had given:** the original green depended on a **post-response** artifact. `body` is initialised `signal(new GetInnovationUseDetails())` (`.ts:144`) whose `actors` is already `[]`, and the seed only ran *after* the response landed — so **during the real in-flight window there was never a card to skeletonise, before or after this change**. The skeletons are not this template's at all; they come from the shared field components (`input.component.html:18-19`, `@if (currentResultIsLoading())`). An empty result with no level selected and no rows legitimately contains zero fields. Nothing about default load is lost, making the dependency explicit is an improvement, and the arrangement (`await getData()` → `set(true)` → `detectChanges()`) is a real transition per `KZ-015`, matching the idiom `c2`/`c3` already use.
+
+**Reviewer rulings on the other six questions**
+
+- **Seed removal complete.** The `Array.isArray` guard is preserved so `null`/`undefined`/non-array still normalise to `[]`; the class default is already `[]`, so no path yields a non-array and `body`'s non-optional `actors: InnovationUseActor[]` still holds. **No consumer needs ≥ 1 row** — every `actors` use is `forEach` (`:253`, duplicate detection, empty-safe), `map`/`filter` (`:371`, `:381`) or `buildPayload`'s `filter` (`:471`). **No indexing anywhere.**
+- **The message renders in no state.** A case-insensitive sweep of the whole client `src` returns exactly **six** hits: four spec assertions, one `it` title, and the `.html:154` comment — **zero renderable occurrences**.
+- **The comment's retained string is safe, and the risk direction is stated.** `Node.textContent` concatenates **Text**-node descendants only, and a `Comment` is not a `Text` node — so the four `not.toContain` assertions cannot see it *even if* Angular emitted it, and Angular's compiler does not emit authored comments in the first place. **No false pass is constructible;** the only failure mode would be a future switch to `innerHTML`/`outerHTML`, which yields a false **FAIL**. Advisory 2 covers the real (non-test) cost.
+- **`c2` satisfies the Disqualifier** — it goes through the production `getData()` path and asserts zero cards for all three collections **plus** positive presence of the guidance callout (`.html:138`) and the `Add other actor` button (`.html:175`), rather than resting on an unused-line tautology. The observed RED (`Expected: 0, Received: 1`) discriminates on exactly the deleted line.
+- **No coverage lost by the inversions.** `R-IUR-002` **AC.2** stays with `c3` (populated `200`) and **AC.3** with the relative `before + 1` assertion at `:555-560` — *which is why neither broke*. `c10`'s pair now brackets both states of `actors`.
+- **`addActor()` untouched** at `.ts:376-378`, outside every hunk, and `new InnovationUseActor()` now has exactly **one** occurrence in the file. The ≥ 1-actor path returns `data.actors` verbatim, so a populated response renders identically (`R-IUR-002` S1's `BUT`).
+- **T-12's territory intact.** `[fieldsRequired]="false"` is present at **`.html:223`** (was `:227`; the html hunk nets −4 lines above it, **which reconciles exactly**), and `c10`'s asterisk test survives verbatim at `.spec.ts:404-408` as the single known-red. `R-IUR-002` AC.4's doc update is **T-15's** (`tasks.md:506`), correctly absent here. No save-gate, toast or organization-card change.
+
+**Verification** — `npx eslint` clean · `npx jest innovation-use-details.component.spec --coverage=false --silent` → **1 failed, 150 passed, 151 total**, **exactly the pre-T-11 baseline, independently re-measured by the Leader**; the single failure is c10's asterisk test, T-12's, untouched · `npm test -- --silent -- ...` → exit 1 from project-wide coverage floors (`K-020`), same tally · observed RED for the empty-state assertion taken by **copying files to the scratchpad and swapping back — explicitly not `git stash`**, per the standing prohibition from T-06's incident, which held.
+
+**Diff hygiene worth noting:** `prettier` reformatted unrelated blocks, so the Implementer restored each file from `git show HEAD:` and reapplied only the intended edits rather than committing incidental churn.
+
+**`ADVISORY` (4R — recorded, non-gating)**
+
+1. *Reliability / `KZ-001`* — **`c1`'s second test is now vacuous.** *"renders no skeleton when currentResultIsLoading() is false"* (`.spec.ts:138-145`) did **not** receive the one-actor arrangement its sibling did, so the default empty load renders zero field components and `expect(skeletons.length).toBe(0)` holds **regardless of the flag**. Reviewer's reachability check: the only defect class it can no longer catch is "a field component renders its skeleton unconditionally", that branch is currently correct (`input.component.html:18`) and is directly owned by `input.component.spec.ts` — so **nothing live is masked**. Symmetric fix is the same one-actor mock. → **forward pointer to T-12.**
+2. *Readability* — the replacement comment at `.html:154` repeats the literal `At least one actor is required`, so a client-wide grep still hits the `.html`. Harmless to the tests (see above) but **a future auditor can misread it as a surviving render**. "the actors-required message" carries the same information without the false hit. → **forward pointer to T-12.**
+3. *Readability* — `c10`'s first test and `T-09 c6`'s second now share an arrangement and a negative; `c10`'s is the pure duplicate (the other adds three distinct assertions), while `c2`'s reaches the negative through the real load path. Not worth a change; if one is ever pruned, prune `c10`'s.
+
+> **FORWARD POINTER → T-12 (Leader-owned; must be copied into T-12's brief).** Three items, all in `innovation-use-details.component.{html,spec.ts}`, which T-12 already owns:
+> 1. **Rewrite, do not restore, `c10`'s asterisk test** (`.spec.ts:404-408`, `hasAsteriskTextNode(quantificationsCard)).toBe(false)`) — `R-IUR-010` AC.1 **deliberately reverses** it: measures now *do* carry asterisks on `Number` and `Unit`, and `Comments` does not. A T-12 that greens it by re-satisfying the old expectation has re-implemented the behaviour the requirement removes. **This is also the task that restores the build** (`NG8002` on `[fieldsRequired]`, now at `.html:223`) and the full suite.
+> 2. **Give `c1`'s second test the same one-actor mock its sibling got** (advisory 1) — it is currently vacuous. Nothing live is masked, so this is hygiene, not a defect.
+> 3. **Reword the `.html:154` comment** to drop the literal message string (advisory 2), so a client-wide grep stops producing a false hit.
+> Also still standing: **scope the prototype-wide `border` setter spy** at `.spec.ts` ~`:2542` to the specific element — T-12 both owns that file and *creates* the second-emitter collision by binding `[unitRequiredMode]="'filled'"` (re-routed here from T-04 at the T-04 dispatch gate; full reasoning at the T-02 entry).
+
+**Requirements covered** — `R-IUR-002` in full (S1 + both clauses, AC.1–AC.3) · `R-IUR-011` AC.1 + S1's `BUT it must NOT remove the per-row actor rules` · `R-IUR-001` S1's `BUT` and `AND IT MUST`, and S2's `BUT`.
+
+**Cannot prove (`KZ-017`)** — the **SQL half** of `R-IUR-011` (AC.2/AC.3/AC.4 → T-18/T-19). **Paint** — jsdom renders nothing, so the empty state's actual appearance is T-16 gate 3. **Template type-checking** — the branch still fails `NG8002` on `[fieldsRequired]` (T-12's), though the Reviewer confirmed the deleted block was the template's only *other* `actors` reference, so nothing dangles. The **`tsc` normalized set diff** is T-16 gate 2's, not this task's. The Reviewer executed **nothing** (read-only wrapper): it re-derived the after-state from the working tree and read `c1`, `c2`, `c10` and `T-09 c6` in full, but **cannot rule out an unreported edit elsewhere in the ~2,900-line spec file** — the Leader's `git diff --stat` (40 changed spec lines) bounds that gap.
+
+**A Leader slip, recorded:** the dispatch brief referred to the component directory in an abbreviated form the Reviewer had to correct — the real path is `pages/platform/pages/result/pages/innovation-use-details/`. No work was misdirected, but exact paths belong in briefs, since a worker cannot tell an abbreviation from an error.

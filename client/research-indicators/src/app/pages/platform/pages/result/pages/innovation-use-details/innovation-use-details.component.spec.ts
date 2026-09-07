@@ -119,6 +119,14 @@ describe('InnovationUseDetailsComponent', () => {
   // ---------------------------------------------------------------------------------------------
   describe('c1 — loading state', () => {
     it('renders p-skeleton inside the actor card fields when currentResultIsLoading() is true', async () => {
+      // R-IUR-002/DD-7: the default empty 200 no longer seeds a blank actor row, so this test
+      // (which targets the actor card's own skeleton, not the empty-state behaviour c2 owns)
+      // must arrange a result that actually has an actor row to render skeletons inside.
+      apiService.GET_InnovationUseDetails.mockResolvedValue({
+        data: { ...new GetInnovationUseDetails(), actors: [new InnovationUseActor()] },
+        successfulRequest: true
+      });
+
       await component.getData();
       cacheMock.currentResultIsLoading.set(true);
       fixture.detectChanges();
@@ -138,10 +146,15 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c2 — empty state: exactly one blank actor card (rendered count), zero organization/quant cards
+  // c2 — empty state (R-IUR-002/DD-7 reversion): zero actor cards on an all-empty 200 — no
+  // auto-seeded blank row — plus zero organization/quant cards. Positive assertion per the
+  // Disqualifier: buildPayload() filters the array regardless, so a green suite after deleting
+  // the seed line proves only that the line was unused, not that the empty state renders
+  // correctly. Assert the rendered DOM directly: zero actor cards, the guidance callout still
+  // present, and the `Add other actor` button still present (isEditableStatus() true by default).
   // ---------------------------------------------------------------------------------------------
   describe('c2 — empty state', () => {
-    it('renders exactly one Actor card and zero Organization/Quantification cards for an all-empty 200', async () => {
+    it('renders zero Actor/Organization/Quantification cards for an all-empty 200, with the guidance callout and Add other actor button still present', async () => {
       apiService.GET_InnovationUseDetails.mockResolvedValue({
         data: { innovation_use_level_id: null, innovation_use_level_explanation: null, actors: [], organizations: [], quantifications: [] },
         successfulRequest: true
@@ -154,9 +167,18 @@ describe('InnovationUseDetailsComponent', () => {
       const organizationCards = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent));
       const quantificationCards = fixture.debugElement.queryAll(By.directive(QuantificationItemComponent));
 
-      expect(actorCards.length).toBe(1);
+      // R-IUR-002 AC.1: empty `actors` from the API ⇒ zero rendered actor cards (no seed).
+      expect(actorCards.length).toBe(0);
       expect(organizationCards.length).toBe(0);
       expect(quantificationCards.length).toBe(0);
+
+      // R-IUR-002 scenario: the section still renders its guidance callout and the
+      // `Add other actor` button, and no card.
+      expect(fixture.nativeElement.textContent).toContain('List every actor group using this innovation.');
+      expect(fixture.nativeElement.textContent).toContain('Add other actor');
+
+      // R-IUR-001 S1's BUT: the removed message must not render in this (or any) state.
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
   });
 
@@ -337,14 +359,16 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c10 — cards 3 and 4 carry no asterisk; card 2 shows the at-least-one-actor message when empty
+  // c10 — cards 3 and 4 carry no asterisk; card 2's at-least-one-actor message is gone in every
+  // state (R-IUR-011 AC.1 / DD-7 reversion — rewritten, not deleted: revision 1's premise that the
+  // message renders when actors is empty no longer holds).
   // ---------------------------------------------------------------------------------------------
   describe('c10 — required messaging boundaries', () => {
-    it('shows the at-least-one-actor message when actors is empty', () => {
+    it('does not show the at-least-one-actor message when actors is empty', () => {
       component.body.set({ ...component.body(), actors: [] });
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).toContain('At least one actor is required');
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
 
     it('does not show the at-least-one-actor message once an actor row exists', () => {
@@ -1763,13 +1787,13 @@ describe('InnovationUseDetailsComponent', () => {
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
     });
 
-    it('renders the incomplete "at least one actor is required" message rather than any error state when actors is empty', () => {
+    it('renders neither the removed "at least one actor is required" message nor any error state when actors is empty (R-IUR-011 AC.1)', () => {
       component.body.set({ ...component.body(), actors: [] });
       fixture.detectChanges();
 
       expect(component.hasDuplicateActorType()).toBe(false);
       expect(component.loadFailed()).toBe(false);
-      expect(fixture.nativeElement.textContent).toContain('At least one actor is required');
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
       // Distinct from the error surface (c4/c5's rendered "could not be loaded" block).
       expect(fixture.nativeElement.textContent).not.toContain('could not be loaded');
     });
