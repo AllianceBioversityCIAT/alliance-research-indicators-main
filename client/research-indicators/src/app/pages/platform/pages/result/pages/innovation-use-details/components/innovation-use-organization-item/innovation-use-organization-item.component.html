@@ -6,6 +6,17 @@
   </div>
 </ng-template>
 
+<!-- R-IUR-006 (T-07) — known-path field-level required message. Its own `.organization-required-
+     message` class is a distinguishing hook: this card now has two `warning`-icon message
+     sources, and a whole-card icon count cannot tell them apart (the Disqualifier AC.3 exists
+     to forbid). -->
+<ng-template #institutionRequiredMessage>
+  <div class="organization-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
 <div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
   <div class="flex justify-between items-center rs-gap-[4]">
     <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber }}</span>
@@ -49,7 +60,7 @@
         </span>
       </div>
 
-      <span class="label rs-mt-[12]">Organization</span>
+      <span class="label rs-mt-[12]">Organization<span class="text-red-500">*</span></span>
       <p-select
         [disabled]="disabled"
         [scrollHeight]="'218px'"
@@ -62,6 +73,7 @@
         placeholder="Select the organization"
         [ariaLabel]="'Select the organization'"
         class="fs-[14] w-full"
+        [style]="institutionMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
         [ngModel]="body().institution_id"
         (onChange)="onInstitutionChange($event.value)"
         [options]="institutionsService.list()">
@@ -72,6 +84,10 @@
           <div class="flex items-center whitespace-normal break-words gap-2" [innerHTML]="institution.html_full_name"></div>
         </ng-template>
       </p-select>
+
+      @if (institutionMissing) {
+        <ng-container *ngTemplateOutlet="institutionRequiredMessage"></ng-container>
+      }
 
       @if (body().institution_id) {
         <app-partner-selected-item [institution]="selectedInstitution()" class="rs-mt-[12] bg-[var(--ac-grey-200)] rs-p-[16]" />

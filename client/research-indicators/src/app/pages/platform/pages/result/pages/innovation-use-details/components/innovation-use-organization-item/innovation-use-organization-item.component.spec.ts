@@ -273,20 +273,131 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
   });
 
-  // c4 — No asterisk renders on any field of this card, in any state.
-  describe('c4 — zero required-asterisk nodes on this card, in every state', () => {
-    it('renders no .text-red-500 node in the known path', () => {
+  // c4 — T-07 (R-IUR-006 AC.1) puts a red asterisk on the KNOWN path's `Organization` label;
+  // the UNKNOWN path stays asterisk-free until T-08 (R-IUR-007) adds its own.
+  describe('c4 — required-asterisk nodes match the active path (known path only, until T-08)', () => {
+    it('renders exactly one .text-red-500 node in the known path, on the Organization label', () => {
       component.organization = { ...new InnovationUseOrganization(), is_organization_known: true };
       fixture.detectChanges();
-      expect(fixture.debugElement.queryAll(By.css('.text-red-500')).length).toBe(0);
+
+      const asterisks = fixture.debugElement.queryAll(By.css('.text-red-500'));
+      expect(asterisks.length).toBe(1);
+      const label = fixture.debugElement.query(By.css('span.label'));
+      expect((label.nativeElement as HTMLElement).textContent).toContain('Organization');
     });
 
-    it('renders no .text-red-500 node in the unknown path, including OTHER + sub-type visible', async () => {
+    it('renders no .text-red-500 node in the unknown path, including OTHER + sub-type visible (T-08 territory, untouched by T-07)', async () => {
       component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
       fixture.detectChanges();
       await component.onInstitutionTypeChange(78);
       fixture.detectChanges();
       expect(fixture.debugElement.queryAll(By.css('.text-red-500')).length).toBe(0);
+    });
+  });
+
+  // R-IUR-006 / DD-9 — the field-level required message on the known path, and its precedence
+  // over the row-level `showNotIdentifiedMessage`. AC.3's falsifying input: an UNTOUCHED
+  // known-path row with no institution must show EXACTLY ONE message (today: zero).
+  describe('R-IUR-006 — known path: institution required, with message precedence (T-07)', () => {
+    // Each message source gets its own hook so a count can be attributed to its source
+    // (Disqualifier: a whole-card `warning`-icon count conflates the two message kinds).
+    // Field-level (T-07, new): the `.organization-required-message` class hook.
+    // Row-level (`#notIdentifiedMessage`, pre-existing): matched by its own exact copy, never
+    // by a shared icon count.
+    const fieldLevelMessages = () => fixture.debugElement.queryAll(By.css('.organization-required-message'));
+    const rowLevelMessages = () =>
+      fixture.debugElement
+        .queryAll(By.css('span'))
+        .filter(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'This row does not identify an organization yet');
+
+    it('AC.3 falsifying input: an UNTOUCHED known-path row with no institution shows EXACTLY ONE message (the field-level one), never zero, never two', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: undefined };
+      fixture.detectChanges();
+
+      // Untouched: the component was never mutated after construction.
+      expect(component.touched()).toBe(false);
+
+      expect(fieldLevelMessages().length).toBe(1);
+      expect(fieldLevelMessages()[0].nativeElement.textContent as string).toContain('This field is required');
+      // The suppressed row-level message must not ALSO render (never two).
+      expect(rowLevelMessages().length).toBe(0);
+      expect(fixture.nativeElement.textContent as string).not.toContain('does not identify an organization yet');
+    });
+
+    it('AC.1: the red asterisk renders on the known path even when the field is already filled', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      const asterisks = fixture.debugElement.queryAll(By.css('.text-red-500'));
+      expect(asterisks.length).toBe(1);
+    });
+
+    it('AC.4: a filled known-path row shows no field-level message and no row-level message', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      expect(fieldLevelMessages().length).toBe(0);
+      expect(rowLevelMessages().length).toBe(0);
+    });
+
+    // AC.2 border half, per DD-3: [style] is applied via a direct `el.style.border = value` write
+    // (never `setProperty`) — spying on the accessor setter of THIS select's own `.style`
+    // (never `CSSStyleDeclaration.prototype`, per the T-12 second-emitter hazard) observes that
+    // write. Angular memoizes the last-applied value per property, so the spy must be installed
+    // BEFORE the transition it is meant to observe (a valid->invalid toggle here), not after a
+    // render that already settled on the same value (T-12 lesson).
+    it('AC.2: toggling the known-path select from filled to empty writes the amber border inline style on that select only', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      const selectDe = selectByAria('Select the organization')!;
+      const selectEl = selectDe.nativeElement as HTMLElement;
+      const borderSetSpy = jest.spyOn(selectEl.style, 'border', 'set');
+
+      // Real transition (KZ-015): drive it through the component's own mutation, matching what
+      // the UI would do (selecting away an institution is not directly exposed, so this exercises
+      // the same code path onInstitutionChange uses to update `body`).
+      component.onInstitutionChange(undefined as unknown as number);
+      fixture.detectChanges();
+
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('AC.2 negative: a filled known-path row never writes the amber border on the organization select', () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('a TOUCHED known-path row with no institution still shows exactly the field-level message (precedence holds touched too)', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 };
+      fixture.detectChanges();
+
+      component.onInstitutionChange(undefined as unknown as number);
+      fixture.detectChanges();
+
+      expect(component.touched()).toBe(true);
+      expect(fieldLevelMessages().length).toBe(1);
+      expect(rowLevelMessages().length).toBe(0);
+    });
+
+    // Un-suppression guard: T-07 must not widen suppression onto the UNKNOWN path — that is
+    // R-IUR-007 (T-08) territory. This is also what proves spec.ts:302-316 keeps passing (see
+    // that test below, left untouched).
+    it('does not suppress the row-level message on the UNKNOWN path (T-08 not yet implemented)', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      const countInput = appInputLabelled('Organization count')!;
+      countInput.setValue(3);
+      fixture.detectChanges();
+
+      expect(rowLevelMessages().length).toBe(1);
+      expect(fieldLevelMessages().length).toBe(0);
     });
   });
 

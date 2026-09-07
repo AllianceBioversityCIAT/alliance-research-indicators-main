@@ -42,8 +42,8 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-04 actor disaggregated counts + total msg | `[x]` | PASS attempt 3 of 3. Pointers → T-16, T-19 |
 | T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
 | T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
-| T-07 org known path + DD-9 precedence | `[ ]` | |
-| T-08 org unknown type + count | `[ ]` | |
+| T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
+| T-08 org unknown type + count | `[ ]` | **+5 pointers from T-07** (incl. moved `:413-427` rewrite) |
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
@@ -855,3 +855,89 @@ Also carried from attempt 1's audit: **`R-IUR-010` AC.2's amber half is a compos
 **Requirements covered** — `R-IUR-010` AC.1–AC.4 (client half) incl. AC.4's corrected boundary · **AC.6 + S1's `AND IT MUST` reject a whitespace-only `Unit`** (reassigned from T-01 by the 2026-09-04 pivot) · `R-IUR-010` S1.
 
 **Cannot prove (`KZ-017`)** — **OICR's unchanged behaviour** (T-03 owns AC.5, against the real component; both OICR call sites keep the child's `true`/`'off'`/`'off'` defaults). **The SQL/green-check half** of `R-IUR-010` (T-18/T-19). **Paint** — jsdom measures no colour or layout; T-16 gate 3 remains the only evidence for `R-IUR-003`. The `-5` test is **regression-protection, not evidence** — a bare valid-no-message verdict cannot distinguish "`'nonzero'` ran and passed" from "no mode ran"; its discriminating power comes from the `0` case plus the resolved-mode assertion, and it is labelled so in-code. No Reviewer executed anything (read-only wrappers); every gate figure is the Leader's measurement.
+
+---
+
+### T-07 — Organization card, known path: institution required, with message precedence
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1) |
+| Date | 2026-09-07 |
+| Implementer attempts | **1** |
+| Effort assigned | `medium` (task said `M`) |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max`, **`tdd`** |
+
+**Production changes** (`.ts` 20 changed lines, `.html` 18, `.spec.ts` 121)
+
+| # | Change |
+| --- | --- |
+| AC.1 | Red `*` added to the known-path `Organization` label, **unconditional on that path** |
+| AC.2 | `[style]="institutionMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"` **added** to the known-path `p-select` — Leader-verified it had **no `[style]` at all** before |
+| new | `#institutionRequiredMessage` template with its own `.organization-required-message` class hook, rendered by a bare `@if (institutionMissing)` — **not gated on `touched()`** |
+| `DD-9` | `institutionMissing = is_organization_known && !identitySatisfied`; `showNotIdentifiedMessage` gains `&& !this.institutionMissing` |
+
+**Verification** — `npx eslint` clean · `innovation-use-organization-item.component.spec` **34/34** · `npm run build` green · `tsc` scoped before/after: **identical single pre-existing `TS2741`** · **Leader full-suite gate: 317 suites, 6855 tests, exit 0** · reds taken **without `git stash`**.
+
+**Observed RED** — `AC.3 falsifying input: an UNTOUCHED known-path row with no institution shows EXACTLY ONE message — Expected: 1, Received: 0`, plus four more new tests red for the same absence. The Reviewer confirmed attribution: before this change the card's **only** message was `showNotIdentifiedMessage`, gated on `touched()`, so an untouched loaded row rendered exactly zero.
+
+---
+
+#### The misattribution the Leader caught before dispatch — confirmed on three independent grounds
+
+T-07's `Verify` line ordered `:302-316` rewritten. `DD-9`'s own blast-radius table attributes that break to **`R-IUR-007`** — **T-08**. The test arranges `is_organization_known: false`, the **unknown** path, which T-07 does not touch. The brief told the Implementer to leave it alone and to **stop and report if it broke**, because breaking would mean the clause was too broad — and a clause reaching the unknown path renders **zero** messages there (no field-level message exists until T-08), violating AC.3's *"never zero"* half.
+
+**The Reviewer confirmed the reading three ways:**
+
+1. `design.md:514` attributes it in words — *"**Under `R-IUR-007`** that row now shows a required message on `Organization type`"*. `tasks.md:234` inherited the note **without** the attribution.
+2. **The clause structurally cannot reach the unknown path** — `is_organization_known` is the *leading* conjunct and a non-optional `boolean` defaulting to `false`, so `showNotIdentifiedMessage` is byte-equivalent to its pre-change behaviour there.
+3. **Line arithmetic reconciles exactly.** The two spec hunks add `+5` and `+106` = `+111`; the untouched test now sits at **`:413-427`**, and `413 − 111 = 302`, `427 − 111 = 316`. **This proves the test left alone is the one the citation named.**
+
+**Fifth misplaced/rotted citation in this spec** (`A-N4` family). **`tasks.md` corrected in this commit** per root `CLAUDE.md` (*fix the document that is wrong*): the instruction is **moved from T-07's `Verify` to T-08's**, each with the reason recorded inline.
+
+The Implementer also wrote an **un-suppression guard** test asserting the row-level message *still* renders on the unknown path — the positive control for exactly this hazard, and it discriminates (`rowLevel` 1, `fieldLevel` 0).
+
+#### A standing instruction of the Leader's, corrected by the Reviewer
+
+The brief said **never** use `jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set')`, generalising from T-12's rescope. **That ban was too absolute, and `DD-3` itself contradicts it:** `design.md:271` names the prototype spy verbatim as *the* automated assertion for `p-select`.
+
+The distinction the Reviewer drew, which is the correct rule: **T-12's hazard was a false PASS on a *positive* `toContainEqual`** when a second emitter of the identical string existed in the same fixture. **A second emitter can only turn `not.toContainEqual` red, never green** — so prototype-wide is the **strictly safe** direction for a *negative* assertion, and element-scoping a negative is actually *weaker* (something else could write the amber and the test would still pass). The Implementer used element-scoped for its positive assertion and prototype-wide for its negative — **correct on both counts.**
+
+It further noted the prototype spy is the **only** instrument that can observe the **first** style write on a newly created element, because an element-scoped spy needs the element to exist beforehand. **Recorded as corrected guidance for every remaining brief in this spec:** scope by attribution need — element-scoped when claiming a *specific* element wrote a value, prototype-wide for card-wide negatives and first-render writes.
+
+#### The work order's `Cannot prove` describes a FUTURE state — corrected
+
+T-07's `Cannot prove` says to record the suppressed branch as unreachable-so-untestable. **That is not true today.** The Reviewer established it still renders on the **unknown** path and **two** tests exercise it (`:391-401`, `:413-427`). `DD-9`'s *"unreachable in practice"* becomes true only once **T-08** extends the clause. **Recorded as the known untested-but-retained path effective T-08**, not now — the honest version of the instruction.
+
+#### Reviewer rulings (all ten questions clean)
+
+- **`DD-9` precedence, both table rows** satisfied. Note which test does the work: on an *untouched* row `touched()` is already `false`, so suppression there is a **no-op** and proves nothing about the new clause — the only test that genuinely exercises it is the touched one. `identitySatisfied` is genuinely reused, never re-derived.
+- **Disqualifier satisfied** — two disjoint hooks, and **both proven to discriminate in both directions inside the same describe** (`fieldLevel` 1 and 0; `rowLevel` 1 and 0), so neither is a vacuous cohort.
+- **`c4` rewrite necessary, no coverage lost** — AC.1 makes *"zero asterisks in every state"* false; the unknown-path half is retained verbatim including its `OTHER + sub-type` arrangement.
+- **`c5` verified from source — passes on merit, not by accident.** Its fixture is the unknown path (`new InnovationUseOrganization()` sets `is_organization_known = false`), and it still asserts something live: the touched-gate on the only path where the row-level message can still render until T-08. *(The Leader raised this because a green suite cannot distinguish "still correct" from "passing by accident".)*
+- **AC.1 unconditional is the right reading** — AC.1 keys on *"when the known path is active"*, `R-IUR-003` says *"field name immediately followed by a red `*`"*, and the in-tree reference card renders it unconditionally.
+- **Copy verified** at `requirements.md:163` and against the sibling actor card's identical string.
+- **`OQ-6` intact** — `ng-template` byte-identical, render site unchanged, getter retained; reversal is deleting one clause on one line.
+- **Scope clean** — T-08/T-09/T-10/T-13 all provably absent (type select carries no asterisk and no `[style]`; sub-type block untouched; `onInstitutionTypeChange` still sends `undefined`; `onKnownToggle` still flag-only; no save gate or toast).
+- **Prettier ruling: acceptable.** `.husky/pre-commit` is **empty** and eslint ignores `*.spec.ts`, so nothing gates spec formatting; at `printWidth: 150` a `--write` would have reflowed unrelated blocks — the churn T-11 had to undo by hand.
+- **Token compliance** — no hex; `[style]` object binding on `p-select` per `DD-3`, no Tailwind `border-*`.
+
+#### `ADVISORY` (4R — recorded, non-gating; routed to T-08 where it owns the file)
+
+1. *Reliability / `KZ-015`* — **reachable, and it is the common case.** The touched arrangement calls `onInstitutionChange(undefined)`, but the select has **no `[showClear]`**, so **the UI cannot produce that transition**. The production-reachable route into *touched + known + empty* is `onKnownToggle(true)` on an unfilled row — a user ticking the checkbox — and that call already exists in the file for another assertion. Moving the message/border assertions there would test the transition the product performs **and** cover the create-with-amber first write.
+2. *Readability* — retitle the AC.2 negative to *"never writes the amber border anywhere in the card"*, matching its card-wide spy.
+3. *Reliability* — `c4`'s known-path title claims the asterisk is *"on the Organization label"*, but `length === 1` plus *"first `span.label` contains 'Organization'"* does not establish **containment**; an asterisk on the wrong element still passes. `label.query(By.css('.text-red-500'))` closes it.
+4. *Risk* — **neither border spy is restored in a `finally`.** A failing assertion leaves `CSSStyleDeclaration.prototype.border` mocked and **swallowing every write for the rest of the file**, turning one red into a cascade during the exact run where diagnosis matters. `try/finally` or `afterEach(() => jest.restoreAllMocks())`.
+5. *Readability* — the leading `is_organization_known` conjunct is redundant for both **template** uses (both sit inside `@if (body().is_organization_known)`) and load-bearing **only** for the suppression clause. A future "simplification" dropping it would silently widen suppression onto the unknown path. The in-code comment says so.
+6. *Readability* — the reference card in `innovation-details` uses the same getter name and mechanism with a hex `#E69F00`; this card uses the token. The two have now diverged, **in this card's favour**.
+
+> **FORWARD POINTER → T-08 (Leader-owned; must be copied into T-08's brief).**
+> 1. **Rewrite the test now at `:413-427`** (formerly `:302-316`) — instruction moved into T-08's `Verify` line in this commit. Adding a field-level required message to `Organization type` suppresses the row-level message on the unknown path, which that test asserts.
+> 2. **Two stale in-code claims travel with it.** Its comment asserts *"only in this `@if` branch is 'unknown path, no identity yet' true, so exactly one `material-symbols-rounded` warning icon exists in the DOM here"* — false the moment T-08 lands. And it uses **`query` (first match), not `queryAll`**, so it will **silently begin matching T-08's new icon** instead of the row-level one while staying green: `KZ-014` and `KZ-001` together — a claim that stops being true and an assertion that stops measuring what it names.
+> 3. **`c5`'s first test** stays true under T-08 (it matches the row-level copy only) but should be **re-read at that gate rather than assumed**.
+> 4. **Advisories 1–4 above** are hygiene in the file T-08 owns: the `KZ-015` reachable-transition fix, the negative-spy retitle, `c4`'s containment assertion, and the **spy-restore-in-`finally`** risk. Authorise as a bundle only if T-08's own scope stays intact.
+> 5. **When T-08 lands, the suppressed branch becomes genuinely unreachable** — record it as the known untested-but-retained path at that point, per `DD-9`'s honest caveat.
+
+**Requirements covered** — `R-IUR-006` **in full**: S1 + its `BUT it must NOT render two competing messages`; AC.1, AC.2 (client half), AC.3, AC.4.
+
+**Cannot prove (`KZ-017`)** — **paint**: a captured `.style.border` setter call is not a painted border; T-16 gate 3 is the only evidence, **and this card's amber border is not yet on gate 3's named list** → carried to T-16. **AC.2's amber on the *first render* of an already-invalid select is a composition, not a direct measurement** — the same shape recorded for T-12: `institutionMissing === true` on an untouched loaded row, plus `[style]` emitting the amber whenever it is true; **no test observes a first-render write**, and advisory 1 would close it directly. **AC.2's green-check half and rule 6's SQL** — T-13/T-18/T-19. The Reviewer executed **nothing** (read-only wrapper) and could not run `git diff`, so it cannot rule out an unreported edit elsewhere in the 684-line spec file; it read `.ts` and `.html` in full plus most of the spec and enumerated all 14 top-level `describe`s — the Leader's `git diff --stat` (20/18/121) bounds that gap.

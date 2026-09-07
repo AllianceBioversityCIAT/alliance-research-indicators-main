@@ -183,7 +183,25 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
     return current.is_organization_known ? !!current.institution_id : !!current.institution_type_id;
   }
 
+  /**
+   * R-IUR-006 (T-07) — known-path-only field-level requirement: `institution_id` is required
+   * once `Is the organization known?` is checked. Reuses `identitySatisfied` (DD-9) rather than
+   * recomputing it; scoped to the known path with the leading `is_organization_known` conjunct so
+   * it stays `false` on the unknown path, which is `R-IUR-007`/T-08 territory, not this task's.
+   */
+  get institutionMissing(): boolean {
+    return this.body().is_organization_known && !this.identitySatisfied;
+  }
+
+  /**
+   * DD-9 precedence: the row-level message is SUPPRESSED — not deleted (`OQ-6`, user ruling) —
+   * while a field-level required message is showing on the same row. After T-07 that field-level
+   * state is `institutionMissing` (known path only); T-08 will extend this clause to the unknown
+   * path's type and count. Not gated further by touch here: `institutionMissing` already implies
+   * the known path, and the row-level message never fires on the known path once this clause
+   * excludes it, whether touched or not.
+   */
   get showNotIdentifiedMessage(): boolean {
-    return this.touched() && !this.identitySatisfied;
+    return this.touched() && !this.identitySatisfied && !this.institutionMissing;
   }
 }
