@@ -49,7 +49,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
 | T-12 details measure wiring | `[x]` | PASS attempt 3 of 3. **Restored the build.** All 4 pointers discharged |
 | T-13 details: remove every save-time gate | `[x]` | **PASS attempt 2** (post-Pivot rewrite; attempt 1 reverted in full). 8 mutations, all reds observed. Advisory → T-21 docstring |
-| T-14 sub-type catalog equivalence | `[ ]` | |
+| T-14 sub-type catalog equivalence | `[x]` | **PASS attempt 1.** 42/42, 0 divergences; naive mirror reddens on exactly the 8 predicted codes. **4 advisories → T-18/T-19** |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
 | T-17 RSK-2 population sizing | `[ ]` | |
@@ -1893,3 +1893,37 @@ Attempt 1 (the save-blocking version) was **reverted in full** — `git restore`
 4. Two stale-but-harmless `T-09` test titles left in place.
 
 **Carried:** `NFR-IUR-003`'s second half (a real `201`/`200`) is unreachable from jsdom → **T-16 / the human gate**, not ticked here.
+
+---
+
+#### T-14 — Reviewer `STATUS: PASS` ✅ **task complete**
+
+**Architecture (Implementer's choice, delegated by `tasks.md`):** copy the 42 catalog rows from **Dev by read-only `SELECT`** into the disposable `ari_scratch_test` schema, then enumerate inside a normal `npm run test:fixtures` fixture. Reason recorded in the file: the catalog is reachable **only** server-side (the client fetches per-type slices, never the whole tree), so a client jsdom enumeration structurally cannot see it.
+
+**Result — and `DD-5` turns out to have been protecting against something real, not hypothetical:**
+
+```
+T-14 catalog enumeration: 42 types checked (Dev real size measured 2026-09-07: 42), 0 divergences: []
+T-14 naive-EXISTS mutation over 42 types: 8 divergences: [38, 41, 44, 47, 51, 55, 58, 61]
+```
+
+The Leader's own read-only Dev probe before dispatch (**42 total · 9 root+active · 5 of those with children · 8 non-root with children**) predicted exactly those 8 codes, and the mutation reddened on exactly them. **Had the SQL mirror been written the obvious way — `EXISTS(parent_code = type)` — the server would have demanded a sub-type for 8 catalog types where the client renders no select at all.** That is `DC-3`: a row that looks complete, is rejected on submit, with nothing on screen explaining why.
+
+**Stronger than a one-off mutation:** the 8-divergence line runs in the **normal green suite**, so the naive mirror's wrongness is a standing assertion, not a probe that happened once.
+
+**Reviewer verification, all traced rather than accepted:**
+- **The real source is called.** It followed the chain end to end — `@if (subTypeOptions().length > 0)` ← `subTypesService.list(typeId)` ← `getSubTypes(2, typeId)` ← `GET_SubInstitutionTypes` ← the controller → the same service method with the same `(code, 2)` argument order — and confirmed the fixture's `clientRendersSelect` **is** that predicate, with no reimplementation and no stub.
+- **`N-7` is not merely avoided but asserted against.** It re-derived the semantics instead of trusting the comment: `getItemsAtLevel(items, 2)` returns `[]` unless the matched root has ≥1 direct child, and `relations: { children: { children: true } }` is unconditioned, so **an inactive child still yields a non-empty list**. The fixture computes a third column, `requires_subtype_child_filtered`, and pins it `false` on the synthetic pair while client and correct-SQL are both `true`.
+- **Exhaustive and honestly counted** — no `LIMIT`, no filter, no early return; the printed count is the array actually iterated and is asserted `=== 42` in the same test.
+- **Dev untouched** — the committed file's only datasource is `orm.test.config` (scratch). The four-column copy is sound: both predicates read only `code`/`parent_code`/`is_active`, and `deleted_at` is a plain `@Column`, not `@DeleteDateColumn`, so no hidden soft-delete filter alters the reading.
+- **Synthetic `N-7` band verified non-colliding** — the Reviewer grepped `test/` independently: `970_00x` has zero hits elsewhere and sits clear of every declared band.
+
+**Leader-measured:** full fixture suite **18 suites / 95 tests / 0 failed** in a quiet tree — the gate that matters, since `nest-harness.ts` is **shared** with every other fixture spec. (`npm test`'s `rootDir: "src"` does not collect `*.fixture-spec.ts` at all, so the unit suite is structurally irrelevant here.)
+
+**⚠️ `ADVISORY` — one of these MUST reach T-18 and T-19, and is copied into their briefs:**
+1. **The "correct SQL" is a string literal inside the fixture, not read from T-18's migration.** So this proof **structurally cannot detect T-18 writing a different clause** — the very `DC-3` recurrence it exists to prevent. The header does not overclaim, but the limit belongs in its `Cannot prove` block, and **T-19's `DD-5` case must cite this file by name.**
+2. **Seeding is never verified.** `INSERT IGNORE` downgrades a per-row failure to a warning, and an absent row makes its own comparison **vacuously agree** (client `false`, SQL `undefined → false`). The printed "42" is `REAL_CATALOG.length`, not a row count. *Reviewer could not construct a reachable failure*, but one `SELECT COUNT(*)` after seeding would close it. Related: the **positive** set is only indirectly pinned — nothing asserts it is exactly `{37, 50, 64, 67, 70}`, so a silent loss of 64/67/70's children would still read green.
+3. `afterAll` swallows both cleanup statements with `.catch(() => undefined)`; the "table returns to 0 rows" claim has no assertion behind it. Consequences are contained (re-seeding is `INSERT IGNORE` over byte-identical rows, and no sibling fixture uses codes 37–78), which is why it is advisory.
+4. **Recorded for T-18's benefit:** `getInstitutionTypesByDepthLevel` **drops the `code` filter entirely** when `institutionTypeId` is falsy, so id `0` would return every root's children server-side while the client's `getSubTypes` returns early on `!code`. Unreachable today (FK-constrained, rule 7 requires non-null, `0` is not a catalog code) — recorded **only so a future `IN (0, …)` is not written by accident**.
+
+**`R-IUR-008` AC.4:** the enumeration half is discharged. T-18 owns writing the clause into the migration; T-19 owns executing it. **The link between them is what advisory 1 says nobody currently owns.**
