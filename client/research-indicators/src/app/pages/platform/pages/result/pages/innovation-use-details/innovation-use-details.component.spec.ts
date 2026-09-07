@@ -1977,19 +1977,28 @@ describe('InnovationUseDetailsComponent', () => {
     });
   });
 
-  describe('T-09 c3 — no PATCH is issued while any row is flagged as a duplicate', () => {
-    it('issues zero PATCH requests when two rows share the same actor type', async () => {
+  describe('T-13 (R-IUR-014 AC.5, R-IUR-017/DD-18, T-13 Pivot) — a duplicate actor type no longer gates the save', () => {
+    // INVERTS the withdrawn T-09 c3 above, which asserted the save was refused. R-IUR-017/DD-18
+    // moves duplicate prevention into the dropdown (T-21 — disables the already-taken type at
+    // source); this page raises no save-time gate of its own any more.
+    // regression-protection: observed RED against HEAD by temporarily restoring
+    // `&& !this.hasDuplicateActorType()` to saveData()'s guard — with that clause back, this
+    // exact test fails (`PATCH_InnovationUseDetails` is never called). Reverting the clause turns
+    // it green again — see the Implementer report for the verbatim run.
+    it('issues the PATCH even when two actor rows share the same actor_type_id', async () => {
       component.body.set({
         ...component.body(),
         actors: [
-          { ...new InnovationUseActor(), actor_type_id: 1 },
-          { ...new InnovationUseActor(), actor_type_id: 1 }
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 2 }
         ]
       });
 
       await component.saveData();
 
-      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(2);
     });
   });
 
@@ -2028,6 +2037,167 @@ describe('InnovationUseDetailsComponent', () => {
       await component.saveData();
 
       expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // =================================================================================================
+  // T-13 (R-IUR-014 AC.1-AC.4, AC.6, AC.7; DD-8 SECOND AMENDMENT; NFR-IUR-003 unnarrowed) —
+  // nothing on this page gates saveData() any more. Every row buildPayload() drops still reaches
+  // the PATCH for every OTHER row, and the user's only signal for the drop is the field-level
+  // required message already rendered continuously (T-07/T-08/T-09, never gated on touched()) —
+  // never a save-time toast (`DD-8` SECOND AMENDMENT, PRMS + BA). Every assertion below reads the
+  // actual HTTP body off `apiService.PATCH_InnovationUseDetails.mock.calls`, never
+  // `buildPayload()`'s return directly, per this task's Disqualifier.
+  // =================================================================================================
+  describe('T-13 — AC.1 / AC.6: an actor row with typed counts and no actor_type_id saves silently, marked only by the field-level message', () => {
+    // regression-protection: reddened by temporarily changing `buildPayload()`'s actors filter
+    // from `!!row.actor_type_id` to `true` (keep every row) — with that mutation, `sent.actors`
+    // has length 1, not 0, and this test fails. Reverting the mutation turns it green again.
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Actor type — with no extra toast', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            sex_age_disaggregation_not_apply: false,
+            women_youth_count: 3,
+            women_not_youth_count: 2,
+            men_youth_count: 1,
+            men_not_youth_count: 4
+          }
+        ]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — rendered DOM, not the getter, asserted BEFORE the save: the message is immediate
+      // and continuous (`OQ-1` = IMMEDIATE), so it is already on screen the instant the row exists
+      // — it is not a save-time artifact. Asserted here rather than after `saveData()` because a
+      // successful save's `getData()` re-read replaces `body()` with the mocked (empty) GET
+      // response, which would make the row and its card vanish and turn this into a false
+      // negative that has nothing to do with whether the message ever rendered (the documented
+      // "residual" in `requirements.md` `R-IUR-014`).
+      // regression-protection: reddened by temporarily forcing `actorTypeMissing` to return
+      // `false` in innovation-use-actor-item.component.ts — with that mutation this `toContain`
+      // fails because the message never renders. Reverting the mutation turns it green again.
+      const card = fixture.debugElement.query(By.directive(InnovationUseActorItemComponent));
+      expect(card.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(0);
+
+      // No save-time message: the ONLY showToast call is the plain success one, scoped so this
+      // cannot pass merely because some toast fired (the success toast always does).
+      // regression-protection: reddened by temporarily inserting an extra
+      // `this.actions.showToast({ severity: 'warning', summary: 'Innovation Use', detail: 'dropped' })`
+      // call into saveData() right before navigation — with that mutation
+      // `toHaveBeenCalledTimes(1)` fails (2 calls). Reverting the mutation turns it green again.
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.2: an unknown-path organization row with a count and no type saves silently, marked only by the field-level message', () => {
+    // regression-protection: reddened by temporarily changing `organizationIdentitySatisfied()`
+    // to always return `true` — with that mutation `sent.organizations` has length 1, not 0, and
+    // this test fails. Reverting the mutation turns it green again.
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Organization type', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, organization_count: 7 }]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — asserted BEFORE the save, same reason as the actor test above: a successful
+      // save's `getData()` re-read replaces `body()` with the mocked (empty) GET response, and
+      // the row (with it, its card) would no longer exist to query.
+      // regression-protection: reddened by temporarily forcing `organizationTypeMissing` to
+      // return `false` in innovation-use-organization-item.component.ts — with that mutation the
+      // query below returns null and `.nativeElement` throws / the assertion fails. Reverting the
+      // mutation turns it green again.
+      const message = fixture.debugElement.query(By.css('.organization-type-required-message'));
+      expect(message.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.organizations).toHaveLength(0);
+
+      // regression-protection: reddened by temporarily changing
+      // `organizationIdentitySatisfied()` to always return `true` — with that mutation
+      // `sent.organizations` has length 1, not 0, and this test fails. Reverting the mutation
+      // turns it green again.
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.2 (known path): an organization row on the known path with no institution saves silently, marked only by the field-level message', () => {
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Organization', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true }]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — asserted BEFORE the save, same reason as above.
+      // regression-protection: reddened by temporarily forcing `institutionMissing` to return
+      // `false` in innovation-use-organization-item.component.ts — with that mutation the query
+      // below returns null and the assertion fails. Reverting the mutation turns it green again.
+      const message = fixture.debugElement.query(By.css('.organization-required-message'));
+      expect(message.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.organizations).toHaveLength(0);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.3: an entirely blank actor row saves silently, with no extra toast', () => {
+    it('issues the PATCH and omits the blank row, raising only the plain success toast', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [new InnovationUseActor()]
+      });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(0);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.4: a measure row missing one of its own required fields never blocks the save and raises no message of its own', () => {
+    // regression-protection: reddened by temporarily AND-ing a bogus
+    // `&& current.quantifications.every(q => !!q.unit)`-shaped clause into saveData()'s guard —
+    // with that mutation `PATCH_InnovationUseDetails` is never called and this test fails.
+    // Reverting the mutation turns it green again.
+    it('issues the PATCH with the partially-filled measure row intact, unblocked by its own incomplete required fields', async () => {
+      // Number filled, Unit blank: kept by quantificationRowAbsent (a number is present), and
+      // Unit's OWN required message renders on QuantificationItemComponent (R-IUR-010) — but
+      // that message must never become a save gate, which is what this test proves.
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: undefined, description: undefined }]
+      });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.quantifications).toHaveLength(1);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
     });
   });
 

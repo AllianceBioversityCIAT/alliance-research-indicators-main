@@ -48,7 +48,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-10 org DD-12 toggle clearing | `[x]` | **PASS attempt 3 of 3.** Both directions clear to explicit `null` (proven, not assumed). **Bug B fixed under user ruling**, red-before-green |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
 | T-12 details measure wiring | `[x]` | PASS attempt 3 of 3. **Restored the build.** All 4 pointers discharged |
-| T-13 details DD-8 save gate + toast | `[~]` | **PIVOTED 2026-09-07** — user ruling overturns the save-blocking gate. Attempt 1 built and reviewed (`STATUS: FAIL`, 1 issue); superseded before rework. See `## Pivot Record: T-13` |
+| T-13 details: remove every save-time gate | `[x]` | **PASS attempt 2** (post-Pivot rewrite; attempt 1 reverted in full). 8 mutations, all reds observed. Advisory → T-21 docstring |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
@@ -56,6 +56,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-18 migration + migration spec | `[ ]` | |
 | T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
+| T-21 actor: used type not selectable (`R-IUR-017`) | `[ ]` | **NEW — T-13 Pivot.** Replaces the withdrawn duplicate save-block |
 
 ---
 
@@ -1870,3 +1871,25 @@ one.
 first amendment hours earlier**, and left stale by the second. Corrected. This is the `KZ-005` pattern
 firing against a correction made the same session, which is the argument for sweeping every time
 rather than only when a change feels big.
+
+---
+
+#### T-13 attempt 2 — Reviewer `STATUS: PASS` ✅ **task complete** *(post-Pivot version)*
+
+Attempt 1 (the save-blocking version) was **reverted in full** — `git restore` to `HEAD`, confirmed clean — and rebuilt against the twice-amended requirement. **The entire production change is one clause plus a docstring:** `&& !this.hasDuplicateActorType()` removed from `saveData`'s guard. Nothing on this page gates the save any more; navigation untouched.
+
+**Verification (Leader-measured, quiet tree):** full client suite **317 suites / 6877 tests / 0 failed**, exit 0 · `npm run build` exit 0 · **+5 on the 6872 baseline — exactly the net tests added** · targeted 167/167 · `npx eslint` clean on the production `.ts` · `tsc -p tsconfig.spec.json` zero new errors.
+
+**Eight mutations, every one with an observed red** — the discipline attempt 1 lacked: the guard restored (PATCH 1→0 calls); `buildPayload`'s actors filter forced `() => true`; `organizationIdentitySatisfied()` forced `true`; `actorTypeMissing`, `organizationTypeMissing` and `institutionMissing` each forced `false`; a spurious `showToast` inserted into the success branch (5 tests reddened on the count+identity assertion); a bogus quantifications clause added to the guard. All reverted, with `git diff` on the two mutated **support** files confirmed at zero.
+
+**Reviewer's structural verification of `AC.7`, which is the criterion the whole "silent is safe" argument rests on.** It did not accept the enumeration — it worked both organization cases and found the page's drop predicate (`organizationIdentitySatisfied`, an OR) and the card's (`identitySatisfied`, active-path-only) are **asymmetric, but only ever over-mark**: a dropped known-path row has neither id so `institutionMissing` fires; a dropped unknown-path row has no type so `organizationTypeMissing` fires. **No drop path can be unmarked.** Actors match exactly; quantifications are content-aware.
+
+**Pre-save assertion placement ruled correct, not convenient.** The three rendered-DOM checks run *before* `saveData()` because a successful save's `getData()` replaces `body()` with the mocked empty GET — asserting after would observe the documented residual rather than the continuous signal. The messages are ungated on `touched()` (`OQ-1` = IMMEDIATE), so the assertion and the drop observe the same state.
+
+**`ADVISORY` (non-gating):**
+1. **The new docstring describes `R-IUR-017`/`DD-18` in the present tense, but T-21 is not in the tree yet** (zero matches for `optionDisabled`). Mark it T-21-pending. **The interim window is not a regression:** a duplicate now reaches the server, which rejects it, surfacing the existing error toast — *strictly louder* than the previous silent skip-and-navigate.
+2. `hasDuplicateActorType`'s own docstring still says the save is blocked — now false. Keeping the member is spec-mandated (`DD-18`); the docstring should say it gates nothing.
+3. **Evidence-hygiene, recorded rather than waved through:** the mutation table reports the actor-`AC.7` red as a `TypeError` on `card.nativeElement`, but that query is `By.directive(...)` and is independent of `actorTypeMissing` — the expected red is a `toContain` failure. A `TypeError` implies the component crashed, so **that one red may have come from a broken component rather than an absent message.** The Reviewer independently confirmed the assertion discriminates anyway (in that fixture `actorTypeMissing` is the only source of *"This field is required"* inside the card), so the criterion holds — but the recorded red is imprecise. Re-run as `return false;` inside the getter body if the record must be exact.
+4. Two stale-but-harmless `T-09` test titles left in place.
+
+**Carried:** `NFR-IUR-003`'s second half (a real `201`/`200`) is unreachable from jsdom → **T-16 / the human gate**, not ticked here.
