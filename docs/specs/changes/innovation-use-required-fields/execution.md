@@ -47,7 +47,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
-| T-12 details measure wiring | `[ ]` | pivot input · **REWRITE c10** · restores build · cohort spy · +2 hygiene items from T-11 |
+| T-12 details measure wiring | `[x]` | PASS attempt 3 of 3. **Restored the build.** All 4 pointers discharged |
 | T-13 details DD-8 save gate + toast | `[ ]` | |
 | T-14 sub-type catalog equivalence | `[ ]` | |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
@@ -782,3 +782,76 @@ The work order names likely casualties *and* warns that revision 1 of this spec 
 **Cannot prove (`KZ-017`)** — the **SQL half** of `R-IUR-011` (AC.2/AC.3/AC.4 → T-18/T-19). **Paint** — jsdom renders nothing, so the empty state's actual appearance is T-16 gate 3. **Template type-checking** — the branch still fails `NG8002` on `[fieldsRequired]` (T-12's), though the Reviewer confirmed the deleted block was the template's only *other* `actors` reference, so nothing dangles. The **`tsc` normalized set diff** is T-16 gate 2's, not this task's. The Reviewer executed **nothing** (read-only wrapper): it re-derived the after-state from the working tree and read `c1`, `c2`, `c10` and `T-09 c6` in full, but **cannot rule out an unreported edit elsewhere in the ~2,900-line spec file** — the Leader's `git diff --stat` (40 changed spec lines) bounds that gap.
 
 **A Leader slip, recorded:** the dispatch brief referred to the component directory in an abbreviated form the Reviewer had to correct — the real path is `pages/platform/pages/result/pages/innovation-use-details/`. No work was misdirected, but exact paths belong in briefs, since a worker cannot tell an abbreviation from an error.
+
+---
+
+### T-12 — Details page: wire the measure card's five new inputs
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 3 of 3) |
+| Date | 2026-09-07 |
+| Implementer attempts | **3** — and **the product code was correct on attempt 1. Both failures were false claims in a code comment, and both texts were supplied to the Implementer rather than authored by it.** |
+| Effort assigned | `medium` on all three attempts — **deliberately never bumped**; see below |
+| Skills assigned | `angular-developer`, **`tdd`** |
+
+**This is the task that restored the build.** Red since T-03 (`NG8002` on the dead `[fieldsRequired]` binding), green from attempt 1 onward.
+
+**Production change** — `.html:223-227`, five bindings replacing `[fieldsRequired]="false"`:
+
+```html
+[numberRequired]="true"  [unitRequired]="true"  [commentsRequired]="false"
+[numberRequiredMode]="'nonzero'"  [unitRequiredMode]="'filled'"
+```
+
+`[min]`/`[max]`/`[maxFractionDigits]`/`[placeholder]` untouched. **`.ts` never touched** (T-13's).
+
+**Leader pre-dispatch check that mattered:** `QUANTIFICATION_NUMBER_MIN = -QUANTIFICATION_NUMBER_MAX` (`.ts:41-42`), so `-5` is genuinely enterable and AC.4 is reachable in the UI. The brief said explicitly **not** to "tighten" `min` to `0` — that would look like a safety improvement while contradicting the signed-decimal decision and making the requirement unverifiable. The mirror of T-05's `[min]="0"` ruling, in the opposite direction.
+
+**The Disqualifier did the real work.** The strongest evidence is not the green suite: dropping **only** `[unitRequiredMode]` produced **two** failures — the resolved-mode assertion (`Expected: "filled" Received: "off"`) **and** the whitespace-`Unit` test — then 156/156 on restore. Without the resolved-input assertions, forgetting that one binding would have failed **nothing**: the child would silently take its `'off'` default, whitespace `Unit` would stay valid, and the exact defect the pivot was raised to close would walk back in.
+
+**All four forward pointers discharged** (the largest carry-forward set in the run):
+
+| Pointer | Outcome |
+| --- | --- |
+| Rewrite `c10`, don't restore | Rewritten per field — `Number`/`Unit` carry `*`, `Comments` does not. The `organizationsCard` half left strictly alone for T-07/T-08 (Leader-verified: appears in the diff **only as a context line**, never on a `+`/`-`) |
+| Scope the prototype border spy | Rescoped to the `p-select`'s own `style` object, **preserving the valid→invalid toggle** that defeats Angular's per-property style memoization |
+| Un-vacuum `c1`'s second test | Given its sibling's one-actor mock |
+| Reword `.html:154`'s comment | Literal message string dropped; that grep now returns **0** |
+
+**Verification** — `npm run build` → **`Application bundle generation complete`, exit 0, no `NG8002`** · `innovation-use-details.component.spec` → **156/156** (from 1 failed / 150 passed) · **Leader full-suite gate → 317 suites, 6848 tests, exit 0**, coverage 98.2 / 96.3 / 97.82 / 98.5 · `eslint` clean · `tsc -p tsconfig.spec.json` 0 errors before and after. Reds taken by **scratchpad file-swap, never `git stash`** — the standing prohibition held on every attempt.
+
+---
+
+#### The failure chain — recorded in full, because two of the three failures were the Leader's
+
+| Step | Actor | What happened |
+| --- | --- | --- |
+| 1 | **Leader** | The dispatch brief asserted **as fact**: *"Your `[unitRequiredMode]="'filled'"` binding creates a second emitter of that identical string **inside this same fixture**."* The general mechanism was verified; **whether that `describe` renders a measure card was not.** It does not — its `beforeEach` loads `quantifications: []` |
+| 2 | Implementer | Transcribed the Leader's stated reason into a code comment — the correct instinct, and how a false premise in a brief becomes a false claim in the repo |
+| 3 | Reviewer (attempt 1) | **Caught it correctly** — then its prescribed remediation introduced a **new** false claim: that the emission comes from `[unitRequired]` and `[unitRequiredMode]` *"jointly — the boolean covers empty, the mode adds whitespace-only"* |
+| 4 | **Leader** | **Relayed that remediation as authorized without checking it against `DD-1`** — despite having briefed T-01's precedence rule personally. Also passed through its line citation `:2515-2527`, after reading a `sed` range that only *looked* consistent because position was inferred from output ordering instead of counted |
+| 5 | Implementer | Transcribed it faithfully again |
+| 6 | Reviewer (attempt 2) | Caught both, citing T-01's **own in-code comment** |
+
+**Why the joint attribution was false.** `inputValid()` returns `evaluateRequiredMode(value)` the instant `requiredMode !== 'off'`, so the legacy `isRequired` branch is **structurally unreachable** under an active mode — and `isFilled()` trims, so `'filled'` **alone** covers empty *and* whitespace-only. `[unitRequired]` contributes nothing to the `[style]` write; it drives only asterisks. T-01's in-code comment states this in capitals: *"When active, requiredMode **OWNS THE VERDICT OUTRIGHT** and bypasses the legacy isRequired / validateEmpty emptiness branches below."* **The remediation contradicted `DD-1`, the first decision in this spec.**
+
+**The line citation, settled by measurement** when the two Reviewers disagreed: `beforeEach(async` is at **`:2524`**, `quantifications: []` at **`:2533`**; `:2515` is a colour constant and `:2527` is the `mockResolvedValue(` opening line. Reviewer 2 was right; the citation inherited from Reviewer 1 was wrong on both endpoints and did not contain the value it claimed.
+
+**`KZ-007` demonstrated in both directions.** A correction is the highest-risk artifact class *because it reads as settled fact*. Here a Reviewer's correction was wrong, and the Leader's relay of it was unchecked — the same failure mode at two different layers. The counter-measure that finally worked was cheap: attempt 3's brief ordered the Implementer to **verify the replacement wording against source, including re-counting the Leader's line numbers, and to report any discrepancy.** It did, independently, and they matched. **That instruction costs one paragraph and is now standing practice for every remediation in this spec.**
+
+**Effort held at `medium` for all three attempts, against the standing rework rule.** The rule bumps effort because a failed fix is usually under-thinking; that premise did not hold once here. The implementation was right on attempt 1, and each later failure was a false premise handed down. Raising the dial would have bought nothing; the risk was **transcribing a third false claim**, so the briefs spent their weight on verification instead. Recorded as a deliberate deviation.
+
+#### Reviewer rulings (attempt 3)
+
+Every claim in the corrected comment re-verified at source, **not accepted on the prior Reviewer's authority**: the `inputValid()` early return; `isFilled()` returning `false` for both `''` and `'   '`; `input.component.ts:47-49`'s wording exact and its range exact; `quantifications: []` at `:2533` inside the governing `beforeEach` at `:2524` (and the nested `describe` at `:2656` declares no `beforeEach` of its own, so `:2533` governs); `[style]` at `input.component.html:30` driven solely by `inputValid()`; `Unit` confirmed the `pInputText` branch (no `[type]` passed, default `'text'`).
+
+**Proportionality ruling on the one disclosed nuance — reading (ii), advisory, not FAIL.** The Implementer volunteered that the comment names two asterisk sites for `[unitRequired]`, of which `input.component.html:6` is structurally inert for this call site (no `[label]` is passed — established in T-03). The Leader put this to the Reviewer as an explicit proportionality question, with both sides stated and **no steer**, because at attempt 3 of 3 a FAIL triggers HALT and an automatic rollback of verified-correct product code. Its three reasons: the statement is **true of the code it cites** (a maintainer following the pointer lands on real code doing what the sentence says — what is unreachable is the enclosing `@if (label)` for *this* call site, a property of the call site rather than a misdescription of `:6`); the sentence's **load-bearing** assertion is independently verified true and is what the rescope rests on; and it is **categorically unlike** the two failures that consumed attempts 1 and 2, which asserted a nonexistent fixture and a mechanism contradicting `DD-1` — *"This one sends them to the right causal model with one over-inclusive pointer."*
+
+**`ADVISORY` (recorded, non-gating)** — the `input.component.html:6` citation is **doubly** over-inclusive: `isRequired` does participate in that condition, but the enclosing `@if (label)` never opens for this call site, **and even if it did, the `|| requiredMode !== 'off'` disjunct would render the asterisk regardless of `unitRequired`.** A future touch of this comment can drop the pointer or mark it *"(component-level, inert at this call site)"*. Also noted outside the change under review: the phrase *"this describe's own `beforeEach`"* is strictly the **parent** describe's — inherited wording, correct in effect.
+
+Also carried from attempt 1's audit: **`R-IUR-010` AC.2's amber half is a composition, not a direct T-12 proof.** It composes from T-01's `input.component.spec.ts` evidence (`isInvalid()` honours each mode; the `border-[var(--ac-warning-1)]` class renders iff `isInvalid()`) plus this task's proof that `'nonzero'`/`'filled'` actually arrive. Legitimate, and `DD-3` is not in T-12's design scope — recorded as a composition so no later reader mistakes it for a single measured claim.
+
+**Requirements covered** — `R-IUR-010` AC.1–AC.4 (client half) incl. AC.4's corrected boundary · **AC.6 + S1's `AND IT MUST` reject a whitespace-only `Unit`** (reassigned from T-01 by the 2026-09-04 pivot) · `R-IUR-010` S1.
+
+**Cannot prove (`KZ-017`)** — **OICR's unchanged behaviour** (T-03 owns AC.5, against the real component; both OICR call sites keep the child's `true`/`'off'`/`'off'` defaults). **The SQL/green-check half** of `R-IUR-010` (T-18/T-19). **Paint** — jsdom measures no colour or layout; T-16 gate 3 remains the only evidence for `R-IUR-003`. The `-5` test is **regression-protection, not evidence** — a bare valid-no-message verdict cannot distinguish "`'nonzero'` ran and passed" from "no mode ran"; its discriminating power comes from the `0` case plus the resolved-mode assertion, and it is labelled so in-code. No Reviewer executed anything (read-only wrappers); every gate figure is the Leader's measurement.

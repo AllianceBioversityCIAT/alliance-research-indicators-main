@@ -136,6 +136,14 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     it('renders no skeleton when currentResultIsLoading() is false', async () => {
+      // Hygiene (T-12 pointer 3): give this test the same one-actor arrangement as its sibling
+      // above, so a field component actually renders here — without it, the default empty load
+      // renders zero field components and the assertion holds regardless of the flag.
+      apiService.GET_InnovationUseDetails.mockResolvedValue({
+        data: { ...new GetInnovationUseDetails(), actors: [new InnovationUseActor()] },
+        successfulRequest: true
+      });
+
       await component.getData();
       cacheMock.currentResultIsLoading.set(false);
       fixture.detectChanges();
@@ -378,7 +386,11 @@ describe('InnovationUseDetailsComponent', () => {
       expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
 
-    it('renders no asterisk on the Organizations or Other quantitative measures cards', () => {
+    // T-12 REWRITE (R-IUR-010 AC.1): this used to assert NO asterisk anywhere on the
+    // quantifications card — that premise is reversed by this requirement. Measures now DO carry
+    // asterisks, on Number and Unit; Comments does not. The organizationsCard half is untouched —
+    // it still belongs to T-07/T-08, which have not yet added required fields to that card.
+    it('renders no asterisk on the Organizations card; renders Number/Unit asterisks (not Comments) on the Other quantitative measures card (R-IUR-010 AC.1)', () => {
       component.body.set({
         ...component.body(),
         organizations: [new InnovationUseOrganization()],
@@ -398,14 +410,133 @@ describe('InnovationUseDetailsComponent', () => {
 
       // REWORK (Issue 1): the shared quantification card renders its asterisk as a bare `*` text
       // node inside a `<span>` (shared/components/quantification-item/.../quantification-item.component.html),
-      // never with `.text-red-500` — a `.text-red-500` query returns null regardless of
-      // `[fieldsRequired]`, so it cannot detect the binding this test exists to guard
-      // (R-IUP-012 AC.3). Search for the asterisk text node itself instead.
+      // never with `.text-red-500` — a `.text-red-500` query returns null regardless of the
+      // binding under test. Search for the asterisk text node itself instead.
       const hasAsteriskTextNode = (root: HTMLElement) => Array.from(root.querySelectorAll('span')).some(span => span.textContent?.trim() === '*');
 
+      // ORGANIZATIONS is not this task's scope (T-07/T-08 own it) and its behaviour has not
+      // changed: left exactly as it was.
       expect(hasAsteriskTextNode(organizationsCard)).toBe(false);
-      expect(hasAsteriskTextNode(quantificationsCard)).toBe(false);
-      expect(quantificationsCard.textContent).not.toContain('This field is required');
+
+      // R-IUR-010 AC.1, asserted per field rather than per card: Number and Unit each carry the
+      // red `*` beside their label; Comments does not.
+      const quantLabels = Array.from(quantificationsCard.querySelectorAll('h2.label'));
+      const numberLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Number'));
+      const unitLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Unit'));
+      const commentsLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Comments'));
+
+      expect(numberLabel).toBeTruthy();
+      expect(unitLabel).toBeTruthy();
+      expect(commentsLabel).toBeTruthy();
+      expect(numberLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(commentsLabel!.querySelector('span')).toBeNull();
+    });
+
+    // R-IUR-010 — the Disqualifier (T-12 work order): a green suite after removing
+    // `fieldsRequired` is not evidence the five new bindings arrived — a stale binding on the
+    // one template that carries it does redden, but the ABSENCE of a new binding is silent for
+    // three of these five assertions (e.g. a forgotten `[unitRequiredMode]` would leave the
+    // child's default `'off'` in place, and a whitespace-only Unit would stay valid — the exact
+    // defect the pivot exists to close). `commentsRequired`, `numberRequiredMode` and
+    // `unitRequiredMode` discriminate this way; `numberRequired`/`unitRequired` do not — both
+    // default to `true` in the child, so deleting those two bindings would leave these two
+    // assertions green regardless (no behavioural consequence: the resolved value is identical
+    // either way). Assert the real child component's RESOLVED input values, not the template
+    // text.
+    it('forwards DD-4\'s five bindings to the real QuantificationItemComponent instance, resolved', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: undefined, unit: undefined, description: undefined }]
+      });
+      fixture.detectChanges();
+
+      const quantItem = fixture.debugElement.query(By.directive(QuantificationItemComponent)).componentInstance as QuantificationItemComponent;
+
+      expect(quantItem.numberRequired).toBe(true);
+      expect(quantItem.unitRequired).toBe(true);
+      expect(quantItem.commentsRequired).toBe(false);
+      expect(quantItem.numberRequiredMode).toBe('nonzero');
+      expect(quantItem.unitRequiredMode).toBe('filled');
+    });
+
+    // R-IUR-010 AC.4 (corrected boundary, user ruling 2026-09-04): 0 is INVALID with a message
+    // distinguishable from the required message ("Must be different from 0", not "This field is
+    // required") — this is the falsifying input the work order names for the zero half.
+    it('Number = 0 renders invalid, with a message distinguishable from the required message', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 0, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const verdict = numberInput.inputValid();
+
+      expect(verdict.valid).toBe(false);
+      expect(verdict.message).toBe('Must be different from 0');
+      expect(verdict.message).not.toBe('This field is required');
+      expect(numberInput.isInvalid()).toBe(true);
+    });
+
+    // R-IUR-010 AC.4's other half: -5 must NOT redden — `quantification_number` is a signed
+    // decimal (changes/measure-number-signed-decimal), so a negative measure is legitimate and
+    // the rule is `!= 0`, never `> 0`. Regression-protection, not standalone proof the mode ran:
+    // a bare "valid, no message" verdict cannot by itself distinguish "requiredMode='nonzero'
+    // evaluated -5 and passed" from "no mode ran at all" — that distinguishing power comes from
+    // the 0 case above (which DOES redden) plus the resolved-mode assertion two tests up.
+    it('Number = -5 renders valid — no amber, no message (regression-protection, read alongside the 0 case above)', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: -5, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const verdict = numberInput.inputValid();
+
+      expect(verdict.valid).toBe(true);
+      expect(verdict.message).toBe('');
+      expect(numberInput.isInvalid()).toBe(false);
+    });
+
+    // R-IUR-010 S1's AND IT MUST + AC.6 (reassigned to T-12 by the 2026-09-04 pivot): a
+    // whitespace-only Unit must redden. This is the pivot's whole justification — before
+    // `unitRequiredMode` existed, `Unit` reached `app-input` only through the boolean
+    // `unitRequired` -> `isRequired`, whose branch is `!value || value.length === 0`; `'   '` is
+    // truthy with `length === 3`, so it evaluated valid and the row saved unsubmittable with
+    // nothing on screen (DC-2b + DC-3).
+    it("Unit = '   ' (whitespace-only) renders invalid — proof that unitRequiredMode is load-bearing", () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: '   ', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputs = quantCard.queryAll(By.directive(InputComponent));
+      // Selected by `optionValue` (a public @Input), not position — a new field inserted before
+      // Unit would otherwise leave this positional lookup silently checking the wrong node.
+      const unitInput = inputs.find(i => (i.componentInstance as InputComponent).optionValue === 'unit')!.componentInstance as InputComponent;
+      const verdict = unitInput.inputValid();
+
+      expect(verdict.valid).toBe(false);
+      expect(verdict.message).toBe('This field is required');
+    });
+
+    // R-IUR-010 AC.3: Comments stays optional. Empty renders no asterisk (covered above) and no
+    // required message.
+    it('Comments empty renders no required message', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent)).nativeElement as HTMLElement;
+      expect(quantCard.textContent).not.toContain('This field is required');
     });
   });
 
@@ -2563,10 +2694,29 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       const actorRow = component.body().actors[0];
       component.onActorUpdate(0, { ...actorRow, actor_type_id: 1 });
       fixture.detectChanges();
-      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      // T-12 (Forward Pointer 2, KZ-001, corrected in rework — see execution.md): scoped to the
+      // p-select's OWN `style` accessor, not the whole `CSSStyleDeclaration` prototype. The page
+      // template renders the actor card and the measures card in one component, so once a
+      // fixture in this describe renders a measure row with an empty/whitespace-only `Unit`, that
+      // row's `app-input` (a `pInputText` branch, tokenized by T-02) would emit this identical
+      // `[style]` literal from its own DOM node, and a prototype-wide spy could not attribute the
+      // write to the p-select specifically. That emission would come from
+      // `[unitRequiredMode]="'filled'"` alone — with a mode active, `inputValid()` returns
+      // `evaluateRequiredMode(value)` and never reaches the legacy `isRequired` branch
+      // (`input.component.ts:47-49` states the precedence: the mode owns the verdict outright),
+      // and `'filled'` covers empty AND whitespace-only via `isFilled()`'s `trim()`.
+      // `[unitRequired]` drives only the asterisks (`quantification-item.component.html:23`,
+      // `input.component.html:6`), not the `[style]` write.
+      // This describe's own `beforeEach` (`:2533`) resolves `quantifications: []` and this
+      // test never adds a row, so no `app-quantification-item` — and therefore no Unit
+      // `app-input` — exists in THIS fixture: the hazard is precautionary, not currently
+      // reachable, and this rescope is defensive against a future fixture in this describe that
+      // renders a measure row. Spying on the p-select's own native `.style` object keeps the
+      // assertion pinned to the one element it claims to prove regardless.
+      const borderSetSpy = jest.spyOn(selectDe!.nativeElement.style as CSSStyleDeclaration, 'border', 'set');
       component.onActorUpdate(0, { ...actorRow, actor_type_id: undefined });
       fixture.detectChanges();
-      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      expect(borderSetSpy).toHaveBeenCalledWith('2px solid var(--ac-warning-1)');
       borderSetSpy.mockRestore();
 
       const ratio = contrastRatio(WARNING_AMBER, GREY_100);
