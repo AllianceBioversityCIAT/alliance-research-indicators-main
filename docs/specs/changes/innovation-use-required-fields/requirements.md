@@ -465,35 +465,52 @@ typed values are gone.
 
 #### Scenario: Counts typed, actor type left empty
 
-*(Rewritten 2026-09-07 by the T-13 Pivot — user ruling. The previous version blocked the save; it now
-reports. The requirement's headline sentence above is **unchanged**: it never said "block", it said
-"without telling the user". See `execution.md` → `Pivot Record: T-13`.)*
+*(Rewritten **twice** on 2026-09-07 by the T-13 Pivot. First to report instead of block; then again —
+same day, same user, after validating against **PRMS**, the app this section was extracted from, with
+the **BA's** explicit instruction — to drop the save-time message as well. Both amendments are user
+rulings and both are recorded in `execution.md` → `Pivot Record: T-13`. The headline sentence above has
+never changed.)*
 
 - GIVEN an actor row whose four counts are filled and whose `Actor type` is empty
 - WHEN the user saves
 - THEN the save **proceeds** and the row is dropped, exactly as `buildPayload()` does today
-- AND the user is told which rows were not saved and why — **before** navigation carries them away
-- BUT it must NOT block the save, and must NOT make navigation conditional: a user may always save an
-  incomplete draft (`R-IUD-001`), and blocking converted a partial loss into a total one (the T-13
-  Pivot's constructed sequence — the level and the justification were lost too)
+- AND **no save-time message is raised** — the user was already told, and still is
+- BUT it must NOT block the save, and must NOT make navigation conditional
 - AND IT MUST apply the same rule to organization rows carrying a count or sub-type with no identity
 
-#### Scenario: A blank row does not produce a message
+**How the user is told — and why this is not silent data loss.** The notification is the **field-level
+required treatment this spec already builds** (`R-IUR-003` / `R-IUR-006` / `R-IUR-007` / `R-IUR-009`):
+a red `*`, a 2px amber border and *"This field is required"*, rendered **immediately and continuously**
+— not gated on `touched()`, not deferred to a save attempt (`OQ-1`, closed **IMMEDIATE**). A save-time
+toast would restate what is already on screen.
+
+**Verified, not assumed (2026-09-07):** every row `buildPayload()` can drop is a row that renders one
+of those messages — an actor without `actor_type_id` (`actorTypeMissing`), an unknown-path organization
+without a type (`organizationTypeMissing`), a known-path organization without an institution
+(`institutionMissing`). Measures are content-aware and have no loss case. **There is no drop path that
+is not already marked on screen.**
+
+**The residual, stated plainly:** after the save, `getData()` refetches and the dropped row **disappears
+from the page**, with nothing announcing it. This matches PRMS and is accepted on the BA's instruction.
+It is the one behaviour a future reviewer is most likely to question, so it is recorded here rather
+than left to be rediscovered.
+
+#### Scenario: A blank row
 
 - GIVEN the user clicks `Add other actor` and types nothing
 - WHEN the user saves
-- THEN the save proceeds normally and the blank row is discarded **without a message** — it carries
-  nothing to lose
+- THEN the save proceeds normally and the blank row is discarded — no message, nothing to lose
 
 **Acceptance criteria**
 
-- [ ] AC.1 — Actor row with any count filled and no `actor_type_id` ⇒ **save proceeds**, row dropped, user informed naming that row.
-- [ ] AC.2 — Organization row with `organization_count` or `sub_institution_type_id` filled and no identity ⇒ **save proceeds**, row dropped, user informed naming that row.
-- [ ] AC.3 — Entirely blank row ⇒ save proceeds, **no message**, row discarded.
-- [ ] AC.4 — Measure rows never produce a message: the existing drop rule is already content-aware, so no loss case exists.
-- [ ] ~~AC.4b~~ — **WITHDRAWN by the T-13 Pivot.** It forbade a gate over the inactive path; **no gate exists anywhere** now, so the criterion is trivially satisfied and its T-10 + T-13 co-assignment collapses. T-10's observed red for it (recorded in `execution.md`) stands as history, not as a live obligation.
-- [ ] AC.5 — **Duplicate actor types are prevented at source, not blocked at save.** See `R-IUR-017`. `hasDuplicateActorType()` no longer gates `saveData`; a duplicate that reaches the server (only possible from a direct database write) is rejected there and surfaced by the existing server-error toast.
-- [ ] AC.6 — **Falsifying input:** four counts + no actor type. The save proceeds, the row is dropped, **and a message names it**. A silent drop fails this criterion.
+- [ ] AC.1 — Actor row with any count filled and no `actor_type_id` ⇒ **save proceeds**, row dropped, **no save-time message**; the field-level required treatment is present on `Actor type`.
+- [ ] AC.2 — Organization row with `organization_count` or `sub_institution_type_id` filled and no identity ⇒ **save proceeds**, row dropped, **no save-time message**; the field-level treatment is present on the missing identity field.
+- [ ] AC.3 — Entirely blank row ⇒ save proceeds, no message, row discarded.
+- [ ] AC.4 — Measure rows never produce a message and never block.
+- [ ] ~~AC.4b~~ — **WITHDRAWN.** It forbade a gate over the inactive path; **no gate exists anywhere** now. T-10's observed red stands as history, not as a live obligation.
+- [ ] AC.5 — **Duplicate actor types are prevented at source** (`R-IUR-017`), never blocked at save. `hasDuplicateActorType()` no longer gates `saveData`.
+- [ ] AC.6 — **Falsifying input:** four counts + no actor type ⇒ the PATCH **is** issued and its body contains **no** such actor row. A save that is refused, or a save-time toast, fails this criterion.
+- [ ] AC.7 — **No drop path is unmarked.** For every case `buildPayload()` drops a row carrying data, the page renders that row's field-level required message. *(This is the criterion that keeps the silence honest: if a future change adds a drop path with no field message, the loss becomes genuinely silent.)*
 
 ---
 

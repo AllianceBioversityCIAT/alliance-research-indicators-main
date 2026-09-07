@@ -1822,3 +1822,51 @@ Neither is a direction the user needs to set, but both are traps if left implici
 - Touch `innovation-use-actor-item.component.ts`'s `undefined` clears (`FR-13`) — still its own spec.
 - Make navigation conditional anywhere. The pivot removes the need; no navigation change is proposed.
 - Re-open `R-IUR-011` or `RSK-1`.
+
+### Pivot Record: T-13 — SECOND amendment, same day: no save-time message either (2026-09-07)
+
+**Supersedes the "report what was dropped" ruling recorded above, which was itself hours old.**
+Recorded as a supersession rather than an edit, because the first ruling was already committed
+(`a3512b33`) and a live document may not quietly change what a user decided (`KZ-007`).
+
+**Trigger:** the user validated the behaviour against **PRMS**, the application this section was
+extracted from, and reported the **BA's** explicit instruction — an incomplete row is **omitted from
+the save with no message at all**. Evidence supplied: a screenshot of `ORGANIZATION # 3` with
+`Organization type` empty and amber-bordered, *"This field is required"* rendered, and
+`Organization count` = 43. *"Si lo mando así no se guarda, o sea se omite ese dato para el guardado,
+incluso no muestra mensaje, solo no se guarda… y hablando con el BA dijo que hacerlo así."*
+
+**Ruling: no gate and no save-time toast. The field-level required message is the notification.**
+
+**The Leader verified the safety of this rather than accepting it**, because "no message" is exactly
+the shape of the silent-data-loss defect `R-IUR-014` was written to prevent. It is safe, and the
+reason is structural:
+
+| Row `buildPayload()` drops | Field-level message rendered |
+| --- | --- |
+| Actor without `actor_type_id` | `actorTypeMissing` → *"This field is required"* |
+| Unknown-path organization without a type | `organizationTypeMissing` → amber message *(the user's own screenshot)* |
+| Known-path organization without an institution | `institutionMissing` → amber message |
+| Measure with no content | none needed — the drop rule is content-aware, nothing is lost |
+
+**There is no drop path that is not already marked on screen**, and those messages are **immediate and
+continuous** — `OQ-1` was closed **IMMEDIATE**, and T-07 deliberately did not gate them on `touched()`.
+A save-time toast would restate what is already in front of the user. **`R-IUR-014` AC.7 was added to
+keep this true**: it makes "every drop path is marked" a checkable criterion rather than a fact that
+happens to hold today.
+
+**The residual, accepted and named:** after the save, `getData()` refetches and the dropped row
+disappears from the page with nothing announcing it. This matches PRMS, is taken on the BA's
+instruction, and is written into `requirements.md` so a future reviewer meets it as a decision rather
+than as a discovery.
+
+**Consequence for the task:** T-13 shrinks again, `M` → **`S`**. It is now a **revert plus one clause**:
+restore the two uncommitted files to `HEAD`, then drop `&& !this.hasDuplicateActorType()` from
+`saveData`'s guard. Attempt 1's predicates and message computed are **dead code under this ruling and
+must be reverted, not adapted** — an unused predicate that looks authoritative is worse than an absent
+one.
+
+**Sweep:** three sites still promised the report toast — **all three introduced by the Leader's own
+first amendment hours earlier**, and left stale by the second. Corrected. This is the `KZ-005` pattern
+firing against a correction made the same session, which is the argument for sweeping every time
+rather than only when a change feels big.

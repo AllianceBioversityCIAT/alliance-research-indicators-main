@@ -112,7 +112,7 @@ Two facts drive most of this design:
 | `shared/components/quantification-item/quantification-item.component.{ts,html}` + `.spec.ts` | `fieldsRequired` → **5** per-field inputs (`unitRequiredMode` added 2026-09-04 by pivot); spec rewrite is **in scope** (`S-5`) |
 | `.../innovation-use-actor-item/*.{ts,html,spec.ts}` | count required states + total-positivity message |
 | `.../innovation-use-organization-item/*.{ts,html,spec.ts}` | required states on 4 fields, message precedence |
-| `.../innovation-use-details.component.{ts,html,spec.ts}` | remove message + seed, wire measures, **dropped-row report toast** (no gate — T-13 Pivot), pass the used-type set to the actor cards (`DD-18`) |
+| `.../innovation-use-details.component.{ts,html,spec.ts}` | remove message + seed, wire measures, **remove every save-time gate** (no block, no toast — T-13 Pivot, 2nd amendment), pass the used-type set to the actor cards (`DD-18`) |
 | `server/.../db/migrations/<ts>-updateInnovationUseValidation.ts` | **new**, append-only |
 | `server/.../test/fixtures/**/innovation-use-validation.fixture-spec.ts` | **extended** — the existing band-`900_100` fixture (`S-4`) |
 | `docs/ux-ui/design.md` · `docs/specs/innovation-use/family.md` | doc sweep (`DD-11`) |
@@ -459,12 +459,20 @@ fill in the type — but the gate combined with the page's **pre-existing uncond
 justification and every other edited row were discarded where they previously persisted, while the
 message named only the blocking row. Full sequence in `execution.md` → `Pivot Record: T-13`.
 
-| Reports (save still proceeds) | Silent (nothing to report) |
+| Dropped by `buildPayload()` (save still proceeds) | Already marked on screen by |
 | --- | --- |
-| Site 1 — a row carrying typed data but lacking its identity field, which `buildPayload()` drops | An entirely blank row — nothing to lose |
+| Site 1 — a row carrying typed data but lacking its identity field | `actorTypeMissing` / `organizationTypeMissing` / `institutionMissing` — the **field-level** required treatment, rendered immediately and continuously (`OQ-1` = IMMEDIATE) |
 | — | **Site 2 — nothing.** `DD-12` makes both cards clear on toggle, so no hidden state survives to be nulled (`P-3`) |
 | — | Measures — no loss case; the drop rule is already content-aware |
 | — | **Duplicate actor types — prevented at source by `DD-18`/`R-IUR-017`, no longer gated at save** |
+
+**SECOND AMENDMENT *(T-13 Pivot, 2nd amendment 2026-09-07 — PRMS + BA)*: no save-time message either.** Validated against **PRMS**, the app this
+section was extracted from, on the **BA's** explicit instruction: an incomplete row is simply omitted
+from the save, with no toast. **This is not silent data loss, and it was verified rather than assumed**
+— every row `buildPayload()` can drop already renders a field-level required message, so the user is
+told continuously instead of once at save time. `R-IUR-014` AC.7 exists to keep that true. The one
+residual is that `getData()`'s refetch removes the dropped row from the page with nothing announcing
+it; accepted, and recorded in `requirements.md`.
 
 **Nothing blocks the save, and navigation is untouched.** `R-IUR-014`'s headline — *"SHALL NOT discard
 user-entered data on save **without telling the user**"* — is satisfied by the telling; blocking was
@@ -695,7 +703,7 @@ No schema change. One new append-only migration replacing one stored function.
 | `quantification-item` (shared) | which of its three fields are required | the zero policy (passed in) |
 | `actor-item` | rules 1, 2; rule 4's total message; `p-select` border; **the used-type disable (`DD-18`/`R-IUR-017`)** | field-level count messages (delegated) |
 | `organization-item` | rules 6, 7, 8, 8b; message precedence (`DD-9`); **path clearing on toggle (`DD-12`)**; three `p-select` borders | rule 9's message (delegated) |
-| `details` page | the `DD-8` **dropped-row report** toast (no gate — T-13 Pivot); the used-type set for `DD-18`; measure wiring; no seeding | row-level messages; the option-disable itself (card-owned) |
+| `details` page | **no save-time gate and no save-time message** (`DD-8`, 2nd amendment); the used-type set for `DD-18`; measure wiring; no seeding | row-level messages; the option-disable itself (card-owned); **the user-facing required signal — that is field-level, card-owned** |
 
 **Design tokens.** No new tokens; `--ac-warning-1` everywhere after `DD-10`. The red asterisk is
 inconsistent in the codebase today (`text-red-500` in the innovation-use cards, `#CF0808` in
@@ -708,7 +716,7 @@ inconsistent in the codebase today (`text-red-500` in the innovation-use cards, 
 
 | Case | Behavior |
 | --- | --- |
-| A row would be dropped by `buildPayload()` while carrying typed data | **New** toast naming the affected rows. **The PATCH still fires** — `DD-8` reports, it does not block (T-13 Pivot) |
+| A row would be dropped by `buildPayload()` while carrying typed data | **Nothing at save time.** The PATCH fires and the row is omitted. The user's signal is the **field-level** required message, already on screen *(T-13 Pivot, 2nd amendment 2026-09-07 — PRMS + BA)* |
 | Duplicate actor type | **Prevented at source** — the option is disabled in every other row's dropdown (`DD-18`). No save-time block, no toast. A duplicate from a direct DB write is rejected by the server and surfaced by the existing error toast |
 | PATCH rejected | Unchanged |
 | Green check `false` | Submit disabled; existing mechanism |

@@ -66,7 +66,7 @@ graph TD
     T09 --> T14["T-14 sub-type catalog equivalence"]
     T11["T-11 details: drop message + stop seeding"] --> T12["T-12 details: measure wiring"]
     T03 --> T12
-    T12 --> T13["T-13 details: DD-8 dropped-row report"]
+    T12 --> T13["T-13 details: remove every save-time gate"]
     T13 --> T21["T-21 actor: used type not selectable (R-IUR-017)"]
     T10 --> T13
     T15["T-15 doc sweep DD-11"]
@@ -327,27 +327,27 @@ migration **does not self-apply** (`K-015`).
 
 ---
 
-### T-13 — Details page: report what the save dropped *(REWRITTEN by the T-13 Pivot, 2026-09-07)*
+### T-13 — Details page: remove every save-time gate *(REWRITTEN TWICE by the T-13 Pivot, 2026-09-07)*
 
-> **Supersedes the save-blocking version.** Attempt 1 built and reviewed that version; the user ruled
-> it out. Most of attempt 1's code **survives** — its predicates compute *what would be dropped*, which
-> is exactly what the message needs. See `execution.md` → `Pivot Record: T-13`.
+> **Second rewrite, same day.** Version 1 blocked the save; version 2 reported what was dropped;
+> **this version does neither.** Validated against PRMS on the BA's instruction: an incomplete row is
+> simply omitted, with no message. **Attempt 1's predicates and toast are now unused and must be
+> reverted**, not adapted. See `execution.md` → `Pivot Record: T-13`.
 
-- **Requirements covered:** `R-IUR-014` — S1 (rewritten) + its `BUT it must NOT block the save, and must NOT make navigation conditional` + its `AND IT MUST apply the same rule to organization rows`; S2; AC.1, AC.2, AC.3, AC.4, AC.5, AC.6 · `NFR-IUR-003` (now **unnarrowed** — no exception)
-- **Design:** `DD-8` (**revised — reports, never blocks**), `DD-18`, §8
+- **Requirements covered:** `R-IUR-014` — S1 (twice-rewritten) + its `BUT it must NOT block the save, and must NOT make navigation conditional`; S2; AC.1–AC.7 · `NFR-IUR-003` (**unnarrowed**, no exception)
+- **Design:** `DD-8` (**revised twice — no gate, no save-time message**), `DD-18`, §8
 - **Files:** `client/.../innovation-use-details.component.ts` · `.spec.ts`
-- **Description:** Let every save proceed. When `buildPayload()` drops a row that carried typed data, raise a toast naming those rows. Blank rows are silent. `hasDuplicateActorType()` no longer gates `saveData`.
+- **Description:** Nothing gates the save. Remove `hasDuplicateActorType()` from `saveData`'s guard, and revert attempt 1's predicates and toast — they computed a message this spec no longer raises.
 - **Implementation notes:**
-  - **Keep** `actorRowWouldLoseData`, `organizationRowWouldLoseData`, `hasCountValue` and the message-building computed from attempt 1 — all reviewed and correct. **Rename** the computed away from `blockedSaveRowMessages` (nothing is blocked).
-  - **Invert `saveData`'s `if/else`:** the PATCH always fires; the message is raised **alongside** it, not instead of it. Raise it **before** `await getData()`, so the user sees it before the refetch replaces the rows.
-  - **Remove** `hasDuplicateActorType()` from `saveData`'s guard and drop its messages from the toast — `DD-18` prevents duplicates at source. The computed itself stays; it still drives the card's own message.
-  - **Navigation is untouched** — the pivot removes the reason to change it.
-  - An entirely blank row stays silent (`AC.3` / `R-IUD-001`).
-- **Verify:** `npm test -- --silent -- innovation-use-details.component.spec`, asserting **both** that the PATCH **is** issued and that the toast names the dropped rows.
-- **Falsifying input:** four counts + no actor type — the save proceeds, the row is dropped, **and the toast names it**. A silent drop fails. And the negative: a blank row saves with **no** message.
-- **Disqualifier:** asserting only "the toast fired" leaves the save unproven, and asserting only "the PATCH fired" ships a silent drop — the exact defect this task exists to close. **Both halves or the reading is worthless.** A test spying `buildPayload` rather than the HTTP call cannot tell what was actually sent.
-- **Cannot prove:** legacy rows carrying hidden state (`P-6`). `NFR-IUR-003`'s second half — a real `201`/`200` — is unreachable from jsdom (`ApiService` is mocked); **carry it to T-16 / the human gate rather than ticking it here.**
-- **Deps:** T-10, T-12 · **Effort:** M *(reduced from `L` — the gate is gone and attempt 1's predicates survive)* · **Skills:** `angular-developer`, `systematic-debugging`
+  - **Start by reverting the two uncommitted files to `HEAD`** (the T-10 state). Attempt 1's `actorRowWouldLoseData` / `organizationRowWouldLoseData` / `hasCountValue` / the messages computed are **dead code** under this ruling. Do not keep them "just in case" — unused predicates that look authoritative are worse than absent ones.
+  - The **only** production change that remains: drop `&& !this.hasDuplicateActorType()` from `saveData`'s guard. Everything else about `saveData` returns to its pre-T-13 shape.
+  - `hasDuplicateActorType()` and `duplicateActorTypeIndexes()` **stay** — they still drive the card's own amber duplicate message (`DD-5`, unchanged). Only their use as a **save gate** is removed.
+  - **Navigation is untouched.**
+- **Verify:** `npm test -- --silent -- innovation-use-details.component.spec`, asserting the PATCH **is** issued in every case, and that its body omits the incomplete rows.
+- **Falsifying input:** four counts + no actor type ⇒ the PATCH fires and its body contains **no** such actor row. A refused save, or any save-time toast, fails. Same for an unknown-path organization with a count and no type. And: **two rows sharing an actor type still save** (`AC.5`).
+- **Disqualifier:** asserting only "the PATCH fired" does not show the row was omitted; asserting only on `buildPayload()`'s return does not show what was **sent**. Assert the **HTTP body**. And `AC.7` is not discharged by a code reading — it needs a rendered-DOM assertion that the dropped row's field message is present.
+- **Cannot prove:** `NFR-IUR-003`'s second half (a real `201`/`200`) — `ApiService` is mocked in jsdom; **carry it to T-16 / the human gate**. That the dropped row's disappearance after `getData()` is acceptable to users — a product judgement, taken on the BA's instruction, not a testable property.
+- **Deps:** T-10, T-12 · **Effort:** S *(reduced from `M`, and from `L` before that — the task is now a revert plus one clause)* · **Skills:** `angular-developer`
 
 ---
 
