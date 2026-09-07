@@ -699,4 +699,130 @@ describe('InnovationUseActorItemComponent', () => {
       expect(totalMessages().length).toBe(0);
     });
   });
+
+  // T-05 (R-IUR-005) — aggregate path: `How many` (actors_count) required and positive via
+  // `requiredMode="positive"`. S1's BUT clause (must NOT evaluate the four disaggregated counts
+  // while this path is active) is the template's `@if`/`@else` gate, already proven by c1 above;
+  // this block covers AC.1-AC.5 for the aggregate field itself.
+  describe('T-05 — aggregate path: How many required and positive', () => {
+    // Scoped exactly like T-04's fieldRequiredMessage: queried within one app-input's own
+    // DebugElement, never a whole-card warning-icon count (KZ-001).
+    const hasMessage = (de: ReturnType<typeof appInputs>[number], text: string): boolean =>
+      de.queryAll(By.css('span')).some(s => (s.nativeElement as HTMLElement).textContent?.trim() === text);
+    const requiredMessage = (de: ReturnType<typeof appInputs>[number]): boolean => hasMessage(de, 'This field is required');
+    const positivityMessage = (de: ReturnType<typeof appInputs>[number]): boolean => hasMessage(de, 'Must be greater than 0');
+
+    // AC.2 — empty renders the required message.
+    // Mutation that reddens: delete `[requiredMode]="'positive'"` from the aggregate app-input
+    // (.html:148-156) — with requiredMode back at its 'off' default and isRequired unset, no
+    // message renders at all. MEASURED red (see report): the assertion below failed with
+    // `received: false` when the binding was removed.
+    it('empty actors_count renders the required message, not the positivity message', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: undefined };
+      fixture.detectChanges();
+
+      const howMany = appInputs()[0];
+      expect(requiredMessage(howMany)).toBe(true);
+      expect(positivityMessage(howMany)).toBe(false);
+    });
+
+    // AC.3 — 0 renders the positivity message, DISTINGUISHABLE from the required message (0 is
+    // filled, not empty). Mutation that reddens: same binding removal as above (no message at
+    // all instead of the positivity one) — MEASURED red. A second, sharper mutation was also
+    // measured: swapping `'positive'` for `'filled'` leaves 0 reading as filled-and-done, so
+    // `positivityMessage` again reads false with no message rendered — this is what proves the
+    // test pins the MODE, not merely "some mode is active".
+    it('actors_count = 0 renders the positivity message, not the required message', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 0 };
+      fixture.detectChanges();
+
+      const howMany = appInputs()[0];
+      expect(positivityMessage(howMany)).toBe(true);
+      expect(requiredMessage(howMany)).toBe(false);
+    });
+
+    // AC.4 — > 0 is valid, no message.
+    // KZ-017: no single-line mutation on the production binding reddens this assertion — a field
+    // with `requiredMode` left at its 'off' default and no `isRequired` is ALSO silent at
+    // actors_count = 1 (neither branch fires), so this assertion cannot tell "positive mode
+    // evaluated 1 as valid" apart from "no mode ran at all". Kept as regression-protection for a
+    // future change to the >0 boundary, not as evidence for this task's binding — labelled per
+    // the brief's KZ-014 instruction rather than presented as proof.
+    it('actors_count = 1 is valid: no required message, no positivity message (regression-protection, not discriminating)', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 1 };
+      fixture.detectChanges();
+
+      const howMany = appInputs()[0];
+      expect(requiredMessage(howMany)).toBe(false);
+      expect(positivityMessage(howMany)).toBe(false);
+    });
+
+    // AC.1 — red asterisk on `How many`, rendered by app-input itself (via [label] +
+    // requiredMode !== 'off'), and exactly one. Mutation (binding removed): asterisk count drops
+    // to 0 — MEASURED red.
+    // WHAT THIS TEST CANNOT REACH (KZ-017): a duplicate card-side asterisk placed as a *sibling*
+    // markup next to `<app-input>` (the literal forbidden trap this task's brief warns against)
+    // was measured NOT to redden this assertion — `howMany.queryAll(...)` is scoped to the
+    // app-input DebugElement's own subtree (deliberately, matching T-04's anti-KZ-001 pattern),
+    // so it cannot see markup outside that element. The guarantee against doubling here is
+    // structural, not this test's: the aggregate branch (.html:146-159) has no `<span
+    // class="label">` wrapper of its own around `How many`, unlike the actor-type/other-name
+    // fields above it that do carry their own label+asterisk markup.
+    it('How many carries exactly one red asterisk, rendered by app-input', () => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true };
+      fixture.detectChanges();
+
+      const howMany = appInputs()[0];
+      const asterisks = howMany.queryAll(By.css('span.text-red-500')).filter(s => (s.nativeElement as HTMLElement).textContent?.trim() === '*');
+      expect(asterisks.length).toBe(1);
+    });
+
+    // AC.5 — the TRANSITION (KZ-015 / the Disqualifier verbatim): construct in DISAGGREGATED mode
+    // with the four counts empty (rendering four live "This field is required" messages after
+    // T-04), assert that starting state, THEN call the live onModeChange(true) toggle, THEN
+    // assert the four messages are gone (not merely hidden — the four app-inputs no longer exist
+    // in the DOM at all) and that How many now renders its own state. Also proves the falsifying
+    // input from the brief: after the toggle, How many = 0 must show the positivity message, not
+    // the required one — the same distinction AC.2/AC.3 proved statically, now proved to survive
+    // a live transition.
+    it('toggling on from a fully-amber disaggregated state clears the four messages and How many renders its own state', fakeAsync(() => {
+      component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: false };
+      fixture.detectChanges();
+      tick();
+      flush();
+
+      // Arrange / assert the starting state the product actually reaches: four disaggregated
+      // app-inputs, each carrying its own amber "This field is required" message (T-04's ground).
+      const startingCounts = appInputs();
+      expect(startingCounts.length).toBe(4);
+      startingCounts.forEach(de => expect(requiredMessage(de)).toBe(true));
+
+      // Act — the live toggle onModeChange() already clears the leaving mode's fields; T-05 does
+      // not duplicate that.
+      component.onModeChange(true);
+      tick();
+      flush();
+      fixture.detectChanges();
+
+      // Assert — gone, not merely hidden: the four disaggregated app-inputs are absent from the
+      // DOM, and How many is the only app-input left, in its own (now-empty) required state.
+      expect(appInputs().length).toBe(1);
+      expect(appInputLabelled('Women youth')).toBeFalsy();
+      expect(appInputLabelled('Women non-youth')).toBeFalsy();
+      expect(appInputLabelled('Men youth')).toBeFalsy();
+      expect(appInputLabelled('Men non-youth')).toBeFalsy();
+      const howManyAfterToggle = appInputs()[0];
+      expect(appInputLabelled('How many')).toBeTruthy();
+      expect(requiredMessage(howManyAfterToggle)).toBe(true);
+
+      // Extend the same live transition: setting How many = 0 after the toggle must show the
+      // positivity message, never the required one — the falsifying input named in the brief.
+      component.body.update(current => ({ ...current, actors_count: 0 }));
+      fixture.detectChanges();
+
+      const howManyAfterZero = appInputs()[0];
+      expect(positivityMessage(howManyAfterZero)).toBe(true);
+      expect(requiredMessage(howManyAfterZero)).toBe(false);
+    }));
+  });
 });

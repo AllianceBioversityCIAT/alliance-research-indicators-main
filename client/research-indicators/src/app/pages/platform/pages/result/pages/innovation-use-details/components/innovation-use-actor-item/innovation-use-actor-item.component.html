@@ -145,6 +145,7 @@
       }
     } @else {
       <div class="rs-pt-[12]">
+        <!-- @akili-spec docs/specs/changes/innovation-use-required-fields (T-05 — R-IUR-005, DD-1 'positive') -->
         <app-input
           [signal]="body"
           [optionValue]="'actors_count'"
@@ -152,6 +153,7 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'positive'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
       </div>

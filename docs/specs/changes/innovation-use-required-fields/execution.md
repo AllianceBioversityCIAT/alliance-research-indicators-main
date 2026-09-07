@@ -40,8 +40,8 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-02 `app-input` DD-10 token sweep | `[x]` | PASS attempt 1. Visual claims INCONCLUSIVE → T-16 gate 3 |
 | T-03 `quantification-item` 5 inputs | `[x]` | PASS attempt 1. Branch RED until T-12 (measured) |
 | T-04 actor disaggregated counts + total msg | `[x]` | PASS attempt 3 of 3. Pointers → T-16, T-19 |
-| T-05 actor aggregate path | `[ ]` | |
-| T-06 actor custom name trimmed | `[ ]` | |
+| T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
+| T-06 actor custom name trimmed | `[ ]` | **+ forward pointer from T-05** (narrow one comment aside) |
 | T-07 org known path + DD-9 precedence | `[ ]` | |
 | T-08 org unknown type + count | `[ ]` | |
 | T-09 org sub-type conditional + null | `[ ]` | |
@@ -559,3 +559,63 @@ The confirmation pass was told to verify the supplied wording rather than trust 
 > **FORWARD POINTER → T-16 (cumulative, now four items).** Gate 3 must name in words: (a) the amber border on a **text** field (`app-input :30`, `[style]`), (b) the amber border on a **number** field (`app-input :49`, class), (c) the message rows' line-height after the `fs-[14] leading-[1.25rem]` swap, (d) **T-04's new total-positivity message** (colour and `fs-[14]` asserted nowhere automatically). Plus gate 3b's dark-theme helper-text look and the two T-15 doc claims.
 
 **`ADVISORY` carried forward, unapplied (recorded, non-gating, none becomes a task in this spec)** — 1: `total() <= 0` (see the T-19 pointer). 3: harden `c9`'s `rs-mt-[4]` selector against the collision it now shares with the total message. 4: `showTotalNotPositive` re-derives emptiness that `InputComponent.isFilled()` now owns publicly; the two definitions must be kept in step by hand.
+
+---
+
+### T-05 — Actor card, aggregate path: `How many` required and positive
+
+| Field | Value |
+| --- | --- |
+| **Final status** | **PASS** (Reviewer, attempt 1) |
+| Date | 2026-09-07 |
+| Implementer attempts | **1** |
+| Effort assigned | `medium` (task said `S`) |
+| Skills assigned | `angular-developer`, **`tdd`** |
+
+**Effort and skill reasoning, recorded because it departs from the reflex.** T-04 in this same file needed three attempts, so the instinct was to raise effort. The Leader did the opposite: held `medium` and instead made a **process demand** — *for every assertion, name a concrete mutation that reddens it, run it, observe the red; where none exists, say so and label it regression-protection rather than evidence.* T-04's failures were not under-thinking (its production code was right on attempt 1); they were imprecision about what each assertion could detect. `tdd` was added over the task's list for its **anti-pattern** guidance, not to drive implementation order. **The approach worked: PASS on attempt 1.**
+
+**Production change — one binding**
+
+`.html` +2 total: `[requiredMode]="'positive'"` on the aggregate `actors_count` `app-input`, plus one `@akili-spec` marker. **`.ts` byte-identical** (`git diff --quiet` clean, Leader-verified). `.spec.ts` +126.
+
+No other code was needed, and the brief said so up front: `'positive'` already distinguishes the two messages inside `app-input` (`evaluateRequiredMode`, T-01) — `This field is required` when not filled, `Must be greater than 0` when filled and `≤ 0` — and the field passes `[label]`, so `app-input` renders its own asterisk. No card-side asterisk (would double it, the trap T-04 avoided); no `[isRequired]` alongside `requiredMode` (`DD-1` precedence).
+
+**Stale citation corrected at dispatch** — the work order cites `onModeChange()` at `:111-125`; T-04 shifted it to **`.ts:143-156`**. Third rotted citation in this spec (`A-N4`); the Implementer was told to re-check any it relied on.
+
+**Per-assertion mutation table — the deliverable the Leader required**
+
+| Assertion | Mutation | Observed |
+| --- | --- | --- |
+| AC.2 empty ⇒ required message | remove the binding | **RED** |
+| AC.3 `0` ⇒ positivity, not required | remove the binding | **RED** |
+| AC.3 **mode-pinning** | swap `'positive'` → `'filled'` | **RED** — *Implementer's own initiative, beyond the brief.* Proves the test pins the **right mode**, not merely that some mode is active |
+| AC.1 exactly one asterisk | remove the binding | **RED** (count 0, expected 1) |
+| AC.1 no card-side double | duplicate the asterisk as a **sibling** of `<app-input>` | **NOT reddened** — measured; comment corrected to say so rather than claim a red |
+| AC.5 transition | remove the binding | **RED** |
+| AC.4 `1` ⇒ valid | remove the binding | **NOT reddened** — labelled regression-protection, not evidence |
+
+**The Reviewer verified the table arithmetically**, not just plausibly: binding-removal should redden exactly AC.1/AC.2/AC.3/AC.5 (4) and leave AC.4 green — reported 4; the `'filled'` swap should redden only AC.3 and AC.5's post-toggle `0` check, since `'filled'` still emits the required message when empty and still renders the asterisk — reported exactly those 2. It called this *"the `KZ-014` discipline T-04 lacked."*
+
+**Reviewer rulings on the six named questions**
+
+1. **AC.5 satisfies the Disqualifier / `KZ-015` — yes.** `beforeEach` does not call `detectChanges()`, so the first call in each test runs `ngOnInit`; AC.5 therefore constructs in **disaggregated** mode, and that state is not synthetic — `InnovationUseActor` declares `sex_age_disaggregation_not_apply = false` and `actors_count = undefined`, so "four empty counts, four live messages" is literally what a newly added row reaches. It asserts that live, mutates through the **production handler** `onModeChange(true)` (the same method the template binds at `.html:71`), then asserts from the DOM.
+2. **The Leader's split reading — "confirmed, not corrected."** `KZ-015` is scoped to **AC.5 only** by the Disqualifier's own words. AC.1–AC.4 are steady-state claims about one field at one value, and constructing in aggregate mode *is* the state under test — a saved aggregate row loads exactly that way, which existing test c5 already relies on. *"Failing them under `KZ-015` would be over-application. I did not."* **This was raised pre-emptively because the risk after T-04's three rounds was a reviewer applying that lesson too broadly and failing correct work.**
+3. **The `body.update()` seam in AC.5's tail — sound, not tautological.** T-01's Disqualifier forbade value-in-via-the-component's-own-setter → verdict-out-via-its-own-getter. Neither half applies: the value enters the **card's** `body` signal, the same object graph `app-input` reads through `[signal]` and the same state `setValue()` produces via `setNestedPropertyWithReduceSignal`; the verdict comes out of **rendered DOM**. The subject under audit sits between them, and removing the binding reddens this exact assertion.
+4. **Both `KZ-017` disclosures verified accurate at source.** AC.4: with the binding gone, `inputValid()` falls through every branch and returns valid at `1` — indistinguishable from `'positive'` evaluating `1` as valid. AC.1: `howMany` is the `app-input`'s own `DebugElement`, so a sibling `<span>` is not a descendant and cannot redden the count; and the `@else` branch contains only the wrapper `div`, the comment and `<app-input>` — **so the non-doubling guarantee genuinely is structural**, as claimed.
+5. **`R-IUR-005` S1's `BUT` — the c1 citation holds and is stronger than claimed.** `appInputs()` is `By.directive(InputComponent)` over the whole fixture and c1's aggregate test asserts `length === 1`, so the four counts are **not instantiated** — hence no `isInvalid()`/`inputValid()` computeds exist to evaluate. That is *"not evaluated", not merely "not visible"*. The Reviewer also checked the one place a client leak could hide: in `innovation-use-details.component.ts` the four counts appear only in save normalization (nulled when aggregate), never in a validity computation. **No un-owned client gap.** Remaining: the SQL half (T-19).
+6. **`[min]="0"` is correct — do not change it.** `DD-1`'s `'positive'` row and `R-IUR-005` S1 both require that `0` be **enterable and then flagged**. `[min]="1"` would make the `0` state unreachable and AC.3 untestable in the UI — it would contradict the requirement rather than implement it. Explicitly ruled so no future task "fixes" it.
+7. **Scope clean** — `onModeChange`, `showTotalNotPositive`, `otherNameMissing`, `total()` and the four counts all in their T-04 state. **No T-06 leakage:** `otherNameMissing` is still the untrimmed `!this.body().actor_type_custom_name` and no asterisk was added to `Specify other` (T-06 AC.3 preserved). T-04's three carried-forward advisories all still **unapplied**.
+
+**Verification** — `npx eslint` 0 errors (1 expected "File ignored" on the spec) · `npx tsc -p tsconfig.spec.json --noEmit` filtered to this spec: **0 lines before and after** · `npx jest innovation-use-actor-item.component.spec --coverage=false --silent` → **39/39** (34 baseline + 5 new) · `npm test -- --silent -- …` → 39/39 pass, exit 1 on project-wide coverage floors (`K-020`) · `npx prettier --write` → no changes · all mutations reverted, final state is the one binding.
+
+**`ADVISORY` (4R — recorded, non-gating)**
+
+1. *Readability* — the AC.1 comment's aside says *"unlike the actor-type/**other-name** fields above it that do carry their own label+asterisk markup."* Right about `Actor type` (`.html:25`); **wrong about `Specify other`** (`.html:51-60`), which has neither its own label nor an asterisk and relies on `placeholder`, with T-06 AC.3 forbidding one. The load-bearing halves of the disclosure are accurate — only this aside is imprecise. → **forward pointer to T-06**, below.
+2. *Reliability* — AC.5 exercises the **on** direction only, which is the direction the work order's falsifying input names. The reverse (aggregate → disaggregated with `How many` holding a message) is covered indirectly: c2 proves `actors_count` is cleared in the emitted row and c1 proves the branch is destroyed, so no stale positivity message is structurally possible. Recorded, not requested.
+3. *Reliability* — the no-stale-message claim covers the four **field** messages; the card-level total message is proven absent in aggregate mode only **statically** (T-04). Structurally it cannot survive the toggle (its `@if` lives inside the destroyed branch *and* the getter early-returns `false`). Completeness note, not a behavioural gap.
+
+> **FORWARD POINTER → T-06 (Leader-owned; must be copied into T-06's brief).** While you are in `innovation-use-actor-item.component.spec.ts`, narrow one imprecise comment aside in the T-05 AC.1 block: it currently claims the *"actor-type/other-name fields above it … carry their own label+asterisk markup"*, but **`Specify other` carries neither** — it relies on `placeholder="Specify other"`, and **T-06 AC.3 forbids adding an asterisk to it** (`OQ-2` is open and must not be closed by implementation). Narrow it to *"unlike the `Actor type` field above it"*. This is a **comment-only** correction to a factual aside, deliberately routed here rather than done by the Leader because T-06 is the next task to touch this file — it is **not** a licence to change any T-05 assertion or binding.
+
+**Requirements covered** — `R-IUR-005` **in full**: S1 + its `BUT it must NOT evaluate the four disaggregated counts while this path is active`, AC.1–AC.5 including AC.5's no-stale-message-across-a-toggle.
+
+**Cannot prove (`KZ-017`)** — **paint** (T-16 gate 3). **The SQL half**: `R-IUR-005` AC.2/AC.3's green-check clauses are T-19's; `innovation_use_validation` is untouched here. The forbidden sibling-asterisk mutation (disclosed in-file). The Reviewer executed **nothing** — read-only wrapper, no `Bash`: it verified the supplied diff **verbatim against the working-tree files** and re-derived every mutation outcome analytically from `input.component.ts` and both templates; the `.ts` byte-identity it confirmed by **content**, with the Leader supplying the `git diff --quiet` measurement. `npm run build` remains unusable as a gate on this file until T-12 clears the `NG8002` from T-03.
