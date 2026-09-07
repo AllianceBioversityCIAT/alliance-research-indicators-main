@@ -749,7 +749,7 @@ read-back (`P-6` — revision 3 had §6 and §10 pointing at each other and the 
 | --- | --- | --- | --- | --- | --- |
 | Tasks | 13 | 16 | 18 | **20** | **+2 breach, declared at the Phase 3 gate** (`tasks.md` §1.1): `T-14` (catalog equivalence — folded into a sibling it would have been discharged by the very mock `DD-5` rejects) and `T-16` (the three post-change client gates, which had no owner among the feature tasks). Rev 4's own deltas stand: +`DD-12` path clearing, +`R-IUR-016`, +the `'nonzero'` mode; −the withdrawn site-2 gate |
 | LOC | ~1,150 | ~1,500 | ~1,600 | **~1,650** | Re-baselined for the two extra tasks; the `DD-9` and `c2` spec rewrites remain the bulk |
-| Review rounds | ~20 | ~24 | ~24 | **~24** | unchanged |
+| Review rounds | ~20 | ~24 | ~24 | ~~~24~~ **~37** | **RE-BASELINED 2026-09-07 by user ruling, mid-execution** (`RB-9`). Derived from measurement, not re-estimated: **24 rounds consumed across 13 completed tasks = 1.85/task**. Seven remain, of which **T-20 is a human migration step consuming no review round**, so 6 x 1.85 ~= 11 more, plus margin for T-13 (the heaviest remaining task, carrying `R-IUR-014` AC.4b's owed discriminating red). **This figure is the single home; every other site links here** (`KZ-005`) |
 
 **Depth stays Full.** A tripwire, not a cap; `/akili-execute` escalates on breach.
 

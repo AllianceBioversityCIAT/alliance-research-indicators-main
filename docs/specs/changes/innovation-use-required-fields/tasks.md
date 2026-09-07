@@ -45,7 +45,7 @@ lands at **20 tasks**, a **+2 breach** the Leader must not absorb silently:
 | **T-14** — sub-type catalog equivalence | `R-IUR-008` AC.4 demands enumeration over the whole catalog against `getInstitutionTypesByDepthLevel`, the **real** service. Folded into T-09 it would have been discharged by the jsdom mock that `DD-5` explicitly says cannot observe either the `is_active` or the root filter |
 | **T-16** — client gate task | The three gates that can only run *after* every client change (full suite, normalized `tsc` set diff, human browser check) have no natural owner among the feature tasks, and a gate owned by everyone is owned by no one |
 
-LOC re-baselined to **~1,650**; review rounds unchanged at **~24**. **Depth stays Full.**
+LOC re-baselined to **~1,650**. **Review rounds: see `design.md` §11, the single home for this figure** (`KZ-005`) — **re-baselined 2026-09-07 to ~37** by user ruling at the T-10 gate, from measured throughput rather than re-estimation. **Depth stays Full.**
 
 ---
 
