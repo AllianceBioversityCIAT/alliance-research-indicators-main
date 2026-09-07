@@ -194,14 +194,27 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
   }
 
   /**
+   * R-IUR-007 (T-08) — unknown-path-only field-level requirement: `institution_type_id` is
+   * required once `Is the organization known?` is unchecked. Mirrors `institutionMissing`'s
+   * shape for the opposite path. The leading `!is_organization_known` conjunct is redundant for
+   * template use (the template already scopes this field inside the `@else` branch — AC.3 is
+   * satisfied structurally, not by this guard) but it is load-bearing for the suppression clause
+   * below: dropping it would silently widen suppression onto the known path.
+   */
+  get organizationTypeMissing(): boolean {
+    return !this.body().is_organization_known && !this.identitySatisfied;
+  }
+
+  /**
    * DD-9 precedence: the row-level message is SUPPRESSED — not deleted (`OQ-6`, user ruling) —
-   * while a field-level required message is showing on the same row. After T-07 that field-level
-   * state is `institutionMissing` (known path only); T-08 will extend this clause to the unknown
-   * path's type and count. Not gated further by touch here: `institutionMissing` already implies
-   * the known path, and the row-level message never fires on the known path once this clause
-   * excludes it, whether touched or not.
+   * while a field-level required message is showing on the same row. T-07 covered the known
+   * path (`institutionMissing`); T-08 extends this clause to the unknown path's identity field
+   * (`organizationTypeMissing`). Consequence, expected per `DD-9`'s "honest caveat": once both
+   * paths are covered, `!identitySatisfied` always implies exactly one of the two field-level
+   * states, so this getter is now unconditionally `false` in practice — dead-but-reversible code,
+   * not deleted (`OQ-6`).
    */
   get showNotIdentifiedMessage(): boolean {
-    return this.touched() && !this.identitySatisfied && !this.institutionMissing;
+    return this.touched() && !this.identitySatisfied && !this.institutionMissing && !this.organizationTypeMissing;
   }
 }

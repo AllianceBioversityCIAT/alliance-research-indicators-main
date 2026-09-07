@@ -43,7 +43,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-05 actor aggregate path | `[x]` | PASS attempt 1. Pointer → T-06 (comment aside) |
 | T-06 actor custom name trimmed | `[x]` | PASS attempt 1. T-05 pointer applied. See stash incident |
 | T-07 org known path + DD-9 precedence | `[x]` | PASS attempt 1. 5 pointers filed → T-08 |
-| T-08 org unknown type + count | `[ ]` | **+5 pointers from T-07** (incl. moved `:413-427` rewrite) |
+| T-08 org unknown type + count | `[~]` | **IN FLIGHT** — code green, full suite green, **Reviewer verdict pending**. See the T-08 block + handoff |
 | T-09 org sub-type conditional + null | `[ ]` | |
 | T-10 org DD-12 toggle clearing | `[ ]` | |
 | T-11 details drop message + stop seeding | `[x]` | PASS attempt 1. 3 pointers filed → T-12 |
@@ -941,3 +941,115 @@ T-07's `Cannot prove` says to record the suppressed branch as unreachable-so-unt
 **Requirements covered** — `R-IUR-006` **in full**: S1 + its `BUT it must NOT render two competing messages`; AC.1, AC.2 (client half), AC.3, AC.4.
 
 **Cannot prove (`KZ-017`)** — **paint**: a captured `.style.border` setter call is not a painted border; T-16 gate 3 is the only evidence, **and this card's amber border is not yet on gate 3's named list** → carried to T-16. **AC.2's amber on the *first render* of an already-invalid select is a composition, not a direct measurement** — the same shape recorded for T-12: `institutionMissing === true` on an untouched loaded row, plus `[style]` emitting the amber whenever it is true; **no test observes a first-render write**, and advisory 1 would close it directly. **AC.2's green-check half and rule 6's SQL** — T-13/T-18/T-19. The Reviewer executed **nothing** (read-only wrapper) and could not run `git diff`, so it cannot rule out an unreported edit elsewhere in the 684-line spec file; it read `.ts` and `.html` in full plus most of the spec and enumerated all 14 top-level `describe`s — the Leader's `git diff --stat` (20/18/121) bounds that gap.
+
+---
+
+### T-08 — Organization card, unknown path: type required, count required and positive
+
+| Field | Value |
+| --- | --- |
+| **Status** | **`[~]` IN FLIGHT — code complete and verified green; Reviewer verdict PENDING at session end.** Not committed as done; **not** marked `[x]`. |
+| Date | 2026-09-07 |
+| Implementer attempts | **2** (attempt 1 never reviewed — it went straight to rework when the Leader's full-suite gate went red) |
+| Effort assigned | `medium` on both attempts — deliberately never bumped; the rework cause was a Leader omission, not under-thinking |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max`, **`tdd`** |
+
+**Production changes** (org card `.ts` 25 changed lines, `.html` 19, `.spec.ts` 173; `innovation-use-details.component.spec.ts` +20/−3)
+
+- `Organization type`: unconditional red `*`; `[style]="organizationTypeMissing ? …"` amber border (`DD-3`, it had **none** before); new `#organizationTypeRequiredMessage` template with its own `.organization-type-required-message` hook.
+- `Organization count`: `[requiredMode]="'positive'"`, nothing else. No `[isRequired]` (`DD-1` precedence), no card-side asterisk (it passes `[label]`, so `app-input` renders its own — the actor-card pattern), `[min]="0"` unchanged so `0` stays enterable and *then* flagged.
+- New `organizationTypeMissing` getter; `showNotIdentifiedMessage` extended to `touched() && !identitySatisfied && !institutionMissing && !organizationTypeMissing`.
+
+**`DD-9`'s "honest caveat" has now arrived, on schedule.** With both paths covered, `institutionMissing || organizationTypeMissing` is exactly equivalent to `!identitySatisfied`, so `showNotIdentifiedMessage` is **unconditionally `false`** — dead-but-reversible code. All three `OQ-6` artifacts survive (getter, `ng-template #notIdentifiedMessage`, render site); reversal is deleting clauses. **This is the gate at which the branch became genuinely unreachable** — the state T-07's `Cannot prove` described as a future condition.
+
+**Verification, all Leader-re-measured**
+
+| Gate | Result |
+| --- | --- |
+| org-card spec | **36/36** (baseline 34/34) |
+| `innovation-use-details.component.spec` | **156/156** (restored from red) |
+| **Full client suite** | **317 suites, 6857 tests, 0 failed** |
+| `npm run build` | green |
+| `eslint` | clean |
+| `tsc -p tsconfig.spec.json` scoped | identical single pre-existing `TS2741` |
+
+**Observed RED for both falsifying inputs** — taken by swapping in `git show HEAD:` originals, **never `git stash`**. `Organization count = 0` rendered **no message at all** pre-fix (`Received string: " Organization count "`), confirming there was no required/positivity distinction before `requiredMode`; the type field-level message count was `0` instead of `1`.
+
+#### The rework, and why it was the Leader's fault
+
+**Attempt 1 passed every gate inside its own file scope** — 36/36, build green, `eslint` clean, `tsc` no new errors — **and the branch was still broken.** The Leader's full-suite gate returned `1 failed / 6856 passed`, in a *different* file: `c10` in `innovation-use-details.component.spec.ts`, whose `organizationsCard` half asserted **no** asterisk on that card. T-08's `Organization type` asterisk falsifies it.
+
+**The casualty was predicted, documented in three places, and still missed.** T-12's Implementer wrote the deferral *into the code* four lines above the assertion — `// ORGANIZATIONS is not this task's scope (T-07/T-08 own it)`. T-12's Reviewer endorsed it. The Leader recorded it in this file. **And then wrote T-08's brief with five forward pointers and omitted that one.** `/akili-execute` names the failure exactly: *"a pointer filed three tasks ago is not carried by having been filed — the brief carries it or nobody does."*
+
+**Two structural lessons, recorded because they change how the Leader should work:**
+
+1. **A test comment naming a future owner is documentation, not a mechanism.** It informs whoever reads *that* file — but the task that will break it never reads that file; that is precisely why the work was deferred. Only the brief carries a cross-file casualty.
+2. **`execution.md` is where such pointers get recorded, and it is not what the Leader re-reads when composing a brief.** The Leader reads the target task's own entry and the pointers filed *under its heading*. A pointer filed under **T-12's** entry, naming T-08, does not surface when T-08 is opened. **Standing correction: grep `execution.md` for the target task's ID before composing its brief**, rather than relying on pointers filed under its own heading.
+
+**Scope was widened by exactly one file** (`innovation-use-details.component.spec.ts`, `c10`'s `organizationsCard` assertion only), justified because T-08 *causes* the break, T-12 designated T-07/T-08 as owner, and no later task claimed it. **`tasks.md`'s T-08 `Files` line was corrected** to record that ownership with its reason.
+
+**The `c10` fix** replaced a whole-card `hasAsteriskTextNode(organizationsCard)).toBe(false)` with per-field assertions (`orgLabels.length === 2`; `Organization type` and `Organization count` each carrying `*`) and replaced the stale *"behaviour has not changed"* comment. `Sub-type` is genuinely not rendered in that fixture (`subTypeOptions()` stays empty while `institution_type_id` is `undefined`).
+
+**Two pre-existing tests rewritten that were on no pointer list** — the Implementer flagged both itself: `c4`'s second test (asserted zero asterisks on the unknown path; AC.1 falsifies it) and **T-07's un-suppression guard**, which asserted the row-level message renders on the unknown path. That guard was written by T-07 *specifically as a tripwire for this moment* — **it fired as designed.** A test written by one task to catch the next task's landing, working exactly as intended.
+
+**Leader-found, pending the Reviewer's ruling:** `hasAsteriskTextNode` at `innovation-use-details.component.spec.ts:415` is now **defined but never used** — its only consumer was the assertion just replaced, and the measures half uses per-field queries. eslint ignores `*.spec.ts` (`K-002`), so nothing flags it. Dead code introduced by this change; referred for a FAIL-or-advisory ruling.
+
+> **⚠ TO FINISH T-08 IN THE NEXT SESSION**
+> The code is complete and the full suite is green. **The Reviewer was dispatched and its verdict did not arrive before session end.** Do **not** mark T-08 `[x]` without it (`evidence before checkbox`; the `akili-tasks-gate.sh` hook enforces this on Claude Code).
+> 1. **Re-dispatch the Reviewer** on the current diff — its brief covered ten named questions: rules 7/9 conformance, AC.3-satisfied-structurally, the suppression extension and unreachability, container-not-null assertion (the Disqualifier), the `:413-427` rewrite and its two stale claims, the four hygiene items, the cross-file `c10` fix and its `orgLabels.length === 2` guard, the **dead `hasAsteriskTextNode` helper**, the two unlisted test rewrites, and scope vs T-09/T-10/T-13/T-14.
+> 2. On **PASS**: append the verdict here, flip the status board to `[x]`, and commit. The work is already committed as `[~]`, so this is an append plus a status flip.
+> 3. On **FAIL**: attempt 3 of 3 remains available.
+
+**Requirements covered (pending verdict)** — `R-IUR-007` in full (S1, AC.1–AC.3) · `R-IUR-009` AC.1–AC.3 + S1's `AND IT MUST`.
+
+**Cannot prove (`KZ-017`)** — **paint** (T-16 gate 3), and **this card's amber borders are not yet on gate 3's named list** → carried to T-16. **The SQL halves** of `R-IUR-007` AC.2 and `R-IUR-009` AC.4 → T-19.
+
+---
+
+## SESSION HANDOFF — 2026-09-07
+
+**Entry point for the next session: `/akili-resume`**, then read this file's §1.2 status board and the T-08 block above.
+
+### Where the spec stands
+
+**10 of 20 tasks complete and committed. T-08 is `[~]` in flight (code green, verdict pending).**
+
+| Done `[x]` | In flight `[~]` | Remaining `[ ]` |
+| --- | --- | --- |
+| T-01, T-02, T-03, T-04, T-05, T-06, T-07, T-11, T-12, T-15 | **T-08** | T-09, T-10, T-13, T-14, T-16 *(client gates)*, T-17, T-18, T-19, T-20 *(human)* |
+
+**Branch health: GREEN.** Full client suite **317 suites / 6857 tests / 0 failed**; `npm run build` green. Both were red from T-03 until T-12 restored them — do not let that recur unnoticed: **the Leader must re-measure the full suite after every worker reports.** That gate, and nothing else, caught T-08's cross-file casualty.
+
+**11 commits this session**, all `[SPEC:changes/innovation-use-required-fields]`. **Nothing has been pushed** — pushing is the user's call.
+
+### What comes next, in order
+
+- **T-09** (org sub-type conditional + explicit `null` on type change) — deps T-08. Its brief must carry: the `undefined`-is-dropped-by-`JSON.stringify` trap (`DD-5b`), the narrower-than-it-looks client predicate (`is_active` + root + has-children, **not** `EXISTS(parent_code = type)`), and that a mocked sub-types service **cannot** observe the `is_active` or root filters — equivalence is **T-14's**, and T-09 must not claim it.
+- **T-10** (`DD-12` toggle clearing, both directions) — deps T-09. **Do not** add a save gate over the inactive path; `P-3` withdrew that and it produced a row that could neither be saved nor repaired.
+- **T-13** (save gate + first blocked-save toast) — deps T-10, T-12. **There is no existing toast channel to reuse** (`S-2`); the duplicate-actor-type block is **silent today** and T-13 must cover it or it ships a second silent block.
+- **T-14** (sub-type catalog equivalence, by enumeration) — deps T-09. A run against a **mocked** service is **inconclusive, never a pass**.
+- **T-16** (client gates) — deps T-02, T-06, T-13, T-14, T-15. **Carries five accumulated items** (below).
+- **T-17 → T-20** (server: `SELECT`-only sizing, migration, executed truth table, human apply) — PR 2.
+
+### T-16's accumulated list — every visual claim in this spec lands here
+
+Gate 3 must name **in words** (`KZ-002`): (a) amber border on a **text** field (`app-input :30`, `[style]`); (b) amber border on a **number** field (`app-input :49`, class); (c) message-row line-height after the `fs-[14] leading-[1.25rem]` swap; (d) **T-04's total-positivity message** (colour and `fs-[14]` asserted nowhere automatically); (e) **the organization card's two new amber borders** (T-07 known path, T-08 unknown path) — *not yet on the list*; plus **gate 3b**'s dark-theme helper-text look and the two **T-15** doc claims re-read once T-07…T-11 have landed.
+
+T-01, T-02, T-07 and T-08 all recorded their visual claims as **`inconclusive`, never passing**, pending gate 3.
+
+### Standing decisions accumulated this session — carry these into every brief
+
+1. **Never `git stash` in this checkout.** A T-06 worker's mis-ordered `-m` flag led to `git stash pop` applying `stash@{0}` — an unrelated stash from another branch whose own message reads **"DO NOT APPLY"** — conflicting three unrelated files. **18 stashes** live here. Copy to the scratchpad and swap back. *(Kaizen candidate: a repo-level guard.)*
+2. **Border-spy scoping, by attribution need** — the earlier blanket ban was wrong and `DD-3` contradicts it. **Element-scoped** when claiming a *specific* element wrote a value (a second emitter causes a false **PASS** on a positive `toContainEqual`). **Prototype-wide** is stricter for a card-wide *negative* (a second emitter can only turn it **red**) and is the **only** instrument that can observe a **first** style write on a newly created element.
+3. **Angular memoizes** the last-applied style value per property — a spy installed after the state settled records **zero calls**. Install before the transition.
+4. **Re-measure every line citation before dispatch.** Citations in this spec have rotted or been misplaced in **six of eleven** tasks (`A-N4` family), including two that would have caused wrong work: T-07's `:302-316` (belonged to T-08) and T-08's `.html:36`/`:79` path boundaries.
+5. **Grep `execution.md` for the target task's ID before composing its brief** — pointers filed under *another* task's heading do not surface otherwise. This is the T-08 lesson.
+6. **Demand a reddening mutation per assertion**, and require the ones with none to be labelled regression-protection in-code. This converted T-05 to a first-attempt PASS after T-04 took three.
+7. **Hold effort rather than bumping it** when a rework's cause was a false premise supplied to the worker rather than the worker's own thinking. Applied on T-04, T-12 and T-08.
+8. **`prettier --write` is inadvisable in this spec's files** — it reflows unrelated blocks at `printWidth: 150`, and nothing in the repo gates spec formatting (`.husky/pre-commit` empty, eslint ignores `*.spec.ts`). T-11 and T-12 both had to undo that churn by hand.
+
+### Open items not owned by any remaining task
+
+- **`OQ-2`** (does `Specify other` get a red `*`) and **`OQ-3`** (the 15 untouched `app-input` templates' falsy-`0` audit) remain **open** and must not be closed by implementation — `tasks.md` §7's Definition of Done requires them carried forward as recorded open questions.
+- **`RB-1`** (MEL / product-owner sign-off) is required **before PR 2 merges** — `T-17`'s population sizing feeds it.
+- **Budget:** 20 tasks / ~1,650 LOC / ~24 review rounds (`RB-8` re-baseline). Review rounds are running **above** estimate — T-04 (3 attempts), T-12 (3), T-08 (2) — but the task count and LOC are on plan. **No tripwire escalation is owed**; flagged so the next session can judge.

@@ -414,9 +414,26 @@ describe('InnovationUseDetailsComponent', () => {
       // binding under test. Search for the asterisk text node itself instead.
       const hasAsteriskTextNode = (root: HTMLElement) => Array.from(root.querySelectorAll('span')).some(span => span.textContent?.trim() === '*');
 
-      // ORGANIZATIONS is not this task's scope (T-07/T-08 own it) and its behaviour has not
-      // changed: left exactly as it was.
-      expect(hasAsteriskTextNode(organizationsCard)).toBe(false);
+      // T-08 REWORK (R-IUR-007 AC.1): T-12 pointed this half at T-07/T-08 rather than asserting it
+      // unchanged, and it is not unchanged. On the unknown path (`is_organization_known: false`,
+      // this fixture's default via `new InnovationUseOrganization()`), two fields on this card now
+      // carry the required asterisk: `Organization type` (card-owned markup, unconditional, in
+      // innovation-use-organization-item.component.html) and `Organization count` (forwarded to
+      // `app-input`, whose own `@if (isRequired || requiredMode !== 'off')` renders the asterisk
+      // because this field passes `[label]` with `[requiredMode]="'positive'"`). No other labelled
+      // field on this card (e.g. Sub-type, not rendered while `institution_type_id` is undefined)
+      // carries one. Asserted per field, keyed on the label each asterisk belongs to — the shape
+      // the quantifications half above already uses — because a whole-card cohort count cannot
+      // express "these two fields carry asterisks and nothing else does" (KZ-001).
+      const orgLabels = Array.from(organizationsCard.querySelectorAll('.label'));
+      const organizationTypeLabel = orgLabels.find(label => label.textContent?.trim().startsWith('Organization type'));
+      const organizationCountLabel = orgLabels.find(label => label.textContent?.trim().startsWith('Organization count'));
+
+      expect(orgLabels.length).toBe(2);
+      expect(organizationTypeLabel).toBeTruthy();
+      expect(organizationCountLabel).toBeTruthy();
+      expect(organizationTypeLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(organizationCountLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
 
       // R-IUR-010 AC.1, asserted per field rather than per card: Number and Unit each carry the
       // red `*` beside their label; Comments does not.
