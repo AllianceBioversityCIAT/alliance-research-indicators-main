@@ -53,7 +53,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
 | T-17 RSK-2 population sizing | `[x]` | **done.** Dev: 7 results, 3 passing, **1 affected** (rule 1). ⚠️ **Dev cannot support a Prod-covering `RB-1` sign-off** |
-| T-18 migration + migration spec | `[ ]` | |
+| T-18 migration + migration spec | `[x]` | **PASS attempt 1 — STRUCTURE ONLY.** Never executed; `R-IUR-012` AC.1 is **not** discharged. ⚠️ **F17 will go red when applied — T-19 must INVERT it, not extend around it** |
 | T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
 | T-21 actor: used type not selectable (`R-IUR-017`) | `[x]` | **PASS attempt 1.** Rendered-overlay assertions, not the derived array. PrimeNG's own self-exemption is inert here — ours is load-bearing |
@@ -1990,3 +1990,37 @@ The Leader's own read-only Dev probe before dispatch (**42 total · 9 root+activ
 **⚠️ THE LIMIT THAT MATTERS MORE THAN THE NUMBERS — escalated to the user.** `RB-1` (the MEL / product-owner sign-off that **blocks the PR 2 merge**) is supposed to be informed by this population. **It was measured against a 7-result Dev database.** Production is very likely larger and could have a materially different rule-by-rule distribution. **These numbers cannot support a Prod-covering sign-off**, and saying "1 result affected" to MEL without that caveat would be misleading. Recorded as `RSK-2`'s open half.
 
 **Process limit, declared rather than glossed:** T-17 produced **no files**, so no Reviewer round was run — the Leader verified the three load-bearing numbers directly instead. The queries' *shape* therefore carries one pair of eyes plus the Leader's spot-check, not an independent audit. Cheap and proportionate for a measurement with almost all-zero results; it would not be proportionate if the numbers were large.
+
+---
+
+#### T-18 — Reviewer `STATUS: PASS` ✅ **structure only — this does NOT discharge `R-IUR-012` AC.1**
+
+**Files (both new):** `src/db/migrations/1787280000000-updateInnovationUseValidation.ts` · `src/db/migration-specs/1787280000000-updateInnovationUseValidation.spec.ts`. Timestamp sorts last (after `1787270000000`). **Never executed against any database** — not Dev, not scratch.
+
+**All five hard constraints verified by the Reviewer at the source, not accepted from the report:**
+1. **Rules 14–15 preserved *and reachable*.** Line-for-line identical to the source block, `LIMIT 1` and both `is_active` filters intact, and `useLevel` bound to `ciul.level` through the join — **not** to the FK, so the `level`-vs-`id` trap is avoided. Verbatim text is necessary but not sufficient, so the Reviewer also confirmed the block executes **before** all three counts and that the `IF(useLevel >= 6, explanationValid, TRUE)` conjunct sits in a **flat top-level AND chain**, not nested inside a bypassing `IF()` — the `DD-11` hazard `innovation_dev_validation` still carries.
+2. **`is_active = TRUE` on all three predicates**, and the soft-delete premise re-verified in the services that write `{ is_active: false }`.
+3. **NULL-safe, and the ELSE branch is the *intended* rule**, traced against what the client paints: a NULL `sex_age_disaggregation_not_apply` routes to the disaggregated branch, matching `@if (!body().sex_age_disaggregation_not_apply)`; a NULL `is_organization_known` routes to the unknown path, matching the template's `@else`.
+4. **Both `OR`-in-`WHERE` sites wrapped**, so `A AND B AND (C OR D)` cannot read as `(A AND B AND C) OR D`. The Reviewer names those two parentheses as exactly what T-19's falsifier should pull.
+5. **Sub-type clause mirrors the CLIENT predicate** — parent-only `is_active`, root, has children, no child filter; rule 8b a separate `EXISTS`. **Leader-verified independently**: `grep` for `c.is_active` across the file returns nothing.
+
+**Rules 1–13 walked one by one against `design.md` §3.1** — none missing, inverted or narrowed. Role discriminators checked against the **enums**, not the design prose.
+
+**A three-valued-logic trap the Reviewer found closed, and worth recording because the old form failed the other way.** The `SUM(...)` → `COUNT(*) WHERE` rewrite could have introduced fail-**open** NULL propagation. It checked every predicate: `X IS NOT NULL AND X > 0` yields `FALSE` (not `NULL`) when `X` is NULL, and **`valid_text` returns `FALSE`, not `NULL`, for a NULL argument**. Had it returned NULL, rules 2 and 11 would have **silently stopped counting their most common failure**.
+
+**`down()`** compared line by line against the prior `CREATE FUNCTION` — identical, including the retired `tempFullActors` logic. `up()`+`down()` round-trips to the exact pre-migration state.
+
+**A runtime-only trap the Implementer found and fixed:** a `:87-101` line citation **inside a `--` SQL comment** would have thrown `Named query contains placeholders…` **before MySQL ever parsed the migration** — the driver reads `:word` as a named parameter even in a comment. The Reviewer re-verified with the driver's own character class: every `:[0-9a-zA-Z]` hit is in the TSDoc header, which never reaches the driver.
+
+**Leader-run gates** (the Reviewer flagged that the report did not quote eslint): `npx eslint` on both files → **exit 0, no output**; structural spec → **17/17**.
+
+**Deviation from the Leader's brief, and the Leader was wrong.** The brief said the spec should be a *"sibling"* beside the migration, copying `tasks.md`'s wording. The Implementer placed it in `src/db/migration-specs/` per the server child guide — `orm.config.ts`'s glob `require()`s **every** file under `migrations/**` expecting a `MigrationInterface`, so a co-located `*.spec.ts` crashes the migration runner. **Leader-verified:** the glob is `migrations/**/*{.ts,.js}`, and **five** innovation-use migration specs already live there, including the one for the migration this replaces. Constitution over brief wording; the Reviewer independently agreed it would have failed the sibling placement.
+
+### ⚠️ TWO ITEMS T-19 MUST CARRY — the first is a red waiting to happen
+
+1. **`innovation-use-validation.fixture-spec.ts`'s F17 WILL GO RED the moment this migration reaches the scratch schema.** It seeds a detail row at level id 1 with **zero actor rows** and asserts the function returns `0`; under the new body all three violation counts are `0` and it returns `1`. **That flip *is* `R-IUR-011` AC.2** — F17 is asserting the retired rule 13. **T-19's brief says the file is "extended, not replaced", which invites appending rows and leaving F17 alone. It must be INVERTED, not extended.** The Reviewer checked every other caller and **F17 is the only one that flips**: F1–F11 seed aggregate actors with `actors_count: 5`; the level-boundary fixtures assert rules 14–15, preserved; the result-creation fixture's false case has no `result_innovation_use` row at all. One stale comment there also becomes wrong while its assertion stays green.
+2. **The structural spec is silent on 5 of the 11 live rules.** Deleting `NOT valid_text(rq.unit)`, or the `> 0` from rule 5, or `institution_id IS NULL` from rule 6 leaves it **17/17 green**. That is within T-18's scope — but it means **T-19's truth table is the sole gate on most of the rule table.** Its "at minimum one pass and one fail row per rule" is load-bearing, and the eight naive-divergence catalog codes deserve a row of their own.
+
+**`ADVISORY`:** a collation prediction — `result_quantifications.unit` is `text` under the schema default collation while `valid_text`'s parameter declares `utf8mb4_unicode_ci`; assignment coercion should make it a non-event (the existing call on another `text` column works today), but *"Illegal mix of collations"* is runtime-only, so **rule 11 needs a real T-19 case with a non-empty `unit`**, not only a NULL one. Plus: a falsifier comment in the spec contradicts itself in its own sentence (says both assertions redden, then says the first does not — only the second does), and one header citation is off by one line.
+
+**Reviewer's own framing, kept verbatim because it is the honest limit:** *"This PASS is on T-18's scope, which explicitly excludes behavior. The migration is **not verified** — it has never executed. Only MySQL's own parser can confirm the grouping, only a run can confirm `IF()`-with-NULL takes the ELSE branch, and only a run can confirm `valid_text(rq.unit)` does not raise a collation error. Do not read this PASS as the gate `R-IUR-012` AC.1 asks for; T-19 is the only instrument that discharges it."*
