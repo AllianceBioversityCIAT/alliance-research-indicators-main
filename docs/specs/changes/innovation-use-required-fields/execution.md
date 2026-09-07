@@ -52,7 +52,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-14 sub-type catalog equivalence | `[x]` | **PASS attempt 1.** 42/42, 0 divergences; naive mirror reddens on exactly the 8 predicted codes. **4 advisories → T-18/T-19** |
 | T-15 doc sweep DD-11 | `[x]` | PASS attempt 2 of 3. Forward pointer filed → T-16 |
 | T-16 CLIENT GATES suite + tsc + browser | `[ ]` | **3 forward pointers filed** — owns every visual claim |
-| T-17 RSK-2 population sizing | `[ ]` | |
+| T-17 RSK-2 population sizing | `[x]` | **done.** Dev: 7 results, 3 passing, **1 affected** (rule 1). ⚠️ **Dev cannot support a Prod-covering `RB-1` sign-off** |
 | T-18 migration + migration spec | `[ ]` | |
 | T-19 executed truth table | `[ ]` | **forward pointer: client predicate NARROWER than SQL (AC.6)** |
 | T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
@@ -1952,3 +1952,41 @@ The Leader's own read-only Dev probe before dispatch (**42 total · 9 root+activ
 2. The load-bearing own-value exemption (finding 1 above) should carry an in-code comment naming PrimeNG's inert equivalent.
 3. If the actor list ever grows past single digits, one `computed` producing a single "types in use" set — each card subtracting its own value — would remove the per-row allocation.
 4. **The `duplicateType` amber message is now reachable only from data written directly to the database**, since the UI can no longer create a duplicate. That is exactly what `DD-18` specifies (the computed stays; only its save-gate use is gone). **Noted so a future reader does not read it as dead code and delete it.**
+
+---
+
+#### T-17 — `RSK-2` population sized ✅ **task complete** *(read-only measurement; no code, no Reviewer round — see the limit declared below)*
+
+**Method — the narrower, correct population.** Counts are **distinct results** where `innovation_use_validation(result_id) = 1` **today** *and* the new rule's violation predicate holds. That is *"passes today **and** will fail tomorrow"*, not merely *"will fail tomorrow"* — a result that already fails is not part of `RSK-2`, because nobody is surprised by it. The Implementer also ran the broader form for comparison.
+
+**Population context (Leader-verified independently, not relayed):**
+
+| | Dev |
+| --- | --- |
+| Innovation Use results, active | **7** |
+| Passing the green check today | **3** (33544, 33962, 33970) |
+
+**Per-rule results:**
+
+| # | Rule | Passes today ∧ fails tomorrow | `is_active` removed |
+| --- | --- | --- | --- |
+| 1 | Actor: **some-but-not-all** of the four disaggregated counts filled | **1** (result 33544) | 1 |
+| 2 | Disaggregated actor: four counts **sum to zero** | 0 | 0 |
+| 3 | Aggregate `actors_count = 0` | 0 | 0 |
+| 4 | Organization `organization_count = 0` (unknown path) | 0 | 0 |
+| 5 | Measure `quantification_number = 0` | 0 | 0 |
+| 6 | Measure **whitespace-only** `unit` | 0 | **1 — CHANGED** |
+
+**Leader-verified independently:** total 7, passing 3, rule 1 = 1. Query text for every rule is in the Implementer's report; the runner lived in the scratchpad and was never committed.
+
+**The falsifying check was done properly, per rule, and this is the part that makes the zeros trustworthy.** A flat "5 of 6 unchanged" was **not** accepted at face value — each was explained by inspection:
+- rules 1–3: **zero** soft-deleted `result_actors` rows exist for role 2, so the filter has nothing to exclude — a measured fact, not an assumption;
+- rule 4: 3 soft-deleted rows exist and **all three were inspected** — none matches the predicate;
+- rule 5: 9 soft-deleted rows exist, **all 11 measure rows inspected** — none is exactly `0`, though several are negative;
+- **rule 6 DID change, 0 → 1** — four inactive rows carry a whitespace-only `unit`. **This is the concrete case proving `DD-0`'s `is_active` scoping matters**: without it this rule would have been overcounted.
+
+**A structural finding worth carrying into T-18:** today's `innovation_use_validation` **does not examine organizations or measures at all** — only level/justification and actor rows. So rules 4–6 are **entirely new gates**, and any row matching them is invisible to the current check *by construction*, not by coincidence.
+
+**⚠️ THE LIMIT THAT MATTERS MORE THAN THE NUMBERS — escalated to the user.** `RB-1` (the MEL / product-owner sign-off that **blocks the PR 2 merge**) is supposed to be informed by this population. **It was measured against a 7-result Dev database.** Production is very likely larger and could have a materially different rule-by-rule distribution. **These numbers cannot support a Prod-covering sign-off**, and saying "1 result affected" to MEL without that caveat would be misleading. Recorded as `RSK-2`'s open half.
+
+**Process limit, declared rather than glossed:** T-17 produced **no files**, so no Reviewer round was run — the Leader verified the three load-bearing numbers directly instead. The queries' *shape* therefore carries one pair of eyes plus the Leader's spot-check, not an independent audit. Cheap and proportionate for a measurement with almost all-zero results; it would not be proportionate if the numbers were large.
