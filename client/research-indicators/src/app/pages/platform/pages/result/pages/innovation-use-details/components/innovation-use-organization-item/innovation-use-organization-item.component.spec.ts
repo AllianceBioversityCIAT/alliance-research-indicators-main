@@ -326,6 +326,61 @@ describe('InnovationUseOrganizationItemComponent', () => {
       expect(selectByAria('Select the organization type')).toBeFalsy();
       expect(fixture.debugElement.queryAll(By.css('.organization-type-required-message')).length).toBe(0);
     });
+
+    // Attempt-3 remediation (Reviewer attempt-2 Issue 1): the amber-border half of AC.2 was
+    // implemented at `.html:116` (`[style]="organizationTypeMissing ? { border: '2px solid
+    // var(--ac-warning-1)' } : {}"`) but asserted nowhere in this file — deleting that binding
+    // left the org-card suite green. Mirrors the known-path exemplar at :407-421 (positive) and
+    // :425-434 (negative), for the unknown path's organization-TYPE select instead of the
+    // organization select.
+    //
+    // Mechanism (same three traps as the exemplar, and all load-bearing here too):
+    // 1. Angular memoizes the last style value it wrote per property — a spy installed AFTER the
+    //    state has settled records zero calls. For an unknown-path fixture with a missing type,
+    //    the write happens on the type select's FIRST `detectChanges()`, so the spy goes in
+    //    before that call, not after.
+    // 2. The type select does not pre-exist that first pass either (unknown path renders it fresh
+    //    via the `@else` branch), so only a `CSSStyleDeclaration.prototype`-wide spy — not an
+    //    element-scoped one — can observe it. That also means this assertion is CARD-WIDE: it
+    //    proves the amber value was written somewhere in the card during this pass, not that it
+    //    landed on the type select specifically. Attribution comes from the discriminating
+    //    mutation (deleting `.html:116`, run and observed red in the attempt-3 report), not from
+    //    this test alone — it is titled as a card-wide write, not an element-attributed one.
+    // 3. `element.style.border` itself is unreadable here (`cssstyle@2.3.0` drops a shorthand
+    //    carrying `var()`), which is why the setter spy exists instead of a direct style read.
+    it('AC.2: an unfilled unknown-path row writes the amber border somewhere in the card on construction', () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      try {
+        fixture.detectChanges();
+
+        expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      } finally {
+        borderSetSpy.mockRestore();
+      }
+    });
+
+    // Negative half, arranged via the TRANSITION the product performs (KZ-015): fill the type
+    // through `onInstitutionTypeChange(10)` — a type that is neither OTHER (78) nor sub-typed,
+    // already used this way elsewhere in this file (e.g. the c2 describe above) — AFTER the
+    // initial pass has settled, so `organizationTypeMissing` goes false and no further amber write
+    // can occur. A fresh spy is opened only after that first `detectChanges()`, so the
+    // construction-time write the positive test above exercises cannot leak into this window.
+    it('AC.2 negative: filling the organization type stops writing the amber border', async () => {
+      component.organization = { ...new InnovationUseOrganization(), is_organization_known: false };
+      fixture.detectChanges();
+
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      try {
+        await component.onInstitutionTypeChange(10);
+        fixture.detectChanges();
+
+        expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+      } finally {
+        borderSetSpy.mockRestore();
+      }
+    });
   });
 
   // R-IUR-009 (T-08) — the Disqualifier's other falsifying input: `Organization count = 0` must
@@ -518,8 +573,12 @@ describe('InnovationUseOrganizationItemComponent', () => {
     });
   });
 
-  // c6 — organization_count rejects negatives/fractions via paste and typing; 0 is accepted.
-  describe('c6 — organization_count: no negative, no fractional, 0 accepted and distinct from absent', () => {
+  // c6 — organization_count rejects negatives/fractions via paste and typing; 0 is enterable and
+  // stored (distinct from absent). Advisory (c), T-08 attempt-3: this is a separate claim from
+  // R-IUR-009's positivity rule — 0 is NOT a valid final value there ("Must be greater than 0"),
+  // but it must still reach `body()`/the emitted row rather than being silently dropped to
+  // `undefined`, which is what makes R-IUR-009 AC.2 verifiable in the first place.
+  describe('c6 — organization_count: no negative, no fractional, 0 enterable/stored (not necessarily valid) and distinct from absent', () => {
     it(
       'pasted -1 is blocked and pasted 2.5 yields an integer >= 0',
       fakeAsync(() => {
@@ -541,7 +600,7 @@ describe('InnovationUseOrganizationItemComponent', () => {
       })
     );
 
-    it('0 is accepted and the emitted row carries 0, not undefined', () => {
+    it('0 is enterable and stored/emitted as 0, not dropped to undefined (validity is a separate, R-IUR-009 claim)', () => {
       component.organization = new InnovationUseOrganization();
       fixture.detectChanges();
       const emitSpy = jest.spyOn(component.update, 'emit');

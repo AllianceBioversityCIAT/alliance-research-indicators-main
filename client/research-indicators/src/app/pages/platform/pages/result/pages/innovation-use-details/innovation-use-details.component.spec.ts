@@ -359,6 +359,11 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Justification');
+      // Advisory (d), T-08 attempt-3: this page-wide `not.toContain` survives T-08's new
+      // Organization type/count asterisks (c10) only because this test's fixture resolves through
+      // the default `GetInnovationUseDetails`, whose `organizations` defaults to `[]` — zero
+      // organization cards render, so T-08's required message never gets a chance to appear here.
+      // Pre-existing pattern (predates T-08); T-08 widens the set of rows that would falsify it.
       expect(fixture.nativeElement.textContent).not.toContain('This field is required');
       // REWORK (Issue 5): "does not block completion" is the criterion's other half and has no
       // save path to exercise until buildPayload()/PATCH exist (T-08) — owned by T-08 c14 /
@@ -367,9 +372,11 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c10 — cards 3 and 4 carry no asterisk; card 2's at-least-one-actor message is gone in every
-  // state (R-IUR-011 AC.1 / DD-7 reversion — rewritten, not deleted: revision 1's premise that the
-  // message renders when actors is empty no longer holds).
+  // c10 — required messaging/asterisk boundaries: card 2's at-least-one-actor message is gone in
+  // every state (R-IUR-011 AC.1 / DD-7 reversion — rewritten, not deleted: revision 1's premise
+  // that the message renders when actors is empty no longer holds); cards 3 and 4 (Organizations,
+  // Other quantitative measures) each carry required-field asterisks on specific fields only,
+  // asserted per field below — not as a whole-card presence/absence claim.
   // ---------------------------------------------------------------------------------------------
   describe('c10 — required messaging boundaries', () => {
     it('does not show the at-least-one-actor message when actors is empty', () => {
@@ -388,9 +395,9 @@ describe('InnovationUseDetailsComponent', () => {
 
     // T-12 REWRITE (R-IUR-010 AC.1): this used to assert NO asterisk anywhere on the
     // quantifications card — that premise is reversed by this requirement. Measures now DO carry
-    // asterisks, on Number and Unit; Comments does not. The organizationsCard half is untouched —
-    // it still belongs to T-07/T-08, which have not yet added required fields to that card.
-    it('renders no asterisk on the Organizations card; renders Number/Unit asterisks (not Comments) on the Other quantitative measures card (R-IUR-010 AC.1)', () => {
+    // asterisks, on Number and Unit; Comments does not. The organizationsCard half is covered by
+    // the T-08 REWORK comment below — it is not unchanged either.
+    it('renders Organization type and count asterisks on the Organizations card; renders Number/Unit asterisks (not Comments) on the Other quantitative measures card (R-IUR-007 AC.1 / R-IUR-010 AC.1)', () => {
       component.body.set({
         ...component.body(),
         organizations: [new InnovationUseOrganization()],
@@ -407,12 +414,6 @@ describe('InnovationUseDetailsComponent', () => {
       const quantificationsCard = cards
         .find(card => card.nativeElement.textContent.trim() === 'OTHER QUANTITATIVE MEASURES')
         ?.parent?.nativeElement as HTMLElement;
-
-      // REWORK (Issue 1): the shared quantification card renders its asterisk as a bare `*` text
-      // node inside a `<span>` (shared/components/quantification-item/.../quantification-item.component.html),
-      // never with `.text-red-500` — a `.text-red-500` query returns null regardless of the
-      // binding under test. Search for the asterisk text node itself instead.
-      const hasAsteriskTextNode = (root: HTMLElement) => Array.from(root.querySelectorAll('span')).some(span => span.textContent?.trim() === '*');
 
       // T-08 REWORK (R-IUR-007 AC.1): T-12 pointed this half at T-07/T-08 rather than asserting it
       // unchanged, and it is not unchanged. On the unknown path (`is_organization_known: false`,
