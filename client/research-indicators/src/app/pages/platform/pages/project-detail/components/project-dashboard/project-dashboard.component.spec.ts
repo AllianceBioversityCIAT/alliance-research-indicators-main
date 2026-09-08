@@ -1129,7 +1129,6 @@ describe('ProjectDashboardComponent', () => {
           remove: {
             imports: [ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent],
             providers: [
-              GetTopContributorsContractsService,
               GetTopMainContactPersonsService,
               GetTopPartnersService,
               GetTopPrimaryLeversService,
@@ -1139,7 +1138,6 @@ describe('ProjectDashboardComponent', () => {
           add: {
             imports: [ProjectDashboardCardStubComponent, GeoScopeCardStubComponent, ResultsCenterTableStubComponent],
             providers: [
-              { provide: GetTopContributorsContractsService, useValue: createRankedServiceMock() },
               { provide: GetTopMainContactPersonsService, useValue: createRankedServiceMock() },
               { provide: GetTopPartnersService, useValue: createRankedServiceMock() },
               { provide: GetTopPrimaryLeversService, useValue: createRankedServiceMock() },
