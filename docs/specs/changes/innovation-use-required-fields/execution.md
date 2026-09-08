@@ -55,7 +55,7 @@ Legend: `[ ]` pending · `[~]` started / incomplete / blocked · `[x]` complete 
 | T-17 RSK-2 population sizing | `[x]` | **done.** Dev: 7 results, 3 passing, **1 affected** (rule 1). ⚠️ **Dev cannot support a Prod-covering `RB-1` sign-off** |
 | T-18 migration + migration spec | `[x]` | **PASS attempt 1 — STRUCTURE ONLY.** Never executed; `R-IUR-012` AC.1 is **not** discharged. ⚠️ **F17 will go red when applied — T-19 must INVERT it, not extend around it** |
 | T-19 executed truth table | `[x]` | **PASS attempt 2.** `R-IUR-012` AC.1 **discharged** — real MySQL, new body provably live. Suite serialised (`FP-51` amended) after 3 spurious failures in 9 runs |
-| T-20 HUMAN apply the migration | `[ ]` | owner: D. Casañas (`OQ-4`) |
+| T-20 HUMAN apply the migration | `[x]` | **done 2026-09-07 by D. Casañas** — all pending migrations applied, confirmed none remain. Reported by the owner; **the Leader could not verify** (Dev unreachable, VPN down) |
 | T-21 actor: used type not selectable (`R-IUR-017`) | `[x]` | **PASS attempt 1.** Rendered-overlay assertions, not the derived array. PrimeNG's own self-exemption is inert here — ours is load-bearing |
 
 ---
@@ -2067,3 +2067,64 @@ I set `maxWorkers: 1` on `test/jest-fixtures.json` — and `server/researchindic
 **`ADVISORY` (recorded, not actioned):** the **measures** third of `DD-0` has no fixture — F32 and F39 pin the organization and actor predicates, but deleting `rq.is_active = TRUE` reddens nothing. · F40/F41 prove the NULL-mode row is **not vacuously valid** (`C-6`'s actual concern) but not *branch identity*; the Reviewer supplied exact seeds to isolate routing if ever wanted. · The header's *"F17 through F42"* ranges now stop one short of F43.
 
 **What remains unproven, precisely:** the measures `is_active` predicate · NULL-mode branch identity · **T-20's apply to Dev, and Production** — this is proven on the scratch schema only, and per `K-015` a merge ships code, not schema · client-verdict parity beyond the sub-type predicate, which is a client-side obligation.
+
+---
+
+## Deployment status — reported by the user, 2026-09-08
+
+**Merged and deployed to the testing environment.** Verified by the Leader: `dev` is in sync with
+`origin/dev` (0 ahead / 0 behind) and T-19's commit `7196b13a` is present on `origin/dev`,
+`origin/AC-1679-to-dev` and the original feature branch. The merge chain is complete.
+
+**T-20 — migration applied.** The user applied all pending migrations on 2026-09-07 and confirms
+none remain. **Recorded on the owner's report, NOT verified by the Leader** — Dev
+(`192.168.20.210:3306`) became unreachable (VPN down) before this could be checked, and the Leader
+declined to infer "unapplied" from a failed connection, which is the confident-zero-over-a-failed-
+command error `K-014` names.
+
+**The browser check (gate 3):** the user reports *"todo se ve bien"*. See the T-16 note below for
+what that does and does not close.
+
+### ⚠️ `RB-1` — the sign-off gate was crossed by the deploy
+
+`tasks.md` §6 records `RB-1` as **"open — blocks PR 2 merge"**, and §Done-definition carries the
+unchecked criterion *"RB-1 signed off by MEL / the product owner **before PR 2 merges**"*. **PR 2 is
+merged and its migration is applied.** The gate was passed without the sign-off it names.
+
+**This is not a technical defect — the code and the migration are correct and proven. It is a product
+decision now live without the approval the spec required for it.** What `RB-1` guards is specific:
+
+- **`RSK-1`** — the submit gate becomes **strictly weaker**. A result with **no content at all** is
+  now submittable, because `R-IUR-011` removed the zero-actor backstop. That is a deliberate user
+  decision (`D-1`), but MEL/product-owner sign-off was the condition attached to it.
+- **`RSK-2`** — **result `33544` passed the green check on 2026-09-07 and does not pass now.**
+  T-17 measured it: one of Dev's three passing results, failing rule 1 (some-but-not-all
+  disaggregated counts). There is **no backfill by design** — existing rows are re-graded silently.
+
+Both are live in the testing environment as of this deploy.
+
+**And the number MEL would be signing against is weak, which the Leader escalated at T-17 and
+repeats here:** the population was measured on a **7-result Dev database** (3 passing). It cannot
+support a Production-covering sign-off. If Production has materially more Innovation Use results, the
+rule-by-rule distribution is unknown.
+
+**Recorded, not actioned — closing `RB-1` is not a Leader action.** The useful move is that MEL hears
+it from the team rather than from a reporter whose result stopped being submittable.
+
+### T-16 — NOT complete; two of its four gates are still open
+
+The user's *"todo se ve bien"* covers gate 3 in substance, but T-16 has four gates and the spec is
+explicit that a human *"looks fine"* covering an adjacent property **is not evidence** (`KZ-002`):
+
+| Gate | State |
+| --- | --- |
+| 1 — full client suite | ✅ **green**, measured repeatedly in a quiet tree; last: **317 suites / 6885 tests / 0 failed** |
+| 2 — normalized `tsc -p tsconfig.spec.json` before/after error-set diff | ❌ **never run as T-16's gate.** `DC-8` is its target. Individual tasks each ran a filtered check and reported no new errors, but the whole-spec normalized set diff was not performed |
+| 3 — human browser check, light theme | ⚠️ **performed, but the field list was not recorded in words.** T-16 requires naming *which* fields were checked. **Specifically unconfirmed: the three `p-select` amber borders on the organization card** (Organization type · Organization on the known path · Sub-type) — the Leader added these to the list after finding they had **no paint owner at all**, since `DC-1` is explicitly substituted by this gate and jsdom cannot paint |
+| 3b — one dark-theme look at an `app-input` `helperText` | ⚠️ **unconfirmed.** T-02's only behavioural change is `--ac-grey-600` resolving to `#949494` under `[data-theme='dark']` — the one change T-02 makes falls in the only theme gate 3 was scoped to skip |
+
+**Also never observed failing:** gate 3's own falsifier — *"revert one `[style]` binding to a Tailwind
+utility on a `p-select`; no test will redden and the border must visibly vanish in the browser."*
+`tasks.md` states that is **the only proof gate 3 is load-bearing** and that it **must be observed
+failing before gate 3 is cited** (`K-004`). Since the code is already deployed, that falsifier is now
+impractical — recorded as an accepted gap rather than a pending step.
