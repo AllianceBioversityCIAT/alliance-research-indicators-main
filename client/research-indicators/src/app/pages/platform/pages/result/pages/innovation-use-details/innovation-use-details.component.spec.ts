@@ -2824,7 +2824,7 @@ describe('InnovationUseDetailsComponent', () => {
       const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body-text token
       const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link token
       const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — the ACTORS callout's (wrong-for-here) token
-      const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the calculator link's user-chosen AA exception
+      const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the banner BODY text's user-chosen AA exception
 
       // Added by quick/innovation-use-guidance-spacing-and-link-colour (2026-09-08). The falsifying
       // probe for that change found the margin half was covered by NOTHING: reverting it reddened
@@ -2854,66 +2854,73 @@ describe('InnovationUseDetailsComponent', () => {
         });
       });
 
-      it('which selector won: bullets carry text-[var(--ac-grey-800)], never text-[var(--ac-grey-600)]', () => {
+      // quick/innovation-use-banner-body-grey-700 (2026-09-08) moved every information banner's
+      // NON-LINK text to --ac-grey-700, superseding DD-17's --ac-grey-800 body choice. The
+      // grey-600 half of this assertion is kept: grey-600 (2.91:1) was rejected on its own merits
+      // and is still not the intended token, so the bullets must be grey-700 and neither of the
+      // other two greys.
+      it('which selector won: bullets carry text-[var(--ac-grey-700)], never grey-800 or grey-600', () => {
         const bullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        expect(bullets.length).toBe(4);
         bullets.forEach(li => {
           const className = (li.nativeElement as HTMLElement).className;
-          expect(className).toContain('text-[var(--ac-grey-800)]');
+          expect(className).toContain('text-[var(--ac-grey-700)]');
+          expect(className).not.toContain('text-[var(--ac-grey-800)]');
           expect(className).not.toContain('text-[var(--ac-grey-600)]');
         });
       });
 
-      it('which selector won: P1/P2 carry text-[var(--ac-grey-800)]', () => {
+      it('which selector won: P1/P2 carry text-[var(--ac-grey-700)]', () => {
         const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        expect(paragraphs.length).toBe(2);
         paragraphs.forEach(p => {
-          expect((p.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+          const className = (p.nativeElement as HTMLElement).className;
+          expect(className).toContain('text-[var(--ac-grey-700)]');
+          expect(className).not.toContain('text-[var(--ac-grey-800)]');
         });
       });
 
-      // quick/innovation-use-guidance-spacing-and-link-colour (2026-09-08): the calculator link
-      // SPLIT OFF from the other two. It now carries --ac-grey-700 by user request; the definitions
-      // link and the evidence button are untouched and keep --ac-light-blue-400. Asserting the
-      // three separately (rather than dropping the check) is what keeps the exception CONTAINED —
-      // a later edit that spreads grey-700 to the other two reddens here.
-      it('which selector won: the calculator link carries text-[var(--ac-grey-700)], not the blue', () => {
+      // The banner recolour applies to BODY TEXT ONLY — all three links/buttons keep
+      // --ac-light-blue-400 and stay AA. (A previous same-day quick change briefly moved the
+      // calculator link to grey-700; that was the user's mistake and is reverted. Asserting the
+      // link colour explicitly here is what keeps the body-text exception from creeping into the
+      // links a second time.)
+      it('which selector won: all three links/buttons keep text-[var(--ac-light-blue-400)], never the body grey', () => {
         const calculatorLink = findLink(CALCULATOR_URL)!.nativeElement as HTMLElement;
-
-        expect(calculatorLink.className).toContain('text-[var(--ac-grey-700)]');
-        expect(calculatorLink.className).not.toContain('text-[var(--ac-light-blue-400)]');
-      });
-
-      it('which selector won: the definitions link and evidence button still carry text-[var(--ac-light-blue-400)]', () => {
         const definitionsLink = findLink(DEFINITIONS_URL)!.nativeElement as HTMLElement;
         const evidenceButton = findButton('Click here to go there')!.nativeElement as HTMLElement;
 
-        [definitionsLink, evidenceButton].forEach(el => {
+        [calculatorLink, definitionsLink, evidenceButton].forEach(el => {
           expect(el.className).toContain('text-[var(--ac-light-blue-400)]');
           expect(el.className).not.toContain('text-[var(--ac-grey-700)]');
         });
       });
 
-      it('computes ≥ 4.5:1 for body text and the two AA links against the callout background (--ac-grey-100)', () => {
-        const bodyRatio = contrastRatio(GREY_800, GREY_100);
+      it('computes ≥ 4.5:1 for the links against the callout background (--ac-grey-100)', () => {
         const linkRatio = contrastRatio(LIGHT_BLUE_400, GREY_100);
 
-        expect(bodyRatio).toBeCloseTo(7.44, 1);
         expect(linkRatio).toBeCloseTo(6.35, 1);
-        expect(bodyRatio).toBeGreaterThanOrEqual(4.5);
         expect(linkRatio).toBeGreaterThanOrEqual(4.5);
       });
 
       // The exception, MEASURED and pinned rather than left implicit. R-IUP-020 AC.6 and
-      // NFR-IUP-001 require ≥ 4.5:1; --ac-grey-700 on --ac-grey-100 does not reach it. This test
-      // asserts the shortfall on purpose, so the deviation is a recorded number in the suite
-      // instead of an undocumented regression — and so that restoring an AA colour here is a
-      // deliberate act that reddens this test, not a silent drift.
-      it('records the calculator link as a DELIBERATE AA exception: --ac-grey-700 measures 3.91:1, below 4.5:1', () => {
+      // NFR-IUP-001 require ≥ 4.5:1 and DD-17 chose --ac-grey-800 (7.44:1) to meet it;
+      // --ac-grey-700 does not reach it. This test asserts the shortfall ON PURPOSE, so the
+      // deviation is a recorded number in the suite instead of an undocumented regression — and so
+      // that restoring an AA colour becomes a deliberate act that reddens this test, not a silent
+      // drift. The superseded 7.44:1 is asserted alongside it, so the size of what was traded away
+      // stays visible at the point of the trade.
+      it('records the banner body text as a DELIBERATE AA exception: --ac-grey-700 is 3.91:1 on --ac-grey-100, below 4.5:1', () => {
         const exceptionRatio = contrastRatio(GREY_700, GREY_100);
+        const supersededRatio = contrastRatio(GREY_800, GREY_100);
 
         expect(exceptionRatio).toBeCloseTo(3.91, 1);
         expect(exceptionRatio).toBeLessThan(4.5);
-        // Still comfortably above the 3:1 floor WCAG applies to large text / non-text contrast.
+        // Still above the 3:1 floor WCAG applies to large text / non-text contrast.
         expect(exceptionRatio).toBeGreaterThan(3);
+        // What DD-17 had, for comparison at the point of the trade.
+        expect(supersededRatio).toBeCloseTo(7.44, 1);
+        expect(supersededRatio).toBeGreaterThanOrEqual(4.5);
       });
 
       it('computes ≥ 4.5:1 for the definitions link paragraph against the card background (--ac-white-1)', () => {
@@ -3151,7 +3158,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
   const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded for the ACTORS callout body,
   // but the LIVE token on the ACTOR #/ORGANIZATION # eyebrows since quick/innovation-use-eyebrow-grey (accepted 2.91:1)
-  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
+  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the banner BODY text's user-chosen AA exception (2026-09-08)
   const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded for the stepper/org-link,
   // but the LIVE token on the three Add-other buttons since quick/innovation-use-add-button-style (accepted 3.84:1)
   const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
@@ -3397,16 +3404,24 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     });
   });
 
-  it('ACTORS callout body: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-banner-body-grey-700, 2026-09-08) — human-decided,
+  // applied to EVERY information banner in this feature for visual consistency. The ACTORS callout
+  // body moved from --ac-grey-800 (7.44:1 on this callout's --ac-grey-100) to --ac-grey-700, which
+  // measures 3.91:1 and does NOT meet 1.4.3 AA (>= 4.5:1). It clears the 3:1 non-text floor only.
+  // Pinned so a later token sweep cannot silently "re-fix" it without reading this comment.
+  it('ACTORS callout body: text-[var(--ac-grey-700)] on --ac-grey-100, 3.91:1 accepted (AA exception)', () => {
     const body = fixture.debugElement
       .queryAll(By.css('span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'List every actor group using this innovation.');
     expect(body).toBeTruthy();
-    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
+    expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
     expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_700, GREY_100);
+    expect(ratio).toBeCloseTo(3.91, 1);
+    expect(ratio).toBeLessThan(4.5);
+    expect(ratio).toBeGreaterThan(3);
   });
 
   // ACCEPTED EXCEPTION (quick/innovation-use-add-button-style, 2026-09-03) — human-decided.
@@ -3469,18 +3484,27 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
+  // Same ACCEPTED EXCEPTION as the ACTORS callout above (quick/innovation-use-banner-body-grey-700).
+  // NOTE THE DIFFERENT BACKGROUND: this banner sits on --ac-grey-200, not --ac-grey-100, so its
+  // ratio is 3.51:1 — the WORST of the four banners, and lower than the 3.91:1 the other three
+  // measure. Asserting the distinct number here (rather than reusing 3.91) is the point: the two
+  // backgrounds are not interchangeable, and a sweep that assumed one figure for all banners would
+  // be wrong about this one. Superseded --ac-grey-800 measured 6.68:1 on this same background.
+  it('organization known-institution callout body: text-[var(--ac-grey-700)] on --ac-grey-200, 3.51:1 accepted (AA exception)', () => {
     const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
     const calloutBody = orgItem
       .queryAll(By.css('span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes("Can't find the institution"));
     expect(calloutBody).toBeTruthy();
-    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
 
-    const ratio = contrastRatio(GREY_800, GREY_200);
-    expect(ratio).toBeCloseTo(6.68, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_700, GREY_200);
+    expect(ratio).toBeCloseTo(3.51, 1);
+    expect(ratio).toBeLessThan(4.5);
+    expect(ratio).toBeGreaterThan(3);
+    // The superseded token, for comparison at the point of the trade.
+    expect(contrastRatio(GREY_800, GREY_200)).toBeCloseTo(6.68, 1);
   });
 
   it('organization known-institution callout link "here": text-[var(--ac-light-blue-500)] on --ac-grey-200 (>= 4.5:1)', () => {
