@@ -2838,6 +2838,33 @@ describe('InnovationUseDetailsComponent', () => {
         expect(callout.className).toContain('rs-mt-[8]');
       });
 
+      // quick/innovation-use-banner-leading-and-border (2026-09-08). Same coverage gap as rs-mt-[8]
+      // above: reviewers asked for these two properties by name, and NOTHING in the suite asserted
+      // either, so both could be dropped in silence. Pinned on the two banners this describe owns;
+      // the ACTORS and organization banners are pinned in the R3 contrast block further down.
+      // ⚠️ SCOPE (KZ-017): class-presence only. jsdom paints nothing, so this cannot see a 5px rule
+      // or a 17px line box — `border-l-[5px]`/`leading-[17px]` resolve in Tailwind, out of reach.
+      it('both guidance and evidence banners carry border-l-[5px], matching the innovation-details reference', () => {
+        const guidance = fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))!.nativeElement as HTMLElement;
+        const evidence = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))!.nativeElement as HTMLElement;
+
+        [guidance, evidence].forEach(el => {
+          expect(el.className).toContain('border-l-[5px]');
+          expect(el.className).not.toContain('border-l-[4px]');
+        });
+      });
+
+      it('every banner body text element carries leading-[17px]', () => {
+        const bullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        expect(bullets.length).toBe(4);
+        expect(paragraphs.length).toBe(2);
+
+        [...bullets, ...paragraphs].forEach(el => {
+          expect((el.nativeElement as HTMLElement).className).toContain('leading-[17px]');
+        });
+      });
+
       it('resolves the cascade: none of the four text roles sits inside a `.description` ancestor', () => {
         // `.description` (custom-fields.scss, rgb(119,124,131), 3.91:1) and `.description a`
         // (styles.scss, rgb(46,46,46)) only match elements that are, or descend from,
@@ -3417,6 +3444,9 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
     expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
     expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    // quick/innovation-use-banner-leading-and-border: the ACTORS banner's share of the shape
+    // alignment. Border width is asserted on the wrapper in the sibling test below.
+    expect((body!.nativeElement as HTMLElement).className).toContain('leading-[17px]');
 
     const ratio = contrastRatio(GREY_700, GREY_100);
     expect(ratio).toBeCloseTo(3.91, 1);
@@ -3498,6 +3528,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(calloutBody).toBeTruthy();
     expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
     expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('leading-[17px]');
 
     const ratio = contrastRatio(GREY_700, GREY_200);
     expect(ratio).toBeCloseTo(3.51, 1);
@@ -3505,6 +3536,34 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThan(3);
     // The superseded token, for comparison at the point of the trade.
     expect(contrastRatio(GREY_800, GREY_200)).toBeCloseTo(6.68, 1);
+  });
+
+  // quick/innovation-use-banner-leading-and-border (2026-09-08): border width for the two banners
+  // NOT covered by the c12 block above, so all four are pinned between the two describes. The
+  // organization banner is the one that changed shorthand — it was `border-l-4`, not `border-l-[4px]`
+  // — which is why it is asserted by its own selector rather than swept with the others.
+  it('ACTORS and organization banners carry border-l-[5px], matching the innovation-details reference', () => {
+    // Both selectors require the border class AND the identifying copy: matching on text alone
+    // returns an inner layout wrapper (the first attempt here found `flex flex-col rs-gap-[4]`),
+    // and matching on the border class alone would not prove WHICH banner was inspected.
+    const bannerWithText = (scope: typeof fixture.debugElement, text: string) =>
+      scope
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('border-l-') && (d.nativeElement as HTMLElement).textContent?.includes(text));
+
+    const actorsBanner = bannerWithText(fixture.debugElement, 'List every actor group using this innovation.');
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const orgBanner = bannerWithText(orgItem, "Can't find the institution");
+
+    expect(actorsBanner).toBeTruthy();
+    expect(orgBanner).toBeTruthy();
+    [actorsBanner!, orgBanner!].forEach(el => {
+      const className = (el.nativeElement as HTMLElement).className;
+      expect(className).toContain('border-l-[5px]');
+      expect(className).not.toContain('border-l-[4px]');
+      // `border-l-4` is Tailwind's 4px shorthand — the pre-change value on the organization banner.
+      expect(className).not.toMatch(/border-l-4(\s|$)/);
+    });
   });
 
   it('organization known-institution callout link "here": text-[var(--ac-light-blue-500)] on --ac-grey-200 (>= 4.5:1)', () => {

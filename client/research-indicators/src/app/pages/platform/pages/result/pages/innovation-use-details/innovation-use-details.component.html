@@ -18,6 +18,15 @@
            showJustification() or isEditableStatus() (AC.5). Mirrors the ACTORS callout's bg-/border-l-/
            rs-p-* shape (design.md §5.8).
 
+           SHAPE — quick/innovation-use-banner-leading-and-border (2026-09-08) aligns all four of
+           this feature's banners to the innovation-details readiness banner that reviewers cited:
+           `border-l-[5px]` (was 4px) and `leading-[17px]` on the body text. That reference banner
+           spells raw hex for background, border and text because it predates the token rule; the
+           equivalent TOKENS are used here instead, and they already matched — only the border width
+           and the line-height differed. `font-['Barlow']` there is a no-op for us: styles.scss sets
+           Barlow globally. `my-[15px]` on the reference's text was NOT copied — reviewers named
+           only leading and border, and our banners space themselves with rs-p-* padding.
+
            BODY COLOUR — quick/innovation-use-banner-body-grey-700 (2026-09-08), user-requested for
            EVERY information banner in this feature: non-link banner text is --ac-grey-700, links
            keep --ac-light-blue-400. This SUPERSEDES DD-17's --ac-grey-800 body choice and is a
@@ -33,21 +42,21 @@
            The gap is opened here, at the call site, rather than on the shared `.label` rule. -->
       <div
         data-testid="use-level-guidance"
-        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[8] rs-mb-[16]">
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[8] rs-mb-[16]">
         <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
         <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
-          <li class="fs-[14] text-[var(--ac-grey-700)]">
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
             In case the innovation use level differs across countries or regions, we advise to assign the highest current
             innovation use level that can be supported by the evidence provided.
           </li>
-          <li class="fs-[14] text-[var(--ac-grey-700)]">
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
             Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be
             supported by evidence documentation.
           </li>
-          <li class="fs-[14] text-[var(--ac-grey-700)]">The innovation use level will be quality assessed.</li>
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">The innovation use level will be quality assessed.</li>
           <!-- The link keeps --ac-light-blue-400 (6.35:1, AA). Only the NON-link banner text moved
                to --ac-grey-700 — see the callout header comment. -->
-          <li class="fs-[14] text-[var(--ac-grey-700)]"
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]"
             ><span class="font-semibold">YOUR USE LEVEL IN JUST 3 CLICKS:</span>{{ ' ' }}<a
               [href]="calculatorUrl"
               target="_blank"
@@ -91,10 +100,10 @@
       @if (showJustification()) {
         <div
           data-testid="evidence-callout"
-          class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
+          class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
           <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
           <div class="flex flex-col">
-            <p class="fs-[14] text-[var(--ac-grey-700)] rs-mb-[12]"
+            <p class="fs-[14] leading-[17px] text-[var(--ac-grey-700)] rs-mb-[12]"
               >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
               necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
               section of the form (<button
@@ -104,7 +113,7 @@
                 >Click here to go there</button
               >)</p
             >
-            <p class="fs-[14] text-[var(--ac-grey-700)]"
+            <p class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]"
               >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental
               data paper, newsletter, etc. It may be project reports, scientific publications, book chapters,
               communication materials that provide evidence of the current development/ maturity stage of the
@@ -155,14 +164,14 @@
     <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
       <h2 class="section-title">ACTORS</h2>
 
-      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
+      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
         <i class="shrink-0 material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-500)]">info</i>
         <div class="flex flex-col rs-gap-[4]">
-          <span class="fs-[14] text-[var(--ac-grey-700)]">List every actor group using this innovation.</span>
+          <span class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">List every actor group using this innovation.</span>
           <!-- Youth guidance: the sex/age disaggregation fields below split each actor group into
                youth / non-youth, so the callout states the age boundary the counts assume and links
                to the UN source that defines it. -->
-          <span class="fs-[14] text-[var(--ac-grey-700)]"
+          <span class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]"
             >For the youth counts, the United Nations defines youth as people between 15 and 24 years old.{{ ' ' }}<a
               [href]="youthDefinitionUrl"
               target="_blank"
