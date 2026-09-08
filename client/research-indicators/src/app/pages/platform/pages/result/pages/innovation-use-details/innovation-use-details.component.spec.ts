@@ -2466,6 +2466,19 @@ describe('InnovationUseDetailsComponent', () => {
     const findButton = (text: string) =>
       fixture.debugElement.queryAll(By.css('button')).find(b => normalize((b.nativeElement as HTMLButtonElement).textContent) === text);
 
+    /** quick/innovation-use-evidence-callout-gating (2026-09-08): the evidence callout is now gated
+     *  on `showJustification()` (level ≥ 6), so it is ABSENT in this describe's default fixture
+     *  state — the GET mock at the top of this file returns `innovation_use_level_id: null`. Every
+     *  block that asserts the callout's own content (c4 copy, c5 navigation, c12 contrast) must
+     *  therefore put the component at a rendering level first. Blocks that assert the guidance
+     *  bullets or the definitions link (c1, c2, c3) must NOT call this — those two stay
+     *  unconditional under R-IUP-020 AC.5, and running them at the default null level is exactly
+     *  what proves it. */
+    const atJustificationLevel = () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6) });
+      fixture.detectChanges();
+    };
+
     // -----------------------------------------------------------------------------------------------
     // c1 — the label's exact string plus the required marker (R-IUP-020 AC.1)
     // -----------------------------------------------------------------------------------------------
@@ -2537,6 +2550,8 @@ describe('InnovationUseDetailsComponent', () => {
     // c4 — P1 (adapted, with the curly-quote 'Evidence') and P2 (verbatim) (R-IUP-021 AC.1, AC.2)
     // -----------------------------------------------------------------------------------------------
     describe('c4 — evidence callout paragraphs', () => {
+      beforeEach(atJustificationLevel);
+
       it('renders P1 and P2 with their exact strings', () => {
         const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
         expect(paragraphs.length).toBe(2);
@@ -2570,6 +2585,7 @@ describe('InnovationUseDetailsComponent', () => {
       // tests already asserted a numeric `1`, not a string.
       beforeEach(() => {
         originalGet = routeMock().snapshot.queryParamMap.get;
+        atJustificationLevel();
       });
 
       afterEach(() => {
@@ -2640,54 +2656,129 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     // -----------------------------------------------------------------------------------------------
-    // c6 — guidance, definitions link and evidence callout all render at level null/0/9 and with
-    // isEditableStatus() false (R-IUP-020 AC.5, R-IUP-021 AC.5)
+    // c6 — REWRITTEN by quick/innovation-use-evidence-callout-gating (2026-09-08). The guidance
+    // block and the definitions link keep their unconditional contract (R-IUP-020 AC.5, unchanged);
+    // the evidence callout no longer does — R-IUP-021 AC.5 and its "Evidence guidance is not gated
+    // on the justification's condition" scenario are REVERSED by user ruling. The callout now
+    // follows `showJustification()` (level ≥ 6), the same threshold as the justification textarea
+    // whose absence made P1's request ("provide a brief explanation justifying…") unanswerable.
+    //
+    // The old block asserted all three render together at null/0/9 and carried a falsifying test
+    // written specifically to catch the `@if (showJustification())` wrap. That test is not deleted
+    // to make the suite green — it is INVERTED, because the property it guarded is now the defect:
+    // it proved the callout was NOT gated, and its replacement below proves that it IS, at the
+    // exact same boundary levels. The guidance/definitions half of every old assertion survives
+    // verbatim, so a regression that accidentally gated THOSE still reddens here.
     // -----------------------------------------------------------------------------------------------
-    describe('c6 — unconditional rendering', () => {
-      const assertAllThreeRender = () => {
+    describe('c6 — conditional evidence callout, unconditional guidance', () => {
+      /** R-IUP-020 AC.5 — unchanged, and asserted at every level below so the reversal cannot
+       *  silently spread from the callout to its two neighbours. */
+      const assertGuidanceAndDefinitionsRender = () => {
         expect(fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))).toBeTruthy();
         expect(fixture.debugElement.query(By.css('[data-testid="use-level-definitions-link"]'))).toBeTruthy();
-        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
         expect(findLink(CALCULATOR_URL)).toBeTruthy();
         expect(findLink(DEFINITIONS_URL)).toBeTruthy();
+      };
+
+      const assertEvidenceCalloutAbsent = () => {
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeNull();
+        expect(findButton('Click here to go there')).toBeUndefined();
+      };
+
+      const assertEvidenceCalloutRenders = () => {
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
         expect(findButton('Click here to go there')).toBeTruthy();
       };
 
-      it('renders all three blocks with no level selected (null)', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: undefined });
+      const setLevel = (levelId: number | undefined) => {
+        component.body.set({ ...component.body(), innovation_use_level_id: levelId });
         fixture.detectChanges();
-        assertAllThreeRender();
+      };
+
+      it('hides the evidence callout with no level selected (null), keeping guidance + definitions', () => {
+        setLevel(undefined);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks at level 0', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
-        fixture.detectChanges();
-        assertAllThreeRender();
+      it('hides the evidence callout at level 0, keeping guidance + definitions', () => {
+        setLevel(idForLevel(0));
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks at level 9', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(9) });
-        fixture.detectChanges();
-        assertAllThreeRender();
+      // The boundary the change is actually about: 5 is the highest level with no justification
+      // field, and the screenshot that prompted the reversal was taken at exactly this level.
+      it('hides the evidence callout at level 5 — the last level below the justification threshold', () => {
+        setLevel(idForLevel(5));
+
+        expect(component.showJustification()).toBe(false);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks when isEditableStatus() is false', () => {
+      it('renders the evidence callout at level 6 — the first level that asks for a justification', () => {
+        setLevel(idForLevel(6));
+
+        expect(component.showJustification()).toBe(true);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
+      });
+
+      it('renders the evidence callout at level 9', () => {
+        setLevel(idForLevel(9));
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
+      });
+
+      // isEditableStatus() is an INDEPENDENT axis from the level: the callout is gated on the level
+      // only, so a read-only result at level 6 must still show it. Asserting both halves here keeps
+      // the two conditions from being accidentally fused into one.
+      it('renders the evidence callout when isEditableStatus() is false but the level is 6', () => {
         submission.isEditableStatus.mockReturnValue(false);
-        fixture.detectChanges();
-        assertAllThreeRender();
+        setLevel(idForLevel(6));
+
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
         submission.isEditableStatus.mockReturnValue(true);
       });
 
-      // Falsifying input: wrapping the evidence callout in `@if (showJustification())` must fail
-      // this check at level 0, where showJustification() is false and the textarea does not render.
-      it('falsifying input: at level 0 the conditional textarea is absent, proving the evidence callout cannot be riding inside that branch', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
-        fixture.detectChanges();
+      it('hides the evidence callout when isEditableStatus() is false and the level is 5', () => {
+        submission.isEditableStatus.mockReturnValue(false);
+        setLevel(idForLevel(5));
 
-        expect(component.showJustification()).toBe(false);
-        expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
-        // Yet the evidence callout is still present — it cannot be a descendant of the branch above.
-        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
+        submission.isEditableStatus.mockReturnValue(true);
+      });
+
+      // Falsifying input, INVERTED from the old c6. Reverting the template to an unconditional
+      // callout must fail this at level 5 — and the assertion is written so that a lazy fix
+      // (deleting the callout outright) fails it too, since level 6 must still render it.
+      it('falsifying input: the callout tracks showJustification() exactly — absent at 5, present at 6, never constant', () => {
+        setLevel(idForLevel(5));
+        const atFive = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'));
+
+        setLevel(idForLevel(6));
+        const atSix = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'));
+
+        expect(atFive).toBeNull();
+        expect(atSix).toBeTruthy();
+        // A template that always renders, or never renders, cannot satisfy both lines above.
+        expect(atFive === null && atSix !== null).toBe(true);
+      });
+
+      // The callout must be its OWN @if, not merged into the textarea's block: it has to stay above
+      // the textarea in DOM order. Asserting document order catches a "fix" that nests it inside.
+      it('renders the callout as a sibling ABOVE the justification textarea, not nested inside it', () => {
+        setLevel(idForLevel(6));
+
+        const callout = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))!.nativeElement as HTMLElement;
+        const textarea = fixture.debugElement.query(By.css('textarea'))!.nativeElement as HTMLElement;
+
+        expect(callout.contains(textarea)).toBe(false);
+        // Node.DOCUMENT_POSITION_FOLLOWING (4) — the textarea comes after the callout.
+        expect(callout.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       });
     });
 
@@ -2701,6 +2792,11 @@ describe('InnovationUseDetailsComponent', () => {
     // the utility class asserted in (a) is what actually renders (§5.8's traps do not reach here).
     // -----------------------------------------------------------------------------------------------
     describe('c12 — contrast, measured', () => {
+      // The three class-presence tests below query the evidence callout, which since
+      // quick/innovation-use-evidence-callout-gating only renders at level ≥ 6. The four pure-math
+      // tests do not touch the DOM at all and are unaffected either way.
+      beforeEach(atJustificationLevel);
+
       // WCAG 2.1 relative luminance / contrast ratio — pure functions, independent of jsdom style
       // resolution (jsdom does not paint; see "What this task's automated criteria cannot prove").
       // Takes decimal RGB triples rather than "#rrggbb" strings deliberately (c8's grep bans a `#`
@@ -2728,6 +2824,51 @@ describe('InnovationUseDetailsComponent', () => {
       const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body-text token
       const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link token
       const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — the ACTORS callout's (wrong-for-here) token
+      const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the banner BODY text's user-chosen AA exception
+
+      // Added by quick/innovation-use-guidance-spacing-and-link-colour (2026-09-08). The falsifying
+      // probe for that change found the margin half was covered by NOTHING: reverting it reddened
+      // zero tests, so it could have been dropped by any later edit in silence. This pins the class.
+      // ⚠️ SCOPE (KZ-017): jsdom paints nothing, so this asserts the CLASS IS PRESENT, never that
+      // 8px of space is rendered. `.rs-mt-[8] { margin-top: 8px }` comes from responsive-size.scss,
+      // outside this test's reach — the gap itself stays human-verified.
+      // Raised from rs-mt-[8] to rs-mt-[16] (2026-09-08) so the callout's vertical margins are
+      // SYMMETRIC. Asserting both halves together is the point — the defect this replaced was not
+      // "no top margin" but "top ≠ bottom", which a single-sided check would not have caught.
+      it('the guidance callout carries matching rs-mt-[16] / rs-mb-[16] margins', () => {
+        const callout = fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))!.nativeElement as HTMLElement;
+
+        expect(callout.className).toContain('rs-mt-[16]');
+        expect(callout.className).toContain('rs-mb-[16]');
+        expect(callout.className).not.toContain('rs-mt-[8]');
+      });
+
+      // quick/innovation-use-banner-leading-and-border (2026-09-08). Same coverage gap as rs-mt-[8]
+      // above: reviewers asked for these two properties by name, and NOTHING in the suite asserted
+      // either, so both could be dropped in silence. Pinned on the two banners this describe owns;
+      // the ACTORS and organization banners are pinned in the R3 contrast block further down.
+      // ⚠️ SCOPE (KZ-017): class-presence only. jsdom paints nothing, so this cannot see a 5px rule
+      // or a 17px line box — `border-l-[5px]`/`leading-[17px]` resolve in Tailwind, out of reach.
+      it('both guidance and evidence banners carry border-l-[5px], matching the innovation-details reference', () => {
+        const guidance = fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))!.nativeElement as HTMLElement;
+        const evidence = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))!.nativeElement as HTMLElement;
+
+        [guidance, evidence].forEach(el => {
+          expect(el.className).toContain('border-l-[5px]');
+          expect(el.className).not.toContain('border-l-[4px]');
+        });
+      });
+
+      it('every banner body text element carries leading-[17px]', () => {
+        const bullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        expect(bullets.length).toBe(4);
+        expect(paragraphs.length).toBe(2);
+
+        [...bullets, ...paragraphs].forEach(el => {
+          expect((el.nativeElement as HTMLElement).className).toContain('leading-[17px]');
+        });
+      });
 
       it('resolves the cascade: none of the four text roles sits inside a `.description` ancestor', () => {
         // `.description` (custom-fields.scss, rgb(119,124,131), 3.91:1) and `.description a`
@@ -2745,40 +2886,73 @@ describe('InnovationUseDetailsComponent', () => {
         });
       });
 
-      it('which selector won: bullets carry text-[var(--ac-grey-800)], never text-[var(--ac-grey-600)]', () => {
+      // quick/innovation-use-banner-body-grey-700 (2026-09-08) moved every information banner's
+      // NON-LINK text to --ac-grey-700, superseding DD-17's --ac-grey-800 body choice. The
+      // grey-600 half of this assertion is kept: grey-600 (2.91:1) was rejected on its own merits
+      // and is still not the intended token, so the bullets must be grey-700 and neither of the
+      // other two greys.
+      it('which selector won: bullets carry text-[var(--ac-grey-700)], never grey-800 or grey-600', () => {
         const bullets = fixture.debugElement.queryAll(By.css('[data-testid="use-level-guidance"] li'));
+        expect(bullets.length).toBe(4);
         bullets.forEach(li => {
           const className = (li.nativeElement as HTMLElement).className;
-          expect(className).toContain('text-[var(--ac-grey-800)]');
+          expect(className).toContain('text-[var(--ac-grey-700)]');
+          expect(className).not.toContain('text-[var(--ac-grey-800)]');
           expect(className).not.toContain('text-[var(--ac-grey-600)]');
         });
       });
 
-      it('which selector won: P1/P2 carry text-[var(--ac-grey-800)]', () => {
+      it('which selector won: P1/P2 carry text-[var(--ac-grey-700)]', () => {
         const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
+        expect(paragraphs.length).toBe(2);
         paragraphs.forEach(p => {
-          expect((p.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+          const className = (p.nativeElement as HTMLElement).className;
+          expect(className).toContain('text-[var(--ac-grey-700)]');
+          expect(className).not.toContain('text-[var(--ac-grey-800)]');
         });
       });
 
-      it('which selector won: all three links/buttons carry text-[var(--ac-light-blue-400)]', () => {
+      // The banner recolour applies to BODY TEXT ONLY — all three links/buttons keep
+      // --ac-light-blue-400 and stay AA. (A previous same-day quick change briefly moved the
+      // calculator link to grey-700; that was the user's mistake and is reverted. Asserting the
+      // link colour explicitly here is what keeps the body-text exception from creeping into the
+      // links a second time.)
+      it('which selector won: all three links/buttons keep text-[var(--ac-light-blue-400)], never the body grey', () => {
         const calculatorLink = findLink(CALCULATOR_URL)!.nativeElement as HTMLElement;
         const definitionsLink = findLink(DEFINITIONS_URL)!.nativeElement as HTMLElement;
         const evidenceButton = findButton('Click here to go there')!.nativeElement as HTMLElement;
 
         [calculatorLink, definitionsLink, evidenceButton].forEach(el => {
           expect(el.className).toContain('text-[var(--ac-light-blue-400)]');
+          expect(el.className).not.toContain('text-[var(--ac-grey-700)]');
         });
       });
 
-      it('computes ≥ 4.5:1 for body text and link text against the callout background (--ac-grey-100)', () => {
-        const bodyRatio = contrastRatio(GREY_800, GREY_100);
+      it('computes ≥ 4.5:1 for the links against the callout background (--ac-grey-100)', () => {
         const linkRatio = contrastRatio(LIGHT_BLUE_400, GREY_100);
 
-        expect(bodyRatio).toBeCloseTo(7.44, 1);
         expect(linkRatio).toBeCloseTo(6.35, 1);
-        expect(bodyRatio).toBeGreaterThanOrEqual(4.5);
         expect(linkRatio).toBeGreaterThanOrEqual(4.5);
+      });
+
+      // The exception, MEASURED and pinned rather than left implicit. R-IUP-020 AC.6 and
+      // NFR-IUP-001 require ≥ 4.5:1 and DD-17 chose --ac-grey-800 (7.44:1) to meet it;
+      // --ac-grey-700 does not reach it. This test asserts the shortfall ON PURPOSE, so the
+      // deviation is a recorded number in the suite instead of an undocumented regression — and so
+      // that restoring an AA colour becomes a deliberate act that reddens this test, not a silent
+      // drift. The superseded 7.44:1 is asserted alongside it, so the size of what was traded away
+      // stays visible at the point of the trade.
+      it('records the banner body text as a DELIBERATE AA exception: --ac-grey-700 is 3.91:1 on --ac-grey-100, below 4.5:1', () => {
+        const exceptionRatio = contrastRatio(GREY_700, GREY_100);
+        const supersededRatio = contrastRatio(GREY_800, GREY_100);
+
+        expect(exceptionRatio).toBeCloseTo(3.91, 1);
+        expect(exceptionRatio).toBeLessThan(4.5);
+        // Still above the 3:1 floor WCAG applies to large text / non-text contrast.
+        expect(exceptionRatio).toBeGreaterThan(3);
+        // What DD-17 had, for comparison at the point of the trade.
+        expect(supersededRatio).toBeCloseTo(7.44, 1);
+        expect(supersededRatio).toBeGreaterThanOrEqual(4.5);
       });
 
       it('computes ≥ 4.5:1 for the definitions link paragraph against the card background (--ac-white-1)', () => {
@@ -3016,7 +3190,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body/eyebrow token
   const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — superseded for the ACTORS callout body,
   // but the LIVE token on the ACTOR #/ORGANIZATION # eyebrows since quick/innovation-use-eyebrow-grey (accepted 2.91:1)
-  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — superseded (organization-callout pre-fix)
+  const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the banner BODY text's user-chosen AA exception (2026-09-08)
   const LIGHT_BLUE_300: Rgb = [22, 137, 202]; // --ac-light-blue-300 — superseded for the stepper/org-link,
   // but the LIVE token on the three Add-other buttons since quick/innovation-use-add-button-style (accepted 3.84:1)
   const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link/Add/stepper token
@@ -3262,16 +3436,27 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     });
   });
 
-  it('ACTORS callout body: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1)', () => {
+  // ACCEPTED EXCEPTION (quick/innovation-use-banner-body-grey-700, 2026-09-08) — human-decided,
+  // applied to EVERY information banner in this feature for visual consistency. The ACTORS callout
+  // body moved from --ac-grey-800 (7.44:1 on this callout's --ac-grey-100) to --ac-grey-700, which
+  // measures 3.91:1 and does NOT meet 1.4.3 AA (>= 4.5:1). It clears the 3:1 non-text floor only.
+  // Pinned so a later token sweep cannot silently "re-fix" it without reading this comment.
+  it('ACTORS callout body: text-[var(--ac-grey-700)] on --ac-grey-100, 3.91:1 accepted (AA exception)', () => {
     const body = fixture.debugElement
       .queryAll(By.css('span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.trim() === 'List every actor group using this innovation.');
     expect(body).toBeTruthy();
-    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((body!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
+    expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
     expect((body!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-600)]');
+    // quick/innovation-use-banner-leading-and-border: the ACTORS banner's share of the shape
+    // alignment. Border width is asserted on the wrapper in the sibling test below.
+    expect((body!.nativeElement as HTMLElement).className).toContain('leading-[17px]');
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_700, GREY_100);
+    expect(ratio).toBeCloseTo(3.91, 1);
+    expect(ratio).toBeLessThan(4.5);
+    expect(ratio).toBeGreaterThan(3);
   });
 
   // ACCEPTED EXCEPTION (quick/innovation-use-add-button-style, 2026-09-03) — human-decided.
@@ -3334,18 +3519,56 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeLessThan(4.5);
   });
 
-  it('organization known-institution callout body: text-[var(--ac-grey-800)] on --ac-grey-200 (>= 4.5:1)', () => {
+  // Same ACCEPTED EXCEPTION as the ACTORS callout above (quick/innovation-use-banner-body-grey-700).
+  // NOTE THE DIFFERENT BACKGROUND: this banner sits on --ac-grey-200, not --ac-grey-100, so its
+  // ratio is 3.51:1 — the WORST of the four banners, and lower than the 3.91:1 the other three
+  // measure. Asserting the distinct number here (rather than reusing 3.91) is the point: the two
+  // backgrounds are not interchangeable, and a sweep that assumed one figure for all banners would
+  // be wrong about this one. Superseded --ac-grey-800 measured 6.68:1 on this same background.
+  it('organization known-institution callout body: text-[var(--ac-grey-700)] on --ac-grey-200, 3.51:1 accepted (AA exception)', () => {
     const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
     const calloutBody = orgItem
       .queryAll(By.css('span'))
       .find(s => (s.nativeElement as HTMLElement).textContent?.includes("Can't find the institution"));
     expect(calloutBody).toBeTruthy();
-    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
-    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-700)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-700)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-grey-800)]');
+    expect((calloutBody!.nativeElement as HTMLElement).className).toContain('leading-[17px]');
 
-    const ratio = contrastRatio(GREY_800, GREY_200);
-    expect(ratio).toBeCloseTo(6.68, 1);
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    const ratio = contrastRatio(GREY_700, GREY_200);
+    expect(ratio).toBeCloseTo(3.51, 1);
+    expect(ratio).toBeLessThan(4.5);
+    expect(ratio).toBeGreaterThan(3);
+    // The superseded token, for comparison at the point of the trade.
+    expect(contrastRatio(GREY_800, GREY_200)).toBeCloseTo(6.68, 1);
+  });
+
+  // quick/innovation-use-banner-leading-and-border (2026-09-08): border width for the two banners
+  // NOT covered by the c12 block above, so all four are pinned between the two describes. The
+  // organization banner is the one that changed shorthand — it was `border-l-4`, not `border-l-[4px]`
+  // — which is why it is asserted by its own selector rather than swept with the others.
+  it('ACTORS and organization banners carry border-l-[5px], matching the innovation-details reference', () => {
+    // Both selectors require the border class AND the identifying copy: matching on text alone
+    // returns an inner layout wrapper (the first attempt here found `flex flex-col rs-gap-[4]`),
+    // and matching on the border class alone would not prove WHICH banner was inspected.
+    const bannerWithText = (scope: typeof fixture.debugElement, text: string) =>
+      scope
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('border-l-') && (d.nativeElement as HTMLElement).textContent?.includes(text));
+
+    const actorsBanner = bannerWithText(fixture.debugElement, 'List every actor group using this innovation.');
+    const orgItem = fixture.debugElement.query(By.css('app-innovation-use-organization-item'));
+    const orgBanner = bannerWithText(orgItem, "Can't find the institution");
+
+    expect(actorsBanner).toBeTruthy();
+    expect(orgBanner).toBeTruthy();
+    [actorsBanner!, orgBanner!].forEach(el => {
+      const className = (el.nativeElement as HTMLElement).className;
+      expect(className).toContain('border-l-[5px]');
+      expect(className).not.toContain('border-l-[4px]');
+      // `border-l-4` is Tailwind's 4px shorthand — the pre-change value on the organization banner.
+      expect(className).not.toMatch(/border-l-4(\s|$)/);
+    });
   });
 
   it('organization known-institution callout link "here": text-[var(--ac-light-blue-500)] on --ac-grey-200 (>= 4.5:1)', () => {
