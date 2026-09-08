@@ -12,6 +12,8 @@ import {
 import { ResultsUtil } from '../../../src/domain/shared/utils/results.util';
 import { ClarisaInnovationUseLevelsModule } from '../../../src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.module';
 import { ClarisaInnovationUseLevelsService } from '../../../src/domain/tools/clarisa/entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.service';
+import { ClarisaInstitutionTypesModule } from '../../../src/domain/tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.module';
+import { ClarisaInstitutionTypesService } from '../../../src/domain/tools/clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 
 /**
  * T-09 (`docs/specs/innovation-use/details-api`) — design.md §10.4 "the
@@ -237,6 +239,59 @@ export async function createClarisaInnovationUseLevelsHarness(
 
   const dataSource = moduleRef.get(DataSource);
   const service = moduleRef.get(ClarisaInnovationUseLevelsService);
+
+  return {
+    moduleRef,
+    dataSource,
+    service,
+    close: async () => {
+      await moduleRef.close();
+    },
+  };
+}
+
+/**
+ * T-14 (`docs/specs/changes/innovation-use-required-fields`) — same shape as
+ * `createClarisaInnovationUseLevelsHarness` above, one module swapped.
+ * `ClarisaInstitutionTypesService` is the REAL source the client consults
+ * (`subTypesService.list(typeId)` → `GET_SubInstitutionTypes(2, typeId)` →
+ * `getInstitutionTypesByDepthLevel`) — T-14's enumeration must call this
+ * exact class/method, not a hand-rolled reimplementation of its query, or
+ * it stops being evidence (`DD-5`'s disqualifier: a jsdom mock of the
+ * sub-types service "observes neither the `is_active` nor the root
+ * filter" — the same is true of any stand-in that isn't this class).
+ * `ClarisaInstitutionTypesModule` has no controller/service dependency on
+ * `ResultsUtil`, so — like `ClarisaInnovationUseLevelsModule` above and
+ * unlike `createInnovationUseHarness` — only `CurrentUserUtil` needs
+ * overriding.
+ */
+export interface ClarisaInstitutionTypesHarness {
+  moduleRef: TestingModule;
+  dataSource: DataSource;
+  service: ClarisaInstitutionTypesService;
+  close: () => Promise<void>;
+}
+
+export async function createClarisaInstitutionTypesHarness(
+  actingUserId: number,
+): Promise<ClarisaInstitutionTypesHarness> {
+  const currentUser = new StubCurrentUserUtil(actingUserId);
+
+  const moduleRef = await Test.createTestingModule({
+    imports: [
+      TypeOrmModule.forRoot(rawTestDataSource.options),
+      GlobalUtilsModule,
+      ClarisaInstitutionTypesModule,
+    ],
+  })
+    .overrideProvider(CurrentUserUtil)
+    .useValue(currentUser)
+    .compile();
+
+  await moduleRef.init();
+
+  const dataSource = moduleRef.get(DataSource);
+  const service = moduleRef.get(ClarisaInstitutionTypesService);
 
   return {
     moduleRef,

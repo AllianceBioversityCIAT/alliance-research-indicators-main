@@ -1,5 +1,18 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-05 — innovation use actor card)
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, effect, inject, signal, WritableSignal } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+  computed,
+  effect,
+  inject,
+  signal,
+  WritableSignal
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
@@ -8,6 +21,7 @@ import { SelectModule } from 'primeng/select';
 import { InnovationUseActor } from '@shared/interfaces/get-innovation-use-details.interface';
 import { GetActorTypesService } from '@shared/services/control-list/get-actor-types.service';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { ActorType } from '@shared/interfaces/get-actor-types.interface';
 
 /**
  * CLARISA actor-type value reserved for "OTHER". A client-side literal, not an import:
@@ -35,11 +49,45 @@ export class InnovationUseActorItemComponent implements OnInit, OnChanges {
   @Input() actorNumber = 1;
   @Input() disabled = false;
   @Input() duplicateType = false;
+  /**
+   * R-IUR-017 / DD-18 (T-21): `actor_type_id`s already claimed by OTHER rows, computed by the
+   * parent (`InnovationUseDetailsComponent.usedActorTypeIdsExcluding`). This card is the one
+   * that decides how to act on it — see `typeOptions` below.
+   */
+  @Input() usedActorTypeIds: Set<number> = new Set<number>();
   @Output() update = new EventEmitter<InnovationUseActor>();
   @Output() remove = new EventEmitter<void>();
 
   actorService = inject(GetActorTypesService);
   readonly otherActorTypeId = OTHER_ACTOR_TYPE_ID;
+
+  /**
+   * R-IUR-017 / DD-18 (T-21): per-row options derived from the shared catalog
+   * (`actorService.list()`), never mutated (the catalog array is shared across every card on
+   * the page — mutating it would have cards fight over it). PrimeNG disables an option via
+   * `[optionDisabled]="'optionDisabled'"` on the `p-select` — a PROPERTY NAME on the option
+   * object, not a predicate — so each returned option carries its own resolved boolean instead
+   * of a shared computed function.
+   *
+   * Two exemptions are this card's own, regardless of what `usedActorTypeIds` reports:
+   *  - the row's own current value is never disabled (`R-IUR-017`'s BUT clause) — otherwise a
+   *    row renders its own selection greyed out, including in the pre-existing-duplicate-data
+   *    case where the parent legitimately reports this row's own type as "used elsewhere";
+   *  - `OTHER` (`otherActorTypeId`) is never disabled (`R-IUR-017`'s AND clause) — duplicates
+   *    there are keyed on type + trimmed lowercase custom name, so several OTHER rows are
+   *    legitimate.
+   *
+   * A plain getter, not a `computed`, because `@Input`s are not signals here (`ngOnChanges`,
+   * not `input()`) — the surrounding component has no `OnPush` strategy, so this re-evaluates
+   * on every change-detection pass, the same way `actorTypeMissing`/`otherNameMissing` do.
+   */
+  get typeOptions(): (ActorType & { optionDisabled: boolean })[] {
+    const currentTypeId = this.body().actor_type_id;
+    return this.actorService.list().map(option => ({
+      ...option,
+      optionDisabled: option.code !== this.otherActorTypeId && option.code !== currentTypeId && this.usedActorTypeIds.has(option.code)
+    }));
+  }
 
   /**
    * Local copy of the row. Never the parent's signal (DD-5), and never the parent's *object*
@@ -91,8 +139,32 @@ export class InnovationUseActorItemComponent implements OnInit, OnChanges {
     return !this.body().actor_type_id;
   }
 
+  /**
+   * R-IUR-016 (T-06, §3.3 `N-11`): the second conjunct is trimmed to match the server's
+   * `valid_text` (`LENGTH(TRIM(REGEXP_REPLACE(text,'\s+','')))>0`). This field is a plain
+   * `pInputText` owned by the card, never an `app-input`, so `requiredMode`'s own trimming
+   * (`isFilled()`) never reaches it — this getter needs its own trimmed check.
+   */
   get otherNameMissing(): boolean {
-    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name;
+    return this.body().actor_type_id === this.otherActorTypeId && !this.body().actor_type_custom_name?.trim();
+  }
+
+  /**
+   * T-04 (R-IUR-004 S2, DD-2) — the four-count cross-field total-positivity message.
+   * `total()` (above) returns `0` in TWO situations that require opposite UI: all four counts
+   * filled with `0` (this message, and ONLY this message), or exactly one count filled with `0`
+   * while the other three are absent (three per-field required messages, and NOT this one).
+   * Consuming `total()`'s sum alone therefore cannot drive this message — it must also require
+   * all four counts to be filled, matching `requiredMode="filled"`'s own definition of filled
+   * (`null`/`undefined` are empty; `0` is filled). Gated to the disaggregated path only: on the
+   * aggregate path `total()` returns `actors_count`, which is T-05's `'positive'`-mode concern.
+   */
+  get showTotalNotPositive(): boolean {
+    const current = this.body();
+    if (current.sex_age_disaggregation_not_apply) return false;
+    const counts = [current.women_youth_count, current.women_not_youth_count, current.men_youth_count, current.men_not_youth_count];
+    const allFilled = counts.every(count => count !== null && count !== undefined);
+    return allFilled && this.total() === 0;
   }
 
   /** Selecting away from OTHER clears `actor_type_custom_name` (R-IUP-010 AC.3). */

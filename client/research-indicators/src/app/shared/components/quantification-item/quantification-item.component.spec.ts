@@ -102,54 +102,123 @@ describe('QuantificationItemComponent', () => {
     });
   });
 
-  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
-  describe('fieldsRequired rendering (T-03, baseline established before the inputs existed)', () => {
-    it('reproduces the field-asymmetric rendering: Number and Unit carry isRequired+validateEmpty, Comments carries isRequired only, all three show an asterisk', () => {
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-03 — DD-4: fieldsRequired split
+  // into five per-field inputs. This describe block REPLACES the old `fieldsRequired rendering`
+  // block wholesale — `fieldsRequired` no longer exists as a TypeScript property, and the old block's
+  // three tests are exactly the failing-run blast radius this rewrite discharges (verified red before
+  // this edit: `numberInput.validateEmpty` undefined, `component.fieldsRequired` undefined,
+  // `numberInput.isRequired` still `true` when the removed input was set to `false`).
+  //
+  // R-IUR-010 AC.5's Disqualifier applies here: OICR's own suite (oicr-details.component.spec.ts)
+  // stubs this card with an empty-template FakeQuantificationItemComponent (KZ-001) and is
+  // structurally blind to every property this block asserts. The default, no-inputs-passed
+  // configuration below is deliberately NOT parameterized by a call site — it IS the shape both
+  // OICR call sites (`oicr-details.component.html:60`, `:81`) produce, verified by grep: neither
+  // passes any of the five required-related inputs.
+  describe('per-field required inputs (T-03, DD-4 — fieldsRequired split into five)', () => {
+    it('numberRequired, unitRequired and commentsRequired default to true; numberRequiredMode and unitRequiredMode default to \'off\' (R-IUR-010 AC.5)', () => {
+      expect(component.numberRequired).toBe(true);
+      expect(component.unitRequired).toBe(true);
+      expect(component.commentsRequired).toBe(true);
+      expect(component.numberRequiredMode).toBe('off');
+      expect(component.unitRequiredMode).toBe('off');
+    });
+
+    describe('default, no-inputs-passed configuration — the exact OICR call-site shape (R-IUR-010 AC.1, AC.3, AC.5)', () => {
+      it('forwards isRequired=true and requiredMode=\'off\' to the real Number and Unit app-input instances, and isRequired=true to the real Comments app-textarea instance', () => {
+        fixture.detectChanges();
+
+        const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+        const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
+
+        expect(inputs.length).toBe(2);
+        const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+        expect(numberInput.isRequired).toBe(true);
+        expect(numberInput.requiredMode).toBe('off');
+        expect(unitInput.isRequired).toBe(true);
+        expect(unitInput.requiredMode).toBe('off');
+
+        expect(textareas.length).toBe(1);
+        const commentsTextarea = textareas[0].componentInstance as TextareaComponent;
+        expect(commentsTextarea.isRequired).toBe(true);
+      });
+
+      it('renders all three asterisks (AC.1) — Number, Unit and Comments each carry the card-owned red *', () => {
+        fixture.detectChanges();
+
+        const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
+        expect(asterisks.length).toBe(3);
+      });
+
+      // Real rendered DOM (KZ-001): body() starts { number: null, unit: '', comments: '' } and
+      // ngOnInit seeds it from the (unset) `quantification` input, which falls back to the same
+      // empty shape — so this IS the state at first render, not an arranged end-state (KZ-015).
+      it('renders all three "This field is required" messages (AC.3) at first render, before any user input', () => {
+        fixture.detectChanges();
+
+        const requiredMessages = fixture.debugElement
+          .queryAll(By.css('span'))
+          .filter(de => de.nativeElement.textContent.trim() === 'This field is required');
+        expect(requiredMessages.length).toBe(3);
+      });
+    });
+
+    it('numberRequired=false drops the Number asterisk and its required validation, leaving Unit and Comments untouched', () => {
+      component.numberRequired = false;
       fixture.detectChanges();
 
       const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
-      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
-
-      expect(inputs.length).toBe(2);
-      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
-      expect(numberInput.isRequired).toBe(true);
-      expect(numberInput.validateEmpty).toBe(true);
-      expect(unitInput.isRequired).toBe(true);
-      expect(unitInput.validateEmpty).toBe(true);
-
-      expect(textareas.length).toBe(1);
-      const commentsTextarea = textareas[0].componentInstance as TextareaComponent;
-      expect(commentsTextarea.isRequired).toBe(true);
-      expect((commentsTextarea as any).validateEmpty).toBeUndefined();
-
-      const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
-      expect(asterisks.length).toBe(3);
-    });
-
-    it('defaults to true', () => {
-      expect(component.fieldsRequired).toBe(true);
-    });
-
-    it('false drops the asterisks and the required validation on all three fields', () => {
-      component.fieldsRequired = false;
-      fixture.detectChanges();
-
-      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
-      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
-
-      expect(inputs.length).toBe(2);
       const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
       expect(numberInput.isRequired).toBe(false);
-      expect(numberInput.validateEmpty).toBe(false);
-      expect(unitInput.isRequired).toBe(false);
-      expect(unitInput.validateEmpty).toBe(false);
+      expect(unitInput.isRequired).toBe(true);
 
-      expect(textareas.length).toBe(1);
+      const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
+      expect(asterisks.length).toBe(2);
+    });
+
+    it('unitRequired=false drops the Unit asterisk and its required validation, leaving Number and Comments untouched', () => {
+      component.unitRequired = false;
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.isRequired).toBe(true);
+      expect(unitInput.isRequired).toBe(false);
+
+      const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
+      expect(asterisks.length).toBe(2);
+    });
+
+    it('commentsRequired=false drops the Comments asterisk and its required validation, leaving Number and Unit untouched (the AC.5 falsifying input — see task report)', () => {
+      component.commentsRequired = false;
+      fixture.detectChanges();
+
+      const textareas = fixture.debugElement.queryAll(By.directive(TextareaComponent));
       const commentsTextarea = textareas[0].componentInstance as TextareaComponent;
       expect(commentsTextarea.isRequired).toBe(false);
 
       const asterisks = fixture.debugElement.queryAll(By.css('h2.label span'));
-      expect(asterisks.length).toBe(0);
+      expect(asterisks.length).toBe(2);
+    });
+
+    it('numberRequiredMode is forwarded straight through to the Number app-input\'s requiredMode, independent of unitRequiredMode', () => {
+      component.numberRequiredMode = 'nonzero';
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.requiredMode).toBe('nonzero');
+      expect(unitInput.requiredMode).toBe('off');
+    });
+
+    it('unitRequiredMode is forwarded straight through to the Unit app-input\'s requiredMode, independent of numberRequiredMode', () => {
+      component.unitRequiredMode = 'filled';
+      fixture.detectChanges();
+
+      const inputs = fixture.debugElement.queryAll(By.directive(InputComponent));
+      const [numberInput, unitInput] = inputs.map(i => i.componentInstance as InputComponent);
+      expect(numberInput.requiredMode).toBe('off');
+      expect(unitInput.requiredMode).toBe('filled');
     });
   });
 

@@ -275,6 +275,28 @@ export default class InnovationUseDetailsComponent {
   hasDuplicateActorType = computed<boolean>(() => this.duplicateActorTypeIndexes().size > 0);
 
   /**
+   * R-IUR-017 / DD-18 (T-21, T-13 Pivot): for the actor row at `index`, the `actor_type_id`s
+   * already claimed by every OTHER row — this row's own current selection is excluded from
+   * the computation (never merely exempted downstream), so a pre-existing duplicate (two rows
+   * already sharing a type) still reports correctly for both rows. Read live off
+   * `body().actors` on every call, never a cached set, so removing a row re-enables its type
+   * everywhere immediately (AC.4). This is a plain method, not a `computed`, precisely because
+   * it is parameterised per row — a `computed` here would need to be indexed itself and gains
+   * nothing over deriving directly on each template read (the same pattern this page already
+   * uses for `duplicateActorTypeIndexes().has($index)`).
+   *
+   * Exempting the row's own value and `OTHER` from disabling is the CARD's job (DD-18 /
+   * design.md §7 component table), not this method's — it only reports what other rows use.
+   */
+  usedActorTypeIdsExcluding(index: number): Set<number> {
+    const used = new Set<number>();
+    this.body().actors.forEach((row, i) => {
+      if (i !== index && row.actor_type_id) used.add(row.actor_type_id);
+    });
+    return used;
+  }
+
+  /**
    * §6.7 step 5: the one field on this page a save error can be addressed to by a stable name.
    * Array rows (actors/organizations/quantifications) have no server-assigned index in this
    * shape to bind an inline message to — every other message still reaches the user through the
@@ -347,10 +369,11 @@ export default class InnovationUseDetailsComponent {
     const data = response.data ?? new GetInnovationUseDetails();
     this.body.set({
       ...data,
-      // DD-10: exactly one blank actor affordance on empty load. Organizations and
-      // quantifications stay empty — they are optional, and a blank row there is precisely the
-      // identity-less-row `400` chunk 2 added to stop.
-      actors: Array.isArray(data.actors) && data.actors.length > 0 ? data.actors : [new InnovationUseActor()],
+      // DD-7 (reversion of DD-10, R-IUR-002): no blank actor seed on an empty load. Actors are no
+      // longer required (R-IUR-011), so a seeded blank card would be a row the user never created
+      // that immediately fails validation and flips a valid empty result to invalid on first paint.
+      // Organizations and quantifications have always stayed empty here — same treatment now.
+      actors: Array.isArray(data.actors) ? data.actors : [],
       organizations: Array.isArray(data.organizations) ? data.organizations : [],
       quantifications: Array.isArray(data.quantifications) ? data.quantifications : []
     });
@@ -557,11 +580,16 @@ export default class InnovationUseDetailsComponent {
    *    **REWORK (Issue 3):** `loadFailed()` only covers the *failed-load* subset. The
    *    *stale-success* subset — a version switch's in-flight GET, where `body` still holds the
    *    previous version's rows and `loadFailed()` is `false` — is covered by `loading()` instead.
-   * 2b. **T-09 (§6.6), narrowed by T-02 (bugfix/innovation-use-draft-save):** one remaining
-   *    blocking client rule, same shape as (1)/(2) — issue nothing, still fall through to
-   *    navigation below. `hasDuplicateActorType()` (a duplicate actor identity somewhere in the
-   *    block) is invalid *data* the server rejects, not an unfinished draft, so it still blocks
-   *    (DD-5, unchanged). `justificationMissing()` **no longer gates the save** — R-IUD-001: a
+   * 2b. **T-09 (§6.6), narrowed by T-02 (bugfix/innovation-use-draft-save), and withdrawn by T-13
+   *    (`R-IUR-014`/`R-IUR-017`, `DD-8`/`DD-18`, T-13 Pivot):** `hasDuplicateActorType()` no longer
+   *    gates this save. A duplicate actor type can no longer be created through the UI at all —
+   *    `R-IUR-017`/`DD-18` disables an already-used type in every other row's own dropdown, so the
+   *    prevention moved to the source instead of a save-time block. The computed itself stays: it
+   *    still drives the actor card's own amber duplicate message (`DD-5`, unchanged) — only its use
+   *    as a save gate is gone. Nothing on this page blocks the save anymore; `buildPayload()` simply
+   *    omits whatever row lacks its identity field, silently and by design (`R-IUR-014` S1/S2) — the
+   *    user's signal for that is the field-level required message already on screen, not a save-time
+   *    message (`DD-8` SECOND AMENDMENT). `justificationMissing()` **no longer gates the save** — R-IUD-001: a
    *    blank-or-whitespace justification at resolved level >= 6 must save like everything else on
    *    an incomplete draft. Completeness is still required to *submit* — `innovation_use_validation`
    *    (unchanged) keeps the green check `false`, which keeps the Submit button disabled
@@ -581,7 +609,7 @@ export default class InnovationUseDetailsComponent {
   async saveData(page?: 'back' | 'next'): Promise<void> {
     this.saveErrors.set([]);
 
-    if (this.submission.isEditableStatus() && !this.loadFailed() && !this.loading() && !this.hasDuplicateActorType()) {
+    if (this.submission.isEditableStatus() && !this.loadFailed() && !this.loading()) {
       const response = await this.api.PATCH_InnovationUseDetails(this.cache.getCurrentNumericResultId(), this.buildPayload());
 
       if (response.successfulRequest) {

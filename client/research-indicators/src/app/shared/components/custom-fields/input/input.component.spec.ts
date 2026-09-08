@@ -7,6 +7,7 @@ import { WordCountService } from '../../../services/word-count.service';
 import { By } from '@angular/platform-browser';
 import { InputNumber } from 'primeng/inputnumber';
 import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
+import { ActionsService } from '../../../services/actions.service';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -685,6 +686,217 @@ describe('InputComponent', () => {
       });
     });
   });
+
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode precedence)
+  // Falsifying inputs and boundaries from design.md DD-1/DD-2 and requirements.md R-IUR-004/005/009/010.
+  // `inputValid()` is driven through the SIGNAL input (via the mocked `getNestedProperty`), exactly
+  // as `inputValid()` itself reads (`getNestedProperty(this.signal(), ...)`). `isInvalid()` is driven
+  // through `body()` directly, exactly as `isInvalid()` itself reads — the two sources are asserted
+  // separately on purpose (KZ-015 disqualifier: a same-source test would hide the divergence).
+  describe('T-01 — requiredMode precedence and boundaries', () => {
+    it('defaults to "off"', () => {
+      expect(component.requiredMode).toBe('off');
+    });
+
+    describe('mode "filled"', () => {
+      it('FALSIFYING (precedence) — isRequired=true AND requiredMode="filled" holding 0 renders NO amber and NO message', () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+        component.body.set({ value: 0 });
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it('FALSIFYING — a whitespace-only string is treated as empty and reddens', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '   ' });
+        utilsService.getNestedProperty.mockReturnValue('   ');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('empty string is invalid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '' });
+        utilsService.getNestedProperty.mockReturnValue('');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('a non-blank value is valid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 'hello' });
+        utilsService.getNestedProperty.mockReturnValue('hello');
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "positive"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is filled-but-not-positive: a distinct positivity message, not the required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be greater than 0');
+      });
+
+      it('1 ⇒ valid', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 1 });
+        utilsService.getNestedProperty.mockReturnValue(1);
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "nonzero"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is invalid with a zero message, distinct from the required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be different from 0');
+      });
+
+      it('FALSIFYING — a negative value (-5) is valid; negatives are accepted', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: -5 });
+        utilsService.getNestedProperty.mockReturnValue(-5);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+      });
+    });
+
+    describe('isInvalid() honors requiredMode precedence, driven through body()', () => {
+      it("mode 'off' leaves the legacy isRequired falsy-0 behavior untouched (regression guard)", () => {
+        component.isRequired = true;
+        component.requiredMode = 'off';
+        component.body.set({ value: 0 });
+        // Pre-existing latent DC-2 behavior for 'off' mode — explicitly NOT this task's scope to fix.
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING (precedence) — mode 'filled' with isRequired=true and value 0: isInvalid() is false", () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it("mode 'positive' with value 0: isInvalid() is true", () => {
+        component.requiredMode = 'positive';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING — mode 'nonzero' with value -5: isInvalid() is false", () => {
+        component.requiredMode = 'nonzero';
+        component.body.set({ value: -5 });
+        expect(component.isInvalid()).toBe(false);
+      });
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode asterisk)
+// A separate top-level suite for the same reason as the rendered p-inputNumber suite above: the
+// outer `describe('InputComponent', ...)` overrides the template with '', so the real label/asterisk
+// markup never renders there. The asterisk render condition (`:6`) must be asserted on the REAL
+// rendered template (KZ-001) — a presence check on `component.isRequired`/`component.requiredMode`
+// would prove the inputs were set, not that the template's `@if` reads them.
+describe('InputComponent — rendered asterisk (T-01 requiredMode)', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+
+  async function render(config: { isRequired?: boolean; requiredMode?: 'off' | 'filled' | 'positive' | 'nonzero' }): Promise<void> {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.label = 'Test label';
+    // `type: 'number'` avoids the `text` branch's `appSaveOnWriting` directive, which resolves a
+    // DI chain (ActionsService -> ApiService -> ToPromiseService -> HttpClient) not provided by this
+    // harness and unrelated to the asterisk being asserted — same reason the pre-existing "rendered
+    // p-inputNumber" suite above renders as `type: 'number'`.
+    component.type = 'number';
+    if (config.isRequired !== undefined) component.isRequired = config.isRequired;
+    if (config.requiredMode !== undefined) component.requiredMode = config.requiredMode;
+    fixture.detectChanges();
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('renders no asterisk when isRequired=false and requiredMode="off"', async () => {
+    await render({});
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).toBeNull();
+  });
+
+  it('FALSIFYING — renders the asterisk when requiredMode is active even with isRequired=false', async () => {
+    await render({ requiredMode: 'filled' });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
+
+  it('still renders the asterisk for the legacy isRequired=true, requiredMode="off" case', async () => {
+    await render({ isRequired: true });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
 });
 
 // @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
@@ -1062,6 +1274,230 @@ describe('InputComponent — T-09: max as @Input, character guard asserted uncha
 
       expect(inputNumber.input.nativeElement.value).toBe('5'); // clamped on the rendered DOM value
       expect(inputNumber.value).toBe(5); // clamped on the real PrimeNG instance
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-02 — app-input: tokenize the
+// five live literals, delete the dead [style])
+//
+// DD-10 (INVERTED by P-2) + DD-3's per-control gate. Per DD-3's resolution table:
+//   - pInputText branch (:30) LIVE mechanism is the `[style]` object binding — asserted with a
+//     `CSSStyleDeclaration.prototype.border` setter spy, exactly as the in-tree exemplar
+//     (innovation-use-actor-item.component.spec.ts:291) does, and for the SAME reason: cssstyle
+//     @2.3.0 drops a shorthand carrying var(), so `element.style.border` reads back empty
+//     whether the binding is correct or broken (KZ-017 — this is what that check CANNOT reach).
+//   - p-inputNumber branch (:49) LIVE mechanism is the Tailwind utility CLASS — the `[style]` at
+//     the old :55 was PROVEN DEAD by P-1 (`p-inputNumber` declares `style` as an `@Input` and
+//     never applies it) and has been DELETED, not converted. Asserted on the rendered class
+//     string, never on style.
+// Neither assertion proves PAINT (DC-7) — T-16's human browser check is the gate for that
+// (DC-1); these assertions are token-compliance only.
+describe('InputComponent — T-02: tokenized amber/grey literals (DD-10, DD-3)', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  describe(':30 — pInputText [style] binding is CONVERTED (kept, not deleted)', () => {
+    async function renderTextType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? '' : 'some value'),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+      // appSaveOnWriting (@if (type === 'text') branch) injects ActionsService — mocked here so
+      // the real `type: 'text'` template can render at all (the pre-existing sibling suites in
+      // this file avoid type: 'text' entirely for exactly this DI reason and render type:
+      // 'number' instead; :30 lives only on the text branch, so it cannot be avoided here).
+      const mockActionsService: Partial<ActionsService> = { saveCurrentSection: jest.fn() };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService },
+          { provide: ActionsService, useValue: mockActionsService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? '' : 'some value' });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'text';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('sets a warning-token inline-style border on the invalid text input (R-IUR-003 AC.2)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(true);
+
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('does not set the warning-token border when the field is valid (R-IUR-003 AC.2, clears on fill)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(false);
+
+      expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+  });
+
+  describe(':49/:55 — p-inputNumber CLASS is CONVERTED (LIVE); the dead [style] is DELETED (P-1/P-2)', () => {
+    async function renderNumberType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // Drive `body` through the REAL mechanism (the `onChange` effect reads
+      // `getNestedProperty(signal(), optionValue)`) rather than calling `body.set()` directly —
+      // the effect's first run fires synchronously within this single `detectChanges()` and would
+      // clobber a directly-set `body` value back to whatever this mock returns.
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? null : 5),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? null : 5 });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('renders the warning-token border-color utility class when invalid (isInvalid() true)', async () => {
+      const localFixture = await renderNumberType(true);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).toContain('border-[var(--ac-warning-1)]');
+      expect(hostEl.className).not.toContain('#E69F00');
+    });
+
+    it('renders no border utility class when valid (isInvalid() false)', async () => {
+      const localFixture = await renderNumberType(false);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).not.toContain('border-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':58 — helper text is CONVERTED to --ac-grey-600 (not --ac-warning-1)', () => {
+    async function renderWithHelperText(): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(null),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({});
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.helperText = 'Helper copy';
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('applies the grey token, never the amber token, to the helper text row', async () => {
+      const localFixture = await renderWithHelperText();
+      // Matched by class, not by exact textContent equality: the outer wrapping <div>s have no
+      // text of their own when no label/description is set, so an exact-equality match on
+      // trimmed textContent picks up the FIRST ancestor div in traversal order instead of the
+      // helper row itself. The grey token is unique to this row (the warning-token rows below
+      // never carry it), so it is an unambiguous discriminator.
+      const helperDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-grey-600'));
+
+      expect(helperDiv).toBeTruthy();
+      expect((helperDiv!.nativeElement as HTMLElement).textContent).toContain('Helper copy');
+      expect((helperDiv!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+      expect((helperDiv!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':64/:70 — amber required/max-reached messages keep the warning token and the fs-[14] decision', () => {
+    async function renderMessage(kind: 'required' | 'maxReached'): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // 'maxReached' is driven through the REAL threshold in `updateMaxReachedMessage` (an
+      // 18-character value, `MAX_SAFE_INTEGER`) via the mocked `getNestedProperty` — not by
+      // calling `showMaxReachedMessage.set(true)` directly, which the effect's own first,
+      // synchronous run (within this same `detectChanges()`) recomputes and overwrites from
+      // `body().value` regardless of what was set beforehand.
+      const value = kind === 'required' ? '' : '9'.repeat(18);
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(value),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: value });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      if (kind === 'required') {
+        localComponent.isRequired = true;
+      }
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it.each([
+      { kind: 'required' as const, text: 'This field is required' },
+      { kind: 'maxReached' as const, text: 'Maximum reached' }
+    ])('the $kind message div carries the warning token, fs-[14], and an explicit 1.25rem line-height (text-sm decision, T-02)', async ({ kind, text }) => {
+      const localFixture = await renderMessage(kind);
+      // `.includes`, not exact equality: the div's own textContent concatenates the icon
+      // ligature text ("warning") with the message span's text (e.g. "warningThis field is
+      // required"), so an exact match against just the message string never matches.
+      const messageDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-warning-1') && (d.nativeElement as HTMLElement).textContent?.includes(text));
+
+      expect(messageDiv).toBeTruthy();
+      const className = (messageDiv!.nativeElement as HTMLElement).className;
+      expect(className).toContain('text-[var(--ac-warning-1)]');
+      expect(className).toContain('fs-[14]');
+      expect(className).toContain('leading-[1.25rem]');
+      expect(className).not.toContain('#E69F00');
+      expect(className).not.toContain('text-sm');
     });
   });
 });

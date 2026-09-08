@@ -6,6 +6,39 @@
   </div>
 </ng-template>
 
+<!-- R-IUR-006 (T-07) — known-path field-level required message. Its own `.organization-required-
+     message` class is a distinguishing hook: this card now has two `warning`-icon message
+     sources, and a whole-card icon count cannot tell them apart (the Disqualifier AC.3 exists
+     to forbid). -->
+<ng-template #institutionRequiredMessage>
+  <div class="organization-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
+<!-- R-IUR-007 (T-08) — unknown-path field-level required message for `Organization type`. Its
+     own `.organization-type-required-message` class keeps it distinguishable from T-07's
+     known-path `.organization-required-message` so message counts stay attributable per
+     source (mirrors the `#institutionRequiredMessage` (T-07) per-source attribution rationale). -->
+<ng-template #organizationTypeRequiredMessage>
+  <div class="organization-type-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
+<!-- R-IUR-008 (T-09) — Sub-type required message, rendered only when the sub-type select itself
+     renders (subTypeOptions().length > 0) AND it is empty. Own `.organization-subtype-required-
+     message` class hook, mirroring the `#institutionRequiredMessage` (T-07) and
+     `#organizationTypeRequiredMessage` (T-08) per-source attribution rationale. -->
+<ng-template #subTypeRequiredMessage>
+  <div class="organization-subtype-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
 <div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
   <div class="flex justify-between items-center rs-gap-[4]">
     <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ORGANIZATION # {{ organizationNumber }}</span>
@@ -49,7 +82,7 @@
         </span>
       </div>
 
-      <span class="label rs-mt-[12]">Organization</span>
+      <span class="label rs-mt-[12]">Organization<span class="text-red-500">*</span></span>
       <p-select
         [disabled]="disabled"
         [scrollHeight]="'218px'"
@@ -62,6 +95,7 @@
         placeholder="Select the organization"
         [ariaLabel]="'Select the organization'"
         class="fs-[14] w-full"
+        [style]="institutionMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
         [ngModel]="body().institution_id"
         (onChange)="onInstitutionChange($event.value)"
         [options]="institutionsService.list()">
@@ -73,11 +107,15 @@
         </ng-template>
       </p-select>
 
+      @if (institutionMissing) {
+        <ng-container *ngTemplateOutlet="institutionRequiredMessage"></ng-container>
+      }
+
       @if (body().institution_id) {
         <app-partner-selected-item [institution]="selectedInstitution()" class="rs-mt-[12] bg-[var(--ac-grey-200)] rs-p-[16]" />
       }
     } @else {
-      <span class="label rs-mt-[12]">Organization type</span>
+      <span class="label rs-mt-[12]">Organization type<span class="text-red-500">*</span></span>
       <p-select
         [disabled]="disabled"
         [scrollHeight]="'218px'"
@@ -86,6 +124,7 @@
         placeholder="Select the organization type"
         [ariaLabel]="'Select the organization type'"
         class="fs-[14] w-full"
+        [style]="organizationTypeMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
         [ngModel]="body().institution_type_id"
         (onChange)="onInstitutionTypeChange($event.value)"
         [options]="institutionTypesService.list()">
@@ -107,8 +146,12 @@
         </ng-template>
       </p-select>
 
+      @if (organizationTypeMissing) {
+        <ng-container *ngTemplateOutlet="organizationTypeRequiredMessage"></ng-container>
+      }
+
       @if (subTypeOptions().length > 0) {
-        <span class="label rs-mt-[12]">Sub-type</span>
+        <span class="label rs-mt-[12]">Sub-type<span class="text-red-500">*</span></span>
         <p-select
           [disabled]="disabled"
           [scrollHeight]="'218px'"
@@ -117,6 +160,7 @@
           placeholder="Select the organization sub-type"
           [ariaLabel]="'Select the organization sub-type'"
           class="fs-[14] w-full"
+          [style]="subTypeMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
           [ngModel]="body().sub_institution_type_id"
           (onChange)="onSubTypeChange($event.value)"
           [options]="subTypeOptions()">
@@ -137,6 +181,10 @@
             </div>
           </ng-template>
         </p-select>
+
+        @if (subTypeMissing) {
+          <ng-container *ngTemplateOutlet="subTypeRequiredMessage"></ng-container>
+        }
       }
 
       @if (body().institution_type_id === otherInstitutionTypeId) {
@@ -159,6 +207,7 @@
           [type]="'number'"
           [min]="0"
           [maxFractionDigits]="0"
+          [requiredMode]="'positive'"
           [disabled]="disabled"
           placeholder="How many?"></app-input>
       </div>

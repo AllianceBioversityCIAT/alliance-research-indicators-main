@@ -119,6 +119,14 @@ describe('InnovationUseDetailsComponent', () => {
   // ---------------------------------------------------------------------------------------------
   describe('c1 — loading state', () => {
     it('renders p-skeleton inside the actor card fields when currentResultIsLoading() is true', async () => {
+      // R-IUR-002/DD-7: the default empty 200 no longer seeds a blank actor row, so this test
+      // (which targets the actor card's own skeleton, not the empty-state behaviour c2 owns)
+      // must arrange a result that actually has an actor row to render skeletons inside.
+      apiService.GET_InnovationUseDetails.mockResolvedValue({
+        data: { ...new GetInnovationUseDetails(), actors: [new InnovationUseActor()] },
+        successfulRequest: true
+      });
+
       await component.getData();
       cacheMock.currentResultIsLoading.set(true);
       fixture.detectChanges();
@@ -128,6 +136,14 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     it('renders no skeleton when currentResultIsLoading() is false', async () => {
+      // Hygiene (T-12 pointer 3): give this test the same one-actor arrangement as its sibling
+      // above, so a field component actually renders here — without it, the default empty load
+      // renders zero field components and the assertion holds regardless of the flag.
+      apiService.GET_InnovationUseDetails.mockResolvedValue({
+        data: { ...new GetInnovationUseDetails(), actors: [new InnovationUseActor()] },
+        successfulRequest: true
+      });
+
       await component.getData();
       cacheMock.currentResultIsLoading.set(false);
       fixture.detectChanges();
@@ -138,10 +154,15 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c2 — empty state: exactly one blank actor card (rendered count), zero organization/quant cards
+  // c2 — empty state (R-IUR-002/DD-7 reversion): zero actor cards on an all-empty 200 — no
+  // auto-seeded blank row — plus zero organization/quant cards. Positive assertion per the
+  // Disqualifier: buildPayload() filters the array regardless, so a green suite after deleting
+  // the seed line proves only that the line was unused, not that the empty state renders
+  // correctly. Assert the rendered DOM directly: zero actor cards, the guidance callout still
+  // present, and the `Add other actor` button still present (isEditableStatus() true by default).
   // ---------------------------------------------------------------------------------------------
   describe('c2 — empty state', () => {
-    it('renders exactly one Actor card and zero Organization/Quantification cards for an all-empty 200', async () => {
+    it('renders zero Actor/Organization/Quantification cards for an all-empty 200, with the guidance callout and Add other actor button still present', async () => {
       apiService.GET_InnovationUseDetails.mockResolvedValue({
         data: { innovation_use_level_id: null, innovation_use_level_explanation: null, actors: [], organizations: [], quantifications: [] },
         successfulRequest: true
@@ -154,9 +175,18 @@ describe('InnovationUseDetailsComponent', () => {
       const organizationCards = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent));
       const quantificationCards = fixture.debugElement.queryAll(By.directive(QuantificationItemComponent));
 
-      expect(actorCards.length).toBe(1);
+      // R-IUR-002 AC.1: empty `actors` from the API ⇒ zero rendered actor cards (no seed).
+      expect(actorCards.length).toBe(0);
       expect(organizationCards.length).toBe(0);
       expect(quantificationCards.length).toBe(0);
+
+      // R-IUR-002 scenario: the section still renders its guidance callout and the
+      // `Add other actor` button, and no card.
+      expect(fixture.nativeElement.textContent).toContain('List every actor group using this innovation.');
+      expect(fixture.nativeElement.textContent).toContain('Add other actor');
+
+      // R-IUR-001 S1's BUT: the removed message must not render in this (or any) state.
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
   });
 
@@ -276,9 +306,13 @@ describe('InnovationUseDetailsComponent', () => {
       expect(textareaEl.nativeElement.textContent).toContain('Justification');
       expect(textareaEl.nativeElement.textContent).toContain('This field is required');
       // REWORK (T-02 rework, c5 / R-IUD-003 AC.5): the asterisk is proven as a rendered text
-      // node, scoped to the `app-textarea` instance itself — not by `.text-red-500` class
-      // (disqualified elsewhere in this file, see c10's REWORK at :361-366) and not page-wide
-      // (the level stepper's own label also renders a bare `*` and would pass vacuously).
+      // node, scoped to the `app-textarea` instance itself — not by an unscoped `.text-red-500`
+      // class query and not by an unscoped page-wide text search. Both would also match the level
+      // stepper's own bare `*` asterisk (its label uses the same class —
+      // `innovation-use-details.component.html:15`) and pass vacuously regardless of which
+      // asterisk actually rendered. (Attempt-4: the prior parenthetical here pointed at a same-
+      // file REWORK block that a later diff removed — `A-N4` — replaced with a self-contained
+      // rationale that names no in-file line.)
       const hasAsteriskTextNode = Array.from((textareaEl.nativeElement as HTMLElement).querySelectorAll('span')).some(
         span => (span.textContent || '').trim() === '*'
       );
@@ -329,6 +363,11 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Justification');
+      // Advisory (d), T-08 attempt-3: this page-wide `not.toContain` survives T-08's new
+      // Organization type/count asterisks (c10) only because this test's fixture resolves through
+      // the default `GetInnovationUseDetails`, whose `organizations` defaults to `[]` — zero
+      // organization cards render, so T-08's required message never gets a chance to appear here.
+      // Pre-existing pattern (predates T-08); T-08 widens the set of rows that would falsify it.
       expect(fixture.nativeElement.textContent).not.toContain('This field is required');
       // REWORK (Issue 5): "does not block completion" is the criterion's other half and has no
       // save path to exercise until buildPayload()/PATCH exist (T-08) — owned by T-08 c14 /
@@ -337,14 +376,18 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // c10 — cards 3 and 4 carry no asterisk; card 2 shows the at-least-one-actor message when empty
+  // c10 — required messaging/asterisk boundaries: card 2's at-least-one-actor message is gone in
+  // every state (R-IUR-011 AC.1 / DD-7 reversion — rewritten, not deleted: revision 1's premise
+  // that the message renders when actors is empty no longer holds); cards 3 and 4 (Organizations,
+  // Other quantitative measures) each carry required-field asterisks on specific fields only,
+  // asserted per field below — not as a whole-card presence/absence claim.
   // ---------------------------------------------------------------------------------------------
   describe('c10 — required messaging boundaries', () => {
-    it('shows the at-least-one-actor message when actors is empty', () => {
+    it('does not show the at-least-one-actor message when actors is empty', () => {
       component.body.set({ ...component.body(), actors: [] });
       fixture.detectChanges();
 
-      expect(fixture.nativeElement.textContent).toContain('At least one actor is required');
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
 
     it('does not show the at-least-one-actor message once an actor row exists', () => {
@@ -354,7 +397,11 @@ describe('InnovationUseDetailsComponent', () => {
       expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
     });
 
-    it('renders no asterisk on the Organizations or Other quantitative measures cards', () => {
+    // T-12 REWRITE (R-IUR-010 AC.1): this used to assert NO asterisk anywhere on the
+    // quantifications card — that premise is reversed by this requirement. Measures now DO carry
+    // asterisks, on Number and Unit; Comments does not. The organizationsCard half is covered by
+    // the T-08 REWORK comment below — it is not unchanged either.
+    it('renders Organization type and count asterisks on the Organizations card; renders Number/Unit asterisks (not Comments) on the Other quantitative measures card (R-IUR-007 AC.1 / R-IUR-010 AC.1)', () => {
       component.body.set({
         ...component.body(),
         organizations: [new InnovationUseOrganization()],
@@ -372,16 +419,146 @@ describe('InnovationUseDetailsComponent', () => {
         .find(card => card.nativeElement.textContent.trim() === 'OTHER QUANTITATIVE MEASURES')
         ?.parent?.nativeElement as HTMLElement;
 
-      // REWORK (Issue 1): the shared quantification card renders its asterisk as a bare `*` text
-      // node inside a `<span>` (shared/components/quantification-item/.../quantification-item.component.html),
-      // never with `.text-red-500` — a `.text-red-500` query returns null regardless of
-      // `[fieldsRequired]`, so it cannot detect the binding this test exists to guard
-      // (R-IUP-012 AC.3). Search for the asterisk text node itself instead.
-      const hasAsteriskTextNode = (root: HTMLElement) => Array.from(root.querySelectorAll('span')).some(span => span.textContent?.trim() === '*');
+      // T-08 REWORK (R-IUR-007 AC.1): T-12 pointed this half at T-07/T-08 rather than asserting it
+      // unchanged, and it is not unchanged. On the unknown path (`is_organization_known: false`,
+      // this fixture's default via `new InnovationUseOrganization()`), two fields on this card now
+      // carry the required asterisk: `Organization type` (card-owned markup, unconditional, in
+      // innovation-use-organization-item.component.html) and `Organization count` (forwarded to
+      // `app-input`, whose own `@if (isRequired || requiredMode !== 'off')` renders the asterisk
+      // because this field passes `[label]` with `[requiredMode]="'positive'"`). No other labelled
+      // field on this card (e.g. Sub-type, not rendered while `institution_type_id` is undefined)
+      // carries one. Asserted per field, keyed on the label each asterisk belongs to — the shape
+      // the quantifications half above already uses — because a whole-card cohort count cannot
+      // express "these two fields carry asterisks and nothing else does" (KZ-001).
+      const orgLabels = Array.from(organizationsCard.querySelectorAll('.label'));
+      const organizationTypeLabel = orgLabels.find(label => label.textContent?.trim().startsWith('Organization type'));
+      const organizationCountLabel = orgLabels.find(label => label.textContent?.trim().startsWith('Organization count'));
 
-      expect(hasAsteriskTextNode(organizationsCard)).toBe(false);
-      expect(hasAsteriskTextNode(quantificationsCard)).toBe(false);
-      expect(quantificationsCard.textContent).not.toContain('This field is required');
+      expect(orgLabels.length).toBe(2);
+      expect(organizationTypeLabel).toBeTruthy();
+      expect(organizationCountLabel).toBeTruthy();
+      expect(organizationTypeLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(organizationCountLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+
+      // R-IUR-010 AC.1, asserted per field rather than per card: Number and Unit each carry the
+      // red `*` beside their label; Comments does not.
+      const quantLabels = Array.from(quantificationsCard.querySelectorAll('h2.label'));
+      const numberLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Number'));
+      const unitLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Unit'));
+      const commentsLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Comments'));
+
+      expect(numberLabel).toBeTruthy();
+      expect(unitLabel).toBeTruthy();
+      expect(commentsLabel).toBeTruthy();
+      expect(numberLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
+      expect(commentsLabel!.querySelector('span')).toBeNull();
+    });
+
+    // R-IUR-010 — the Disqualifier (T-12 work order): a green suite after removing
+    // `fieldsRequired` is not evidence the five new bindings arrived — a stale binding on the
+    // one template that carries it does redden, but the ABSENCE of a new binding is silent for
+    // three of these five assertions (e.g. a forgotten `[unitRequiredMode]` would leave the
+    // child's default `'off'` in place, and a whitespace-only Unit would stay valid — the exact
+    // defect the pivot exists to close). `commentsRequired`, `numberRequiredMode` and
+    // `unitRequiredMode` discriminate this way; `numberRequired`/`unitRequired` do not — both
+    // default to `true` in the child, so deleting those two bindings would leave these two
+    // assertions green regardless (no behavioural consequence: the resolved value is identical
+    // either way). Assert the real child component's RESOLVED input values, not the template
+    // text.
+    it('forwards DD-4\'s five bindings to the real QuantificationItemComponent instance, resolved', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: undefined, unit: undefined, description: undefined }]
+      });
+      fixture.detectChanges();
+
+      const quantItem = fixture.debugElement.query(By.directive(QuantificationItemComponent)).componentInstance as QuantificationItemComponent;
+
+      expect(quantItem.numberRequired).toBe(true);
+      expect(quantItem.unitRequired).toBe(true);
+      expect(quantItem.commentsRequired).toBe(false);
+      expect(quantItem.numberRequiredMode).toBe('nonzero');
+      expect(quantItem.unitRequiredMode).toBe('filled');
+    });
+
+    // R-IUR-010 AC.4 (corrected boundary, user ruling 2026-09-04): 0 is INVALID with a message
+    // distinguishable from the required message ("Must be different from 0", not "This field is
+    // required") — this is the falsifying input the work order names for the zero half.
+    it('Number = 0 renders invalid, with a message distinguishable from the required message', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 0, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const verdict = numberInput.inputValid();
+
+      expect(verdict.valid).toBe(false);
+      expect(verdict.message).toBe('Must be different from 0');
+      expect(verdict.message).not.toBe('This field is required');
+      expect(numberInput.isInvalid()).toBe(true);
+    });
+
+    // R-IUR-010 AC.4's other half: -5 must NOT redden — `quantification_number` is a signed
+    // decimal (changes/measure-number-signed-decimal), so a negative measure is legitimate and
+    // the rule is `!= 0`, never `> 0`. Regression-protection, not standalone proof the mode ran:
+    // a bare "valid, no message" verdict cannot by itself distinguish "requiredMode='nonzero'
+    // evaluated -5 and passed" from "no mode ran at all" — that distinguishing power comes from
+    // the 0 case above (which DOES redden) plus the resolved-mode assertion two tests up.
+    it('Number = -5 renders valid — no amber, no message (regression-protection, read alongside the 0 case above)', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: -5, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const verdict = numberInput.inputValid();
+
+      expect(verdict.valid).toBe(true);
+      expect(verdict.message).toBe('');
+      expect(numberInput.isInvalid()).toBe(false);
+    });
+
+    // R-IUR-010 S1's AND IT MUST + AC.6 (reassigned to T-12 by the 2026-09-04 pivot): a
+    // whitespace-only Unit must redden. This is the pivot's whole justification — before
+    // `unitRequiredMode` existed, `Unit` reached `app-input` only through the boolean
+    // `unitRequired` -> `isRequired`, whose branch is `!value || value.length === 0`; `'   '` is
+    // truthy with `length === 3`, so it evaluated valid and the row saved unsubmittable with
+    // nothing on screen (DC-2b + DC-3).
+    it("Unit = '   ' (whitespace-only) renders invalid — proof that unitRequiredMode is load-bearing", () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: '   ', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const inputs = quantCard.queryAll(By.directive(InputComponent));
+      // Selected by `optionValue` (a public @Input), not position — a new field inserted before
+      // Unit would otherwise leave this positional lookup silently checking the wrong node.
+      const unitInput = inputs.find(i => (i.componentInstance as InputComponent).optionValue === 'unit')!.componentInstance as InputComponent;
+      const verdict = unitInput.inputValid();
+
+      expect(verdict.valid).toBe(false);
+      expect(verdict.message).toBe('This field is required');
+    });
+
+    // R-IUR-010 AC.3: Comments stays optional. Empty renders no asterisk (covered above) and no
+    // required message.
+    it('Comments empty renders no required message', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: 'ha', description: '' }]
+      });
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent)).nativeElement as HTMLElement;
+      expect(quantCard.textContent).not.toContain('This field is required');
     });
   });
 
@@ -1122,6 +1299,231 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   // -------------------------------------------------------------------------------------------------
+  // R-IUR-008 (T-09) / DD-5b — end-to-end through the emitted row: the card clears a stale
+  // sub-type to an explicit `null` on a type change, that `null` propagates through
+  // `onOrganizationUpdate` into `body()`, and `buildOrganizationPayload` forwards it into the
+  // PATCH body's serialized JSON rather than letting `JSON.stringify` drop it as `undefined`
+  // would be (DD-5b). This is the falsifying-input scenario named in tasks.md verbatim: select a
+  // type with sub-types, choose a sub-type, switch to a type without sub-types, save.
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-008 (T-09) / DD-5b — a type change never leaves a stale sub_institution_type_id in the serialized payload', () => {
+    it('switching the rendered card from a sub-typed type (with a chosen sub-type) to one without sub-types serializes sub_institution_type_id as an explicit null, never omitted', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10 }]
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      // Choose a sub-type (mock resolves `[{ code: 1, name: 'Sub A' }]` for type 10 — see
+      // `GET_SubInstitutionTypes` at the top of this file).
+      cardInstance.onSubTypeChange(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component.body().organizations[0].sub_institution_type_id).toBe(1);
+
+      // Switch to a type with no sub-types (any code other than 10 resolves zero rows here).
+      await cardInstance.onInstitutionTypeChange(20);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.body().organizations[0].sub_institution_type_id).toBeNull();
+
+      const payload = component.buildPayload();
+      const serialized = JSON.stringify(payload.organizations[0]);
+      // The disqualifying check the task brief calls out by name: a `toBeUndefined()`/property
+      // check passes for both the bug (value dropped to `undefined`) and the fix (value `null`),
+      // because both read as "not present"/"falsy" on a plain object read. Only the SERIALIZED
+      // form distinguishes them — `undefined` disappears from `JSON.stringify`, `null` does not.
+      expect(serialized).toContain('"sub_institution_type_id":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // T-10 (R-IUR-015, DD-12) — the organization card's toggle-clearing (`onKnownToggle`) must reach
+  // the PARENT's `body()` through the real `(update)` binding, not just the card's own local state
+  // (Disqualifier: "the card's effect emits upward; if the cleared row is not what the parent
+  // holds, buildOrganizationPayload still sees the old values. Assert the emitted row" — the
+  // parent-level half of that assertion belongs here per the task's own Verify split).
+  // -------------------------------------------------------------------------------------------------
+  describe('T-10 (R-IUR-015 AC.1/AC.2, DD-12) — the toggle\'s clearing reaches the PARENT\'s body(), not just the card\'s local state', () => {
+    it('ticking known clears the unknown-path fields in body() through the real (update) binding', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            is_organization_known: false,
+            institution_type_id: 10,
+            sub_institution_type_id: 1,
+            institution_type_custom_name: 'stale',
+            organization_count: 5
+          }
+        ]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true);
+      fixture.detectChanges();
+
+      const row = component.body().organizations[0];
+      expect(row.institution_type_id).toBeNull();
+      expect(row.sub_institution_type_id).toBeNull();
+      expect(row.institution_type_custom_name).toBeNull();
+      expect(row.organization_count).toBeNull();
+    });
+
+    it('unticking clears institution_id in body() through the real (update) binding', () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(false);
+      fixture.detectChanges();
+
+      expect(component.body().organizations[0].institution_id).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // R-IUR-014 AC.4b, and the concrete DD-5b-style hazard the brief's "question you must answer
+  // first" names: does clearing to `undefined` (the actor-card exemplar's own value) reintroduce
+  // the DD-5b bug on a toggle-back-and-save path? `organization_count` is the reachable case here
+  // — unlike `sub_institution_type_id` (always force-reset to `null` by `onInstitutionTypeChange`
+  // on every type change, T-09), nothing re-touches `organization_count` when the unknown path's
+  // identity (`institution_type_id`) is re-selected after a tick+untick round trip. Sequence:
+  // fill unknown path -> tick (clears institution_type_id + organization_count) -> untick (leaves
+  // them cleared) -> re-select the SAME institution type (re-satisfies the row's identity,
+  // WITHOUT touching organization_count) -> save. If the clear had left `undefined`,
+  // `buildOrganizationPayload`'s `known === false` branch would forward `row.organization_count`
+  // (`undefined`) verbatim, `JSON.stringify` would drop the key, and a stale server value would
+  // survive under an empty-looking UI. `null` is forwarded explicitly instead — proven on the
+  // SERIALIZED payload (KZ-001), never on the object read alone (both a dropped key and an
+  // explicit `null` read as "falsy"/"not present" on a plain property access).
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-014 AC.4b / DD-5b interaction (T-10) — a toggle-then-save succeeds, and a field that becomes ACTIVE again after the round trip still serializes as an explicit null', () => {
+    // Regression protection only — non-discriminating under either DD-12 mutation (reverting
+    // onKnownToggle, or null->undefined): both mutants still pass this assertion. Its
+    // discriminating red arrives with T-13's save gate; R-IUR-014 AC.4b is assigned to T-10 + T-13.
+    it('R-IUR-014 AC.4b: fill the unknown path, tick, pick an institution, save — the save succeeds', async () => {
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(2),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 5 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true);
+      fixture.detectChanges();
+      cardInstance.onInstitutionChange(501);
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalled();
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls.at(-1)!;
+      expect(sent.organizations[0]).toEqual(
+        expect.objectContaining({
+          is_organization_known: true,
+          institution_id: 501,
+          institution_type_id: null,
+          sub_institution_type_id: null,
+          institution_type_custom_name: null,
+          organization_count: null
+        })
+      );
+    });
+
+    it('fill unknown path, tick, untick, re-select the same type, save: organization_count serializes as an explicit null, never dropped as undefined', async () => {
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(2),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 5 }]
+      });
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      cardInstance.onKnownToggle(true); // leaves the unknown path -> clears institution_type_id + organization_count
+      fixture.detectChanges();
+      cardInstance.onKnownToggle(false); // back to the unknown path; institution_type_id/organization_count stay cleared
+      fixture.detectChanges();
+      await cardInstance.onInstitutionTypeChange(10); // re-identifies the row WITHOUT touching organization_count
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls.at(-1)!;
+      // The row must still be present — its identity (institution_type_id) was restored.
+      expect(sent.organizations.length).toBe(1);
+      const serialized = JSON.stringify(sent.organizations[0]);
+      expect(serialized).toContain('"organization_count":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
+  // R-IUR-008 (T-09) / DD-5b — the `institution_type_custom_name` half of the same statement T-09
+  // fixed for `sub_institution_type_id`. Fixed under a user ruling recorded during T-10 (an
+  // advisory the Reviewer raised on T-10's own diff); it discharges no T-10 acceptance criterion.
+  // `onInstitutionTypeChange` cleared `sub_institution_type_id` to an explicit `null` (T-09) but
+  // left `institution_type_custom_name` clearing to `undefined` on the same statement — same
+  // defect class, half done. Reachable: a saved unknown-path row with type 78 (OTHER) and a
+  // non-empty custom name, user changes the type to a non-OTHER type, save. On the unknown path
+  // `buildOrganizationPayload` forwards `institution_type_custom_name: known ? null :
+  // row.institution_type_custom_name` verbatim; `undefined` there is dropped by `JSON.stringify`
+  // and a stale server-side custom name survives under a UI that shows it gone. Proven on the
+  // SERIALIZED payload (KZ-001) — a `toBeUndefined()`/`toBeNull()` property check passes for both
+  // the bug and the fix, which is why this defect class survived T-09 in the first place.
+  // -------------------------------------------------------------------------------------------------
+  describe('R-IUR-008 / DD-5b (T-10, user-ruled fix) — a type change never leaves a stale institution_type_custom_name in the serialized payload', () => {
+    it('switching the rendered card from OTHER (type 78, with a custom name) to a non-OTHER type serializes institution_type_custom_name as an explicit null, never omitted', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [
+          {
+            ...new InnovationUseOrganization(),
+            is_organization_known: false,
+            institution_type_id: 78,
+            institution_type_custom_name: 'Stale Custom Name'
+          }
+        ]
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cardInstance = fixture.debugElement.queryAll(By.directive(InnovationUseOrganizationItemComponent))[0]
+        .componentInstance as InnovationUseOrganizationItemComponent;
+
+      await cardInstance.onInstitutionTypeChange(10);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const payload = component.buildPayload();
+      const serialized = JSON.stringify(payload.organizations[0]);
+      expect(serialized).toContain('"institution_type_custom_name":null');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------------
   // Hazard (b) — quantification "absent" must include falsy/empty text, not just == null. Not a
   // named c-criterion; flagged by the task brief.
   // -------------------------------------------------------------------------------------------------
@@ -1575,19 +1977,28 @@ describe('InnovationUseDetailsComponent', () => {
     });
   });
 
-  describe('T-09 c3 — no PATCH is issued while any row is flagged as a duplicate', () => {
-    it('issues zero PATCH requests when two rows share the same actor type', async () => {
+  describe('T-13 (R-IUR-014 AC.5, R-IUR-017/DD-18, T-13 Pivot) — a duplicate actor type no longer gates the save', () => {
+    // INVERTS the withdrawn T-09 c3 above, which asserted the save was refused. R-IUR-017/DD-18
+    // moves duplicate prevention into the dropdown (T-21 — disables the already-taken type at
+    // source); this page raises no save-time gate of its own any more.
+    // regression-protection: observed RED against HEAD by temporarily restoring
+    // `&& !this.hasDuplicateActorType()` to saveData()'s guard — with that clause back, this
+    // exact test fails (`PATCH_InnovationUseDetails` is never called). Reverting the clause turns
+    // it green again — see the Implementer report for the verbatim run.
+    it('issues the PATCH even when two actor rows share the same actor_type_id', async () => {
       component.body.set({
         ...component.body(),
         actors: [
-          { ...new InnovationUseActor(), actor_type_id: 1 },
-          { ...new InnovationUseActor(), actor_type_id: 1 }
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 2 }
         ]
       });
 
       await component.saveData();
 
-      expect(apiService.PATCH_InnovationUseDetails).not.toHaveBeenCalled();
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(2);
     });
   });
 
@@ -1626,6 +2037,251 @@ describe('InnovationUseDetailsComponent', () => {
       await component.saveData();
 
       expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // =================================================================================================
+  // T-21 (R-IUR-017/DD-18, T-13 Pivot) — the parent computes which actor types are already taken
+  // (self excluded) and wires that set into each card as `usedActorTypeIds`. The disable/exemption
+  // logic itself is card-owned (asserted in innovation-use-actor-item.component.spec.ts against the
+  // RENDERED p-select overlay, per this task's Disqualifier) — these tests cover only the parent's
+  // half: does the right set reach the right row, and does it stay LIVE off `body().actors` (AC.4).
+  // =================================================================================================
+  describe('T-21 (R-IUR-017/DD-18) — usedActorTypeIds wiring', () => {
+    it('wires each row the OTHER rows\' actor_type_ids, excluding its own index', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 2 },
+          new InnovationUseActor()
+        ]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(3);
+      // Row 0 (type 1): sees row 1's type (2), never its own (1).
+      expect(cards[0].componentInstance.usedActorTypeIds).toEqual(new Set([2]));
+      // Row 1 (type 2): sees row 0's type (1), never its own (2).
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set([1]));
+      // Row 2 (blank): sees both other rows' types.
+      expect(cards[2].componentInstance.usedActorTypeIds).toEqual(new Set([1, 2]));
+    });
+
+    it('a blank actor_type_id on another row contributes nothing to the set', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [new InnovationUseActor(), { ...new InnovationUseActor(), actor_type_id: 1 }]
+      });
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set());
+    });
+
+    // AC.4 (R-IUR-017) — falsifying input: removing the row that held a type must re-enable it on
+    // the surviving row's wiring. This is the "derive live, never cache" trap named in the brief —
+    // asserted here at the parent's own boundary (what reaches the card), which is exactly what a
+    // cached-set implementation would get wrong: a memoized Set built once from the original
+    // three-row body would still contain the removed row's type after the removal.
+    it('removing the row that held a type re-enables it everywhere (AC.4)', () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1 },
+          { ...new InnovationUseActor(), actor_type_id: 2 }
+        ]
+      });
+      fixture.detectChanges();
+      let cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards[1].componentInstance.usedActorTypeIds).toEqual(new Set([1]));
+
+      component.removeActor(0);
+      fixture.detectChanges();
+
+      cards = fixture.debugElement.queryAll(By.directive(InnovationUseActorItemComponent));
+      expect(cards.length).toBe(1);
+      expect(cards[0].componentInstance.usedActorTypeIds).toEqual(new Set());
+    });
+
+    // AC.5 — this requirement adds no save-time gate: pre-existing duplicate data (two rows
+    // already sharing a type) must still save. Mirrors the T-13 test above, restated for R-IUR-017
+    // specifically since it is the requirement AC.5 names.
+    it('a result whose stored data already contains a duplicate still saves (AC.5, no client-side block)', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 4 },
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 2 }
+        ]
+      });
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // =================================================================================================
+  // T-13 (R-IUR-014 AC.1-AC.4, AC.6, AC.7; DD-8 SECOND AMENDMENT; NFR-IUR-003 unnarrowed) —
+  // nothing on this page gates saveData() any more. Every row buildPayload() drops still reaches
+  // the PATCH for every OTHER row, and the user's only signal for the drop is the field-level
+  // required message already rendered continuously (T-07/T-08/T-09, never gated on touched()) —
+  // never a save-time toast (`DD-8` SECOND AMENDMENT, PRMS + BA). Every assertion below reads the
+  // actual HTTP body off `apiService.PATCH_InnovationUseDetails.mock.calls`, never
+  // `buildPayload()`'s return directly, per this task's Disqualifier.
+  // =================================================================================================
+  describe('T-13 — AC.1 / AC.6: an actor row with typed counts and no actor_type_id saves silently, marked only by the field-level message', () => {
+    // regression-protection: reddened by temporarily changing `buildPayload()`'s actors filter
+    // from `!!row.actor_type_id` to `true` (keep every row) — with that mutation, `sent.actors`
+    // has length 1, not 0, and this test fails. Reverting the mutation turns it green again.
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Actor type — with no extra toast', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [
+          {
+            ...new InnovationUseActor(),
+            sex_age_disaggregation_not_apply: false,
+            women_youth_count: 3,
+            women_not_youth_count: 2,
+            men_youth_count: 1,
+            men_not_youth_count: 4
+          }
+        ]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — rendered DOM, not the getter, asserted BEFORE the save: the message is immediate
+      // and continuous (`OQ-1` = IMMEDIATE), so it is already on screen the instant the row exists
+      // — it is not a save-time artifact. Asserted here rather than after `saveData()` because a
+      // successful save's `getData()` re-read replaces `body()` with the mocked (empty) GET
+      // response, which would make the row and its card vanish and turn this into a false
+      // negative that has nothing to do with whether the message ever rendered (the documented
+      // "residual" in `requirements.md` `R-IUR-014`).
+      // regression-protection: reddened by temporarily forcing `actorTypeMissing` to return
+      // `false` in innovation-use-actor-item.component.ts — with that mutation this `toContain`
+      // fails because the message never renders. Reverting the mutation turns it green again.
+      const card = fixture.debugElement.query(By.directive(InnovationUseActorItemComponent));
+      expect(card.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(0);
+
+      // No save-time message: the ONLY showToast call is the plain success one, scoped so this
+      // cannot pass merely because some toast fired (the success toast always does).
+      // regression-protection: reddened by temporarily inserting an extra
+      // `this.actions.showToast({ severity: 'warning', summary: 'Innovation Use', detail: 'dropped' })`
+      // call into saveData() right before navigation — with that mutation
+      // `toHaveBeenCalledTimes(1)` fails (2 calls). Reverting the mutation turns it green again.
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.2: an unknown-path organization row with a count and no type saves silently, marked only by the field-level message', () => {
+    // regression-protection: reddened by temporarily changing `organizationIdentitySatisfied()`
+    // to always return `true` — with that mutation `sent.organizations` has length 1, not 0, and
+    // this test fails. Reverting the mutation turns it green again.
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Organization type', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, organization_count: 7 }]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — asserted BEFORE the save, same reason as the actor test above: a successful
+      // save's `getData()` re-read replaces `body()` with the mocked (empty) GET response, and
+      // the row (with it, its card) would no longer exist to query.
+      // regression-protection: reddened by temporarily forcing `organizationTypeMissing` to
+      // return `false` in innovation-use-organization-item.component.ts — with that mutation the
+      // query below returns null and `.nativeElement` throws / the assertion fails. Reverting the
+      // mutation turns it green again.
+      const message = fixture.debugElement.query(By.css('.organization-type-required-message'));
+      expect(message.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.organizations).toHaveLength(0);
+
+      // regression-protection: reddened by temporarily changing
+      // `organizationIdentitySatisfied()` to always return `true` — with that mutation
+      // `sent.organizations` has length 1, not 0, and this test fails. Reverting the mutation
+      // turns it green again.
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.2 (known path): an organization row on the known path with no institution saves silently, marked only by the field-level message', () => {
+    it('issues the PATCH, omits the row from the sent body, and still renders "This field is required" on Organization', async () => {
+      component.body.set({
+        ...component.body(),
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true }]
+      });
+      fixture.detectChanges();
+
+      // AC.7 — asserted BEFORE the save, same reason as above.
+      // regression-protection: reddened by temporarily forcing `institutionMissing` to return
+      // `false` in innovation-use-organization-item.component.ts — with that mutation the query
+      // below returns null and the assertion fails. Reverting the mutation turns it green again.
+      const message = fixture.debugElement.query(By.css('.organization-required-message'));
+      expect(message.nativeElement.textContent).toContain('This field is required');
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.organizations).toHaveLength(0);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.3: an entirely blank actor row saves silently, with no extra toast', () => {
+    it('issues the PATCH and omits the blank row, raising only the plain success toast', async () => {
+      component.body.set({
+        ...component.body(),
+        actors: [new InnovationUseActor()]
+      });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.actors).toHaveLength(0);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
+    });
+  });
+
+  describe('T-13 — AC.4: a measure row missing one of its own required fields never blocks the save and raises no message of its own', () => {
+    // regression-protection: reddened by temporarily AND-ing a bogus
+    // `&& current.quantifications.every(q => !!q.unit)`-shaped clause into saveData()'s guard —
+    // with that mutation `PATCH_InnovationUseDetails` is never called and this test fails.
+    // Reverting the mutation turns it green again.
+    it('issues the PATCH with the partially-filled measure row intact, unblocked by its own incomplete required fields', async () => {
+      // Number filled, Unit blank: kept by quantificationRowAbsent (a number is present), and
+      // Unit's OWN required message renders on QuantificationItemComponent (R-IUR-010) — but
+      // that message must never become a save gate, which is what this test proves.
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: undefined, quantification_number: 4, unit: undefined, description: undefined }]
+      });
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, sent] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(sent.quantifications).toHaveLength(1);
+      expect(actions.showToast).toHaveBeenCalledTimes(1);
+      expect(actions.showToast).toHaveBeenNthCalledWith(1, expect.objectContaining({ severity: 'success' }));
     });
   });
 
@@ -1763,13 +2419,13 @@ describe('InnovationUseDetailsComponent', () => {
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
     });
 
-    it('renders the incomplete "at least one actor is required" message rather than any error state when actors is empty', () => {
+    it('renders neither the removed "at least one actor is required" message nor any error state when actors is empty (R-IUR-011 AC.1)', () => {
       component.body.set({ ...component.body(), actors: [] });
       fixture.detectChanges();
 
       expect(component.hasDuplicateActorType()).toBe(false);
       expect(component.loadFailed()).toBe(false);
-      expect(fixture.nativeElement.textContent).toContain('At least one actor is required');
+      expect(fixture.nativeElement.textContent).not.toContain('At least one actor is required');
       // Distinct from the error surface (c4/c5's rendered "could not be loaded" block).
       expect(fixture.nativeElement.textContent).not.toContain('could not be loaded');
     });
@@ -2539,10 +3195,29 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       const actorRow = component.body().actors[0];
       component.onActorUpdate(0, { ...actorRow, actor_type_id: 1 });
       fixture.detectChanges();
-      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      // T-12 (Forward Pointer 2, KZ-001, corrected in rework — see execution.md): scoped to the
+      // p-select's OWN `style` accessor, not the whole `CSSStyleDeclaration` prototype. The page
+      // template renders the actor card and the measures card in one component, so once a
+      // fixture in this describe renders a measure row with an empty/whitespace-only `Unit`, that
+      // row's `app-input` (a `pInputText` branch, tokenized by T-02) would emit this identical
+      // `[style]` literal from its own DOM node, and a prototype-wide spy could not attribute the
+      // write to the p-select specifically. That emission would come from
+      // `[unitRequiredMode]="'filled'"` alone — with a mode active, `inputValid()` returns
+      // `evaluateRequiredMode(value)` and never reaches the legacy `isRequired` branch
+      // (`input.component.ts:47-49` states the precedence: the mode owns the verdict outright),
+      // and `'filled'` covers empty AND whitespace-only via `isFilled()`'s `trim()`.
+      // `[unitRequired]` drives only the asterisks (`quantification-item.component.html:23`,
+      // `input.component.html:6`), not the `[style]` write.
+      // This describe's own `beforeEach` (above, in this same describe block) resolves
+      // `quantifications: []` and this test never adds a row, so no `app-quantification-item` — and therefore no Unit
+      // `app-input` — exists in THIS fixture: the hazard is precautionary, not currently
+      // reachable, and this rescope is defensive against a future fixture in this describe that
+      // renders a measure row. Spying on the p-select's own native `.style` object keeps the
+      // assertion pinned to the one element it claims to prove regardless.
+      const borderSetSpy = jest.spyOn(selectDe!.nativeElement.style as CSSStyleDeclaration, 'border', 'set');
       component.onActorUpdate(0, { ...actorRow, actor_type_id: undefined });
       fixture.detectChanges();
-      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      expect(borderSetSpy).toHaveBeenCalledWith('2px solid var(--ac-warning-1)');
       borderSetSpy.mockRestore();
 
       const ratio = contrastRatio(WARNING_AMBER, GREY_100);
