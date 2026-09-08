@@ -18,9 +18,12 @@
            showJustification() or isEditableStatus() (AC.5). Mirrors the ACTORS callout's bg-/border-l-/
            rs-p-* shape (design.md §5.8) but NOT its color: --ac-grey-600 measures 2.91:1 and fails AA.
            DD-17: body --ac-grey-800 (7.44:1), link --ac-light-blue-400 (6.35:1) on --ac-grey-100. -->
+      <!-- rs-mt-[8]: `span.label` above is inline and carries no margin of its own (custom-fields
+           .scss sets only font + color on `.label`), so the callout sat flush against the question.
+           The gap is opened here, at the call site, rather than on the shared `.label` rule. -->
       <div
         data-testid="use-level-guidance"
-        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[8] rs-mb-[16]">
         <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
         <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
           <li class="fs-[14] text-[var(--ac-grey-800)]">
@@ -32,12 +35,18 @@
             supported by evidence documentation.
           </li>
           <li class="fs-[14] text-[var(--ac-grey-800)]">The innovation use level will be quality assessed.</li>
+          <!-- Calculator link: --ac-grey-700 — the token whose value is the requested colour, so no
+               hex is spelled here (DD-7's zero-hex rule). User-requested 2026-09-08. This is a
+               DELIBERATE WCAG exception, not an oversight — it measures 3.91:1 on --ac-grey-100 and
+               so fails R-IUP-020 AC.6 / NFR-IUP-001 (AA, >= 4.5:1), which the previous
+               --ac-light-blue-400 met at 6.35:1. Recorded in quick-log.md; the sibling definitions
+               link and the evidence button keep --ac-light-blue-400 and stay AA. -->
           <li class="fs-[14] text-[var(--ac-grey-800)]"
             ><span class="font-semibold">YOUR USE LEVEL IN JUST 3 CLICKS:</span>{{ ' ' }}<a
               [href]="calculatorUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-[var(--ac-light-blue-400)] underline"
+              class="text-[var(--ac-grey-700)] underline"
               >TRY THE NEW INNOVATION USE CALCULATOR</a
             ></li
           >

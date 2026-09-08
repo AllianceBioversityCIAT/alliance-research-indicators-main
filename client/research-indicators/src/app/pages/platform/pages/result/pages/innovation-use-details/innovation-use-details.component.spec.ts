@@ -2824,6 +2824,19 @@ describe('InnovationUseDetailsComponent', () => {
       const GREY_800: Rgb = [76, 81, 88]; // --ac-grey-800 — DD-17's body-text token
       const LIGHT_BLUE_400: Rgb = [3, 91, 169]; // --ac-light-blue-400 — DD-17's link token
       const GREY_600: Rgb = [141, 146, 153]; // --ac-grey-600 — the ACTORS callout's (wrong-for-here) token
+      const GREY_700: Rgb = [119, 124, 131]; // --ac-grey-700 — the calculator link's user-chosen AA exception
+
+      // Added by quick/innovation-use-guidance-spacing-and-link-colour (2026-09-08). The falsifying
+      // probe for that change found the margin half was covered by NOTHING: reverting it reddened
+      // zero tests, so it could have been dropped by any later edit in silence. This pins the class.
+      // ⚠️ SCOPE (KZ-017): jsdom paints nothing, so this asserts the CLASS IS PRESENT, never that
+      // 8px of space is rendered. `.rs-mt-[8] { margin-top: 8px }` comes from responsive-size.scss,
+      // outside this test's reach — the gap itself stays human-verified.
+      it('the guidance callout carries rs-mt-[8], separating it from the question label above', () => {
+        const callout = fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))!.nativeElement as HTMLElement;
+
+        expect(callout.className).toContain('rs-mt-[8]');
+      });
 
       it('resolves the cascade: none of the four text roles sits inside a `.description` ancestor', () => {
         // `.description` (custom-fields.scss, rgb(119,124,131), 3.91:1) and `.description a`
@@ -2857,17 +2870,29 @@ describe('InnovationUseDetailsComponent', () => {
         });
       });
 
-      it('which selector won: all three links/buttons carry text-[var(--ac-light-blue-400)]', () => {
+      // quick/innovation-use-guidance-spacing-and-link-colour (2026-09-08): the calculator link
+      // SPLIT OFF from the other two. It now carries --ac-grey-700 by user request; the definitions
+      // link and the evidence button are untouched and keep --ac-light-blue-400. Asserting the
+      // three separately (rather than dropping the check) is what keeps the exception CONTAINED —
+      // a later edit that spreads grey-700 to the other two reddens here.
+      it('which selector won: the calculator link carries text-[var(--ac-grey-700)], not the blue', () => {
         const calculatorLink = findLink(CALCULATOR_URL)!.nativeElement as HTMLElement;
+
+        expect(calculatorLink.className).toContain('text-[var(--ac-grey-700)]');
+        expect(calculatorLink.className).not.toContain('text-[var(--ac-light-blue-400)]');
+      });
+
+      it('which selector won: the definitions link and evidence button still carry text-[var(--ac-light-blue-400)]', () => {
         const definitionsLink = findLink(DEFINITIONS_URL)!.nativeElement as HTMLElement;
         const evidenceButton = findButton('Click here to go there')!.nativeElement as HTMLElement;
 
-        [calculatorLink, definitionsLink, evidenceButton].forEach(el => {
+        [definitionsLink, evidenceButton].forEach(el => {
           expect(el.className).toContain('text-[var(--ac-light-blue-400)]');
+          expect(el.className).not.toContain('text-[var(--ac-grey-700)]');
         });
       });
 
-      it('computes ≥ 4.5:1 for body text and link text against the callout background (--ac-grey-100)', () => {
+      it('computes ≥ 4.5:1 for body text and the two AA links against the callout background (--ac-grey-100)', () => {
         const bodyRatio = contrastRatio(GREY_800, GREY_100);
         const linkRatio = contrastRatio(LIGHT_BLUE_400, GREY_100);
 
@@ -2875,6 +2900,20 @@ describe('InnovationUseDetailsComponent', () => {
         expect(linkRatio).toBeCloseTo(6.35, 1);
         expect(bodyRatio).toBeGreaterThanOrEqual(4.5);
         expect(linkRatio).toBeGreaterThanOrEqual(4.5);
+      });
+
+      // The exception, MEASURED and pinned rather than left implicit. R-IUP-020 AC.6 and
+      // NFR-IUP-001 require ≥ 4.5:1; --ac-grey-700 on --ac-grey-100 does not reach it. This test
+      // asserts the shortfall on purpose, so the deviation is a recorded number in the suite
+      // instead of an undocumented regression — and so that restoring an AA colour here is a
+      // deliberate act that reddens this test, not a silent drift.
+      it('records the calculator link as a DELIBERATE AA exception: --ac-grey-700 measures 3.91:1, below 4.5:1', () => {
+        const exceptionRatio = contrastRatio(GREY_700, GREY_100);
+
+        expect(exceptionRatio).toBeCloseTo(3.91, 1);
+        expect(exceptionRatio).toBeLessThan(4.5);
+        // Still comfortably above the 3:1 floor WCAG applies to large text / non-text contrast.
+        expect(exceptionRatio).toBeGreaterThan(3);
       });
 
       it('computes ≥ 4.5:1 for the definitions link paragraph against the card background (--ac-white-1)', () => {
