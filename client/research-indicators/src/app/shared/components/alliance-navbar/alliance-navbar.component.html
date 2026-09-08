@@ -2,7 +2,7 @@
 <div id="navbar" #navbar class="navbar bg-[#173F6F]">
   <div class="logo flex min-w-0 shrink flex-wrap items-center gap-1 sm:gap-2" routerLink="/">
     <img [src]="'STAR.png' | s3ImageUrl" alt="" class="flex-shrink-0 {{ hss ? 'h-[40px]' : 'h-[60px]' }}" />
-    @if (!!isProductionEnvironment) {
+    @if (!isProductionEnvironment) {
     <div class="testing-env-badge bg-[#CF0808] text-white !rounded-[8px] shadow-lg" aria-label="Testing Environment">
       <span class="hidden xl:inline">Testing Environment</span>
       <span class="hidden md:inline xl:hidden">Testing</span>
