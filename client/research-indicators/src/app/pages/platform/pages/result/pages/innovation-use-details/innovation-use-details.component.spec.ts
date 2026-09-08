@@ -2832,10 +2832,15 @@ describe('InnovationUseDetailsComponent', () => {
       // ⚠️ SCOPE (KZ-017): jsdom paints nothing, so this asserts the CLASS IS PRESENT, never that
       // 8px of space is rendered. `.rs-mt-[8] { margin-top: 8px }` comes from responsive-size.scss,
       // outside this test's reach — the gap itself stays human-verified.
-      it('the guidance callout carries rs-mt-[8], separating it from the question label above', () => {
+      // Raised from rs-mt-[8] to rs-mt-[16] (2026-09-08) so the callout's vertical margins are
+      // SYMMETRIC. Asserting both halves together is the point — the defect this replaced was not
+      // "no top margin" but "top ≠ bottom", which a single-sided check would not have caught.
+      it('the guidance callout carries matching rs-mt-[16] / rs-mb-[16] margins', () => {
         const callout = fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))!.nativeElement as HTMLElement;
 
-        expect(callout.className).toContain('rs-mt-[8]');
+        expect(callout.className).toContain('rs-mt-[16]');
+        expect(callout.className).toContain('rs-mb-[16]');
+        expect(callout.className).not.toContain('rs-mt-[8]');
       });
 
       // quick/innovation-use-banner-leading-and-border (2026-09-08). Same coverage gap as rs-mt-[8]

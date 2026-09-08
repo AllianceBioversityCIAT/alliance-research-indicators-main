@@ -37,12 +37,15 @@
            page are NOT banners and deliberately keep --ac-grey-800 at AA: the `loadFailed` ERROR
            banner and the definitions-link paragraph (which sits on the white card).
 
-           rs-mt-[8]: `span.label` above is inline and carries no margin of its own (custom-fields
+           rs-mt-[16]: `span.label` above is inline and carries no margin of its own (custom-fields
            .scss sets only font + color on `.label`), so the callout sat flush against the question.
-           The gap is opened here, at the call site, rather than on the shared `.label` rule. -->
+           The gap is opened here, at the call site, rather than on the shared `.label` rule. It
+           was first opened at 8px and raised to 16px so the callout's top and bottom margins MATCH
+           (`rs-mt-[16] rs-mb-[16]`) — the asymmetry was visible in the box model. -->
+
       <div
         data-testid="use-level-guidance"
-        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[8] rs-mb-[16]">
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[16] rs-mb-[16]">
         <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
         <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
           <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
