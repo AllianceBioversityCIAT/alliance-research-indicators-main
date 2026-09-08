@@ -127,22 +127,66 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
     }
   }
 
-  /** Neither path clears the other's fields — mirrors the reference card's own rule (§5.5). */
+  /**
+   * Toggling the known/unknown path clears the fields of the path being left, in both
+   * directions (R-IUR-015 AC.1/AC.2; DD-12 — reverts the old "neither path clears" rule and its
+   * §5.5 rationale). Mirrors the actor card's `onModeChange`
+   * (innovation-use-actor-item.component.ts) in STRUCTURE only — a single `body.update` with a
+   * conditional spread clearing one side or the other.
+   *
+   * It deliberately diverges from that exemplar's VALUE: `onModeChange` clears to `undefined`,
+   * but this clears to an explicit `null`. Reason (traced against `buildOrganizationPayload` in
+   * innovation-use-details.component.ts): `JSON.stringify` drops an `undefined`-valued key
+   * (DD-5b, T-09). If the user ticks this box, then unticks it again before saving, the
+   * just-cleared unknown-path fields become ACTIVE again, and `buildOrganizationPayload`'s
+   * `known === false` branch forwards `row.<field>` verbatim (e.g.
+   * `institution_type_id: known ? null : row.institution_type_id`). An `undefined` value there
+   * would vanish from the serialized PATCH body and a stale server value would survive under an
+   * empty-looking UI — reintroducing the exact bug T-09 closed. `null` is sent explicitly on
+   * that same branch, so the toggle-back-and-save sequence stays safe. (AC.4 covers only the
+   * INACTIVE path being a no-op; this is the ACTIVE-again path, which AC.4 does not reach.)
+   *
+   * Also resyncs `subTypeOptions` via `syncSubTypes` (not requirements-mandated, but load-bearing
+   * for this same change): clearing `institution_type_id` on tick would otherwise leave a stale
+   * sub-type option list rendered under the unknown path's select after an untick, a self-
+   * inflicted regression from clearing that field at all.
+   */
   onKnownToggle(known: boolean | undefined): void {
-    this.body.update(current => ({ ...current, is_organization_known: !!known }));
+    const nextKnown = !!known;
+    this.body.update(current => {
+      const next: InnovationUseOrganization = {
+        ...current,
+        is_organization_known: nextKnown,
+        ...(nextKnown
+          ? {
+              institution_type_id: null,
+              sub_institution_type_id: null,
+              institution_type_custom_name: null,
+              organization_count: null
+            }
+          : { institution_id: null })
+      };
+      this.syncSubTypes(next);
+      return next;
+    });
   }
 
   onInstitutionChange(institutionId: number): void {
     this.body.update(current => ({ ...current, institution_id: institutionId }));
   }
 
-  /** Changing type resets the sub-type and, leaving OTHER, clears the custom name (mirrors §5.5). */
+  /**
+   * Changing type resets the sub-type and, leaving OTHER, clears the custom name (mirrors §5.5).
+   * R-IUR-008 `BUT` / DD-5b (T-09): the reset MUST be an explicit `null`, never `undefined` —
+   * `undefined` is dropped by `JSON.stringify`, so `buildOrganizationPayload` would omit the key
+   * entirely on the unknown path and a previously stored sub-type would survive on the server.
+   */
   async onInstitutionTypeChange(typeId: number): Promise<void> {
     this.body.update(current => ({
       ...current,
       institution_type_id: typeId,
-      sub_institution_type_id: undefined,
-      institution_type_custom_name: typeId === this.otherInstitutionTypeId ? current.institution_type_custom_name : undefined
+      sub_institution_type_id: null,
+      institution_type_custom_name: typeId === this.otherInstitutionTypeId ? current.institution_type_custom_name : null
     }));
     await this.loadSubTypes(typeId);
   }
@@ -183,7 +227,52 @@ export class InnovationUseOrganizationItemComponent implements OnInit, OnChanges
     return current.is_organization_known ? !!current.institution_id : !!current.institution_type_id;
   }
 
+  /**
+   * R-IUR-006 (T-07) — known-path-only field-level requirement: `institution_id` is required
+   * once `Is the organization known?` is checked. Reuses `identitySatisfied` (DD-9) rather than
+   * recomputing it; scoped to the known path with the leading `is_organization_known` conjunct so
+   * it stays `false` on the unknown path, which is `R-IUR-007`/T-08 territory, not this task's.
+   */
+  get institutionMissing(): boolean {
+    return this.body().is_organization_known && !this.identitySatisfied;
+  }
+
+  /**
+   * R-IUR-007 (T-08) — unknown-path-only field-level requirement: `institution_type_id` is
+   * required once `Is the organization known?` is unchecked. Mirrors `institutionMissing`'s
+   * shape for the opposite path. The leading `!is_organization_known` conjunct is redundant for
+   * template use (the template already scopes this field inside the `@else` branch — AC.3 is
+   * satisfied structurally, not by this guard) but it is load-bearing for the suppression clause
+   * below: dropping it would silently widen suppression onto the known path.
+   */
+  get organizationTypeMissing(): boolean {
+    return !this.body().is_organization_known && !this.identitySatisfied;
+  }
+
+  /**
+   * DD-9 precedence: the row-level message is SUPPRESSED — not deleted (`OQ-6`, user ruling) —
+   * while a field-level required message is showing on the same row. T-07 covered the known
+   * path (`institutionMissing`); T-08 extends this clause to the unknown path's identity field
+   * (`organizationTypeMissing`). Consequence, expected per `DD-9`'s "honest caveat": once both
+   * paths are covered, `!identitySatisfied` always implies exactly one of the two field-level
+   * states, so this getter is now unconditionally `false` in practice — dead-but-reversible code,
+   * not deleted (`OQ-6`).
+   */
   get showNotIdentifiedMessage(): boolean {
-    return this.touched() && !this.identitySatisfied;
+    return this.touched() && !this.identitySatisfied && !this.institutionMissing && !this.organizationTypeMissing;
+  }
+
+  /**
+   * R-IUR-008 (T-09) — `sub_institution_type_id` is required exactly when the sub-type select
+   * renders. Gated on the SAME condition the template already uses for the select itself
+   * (`subTypeOptions().length > 0`), never on a re-derived `is_active`/root/depth-2 predicate of
+   * its own (`DD-5`): `subTypeOptions` is already the resolved output of that predicate via
+   * `syncSubTypes`/`loadSubTypes`, so restating it here would risk drifting from what the
+   * template actually renders. Independent of `identitySatisfied`/`showNotIdentifiedMessage` —
+   * a type can be chosen (identity satisfied) while its required sub-type is still missing, so
+   * this getter does not participate in the DD-9 precedence table.
+   */
+  get subTypeMissing(): boolean {
+    return this.subTypeOptions().length > 0 && !this.body().sub_institution_type_id;
   }
 }

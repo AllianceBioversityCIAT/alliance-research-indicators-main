@@ -22,9 +22,17 @@ export class QuantificationItemComponent implements OnInit, OnChanges {
   @Input() headerLabel = 'ACTUAL COUNT';
   /** External-result / non-editable-status gate, passed from the parent call site. Defaults to false so this component's own editable-status behavior is unaffected. */
   @Input() disabled = false;
-  // @akili-spec docs/specs/innovation-use/details-page (T-03 — promoted to shared/, fieldsRequired + maxFractionDigits)
-  /** Defaults to true to reproduce OICR's current, field-asymmetric required/validateEmpty rendering (see the template). `false` — passed only by the new page — drops the asterisks and the required validation on all three fields. */
-  @Input() fieldsRequired = true;
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-03 — DD-4: fieldsRequired split into five per-field inputs; R-IUR-010, R-IUR-013)
+  /** Renders the Number field's asterisk (card-owned, template `@if`) and feeds its `[isRequired]`. Defaults to `true`, reproducing OICR's current required rendering for this field byte-identically (R-IUR-013). */
+  @Input() numberRequired = true;
+  /** Renders the Unit field's asterisk (card-owned, template `@if`) and feeds its `[isRequired]`. Defaults to `true`, same rationale as `numberRequired`. */
+  @Input() unitRequired = true;
+  /** Renders the Comments field's asterisk (card-owned, template `@if`) and feeds `app-textarea`'s own `[isRequired]`. `app-textarea` has no `requiredMode` — the field is boolean-only by design (DD-4). Defaults to `true`. */
+  @Input() commentsRequired = true;
+  /** Forwarded straight through to the Number field's `app-input` `[requiredMode]` (DD-1/DD-2). Defaults to `'off'` — OICR passes nothing and keeps its existing untrimmed falsy `isRequired` behavior for `0` (R-IUR-010 AC.5, R-IUR-013). Innovation Use passes `'nonzero'`: `0` invalid, negatives valid. */
+  @Input() numberRequiredMode: 'off' | 'filled' | 'positive' | 'nonzero' = 'off';
+  /** Forwarded straight through to the Unit field's `app-input` `[requiredMode]`. Defaults to `'off'`, same byte-identical-OICR rationale as `numberRequiredMode`. Innovation Use passes `'filled'`, which trims whitespace-only strings (§3.3) — `Unit` is free text, not a positivity rule. */
+  @Input() unitRequiredMode: 'off' | 'filled' | 'positive' | 'nonzero' = 'off';
   // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — DD-4: min/max/placeholder promoted to inputs, defaulting to today's literals)
   /** Forwarded to the Number field's app-input. Defaults to today's literal (`0`, `app-input`'s own default) — additive, so every existing consumer is unaffected. */
   @Input() min = 0;
