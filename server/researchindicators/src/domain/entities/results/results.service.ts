@@ -402,7 +402,7 @@ export class ResultsService {
       createResult;
     await this.mainRepo
       .findOne({
-        where: { title: title?.trim() , is_active: true },
+        where: { title: title?.trim(), is_active: true },
         relations: { indicator: true },
       })
       .then((result) => {
