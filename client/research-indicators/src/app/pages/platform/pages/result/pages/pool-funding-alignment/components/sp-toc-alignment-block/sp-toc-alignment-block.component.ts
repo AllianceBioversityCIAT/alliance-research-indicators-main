@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Select, SelectModule } from 'primeng/select';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { InputNumberModule } from 'primeng/inputnumber';
+import { SkeletonModule } from 'primeng/skeleton';
 import {
   SpAlignmentDraft,
   TocCatalogIndicator,
@@ -28,6 +29,7 @@ export interface SpTocBlockScienceProgram {
   name?: string;
   category?: string | null;
   color?: string | null;
+  icon_key?: string | null;
 }
 
 /** Plain dropdown option (label/value pairs fed to raw `p-select`). */
@@ -121,7 +123,7 @@ const NO_TYPE_MATCH_ANYWHERE = (resTypeLabel: string, levelLabel: string): strin
 @Component({
   selector: 'app-sp-toc-alignment-block',
   standalone: true,
-  imports: [FormsModule, SelectModule, RadioButtonModule, InputNumberModule],
+  imports: [FormsModule, SelectModule, RadioButtonModule, InputNumberModule, SkeletonModule],
   templateUrl: './sp-toc-alignment-block.component.html',
   styleUrl: './sp-toc-alignment-block.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -157,7 +159,11 @@ export class SpTocAlignmentBlockComponent {
     EOI: '2030 Outcome'
   };
 
-  readonly ALIGN_QUESTION = "Does this result align with the Program's TOC indicators?";
+  // R-BIL-110 — reworded to ask whether the contributor wants to map, not
+  // whether the result aligns; the underlying stored field keeps its name and
+  // value domain unchanged (D-C1-2 — copy-only, no rename).
+  readonly ALIGN_QUESTION = 'Would you like to complete the detailed Theory of Change mapping for this result?';
+  readonly GUIDANCE_BANNER_TEXT = 'Theory of Change alignment is configured for the Primary Science Program.';
   readonly LEVEL_LABEL = 'Level';
   readonly INDICATOR_LABEL = 'Indicator';
   readonly CONTRIBUTION_LABEL = 'Quantitative contribution';

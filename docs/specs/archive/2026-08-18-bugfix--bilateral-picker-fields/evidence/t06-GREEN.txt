@@ -1,0 +1,205 @@
+
+            Running 'ngcc' is not required for Angular 16+ projects. This 'ngcc-jest-processor' script will be removed in the next major version of 'jest-preset-angular'.
+            Tip: To avoid this message you can remove 'jest-preset-angular/global-setup' from your jest config
+        
+(node:93822) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  console.error
+    ERROR TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+        at getCSSVariableByRegex (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:30:60)
+        at blockBodyScroll (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:47:24)
+        at _Dialog.enableModality (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1064:13)
+        at _Dialog.onAnimationStart (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1337:26)
+        at Dialog_div_0_div_1_Template_div_animation_animation_start_0_listener (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:522:215)
+        at executeListenerWithErrorHandling (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30334:16)
+        at fn (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+        at Array.forEach (<anonymous>)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:416:32)
+        at Object.onInvoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:415:38)
+        at ZoneImpl.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:147:47)
+        at NgZone.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+        at _ZoneDelegate.invokeTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:449:37)
+        at ZoneImpl.runTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:196:51)
+        at drainMicroTaskQueue (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+      80 |     return;
+      81 |   }
+    > 82 |   originalConsoleError(...args);
+         |   ^
+      83 | };
+      84 |
+      85 | // Mock style loading
+
+      at console.Object.<anonymous>.console.error (src/setup-jest.ts:82:3)
+      at ErrorHandler.handleError (node_modules/@angular/core/fesm2022/core.mjs:6846:23)
+      at handleError (node_modules/@angular/core/fesm2022/core.mjs:12916:34)
+      at executeListenerWithErrorHandling (node_modules/@angular/core/fesm2022/core.mjs:30337:9)
+      at fn (node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+          at Array.forEach (<anonymous>)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at Object.onInvoke (node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at NgZone.run (node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+      at _ZoneDelegate.invokeTask (node_modules/zone.js/bundles/zone.umd.js:449:37)
+      at ZoneImpl.runTask (node_modules/zone.js/bundles/zone.umd.js:196:51)
+      at drainMicroTaskQueue (node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+  console.error
+    ERROR TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+        at getCSSVariableByRegex (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:30:60)
+        at blockBodyScroll (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:47:24)
+        at _Dialog.enableModality (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1064:13)
+        at _Dialog.onAnimationStart (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1337:26)
+        at Dialog_div_0_div_1_Template_div_animation_animation_start_0_listener (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:522:215)
+        at executeListenerWithErrorHandling (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30334:16)
+        at fn (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+        at Array.forEach (<anonymous>)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:416:32)
+        at Object.onInvoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:415:38)
+        at ZoneImpl.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:147:47)
+        at NgZone.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+        at _ZoneDelegate.invokeTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:449:37)
+        at ZoneImpl.runTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:196:51)
+        at drainMicroTaskQueue (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+      80 |     return;
+      81 |   }
+    > 82 |   originalConsoleError(...args);
+         |   ^
+      83 | };
+      84 |
+      85 | // Mock style loading
+
+      at console.Object.<anonymous>.console.error (src/setup-jest.ts:82:3)
+      at ErrorHandler.handleError (node_modules/@angular/core/fesm2022/core.mjs:6846:23)
+      at handleError (node_modules/@angular/core/fesm2022/core.mjs:12916:34)
+      at executeListenerWithErrorHandling (node_modules/@angular/core/fesm2022/core.mjs:30337:9)
+      at fn (node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+          at Array.forEach (<anonymous>)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at Object.onInvoke (node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at NgZone.run (node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+      at _ZoneDelegate.invokeTask (node_modules/zone.js/bundles/zone.umd.js:449:37)
+      at ZoneImpl.runTask (node_modules/zone.js/bundles/zone.umd.js:196:51)
+      at drainMicroTaskQueue (node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+ PASS  src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts (5.911 s)
+  BilateralMappingComponent
+    ✓ defaults activeFilter to "active" and issues the initial list with is_active=true (T-BIL-CAM-09) (240 ms)
+    ✓ renders table rows on successful list response (69 ms)
+    ✓ renders the empty state when list returns an empty items array (40 ms)
+    ✓ renders the error state (with role="alert") when list returns null (37 ms)
+    ✓ Retry button calls load() again (AC-03.3) (59 ms)
+    ✓ entering a search term resets page to 1 and calls list with the search param (409 ms)
+    ✓ changing active filter to "active" calls list with is_active=true and resets page (59 ms)
+    ✓ changing active filter to "inactive" calls list with is_active=false (51 ms)
+    ✓ changing active filter to "all" omits is_active from the query (60 ms)
+    ✓ changing source filter to "MANUAL" calls list with source=MANUAL and resets page (59 ms)
+    ✓ changing source filter to "AI_SUGGESTED" sends source=AI_SUGGESTED (32 ms)
+    ✓ changing source filter to "all" omits source from the query (31 ms)
+    ✓ composes search + is_active + source (plus page/limit) into a single list() call (404 ms)
+    ✓ renders "—" in confidence cell (not the score) for MANUAL rows in the table (45 ms)
+    ✓ renders the confidence value for AI_SUGGESTED rows in the table (53 ms)
+    ✓ loading returns to false after a successful list call (54 ms)
+    ✓ loading returns to false after a failed list call (39 ms)
+    ✓ sourceLabel returns human-readable labels for all enum values (11 ms)
+    ✓ closeDialog() sets dialogOpen to false and clears saveError (11 ms)
+    ✓ onNotesInput clips the input at notesMaxLength (500 chars) (7 ms)
+    ✓ selectedProject returns the matching CLARISA option when a project is selected (24 ms)
+    ✓ selectedProject returns null when no project is selected (24 ms)
+    showConfidence() helper — AC-03.1
+      ✓ returns false (hidden) when source is MANUAL (22 ms)
+      ✓ returns true (shown) when source is AI_SUGGESTED (10 ms)
+      ✓ returns true (shown) when source is AI_AUTO (10 ms)
+    openCreateDialog (AC-05.1 / AC-05.2)
+      ✓ opens the dialog in create mode and loads picker options (114 ms)
+      ✓ resets form fields when opening create dialog (33 ms)
+    canSave — CREATE mode (AC-05.3)
+      ✓ is false when neither picker is set (27 ms)
+      ✓ is false when only AGRESSO is set (26 ms)
+      ✓ is false when only CLARISA is set (26 ms)
+      ✓ is true when both pickers have a value (35 ms)
+      ✓ is false while saving is in progress (27 ms)
+    successful CREATE (AC-05.4)
+      ✓ calls service.create with the correct body, shows success toast, reloads list, fires trackEvent (34 ms)
+      ✓ does not include notes in the create body when notes is empty (32 ms)
+    CREATE 409 conflict (AC-05.5)
+      ✓ keeps dialog open and surfaces result.message (from errorDetail.errors) on 409 (30 ms)
+      ✓ message shown is result.message, not a generic string (AC-05.5) (30 ms)
+    CREATE 400 validation error (AC-05.6)
+      ✓ surfaces result.message inline on a 400 error (32 ms)
+    openEditDialog (AC-06.1 / AC-06.4)
+      ✓ pre-fills form fields from the row when opened in edit mode (AC-06.1) (26 ms)
+      ✓ AGRESSO agreement shown as read-only (editingAgreementId set, not in selectedAgreement picker for edit) (25 ms)
+      ✓ Save is disabled when nothing changed (AC-06.4) (27 ms)
+      ✓ Save is enabled when CLARISA project changes (AC-06.4) (30 ms)
+      ✓ Save is enabled when notes changes (AC-06.4) (27 ms)
+    successful EDIT (AC-06.2)
+      ✓ calls service.update with only the changed fields (project id changed) (31 ms)
+      ✓ calls service.update with only notes when only notes changed (29 ms)
+    EDIT 400 error (AC-06.3)
+      ✓ surfaces result.message inline on a 400 PATCH error and keeps dialog open (AC-06.3) (28 ms)
+    agressoOptionLabel
+      ✓ returns "id — description" when description is present (11 ms)
+      ✓ returns just the id when description is empty (11 ms)
+    onAgressoFilter — lazy server-side AGRESSO search
+      ✓ calls loadAgressoOptions with the term after debounce and updates agressoOptions (375 ms)
+      ✓ sets agressoOptionsLoading to true during the search and false after (384 ms)
+      ✓ onAgressoFilter("") calls loadAgressoOptions with undefined (reloads initial set) (397 ms)
+      ✓ onAgressoFilter(term) pushes into agressoFilter$ subject (397 ms)
+    onClarisaFilter — lazy server-side CLARISA search
+      ✓ calls loadClarisaProjectOptions with the term after debounce and updates clarisaOptions (387 ms)
+      ✓ sets clarisaOptionsLoading to true during the search and false after (381 ms)
+    requestDeactivate — confirmation gate (AC-07.2)
+      ✓ calls ActionsService.showGlobalAlert with correct shape and does NOT call service.deactivate (AC-07.2) (45 ms)
+      ✓ cancel (never invoking the confirmCallback) does NOT call service.deactivate (AC-07.2) (45 ms)
+      ✓ invoking confirmCallback.event triggers service.deactivate (AC-07.2) (42 ms)
+    confirmDeactivate — success path (AC-07.1)
+      ✓ updates the row is_active to false in-place, shows success toast, fires trackEvent (AC-07.1) (27 ms)
+      ✓ only mutates the target row; other rows remain unchanged (28 ms)
+    confirmDeactivate — failure path (AC-07.3)
+      ✓ shows an error toast with result.message and does not change is_active on failure (AC-07.3) (32 ms)
+      ✓ deactivating an already-inactive row — ok:false does not crash the UI (AC-07.3) (32 ms)
+    Deactivate button visibility (AC-07.3)
+      ✓ renders the Deactivate button only for active rows (44 ms)
+      ✓ renders no Deactivate button when all rows are inactive (41 ms)
+    R-BPF-003: CLARISA picker filterBy client-side search
+      ✓ asserts FULL_NAME_255 fixture is exactly 255 characters (KZ-001) (9 ms)
+      ✓ survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2) (52 ms)
+    clarisaOptionLabel helper (R-BPF-004 / R-BPF-005)
+      ✓ returns "short_name — full_name" when both are present and differ (10 ms)
+      ✓ returns the title once when short_name equals full_name (R-BPF-004 de-duplication) (6 ms)
+      ✓ de-duplicates case-insensitively and ignores surrounding whitespace (R-BPF-004) (6 ms)
+      ✓ prefers external_code over short_name as the code (R-BPF-004) (6 ms)
+      ✓ de-duplicates when external_code equals full_name (R-BPF-004) (6 ms)
+      ✓ renders external_code alone when full_name is absent or empty (R-BPF-004) (8 ms)
+      ✓ falls back to short_name when external_code is whitespace-only or empty (R-BPF-004) (7 ms)
+      ✓ returns just "short_name" when full_name is absent / undefined (6 ms)
+      ✓ returns just "short_name" when full_name is an empty string (7 ms)
+      ✓ returns just "short_name" when full_name is whitespace only (5 ms)
+      ✓ handles a 255-character full_name correctly (KZ-001 / R-BPF-005) (9 ms)
+      ✓ never renders the literal "undefined", "null", or a bare trailing separator (7 ms)
+      ✓ returns empty string when opt is nullish (5 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       77 passed, 77 total
+Snapshots:   0 total
+Time:        6.143 s, estimated 7 s
+Ran all test suites matching /src\/app\/pages\/platform\/pages\/administration\/center-admin\/bilateral-mapping\/bilateral-mapping.component.spec.ts/i.

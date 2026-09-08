@@ -178,3 +178,4 @@ describe('IndicatorsTabFilterComponent', () => {
     container.dispatchEvent(new Event('scroll'));
     expect(updateSpy).toHaveBeenCalled();
   });
+});

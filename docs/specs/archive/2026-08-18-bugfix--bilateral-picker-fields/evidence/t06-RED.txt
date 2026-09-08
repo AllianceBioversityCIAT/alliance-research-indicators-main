@@ -1,0 +1,359 @@
+
+            Running 'ngcc' is not required for Angular 16+ projects. This 'ngcc-jest-processor' script will be removed in the next major version of 'jest-preset-angular'.
+            Tip: To avoid this message you can remove 'jest-preset-angular/global-setup' from your jest config
+        
+(node:92892) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  console.error
+    ERROR TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+        at getCSSVariableByRegex (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:30:60)
+        at blockBodyScroll (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:47:24)
+        at _Dialog.enableModality (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1064:13)
+        at _Dialog.onAnimationStart (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1337:26)
+        at Dialog_div_0_div_1_Template_div_animation_animation_start_0_listener (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:522:215)
+        at executeListenerWithErrorHandling (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30334:16)
+        at fn (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+        at Array.forEach (<anonymous>)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:416:32)
+        at Object.onInvoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:415:38)
+        at ZoneImpl.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:147:47)
+        at NgZone.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+        at _ZoneDelegate.invokeTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:449:37)
+        at ZoneImpl.runTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:196:51)
+        at drainMicroTaskQueue (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+      80 |     return;
+      81 |   }
+    > 82 |   originalConsoleError(...args);
+         |   ^
+      83 | };
+      84 |
+      85 | // Mock style loading
+
+      at console.Object.<anonymous>.console.error (src/setup-jest.ts:82:3)
+      at ErrorHandler.handleError (node_modules/@angular/core/fesm2022/core.mjs:6846:23)
+      at handleError (node_modules/@angular/core/fesm2022/core.mjs:12916:34)
+      at executeListenerWithErrorHandling (node_modules/@angular/core/fesm2022/core.mjs:30337:9)
+      at fn (node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+          at Array.forEach (<anonymous>)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at Object.onInvoke (node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at NgZone.run (node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+      at _ZoneDelegate.invokeTask (node_modules/zone.js/bundles/zone.umd.js:449:37)
+      at ZoneImpl.runTask (node_modules/zone.js/bundles/zone.umd.js:196:51)
+      at drainMicroTaskQueue (node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+  console.error
+    ERROR TypeError: object is not iterable (cannot read property Symbol(Symbol.iterator))
+        at getCSSVariableByRegex (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:30:60)
+        at blockBodyScroll (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@primeuix/utils/dom/index.mjs:47:24)
+        at _Dialog.enableModality (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1064:13)
+        at _Dialog.onAnimationStart (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:1337:26)
+        at Dialog_div_0_div_1_Template_div_animation_animation_start_0_listener (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/primeng/fesm2022/primeng-dialog.mjs:522:215)
+        at executeListenerWithErrorHandling (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30334:16)
+        at fn (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+        at Array.forEach (<anonymous>)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:416:32)
+        at Object.onInvoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+        at _ZoneDelegate.invoke (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:415:38)
+        at ZoneImpl.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:147:47)
+        at NgZone.run (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+        at /Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+        at _ZoneDelegate.invokeTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:449:37)
+        at ZoneImpl.runTask (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:196:51)
+        at drainMicroTaskQueue (/Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/client/research-indicators/node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+      80 |     return;
+      81 |   }
+    > 82 |   originalConsoleError(...args);
+         |   ^
+      83 | };
+      84 |
+      85 | // Mock style loading
+
+      at console.Object.<anonymous>.console.error (src/setup-jest.ts:82:3)
+      at ErrorHandler.handleError (node_modules/@angular/core/fesm2022/core.mjs:6846:23)
+      at handleError (node_modules/@angular/core/fesm2022/core.mjs:12916:34)
+      at executeListenerWithErrorHandling (node_modules/@angular/core/fesm2022/core.mjs:30337:9)
+      at fn (node_modules/@angular/core/fesm2022/core.mjs:30368:22)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4839:25
+          at Array.forEach (<anonymous>)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4837:46
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at Object.onInvoke (node_modules/@angular/core/fesm2022/core.mjs:6692:33)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at NgZone.run (node_modules/@angular/core/fesm2022/core.mjs:6538:28)
+      at node_modules/@angular/animations/fesm2022/browser.mjs:4836:28
+      at _ZoneDelegate.invokeTask (node_modules/zone.js/bundles/zone.umd.js:449:37)
+      at ZoneImpl.runTask (node_modules/zone.js/bundles/zone.umd.js:196:51)
+      at drainMicroTaskQueue (node_modules/zone.js/bundles/zone.umd.js:638:39)
+
+ FAIL  src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts (6.298 s)
+  BilateralMappingComponent
+    ✓ defaults activeFilter to "active" and issues the initial list with is_active=true (T-BIL-CAM-09) (246 ms)
+    ✓ renders table rows on successful list response (71 ms)
+    ✓ renders the empty state when list returns an empty items array (43 ms)
+    ✓ renders the error state (with role="alert") when list returns null (43 ms)
+    ✓ Retry button calls load() again (AC-03.3) (64 ms)
+    ✓ entering a search term resets page to 1 and calls list with the search param (416 ms)
+    ✓ changing active filter to "active" calls list with is_active=true and resets page (68 ms)
+    ✓ changing active filter to "inactive" calls list with is_active=false (53 ms)
+    ✓ changing active filter to "all" omits is_active from the query (53 ms)
+    ✓ changing source filter to "MANUAL" calls list with source=MANUAL and resets page (51 ms)
+    ✓ changing source filter to "AI_SUGGESTED" sends source=AI_SUGGESTED (33 ms)
+    ✓ changing source filter to "all" omits source from the query (32 ms)
+    ✓ composes search + is_active + source (plus page/limit) into a single list() call (403 ms)
+    ✓ renders "—" in confidence cell (not the score) for MANUAL rows in the table (47 ms)
+    ✓ renders the confidence value for AI_SUGGESTED rows in the table (53 ms)
+    ✓ loading returns to false after a successful list call (44 ms)
+    ✓ loading returns to false after a failed list call (33 ms)
+    ✓ sourceLabel returns human-readable labels for all enum values (11 ms)
+    ✓ closeDialog() sets dialogOpen to false and clears saveError (13 ms)
+    ✓ onNotesInput clips the input at notesMaxLength (500 chars) (11 ms)
+    ✓ selectedProject returns the matching CLARISA option when a project is selected (28 ms)
+    ✓ selectedProject returns null when no project is selected (30 ms)
+    showConfidence() helper — AC-03.1
+      ✓ returns false (hidden) when source is MANUAL (14 ms)
+      ✓ returns true (shown) when source is AI_SUGGESTED (13 ms)
+      ✓ returns true (shown) when source is AI_AUTO (11 ms)
+    openCreateDialog (AC-05.1 / AC-05.2)
+      ✓ opens the dialog in create mode and loads picker options (112 ms)
+      ✓ resets form fields when opening create dialog (37 ms)
+    canSave — CREATE mode (AC-05.3)
+      ✓ is false when neither picker is set (26 ms)
+      ✓ is false when only AGRESSO is set (28 ms)
+      ✓ is false when only CLARISA is set (23 ms)
+      ✓ is true when both pickers have a value (30 ms)
+      ✓ is false while saving is in progress (27 ms)
+    successful CREATE (AC-05.4)
+      ✓ calls service.create with the correct body, shows success toast, reloads list, fires trackEvent (41 ms)
+      ✓ does not include notes in the create body when notes is empty (39 ms)
+    CREATE 409 conflict (AC-05.5)
+      ✓ keeps dialog open and surfaces result.message (from errorDetail.errors) on 409 (31 ms)
+      ✓ message shown is result.message, not a generic string (AC-05.5) (33 ms)
+    CREATE 400 validation error (AC-05.6)
+      ✓ surfaces result.message inline on a 400 error (30 ms)
+    openEditDialog (AC-06.1 / AC-06.4)
+      ✓ pre-fills form fields from the row when opened in edit mode (AC-06.1) (29 ms)
+      ✓ AGRESSO agreement shown as read-only (editingAgreementId set, not in selectedAgreement picker for edit) (28 ms)
+      ✓ Save is disabled when nothing changed (AC-06.4) (25 ms)
+      ✓ Save is enabled when CLARISA project changes (AC-06.4) (26 ms)
+      ✓ Save is enabled when notes changes (AC-06.4) (25 ms)
+    successful EDIT (AC-06.2)
+      ✓ calls service.update with only the changed fields (project id changed) (29 ms)
+      ✓ calls service.update with only notes when only notes changed (30 ms)
+    EDIT 400 error (AC-06.3)
+      ✓ surfaces result.message inline on a 400 PATCH error and keeps dialog open (AC-06.3) (28 ms)
+    agressoOptionLabel
+      ✓ returns "id — description" when description is present (14 ms)
+      ✓ returns just the id when description is empty (12 ms)
+    onAgressoFilter — lazy server-side AGRESSO search
+      ✓ calls loadAgressoOptions with the term after debounce and updates agressoOptions (377 ms)
+      ✓ sets agressoOptionsLoading to true during the search and false after (390 ms)
+      ✓ onAgressoFilter("") calls loadAgressoOptions with undefined (reloads initial set) (385 ms)
+      ✓ onAgressoFilter(term) pushes into agressoFilter$ subject (395 ms)
+    onClarisaFilter — lazy server-side CLARISA search
+      ✓ calls loadClarisaProjectOptions with the term after debounce and updates clarisaOptions (386 ms)
+      ✓ sets clarisaOptionsLoading to true during the search and false after (392 ms)
+    requestDeactivate — confirmation gate (AC-07.2)
+      ✓ calls ActionsService.showGlobalAlert with correct shape and does NOT call service.deactivate (AC-07.2) (77 ms)
+      ✓ cancel (never invoking the confirmCallback) does NOT call service.deactivate (AC-07.2) (58 ms)
+      ✓ invoking confirmCallback.event triggers service.deactivate (AC-07.2) (55 ms)
+    confirmDeactivate — success path (AC-07.1)
+      ✓ updates the row is_active to false in-place, shows success toast, fires trackEvent (AC-07.1) (32 ms)
+      ✓ only mutates the target row; other rows remain unchanged (33 ms)
+    confirmDeactivate — failure path (AC-07.3)
+      ✓ shows an error toast with result.message and does not change is_active on failure (AC-07.3) (35 ms)
+      ✓ deactivating an already-inactive row — ok:false does not crash the UI (AC-07.3) (30 ms)
+    Deactivate button visibility (AC-07.3)
+      ✓ renders the Deactivate button only for active rows (48 ms)
+      ✓ renders no Deactivate button when all rows are inactive (46 ms)
+    R-BPF-003: CLARISA picker filterBy client-side search
+      ✓ asserts FULL_NAME_255 fixture is exactly 255 characters (KZ-001) (8 ms)
+      ✕ survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2) (57 ms)
+    clarisaOptionLabel helper (R-BPF-004 / R-BPF-005)
+      ✓ returns "short_name — full_name" when both are present and differ (15 ms)
+      ✕ returns the title once when short_name equals full_name (R-BPF-004 de-duplication) (12 ms)
+      ✕ de-duplicates case-insensitively and ignores surrounding whitespace (R-BPF-004) (17 ms)
+      ✕ prefers external_code over short_name as the code (R-BPF-004) (15 ms)
+      ✕ de-duplicates when external_code equals full_name (R-BPF-004) (14 ms)
+      ✕ renders external_code alone when full_name is absent or empty (R-BPF-004) (18 ms)
+      ✕ falls back to short_name when external_code is whitespace-only or empty (R-BPF-004) (13 ms)
+      ✓ returns just "short_name" when full_name is absent / undefined (14 ms)
+      ✓ returns just "short_name" when full_name is an empty string (13 ms)
+      ✓ returns just "short_name" when full_name is whitespace only (13 ms)
+      ✓ handles a 255-character full_name correctly (KZ-001 / R-BPF-005) (14 ms)
+      ✓ never renders the literal "undefined", "null", or a bare trailing separator (12 ms)
+      ✓ returns empty string when opt is nullish (11 ms)
+
+  ● BilateralMappingComponent › R-BPF-003: CLARISA picker filterBy client-side search › survives client-side filtering when searching by full_name, short_name, and external_code (R-BPF-003 / D-2)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 0
+
+      Array [
+        102,
+    -   105,
+      ]
+
+      1311 |       inst!._filterValue.set('B-A1080');
+      1312 |       const visibleByExternalCode = inst!.visibleOptions();
+    > 1313 |       expect(visibleByExternalCode.map((o: ClarisaBilateralProjectOption) => o.id)).toEqual([102, 105]);
+           |                                                                                     ^
+      1314 |
+      1315 |       // 7. Search by external_code lowercase "b-a1080" -> matches id 102 and 105
+      1316 |       inst!._filterValue.set('b-a1080');
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1313:85
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › returns the title once when short_name equals full_name (R-BPF-004 de-duplication)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Fertilize Right Colombia"
+    Received: "Fertilize Right Colombia — Fertilize Right Colombia"
+
+      1345 |         full_name: 'Fertilize Right Colombia'
+      1346 |       };
+    > 1347 |       expect(component.clarisaOptionLabel(optFertilize)).toBe('Fertilize Right Colombia');
+           |                                                          ^
+      1348 |
+      1349 |       const optSemillas: ClarisaBilateralProjectOption = {
+      1350 |         id: 103,
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1347:58
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › de-duplicates case-insensitively and ignores surrounding whitespace (R-BPF-004)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Fertilize Right Colombia"
+    Received: "  fertilize right colombia   — Fertilize Right Colombia"
+
+      1368 |         full_name: 'Fertilize Right Colombia'
+      1369 |       };
+    > 1370 |       expect(component.clarisaOptionLabel(optWhitespace)).toBe('Fertilize Right Colombia');
+           |                                                           ^
+      1371 |
+      1372 |       const optCase: ClarisaBilateralProjectOption = {
+      1373 |         id: 106,
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1370:59
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › prefers external_code over short_name as the code (R-BPF-004)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "B-A1080 — Fertilize Right Colombia"
+    Received: "Fertilize Right Colombia — Fertilize Right Colombia"
+
+      1386 |         external_code: 'B-A1080'
+      1387 |       };
+    > 1388 |       expect(component.clarisaOptionLabel(optWithExternalCode)).toBe('B-A1080 — Fertilize Right Colombia');
+           |                                                                 ^
+      1389 |
+      1390 |       const optCustomCode: ClarisaBilateralProjectOption = {
+      1391 |         id: 108,
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1388:65
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › de-duplicates when external_code equals full_name (R-BPF-004)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Fertilize Right Colombia"
+    Received: "A1806 — Fertilize Right Colombia"
+
+      1404 |         external_code: 'Fertilize Right Colombia'
+      1405 |       };
+    > 1406 |       expect(component.clarisaOptionLabel(optCodeEqualsName)).toBe('Fertilize Right Colombia');
+           |                                                               ^
+      1407 |     });
+      1408 |
+      1409 |     it('renders external_code alone when full_name is absent or empty (R-BPF-004)', () => {
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1406:63
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › renders external_code alone when full_name is absent or empty (R-BPF-004)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "B-A1080"
+    Received: "Fertilize Right Colombia"
+
+      1413 |         external_code: 'B-A1080'
+      1414 |       };
+    > 1415 |       expect(component.clarisaOptionLabel(optNoFullName)).toBe('B-A1080');
+           |                                                           ^
+      1416 |
+      1417 |       const optEmptyFullName: ClarisaBilateralProjectOption = {
+      1418 |         id: 111,
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1415:59
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+  ● BilateralMappingComponent › clarisaOptionLabel helper (R-BPF-004 / R-BPF-005) › falls back to short_name when external_code is whitespace-only or empty (R-BPF-004)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Fertilize Right Colombia"
+    Received: "Fertilize Right Colombia — Fertilize Right Colombia"
+
+      1455 |         external_code: '   '
+      1456 |       };
+    > 1457 |       expect(component.clarisaOptionLabel(optWhitespaceExternalDeDupe)).toBe('Fertilize Right Colombia');
+           |                                                                         ^
+      1458 |     });
+      1459 |
+      1460 |     it('returns just "short_name" when full_name is absent / undefined', () => {
+
+      at src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/bilateral-mapping.component.spec.ts:1457:73
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:416:32)
+      at ProxyZoneSpec.Object.<anonymous>.ProxyZoneSpec.onInvoke (node_modules/zone.js/bundles/zone-testing.umd.js:2177:43)
+      at _ZoneDelegate.invoke (node_modules/zone.js/bundles/zone.umd.js:415:38)
+      at ZoneImpl.run (node_modules/zone.js/bundles/zone.umd.js:147:47)
+      at Object.wrappedFunc (node_modules/zone.js/bundles/zone-testing.umd.js:450:38)
+
+Test Suites: 1 failed, 1 total
+Tests:       7 failed, 70 passed, 77 total
+Snapshots:   0 total
+Time:        6.745 s, estimated 52 s
+Ran all test suites matching /src\/app\/pages\/platform\/pages\/administration\/center-admin\/bilateral-mapping\/bilateral-mapping.component.spec.ts/i.

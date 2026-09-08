@@ -44,6 +44,34 @@
             (fieldChange)="service.onJsonFieldChange(item.key, $event)" />
         </div>
       </div>
+      } @else if (isClarisaPhaseKey(item.key)) {
+      <!-- CLARISA phase selector (R-CPC-004). p-select is `editable` (DD-3)
+           so an admin can still pre-set a year CLARISA has not published yet
+           (design.md §10 reversion challenge). Options carry a per-year
+           project count (DD-7); the currently configured value is always
+           present even when the derived cohort does not contain it
+           (R-CPC-003). -->
+      <div class="flex w-full flex-col gap-2 -mt-1">
+        <span class="mb-0 text-[15px] !font-[700] atc-primary-blue-600">Value</span>
+        <p-select inputId="editEnvVarPhaseSelect" [options]="phaseSelectOptions()" optionLabel="label"
+          optionValue="value" [editable]="true" [ngModel]="service.editForm().simple_value"
+          (ngModelChange)="onPhaseValueChange($event)"
+          [disabled]="!roles.canEditAppConfiguration() || phaseOptionsLoading()" [loading]="phaseOptionsLoading()"
+          placeholder="Select or type a year…" styleClass="w-full" appendTo="body"
+          data-testid="clarisa-phase-select">
+        </p-select>
+        @if (phaseOptionsError()) {
+        <p class="m-0 text-[13px] font-[400] atc-red-1" role="alert" data-testid="clarisa-phase-error">
+          Could not load CLARISA phase data from the server. You can still enter a year manually.
+        </p>
+        } @else {
+          @if (phaseEmptyHint(); as hint) {
+          <p class="m-0 text-[13px] font-[400] atc-grey-600" data-testid="clarisa-phase-hint">
+            {{ hint }}
+          </p>
+          }
+        }
+      </div>
       } @else {
       <div class="flex w-full flex-col -mt-1">
         <app-input label="Value" [signal]="service.editForm" optionValue="simple_value"

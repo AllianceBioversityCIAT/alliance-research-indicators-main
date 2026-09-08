@@ -1,0 +1,29 @@
+{
+  "environment": {
+    "clarisa_host": "https://api.clarisa.cgiar.org/",
+    "upstream_contract_available": false
+  },
+  "measured_at": "2026-08-14T16:09:23.380Z",
+  "phase_used": 2026,
+  "definitions": {
+    "bilateral_contract_predicate": "Active agresso_contracts with UPPER(funding_type) IN ('BLR', 'BILATERAL') and is_active = 1",
+    "normalization_rules": "Trim whitespace, upper-case, strip leading centre prefix from closed set {B-, C-} at most once"
+  },
+  "clarisa": {
+    "slice_size": 0,
+    "source_center_acronym": {},
+    "source_of_funding": {},
+    "has_project_mappings": { "with_mappings": 0, "without_mappings": 0 },
+    "description_populated": { "populated": 0, "empty": 0 },
+    "external_code_populated": { "populated": 0, "empty": 0 },
+    "alliance_selector_agreement": {
+      "both_selectors": 0,
+      "spec_selector_only": 0,
+      "legacy_selector_only": 32
+    }
+  },
+  "agresso": null,
+  "resolution": null,
+  "normalization": null,
+  "samples": null
+}

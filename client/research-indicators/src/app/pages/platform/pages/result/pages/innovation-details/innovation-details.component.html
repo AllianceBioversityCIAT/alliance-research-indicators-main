@@ -38,19 +38,17 @@
               [scrollHeight]="'172px'" [isRequired]="true" [optionLabel]="'name'"
               [optionValue]="{ body: 'innovation_nature_id', option: 'id' }" [serviceName]="'innovationCharacteristics'"
               placeholder="Select the innovation nature">
-              <ng-template #itemTemplate let-item>
+              <ng-template #item let-item>
                 <div class="flex items-center block whitespace-normal break-words">
                   <p class="text-[#4C5158] text-[14px] font-[400]">
-                    <b>{{ item?.name }} -</b>
-                    {{ item?.definition }}
+                    <span class="font-[600] text-[#4C5158]">{{ item?.name }}</span>@if (item?.definition) {<span class="font-[600]">:</span><span> {{ item.definition }}</span>}
                   </p>
                 </div>
               </ng-template>
               <ng-template #selectedItemTemplate let-selected>
                 <div class="flex items-center block whitespace-normal !text-[14px] break-words">
                   <p class="text-[#4C5158] font-[400]">
-                    <b>{{ selected?.name }} -</b>
-                    {{ selected?.definition }}
+                    <span class="font-[600] text-[#4C5158]">{{ selected?.name }}</span>@if (selected?.definition) {<span class="font-[600]">:</span><span> {{ selected.definition }}</span>}
                   </p>
                 </div>
               </ng-template>
@@ -61,19 +59,17 @@
               helperText="Select the type that best fits the nature of the innovation." [scrollHeight]="'172px'"
               [optionLabel]="'name'" [optionValue]="{ body: 'innovation_type_id', option: 'code' }"
               [serviceName]="'innovationTypes'">
-              <ng-template #itemTemplate let-item>
+              <ng-template #item let-item>
                 <div class="flex items-center block whitespace-normal break-words">
                   <p class="text-[#4C5158] text-[14px] font-[400]">
-                    <b>{{ item?.name }} -</b>
-                    {{ item?.definition }}
+                    <span class="font-[600] text-[#4C5158]">{{ item?.name }}</span>@if (item?.definition) {<span class="font-[600]">:</span><span> {{ item.definition }}</span>}
                   </p>
                 </div>
               </ng-template>
               <ng-template #selectedItemTemplate let-selected>
                 <div class="flex items-center block whitespace-normal text-[14px] break-words">
                   <p class="text-[#4C5158] font-[400]">
-                    <b>{{ selected?.name }} -</b>
-                    {{ selected?.definition }}
+                    <span class="font-[600] text-[#4C5158]">{{ selected?.name }}</span>@if (selected?.definition) {<span class="font-[600]">:</span><span> {{ selected.definition }}</span>}
                   </p>
                 </div>
               </ng-template>

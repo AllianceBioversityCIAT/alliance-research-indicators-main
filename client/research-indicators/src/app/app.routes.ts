@@ -36,6 +36,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/oicr-download/oicr-download.component').then(m => m.default)
   },
   {
+    path: 'reporting',
+    loadComponent: () => import('./pages/reporting/reporting.component').then(m => m.default)
+  },
+  {
     path: 'reports/result/:id',
     loadComponent: () => import('./pages/star-report-viewer/star-report-viewer.component').then(m => m.default),
     canMatch: [rolesGuard],
@@ -303,6 +307,16 @@ export const routes: Routes = [
         canMatch: [centerAdminGuard],
         data: {
           title: 'Portfolio Management',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'administration/configuration/prompt-manager',
+        loadComponent: () =>
+          import('@platform/pages/administration/configuration/prompt-manager/prompt-manager.component').then(m => m.default),
+        canMatch: [appConfigurationGuard],
+        data: {
+          title: 'Prompt Manager',
           isLoggedIn: true
         }
       },

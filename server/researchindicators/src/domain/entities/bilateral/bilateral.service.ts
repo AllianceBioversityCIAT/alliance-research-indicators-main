@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
-import { ResultRepository } from '../results/repositories/result.repository';
+import {
+  PoolFundingAlignmentContext,
+  ResultRepository,
+} from '../results/repositories/result.repository';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import {
   AlignmentResponse,
@@ -18,9 +21,11 @@ import {
 } from './dto/update-pool-funding-alignment.dto';
 import { ClarisaScienceProgramsService } from '../../tools/clarisa/entities/clarisa-science-programs/clarisa-science-programs.service';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
+import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
+import { BilateralProjectMapping } from '../bilateral-project-mapping/entities/bilateral-project-mapping.entity';
 import {
   BilateralScienceProgramItem,
   BilateralScienceProgramsResponse,
@@ -42,6 +47,11 @@ import {
   MAPPABLE_LIVE_VERSION,
   resolveResultTypeKey,
 } from './utils/toc-level-rules.util';
+import {
+  isProjectScienceProgramMapping,
+  SpMappingRowLike,
+} from './utils/sp-mapping.predicate';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -55,8 +65,10 @@ import {
 import { ReviewDecisionDto } from './dto/review-decision.dto';
 import {
   PoolFundingAlignmentDetail,
+  PoolFundingAlignmentSpRole,
   ResultPoolFundingAlignmentRepository,
 } from './repositories/result-pool-funding-alignment.repository';
+import { SpRole } from './dto/sp-role.type';
 import {
   ResultPoolFundingTocAlignmentRepository,
   TocAlignmentUpsertInput,
@@ -90,11 +102,35 @@ interface TocAlignmentValidationError {
   error:
     | 'duplicate_sp_code'
     | 'sp_not_selected'
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124
+    | 'toc_alignment_not_primary_sp'
     | 'missing_required_fields'
     | 'level_not_allowed'
     | 'unknown_toc_result_id'
-    | 'unknown_indicator_id';
+    | 'unknown_indicator_id'
+    | 'contribution_without_indicator';
 }
+
+// @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / D-PSP-1 / D-PSP-5
+export type MappedProjectResolution =
+  | {
+      status: 'unmapped';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: null;
+    }
+  | {
+      status: 'stale';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: { id: number; short_name: string };
+      mapping: BilateralProjectMapping;
+    }
+  | {
+      status: 'mapped';
+      context: PoolFundingAlignmentContext;
+      clarisa_project: { id: number; short_name: string };
+      project: ClarisaProject;
+      mapping: BilateralProjectMapping;
+    };
 
 /**
  * SINGLETON-SCOPED BY DESIGN — see docs/specs/bilateral-module/design.md §3.4 Constraint A.
@@ -109,6 +145,8 @@ interface TocAlignmentValidationError {
  */
 @Injectable()
 export class BilateralService {
+  private readonly logger = new LoggerUtil({ name: BilateralService.name });
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly resultRepository: ResultRepository,
@@ -131,6 +169,107 @@ export class BilateralService {
   ) {}
 
   /**
+   * @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-01 / T-04 / T-06 / D-PSP-1 / D-PSP-6 / design §5.1
+   *
+   * Single mapping-resolution seam shared between `getScienceProgramsForResult`
+   * and `getHlosIndicatorsForResult`.
+   *
+   * Steps:
+   *   1. findPoolFundingAlignmentContext(resultId) → 404 if absent.
+   *   2. No agresso_agreement_id ⇒ unmapped, clarisa_project: null.
+   *   3. No active mapping row ⇒ unmapped, clarisa_project: null.
+   *   4. Resolve project:
+   *      a. Stable key first (clarisa_external_code normalized via normalizeExternalCode).
+   *      b. Numeric clarisa_project_id fallback.
+   *      c. Missing in both ⇒ stale (carrying snapshot project ref).
+   *   5. Drift signal: if resolved via external code with a different numeric id,
+   *      emit a warn log naming both ids and the agreement id.
+   *   6. Return mapped + project + mapping row.
+   */
+  private async resolveMappedProject(
+    resultId: number,
+  ): Promise<MappedProjectResolution> {
+    const context =
+      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
+
+    if (!context) {
+      throw new NotFoundException('Result not found');
+    }
+
+    const agreementId = context.agresso_agreement_id?.trim();
+
+    if (!agreementId) {
+      return {
+        status: 'unmapped',
+        context,
+        clarisa_project: null,
+      };
+    }
+
+    const mapping =
+      await this.bilateralProjectMappingService.findActiveByAgreementId(
+        agreementId,
+      );
+
+    if (!mapping) {
+      return {
+        status: 'unmapped',
+        context,
+        clarisa_project: null,
+      };
+    }
+
+    let project: ClarisaProject | null = null;
+    let resolvedViaExternalCode = false;
+
+    if (mapping.clarisa_external_code?.trim()) {
+      project = await this.clarisaProjectsService.findProjectByExternalCode(
+        mapping.clarisa_external_code,
+      );
+      if (project) {
+        resolvedViaExternalCode = true;
+      }
+    }
+
+    if (!project) {
+      project = await this.clarisaProjectsService.findProjectById(
+        mapping.clarisa_project_id,
+      );
+    }
+
+    if (!project) {
+      // Mapping points at a project CLARISA no longer exposes — treat as
+      // stale from the picker's perspective, but surface the snapshot
+      // we have so ops can spot the drift (R-PSP-004, D-PSP-5, D-PSP-6).
+      return {
+        status: 'stale',
+        context,
+        clarisa_project: {
+          id: mapping.clarisa_project_id,
+          short_name: mapping.clarisa_project_short_name ?? '',
+        },
+        mapping,
+      };
+    }
+
+    if (resolvedViaExternalCode && project.id !== mapping.clarisa_project_id) {
+      this.logger._warn(
+        `[BilateralService] CLARISA project id divergence for agreement "${agreementId}": ` +
+          `stored clarisa_project_id=${mapping.clarisa_project_id} != resolved project.id=${project.id} ` +
+          `(clarisa_external_code="${mapping.clarisa_external_code}")`,
+      );
+    }
+
+    return {
+      status: 'mapped',
+      context,
+      clarisa_project: { id: project.id, short_name: project.short_name },
+      project,
+      mapping,
+    };
+  }
+
+  /**
    * @sdd-spec docs/specs/bilateral-module/pending-items — T-15.11 / R-BIL-076 / R-BIL-078
    *
    * Per-result Science Programs picker source. Chain:
@@ -149,60 +288,22 @@ export class BilateralService {
     resultId: number,
     resultCode: string,
   ): Promise<BilateralScienceProgramsResponse> {
-    const context =
-      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
-
-    if (!context) {
-      throw new NotFoundException('Result not found');
-    }
-
-    const agreementId = context.agresso_agreement_id?.trim();
+    const resolution = await this.resolveMappedProject(resultId);
+    const { context } = resolution;
     const baseResponse = {
       result_code: String(context.result_official_code ?? resultCode),
     };
 
-    if (!agreementId) {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
+        mapping_status: resolution.status,
+        clarisa_project: resolution.clarisa_project,
         science_programs: [],
       };
     }
 
-    const mapping =
-      await this.bilateralProjectMappingService.findActiveByAgreementId(
-        agreementId,
-      );
-
-    if (!mapping) {
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
-        science_programs: [],
-      };
-    }
-
-    const project = await this.clarisaProjectsService.findProjectById(
-      mapping.clarisa_project_id,
-    );
-
-    if (!project) {
-      // Mapping points at a project CLARISA no longer exposes — treat as
-      // unmapped from the picker's perspective, but surface the snapshot
-      // we have so ops can spot the drift.
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: {
-          id: mapping.clarisa_project_id,
-          short_name: mapping.clarisa_project_short_name ?? '',
-        },
-        science_programs: [],
-      };
-    }
-
+    const { project } = resolution;
     const derived = this.deriveSciencePrograms(project);
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const catalogByCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
@@ -215,6 +316,7 @@ export class BilateralService {
         return {
           code,
           name,
+          mapping_status: meta?.mapping_status ?? null,
           category: meta?.category ?? fallback?.category ?? null,
           color: fallback?.color ?? null,
           icon_key: fallback?.icon_key ?? null,
@@ -226,7 +328,7 @@ export class BilateralService {
     return {
       ...baseResponse,
       mapping_status: 'mapped',
-      clarisa_project: { id: project.id, short_name: project.short_name },
+      clarisa_project: resolution.clarisa_project,
       science_programs,
     };
   }
@@ -263,12 +365,8 @@ export class BilateralService {
     resultId: number,
     resultCode: string,
   ): Promise<BilateralHlosIndicatorsResponse> {
-    const context =
-      await this.resultRepository.findPoolFundingAlignmentContext(resultId);
-
-    if (!context) {
-      throw new NotFoundException('Result not found');
-    }
+    const resolution = await this.resolveMappedProject(resultId);
+    const { context } = resolution;
 
     const resultType = resolveResultTypeKey(context.indicator_id);
     const allowedLevels = allowedLevelsFor(resultType);
@@ -280,50 +378,17 @@ export class BilateralService {
       // D-V2-7: `report_year_id` carries the literal report year (e.g. 2026).
       version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
     };
-    const agreementId = context.agresso_agreement_id?.trim();
 
-    if (!agreementId) {
+    if (resolution.status === 'unmapped' || resolution.status === 'stale') {
       return {
         ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
+        mapping_status: resolution.status,
+        clarisa_project: resolution.clarisa_project,
         catalogs: [],
       };
     }
 
-    const mapping =
-      await this.bilateralProjectMappingService.findActiveByAgreementId(
-        agreementId,
-      );
-
-    if (!mapping) {
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: null,
-        catalogs: [],
-      };
-    }
-
-    const project = await this.clarisaProjectsService.findProjectById(
-      mapping.clarisa_project_id,
-    );
-
-    if (!project) {
-      // Mapping points at a project CLARISA no longer exposes — treat as
-      // unmapped, but surface the snapshot we have so ops can spot the drift.
-      return {
-        ...baseResponse,
-        mapping_status: 'unmapped',
-        clarisa_project: {
-          id: mapping.clarisa_project_id,
-          short_name: mapping.clarisa_project_short_name ?? '',
-        },
-        catalogs: [],
-      };
-    }
-
-    const projectRef = { id: project.id, short_name: project.short_name };
+    const { project, clarisa_project: projectRef } = resolution;
     const spCodes = this.deriveSciencePrograms(project).map((p) => p.code);
 
     if (!spCodes.length || !allowedLevels.length) {
@@ -467,27 +532,18 @@ export class BilateralService {
   }
 
   /**
-   * True when a CLARISA project mapping row represents a Science Program for the
-   * bilateral picker / ToC catalog (not an Area of Work).
+   * True when a CLARISA project mapping row represents an accepted Science Program
+   * for the bilateral picker / ToC catalog (delegates to pure predicate).
    */
   private isProjectScienceProgramMapping(
-    mapping: {
-      status?: string;
-      global_unit_object?: {
-        smo_code?: string;
-        cgiar_entity_type_object?: { prefix?: string | null };
-        portfolio_object?: { acronym?: string };
-      };
-    },
+    mapping: SpMappingRowLike | null | undefined,
     activePortfolio: string,
   ): boolean {
-    const u = mapping.global_unit_object;
-    if (!u?.smo_code || mapping.status !== 'Confirmed') return false;
-    if (u.portfolio_object?.acronym !== activePortfolio) return false;
-
-    const prefix = u.cgiar_entity_type_object?.prefix?.toUpperCase();
-    if (prefix === 'AOW') return false;
-    return /^SP\d/i.test(u.smo_code.trim());
+    return isProjectScienceProgramMapping(
+      mapping,
+      activePortfolio,
+      ENV.BILATERAL_ACCEPTED_SP_STATUSES,
+    );
   }
 
   /**
@@ -507,11 +563,22 @@ export class BilateralService {
         portfolio_object?: { acronym?: string };
       };
     }>;
-  }): Map<string, { allocation: number | null; category: string | null }> {
+  }): Map<
+    string,
+    {
+      allocation: number | null;
+      category: string | null;
+      mapping_status: string | null;
+    }
+  > {
     const activePortfolio = ENV.BILATERAL_ACTIVE_PORTFOLIO;
     const metaByCode = new Map<
       string,
-      { allocation: number | null; category: string | null }
+      {
+        allocation: number | null;
+        category: string | null;
+        mapping_status: string | null;
+      }
     >();
 
     for (const m of project.project_mappings_array ?? []) {
@@ -526,6 +593,7 @@ export class BilateralService {
         metaByCode.set(u.smo_code, {
           allocation: typeof m.allocation === 'number' ? m.allocation : null,
           category: u.cgiar_entity_type_object?.name ?? null,
+          mapping_status: m.status?.trim() ?? null,
         });
       }
     }
@@ -561,8 +629,14 @@ export class BilateralService {
     const isPrmsSourced = this.isPrmsSourced(context.platform_code);
     const visibleAlignment = eligible ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
+    // Read off `visibleAlignment`, NEVER the raw `alignment` — mirrors the
+    // `selectedLevers` line above so a non-eligible result keeps returning
+    // `selected_science_programs: []` (RA-04). The LEFT JOIN null-sp_code
+    // guard already ran inside the repository (RA-08), so `sp_roles` here
+    // never carries a phantom `{ sp_code: null }` member.
     const selectedSciencePrograms = await this.toSelectedSciencePrograms(
-      selectedLevers.map((lever) => lever.lever_code),
+      visibleAlignment?.sp_roles ?? [],
     );
 
     return {
@@ -618,22 +692,27 @@ export class BilateralService {
     };
   }
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
+  // Widened from `(codes: string[])` to `(sps: PoolFundingAlignmentSpRole[])`
+  // so each entry can carry its resolved role alongside the CLARISA
+  // enrichment — enrichment itself is unchanged.
   private async toSelectedSciencePrograms(
-    codes: string[],
+    sps: PoolFundingAlignmentSpRole[],
   ): Promise<SelectedScienceProgramResponse[]> {
-    if (!codes.length) return [];
+    if (!sps.length) return [];
 
     const catalog = await this.clarisaScienceProgramsService.findAll();
     const byCode = new Map(catalog.map((sp) => [sp.official_code, sp]));
 
-    return codes.map((code) => {
-      const match = byCode.get(code);
+    return sps.map(({ sp_code, sp_role }) => {
+      const match = byCode.get(sp_code);
       return {
-        code,
-        name: match?.name ?? code,
+        code: sp_code,
+        name: match?.name ?? sp_code,
         category: match?.category ?? null,
         color: match?.color ?? null,
         icon_key: match?.icon_key ?? null,
+        role: sp_role,
       };
     });
   }
@@ -674,10 +753,38 @@ export class BilateralService {
       throw new ConflictException('Result is already synced to PRMS');
     }
 
-    const leverCodes = await this.normalizeLeverCodes(
+    // T-05 / RA-02: `validCodes` (the full per-result catalog) rides the
+    // same call so T-06's `resolvePrimarySpCode` below can validate
+    // `primary_sp_code` without a second `getScienceProgramsForResult` call.
+    const { codes: leverCodes, validCodes } = await this.normalizeLeverCodes(
       dto,
       resultId,
       resultCode,
+    );
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+    //
+    // Version gate extracted from `validateTocAlignments` (design.md §4 step
+    // 2) so it keeps firing before Primary validation (T-06 step 3) is
+    // inserted below. Trigger condition is unchanged from the original
+    // inline check: fires ONLY when `toc_alignments` is present, so legacy
+    // bodies still bypass it entirely (R-BIL-097 AC.3).
+    if (dto.toc_alignments) {
+      this.assertTocMappingVersionUnlocked(context);
+    }
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120..122, D-C2-15
+    //
+    // Primary resolution (design.md §4 step 3, §5.1) runs BEFORE the
+    // transaction opens too, so a rejection here observes no partial write
+    // (R-BIL-121's atomicity clause) — same reasoning as the version gate
+    // above. Positioned after it (R-BIL-130) and before
+    // `validateTocAlignments`, which is passed the resolved Primary below
+    // for the T-07 restriction (R-BIL-124).
+    const primarySpCode = this.resolvePrimarySpCode(
+      dto,
+      leverCodes,
+      validCodes,
     );
 
     // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092..094, R-BIL-097
@@ -694,6 +801,7 @@ export class BilateralService {
           leverCodes,
           context,
           resultId,
+          primarySpCode,
         )
       : null;
 
@@ -754,6 +862,15 @@ export class BilateralService {
             // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
             // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
             sp_code: spCode,
+            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
+            // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
+            // Primary and STORED explicitly on every row (never transmitted
+            // per-row on the wire). `satisfies SpRole` ties this literal to
+            // the same shared union the read-back carrier and the DTO use
+            // (design.md §4, D-C2-14) — they agree by type, not convention.
+            sp_role: (spCode === primarySpCode
+              ? 'PRIMARY'
+              : 'CONTRIBUTING') satisfies SpRole,
             created_by: actorUserId,
             updated_by: actorUserId,
           })),
@@ -795,6 +912,8 @@ export class BilateralService {
         payload_after: {
           has_contribution: dto.has_contribution,
           lever_codes: leverCodes,
+          // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-10 / design.md §5.4
+          primary_sp_code: primarySpCode,
           // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06
           // (design §6.3 step 6) — the history entry mentions the ToC
           // alignment change ONLY when `toc_alignments` was submitted;
@@ -829,24 +948,156 @@ export class BilateralService {
   }
 
   /**
-   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094, R-BIL-095, R-BIL-097
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
    *
-   * Pre-transaction gate + validation for `toc_alignments[]` (design §6.3
-   * steps 2a–2d). Returns the per-SP upsert inputs with snapshots already
+   * Version gate: live version (`report_year_id`, literal year per D-V2-7)
+   * ≠ `MAPPABLE_LIVE_VERSION` (2026) → 409 `toc_mapping_version_locked`
+   * (R-BIL-097). Extracted from `validateTocAlignments` — where it used to
+   * be the first statement — so it keeps firing BEFORE Primary validation
+   * (T-06), which the call site inserts after this check. Left inside
+   * `validateTocAlignments`, a new `400 primary_sp_required` would move in
+   * front of this shipped `409`, displacing a tested contract (R-BIL-097
+   * AC.2). The trigger condition (only when `toc_alignments` is present,
+   * R-BIL-097 AC.3) lives at the call site, not here, so it stays visible
+   * next to the other pre-transaction steps instead of being duplicated.
+   */
+  private assertTocMappingVersionUnlocked(context: {
+    report_year_id?: number | string;
+  }): void {
+    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
+      // GlobalExceptions surfaces `exception.response.message` into the
+      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
+      throw new ConflictException({
+        message: {
+          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
+          code: 'toc_mapping_version_locked',
+        },
+      });
+    }
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120, R-BIL-121, R-BIL-122, D-C2-15
+   *
+   * Resolves the Primary SP for this save. `design.md` §5.1 is normative —
+   * the five steps below map 1:1 onto it. Runs BEFORE the transaction opens
+   * (called from the pre-transaction block in `updateAlignment`, right after
+   * the T-04 version gate), so a rejection here observes no partial write
+   * (R-BIL-121's atomicity clause) — same reasoning as the version gate.
+   * Positioned after it (R-BIL-130: the shipped 409 keeps winning) and
+   * before `validateTocAlignments`, which is handed the resolved Primary as
+   * a parameter for the T-07 restriction (R-BIL-124).
+   *
+   *   1. `has_contribution === false` → `null`. No SP rows are written and
+   *      `primary_sp_code` is ignored (R-BIL-014). Returns BEFORE touching
+   *      `validCodes` — the ordering `normalizeLeverCodes` (T-05 / RA-02
+   *      ADVISORY 1) leaves unenforced by type, so this step returning
+   *      first is what makes it true in practice.
+   *   2. Trim `primary_sp_code`. Empty, whitespace-only, or absent →
+   *      `400 errors.primary_sp.code = "primary_sp_required"` (R-BIL-121
+   *      AC.1/AC.2).
+   *   3. Not in the full per-result catalog (`validCodes` — T-05's widened
+   *      `normalizeLeverCodes`, RA-02) → the EXISTING
+   *      `400 errors.unknown_sp_codes` contract, carrying the offending
+   *      code. Without this step an unknown Primary would return
+   *      `primary_sp_not_selected` instead, and R-BIL-122 AC.2 would be
+   *      undischargeable — `normalizeLeverCodes` never inspects
+   *      `primary_sp_code`, so this is the only place that catches it
+   *      (design.md §5.1 "Step 3 is not redundant…").
+   *   4. In the catalog but not in the effective `sp_codes` →
+   *      `400 primary_sp_not_selected` (R-BIL-122 AC.1).
+   *   5. Return the trimmed code. Each persisted SP row derives
+   *      `sp_role = (sp_code === primary) ? 'PRIMARY' : 'CONTRIBUTING'` at
+   *      the call site (R-BIL-120 AC.1). Role is DERIVED, never transmitted
+   *      per-row on the wire, so "one SP in both roles" is unrepresentable
+   *      and mutual exclusion needs NO runtime check (D-C2-1; R-BIL-122
+   *      AC.3 is satisfied structurally — none is added here).
+   */
+  private resolvePrimarySpCode(
+    dto: UpdatePoolFundingAlignmentDto,
+    effectiveSpCodes: string[],
+    validCodes: Set<string>,
+  ): string | null {
+    if (!dto.has_contribution) {
+      return null;
+    }
+
+    const trimmed = dto.primary_sp_code?.trim();
+    if (!trimmed) {
+      throw new BadRequestException({
+        message: {
+          description: 'A Primary Science Program is required',
+          primary_sp: {
+            code: 'primary_sp_required',
+            description:
+              'primary_sp_code is required when has_contribution is true',
+          },
+        },
+      });
+    }
+
+    if (!validCodes.has(trimmed)) {
+      // Existing errors.unknown_sp_codes contract (normalizeLeverCodes,
+      // T-15.1) — carries the offending code so R-BIL-122 AC.2 stays
+      // distinguishable from AC.1 below, rather than both collapsing onto
+      // primary_sp_not_selected.
+      throw new BadRequestException({
+        message: {
+          description: 'Unknown Science Program codes',
+          unknown_sp_codes: [trimmed],
+        },
+      });
+    }
+
+    if (!effectiveSpCodes.includes(trimmed)) {
+      throw new BadRequestException({
+        message: {
+          description: 'The Primary Science Program must be selected',
+          primary_sp: {
+            code: 'primary_sp_not_selected',
+            description: 'primary_sp_code must be one of the selected sp_codes',
+          },
+        },
+      });
+    }
+
+    return trimmed;
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-094, R-BIL-095, R-BIL-097
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+   *
+   * Pre-transaction validation for `toc_alignments[]` (design §6.3 steps
+   * 2b–2d). Returns the per-SP upsert inputs with snapshots already
    * resolved from the validated catalog entries, so the transaction only
    * persists — it never re-reads upstream.
    *
-   *   a. Version gate: live version (`report_year_id`, literal year per
-   *      D-V2-7) ≠ 2026 → 409 `toc_mapping_version_locked` (R-BIL-097).
-   *   b. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
-   *      `missing_required_fields` — collected per alignment.
-   *   c. Catalog validation per "Yes" entry — `level_not_allowed`, then
-   *      `(toc_result_id, indicator_id)` existence in the cached (sp, level)
-   *      catalog → `unknown_toc_result_id` / `unknown_indicator_id`.
-   *      Catalogs are fetched ONLY for the (sp, level) combos actually
-   *      referenced; a cold-cache upstream failure propagates as 503 with
-   *      nothing persisted (R-BIL-094).
-   *   d. ANY collected error → single 400 carrying ALL per-alignment errors
+   * The version gate (former step "a" here) has been EXTRACTED to the call
+   * site as `assertTocMappingVersionUnlocked`, invoked before this method
+   * runs — see design.md §4 step 2 and R-BIL-130.
+   *
+   *   a. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
+   *      `toc_alignment_not_primary_sp` (T-07 / R-BIL-124: a selected SP
+   *      that is not the resolved Primary — checked immediately after
+   *      `sp_not_selected` and before the `aligns_with_toc` short-circuit,
+   *      so an explicit "No" for a Contributing SP is rejected too, design
+   *      §5.2), `missing_required_fields` — collected per alignment. The
+   *      required floor for `aligns_with_toc: true` is `level` +
+   *      `toc_result_id` only (R-BIL-111 §5.1, D-C1-3); `indicator_id` is
+   *      optional.
+   *   b. Catalog validation per "Yes" entry — `level_not_allowed`, then
+   *      `toc_result_id` existence in the cached (sp, level) catalog →
+   *      `unknown_toc_result_id`. `indicator_id` is resolved against that
+   *      ToC result's indicators ONLY when supplied → `unknown_indicator_id`
+   *      (R-BIL-113 AC.1–4). A `quantitative_contribution` supplied without
+   *      an `indicator_id` is rejected with the dedicated
+   *      `contribution_without_indicator` code — never
+   *      `missing_required_fields` (R-BIL-113 AC.6, D-C1-8). Catalogs are
+   *      fetched ONLY for the (sp, level) combos actually referenced; a
+   *      cold-cache upstream failure propagates as 503 with nothing
+   *      persisted (R-BIL-094, NFR-BIL-110).
+   *   c. ANY collected error → single 400 carrying ALL per-alignment errors
    *      as `errors.toc_alignments` (atomic — D-V2-8). The legacy
    *      `errors.unknown_sp_codes` contract is untouched (it fires earlier,
    *      from `normalizeLeverCodes`).
@@ -861,18 +1112,13 @@ export class BilateralService {
     effectiveSpCodes: string[],
     context: { report_year_id?: number | string; indicator_id?: number },
     resultId: number,
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124
+    // The resolved Primary (T-06's `resolvePrimarySpCode`), threaded through
+    // so a selected-but-non-Primary entry can be rejected below. `null` only
+    // when `has_contribution` is false, in which case `effectiveSpCodes` is
+    // already empty and every entry is caught by `sp_not_selected` first.
+    primarySpCode: string | null,
   ): Promise<TocAlignmentUpsertInput[]> {
-    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
-      // GlobalExceptions surfaces `exception.response.message` into the
-      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
-      throw new ConflictException({
-        message: {
-          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
-          code: 'toc_mapping_version_locked',
-        },
-      });
-    }
-
     const errors: TocAlignmentValidationError[] = [];
     const effective = new Set(effectiveSpCodes);
     const allowedLevels = new Set(
@@ -904,13 +1150,34 @@ export class BilateralService {
         continue;
       }
 
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-07 / R-BIL-124, D-1, D-7
+      //
+      // A selected SP that is not the resolved Primary cannot be ToC-mapped
+      // from STAR (design.md §5.2). Positioned AFTER `sp_not_selected` above
+      // (an unselected SP keeps the older, more specific code — AC.2) and
+      // BEFORE the `aligns_with_toc` short-circuit below — deliberately: an
+      // explicit `aligns_with_toc: false` for a Contributing SP is also a
+      // write against a retained row, and must be rejected here rather than
+      // silently accepted as a valid "No".
+      if (entry.sp_code !== primarySpCode) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'sp_code',
+          error: 'toc_alignment_not_primary_sp',
+        });
+        continue;
+      }
+
       if (!entry.aligns_with_toc) {
         continue;
       }
 
-      const missingFields = (
-        ['level', 'toc_result_id', 'indicator_id'] as const
-      ).filter((field) => entry[field] === undefined || entry[field] === null);
+      // Required floor for aligns_with_toc: true (R-BIL-111 §5.1, D-C1-3):
+      // level + toc_result_id only. indicator_id is optional and validated
+      // conditionally below (R-BIL-113).
+      const missingFields = (['level', 'toc_result_id'] as const).filter(
+        (field) => entry[field] === undefined || entry[field] === null,
+      );
       if (missingFields.length) {
         for (const field of missingFields) {
           errors.push({
@@ -927,6 +1194,25 @@ export class BilateralService {
           sp_code: entry.sp_code,
           field: 'level',
           error: 'level_not_allowed',
+        });
+        continue;
+      }
+
+      // A contribution is expressed in the selected indicator's unit of
+      // measurement — without an indicator it is unitless and not
+      // interpretable (R-BIL-113 AC.6, D-C1-8). Distinct from the floor
+      // above: indicator_id itself stays optional, so this is never
+      // reported as missing_required_fields.
+      const hasContribution =
+        entry.quantitative_contribution !== undefined &&
+        entry.quantitative_contribution !== null;
+      const hasIndicator =
+        entry.indicator_id !== undefined && entry.indicator_id !== null;
+      if (hasContribution && !hasIndicator) {
+        errors.push({
+          sp_code: entry.sp_code,
+          field: 'quantitative_contribution',
+          error: 'contribution_without_indicator',
         });
         continue;
       }
@@ -956,7 +1242,7 @@ export class BilateralService {
 
     const validatedCatalogRefs = new Map<
       string,
-      { tocResult: TocResult; indicator: TocIndicator }
+      { tocResult: TocResult; indicator: TocIndicator | null }
     >();
     for (const entry of catalogChecks) {
       const catalog = catalogByKey.get(`${entry.sp_code}:${entry.level}`) ?? [];
@@ -968,6 +1254,17 @@ export class BilateralService {
           sp_code: entry.sp_code,
           field: 'toc_result_id',
           error: 'unknown_toc_result_id',
+        });
+        continue;
+      }
+
+      // indicator_id is optional at the Level + HLO floor (R-BIL-111) — only
+      // validate it against the catalog when the caller supplied one
+      // (R-BIL-113 AC.3–4).
+      if (entry.indicator_id === undefined || entry.indicator_id === null) {
+        validatedCatalogRefs.set(entry.sp_code, {
+          tocResult,
+          indicator: null,
         });
         continue;
       }
@@ -1008,19 +1305,28 @@ export class BilateralService {
       }
 
       const { tocResult, indicator } = validatedCatalogRefs.get(entry.sp_code);
+      // Indicator-derived fields (R-BIL-111 AC.1, R-BIL-114 AC.1) are only
+      // populated when an indicator actually resolved. A Level + HLO-only
+      // "Yes" clears the floor with `indicator: null` (validation loop
+      // above), so `target_year` must not claim a live-version target for
+      // an indicator that was never chosen (judgment F-9).
       return {
         result_id: resultId,
         sp_code: entry.sp_code,
         aligns_with_toc: true,
         level: entry.level,
         toc_result_id: entry.toc_result_id,
-        indicator_id: entry.indicator_id,
+        indicator_id: indicator ? entry.indicator_id : null,
         quantitative_contribution: entry.quantitative_contribution ?? null,
         toc_result_title: tocResult.title,
-        indicator_description: indicator.indicator_description,
-        unit_messurament: indicator.unit_messurament ?? null,
-        target_value: this.resolveLiveTargetValue(indicator),
-        target_year: MAPPABLE_LIVE_VERSION,
+        indicator_description: indicator
+          ? indicator.indicator_description
+          : null,
+        unit_messurament: indicator
+          ? (indicator.unit_messurament ?? null)
+          : null,
+        target_value: indicator ? this.resolveLiveTargetValue(indicator) : null,
+        target_year: indicator ? MAPPABLE_LIVE_VERSION : null,
       };
     });
   }
@@ -1248,14 +1554,23 @@ export class BilateralService {
    *
    * Validation skipped when `has_contribution === false` (codes are dropped
    * per the existing R-BIL-014 behavior).
+   *
+   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-05 / RA-02
+   *
+   * Returns the per-result catalog (`validCodes`) alongside the selected
+   * `codes`, instead of discarding it as before (design.md §5.1 "How step 3
+   * gets the catalog — normative"). This lets T-06's `resolvePrimarySpCode`
+   * validate `primary_sp_code` against the full catalog without a second
+   * `getScienceProgramsForResult` call. `validCodes` is empty on the
+   * `has_contribution === false` path — the catalog is never fetched there.
    */
   private async normalizeLeverCodes(
     dto: UpdatePoolFundingAlignmentDto,
     resultId: number,
     resultCode: string,
-  ): Promise<string[]> {
+  ): Promise<{ codes: string[]; validCodes: Set<string> }> {
     if (!dto.has_contribution) {
-      return [];
+      return { codes: [], validCodes: new Set() };
     }
 
     // Prefer sp_codes (new) over lever_codes (legacy back-compat).
@@ -1289,9 +1604,22 @@ export class BilateralService {
       });
     }
 
-    return codes;
+    return { codes, validCodes };
   }
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-10 / design.md §5.4
+  //
+  // Widened to read the `sp_roles` carrier (T-08) instead of only
+  // `selected_levers[].lever_code`, which cannot see a role at all. This is
+  // what lets `payload_before` distinguish a Primary CHANGE from a Primary
+  // being set for the first time — the three cases from design.md §5.4:
+  //   1. had a Primary        -> that sp_code
+  //   2. legacy, no role      -> `null` (an OBJECT whose field is null)
+  //   3. no previous alignment -> `payload_before` stays `null` ITSELF
+  //      (handled by the early return below, unchanged)
+  // `?? []` guards a defensively-missing carrier (e.g. a pre-T-08 fixture
+  // shape) the same way case 2 is handled — no PRIMARY row found reports
+  // `null`, never a thrown error.
   private toHistoryPayload(
     alignment: PoolFundingAlignmentDetail | null,
   ): Record<string, unknown> | null {
@@ -1299,9 +1627,14 @@ export class BilateralService {
       return null;
     }
 
+    const primarySp = (alignment.sp_roles ?? []).find(
+      (sp) => sp.sp_role === 'PRIMARY',
+    );
+
     return {
       has_contribution: alignment.has_contribution,
       lever_codes: alignment.selected_levers.map((lever) => lever.lever_code),
+      primary_sp_code: primarySp?.sp_code ?? null,
     };
   }
 

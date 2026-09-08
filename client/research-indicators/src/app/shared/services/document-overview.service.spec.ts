@@ -78,6 +78,41 @@ describe('DocumentOverviewService', () => {
     expect(requestOptions.headers.get('Content-Type')).toBe('application/json');
   });
 
+  it('generateDocumentOverview should include the trimmed text resource in the payload when provided', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', '  Context text to ground the summary.  ');
+
+    expect(httpClientMock.post).toHaveBeenCalledWith(
+      `${environment.documentOverviewUrl}/api/document-overview`,
+      {
+        bucket_name: 'ai-services-ibd',
+        project_folder: `${environment.keyProjectOverview}A492`,
+        user_id: cacheServiceMock.dataCache().user.email,
+        text: 'Context text to ground the summary.'
+      },
+      expect.any(Object)
+    );
+  });
+
+  it('generateDocumentOverview should cap the text resource at 20,000 characters', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', 'x'.repeat(25_000));
+
+    const body = httpClientMock.post.mock.calls[0][1];
+    expect(body.text).toHaveLength(20_000);
+  });
+
+  it('generateDocumentOverview should omit the text field when text is empty or whitespace', async () => {
+    httpClientMock.post.mockReturnValue(of({ overview: { project_summary: 'Generated.' } }));
+
+    await service.generateDocumentOverview('A492', '   ');
+
+    const body = httpClientMock.post.mock.calls[0][1];
+    expect(body).not.toHaveProperty('text');
+  });
+
   it('fetchDocumentOverviewSummary should throw error on failure', async () => {
     httpClientMock.get.mockReturnValue(throwError(() => new Error('fail')));
 

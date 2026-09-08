@@ -71,8 +71,9 @@ describe('ToPromiseService', () => {
   });
 
   it('getEnv should return correct url based on isAuth', () => {
-    expect(service.getEnv(true)).toContain('management');
-    expect(service.getEnv(false)).toContain('main');
+    const env = require('../../../environments/environment').environment;
+    expect(service.getEnv(true)).toBe(env.managementApiUrl);
+    expect(service.getEnv(false)).toBe(env.mainApiUrl);
     expect(service.getEnv('custom')).toBe('custom');
   });
 
@@ -300,7 +301,8 @@ describe('ToPromiseService', () => {
       httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
       await service.getBlob('/test-url', { isAuth: true });
       const url = (httpClientMock.get as jest.Mock).mock.calls[0][0];
-      expect(url).toContain('management');
+      const env = require('../../../environments/environment').environment;
+      expect(url).toBe(`${env.managementApiUrl}/test-url`);
     });
 
     it('should use mainApiUrl when isAuth is false', async () => {
@@ -308,7 +310,8 @@ describe('ToPromiseService', () => {
       httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
       await service.getBlob('/test-url', { isAuth: false });
       const url = (httpClientMock.get as jest.Mock).mock.calls[0][0];
-      expect(url).toContain('main');
+      const env = require('../../../environments/environment').environment;
+      expect(url).toBe(`${env.mainApiUrl}/test-url`);
     });
 
     it('should use custom URL when isAuth is a string', async () => {

@@ -1,3 +1,5 @@
+import { parseAcceptedSpStatuses } from '../../entities/bilateral/utils/sp-mapping.predicate';
+
 export class ENV {
   static get IS_PRODUCTION(): boolean {
     return ENV.validateEnvBoolean(process.env.ARI_IS_PRODUCTION);
@@ -33,6 +35,29 @@ export class ENV {
    */
   static get BILATERAL_ACTIVE_PORTFOLIO(): string {
     return process.env.ARI_BILATERAL_ACTIVE_PORTFOLIO?.trim() || 'P25';
+  }
+
+  /**
+   * @sdd-spec bugfix/pool-funding-sp-picker-empty — T-02 / R-PSP-001 / D-PSP-2 / D-PSP-3 / K-005
+   *
+   * Accepted CLARISA mapping statuses for Science Programs in the bilateral
+   * picker and ToC catalog. Single-source default `Confirmed,Pending` derived
+   * from DEFAULT_ACCEPTED_SP_STATUSES in sp-mapping.predicate.ts.
+   */
+  static get BILATERAL_ACCEPTED_SP_STATUSES(): Set<string> {
+    return parseAcceptedSpStatuses(
+      process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES,
+    );
+  }
+
+  /**
+   * @sdd-spec bugfix/bilateral-alliance-selector — T-02 / R-BAS-003
+   *
+   * Fallback phase for CLARISA project mapping when app_config has no value.
+   * Empty string when unset; MappingPhaseResolver treats empty/unset as fallthrough to default 2026.
+   */
+  static get CLARISA_PROJECTS_PHASE(): string {
+    return process.env.ARI_CLARISA_PROJECTS_PHASE?.trim() || '';
   }
 
   /**

@@ -1,0 +1,530 @@
+<!-- @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-06 / R-CAM-002, R-CAM-003, R-5, design.md §6.2 -->
+<p-dialog
+  header="Auto-Mapper — CLARISA ↔ AGRESSO"
+  [(visible)]="visible"
+  [modal]="true"
+  [draggable]="false"
+  [resizable]="false"
+  [style]="{ width: '800px', 'max-width': '95vw' }"
+  [closable]="true"
+  (onHide)="closeDialog()"
+  appendTo="body"
+  data-testid="automapper-dialog"
+  aria-labelledby="automapperDialogTitle">
+
+  <div class="flex flex-col gap-4">
+
+    <!-- Subheader info: feed freshness (F-C / §7) -->
+    <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[var(--ac-grey-200)]">
+      <div class="flex flex-col">
+        <span class="text-xs font-semibold atc-grey-700">CLARISA Project Phase: {{ phase() }}</span>
+        <span class="text-xs atc-grey-600" data-testid="preview-feed-timestamp">
+          Feed Cache: {{ formattedFeedFetchedAt() }}
+        </span>
+      </div>
+      @if (!loadingPreview() && !applyResult()) {
+        <button
+          pButton
+          type="button"
+          label="Refresh preview"
+          icon="pi pi-refresh"
+          class="p-button-text p-button-sm !text-xs"
+          (click)="loadPreview()"
+          data-testid="refresh-preview-btn">
+        </button>
+      }
+    </div>
+
+    <!-- Loading preview state -->
+    @if (loadingPreview()) {
+      <div class="flex flex-col gap-3 py-6" data-testid="preview-loading" aria-live="polite">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-spinner pi-spin atc-primary-blue-400" aria-hidden="true"></i>
+          <span class="text-sm atc-grey-800">Evaluating eligible CLARISA cohort against AGRESSO…</span>
+        </div>
+        <p-skeleton width="100%" height="40px"></p-skeleton>
+        <p-skeleton width="100%" height="150px"></p-skeleton>
+      </div>
+
+    } @else if (previewError()) {
+      <!-- Preview error state -->
+      <div
+        class="flex flex-col gap-3 rounded-[8px] border border-[var(--ac-red-1)] p-4 abc-grey-100"
+        role="alert"
+        aria-live="assertive"
+        data-testid="preview-error">
+        <p class="m-0 text-sm font-semibold atc-red-1">
+          {{ previewError() }}
+        </p>
+        <button
+          pButton
+          type="button"
+          label="Retry"
+          icon="pi pi-refresh"
+          class="p-button-sm self-start"
+          (click)="loadPreview()"
+          data-testid="retry-preview-btn">
+        </button>
+      </div>
+
+    } @else if (applyResult()) {
+      @let res = applyResult()!;
+      <!-- Apply Result Panel -->
+      <div class="flex flex-col gap-4 py-3" data-testid="apply-result-panel">
+        <div class="flex items-center gap-2 p-3 rounded-[8px] bg-[var(--ac-green-100)] border border-[var(--ac-green-200)]">
+          <i class="pi pi-check-circle text-xl atc-green-600" aria-hidden="true"></i>
+          <div class="flex flex-col">
+            <span class="text-sm font-bold atc-green-700">Auto-mapping run completed successfully!</span>
+            <span class="text-xs atc-green-700">
+              Evaluated against server state. Summary below.
+            </span>
+          </div>
+        </div>
+
+        <!-- Counts summary grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" data-testid="apply-result-counts">
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Created</span>
+            <span class="text-lg font-bold atc-green-600" data-testid="apply-count-created">{{ res.counts.created }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Superseded</span>
+            <span class="text-lg font-bold atc-primary-blue-600" data-testid="apply-count-superseded">{{ res.counts.superseded }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Already Mapped</span>
+            <span class="text-lg font-bold atc-grey-700" data-testid="apply-count-alreadyMapped">{{ res.counts.alreadyMapped }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Divergent</span>
+            <span class="text-lg font-bold atc-orange-1" data-testid="apply-count-divergent">{{ res.counts.divergent }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Ambiguous</span>
+            <span class="text-lg font-bold atc-grey-700" data-testid="apply-count-ambiguous">{{ res.counts.ambiguous }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Unresolved</span>
+            <span class="text-lg font-bold atc-grey-700" data-testid="apply-count-unresolved">{{ res.counts.unresolved }}</span>
+          </div>
+        </div>
+
+        @if (res.ambiguous.length > 0 || res.unresolved.length > 0) {
+          <div class="flex flex-col gap-2 mt-2">
+            <h3 class="m-0 text-xs font-bold uppercase tracking-wide atc-grey-700">Items Requiring Attention</h3>
+            @if (res.ambiguous.length > 0) {
+              <div class="p-2.5 rounded border border-[var(--ac-grey-300)] abc-grey-100">
+                <span class="text-xs font-semibold atc-grey-800">Ambiguous ({{ res.ambiguous.length }}):</span>
+                <ul class="m-0 pl-4 text-xs atc-grey-700">
+                  @for (item of res.ambiguous; track item.clarisaProjectId) {
+                    <li>{{ formatProject(item) }} (id: {{ item.clarisaProjectId }}) → Contract {{ item.derivedContractId }}</li>
+                  }
+                </ul>
+              </div>
+            }
+            @if (res.unresolved.length > 0) {
+              <div class="p-2.5 rounded border border-[var(--ac-grey-300)] abc-grey-100">
+                <span class="text-xs font-semibold atc-grey-800">Unresolved ({{ res.unresolved.length }}):</span>
+                <ul class="m-0 pl-4 text-xs atc-grey-700">
+                  @for (item of res.unresolved; track item.clarisaProjectId) {
+                    <li>{{ formatProject(item) }} (id: {{ item.clarisaProjectId }}) → {{ formatDerivedContractId(item.derivedContractId) }}</li>
+                  }
+                </ul>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+    } @else if (preview()) {
+      @let prev = preview()!;
+      <!-- Preview Content -->
+      <div class="flex flex-col gap-3" data-testid="preview-content">
+
+        <!-- Bucket tabs -->
+        <div class="flex flex-wrap gap-1 border-b border-[var(--ac-grey-200)] pb-1" role="tablist">
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'toCreate'"
+            (click)="selectTab('toCreate')"
+            data-testid="tab-toCreate"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'toCreate'">
+            <span>To Create</span>
+            <span class="bil-tab-badge bil-tab-badge--green">{{ prev.counts.toCreate }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'divergent'"
+            (click)="selectTab('divergent')"
+            data-testid="tab-divergent"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'divergent'">
+            <span>Divergent</span>
+            <span class="bil-tab-badge bil-tab-badge--orange">{{ prev.counts.divergent }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'ambiguous'"
+            (click)="selectTab('ambiguous')"
+            data-testid="tab-ambiguous"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'ambiguous'">
+            <span>Ambiguous</span>
+            <span class="bil-tab-badge">{{ prev.counts.ambiguous }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'unresolved'"
+            (click)="selectTab('unresolved')"
+            data-testid="tab-unresolved"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'unresolved'">
+            <span>Unresolved</span>
+            <span class="bil-tab-badge">{{ prev.counts.unresolved }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'supersede'"
+            (click)="selectTab('supersede')"
+            data-testid="tab-supersede"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'supersede'">
+            <span>Superseded</span>
+            <span class="bil-tab-badge">{{ prev.counts.supersede }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'alreadyMapped'"
+            (click)="selectTab('alreadyMapped')"
+            data-testid="tab-alreadyMapped"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'alreadyMapped'">
+            <span>Already Mapped</span>
+            <span class="bil-tab-badge">{{ prev.counts.alreadyMapped }}</span>
+          </button>
+        </div>
+
+        <!-- Bucket Tab Panels -->
+
+        <!-- 1. TO CREATE -->
+        @if (activeTab() === 'toCreate') {
+          <div class="flex flex-col gap-2" data-testid="panel-toCreate">
+            <p class="m-0 text-xs atc-grey-700">
+              Deterministic pairs ready to create as active mappings (source: DERIVED).
+            </p>
+            @if (prev.toCreate.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No new mappings to create.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">AGRESSO Contract</th>
+                      <th class="p-2 atc-grey-800 font-semibold">CLARISA Project</th>
+                      <th class="p-2 atc-grey-800 font-semibold">External Code</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.toCreate; track item.clarisaProjectId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-900" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
+                        </td>
+                        <td class="p-2 atc-grey-700">{{ item.externalCode ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- 2. DIVERGENT (Hard Requirement 7: lists BOTH candidates) -->
+        @if (activeTab() === 'divergent') {
+          <div class="flex flex-col gap-2" data-testid="panel-divergent">
+            <div class="p-2 rounded border border-[var(--ac-orange-1)] bg-[var(--ac-grey-100)] text-xs atc-grey-800">
+              <span class="font-bold atc-orange-1">Manual Mapping Protection (R-CAM-003):</span>
+              Active manual mappings are immutable to automation. The matcher derived a different project; human adjudication is required.
+            </div>
+            @if (prev.divergent.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No divergent mappings found.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">Contract</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Existing Manual Mapping (Protected)</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Automapper Derived Candidate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.divergent; track item.existingMappingId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]" data-testid="divergent-row">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-900" data-testid="divergent-existing">
+                          <span class="font-medium">Project ID {{ item.existingClarisaProjectId }}</span>
+                          <span class="text-xs atc-grey-600 block">(Mapping #{{ item.existingMappingId }})</span>
+                        </td>
+                        <td class="p-2 atc-grey-900" data-testid="divergent-candidate" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600 block">(id: {{ item.clarisaProjectId }}, code: {{ item.externalCode ?? '—' }})</span>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- 3. AMBIGUOUS (Hard Requirement 7: lists BOTH candidates) -->
+        @if (activeTab() === 'ambiguous') {
+          <div class="flex flex-col gap-2" data-testid="panel-ambiguous">
+            <p class="m-0 text-xs atc-grey-700">
+              Multiple eligible projects in the feed derive this same AGRESSO contract identifier. Neither is applied automatically.
+            </p>
+            @if (prev.ambiguous.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No ambiguous pairings detected.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">Contract ID</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Candidate Project</th>
+                      <th class="p-2 atc-grey-800 font-semibold">External Code</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.ambiguous; track item.clarisaProjectId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]" data-testid="ambiguous-row">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-900" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
+                        </td>
+                        <td class="p-2 atc-grey-700">{{ item.externalCode ?? '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- 4. UNRESOLVED (F-B: derivedContractId empty -> 'no external_code') -->
+        @if (activeTab() === 'unresolved') {
+          <div class="flex flex-col gap-2" data-testid="panel-unresolved">
+            <p class="m-0 text-xs atc-grey-700">
+              Eligible CLARISA projects whose derived contract identifier was not found in AGRESSO or project has no external code.
+            </p>
+            @if (prev.unresolved.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">Zero unresolved projects (100% resolution).</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">CLARISA Project</th>
+                      <th class="p-2 atc-grey-800 font-semibold">External Code</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Derived Contract ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.unresolved; track item.clarisaProjectId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]" data-testid="unresolved-row">
+                        <td class="p-2 atc-grey-900" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
+                        </td>
+                        <td class="p-2 atc-grey-700">{{ item.externalCode ?? 'none' }}</td>
+                        <td class="p-2 font-mono" data-testid="unresolved-contract-id">
+                          {{ formatDerivedContractId(item.derivedContractId) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- 5. SUPERSEDED (R-CAM-005) -->
+        @if (activeTab() === 'supersede') {
+          <div class="flex flex-col gap-2" data-testid="panel-supersede">
+            <p class="m-0 text-xs atc-grey-700">
+              Mappings from previous phases that will be deactivated and replaced by a new active row for this phase.
+            </p>
+            @if (prev.supersede.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No superseded mappings in this run.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">Contract</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Deactivating Previous Mapping</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Creating New Mapping</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.supersede; track item.existingMappingId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-700">
+                          Project ID {{ item.existingClarisaProjectId }} (Mapping #{{ item.existingMappingId }})
+                        </td>
+                        <td class="p-2 atc-grey-900" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- 6. ALREADY MAPPED -->
+        @if (activeTab() === 'alreadyMapped') {
+          <div class="flex flex-col gap-2" data-testid="panel-alreadyMapped">
+            <p class="m-0 text-xs atc-grey-700">
+              Eligible projects that already have an identical active mapping. Will not be modified.
+            </p>
+            @if (prev.alreadyMapped.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No already mapped projects.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">Contract</th>
+                      <th class="p-2 atc-grey-800 font-semibold">CLARISA Project</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.alreadyMapped; track item.existingMappingId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-900" [title]="formatProject(item)">
+                          {{ formatProject(item) }}
+                          <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+      </div>
+    }
+
+    <!-- Apply Confirmation Block (F-C / RB-8) -->
+    @if (confirmingApply()) {
+      <div
+        class="flex flex-col gap-3 p-3.5 rounded-[8px] border border-[var(--ac-primary-blue-300)] bg-[var(--ac-grey-100)]"
+        role="alert"
+        data-testid="apply-confirmation-block">
+        <div class="flex items-start gap-2">
+          <i class="pi pi-info-circle text-base atc-primary-blue-600 mt-0.5" aria-hidden="true"></i>
+          <p class="m-0 text-xs sm:text-sm atc-grey-900 font-medium leading-relaxed" data-testid="apply-confirmation-text">
+            {{ applyConfirmationText() }}
+          </p>
+        </div>
+
+        @if (applyError()) {
+          <p class="m-0 text-xs atc-red-1 font-semibold" data-testid="apply-error-text">
+            <i class="pi pi-exclamation-triangle mr-1" aria-hidden="true"></i>
+            {{ applyError() }}
+          </p>
+        }
+
+        <div class="flex justify-end gap-2 mt-1">
+          <button
+            pButton
+            type="button"
+            label="Cancel"
+            class="p-button-sm p-button-outlined p-button-secondary"
+            (click)="onCancelApplyConfirm()"
+            [disabled]="applying()"
+            data-testid="cancel-apply-btn">
+          </button>
+          <button
+            pButton
+            type="button"
+            [label]="applying() ? 'Applying…' : 'Confirm & Apply'"
+            icon="pi pi-check"
+            class="p-button-sm"
+            (click)="onConfirmApply()"
+            [loading]="applying()"
+            data-testid="confirm-apply-btn">
+          </button>
+        </div>
+      </div>
+    }
+
+  </div>
+
+  <!-- Dialog Footer -->
+  <ng-template pTemplate="footer">
+    <div class="flex justify-end gap-2">
+      @if (applyResult()) {
+        <button
+          pButton
+          type="button"
+          label="Done"
+          class="p-button-sm"
+          (click)="closeDialog()"
+          data-testid="dialog-done-btn">
+        </button>
+      } @else {
+        <button
+          pButton
+          type="button"
+          label="Cancel"
+          class="p-button-sm p-button-outlined p-button-secondary"
+          (click)="closeDialog()"
+          [disabled]="applying()"
+          data-testid="dialog-cancel-btn">
+        </button>
+        @if (preview() && !confirmingApply()) {
+          <button
+            pButton
+            type="button"
+            label="Apply auto-mapping"
+            icon="pi pi-bolt"
+            class="p-button-sm"
+            [disabled]="loadingPreview() || (preview()!.counts.toCreate === 0 && preview()!.counts.supersede === 0)"
+            (click)="onStartApply()"
+            data-testid="start-apply-btn">
+          </button>
+        }
+      }
+    </div>
+  </ng-template>
+
+</p-dialog>

@@ -1,0 +1,27 @@
+ PASS  src/domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts (12.505 s)
+  ClarisaProjectsController (T-04 / T-15.15 / T-01)
+    ✓ listBilateral is gated by CENTER_ADMIN + SYSTEM_ADMIN roles (23 ms)
+    ✓ returns trimmed picker shape with additive fields including full_name, description, and external_code (R-BPF-001, NFR-BPF-001) (6 ms)
+    ✓ handles absent full_name, description, and external_code without throwing (R-BPF-001) (4 ms)
+    ✓ supports full_name of exactly 255 characters (KZ-001 / R-BPF-005) (5 ms)
+    ✓ forwards phase parameter to the service (R-BAS-003) (6 ms)
+    ✓ lets non-numeric phase throw BadRequestException (R-BAS-003) (23 ms)
+    ✓ forwards onlyWithSciencePrograms parameter parsed by QueryParseBool (R-BAS-004) (4 ms)
+    search filtering (R-BPF-002)
+      ✓ matches by full_name case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input) (4 ms)
+      ✓ matches uppercase full_name term case-insensitively (5 ms)
+      ✓ still matches by short_name code term (5 ms)
+      ✓ does NOT match on description (DD-2 / OQ-1) (2 ms)
+      ✓ tolerates absent full_name without throwing and matches short_name (3 ms)
+      ✓ matches by external_code case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input / DD-9) (2 ms)
+      ✓ matches uppercase external_code term case-insensitively (2 ms)
+      ✓ tolerates absent or null external_code without throwing and matches short_name or full_name (R-BPF-002) (3 ms)
+    sorting (R-BPF-006 / DD-3)
+      ✓ orders case-insensitively by full_name with absent full_name falling back to short_name in sequence (6 ms)
+      ✓ produces stable and deterministic order across two identical invocations (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       17 passed, 17 total
+Snapshots:   0 total
+Time:        12.608 s
+Ran all test suites matching /src\/domain\/tools\/clarisa\/projects\/clarisa-projects.controller.spec.ts/i.

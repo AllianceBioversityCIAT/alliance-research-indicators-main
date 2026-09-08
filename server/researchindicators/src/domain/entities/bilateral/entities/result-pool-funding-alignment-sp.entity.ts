@@ -38,6 +38,23 @@ export class ResultPoolFundingAlignmentSp extends AuditableEntity {
   @OpenSearchProperty({ type: 'keyword' })
   sp_code!: string;
 
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-123
+  // Domain 'PRIMARY' | 'CONTRIBUTING'. Nullable: legacy rows keep sp_role =
+  // NULL (no backfill, R-BIL-126) meaning "role not yet chosen". No
+  // @OpenSearchProperty — this entity is not reachable by the mapping
+  // generator (it is not in the ResultOpensearchDto tree), so a decorator
+  // here would be inert metadata that misleads the next reader (F-1).
+  //
+  // `active_primary_alignment` (the STORED GENERATED column added by the
+  // same migration, 1786636994078) is deliberately NOT mapped here — TypeORM
+  // would otherwise attempt to write a generated column.
+  @Column('varchar', {
+    name: 'sp_role',
+    length: 20,
+    nullable: true,
+  })
+  sp_role!: string | null;
+
   @ManyToOne(
     () => ResultPoolFundingAlignment,
     (alignment) => alignment.selected_sps,

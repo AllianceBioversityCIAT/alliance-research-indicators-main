@@ -123,6 +123,28 @@ describe('ClarisaInstitutionsService', () => {
     });
   });
 
+  describe('findByCodes', () => {
+    it('should call find with an In condition for the given codes', async () => {
+      const mockResult = [{ code: 1 }, { code: 70 }];
+      mockFind.mockResolvedValue(mockResult);
+
+      const result = await service.findByCodes([1, 70]);
+
+      expect(mockFind).toHaveBeenCalledWith({
+        where: { code: expect.anything() },
+      });
+      expect(result).toEqual(mockResult);
+    });
+
+    it('should return empty array when no codes match', async () => {
+      mockFind.mockResolvedValue([]);
+
+      const result = await service.findByCodes([9999]);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   // [CLAUDE/DONE] 181
   describe('findByLikeNames', () => {
     it('should call find with LIKE conditions for each name', async () => {

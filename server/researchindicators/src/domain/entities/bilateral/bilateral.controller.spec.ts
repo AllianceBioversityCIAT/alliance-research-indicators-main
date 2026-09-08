@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { ArgumentMetadata, HttpStatus, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { BilateralController } from './bilateral.controller';
@@ -17,17 +17,26 @@ import { ROLES_KEY, RolesGuard } from '../../shared/guards/roles.guard';
 import { ResultOwnerGuard } from '../../shared/guards/result-owner.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
-import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
+import {
+  AlignmentResponse,
+  TocAlignmentReadbackResponse,
+  UpdatePoolFundingAlignmentDto,
+} from './dto/update-pool-funding-alignment.dto';
 import { ContributionDto } from './dto/upsert-indicator-mapping.dto';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.6 / NFR-BIL-070
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-04 / R-BIL-090, R-BIL-091
+// @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
 //
 // Handler-level coverage for the bilateral controller — asserts the controller
 // is a thin pass-through to BilateralService + role-decorator metadata is
 // wired correctly on every mutation endpoint. T-04 adds Swagger-metadata
 // assertions for the reshaped GET /hlos-indicators handler (design §5: the
-// frozen envelope must render at /swagger).
+// frozen envelope must render at /swagger). T-05 adds the same class of
+// assertion for GET / and PATCH / — the partial-row null contract
+// (R-BIL-114) must be REGISTERED metadata, not merely a TSDoc comment
+// (evidence disqualifier: a comment on an interface renders nothing in
+// Swagger).
 
 describe('BilateralController (T-15.6)', () => {
   let controller: BilateralController;
@@ -151,9 +160,18 @@ describe('BilateralController (T-15.6)', () => {
     });
 
     it('PATCH / → forwards the body to updateAlignment', async () => {
+      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
+      // re-base: the service is fully mocked here (bilateral.updateAlignment
+      // below), so this fixture never reaches resolvePrimarySpCode and the
+      // block does not currently fail — but has_contribution:true without
+      // primary_sp_code no longer represents a well-formed request under
+      // R-BIL-121, and this test's own claim ("the controller forwards the
+      // body verbatim") is sharper with a representative body. Fixture-only
+      // change — the assertion (dto forwarded byte-for-byte) is untouched.
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
         sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
       };
       bilateral.updateAlignment.mockResolvedValueOnce({});
 
@@ -396,6 +414,267 @@ describe('BilateralController (T-15.6)', () => {
           [...expected].sort(),
         );
       }
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/toc-optional-mapping — T-05 / R-BIL-114 (Swagger: design §6.3, D-C1-10)
+  //
+  // Same reasoning as the T-04 block above, applied to GET / and PATCH /:
+  // the handler must declare an @ApiResponse(200) typed with AlignmentResponse,
+  // and TocAlignmentReadbackResponse's indicator-derived fields must carry
+  // `nullable: true` @ApiProperty metadata — the partial-row null contract
+  // (R-BIL-114 AC.1/AC.4) is only "documented in Swagger" if this metadata
+  // is actually registered. A TSDoc comment on a plain interface (the
+  // pre-T-05 shape) would leave this describe block red.
+  describe('Swagger metadata — GET / and PATCH / (T-05)', () => {
+    it('GET / declares @ApiResponse 200 typed with AlignmentResponse', () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.getAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      expect(apiResponses[HttpStatus.OK].type).toBe(AlignmentResponse);
+    });
+
+    it("PATCH / declares @ApiResponse 200 typed with AlignmentResponse, plus a 400 whose description names contribution_without_indicator (leader-assigned fix — the endpoint's documented 400 vocabulary was missing this code)", () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.updateAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      expect(apiResponses[HttpStatus.OK].type).toBe(AlignmentResponse);
+      expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+        'contribution_without_indicator',
+      );
+      // Regression: the rest of the documented 400 vocabulary must still be present.
+      for (const code of [
+        'duplicate_sp_code',
+        'sp_not_selected',
+        'missing_required_fields',
+        'level_not_allowed',
+        'unknown_toc_result_id',
+        'unknown_indicator_id',
+      ]) {
+        expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+          code,
+        );
+      }
+    });
+
+    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-121, R-BIL-122, R-BIL-124
+    //
+    // The 400 vocabulary gains three codes with this spec: primary_sp_code
+    // absent/blank (R-BIL-121), primary_sp_code valid-but-unselected
+    // (R-BIL-122), and a toc_alignments entry naming a non-Primary SP
+    // (R-BIL-124). Asserted the same way as the pre-existing codes above —
+    // against the REGISTERED @ApiResponse description, not source presence.
+    it('PATCH / 400 description documents the three new primary-SP codes: primary_sp_required, primary_sp_not_selected, toc_alignment_not_primary_sp', () => {
+      const apiResponses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        BilateralController.prototype.updateAlignment,
+      ) as Record<string, { type?: unknown; description?: string }>;
+
+      expect(apiResponses).toBeDefined();
+      for (const code of [
+        'primary_sp_required',
+        'primary_sp_not_selected',
+        'toc_alignment_not_primary_sp',
+      ]) {
+        expect(apiResponses[HttpStatus.BAD_REQUEST].description).toContain(
+          code,
+        );
+      }
+    });
+
+    it('AlignmentResponse carries @ApiProperty metadata for every top-level field', () => {
+      const properties = (Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        AlignmentResponse.prototype,
+      ) ?? []) as string[];
+
+      const fields = properties.map((p) => p.replace(/^:/, ''));
+      expect(fields.sort()).toEqual(
+        [
+          'result_code',
+          'eligible',
+          'has_pool_funding_alignment_eligible',
+          'has_contribution',
+          'selected_levers',
+          'selected_science_programs',
+          'is_synced_to_prms',
+          'is_read_only',
+          'version_locked',
+          'toc_alignments',
+        ].sort(),
+      );
+    });
+
+    it('TocAlignmentReadbackResponse carries @ApiProperty metadata for every field', () => {
+      const properties = (Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        TocAlignmentReadbackResponse.prototype,
+      ) ?? []) as string[];
+
+      const fields = properties.map((p) => p.replace(/^:/, ''));
+      expect(fields.sort()).toEqual(
+        [
+          'sp_code',
+          'aligns_with_toc',
+          'level',
+          'toc_result_id',
+          'indicator_id',
+          'quantitative_contribution',
+          'toc_result_title',
+          'indicator_description',
+          'unit_of_measurement',
+          'target_value',
+          'target_year',
+        ].sort(),
+      );
+    });
+
+    // This is the assertion the evidence disqualifier calls for: it reads
+    // the REGISTERED nullable flag off the property metadata storage that
+    // SwaggerModule consults when it builds /swagger — not a comment, not a
+    // TSDoc block. Remove `nullable: true` from any of these @ApiProperty
+    // calls and this test goes red.
+    it.each([
+      'indicator_id',
+      'indicator_description',
+      'unit_of_measurement',
+      'target_value',
+      'target_year',
+      'quantitative_contribution',
+    ])(
+      'TocAlignmentReadbackResponse.%s is registered nullable: true (R-BIL-114 AC.1/AC.4 — null when the row has no resolved indicator)',
+      (field) => {
+        const propertyMetadata = Reflect.getMetadata(
+          DECORATORS.API_MODEL_PROPERTIES,
+          TocAlignmentReadbackResponse.prototype,
+          field,
+        ) as { nullable?: boolean } | undefined;
+
+        expect(propertyMetadata).toBeDefined();
+        expect(propertyMetadata?.nullable).toBe(true);
+      },
+    );
+
+    // toc_result_title and level/toc_result_id are also nullable (null on a
+    // "No" row), but ONLY toc_result_title stays populated once
+    // aligns_with_toc is true regardless of whether an indicator was
+    // chosen — pin that distinction in the description text so the doc
+    // doesn't silently drift from R-BIL-114's "toc_result_title is always
+    // populated" invariant.
+    it('TocAlignmentReadbackResponse.toc_result_title documents that it stays populated once a ToC result is chosen, independent of the indicator', () => {
+      const propertyMetadata = Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES,
+        TocAlignmentReadbackResponse.prototype,
+        'toc_result_title',
+      ) as { nullable?: boolean; description?: string } | undefined;
+
+      expect(propertyMetadata).toBeDefined();
+      expect(propertyMetadata?.nullable).toBe(true);
+      expect(propertyMetadata?.description).toMatch(
+        /independent of whether an indicator/,
+      );
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-03 / R-BIL-120, R-BIL-121, D-C2-12
+  //
+  // primary_sp_code is optional at the class-validator layer BY DESIGN
+  // (D-C2-12) — the conditional "required when has_contribution === true"
+  // rule lives in structural validation (T-06), not here. This block proves
+  // only the class-validator-level contract: type + length, and that the
+  // whitelist posture (forbidNonWhitelisted: true, wired on the PATCH
+  // handler in bilateral.controller.ts) still rejects an unknown field.
+  // ⚠ The pipe below MIRRORS the controller's options (bilateral.controller.ts
+  // :233-239) but is an INDEPENDENT re-implementation of them. The values match
+  // today — verified at review — so this block does exercise the real posture.
+  // It does NOT, however, guard against drift: deleting `forbidNonWhitelisted`
+  // from the controller would leave every test here green while the running app
+  // silently accepts unknown fields, losing R-5′'s loud failure. Closing that
+  // gap means reading the registered pipe off the handler
+  // (`Reflect.getMetadata(PIPES_METADATA, BilateralController.prototype
+  // .updateAlignment)`, the same idiom the neighbouring @ApiResponse tests use)
+  // or exporting one shared options const referenced from both sites.
+  describe('PATCH / body validation — primary_sp_code (T-03, R-BIL-121)', () => {
+    const pipe = new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    });
+    const metadata: ArgumentMetadata = {
+      type: 'body',
+      metatype: UpdatePoolFundingAlignmentDto,
+      data: undefined,
+    };
+
+    it('accepts a payload with primary_sp_code absent', async () => {
+      await expect(
+        pipe.transform(
+          { has_contribution: true, sp_codes: ['SP06'] },
+          metadata,
+        ),
+      ).resolves.toMatchObject({ has_contribution: true });
+    });
+
+    it('accepts a payload with primary_sp_code as a string', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 'SP06',
+          },
+          metadata,
+        ),
+      ).resolves.toMatchObject({ primary_sp_code: 'SP06' });
+    });
+
+    it('rejects primary_sp_code when it is not a string', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 123,
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('rejects primary_sp_code longer than 50 characters', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp_code: 'S'.repeat(51),
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
+    });
+
+    // Falsifying this on the wrong implementation: dropping
+    // forbidNonWhitelisted (or the DTO decoration that whitelist strips
+    // against) from the pipe config makes this request succeed instead of
+    // throwing — the loud-failure posture R-5′ depends on.
+    it('rejects an unknown field (e.g. primary_sp) — forbidNonWhitelisted must still reject it', async () => {
+      await expect(
+        pipe.transform(
+          {
+            has_contribution: true,
+            sp_codes: ['SP06'],
+            primary_sp: 'SP06',
+          },
+          metadata,
+        ),
+      ).rejects.toThrow();
     });
   });
 });

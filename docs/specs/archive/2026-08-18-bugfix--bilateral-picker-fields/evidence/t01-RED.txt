@@ -1,0 +1,136 @@
+ FAIL  src/domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts (17.523 s)
+  ClarisaProjectsController (T-04 / T-15.15 / T-01)
+    ✓ listBilateral is gated by CENTER_ADMIN + SYSTEM_ADMIN roles (25 ms)
+    ✕ returns trimmed picker shape with additive fields including full_name and description (R-BPF-001, NFR-BPF-001) (19 ms)
+    ✓ handles absent full_name and description without throwing (R-BPF-001) (5 ms)
+    ✕ supports full_name of exactly 255 characters (KZ-001 / R-BPF-005) (20 ms)
+    ✓ forwards phase parameter to the service (R-BAS-003) (6 ms)
+    ✓ lets non-numeric phase throw BadRequestException (R-BAS-003) (28 ms)
+    ✓ forwards onlyWithSciencePrograms parameter parsed by QueryParseBool (R-BAS-004) (7 ms)
+    search filtering (R-BPF-002)
+      ✕ matches by full_name case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input) (11 ms)
+      ✕ matches uppercase full_name term case-insensitively (12 ms)
+      ✓ still matches by short_name code term (6 ms)
+      ✓ does NOT match on description (DD-2 / OQ-1) (3 ms)
+      ✓ tolerates absent full_name without throwing and matches short_name (2 ms)
+    sorting (R-BPF-006 / DD-3)
+      ✕ orders case-insensitively by full_name with absent full_name falling back to short_name in sequence (5 ms)
+      ✓ produces stable and deterministic order across two identical invocations (8 ms)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › returns trimmed picker shape with additive fields including full_name and description (R-BPF-001, NFR-BPF-001)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 2
+    + Received  + 0
+
+    @@ -1,8 +1,6 @@
+      Object {
+    -   "description": "MusaSentinel surveillance and diagnostics project",
+    -   "full_name": "WTO-Phase 1: MusaSentinel",
+        "has_science_programs": true,
+        "id": 1,
+        "phase": 2026,
+        "science_programs": Array [
+          Object {
+
+      113 |     const data = (response as { data: unknown[] }).data;
+      114 |     expect(data).toHaveLength(1);
+    > 115 |     expect(data[0]).toEqual({
+          |                     ^
+      116 |       id: 1,
+      117 |       short_name: 'A1806',
+      118 |       full_name: 'WTO-Phase 1: MusaSentinel',
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:115:21)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › supports full_name of exactly 255 characters (KZ-001 / R-BPF-005)
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "WTO-Phase 1: MusaSentinel - XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    Received: undefined
+
+      182 |     const response = await controller.listBilateral();
+      183 |     const data = (response as { data: { full_name?: string }[] }).data;
+    > 184 |     expect(data[0].full_name).toBe(fullName255);
+          |                               ^
+      185 |     expect(data[0].full_name?.length).toBe(255);
+      186 |   });
+      187 |
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:184:31)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › search filtering (R-BPF-002) › matches by full_name case-insensitively when short_name does not contain needle (R-BPF-002 mandatory red gate input)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Array [
+    -   1,
+    - ]
+    + Array []
+
+      282 |       const response = await controller.listBilateral('musasentinel');
+      283 |       const data = (response as { data: { id: number }[] }).data;
+    > 284 |       expect(data.map((p) => p.id)).toEqual([1]);
+          |                                     ^
+      285 |     });
+      286 |
+      287 |     it('matches uppercase full_name term case-insensitively', async () => {
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:284:37)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › search filtering (R-BPF-002) › matches uppercase full_name term case-insensitively
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 3
+    + Received  + 1
+
+    - Array [
+    -   1,
+    - ]
+    + Array []
+
+      290 |       const response = await controller.listBilateral('MUSASENTINEL');
+      291 |       const data = (response as { data: { id: number }[] }).data;
+    > 292 |       expect(data.map((p) => p.id)).toEqual([1]);
+          |                                     ^
+      293 |     });
+      294 |
+      295 |     it('still matches by short_name code term', async () => {
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:292:37)
+
+  ● ClarisaProjectsController (T-04 / T-15.15 / T-01) › sorting (R-BPF-006 / DD-3) › orders case-insensitively by full_name with absent full_name falling back to short_name in sequence
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 1
+
+      Array [
+    +   1,
+        2,
+        3,
+    -   1,
+      ]
+
+      361 |       // id 3 (Fertilize Right Colombia): 'fertilize right colombia'
+      362 |       // id 1 (WTO-Phase 1: MusaSentinel): 'wto-phase 1: musasentinel'
+    > 363 |       expect(data.map((p) => p.id)).toEqual([2, 3, 1]);
+          |                                     ^
+      364 |     });
+      365 |
+      366 |     it('produces stable and deterministic order across two identical invocations', async () => {
+
+      at Object.<anonymous> (domain/tools/clarisa/projects/clarisa-projects.controller.spec.ts:363:37)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 9 passed, 14 total
+Snapshots:   0 total
+Time:        17.66 s, estimated 22 s
+Ran all test suites matching /src\/domain\/tools\/clarisa\/projects\/clarisa-projects.controller.spec.ts/i.

@@ -136,6 +136,8 @@ Throw Nest HTTP exceptions (`UnauthorizedException`, `BadRequestException`, `Con
 - **MySQL** via TypeORM 0.3, utf8mb4 / `utf8mb4_unicode_520_ci`.
 - Datasource targets in `db/config/mysql/orm.config.ts`: `CORE` (driven by `ARI_MYSQL_*`) and `TEST` (driven by `ARI_TEST_MYSQL_*`).
 - Migrations are **append-only**. Generate with `npm run migration:generate -- ./src/db/migrations/<name>`. Revert one with `npm run migration:revert`.
+- **⚠ In a migration that passes NO parameters, never let a `?` or `:word` appear in the SQL — including inside a SQL comment.** `orm.config.ts:59` sets `extra.namedPlaceholders: true`, so mysql2 rewrites every query through `named-placeholders` first. Its pattern (`named-placeholders/index.js:6`) is `/(?:\?)|(?::(\d+|[a-zA-Z][a-zA-Z0-9_]*))/` — a bare **`?`** counts, not just `:name`. It skips quoted strings (which is why `'…text-align:justify;…'` in the 2024 indicator migrations is fine) but has **no notion of SQL comments**, so a `?` or `:word` in a `--` or block comment is consumed as a bind parameter. With no params argument the call throws `Named query contains placeholders, but parameters object is undefined` *before MySQL parses it*. A query that legitimately uses `?` and passes an array (see `1781879906673-AddNewEnvCl.ts`) is unaffected — the parameters are there. Inside comments, drop the colon (`[SPEC bilateral/…]`) and end questions with a period. TSDoc blocks are never sent to the driver and keep the normal form.
+- **The only sound gate for the rule above is running the migrations** (`npm run migration:dev:execute` against a scratch schema). Migration `1784500000000` shipped **unrunnable from the day it was written** and passed every static gate the repo has — valid TypeScript, lint-clean, type-clean, reviewed — because the one property that matters, *does it run*, was measured by nothing. A static scanner was attempted and withdrawn: reconstructing the SQL that reaches the driver requires the driver's own tokenizer **and** the call-site parameter analysis, and two versions of it disagreed with reality in opposite directions (Kaizen K-006).
 - All domain entities extend `AuditableEntity` (`domain/shared/global-dto/auditable.entity.ts`). Services must populate audit fields from `request.user`.
 - Indexes follow the `idx_<table>_<purpose>` convention (see `Result` entity for examples).
 - DynamoDB usage is confined to `tools/dynamo-feedback/`; do not spread it elsewhere.
@@ -186,7 +188,8 @@ npm run dev                         # NestJS + Vite (admin) together
 npm run start:dev                   # NestJS only (watch)
 npm run dev:admin                   # Vite only (admin) on :5173
 npm run build                       # build NestJS + admin
-npm run lint                        # eslint --fix
+npm run lint                        # eslint --fix  ⚠ MUTATES — see below
+npx eslint <path>                   # verification gate (read-only, no --fix)
 npm test                            # jest unit
 npm run test:cov                    # jest coverage
 npm run test:e2e                    # jest e2e (test/jest-e2e.json)
@@ -197,6 +200,13 @@ npm run migration:revert
 ```
 
 ---
+
+> **⚠ `npm run lint` cannot verify anything (Kaizen K-001).** It is `eslint --fix`: it rewrites the
+> working tree and exits `0`, so it makes the thing it checks true as a side effect of checking it.
+> A spec once reported "lint clean" across ~10 tasks while the **committed branch failed Prettier** —
+> the green runs only passed because the auto-fix was already sitting in the working tree, uncommitted.
+> **For verification use `npx eslint <path>` (no `--fix`).** To check what is actually committed:
+> `git show HEAD:<path> | npx eslint --stdin --stdin-filename <path>`.
 
 ## 12. Where to look next
 

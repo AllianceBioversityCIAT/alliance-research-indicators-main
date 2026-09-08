@@ -2,20 +2,25 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
+import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
+import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { CreateBilateralProjectMappingDto } from './dto/create-bilateral-project-mapping.dto';
 import { UpdateBilateralProjectMappingDto } from './dto/update-bilateral-project-mapping.dto';
 import {
+  EnrichedBilateralProjectMapping,
   ListBilateralProjectMappingsQueryDto,
   PaginatedBilateralProjectMappings,
 } from './dto/list-bilateral-project-mappings.query.dto';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / R-BIL-080 / R-BIL-078
+// @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements — T-BTE-01 / R-BTE-002 / NFR-BTE-003 / DD-1
 //
 // SINGLETON-SCOPED BY DESIGN — see ../bilateral/bilateral.service.ts header
 // and parent design.md §3.4 Constraint A. Do NOT inject CurrentUserUtil or
@@ -31,34 +36,102 @@ export class BilateralProjectMappingService {
   constructor(
     private readonly repo: BilateralProjectMappingRepository,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly clarisaProjectsService?: ClarisaProjectsService,
   ) {}
 
   async list(
     query: ListBilateralProjectMappingsQueryDto,
-  ): Promise<PaginatedBilateralProjectMappings<BilateralProjectMapping>> {
+  ): Promise<
+    PaginatedBilateralProjectMappings<EnrichedBilateralProjectMapping>
+  > {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
 
     const qb = this.repo
       .createQueryBuilder('bpm')
+      .leftJoin(
+        AgressoContract,
+        'ac',
+        'ac.agreement_id = bpm.agresso_agreement_id',
+      )
+      .addSelect(['ac.description', 'ac.projectDescription'])
       .orderBy('bpm.updated_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
-    if (query.is_active !== undefined) {
+    if (query.status) {
+      const normalizedStatus = query.status.toLowerCase();
+      if (normalizedStatus === 'mapped') {
+        qb.andWhere('bpm.is_active = :is_active', { is_active: true });
+      } else if (normalizedStatus === 'inactive') {
+        qb.andWhere('bpm.is_active = :is_active', { is_active: false });
+      } else if (normalizedStatus === 'pending') {
+        qb.andWhere('1 = 0');
+      }
+    } else if (query.is_active !== undefined) {
       qb.andWhere('bpm.is_active = :is_active', { is_active: query.is_active });
     }
+
     if (query.source !== undefined) {
       qb.andWhere('bpm.source = :source', { source: query.source });
     }
+
     if (query.search?.trim()) {
       qb.andWhere(
-        '(bpm.agresso_agreement_id LIKE :s OR bpm.clarisa_project_short_name LIKE :s)',
+        '(bpm.agresso_agreement_id LIKE :s OR bpm.clarisa_project_short_name LIKE :s OR ac.description LIKE :s OR ac.projectDescription LIKE :s)',
         { s: `%${query.search.trim()}%` },
       );
     }
 
-    const [items, total] = await qb.getManyAndCount();
+    const [rawAndEntities, total] = await Promise.all([
+      qb.getRawAndEntities(),
+      qb.getCount(),
+    ]);
+
+    const { entities, raw } = rawAndEntities;
+
+    const clarisaNameMap = new Map<number, string>();
+    if (this.clarisaProjectsService) {
+      try {
+        const clarisaProjects =
+          await this.clarisaProjectsService.listBilateralProjects();
+        if (clarisaProjects) {
+          for (const cp of clarisaProjects) {
+            if (cp.id !== undefined && cp.id !== null) {
+              clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
+            }
+          }
+        }
+      } catch {
+        // Non-blocking if CLARISA service is temporarily unavailable
+      }
+    }
+
+    const items: EnrichedBilateralProjectMapping[] = entities.map(
+      (entity, index) => {
+        const rawRow = raw[index];
+        const agressoDescription =
+          rawRow?.ac_description ??
+          rawRow?.ac_projectDescription ??
+          rawRow?.description ??
+          rawRow?.projectDescription ??
+          (entity as any).agresso_description ??
+          null;
+
+        const clarisaFullName =
+          clarisaNameMap.get(entity.clarisa_project_id) ??
+          (entity as any).clarisa_project_full_name ??
+          null;
+
+        return {
+          ...entity,
+          agresso_description: agressoDescription,
+          clarisa_project_full_name: clarisaFullName,
+        } as EnrichedBilateralProjectMapping;
+      },
+    );
+
     return {
       items,
       meta: {

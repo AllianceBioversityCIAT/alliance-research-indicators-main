@@ -3,10 +3,14 @@ import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 import { MappingSourceEnum } from '../enum/mapping-source.enum';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.13 / R-BIL-079
+// [SPEC bilateral/clarisa-project-automapping] — DD-8 (supersedes D-PI-8)
 //
 // Owns the join between an AGRESSO bilateral contract and a CLARISA bilateral project.
-// Admin-maintained (see /admin/bilateral-project-mappings, T-15.15) — no upstream
-// join field exists per D-PI-8. Soft-delete via `is_active` from AuditableEntity.
+// Admin-maintained (see /admin/bilateral-project-mappings, T-15.15). Upstream join
+// field `external_code` is now published by CLARISA (see DD-8 in
+// docs/specs/bilateral/clarisa-project-automapping superseding archived D-PI-8,
+// which is preserved as a point-in-time record). Soft-delete via `is_active`
+// from AuditableEntity.
 //
 // Partial-uniqueness "(agresso_agreement_id) WHERE is_active = true" is enforced
 // by a MySQL generated column + unique index defined in the matching migration
@@ -15,6 +19,7 @@ import { MappingSourceEnum } from '../enum/mapping-source.enum';
 @Entity('bilateral_project_mapping')
 @Index('idx_bpm_agreement', ['agresso_agreement_id'])
 @Index('idx_bpm_clarisa_project', ['clarisa_project_id'])
+@Index('idx_bpm_clarisa_external_code', ['clarisa_external_code'])
 export class BilateralProjectMapping extends AuditableEntity {
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id!: number;
@@ -41,6 +46,14 @@ export class BilateralProjectMapping extends AuditableEntity {
     comment: 'Snapshot of CLARISA short_name at mapping time (D-PI-11)',
   })
   clarisa_project_short_name?: string | null;
+
+  @Column('varchar', {
+    name: 'clarisa_external_code',
+    length: 100,
+    nullable: true,
+    comment: 'Normalized CLARISA external_code; feed-stable resolution key',
+  })
+  clarisa_external_code?: string | null;
 
   @Column({
     name: 'source',

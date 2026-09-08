@@ -31,7 +31,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TocLevel } from '../../../tools/toc-integration/dto/toc-integration.types';
 
-export type BilateralTocMappingStatus = 'mapped' | 'unmapped';
+export type BilateralTocMappingStatus = 'mapped' | 'unmapped' | 'stale';
 
 const TOC_LEVELS: TocLevel[] = ['OUTPUT', 'OUTCOME', 'EOI'];
 
@@ -106,7 +106,7 @@ export class BilateralHlosIndicatorsResponse {
   @ApiProperty({ example: 'STAR-5238' })
   result_code: string;
 
-  @ApiProperty({ enum: ['mapped', 'unmapped'], example: 'mapped' })
+  @ApiProperty({ enum: ['mapped', 'unmapped', 'stale'], example: 'mapped' })
   mapping_status: BilateralTocMappingStatus;
 
   @ApiProperty({ type: () => BilateralTocProjectRef, nullable: true })

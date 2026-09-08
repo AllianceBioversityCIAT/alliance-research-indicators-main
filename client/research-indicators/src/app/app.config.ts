@@ -17,6 +17,7 @@ import { resultInterceptor } from '@shared/interceptors/result.interceptor';
 import { CacheService } from '@services/cache/cache.service';
 import { ValidateCacheService } from '@shared/services/validate-cache.service';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { applyLocalAuthBypass } from '@shared/auth/local-auth-bypass';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -39,6 +40,10 @@ export const appConfig: ApplicationConfig = {
       const trackingToolsService = inject(TrackingToolsService);
       trackingToolsService.init();
       const cache = inject(CacheService);
+      // LOCAL DEV ONLY — must run before anything reads cache.isLoggedIn(),
+      // which rolesGuard does on the very first navigation. Inert unless
+      // environment.production === false AND environment.localAuthBypass === true.
+      applyLocalAuthBypass(cache);
       if (!cache.dataCache().access_token) {
         return Promise.resolve();
       }

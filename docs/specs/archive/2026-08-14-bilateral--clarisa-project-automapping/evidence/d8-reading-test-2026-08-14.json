@@ -1,0 +1,239 @@
+{
+  "environment": {
+    "clarisa_host": "https://clarisatest-back.ciat.cgiar.org/",
+    "upstream_contract_available": true
+  },
+  "measured_at": "2026-08-14T16:10:24.741Z",
+  "phase_used": 2026,
+  "definitions": {
+    "bilateral_contract_predicate": "Active agresso_contracts with UPPER(funding_type) IN ('BLR', 'BILATERAL') and is_active = 1",
+    "normalization_rules": "Trim whitespace, upper-case, strip leading centre prefix from closed set {B-, C-} at most once"
+  },
+  "clarisa": {
+    "slice_size": 380,
+    "source_center_acronym": {
+      "BIOVERSITY": 107,
+      "CIAT": 273
+    },
+    "source_of_funding": {
+      "BILATERAL": 342,
+      "WINDOW3": 38
+    },
+    "has_project_mappings": {
+      "with_mappings": 5,
+      "without_mappings": 375
+    },
+    "description_populated": {
+      "populated": 74,
+      "empty": 306
+    },
+    "external_code_populated": {
+      "populated": 380,
+      "empty": 0
+    },
+    "alliance_selector_agreement": {
+      "both_selectors": 0,
+      "spec_selector_only": 380,
+      "legacy_selector_only": 0
+    }
+  },
+  "agresso": {
+    "bilateral_contract_total": 1543
+  },
+  "resolution": {
+    "EXACT_CODE": {
+      "count": 32,
+      "percentage": 2.07,
+      "numerator": 32,
+      "denominator": 1543
+    },
+    "NORMALIZED_CODE": {
+      "count": 304,
+      "percentage": 19.7,
+      "numerator": 304,
+      "denominator": 1543
+    },
+    "FULL_NAME": {
+      "count": 0,
+      "percentage": 0,
+      "numerator": 0,
+      "denominator": 1543
+    },
+    "AMBIGUOUS": {
+      "count": 0,
+      "percentage": 0,
+      "numerator": 0,
+      "denominator": 1543
+    },
+    "UNRESOLVED": {
+      "count": 1207,
+      "percentage": 78.22,
+      "numerator": 1207,
+      "denominator": 1543
+    }
+  },
+  "normalization": {
+    "collision_count": 0,
+    "collisions": []
+  },
+  "samples": {
+    "EXACT_CODE": [
+      {
+        "agreement_id": "A1796",
+        "clarisa_project_id": 335,
+        "matched_on": "A1796"
+      },
+      {
+        "agreement_id": "A1805",
+        "clarisa_project_id": 336,
+        "matched_on": "A1805"
+      },
+      {
+        "agreement_id": "A1806",
+        "clarisa_project_id": 337,
+        "matched_on": "A1806"
+      },
+      {
+        "agreement_id": "A411",
+        "clarisa_project_id": 338,
+        "matched_on": "A411"
+      },
+      {
+        "agreement_id": "A516",
+        "clarisa_project_id": 339,
+        "matched_on": "A516"
+      },
+      {
+        "agreement_id": "A549",
+        "clarisa_project_id": 340,
+        "matched_on": "A549"
+      },
+      {
+        "agreement_id": "A567",
+        "clarisa_project_id": 341,
+        "matched_on": "A567"
+      },
+      {
+        "agreement_id": "A587",
+        "clarisa_project_id": 342,
+        "matched_on": "A587"
+      },
+      {
+        "agreement_id": "A605",
+        "clarisa_project_id": 343,
+        "matched_on": "A605"
+      },
+      {
+        "agreement_id": "A607",
+        "clarisa_project_id": 344,
+        "matched_on": "A607"
+      }
+    ],
+    "NORMALIZED_CODE": [
+      {
+        "agreement_id": "A1080",
+        "clarisa_project_id": 351,
+        "matched_on": "A1080"
+      },
+      {
+        "agreement_id": "A132",
+        "clarisa_project_id": 454,
+        "matched_on": "A132"
+      },
+      {
+        "agreement_id": "A1368",
+        "clarisa_project_id": 352,
+        "matched_on": "A1368"
+      },
+      {
+        "agreement_id": "A1430",
+        "clarisa_project_id": 353,
+        "matched_on": "A1430"
+      },
+      {
+        "agreement_id": "A1451",
+        "clarisa_project_id": 354,
+        "matched_on": "A1451"
+      },
+      {
+        "agreement_id": "A1456",
+        "clarisa_project_id": 355,
+        "matched_on": "A1456"
+      },
+      {
+        "agreement_id": "A1465",
+        "clarisa_project_id": 356,
+        "matched_on": "A1465"
+      },
+      {
+        "agreement_id": "A1468",
+        "clarisa_project_id": 357,
+        "matched_on": "A1468"
+      },
+      {
+        "agreement_id": "A1506",
+        "clarisa_project_id": 358,
+        "matched_on": "A1506"
+      },
+      {
+        "agreement_id": "A1518",
+        "clarisa_project_id": 359,
+        "matched_on": "A1518"
+      }
+    ],
+    "FULL_NAME": [],
+    "AMBIGUOUS": [],
+    "UNRESOLVED": [
+      {
+        "agreement_id": "A100",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A101",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A102",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A103",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A1032",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A104",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A105",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A106",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A107",
+        "clarisa_project_id": null,
+        "matched_on": null
+      },
+      {
+        "agreement_id": "A110",
+        "clarisa_project_id": null,
+        "matched_on": null
+      }
+    ]
+  }
+}

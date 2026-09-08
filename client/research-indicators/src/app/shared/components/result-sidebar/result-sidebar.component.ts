@@ -81,6 +81,8 @@ export class ResultSidebarComponent {
 
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
+    const meta = this.cache.currentMetadata();
+    if (meta?.indicator_id === 5) return true;
     return !alignment || alignment.eligible === false;
   }
 
@@ -92,6 +94,22 @@ export class ResultSidebarComponent {
   /** Caption + tooltip for the optional-sections group divider in the sidebar. */
   readonly OPTIONAL_GROUP_LABEL = 'Optional';
   readonly OPTIONAL_GROUP_TOOLTIP = 'This section does not count toward completed sections and is not required to submit the result.';
+
+  canSyncPrms = computed(() => {
+    const meta = this.cache.currentMetadata();
+    const isApproved = meta?.status_id === 6;
+    const isPoolFundingComplete = Boolean(this.cache.greenChecks()?.pool_funding_alignment);
+    return isApproved && isPoolFundingComplete;
+  });
+
+  hasPoolFundingOption = computed(() => {
+    return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
+  });
+
+  onPrmsSync(): void {
+    if (!this.canSyncPrms()) return;
+    // PRMS sync functionality will be implemented in future task
+  }
 
   showOicrStatusDropdown = computed(() => {
     const meta = this.cache.currentMetadata();

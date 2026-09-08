@@ -107,7 +107,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
         is_partner_not_applicable: tempIsPartnerNotApplicable,
       });
 
-      const { institutions } = resultInstitution;
+      const institutions = resultInstitution?.institutions ?? [];
       let filteredInstitutions = [];
 
       if (!tempIsPartnerNotApplicable) {
@@ -120,7 +120,7 @@ export class ResultInstitutionsService extends BaseServiceSimple<
       if (isAi && resultInstitution?.institutions_ai) {
         await this.insertInstitutionsAi(
           resultId,
-          resultInstitution.institutions_ai,
+          resultInstitution?.institutions_ai,
           InstitutionRolesEnum.PARTNERS,
           manager,
         );

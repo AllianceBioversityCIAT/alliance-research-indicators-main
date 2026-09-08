@@ -1,0 +1,409 @@
+<div class="flex min-h-screen flex-col pb-14">
+  <div class="max-sm:sticky max-sm:top-0 max-sm:z-30">
+  <header class="bg-[#173F6F] text-white">
+    <div class="flex h-[74px] items-center gap-3.5 px-6 max-sm:h-auto max-sm:min-h-[64px] max-sm:gap-2.5 max-sm:px-4 max-sm:py-2.5">
+      <img class="h-9 w-auto object-contain max-sm:h-7" [src]="'images/alliance-logo-white.svg' | s3ImageUrl" alt="Alliance of Bioversity International &amp; CIAT" />
+      <span aria-hidden="true" class="h-8 w-px bg-white/30 max-sm:h-10"></span>
+      <div class="text-[13.5px] leading-[1.35] tracking-[0.03em] text-[#DCE8D8] max-sm:text-[11px] max-sm:leading-[1.3]">
+        <span class="block font-semibold uppercase tracking-[0.05em] text-white"><span class="max-sm:hidden">Alliance of Bioversity International &amp; CIAT | </span>Reporting Pathfinder</span>
+        <span class="max-sm:hidden">One entry point for research results reporting</span>
+      </div>
+    </div>
+  </header>
+
+  <div aria-hidden="true" class="h-[5px] bg-[linear-gradient(90deg,#358540_0%,#358540_34%,#CAC92D_34%,#CAC92D_67%,#FFCF01_67%)]"></div>
+  </div>
+
+  <main class="mx-auto w-full max-w-[1250px] flex-1 px-7 max-sm:px-4">
+    <section class=" pt-[50px] flex flex-col items-start pb-10 max-sm:pt-6 max-sm:pb-6">
+      <p class="mb-1 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#1689CA]">Indicator guidance</p>
+      <span class="max-w-[22ch] text-[32px] font-bold leading-[1.1] tracking-[-0.02em] text-[#173F6F] [text-wrap:balance]">
+        Where do I report?
+      </span>
+      <h2 class="mt-1.5 text-[13.5px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Find the right reporting pathway in seconds</h2>
+
+
+    </section>
+
+    <section aria-label="Why reporting matters" class="mb-[26px] border border-l-4 border-[#DCE8D8] border-l-[#173F6F] bg-white px-8 py-[28px] max-sm:px-4 max-sm:py-5">
+      <p class="mb-5 text-[15px] leading-[1.5] text-[#63605F]" [ngClass]="{ 'max-sm:line-clamp-4 max-sm:mb-0': !whyExpanded() }">With the launch of the Alliance 2026–2030 Strategy, research results reporting has evolved from a distinct reporting exercise into a key component of the Alliance’s institutional performance monitoring framework. Research result indicators are now used as dimensions for measuring contribution to selected institutional performance areas and objectives.</p>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-x-6 gap-y-2.5" [ngClass]="{ 'max-sm:hidden': !whyExpanded() }">
+        <p class="text-[15px] leading-normal text-[14px] leading-snug text-[#63605F]"><strong class="font-semibold text-[#173F6F]">Scientific Excellence</strong><br />Knowledge Products · Capacity Sharing · Innovation Development</p>
+        <p class="text-[15px] leading-normal text-[14px] leading-snug text-[#63605F]"><strong class="font-semibold text-[#173F6F]">Enabling System Change</strong><br />Innovation Use · Policy Change · OICRs</p>
+      </div>
+      <p class="-mt-3.5 text-right max-sm:mt-3" [ngClass]="{ 'max-sm:hidden': !whyExpanded() }">
+        <a href="https://cgiar.sharepoint.com/sites/Bioversity_CIAT_Alliance/Available%20information%20about%20the%20Alliance/Forms/AllItems.aspx?id=%2Fsites%2FBioversity%5FCIAT%5FAlliance%2FAvailable%20information%20about%20the%20Alliance%2F2025%2D2026%20Objectives%2FENG%2F2026%5FInstitutional%2DObjectives%5FENG%2Epdf&parent=%2Fsites%2FBioversity%5FCIAT%5FAlliance%2FAvailable%20information%20about%20the%20Alliance%2F2025%2D2026%20Objectives%2FENG" target="_blank" rel="noopener" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#173F6F] px-3 py-1 text-[15px] font-medium text-[#173F6F] no-underline hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+          See diagram
+        </a>
+      </p>
+      <button type="button" (click)="toggleWhy()" class="mt-2 hidden cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-[#173F6F] max-sm:inline-flex">
+        {{ whyExpanded() ? 'View less' : 'View more' }}
+        <i class="pi pi-chevron-down !text-[11px]" [class.rotate-180]="whyExpanded()"></i>
+      </button>
+    </section>
+
+    <section aria-label="Reporting pathway selector" class="border border-[#DCE8D8] bg-white">
+      @if (showTrail()) {
+        <nav aria-label="Breadcrumb" class="flex flex-wrap items-center px-7 pb-3 pt-3.5 text-[14px] text-slate-600 max-sm:px-4 max-sm:text-[12px]">
+          @for (item of chips(); track item.label; let i = $index) {
+            @if (i > 0) {
+              <i class="pi pi-chevron-right mx-2 !text-[12px] text-[#777C83]"></i>
+            }
+            @if (i < chips().length - 1 || showQ2()) {
+              <button type="button" (click)="item.edit()" [attr.aria-label]="item.aria" class="cursor-pointer border-0 bg-transparent p-0 !font-[space_grotesk] text-[#777C83] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#358540]">{{ item.label }}</button>
+            } @else {
+              <button type="button" (click)="item.edit()" [attr.aria-label]="item.aria" aria-current="page" class="cursor-pointer border-0 bg-transparent p-0 !font-[space_grotesk] text-[#035BA9] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#358540]">{{ item.label }}</button>
+            }
+          }
+          @if (showQ2()) {
+            <i class="pi pi-chevron-right mx-2 !text-[12px] text-[#777C83]"></i>
+            <span class="!font-[space_grotesk] text-[#035BA9]" aria-current="page">Funding source</span>
+          }
+        </nav>
+      }
+      @if (showQ1()) {
+        <div class="p-8 max-sm:p-4">
+          <div class="mb-[22px] flex flex-wrap items-baseline gap-3">
+            <h2 class="text-[20px] font-bold text-[#173F6F]"> What are you reporting?</h2>
+            <span class="text-[15px] text-[#63605F] max-sm:-mt-3">Hover a card for more details.</span>
+          </div>
+
+          <div class="mb-2.5 flex items-baseline gap-1 max-sm:flex-col max-sm:items-start max-sm:gap-0.5">
+            <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#1689CA]">Outputs:</h3>
+            <span class="text-[14px] text-[#63605F]">what we produce</span>
+          </div>
+          <div role="group" aria-label="Output indicators" class="mb-6 grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('kp')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-7 pb-7 pt-6 text-center transition-all duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F] max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-lightbulb !text-[24px]"></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Knowledge Product</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Research outputs that generate, preserve, or share knowledge.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> When formally published or officially released.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> DOI, publication or repository record.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Drafts, duplicates, incomplete metadata.</p>
+              </div>
+            </div>
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('cap')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-users !text-[26px]"></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Capacity Sharing for Development</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Structured activities that strengthen knowledge, skills, or capacities.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> After delivery; multi-session programmes count as one.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Participant list, agenda, materials, workshop report.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Meetings or awareness events with no learning component.</p>
+              </div>
+            </div>
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('innovDev')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-flag !text-[22px]"></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Innovation Development</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Development and maturation of innovations using readiness levels.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> When an innovation reaches a documented readiness level.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Testing, validation, trial or prototype documentation.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Reporting activities instead of innovations; overstating readiness.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2.5 flex items-baseline gap-1 max-sm:flex-col max-sm:items-start max-sm:gap-0.5">
+            <h3 class="text-[13px] font-semibold uppercase tracking-[0.09em] text-[#1689CA]">Outcomes:</h3>
+            <span class="text-[14px] text-[#63605F]">the change that follows when others use it</span>
+          </div>
+          <div role="group" aria-label="Outcome indicators" class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('innovUse')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-sun !text-[26px]"></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Innovation Use</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Evidence that an innovation is being actively used.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> When identified users actively apply the innovation.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Adoption data, monitoring records, user confirmations.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Confusing dissemination, training, or awareness with use.</p>
+              </div>
+            </div>
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('policy')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-folder-open !text-[24px] -mr-1 "></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Policy Change</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Policy decisions or investments informed by Alliance research.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> When research uptake, enactment, or impacts are evidenced.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Policy documents, legal instruments, implementation evidence.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Reporting consultations or advocacy without evidence of change.</p>
+              </div>
+            </div>
+            <div class="group relative flex">
+              <button type="button" (click)="setIndicator('oicr')" class="flex h-full w-full cursor-pointer flex-col items-center gap-1 border border-[#DCE8D8] bg-white px-4 pb-4 pt-[18px] text-center transition-all max-sm:grid max-sm:grid-cols-[auto_1fr] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:text-left duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] hover:shadow-[0_2px_10px_rgba(18,86,75,0.08)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+                <span aria-hidden="true" class="mb-2 flex h-[48px] w-[48px] shrink-0 items-center justify-center rounded-full bg-[#EEF3FA] text-[#173F6F] max-sm:row-span-2 max-sm:mb-0 max-sm:self-center">
+                  <i class="pi pi-chart-pie !text-[22px]"></i>
+                </span>
+                <span class="text-[16px] font-medium leading-tight text-[#231F20] pb-2">Outcome Impact Case Report</span>
+                <span class="text-justify max-sm:text-left text-[15px] leading-snug text-[#63605F]">Significant outcomes or impacts influenced by Alliance research.</span>
+              </button>
+              <div role="tooltip" class="absolute left-0 right-0 top-[calc(100%_+_6px)] z-10 hidden flex-col gap-1.5 rounded-[9px] bg-[#173F6F] p-[13px_15px] text-left text-[13.5px] leading-normal text-[#DCE8D8] shadow-[0_10px_26px_rgba(18,86,75,0.22)] group-hover:flex group-focus-within:flex">
+                <p class="m-0"><strong class="font-semibold text-white">When:</strong> When research contributed to measurable change.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Evidence:</strong> Evidence of outcome and Alliance contribution.</p>
+                <p class="m-0"><strong class="font-semibold text-white">Avoid:</strong> Reporting activities instead of outcomes or impacts.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (showQ2()) {
+        <div class="pt-2 p-8 max-sm:p-4">
+          <h2 class=" text-[18px] font-semibold text-[#173F6F]">What was the primary funding source?</h2>
+          <p class="mb-4 text-[15px] text-[#63605F]">The stream that financed most of the activities, resources and staff time behind the result.</p>
+
+          <details class="group mb-4 border border-l-4 border-[#DCE8D8] border-l-[#173F6F] bg-[#EEF3FA]/60 px-4 py-3.5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-[15px] font-medium text-[#173F6F] [&::-webkit-details-marker]:hidden">
+              <span class="inline-flex items-center gap-2"><i class="pi pi-info-circle !text-[15px] text-[#173F6F]"></i> Not sure how the CGIAR funding streams work? Start here</span>
+              <i class="pi pi-chevron-down !text-[12px] text-[#173F6F] transition-transform group-open:rotate-180"></i>
+            </summary>
+            <div class="mt-3 grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
+              <div>
+                <p class="mb-1 text-[15px] font-medium text-[#231F20]">Pooled — W1 / W2</p>
+                <p class="mb-1.5 text-[15px] leading-relaxed text-[#63605F]">W1 supports the CGIAR Portfolio as a whole; W2 is designated to specific CGIAR Programs and Accelerators.</p>
+                <p class="m-0 text-[14px] text-[#63605F]">Results reported in PRMS.</p>
+              </div>
+              <div>
+                <p class="mb-1 text-[15px] font-medium text-[#231F20]">Non-pooled — W3 / bilateral</p>
+                <p class="mb-1.5 text-[15px] leading-relaxed text-[#63605F]">W3 is donor funding allocated to a single Center through the CGIAR Trust Fund; bilateral funding flows directly from donor to Center. Both are Center-managed project funding.</p>
+                <p class="m-0 text-[14px] text-[#63605F]">Results reported in STAR.</p>
+              </div>
+            </div>
+            <div class="mt-3.5 border-t border-[#DCE8D8] pt-3 text-[15px] leading-relaxed text-[#63605F]">
+              <p class="mb-1.5 font-medium text-[#231F20]">Finding your primary source</p>
+              <p class="mb-2">Follow the money: the stream that financed the majority of what made the result possible —</p>
+              <ul class="mb-2 flex list-disc flex-col gap-1 pl-5">
+                <li>staff time dedicated to achieving the result;</li>
+                <li>research, implementation, engagement and partnership activities;</li>
+                <li>travel, workshops, training events and field costs;</li>
+                <li>the technical inputs most critical to the result.</li>
+              </ul>
+              <p class="m-0">Mixed funding is normal. Pick the largest contributor — STAR and PRMS both let you record the other contributing projects and funders.</p>
+            </div>
+          </details>
+
+          <p class="mb-2.5 text-[15px] font-semibold text-[#173F6F]">Select one of these two options:</p>
+          <div role="group" aria-label="Primary funding source" class="flex flex-col gap-2">
+            <button type="button" (click)="setFunding('w3')" class="flex cursor-pointer items-center gap-4 border border-[#DCE8D8] bg-white px-4 py-3.5 text-left transition-colors duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+              <span class="block">
+                <span class="block text-[15px] font-medium text-[#231F20]">W3 or bilateral project</span>
+                <span class="block text-[14px] text-[#63605F]">Non-pooled, Center-managed project funding</span>
+              </span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[#173F6F]">&rarr;</span>
+            </button>
+            <button type="button" (click)="setFunding('program')" class="flex cursor-pointer items-center gap-4 border border-[#DCE8D8] bg-white px-4 py-3.5 text-left transition-colors duration-150 hover:border-[#173F6F] hover:bg-[#EEF3FA] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]">
+              <span class="block">
+                <span class="block text-[15px] font-medium text-[#231F20]">CGIAR Program or Accelerator</span>
+                <span class="block text-[14px] text-[#63605F]">W1 / W2 pooled funding</span>
+              </span>
+              <span aria-hidden="true" class="ml-auto text-[16px] text-[#173F6F]">&rarr;</span>
+            </button>
+          </div>
+
+          <button type="button" (click)="goBack()" class="mt-[18px] inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#173F6F] px-4 py-2 text-[15px] font-medium text-[#173F6F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]"><i class="pi pi-arrow-left !text-[12px]"></i> Back</button>
+        </div>
+      }
+
+      @if (showResult()) {
+        <div aria-live="polite" class="border-t-4 px-7 pb-[26px] pt-[30px] max-sm:px-4 max-sm:pb-5 max-sm:pt-6" [ngClass]="resultTopBorder()">
+          <div class="text-[12.5px] mb-4 font-semibold uppercase tracking-[0.1em] text-[#63605F]">Report this result in</div>
+          <div class="my-2 flex items-center gap-3">
+            <img class="h-[34px] w-[34px] object-contain" [src]="resultLogo() | s3ImageUrl" [alt]="resultName()" />
+            <h2 class="text-[42px] font-bold leading-none tracking-[-0.015em]" [ngClass]="resultInk()">{{ resultName() }}</h2>
+          </div>
+          <p class="mb-[22px] max-w-[58ch] text-[16px] leading-normal text-[#63605F]">{{ resultWhy() }}</p>
+
+          <div class="flex flex-wrap items-center gap-[18px]">
+            <a
+              [href]="resultUrl()"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-[9px] rounded-[13px] px-[26px] py-[15px] text-[14px] font-semibold uppercase tracking-[0.08em] text-white no-underline transition-colors hover:text-white hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F] motion-reduce:transition-none max-sm:w-full max-sm:justify-center"
+              [ngClass]="resultBtn()">
+              Open {{ resultName() }}
+ 
+            </a>
+            <button type="button" (click)="goBack()" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#173F6F] px-4 py-2 text-[15px] font-medium text-[#173F6F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]"><i class="pi pi-arrow-left !text-[12px]"></i> Back</button>
+            <button type="button" (click)="startOver()" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#173F6F] px-4 py-2 text-[15px] font-medium text-[#173F6F] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173F6F]"><i class="pi pi-refresh !text-[12px]"></i> Start over</button>
+          </div>
+
+          <div class="mt-[22px] flex flex-col gap-2 border-t border-[#DCE8D8] pt-4">
+            <p class="m-0 text-[15px] leading-relaxed text-[#63605F]"><strong class="font-medium text-[#173F6F]">Have ready:</strong> {{ resultEvidence() }}</p>
+            <p class="m-0 text-[15px] leading-relaxed text-[#63605F]"><strong class="font-medium text-[#173F6F]">Watch out for:</strong> {{ resultPitfall() }}</p>
+            <p class="m-0 text-[15px] leading-relaxed text-[#63605F]"><strong class="font-medium text-[#173F6F]">Technical support:</strong> {{ resultSupport() }}</p>
+          </div>
+        </div>
+      }
+    </section>
+
+    <section id="platforms" class="mt-11 scroll-mt-[70px]">
+      <h2 class="mb-3.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Already know where to report?</h2>
+      <div class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] items-start gap-3 ">
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#3C8DC8] bg-white px-6 pb-6 pt-5">
+          <div class="flex h-9 items-center gap-[9px]">
+            <img class="h-9 w-9 object-contain" [src]="'images/star.svg' | s3ImageUrl" alt="" />
+            <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">STAR</span>
+          </div>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('STAR') }">Alliance results reporting system for W3 and bilateral results.</p>
+          <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
+            <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
+            <div class="mt-[7px] flex flex-col gap-[9px]">
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Technical support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:Alliance-ITsupport@cgiar.org" class="text-[#173F6F] hover:underline">alliance-ITsupport&#64;cgiar.org</a></p>
+              </div>
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Content support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:alliance-sprm@groups.org" class="text-[#173F6F] hover:underline">alliance-sprm&#64;groups.org</a></p>
+              </div>
+            </div>
+          </div>
+          <div class="relative z-[2] mt-4.5">
+            <div class="flex items-end justify-between gap-3">
+              <a href="https://star.alliance.cgiar.org/" target="_blank" rel="noopener" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#2A6D9E] px-4 py-2 text-[15px] font-medium text-[#2A6D9E] no-underline hover:no-underline">Open STAR
+              </a>
+              @if (!isPlatformExpanded('STAR')) {
+                <button type="button" (click)="togglePlatform('STAR')" class="cursor-pointer border-0 bg-transparent p-0 text-[14px] font-semibold text-[#2A6D9E] hover:underline">View more</button>
+              }
+            </div>
+            @if (isPlatformExpanded('STAR')) {
+              <div class="mt-2.5 flex flex-col gap-2.5">
+                <div>
+                  <p class="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Indicators</p>
+                  <ul class="mt-1 flex list-disc flex-col gap-0.5 pl-[18px] text-[15px] leading-snug text-[#63605F]"><li>Outcome Impact Case Reports</li><li>Capacity Sharing for Development *</li><li>Innovation Development *</li><li>Innovation Use *</li><li>Policy Change *</li></ul>
+                </div>
+                <div>
+                  <p class="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Good to know</p>
+                  <p class="mt-1 text-[15px] leading-normal text-[#63605F]">Only when the result was primarily funded by a W3 or bilateral project. OICRs always start here: submit a request to draft, then technical review, scientific validation, editorial review and publication.</p>
+                </div>
+                <button type="button" (click)="togglePlatform('STAR')" class="cursor-pointer self-start border-0 bg-transparent p-0 text-[14px] font-semibold text-[#2A6D9E] hover:underline">View less</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#E8862A] bg-white px-6 pb-6 pt-5">
+          <div class="flex h-9 items-center gap-[9px]">
+            <img class="h-8 w-8 object-contain" [src]="'images/tracking.svg' | s3ImageUrl" alt="" />
+            <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">TIP</span>
+          </div>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('TIP') }">Alliance platform for tracking and curating information products.</p>
+          <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
+            <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
+            <div class="mt-[7px] flex flex-col gap-[9px]">
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Technical support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:alliance-dm@cgiar.org" class="text-[#173F6F] hover:underline">alliance-dm&#64;cgiar.org</a></p>
+              </div>
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Content support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:alliance-dm@cgiar.org" class="text-[#173F6F] hover:underline">alliance-dm&#64;cgiar.org</a></p>
+              </div>
+            </div>
+          </div>
+          <div class="relative z-[2] mt-4.5">
+            <div class="flex items-end justify-between gap-3">
+              <a href="https://tip.alliance.cgiar.org/" target="_blank" rel="noopener" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#94500F] px-4 py-2 text-[15px] font-medium text-[#94500F] no-underline hover:no-underline">Open TIP
+              </a>
+              @if (!isPlatformExpanded('TIP')) {
+                <button type="button" (click)="togglePlatform('TIP')" class="cursor-pointer border-0 bg-transparent p-0 text-[14px] font-semibold text-[#94500F] hover:underline">View more</button>
+              }
+            </div>
+            @if (isPlatformExpanded('TIP')) {
+              <div class="mt-2.5 flex flex-col gap-2.5">
+                <div>
+                  <p class="my-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Indicators</p>
+                  <ul class="mt-1 flex list-disc flex-col gap-0.5 pl-[18px] text-[15px] leading-snug text-[#63605F]"><li>Knowledge Products</li></ul>
+                </div>
+                <div>
+                  <p class="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Good to know</p>
+                  <p class="mt-1 text-[15px] leading-normal text-[#63605F]">Funding source is irrelevant here — every Knowledge Product is reported in TIP. Products may be Open or Limited Access, but accessibility, licensing and a persistent identifier must be recorded. Report each product once.</p>
+                </div>
+                <button type="button" (click)="togglePlatform('TIP')" class="cursor-pointer self-start border-0 bg-transparent p-0 text-[14px] font-semibold text-[#94500F] hover:underline">View less</button>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="flex min-h-[248px] flex-col max-sm:min-h-0 border border-t-4 border-[#DCE8D8] border-t-[#5569DD] bg-white px-6 pb-6 pt-5">
+          <div class="flex h-9 items-center gap-[9px]">
+            <img class="h-8 w-8 object-contain" [src]="'images/prms-reporting-tool.svg' | s3ImageUrl" alt="" />
+            <span class="text-[17px] font-bold tracking-[0.01em] text-[#173F6F]">PRMS</span>
+          </div>
+          <p class="mt-3 flex-1 text-[15px] leading-normal text-[#63605F]" [ngClass]="{ 'max-sm:hidden': !isPlatformExpanded('PRMS') }">CGIAR Program Results Management System for pooled-funded results.</p>
+          <div class="mt-3 border-t border-[#DCE8D8] pt-4.5">
+            <p class="m-0 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Support</p>
+            <div class="mt-[7px] flex flex-col gap-[9px]">
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Technical support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:PRMSTechSupport@cgiar.org" class="text-[#173F6F] hover:underline">PRMSTechSupport&#64;cgiar.org</a></p>
+              </div>
+              <div>
+                <p class="m-0 text-[13px] font-semibold text-[#231F20]">Content support</p>
+                <p class="relative z-[2] mb-0 mt-[2px] text-[13.5px] leading-snug"><a href="mailto:performanceandresults@cgiar.org" class="text-[#173F6F] hover:underline">performanceandresults&#64;cgiar.org</a></p>
+              </div>
+            </div>
+          </div>
+          <div class="relative z-[2] mt-4.5">
+            <div class="flex items-end justify-between gap-3">
+              <a href="https://reporting.cgiar.org/" target="_blank" rel="noopener" class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-[#4152BB] px-4 py-2 text-[15px] font-medium text-[#4152BB] no-underline hover:no-underline">Open PRMS
+              </a>
+              @if (!isPlatformExpanded('PRMS')) {
+                <button type="button" (click)="togglePlatform('PRMS')" class="cursor-pointer border-0 bg-transparent p-0 text-[14px] font-semibold text-[#4152BB] hover:underline">View more</button>
+              }
+            </div>
+            @if (isPlatformExpanded('PRMS')) {
+              <div class="mt-2.5 flex flex-col gap-2.5">
+                <div>
+                  <p class="my-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Indicators</p>
+                  <ul class="mt-1 flex list-disc flex-col gap-0.5 pl-[18px] text-[15px] leading-snug text-[#63605F]"><li>Capacity Sharing for Development *</li><li>Innovation Development *</li><li>Innovation Use *</li><li>Policy Change *</li></ul>
+                </div>
+                <div>
+                  <p class="mt-3 text-[12px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">Good to know</p>
+                  <p class="mt-1 text-[15px] leading-normal text-[#63605F]">Only when the result was primarily achieved through a CGIAR Program or Accelerator (W1 / W2 pooled funding). Other contributing projects can still be recorded alongside the primary one.</p>
+                </div>
+                <button type="button" (click)="togglePlatform('PRMS')" class="cursor-pointer self-start border-0 bg-transparent p-0 text-[14px] font-semibold text-[#4152BB] hover:underline">View less</button>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faqs" class="mt-11 scroll-mt-[70px]">
+      <h2 class="mb-3.5 text-[14px] font-semibold uppercase tracking-[0.08em] text-[#63605F]">{{ faqsTitle() }}</h2>
+      <div class="flex flex-col">
+        @for (faq of faqs(); track faq.q) {
+          <details class="group  border border-[#DCE8D8] bg-white px-6 py-4.5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[15px] font-semibold text-[#173F6F] [&::-webkit-details-marker]:hidden">
+              {{ faq.q }}
+              <i class="pi pi-chevron-down !text-[12px] text-[#358540] transition-transform group-open:rotate-180"></i>
+            </summary>
+            <p class="mt-2.5 text-[15px] text-[#63605F]">{{ faq.a }}</p>
+          </details>
+        }
+      </div>
+    </section>
+  </main>
+</div>
