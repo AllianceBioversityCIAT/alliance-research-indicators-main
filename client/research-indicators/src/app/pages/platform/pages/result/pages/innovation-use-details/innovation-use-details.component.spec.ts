@@ -2466,6 +2466,19 @@ describe('InnovationUseDetailsComponent', () => {
     const findButton = (text: string) =>
       fixture.debugElement.queryAll(By.css('button')).find(b => normalize((b.nativeElement as HTMLButtonElement).textContent) === text);
 
+    /** quick/innovation-use-evidence-callout-gating (2026-09-08): the evidence callout is now gated
+     *  on `showJustification()` (level ≥ 6), so it is ABSENT in this describe's default fixture
+     *  state — the GET mock at the top of this file returns `innovation_use_level_id: null`. Every
+     *  block that asserts the callout's own content (c4 copy, c5 navigation, c12 contrast) must
+     *  therefore put the component at a rendering level first. Blocks that assert the guidance
+     *  bullets or the definitions link (c1, c2, c3) must NOT call this — those two stay
+     *  unconditional under R-IUP-020 AC.5, and running them at the default null level is exactly
+     *  what proves it. */
+    const atJustificationLevel = () => {
+      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6) });
+      fixture.detectChanges();
+    };
+
     // -----------------------------------------------------------------------------------------------
     // c1 — the label's exact string plus the required marker (R-IUP-020 AC.1)
     // -----------------------------------------------------------------------------------------------
@@ -2537,6 +2550,8 @@ describe('InnovationUseDetailsComponent', () => {
     // c4 — P1 (adapted, with the curly-quote 'Evidence') and P2 (verbatim) (R-IUP-021 AC.1, AC.2)
     // -----------------------------------------------------------------------------------------------
     describe('c4 — evidence callout paragraphs', () => {
+      beforeEach(atJustificationLevel);
+
       it('renders P1 and P2 with their exact strings', () => {
         const paragraphs = fixture.debugElement.queryAll(By.css('[data-testid="evidence-callout"] p'));
         expect(paragraphs.length).toBe(2);
@@ -2570,6 +2585,7 @@ describe('InnovationUseDetailsComponent', () => {
       // tests already asserted a numeric `1`, not a string.
       beforeEach(() => {
         originalGet = routeMock().snapshot.queryParamMap.get;
+        atJustificationLevel();
       });
 
       afterEach(() => {
@@ -2640,54 +2656,129 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     // -----------------------------------------------------------------------------------------------
-    // c6 — guidance, definitions link and evidence callout all render at level null/0/9 and with
-    // isEditableStatus() false (R-IUP-020 AC.5, R-IUP-021 AC.5)
+    // c6 — REWRITTEN by quick/innovation-use-evidence-callout-gating (2026-09-08). The guidance
+    // block and the definitions link keep their unconditional contract (R-IUP-020 AC.5, unchanged);
+    // the evidence callout no longer does — R-IUP-021 AC.5 and its "Evidence guidance is not gated
+    // on the justification's condition" scenario are REVERSED by user ruling. The callout now
+    // follows `showJustification()` (level ≥ 6), the same threshold as the justification textarea
+    // whose absence made P1's request ("provide a brief explanation justifying…") unanswerable.
+    //
+    // The old block asserted all three render together at null/0/9 and carried a falsifying test
+    // written specifically to catch the `@if (showJustification())` wrap. That test is not deleted
+    // to make the suite green — it is INVERTED, because the property it guarded is now the defect:
+    // it proved the callout was NOT gated, and its replacement below proves that it IS, at the
+    // exact same boundary levels. The guidance/definitions half of every old assertion survives
+    // verbatim, so a regression that accidentally gated THOSE still reddens here.
     // -----------------------------------------------------------------------------------------------
-    describe('c6 — unconditional rendering', () => {
-      const assertAllThreeRender = () => {
+    describe('c6 — conditional evidence callout, unconditional guidance', () => {
+      /** R-IUP-020 AC.5 — unchanged, and asserted at every level below so the reversal cannot
+       *  silently spread from the callout to its two neighbours. */
+      const assertGuidanceAndDefinitionsRender = () => {
         expect(fixture.debugElement.query(By.css('[data-testid="use-level-guidance"]'))).toBeTruthy();
         expect(fixture.debugElement.query(By.css('[data-testid="use-level-definitions-link"]'))).toBeTruthy();
-        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
         expect(findLink(CALCULATOR_URL)).toBeTruthy();
         expect(findLink(DEFINITIONS_URL)).toBeTruthy();
+      };
+
+      const assertEvidenceCalloutAbsent = () => {
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeNull();
+        expect(findButton('Click here to go there')).toBeUndefined();
+      };
+
+      const assertEvidenceCalloutRenders = () => {
+        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
         expect(findButton('Click here to go there')).toBeTruthy();
       };
 
-      it('renders all three blocks with no level selected (null)', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: undefined });
+      const setLevel = (levelId: number | undefined) => {
+        component.body.set({ ...component.body(), innovation_use_level_id: levelId });
         fixture.detectChanges();
-        assertAllThreeRender();
+      };
+
+      it('hides the evidence callout with no level selected (null), keeping guidance + definitions', () => {
+        setLevel(undefined);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks at level 0', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
-        fixture.detectChanges();
-        assertAllThreeRender();
+      it('hides the evidence callout at level 0, keeping guidance + definitions', () => {
+        setLevel(idForLevel(0));
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks at level 9', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(9) });
-        fixture.detectChanges();
-        assertAllThreeRender();
+      // The boundary the change is actually about: 5 is the highest level with no justification
+      // field, and the screenshot that prompted the reversal was taken at exactly this level.
+      it('hides the evidence callout at level 5 — the last level below the justification threshold', () => {
+        setLevel(idForLevel(5));
+
+        expect(component.showJustification()).toBe(false);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
       });
 
-      it('renders all three blocks when isEditableStatus() is false', () => {
+      it('renders the evidence callout at level 6 — the first level that asks for a justification', () => {
+        setLevel(idForLevel(6));
+
+        expect(component.showJustification()).toBe(true);
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
+      });
+
+      it('renders the evidence callout at level 9', () => {
+        setLevel(idForLevel(9));
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
+      });
+
+      // isEditableStatus() is an INDEPENDENT axis from the level: the callout is gated on the level
+      // only, so a read-only result at level 6 must still show it. Asserting both halves here keeps
+      // the two conditions from being accidentally fused into one.
+      it('renders the evidence callout when isEditableStatus() is false but the level is 6', () => {
         submission.isEditableStatus.mockReturnValue(false);
-        fixture.detectChanges();
-        assertAllThreeRender();
+        setLevel(idForLevel(6));
+
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutRenders();
         submission.isEditableStatus.mockReturnValue(true);
       });
 
-      // Falsifying input: wrapping the evidence callout in `@if (showJustification())` must fail
-      // this check at level 0, where showJustification() is false and the textarea does not render.
-      it('falsifying input: at level 0 the conditional textarea is absent, proving the evidence callout cannot be riding inside that branch', () => {
-        component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(0) });
-        fixture.detectChanges();
+      it('hides the evidence callout when isEditableStatus() is false and the level is 5', () => {
+        submission.isEditableStatus.mockReturnValue(false);
+        setLevel(idForLevel(5));
 
-        expect(component.showJustification()).toBe(false);
-        expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
-        // Yet the evidence callout is still present — it cannot be a descendant of the branch above.
-        expect(fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))).toBeTruthy();
+        assertGuidanceAndDefinitionsRender();
+        assertEvidenceCalloutAbsent();
+        submission.isEditableStatus.mockReturnValue(true);
+      });
+
+      // Falsifying input, INVERTED from the old c6. Reverting the template to an unconditional
+      // callout must fail this at level 5 — and the assertion is written so that a lazy fix
+      // (deleting the callout outright) fails it too, since level 6 must still render it.
+      it('falsifying input: the callout tracks showJustification() exactly — absent at 5, present at 6, never constant', () => {
+        setLevel(idForLevel(5));
+        const atFive = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'));
+
+        setLevel(idForLevel(6));
+        const atSix = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'));
+
+        expect(atFive).toBeNull();
+        expect(atSix).toBeTruthy();
+        // A template that always renders, or never renders, cannot satisfy both lines above.
+        expect(atFive === null && atSix !== null).toBe(true);
+      });
+
+      // The callout must be its OWN @if, not merged into the textarea's block: it has to stay above
+      // the textarea in DOM order. Asserting document order catches a "fix" that nests it inside.
+      it('renders the callout as a sibling ABOVE the justification textarea, not nested inside it', () => {
+        setLevel(idForLevel(6));
+
+        const callout = fixture.debugElement.query(By.css('[data-testid="evidence-callout"]'))!.nativeElement as HTMLElement;
+        const textarea = fixture.debugElement.query(By.css('textarea'))!.nativeElement as HTMLElement;
+
+        expect(callout.contains(textarea)).toBe(false);
+        // Node.DOCUMENT_POSITION_FOLLOWING (4) — the textarea comes after the callout.
+        expect(callout.compareDocumentPosition(textarea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       });
     });
 
@@ -2701,6 +2792,11 @@ describe('InnovationUseDetailsComponent', () => {
     // the utility class asserted in (a) is what actually renders (§5.8's traps do not reach here).
     // -----------------------------------------------------------------------------------------------
     describe('c12 — contrast, measured', () => {
+      // The three class-presence tests below query the evidence callout, which since
+      // quick/innovation-use-evidence-callout-gating only renders at level ≥ 6. The four pure-math
+      // tests do not touch the DOM at all and are unaffected either way.
+      beforeEach(atJustificationLevel);
+
       // WCAG 2.1 relative luminance / contrast ratio — pure functions, independent of jsdom style
       // resolution (jsdom does not paint; see "What this task's automated criteria cannot prove").
       // Takes decimal RGB triples rather than "#rrggbb" strings deliberately (c8's grep bans a `#`

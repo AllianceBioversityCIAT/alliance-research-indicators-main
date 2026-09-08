@@ -63,33 +63,41 @@
         to see the definition of all use levels</p
       >
 
-      <!-- EVIDENCE CALLOUT (R-IUP-021, Amendment 01 / T-14). A sibling of the showJustification()
-           branch below — NOT nested inside it (c7 / R-IUP-021 scenario), so it renders at every
-           level and in a non-editable status. "Click here to go there" is a <button>, never a
-           document href (R-IUP-021 scenario) — it calls goToEvidence(), which issues a
-           Router.navigate carrying `version`/`from` forward (DD-16). -->
-      <div
-        data-testid="evidence-callout"
-        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
-        <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
-        <div class="flex flex-col">
-          <p class="fs-[14] text-[var(--ac-grey-800)] rs-mb-[12]"
-            >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
-            necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
-            section of the form (<button
-              type="button"
-              class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
-              (click)="goToEvidence()"
-              >Click here to go there</button
-            >)</p
-          >
-          <p class="fs-[14] text-[var(--ac-grey-800)]"
-            >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data
-            paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication
-            materials that provide evidence of the current development/ maturity stage of the innovation.</p
-          >
+      <!-- EVIDENCE CALLOUT (R-IUP-021, Amendment 01 / T-14) — gated on showJustification() since
+           quick/innovation-use-evidence-callout-gating (2026-09-08), which REVERSES R-IUP-021 AC.5
+           and its "not gated on the justification's condition" scenario by user ruling. Rationale
+           for the reversal: P1 asks the reporter to "provide a brief explanation justifying the
+           selected Innovation Use Level", and below level 6 no such field exists on the page
+           (R-IUP-006), so the callout was asking for something the form does not offer. It is a
+           SEPARATE @if from the textarea's block below, not a merge of the two — the callout must
+           stay above the textarea in DOM order, and showJustification() itself is untouched.
+           "Click here to go there" is a <button>, never a document href (R-IUP-021 scenario) — it
+           calls goToEvidence(), which issues a Router.navigate carrying `version`/`from` (DD-16). -->
+      @if (showJustification()) {
+        <div
+          data-testid="evidence-callout"
+          class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[4px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
+          <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
+          <div class="flex flex-col">
+            <p class="fs-[14] text-[var(--ac-grey-800)] rs-mb-[12]"
+              >Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
+              necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
+              section of the form (<button
+                type="button"
+                class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
+                (click)="goToEvidence()"
+                >Click here to go there</button
+              >)</p
+            >
+            <p class="fs-[14] text-[var(--ac-grey-800)]"
+              >Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental
+              data paper, newsletter, etc. It may be project reports, scientific publications, book chapters,
+              communication materials that provide evidence of the current development/ maturity stage of the
+              innovation.</p
+            >
+          </div>
         </div>
-      </div>
+      }
 
       @if (showJustification()) {
         <div class="rs-mt-[20]">
