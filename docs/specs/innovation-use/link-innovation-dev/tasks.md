@@ -281,7 +281,7 @@ absent" spec must go red. Filter out soft-deleted targets → the C12 spec must 
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | — (§4.1 is frozen) |
 | Requirements | R-IUL-007 |
