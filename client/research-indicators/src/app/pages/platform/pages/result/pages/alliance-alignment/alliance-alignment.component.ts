@@ -104,6 +104,7 @@ export default class AllianceAlignmentComponent {
   });
   isOicrIndicator = computed(() => this.cache.currentMetadata()?.indicator_id === 5);
   isPolicyChangeIndicator = computed(() => this.cache.currentMetadata()?.indicator_id === 4);
+  isInnovationUseIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 6);
   isPortfolioP2Alignment = computed(() => this.getCurrentPortfolioId() === PORTFOLIO_P2_ID);
   alignmentRequestParams = computed(() => {
     const portfolioId = this.getCurrentPortfolioId();
@@ -352,7 +353,7 @@ export default class AllianceAlignmentComponent {
   private async savePortfolioP2Alignment(numericResultId: number): Promise<void> {
     const dataToSend = buildPortfolio2AlignmentPatch(
       this.body(),
-      this.isOicrIndicator() || this.isPolicyChangeIndicator(),
+      this.isOicrIndicator() || this.isPolicyChangeIndicator() || this.isInnovationUseIndicator(),
       !this.isOicrIndicator()
     );
     await this.patchAlignmentAndReload(numericResultId, dataToSend);

@@ -55,6 +55,13 @@ describe('AllianceAlignmentP2Component', () => {
     expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
   });
 
+  it('should render impact outcomes for Innovation Use', () => {
+    metadata.set({ indicator_id: 6 });
+    fixture.detectChanges();
+    expect(component.shouldShowImpactOutcomes()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
+  });
+
   it('should hide impact outcomes for non-OICR and non-Policy Change indicators', () => {
     metadata.set({ indicator_id: 1 });
     fixture.detectChanges();

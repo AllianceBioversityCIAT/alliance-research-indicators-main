@@ -88,13 +88,15 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     responseData.strategic_objectives = strategicObjectives;
 
     if (
-      [IndicatorsEnum.OICR, IndicatorsEnum.POLICY_CHANGE].includes(
-        context.result?.indicator_id,
-      )
+      [
+        IndicatorsEnum.OICR,
+        IndicatorsEnum.POLICY_CHANGE,
+        IndicatorsEnum.INNOVATION_USE,
+      ].includes(context.result?.indicator_id)
     ) {
       const impactOutcomes = await this.resultImpactOutcomesService.create(
         context.resultId,
-        payload.impact_outcomes.map((impactOutcome) => ({
+        (payload.impact_outcomes ?? []).map((impactOutcome) => ({
           impact_outcome_id: impactOutcome.impact_outcome_id,
         })),
         'impact_outcome_id',
@@ -131,9 +133,11 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     responseData.strategic_objectives = strategicObjectives;
 
     if (
-      [IndicatorsEnum.OICR, IndicatorsEnum.POLICY_CHANGE].includes(
-        context.result?.indicator_id,
-      )
+      [
+        IndicatorsEnum.OICR,
+        IndicatorsEnum.POLICY_CHANGE,
+        IndicatorsEnum.INNOVATION_USE,
+      ].includes(context.result?.indicator_id)
     ) {
       const impactOutcomes = await this.resultImpactOutcomesService.find(
         context.resultId,

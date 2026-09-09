@@ -172,6 +172,51 @@ describe('Portfolio2AlignmentHandler', () => {
       );
       expect(result.impact_outcomes).toEqual(impactOutcomes);
     });
+
+    it('should persist impact outcomes when indicator is INNOVATION_USE', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.INNOVATION_USE },
+      };
+
+      const result = await handler.save(context, payload);
+
+      expect(resultImpactOutcomesService.create).toHaveBeenCalledWith(
+        context.resultId,
+        [{ impact_outcome_id: 2 }],
+        'impact_outcome_id',
+        ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        manager,
+      );
+      expect(result.impact_outcomes).toEqual(impactOutcomes);
+    });
+
+    it('should not throw and should persist an empty list when indicator is INNOVATION_USE and impact_outcomes is omitted from the payload', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.INNOVATION_USE },
+      };
+      const payloadWithoutImpactOutcomes = {
+        contracts: [{ contract_id: 'C1' }],
+        primary_levers: [{ lever_id: '1' }],
+        contributor_levers: [{ lever_id: '2' }],
+        research_areas: [{ lever_id: '123', custom_lever_name: 'Custom RA' }],
+        strategic_objectives: [{ strategic_objective_id: 1 }],
+        result_sdgs: [],
+      } as any;
+
+      await expect(
+        handler.save(context, payloadWithoutImpactOutcomes),
+      ).resolves.not.toThrow();
+
+      expect(resultImpactOutcomesService.create).toHaveBeenCalledWith(
+        context.resultId,
+        [],
+        'impact_outcome_id',
+        ResultImpactOutcomeRolesEnum.ALIGNMENT,
+        manager,
+      );
+    });
   });
 
   describe('find', () => {
@@ -231,6 +276,21 @@ describe('Portfolio2AlignmentHandler', () => {
       const context: PortfolioHandlerContext = {
         ...baseContext,
         result: { indicator_id: IndicatorsEnum.POLICY_CHANGE },
+      };
+
+      const result = await handler.find(context);
+
+      expect(resultImpactOutcomesService.find).toHaveBeenCalledWith(
+        baseContext.resultId,
+        ResultImpactOutcomeRolesEnum.ALIGNMENT,
+      );
+      expect(result.impact_outcomes).toHaveLength(1);
+    });
+
+    it('should include impact outcomes when indicator is INNOVATION_USE', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.INNOVATION_USE },
       };
 
       const result = await handler.find(context);
