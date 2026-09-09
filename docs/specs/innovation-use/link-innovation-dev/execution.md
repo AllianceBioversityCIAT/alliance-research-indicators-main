@@ -1622,3 +1622,110 @@ dead, print the report as plain terminal text, and do not call `orchestration se
 attempt 3 said the first two things but not the third precisely enough.
 
 Resume with `/akili-resume` or `/akili-execute docs/specs/innovation-use/link-innovation-dev`.
+
+---
+
+## ⛔ HALT: T-09 — The picker (attempt 3 of 3 FAILED)
+
+**Date** 2026-09-09 · **Task** T-09 The picker ⟨Antigravity⟩ · **Status** `[~]` HALT · **Attempts run** 3 of 3
+**Reviewer** `akili-reviewer`, `opus` (T3). Author was a Gemini worker → `author ≠ auditor` strong on both axes.
+**Working tree NOT rolled back.** See *Rollback deliberately withheld* below.
+
+### Attempt history
+
+| Attempt | Model | Verdict | Cause |
+| --- | --- | --- | --- |
+| 1 | `gemini-3.8-flash-high` | **FAIL** | Two hex literals in new code (NFR-IUL-003); R-IUL-012's four states not each asserted; error state neither implemented nor declared |
+| 2 | `gemini-3.1-pro-high` | **FAIL** | Hex closed, but the error fix was **inert**: `ToPromiseService`'s `catchError` returns an array so `firstValueFrom` always resolves, so the `try/catch` could never fire. The error spec was green only because a mock called `error.set(true)` (KZ-001) |
+| 3 | `gemini-3.1-pro-high` | **FAIL** | Envelope-shape detection replaced the try/catch and is genuinely correct — but widening `loadFailed` to carry the picker's error reaches a data-loss path. Four issues, one blocking |
+
+### Attempt 3 — verification evidence (Leader-measured, this session, in isolation)
+
+Run from `client/research-indicators`, no delegated agent active (concurrency rule).
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6909/6909 tests PASS**. Coverage 98.25 / 96.26 / 97.99 / 98.53 — all four floors (40/20/45/30) held |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 errors = the recorded baseline exactly. Delta 0.** No `out-tsc` emitted (checked absent) |
+| `npm run lint -- --quiet` (`ng lint`) | All files pass linting |
+| `npx prettier --check` (4 files) | **FAILS on 2** — `get-innovation-dev-output.service.ts`, `innovation-use-details.component.spec.ts`. `ng lint` does not run prettier, so the repo lint gate cannot catch this |
+
+**Falsifiers — all four observed RED, then the tree restored byte-identically** (diffstat re-verified after restore: 103 / 385 / 79 / 12, 468 insertions, 111 deletions). This discharges the K-004 debt attempt 3 left behind: its worker report was never recovered, so no falsifier evidence existed for it until now.
+
+| Mutation | Observed red |
+| --- | --- |
+| `if (!response?.successfulRequest)` → `if (false)` | T-09 › *asserts the ERROR state uses the section-level error surface (2a) and recovers on retry* |
+| removed `!this.innoDevOutputService.loading() &&` from both computeds | T-09 › *must NOT show the empty state while loading() is true (R-IUL-012, §6.5)* |
+| `[isRequired]="true"` → `"false"` | 5 red, incl. T-09 › *renders the red asterisk on the section title* and T-09 › *renders the amber invalid border and "This field is required" message when empty* |
+| `#item` → `#itemX` | T-09 › *asserts the POPULATED state projects the label with prefix correctly and itemTemplate is bound (2c)* |
+
+**Attempt 2's KZ-001 defect is confirmed closed.** `grep 'error.set'` over the spec file returns nothing — no shortcut survives. Test 2a drives `apiService.GET_Results` → real `main()` → real branch, and asserts rendered DOM. Falsifier 1 proves the check is load-bearing.
+
+### Reviewer FAIL — full findings, verbatim in substance
+
+**Issue 1 (BLOCKING) — widening `loadFailed` turns an options-list HTTP failure into silent, unrecoverable loss of the user's unsaved work across the whole section.**
+
+`loadFailed = computed(() => this._loadFailed() || this.innoDevOutputService.error())` feeds three pre-existing consumers built on a narrower contract:
+1. the whole-page render gate (`.component.html:5-10`) — the entire section unmounts;
+2. `saveData()`'s PATCH guard (`.component.ts:651`) — fails **silently**, no toast;
+3. `app-navigation-buttons` (`.component.html:322`), which sits **outside** the `@if`/`@else` and stays rendered and enabled in the error state.
+
+The pre-existing behavior was safe only because of DD-11's invariant, stated in the file's own comments at `:201-205` and `:614-618`: `loadFailed` meant *the section's own GET failed*, so `body()` held nothing the user authored. The widening breaks that premise — `loadFailed` can now be `true` while the section GET **succeeded** and `body()` holds live unsaved edits.
+
+**Reachability: reachable** (KZ-008, sequence constructed not hypothesized): open an editable result (GET resolves, form renders) → the picker's options request (issued at service construction *and* at every `app-select` mount, `limit: 10_000`, the heaviest request on the page) → user edits justification or an actor row, unsaved in `body()` → that request fails (timeout / 502 / token blip) → `error.set(true)` → `loadFailed()` flips → the whole section is replaced by *"The Innovation Use section could not be loaded"* although it loaded fine → **Save is a silent no-op**, **Next navigates away and the edits are gone, unwarned** (the pre-existing committed test at `.spec.ts:1556` documents navigation-without-save while `loadFailed()`) → nothing on screen clears it: `getData()` is the only reset, reachable only from a `?version=` change or `saveData()`'s success branch, which can no longer run.
+
+*Violated rule:* `requirements.md` → **R-IUL-003, Scenario "Empty and required"**: *"BUT it must NOT block typing, saving a draft, or navigating away"* + its note *"it does not add a save-time rejection"*. Also `design.md` **§6.5**, which enumerates the only sanctioned coupling between the options list and the UI (`disabled`) and authorizes none into the save gate or page render gate.
+
+*Remediation (Reviewer's):* revert `loadFailed` to a plain signal (drop `_loadFailed` and the rename churn), drop `getData()`'s `error.set(false)` reach-in, and render `@if (innoDevOutputService.error())` **inside the new card** with the same banner markup/tokens/message shape — satisfying R-IUL-012's "existing error surface" without collapsing the page. Keep `app-select` **mounted** in the error branch so `ngOnInit → loadData → main()` still supplies a re-entry retry, and make the error tooltip distinct (with `list() === []` and `loading() === false` the current `innoDevTooltip()` would announce *"There are no reported Innovation Development outputs to link."* on a **failed** load, collapsing two of R-IUL-012's four required-distinct states into one).
+
+**Issue 2 — test 2a's "recovers on retry" half exercises a transition the product cannot perform.** It proves recovery by calling `component.getData()` directly; from the state it arranged, no user-reachable control invokes `getData()` (form unmounted, `saveData()` guarded off, version watcher needs a query-param change) while the banner reads *"Please try again"* with no retry affordance. Detection is genuinely proven; **recovery is not**. *Violated rule:* `client/research-indicators/src/CLAUDE.md` KZ-015 (*"arrange the TRANSITION the product performs, not the end state"*) + root `CLAUDE.md` KZ-017 — the region the check cannot inspect is undeclared; T-09's `Cannot prove` names only spacing/alignment/contrast/dark theme.
+
+**Issue 3 — two of four changed files fail `prettier --check`.** Trailing whitespace on new blank lines, including in a production service. *Violated rule:* root `CLAUDE.md` §4.3 *"Lint/format: `npm run lint` in each package (eslint + prettier)"*. *Remediation:* `npx prettier --write` on the two files, then re-check all four.
+
+**Issue 4 — R-IUL-002's clauses are assigned to T-09, neither asserted nor declared out of reach.** The wiring is present and correct (`serviceName="innoDevOutput"` → `GET_Results({'indicator-codes': [2]})`), so this is an unrecorded coverage gap, not a defect. *Violated rule:* `tasks.md` §3 preamble + §4 (closure at clause granularity). *Remediation:* assert the request carries `indicator-codes: [2]` with no user/center/contract filter, and record the server-side residue (`is_active`, `result_status_id`) in `Cannot prove`.
+
+### Questions the Reviewer resolved CLEAN (do not re-litigate)
+
+- **Q1 envelope check is real.** `ToPromiseService.TP` (`to-promise.service.ts:21-36`) sets `successfulRequest: true` in `map` on success and returns `[{ ...error, successfulRequest: false, errorDetail: error?.error }]` in `catchError`; RxJS treats that array as a one-element ObservableInput so `firstValueFrom` resolves to **the object**. `GET_Results`'s `unwrapV2ResultsResponse` (`api.service.ts:379-406`) spreads `{ ...raw, data: … }` and **preserves** the flag. Never `undefined` on success. Attempt 2's inert-`try/catch` class is closed.
+- **Q5 NFR-IUL-003 stayed closed.** No hex literal in any new code; both `text-[var(--ac-grey-800)]` usages intact. `text-red-500` is the section's existing utility. The `#e69f00` in the spec asserts the *shared* control's pre-existing inline style, which §6.2's C15 note records as inherited.
+- **Q6 placement/shell.** Class string byte-identical to siblings and to §6.1's frozen string; `section-title`; DD-11 asterisk; nothing moved out of the details card; no `grid` introduced.
+- **Q7 bindings.** All match §6.2/§6.5. `innoDevOutput` is a valid `ControlListServices` member (`services.interface.ts:35`) resolving to `GetInnoDevOutputService` (`service-locator.service.ts:203-204`). `hideSelected` stays `true`. `formatInnovationDevLabel` satisfies R-IUL-004/§6.3's null-platform fallback without printing `null` or hard-coding `STAR`.
+
+### ADVISORY (recorded, never gates, never becomes a task in this spec)
+
+- **RELIABILITY** — `getData()` mutating `innoDevOutputService.error` is a page reaching into a root singleton's private state; `main()` already resets it at `:25`.
+- **READABILITY** — the doc comment at `.component.ts:201-205` now sits above two declarations and describes only `_loadFailed`, while reading as documentation of the rendered `loadFailed`. Re-anchor whatever survives.
+- **READABILITY** — the new `describe('T-09 — The picker…')` block is nested inside `describe('… R3: contrast, measured …')`. Green, but misleading placement; a sibling top-level describe would be clearer.
+- **RISK** — the amber-border test asserts the literal `#e69f00` from `select.component.html:20`. Correct today, but couples this spec to the shared control's inherited literal: a future tokenization of `SelectComponent` reddens a test in an unrelated feature's file. A comment naming the coupling would save that investigation.
+- **READABILITY** — three pre-existing page-wide `not.toContain('This field is required')` assertions were rescoped to the details card. Correct and unavoidable, honestly commented, but now weaker: they no longer guard a stray required message elsewhere on the page.
+- **READABILITY** — `formatInnovationDevLabel` is exported from the page component file and already labelled `T-09 / T-10`; `@utils/` is the more natural home before it acquires a second caller.
+- **RISK (scope)** — the prettier reflow of unrelated template text and of `quantificationsView` / `buildPayload` inflated a 4-file diff by several hundred lines. It moved both files *toward* repo standard (`prettier --check` now passes on them) so it is acceptable normalization, but it made the audit surface far larger than T-09's actual change; a separate formatting commit would have been cheaper to review.
+
+### Leader adjudication — this HALT also carries a genuine spec defect
+
+The three FAILs are **not** three attempts at the same misunderstanding, and that pattern is itself evidence:
+
+- Attempts 1 and 2 failed on the **error state**, which R-IUL-012 requires but which `design.md` never specifies a *surface* for beyond the phrase *"the section's existing error surface is used"*.
+- Attempt 3 implemented that phrase **literally** — the section's existing error surface *is* the page-level `loadFailed` gate — and the literal reading produces the data-loss path in issue 1.
+
+So R-IUL-012 and R-IUL-003 conflict under R-IUL-012's plain text: one says reuse the section's existing error surface, the other says never block saving a draft or navigating away. The Reviewer found a reading that satisfies both (same banner markup, scoped inside the new card), but **that reading is not what R-IUL-012 says**, and no design decision records it. A fourth attempt against unchanged text would be a fourth guess at an ambiguity the spec never resolved.
+
+**This is Pivot Protocol territory, not just a rework ceiling.** Per the Pivot rules the Leader does not amend `requirements.md`/`design.md` without explicit user approval, so no spec text has been touched.
+
+### Rollback deliberately withheld
+
+Step 4's automatic rollback (`git restore .` + `git clean -fd`) exists so a HALT does not leave **broken** code for the user. That rationale does not hold here: the suite is 6909/6909 green, `tsc` delta is 0, lint passes, and the defect is a design-level coupling, not a breakage. Against that, the rollback is irreversible for 468 lines of uncommitted work that is largely correct — and the Reviewer's own remediation is ~15 lines.
+
+Preserved either way: the full attempt-3 diff is saved at
+`…/scratchpad/T-09-attempt3.diff` (924 lines), so a restore remains recoverable.
+The four files remain modified in the working tree. **Nothing committed, nothing pushed.**
+
+### State after this HALT
+
+| Task | State |
+| --- | --- |
+| T-01, T-02, T-03, T-08, T-14 | `[x]` |
+| **T-09** | **`[~]` HALT — 3 of 3 attempts spent, blocking issue + spec ambiguity** |
+| T-04, T-05, T-06, T-07 (server) · T-10, T-11, T-12 (client) · T-13 (docs) | `[ ]` |
+
+**5 of 14 `[x]`.** The client lane below T-09 (T-10, T-11, T-12) is blocked on it by the §2 dependency graph. **The server lane T-04…T-07 is independent and unblocked** — §2 states the lanes do not wait on each other.
