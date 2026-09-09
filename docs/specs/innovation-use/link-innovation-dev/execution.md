@@ -1793,3 +1793,7 @@ Recorded as **§5 R-6** in `tasks.md`. The ceiling exists to stop repeated attem
 ### Status
 
 T-09 stays **`[~]`**. No code was written or reverted in this Pivot — only spec text. **Execution is stopped pending the user's explicit approval of the amendment above** (Pivot Protocol step 4).
+
+### ✅ Pivot approval — Amendment 03 approved by the user, 2026-09-09
+
+*"Apruebo, reanuda T-09."* Pivot Protocol step 4 satisfied. Execution resumes at **T-09 attempt 1 of the restored budget** (§5 R-6), against the corrected §6.8 / DD-12 text. Client lane → Antigravity via `/orchestration`, per the user's standing ruling.
