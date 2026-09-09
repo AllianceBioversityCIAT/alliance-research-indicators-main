@@ -1810,3 +1810,75 @@ That is exactly the chain that produced this HALT, and it went one step further 
 
 1. The `/akili-execute` rules say an advisory *"is recorded and dies there"* and that a serious one must be **restated as a spec-violation FAIL or escalated via the Pivot Protocol**. Attempt 2 did neither: it invented a third disposition — *"a design-level call for T-12 or the user"* — which is not one of the available outcomes. A deferral to a later task is a **forward pointer**, and forward pointers are only carried if the later brief carries them. This one was carried into the *wrong* task's brief, as an instruction.
 2. The Reviewer's reasoning was sound at the time (*"R-IUL-012:379 literally prescribes it, so it is not a violation"*) — and this is the tell. When a Reviewer has to reason *"the spec literally requires the harmful thing, so it is not a violation"*, that conclusion is itself Pivot evidence. The correct disposition was to stop and escalate the spec, not to pass the implementation and file the harm as advice.
+
+---
+
+## T-09 — Amendment 03 attempt 1 (restored budget): worker delivered, Leader measured, ONE GAP FOUND
+
+**Date** 2026-09-09 · **Executor** Antigravity `gemini-3.1-pro-high` (confirmed on-screen) via Orca orchestration · Run `run_fbd304fd85e8`, task `task_4cdc4b6852c6`, dispatch `ctx_5b75c219ee32`, terminal `term_fdc5dfcb` (**closed after collection**, per the user's standing instruction)
+
+### Transport — the false negative recurred exactly as B-6 predicts
+
+`orchestration dispatch --inject` returned **`agent_prompt_stalled`** again. Per B-6 neither signal was trusted: reading the terminal proved the prompt **had** landed (the worker loaded both skills and began reading the spec). `worker-release` later returned `state: retained, reason: no_owned_resource` — the dispatch never owned the terminal, so `terminal close` was the correct teardown (`ptyKilled: true`). **All five dispatches in this Run report `failed` while one of them ran to completion**; dispatch state is unusable as a liveness or outcome signal on this path.
+
+**The report was recovered, and the method matters.** The worker printed its report as instructed, but agy's TUI repaint made the accumulated stream unreadable (`orca terminal read` default `source: stream` returns stacked fragments — *"Genering...."*). Recovery: one `terminal send` asking it to write the report **verbatim to a known path** with the Write tool. Writing to a file is not the failure attempt 3 had — attempt 3 wrote to a path nobody knew. **Next brief should say: print the report AND write it to a named path.**
+
+### Worker's self-report — honest, and it declares the gap itself
+
+| Field | Reported |
+| --- | --- |
+| Suites / tests | 317 / 317, **6910 / 6910** |
+| Coverage | 98.25 / 96.26 / 97.99 / 98.53 |
+| `tsc` count | 934, delta **0** |
+| prettier | all four pass (fixed via `--write`) |
+| **Falsifiers F1–F6** | **ALL SIX "NOT RUN (Reasoned only)"** |
+
+> **Not Done (verbatim):** *"I did not manually execute the falsifier mutations (F1-F6) to observe them go RED. T-10 (the page-owned card) and T-12 (human visual checklist) are outstanding."*
+> **Assumptions (verbatim):** *"I assumed that providing the new save-path test logic and ensuring the test suite passes was sufficient for the code modification phase. I assumed the mock data used in the tests accurately reflects the backend contracts."*
+
+Credit where due: the worker was asked point-blank whether it ran them or only reasoned, and it said **NOT RUN** six times rather than claiming a red it had not seen. That is the K-004 discipline working at the reporting layer. It is still incomplete scope — a `Not Done` field means the task cannot reach `[x]` regardless of any PASS.
+
+### Leader measurements — in isolation, worker terminal CLOSED first
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6910/6910 tests PASS**; coverage 98.25 / 96.26 / 97.99 / 98.53 — matches the worker's figures exactly |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline, delta 0**; `out-tsc` absent |
+| `npm run lint -- --quiet` | All files pass |
+| `npx prettier --check` (4 files) | **All four pass** — attempt-3 issue 3 is closed |
+
+**Note on the worker's own `tsc` measurement.** It ran `npx tsc … | grep -E 'innovation-use-details\.component\.(ts|spec\.ts)'` and separately `| grep -c "error TS"`. The first is a **K-014 filtered view** that cannot see the total; the second is a bare count over possibly-failed output. Its reported 934/delta-0 happens to match the Leader's independent measurement, so the number stands — **but it stands on the Leader's run, not the worker's.**
+
+### The remediation is correct on every point Amendment 03 specified
+
+Verified by reading the file, not the diff summary:
+
+- `loadFailed = signal(false)` at `:210` — **plain signal restored**; `_loadFailed` and its rename churn are gone; call sites back to `this.loadFailed.set(...)`.
+- `innoDevOutputService.error.set(false)` reach-in in `getData()` — **gone**.
+- The error branch renders **inside** the RELATED card and is a **faithful reuse** of the section's existing affordance: same flex/gap/border/bg structure, same `material-symbols-rounded` `error` icon, same `--ac-red-1` / `--ac-grey-100` / `--ac-grey-800` tokens, same message shape (*"The Innovation Development outputs could not be loaded. Please try again."* against the page banner's *"The Innovation Use section could not be loaded. Please try again."*), with only padding/margin reduced for nesting. `--ac-red-1` confirmed to exist in `src/styles/colors.scss:47` (light `#cf0808`) and `:155` (dark `#ff4d4d`).
+- `app-select` sits **outside** the `@if`, so the control **stays mounted** in the error state — §6.8's retry path is intact.
+- `isInnovationDevDisabled` now includes `error()`; `innoDevTooltip` carries `&& !error()`.
+- **No hex literal in any added line** (NFR-IUL-003 holds).
+
+### Falsifiers — Leader-executed, discharging the worker's declared K-004 debt
+
+Each mutation applied, suite run on the single spec file, then restored. Final diffstat re-verified identical to the worker's state (110 / 391 / 75 / 10 — 481 insertions, 105 deletions).
+
+| # | Mutation | Observed |
+| --- | --- | --- |
+| **F1** | drop `!loading()` from both computeds | ✅ 1 red — *must NOT show the empty state while loading() is true* |
+| **F2** | **compose the picker error back into `loadFailed` (the DD-12 violation)** | ✅ **3 red**, incl. *with error() true, a draft save still issues its PATCH and the section stays mounted (save-path falsifier)* and *ERROR state … keeps the control mounted* |
+| **F3** | `[isRequired]="true"` → `"false"` | ✅ 5 red, incl. the asterisk and amber-border/required-message specs |
+| **F4** | `if (!response?.successfulRequest)` → `if (false)` | ✅ 2 red — the error-state spec **and** the save-path spec |
+| **F5** | `#item` → `#itemX` | ✅ 1 red — the populated-label spec |
+| **F6** | drop `&& !this.innoDevOutputService.error()` from the empty condition | ❌ **NO RED — 196/196 still passed** |
+
+**F2 is the amendment's payoff.** DD-12 is now enforced by a test rather than by a comment: reintroducing attempt 3's data-loss coupling reddens the save-path spec immediately. That was the entire purpose of adding it, and it works.
+
+**F6 is a genuine finding, and the mutation was proved to land** (per K-014 — a no-op mutation would have produced the same green and meant nothing): the guard occurrences went **2 → 1** and `git diff --stat` confirmed the file changed, yet the suite stayed fully green. So the **implementation** of the error-vs-empty distinction is correct and present, but **no test asserts it**. Nothing would catch a future edit that drops the guard and starts telling users *"There are no reported Innovation Development outputs to link."* on a failed load.
+
+This clause is not optional decoration: it is one of Amendment 03's four error clauses, it is listed in §4's closure row for R-IUL-012, and T-09's own FALSIFIER block states it *"must go red"*. §7's Done definition requires **every** falsifier in §3 observed red at least once. **5 of 6 discharged; F6 outstanding.**
+
+### Status
+
+T-09 stays **`[~]`**. Two reasons, either sufficient on its own: the worker's `Not Done` field is unresolved, and F6 cannot fail. Remainder owed: **one test** asserting the empty-state tooltip is suppressed while `error()` is true, so F6 reddens. Being client work, it is delegated to Antigravity per the standing ruling — not written by the Leader.
