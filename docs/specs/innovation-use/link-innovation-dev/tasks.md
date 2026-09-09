@@ -12,6 +12,7 @@
 | Task count | **14** (budget said 12; +1 for the doc-sync task that had no home, +1 for Amendment 02's fixture repair — see §6) |
 | **Amendment 01** | **2026-09-09** — user mock ([`mockup/`](mockup/)). Rescopes **T-08, T-09, T-10, T-11**; adds no task. Own section card, platform-prefixed label, `View innovation detail` action, no remove control. **Server lane T-01…T-07 unaffected** apart from `platform_code` in T-07's projection |
 | **Amendment 02** | **2026-09-09**, mid-execution, **user-approved**. Three verification-text corrections + one new task, all from defects found *while executing*: T-08's verify line emitted into `out-tsc` and disarmed T-12's gate; T-03's falsifier clause was unsatisfiable as written; §7's *"Server suite green"* could not see the fixture suite where T-03 lives. Adds **T-14** to repair the two sibling fixture files Migration B retroactively broke. **No requirement and no design decision changes** — this corrects verification text and closes an unowned consequence |
+| **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed at attempt 3 of 3. Root cause was a **spec gap, not three bad implementations**: R-IUL-012 required an error state and `design.md` draft 2 specified no error surface for it, so the only referent was the page-level `loadFailed()` gate — and the literal reading is a reachable silent-data-loss path. Rewrites **R-IUL-012's error clause**, adds **`design.md` §6.8 + DD-12**, and **rescopes T-09** (clauses, falsifiers, Cannot-prove, Done) against the corrected text. **T-09's attempt budget is restored to 3** — see §5 R-6. Adds no task; no other task changes |
 | Created | 2026-09-09 |
 
 ---
@@ -331,7 +332,7 @@ hundreds of type errors behind a report of three. Confirm the file parsed.
 | Size | M |
 | Depends on | T-08 |
 | Requirements | R-IUL-002, R-IUL-003 (all clauses), R-IUL-012 (all four states), **R-IUL-013** |
-| Design | §6.1, §6.2, §6.5, §6.6, DD-11 |
+| Design | §6.1, §6.2, §6.5, **§6.8 (Amendment 03)**, §6.6, DD-11, **DD-12 (Amendment 03)** |
 | Skills | `angular-developer`, `ui-ux-pro-max` |
 
 **Scope (Amendment 01).** Create a **new sibling card** titled `RELATED INNOVATION DEVELOPMENT`,
@@ -350,16 +351,45 @@ the list and the collapsed value match T-10's card exactly (precedent:
 `innovation-details.component.html:390-394`). `disabled` per design §6.5:
 `!submission.isEditableStatus() || (!loading() && list().length === 0)`.
 
+**The error state — rescoped by Amendment 03, and this is the clause three attempts died on.**
+Implement `design.md` **§6.8** exactly. `GetInnoDevOutputService` gains `error = signal(false)`, set
+from the **envelope** (`if (!response?.successfulRequest)`), never from a `try/catch` — a rejection
+never arrives, and §6.8's callout carries the measured proof. The error renders **inside this card**,
+reusing the section's error affordance, and is wired to **nothing outside it**.
+
+> **Do NOT compose it into `loadFailed()`.** DD-12 rejects that explicitly. It unmounts the whole
+> section, makes *Save* a silent no-op and lets *Next* discard unsaved edits (R-IUL-003 violation).
+> Attempt 3 did exactly this **because its brief instructed it to** — the instruction was wrong, and
+> Amendment 03 is that correction. Leave the control **mounted** in the error branch: §6.6's mount
+> lifecycle is the only retry path, so unmounting makes the error sticky for the session.
+
 **Clauses:** card between the right siblings (R-IUL-013) · nothing moved out of the details card ·
 red asterisk · amber border · "This field is required" · **must NOT** block draft save or navigation ·
-**must NOT** show the empty state while `loading()` is true · **must NOT** nest inside the details card.
+**must NOT** show the empty state while `loading()` is true · **must NOT** nest inside the details card ·
+**error surfaces inside the card** · **error MUST NOT reach `loadFailed()`, `saveData()`'s guard or the
+navigation buttons** · **error MUST NOT show the empty-list tooltip** · **control stays mounted in the
+error state** · the Empty state's condition carries `&& !error()` so the two states cannot collapse.
 
-**Verify.** `npm test -- --silent`
+**Verify.** `npm test -- --silent` · `npx tsc -p tsconfig.spec.json --noEmit` (baseline **934**, delta
+must be **0**; `--noEmit` is mandatory per Amendment 02) · `npx prettier --check` on every touched file.
 **FALSIFIER.** Drop the `!loading()` guard → the "no empty state during load" spec must go red.
 Remove `isRequired` → the asterisk/message specs must go red.
+`#item` → `#itemX` → the populated-label spec must go red.
+`if (!response?.successfulRequest)` → `if (false)` → the error-state spec must go red. **This one is
+mandatory**: it is the exact falsifier attempt 2 could not survive, and its red is what distinguishes
+a real envelope check from KZ-001's mock-driven green.
+Drop the `&& !error()` term from the Empty condition → the "error is not the empty state" spec must go red.
+**A save-path falsifier is required too**: assert that with `error()` true a draft save still issues its
+PATCH and the section stays mounted. Composing the error into `loadFailed()` must turn that spec red —
+that is what makes DD-12 enforced by a test rather than by a comment.
 **Cannot prove.** Spacing, alignment, contrast, dark theme — jsdom measures no layout. Those are
-**T-12's human check**, recorded here as a declared gap, not silently assumed.
-**Done.** Control renders in all four states; falsifiers observed.
+**T-12's human check**, recorded here as a declared gap, not silently assumed. R-IUL-002's
+`is_active` / `result_status_id` predicates are **server-side** properties of `GET /v2/results` and no
+client test can reach them; assert only that the request carries `indicator-codes: [2]` with no
+user/center/contract filter, and treat the rest as declared out of reach *(Amendment 03, closing the
+gap the attempt-3 audit found in §4)*.
+**Done.** Control renders in all four states, each with its own assertion; the error state is proven
+card-scoped by the save-path falsifier; falsifiers observed red.
 
 ---
 
@@ -455,6 +485,9 @@ instead of its serialization would let that swap pass**, because the difference 
 and the **human visual check that no automated gate in this repo can perform**.
 
 **Visual checklist — against the running app, screenshotted:** field position at the end of the card ·
+**the picker's error state (Amendment 03 / §6.8): with the options request forced to fail, the error
+renders inside the RELATED card, the rest of the section stays visible and editable, a draft save
+still succeeds, the empty-list tooltip is absent, and leaving + re-entering the section clears it** ·
 vertical rhythm vs the blocks above · asterisk + amber border + message · card layout with a long
 title · new tab actually opens the right result · keyboard focus visible on the anchor and the remove
 button · **light *and* dark theme** (the module's 2026-09-09 QA sign-off covered light only —
@@ -582,7 +615,7 @@ expects `FALSE` documented in-file with the reason.
 | R-IUL-009 | Rule 16; No grandfathering; all `MUST NOT` clauses | T-02 (shape), **T-03 (behavior)**, **T-14 (regression protection of rules 2–15 after the retroactive break)** |
 | R-IUL-010 | Seed; the enum-not-literal clause | T-01 |
 | R-IUL-011 | Ordering; the ANSI `BUT` clause | §5 runbook + T-01 |
-| R-IUL-012 | All four states; the enabled-but-empty `BUT` | T-09 |
+| R-IUL-012 | All four states; the enabled-but-empty `BUT`; **Amendment 03's four error clauses — card-scoped, distinct from empty, never blocking save/navigation, control stays mounted** | T-09 |
 | NFR-IUL-001 | Refresh policy | design §6.6 (stated) + T-09 |
 | NFR-IUL-002 | Keyboard; `rel=noopener`; **AT discoverability** | T-10, T-12 |
 | NFR-IUL-003 | Tokens; dark theme | T-10, T-12 |
@@ -604,6 +637,7 @@ as covered.
 | **B-4** | Concurrent-PATCH race → two active rows. **Accepted**, not mitigated (design §3.2) | Recorded |
 | **B-5** | If T-05's cycle resists `forwardRef`, fall back to direct repository access — only after running T-05's falsifier | Claude |
 | **B-6** | The Orca `agent_prompt_stalled` false negative may mask a *genuine* worker failure. A silent worker is still a runtime failure; verify by reading the terminal, not by trusting either signal | Claude |
+| **R-6** | **T-09's attempt budget is restored to 3 by Amendment 03**, and this is a deliberate exception to the 3-attempt ceiling, recorded rather than quietly taken. Grounds: attempt 3's blocking FAIL was for behavior its **own brief instructed** — the attempt-2 Reviewer had ruled the page-level routing *"not a violation… R-IUL-012:379 literally prescribes it"* and routed it as a design-level advisory, and the Leader then hardened that into the brief (`execution.md:1100`). Three attempts were spent guessing at a clause the spec never specified. The ceiling exists to stop repeated attempts at the *same* misunderstanding; here the misunderstanding was **in the text**, and the text is now fixed. **The restored budget is contingent on the corrected text** — a FAIL against §6.8/DD-12 as now written is an ordinary FAIL and the ceiling binds normally | Leader (user-approved 2026-09-09) |
 
 ---
 

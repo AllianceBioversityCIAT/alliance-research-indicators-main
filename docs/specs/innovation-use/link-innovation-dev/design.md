@@ -11,6 +11,7 @@
 | Approval Mode | pre-approved — Phase 2 gate **auto-approved (pre-approved mode)**, 2026-09-09 |
 | Design agent | Inline (no subagent). Review delegated: 2 blind judges, Fable + Sonnet |
 | **Amendment 01** | **2026-09-09**, post-Phase-3, from a user-supplied mock ([`mockup/`](mockup/)). Own section card; platform-prefixed label; a labelled "View innovation detail" action instead of a whole-card link; no remove control. **Client-only, plus one added read field.** Revises §4.1, §6.1, §6.3, §6.4, DD-6, DD-7; adds DD-11 |
+| **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed. Draft 2 specified **no** error surface for the picker at all, while `requirements.md` R-IUL-012 required an error state — the gap that caused three consecutive T-09 failures. **Adds §6.8 and DD-12**; adds one cross-reference to §6.5. No other section changes, and the wire contract (§4.1) is untouched |
 | Created / revised | 2026-09-09 |
 
 ---
@@ -337,6 +338,10 @@ that file hardcodes `[disabled]="true"` unconditionally. Specified concretely in
 - **The `!loading()` guard is required**: `list` starts `[]` with `loading = true`, so omitting it
   shows the "no results" state on every single section entry.
 - Empty-list tooltip: *"There are no reported Innovation Development outputs to link."*
+- **The empty state is not the error state** — see §6.8. A failed options request also leaves
+  `list()` empty with `loading() === false`, so a `disabled` computed that reads only those two
+  signals cannot tell the two apart. §6.8's error signal is what separates them, and the empty-list
+  tooltip above **must not** be shown for a failed load *(Amendment 03)*.
 
 ### 6.6 Options freshness (C2 — NFR-IUL-001's `MUST`)
 
@@ -363,6 +368,76 @@ R-IUL-008:
 **This field follows the second.** `buildPayload()` emits `undefined` when untouched, the id when
 selected, and an **explicit `null`** when cleared. Copying the `?? undefined` pattern from the same
 file would make clearing a silent no-op.
+
+### 6.8 The error state — card-scoped, never page-scoped (**Amendment 03**)
+
+Draft 2 specified no error surface for the picker. R-IUL-012 required one, so T-09's implementer had
+to infer it, and the only existing referent — the page-level `loadFailed()` gate — is the wrong one.
+This section closes that gap normatively.
+
+**The signal.** `GetInnoDevOutputService` exposes `error = signal(false)` alongside `list` and
+`loading`. `main()` sets it from the **envelope**, not from a rejection:
+
+```ts
+const response = await this.api.GET_Results({ 'indicator-codes': [2] });
+if (!response?.successfulRequest) {
+  this.error.set(true);
+} else {
+  this.list.set(response?.data?.results ?? []);
+}
+this.loading.set(false);   // must run on BOTH paths
+```
+
+> **A `try/catch` here is inert, and this is measured, not assumed.** `ToPromiseService.TP`
+> (`to-promise.service.ts:21-36`) maps success to `successfulRequest: true` and, in `catchError`,
+> returns `[{ ...error, successfulRequest: false, errorDetail: error?.error }]`. RxJS treats that
+> array as a one-element `ObservableInput`, so `firstValueFrom` **resolves** to the object — it never
+> rejects. `GET_Results`'s `unwrapV2ResultsResponse` (`api.service.ts:379-406`) spreads
+> `{ ...raw, data: … }` and therefore preserves the flag. T-09 attempt 2 shipped a `try/catch` that
+> could never fire and passed review only because a mock called `error.set(true)` directly (KZ-001).
+> The envelope check is the only detection that works.
+
+**The surface.** The error renders **inside the `RELATED INNOVATION DEVELOPMENT` card**, reusing the
+section's existing error affordance — same message shape, same tokens, no new invalid style — and it
+is wired to **nothing outside that card**. Specifically it **MUST NOT** be composed into
+`loadFailed()`.
+
+**Why not `loadFailed()`** — the coupling is not merely inelegant, it is a data-loss path.
+`loadFailed()` feeds three consumers that were built on a narrower contract, documented in that
+file's own comments at `:201-205` and `:614-618`: *a failed GET leaves `body` untouched, so there is
+nothing of the user's to lose.*
+
+| Consumer | Effect if the picker's failure reaches it |
+| --- | --- |
+| the whole-page render gate (`.component.html:5-10`) | the **entire** section unmounts, although its own GET succeeded |
+| `saveData()`'s PATCH guard (`.component.ts:651`) | *Save* becomes a **silent** no-op — no toast, no explanation |
+| `app-navigation-buttons` (`.component.html:322`) | sits **outside** the `@if`/`@else`, so it stays enabled and *Next* **discards unsaved edits unwarned** |
+
+Reachable in six steps (KZ-008 — constructed, not hypothesized): open an editable result → the
+section GET resolves and the form renders → the user edits the justification or an actor row, unsaved
+in `body()` → the picker's options request (issued at every control mount per §6.6, `limit: 10_000`,
+the heaviest request on the page) times out → the section is replaced by *"could not be loaded"* →
+*Save* does nothing and *Next* loses the edits.
+
+**Recovery.** The control stays **mounted** in the error state, rendered disabled beside the error
+text. §6.6's mount lifecycle (`SelectComponent.ngOnInit → initializeService → loadData → main()`) is
+then the retry path: leaving and re-entering the section re-runs the request and `main()` clears the
+flag at its first line. **No bespoke retry button, and no page-level reset.** Unmounting the control
+in the error branch would remove the only retry path and make the error sticky for the session — the
+service is `providedIn: 'root'`.
+
+**Four distinct states, four distinct surfaces** (R-IUL-012):
+
+| State | Condition | Surface |
+| --- | --- | --- |
+| Loading | `currentResultIsLoading()` | the section's existing skeleton; no `p-select` |
+| Empty | `!loading() && list().length === 0 && !error()` | control disabled + *"There are no reported Innovation Development outputs to link."* |
+| Populated | a link is set | the page-owned card of §6.3 |
+| **Error** | `error()` | card-scoped error text + the control mounted-but-disabled. **Never** the empty-state tooltip |
+
+The `!error()` term in the Empty row is load-bearing: a failed load also yields
+`list() === [] && loading() === false`, so without it the two states collapse into one and the UI
+tells the user there is nothing to link when in fact the request failed.
 
 ---
 
@@ -424,6 +499,7 @@ verify their own scope; the Leader re-measures the full suite after each worker 
 | **DD-8** | No backfill; rule 16 applies retroactively | Direct user ruling (OQ-1) | A cut-off clause |
 | **DD-9** | **New (C7).** `forwardRef` on both the module import and the service injection | `ResultsModule` already imports `ResultInnovationUseModule`, so this edge closes a cycle. Precedent: `link-results.service.ts`, `result-oicr.service.ts` | Naive import (boot failure); direct repository access (kept as the §5.3 fallback) |
 | **DD-10** | **New (C10).** Migration B is verified against a scratch schema before it is applied anywhere shared | A failed `CREATE` after a successful `DROP` leaves **no function at all** — worse than a closed gate | Applying straight to Dev |
+| **DD-12** | **New (Amendment 03).** The picker's load error is **card-scoped**; it is never composed into the page-level `loadFailed()` | Draft 2 named no error surface, so "the section's existing error surface" resolved to the page gate — whose three consumers (page render, `saveData()`'s guard, the navigation buttons outside the `@if`) turn a dropdown's HTTP failure into a silent loss of the user's unsaved work, violating R-IUL-003. The card-scoped surface satisfies R-IUL-012 without touching the save path | Widening `loadFailed()` (**rejected — the data-loss path above**); a page-level banner above all cards (rejected — same unmount consequence, and it misattributes the failure to the section); failing silently (rejected — R-IUL-012 requires a defined error state) |
 | **DD-11** | **New (Amendment 01).** The required asterisk sits on the **section title** — `RELATED INNOVATION DEVELOPMENT *` — because the mock gives the control no field label to carry one | The user's ruling was explicit that the field is required with the section's usual affordances; the mock (a *filled* state) shows no label. The amber border and "This field is required" still come from `isInvalid()` when empty. **Cosmetic and reversible — flagged for overrule at T-12's visual check** rather than blocking on a question | An invented field label above the control; dropping the asterisk |
 
 ---

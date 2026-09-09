@@ -13,6 +13,7 @@
 | Source | [`proposal.md`](proposal.md), approved 2026-09-09 with OQ-1/2/3 answered |
 | Phase 1 gate | **auto-approved (pre-approved mode)** — 2026-09-09 |
 | **Amendment 01** | **2026-09-09** — user supplied a mock after Phase 3. The field becomes **its own card** titled *RELATED INNOVATION DEVELOPMENT*, placed **below the level-stepper card**; the display format gains the platform prefix; and the selected result carries a labelled **"View innovation detail ↗"** button instead of being a whole-card link. Affects R-IUL-004, R-IUL-007, R-IUL-012 and the new R-IUL-013. **Server contract unchanged except for one added read field.** Mock: [`mockup/`](mockup/) |
+| **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed at attempt 3 of 3. R-IUL-012's error clause said only *"the section's existing error surface is used"*, which under its plain text means the page-level load-failure gate — and implementing it literally produced a reachable silent-data-loss path that violates R-IUL-003. The two requirements were in conflict. **Revises R-IUL-012's error clause only**; adds no requirement and changes no other behavior. Companion: `design.md` §6.8 + DD-12, which is the surface R-IUL-012 previously never specified |
 | Created | 2026-09-09 |
 
 ---
@@ -376,8 +377,31 @@ The control **SHALL** present a defined state for loading, empty, populated and 
 - AND IT MUST NOT show that empty state while the options request is still in flight — the list
   starts empty with `loading = true`, so a check that ignores loading fires on every section entry
 - AND when a link is set the card of R-IUL-004 is shown
-- AND when the options request fails the section's existing error surface is used
+- AND when the options request fails the failure is surfaced **inside the RELATED INNOVATION
+  DEVELOPMENT card**, reusing the section's existing error affordance — the same message shape and the
+  same tokens — and it **MUST NOT** be routed into the page-level load-failure gate *(Amendment 03)*
+- AND that error state **MUST** be visibly distinct from the empty state: the empty-list tooltip
+  *"There are no reported Innovation Development outputs to link."* **MUST NOT** be shown for a failed
+  load, because a failed load is not an empty catalog *(Amendment 03)*
+- AND a failed options request **MUST NOT** unmount the section, block typing, suppress a draft save,
+  or let navigation discard unsaved work — R-IUL-003's draft-save guarantee binds this clause
+  *(Amendment 03)*
+- AND the control **MUST** stay mounted in the error state, so that leaving and re-entering the section
+  re-runs the options request and clears the error; the retry path is the control's own mount
+  lifecycle (`design.md` §6.6), not a bespoke retry button *(Amendment 03)*
 - BUT it must NOT render an enabled, empty dropdown that looks selectable but is not
+
+> **Why the error clause was rewritten (Amendment 03, user-approved Pivot).** The original clause read
+> *"the section's existing error surface is used"* and nothing more. `design.md` specified **no** error
+> surface at all — a grep for *"error surface"*, *"error state"* and *"loadFailed"* across draft 2
+> returned **zero** matches — so the only concrete referent was the page-level `loadFailed()` gate that
+> already existed in `innovation-use-details.component.ts`. Three consecutive T-09 attempts failed on
+> this state; the third implemented the clause **literally** and thereby made an options-list HTTP
+> failure unmount the whole section, turn *Save* into a silent no-op and let *Next* discard unsaved
+> edits. That is a direct violation of R-IUL-003's *"must NOT block typing, saving a draft, or
+> navigating away"*, so the two requirements could not both be satisfied under the old text. The
+> clauses above resolve the conflict in R-IUL-003's favour — the picker's own failure is the picker's
+> own problem, and it may never cost the user work they already typed.
 
 ---
 

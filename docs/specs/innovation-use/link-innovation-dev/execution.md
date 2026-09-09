@@ -1729,3 +1729,67 @@ The four files remain modified in the working tree. **Nothing committed, nothing
 | T-04, T-05, T-06, T-07 (server) · T-10, T-11, T-12 (client) · T-13 (docs) | `[ ]` |
 
 **5 of 14 `[x]`.** The client lane below T-09 (T-10, T-11, T-12) is blocked on it by the §2 dependency graph. **The server lane T-04…T-07 is independent and unblocked** — §2 states the lanes do not wait on each other.
+
+---
+
+## ⛔ Pivot Record: T-09 — R-IUL-012's error clause was underspecified, and the literal reading is a data-loss path
+
+**Date** 2026-09-09 · **Trigger** T-09 HALT (attempt 3 of 3 FAIL, blocking issue 1)
+**User decision** *"Pivot: corregir el spec primero"* — chosen over a 4th attempt against unchanged text, over parking T-09 for the server lane, and over a rollback. **Approved the direction; the amendment text below still awaits explicit approval before T-09 resumes.**
+**ADR impact** none. No TRD architecture decision is overturned — this is a client-side surface decision internal to the spec, recorded as DD-12.
+
+### The blocker, stated as a spec defect rather than an implementation defect
+
+`requirements.md` R-IUL-012 required four UI states. Its entire specification of the fourth was:
+
+> *"AND when the options request fails the section's existing error surface is used"*
+
+**`design.md` draft 2 specified no error surface at all.** Grepping draft 2 for *"error surface"*, *"error state"* and *"loadFailed"* returns **zero** matches. So the only concrete referent in the codebase was the page-level `loadFailed()` gate that already existed in `innovation-use-details.component.ts` — and that gate feeds three consumers built on the narrower contract documented in that file's own comments at `:201-205` and `:614-618` (*a failed GET leaves `body` untouched, so there is nothing of the user's to lose*).
+
+Under the literal reading, R-IUL-012 and **R-IUL-003** cannot both hold: one directs the picker's failure into the page gate, the other says the field *"must NOT block typing, saving a draft, or navigating away"*. Three consecutive attempts failed on this one state.
+
+### The part that makes this unambiguously a Pivot and not a rework ceiling
+
+The attempt-3 Implementer **did what its brief told it to do.** The chain is in this log:
+
+1. `execution.md:1100` — the **attempt-2 Reviewer** flagged the exact blast radius, then ruled it out of bounds: *"routing a control-list failure into `loadFailed()` blanks the **entire** Innovation Use section… **This is what R-IUL-012:379 literally prescribes, so it is not a violation** — recorded because a partial surface (error text inside the RELATED card only) would degrade better. **That is a design-level call for T-12 or the user, not the Implementer's**, and attempt 3's brief fences it off explicitly."*
+2. The **Leader** then hardened that ruling into attempt 3's brief.
+3. The **attempt-3 Reviewer** FAILed attempt 3 for precisely that behavior.
+
+Both Reviewers read the spec correctly and reached opposite verdicts, because **the spec supported both readings.** Attempt 3 was FAILed for compliance with its own instruction. That is a Leader-and-spec failure, not an Implementer failure, and it is recorded here as the Leader's own error rather than left implicit — the advisory at `:1100` correctly identified that a card-scoped surface *"would degrade better"* and correctly routed the call to the user; the mistake was converting a deferred design question into a positive instruction while the question was still open.
+
+### Alternatives considered
+
+| Option | Verdict |
+| --- | --- |
+| **Card-scoped error surface** (chosen) | Satisfies R-IUL-012's four-state requirement and R-IUL-003's draft-save guarantee simultaneously. Reuses the existing affordance, so no new invalid style. ~15 lines |
+| Widen `loadFailed()` (attempt 3's behavior) | **Rejected — the data-loss path.** Recorded as DD-12's rejected alternative so a future reader cannot re-derive it as reasonable |
+| Page-level banner above all cards | **Rejected.** Same unmount consequence, and it misattributes a dropdown's failure to the whole section |
+| Fail silently (no error state) | **Rejected.** R-IUL-012 requires a defined error state; this is also what attempt 1 was FAILed for |
+| 4th attempt against unchanged text | **Rejected by the user.** It would be a fourth guess at an ambiguity the text never resolved, and R-IUL-012 would still mislead T-10/T-12 |
+
+### Revised technical direction — the amendment
+
+**`requirements.md` — Amendment 03.** R-IUL-012's single error clause is replaced by four, plus a note recording why. The failure surfaces **inside the RELATED INNOVATION DEVELOPMENT card**, reusing the section's existing affordance; it **MUST NOT** be routed into the page-level load-failure gate; it **MUST** be visibly distinct from the empty state (the empty-list tooltip may not be shown for a failed load — a failed load is not an empty catalog); it **MUST NOT** unmount the section, block typing, suppress a draft save or let navigation discard unsaved work; and the control **MUST** stay mounted so §6.6's mount lifecycle remains the retry path. No requirement added; no other behavior changed.
+
+**`design.md` — Amendment 03.** New **§6.8** ("The error state — card-scoped, never page-scoped") specifies the signal, the envelope-based detection, the surface, the three-consumer table showing why `loadFailed()` is wrong, the six-step reachability sequence, the recovery path, and a four-states/four-surfaces table whose Empty row now carries `&& !error()`. New **DD-12** records the decision with all three rejected alternatives. §6.5 gains a cross-reference stating that the empty state is not the error state. §6.8 also carries, as a measured callout, the `ToPromiseService` / `unwrapV2ResultsResponse` evidence proving a `try/catch` is inert here — so attempt 2's failure class cannot be re-derived.
+
+**`tasks.md` — Amendment 03.** T-09 is rescoped against the corrected text: Design row gains §6.8 + DD-12; a dedicated error-state paragraph carries the explicit *do not compose into `loadFailed()`* prohibition **and names that attempt 3 did it under instruction**; five clauses added; the Verify line gains `tsc --noEmit` (baseline 934, delta 0) and `prettier --check`; three falsifiers added, of which two are mandatory — the `if (false)` envelope falsifier (the one attempt 2 could not survive) and a **save-path falsifier** asserting that with `error()` true a draft save still PATCHes and the section stays mounted, which is what makes DD-12 test-enforced rather than comment-enforced. The Cannot-prove block now also declares R-IUL-002's server-side residue, closing the §4 coverage gap the attempt-3 audit found (issue 4). §4's closure row for R-IUL-012 lists the four new clauses. T-12's visual checklist gains the error state. **§5 R-6** records the restored attempt budget and its contingency.
+
+### Attempt budget — restored to 3, with the reason recorded
+
+Recorded as **§5 R-6** in `tasks.md`. The ceiling exists to stop repeated attempts at the *same* misunderstanding; here the misunderstanding was **in the text**. The restoration is contingent on the corrected text: a FAIL against §6.8/DD-12 as now written is an ordinary FAIL and the ceiling binds normally from that point.
+
+### What carries forward into T-09's next brief — MUST be copied, not pointed at
+
+1. The attempt-3 diff is **still in the working tree** (4 files, unrolled-back) and is largely correct. The remediation is a **subtraction plus ~10 template lines**, not a rewrite: revert `loadFailed` to a plain `signal(false)`, delete `_loadFailed` and its rename churn, delete `getData()`'s `innoDevOutputService.error.set(false)` reach-in, add the `@if (innoDevOutputService.error())` branch inside the card, add `&& !error()` to the Empty condition, keep the control mounted, and rescope test 2a from *"card is gone / page banner"* to *"banner inside the card, section still savable"*.
+2. **The envelope check itself is correct and must be preserved.** §6.8 now carries its proof. Do not replace it with a `try/catch`.
+3. **All four previously-observed falsifiers remain valid under this remediation** (the attempt-3 Reviewer confirmed this explicitly), so they do not need re-deriving — but they **do** need re-observing after the change, together with the two new mandatory ones.
+4. Issue 2 (test 2a's "recovers on retry" exercised a transition the product cannot perform) is resolved by the remediation itself: with the control mounted, re-entry becomes a real transition — arrange it as a remount, per KZ-015, rather than by calling `getData()` directly.
+5. Issue 3: `npx prettier --write` on `get-innovation-dev-output.service.ts` and `innovation-use-details.component.spec.ts` — the worker may fix, the Leader verifies with `--check` (§4.3).
+6. Issue 4: add the `indicator-codes: [2]` / no-filter assertion; declare the server-side residue.
+7. **Transport, still binding:** every Antigravity dispatch on this run returned `agent_prompt_stalled` with dispatch capability revoked, so `worker_done` and `heartbeat` are dead. The brief must say: print the report as plain terminal text, do **not** call `orchestration send`, and do **not** echo the report through `Bash(echo …)` — attempt 3's report was lost that way and cost this spec its falsifier evidence until this session re-derived it.
+
+### Status
+
+T-09 stays **`[~]`**. No code was written or reverted in this Pivot — only spec text. **Execution is stopped pending the user's explicit approval of the amendment above** (Pivot Protocol step 4).
