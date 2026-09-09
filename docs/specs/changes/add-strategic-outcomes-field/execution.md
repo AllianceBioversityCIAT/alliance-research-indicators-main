@@ -84,6 +84,36 @@
 
 ---
 
+### Task T-03 — Server: migration widening `alignment_validation` for Policy Change and Innovation Use
+
+- **Status:** PASS (attempt 1)
+- **Date:** 2026-09-09
+- **Requirements covered:** R-ALN-003 (behavioral change; AC.1–AC.5 verification split into T-04/T-05)
+- **Skills assigned:** `nestjs-expert` (task default, unchanged)
+- **Effort:** **xhigh** (escalated from the task default `medium` — schema-risk work on a shared SQL function gating Submit for existing production data. Tier kept at T2/Sonnet rather than escalated, to preserve author ≠ auditor against the default T3/Opus Reviewer.)
+- **Review lens mode:** **Parallel lens reviewers** (RISK + RELIABILITY), per the xhigh-effort / migration-surface trigger in `/akili-execute` §2.3.
+
+**Attempt 1:**
+- **Files changed:**
+  - `server/researchindicators/src/db/migrations/1788972162238-includeInnovationUseImpactOutcomes.ts` (new file, 294 lines). `up()` = `1783021729548-UpdateAlignmentValidation.ts`'s `up()` verbatim with exactly one line changed (`if result_indicator = 5 then` → `if result_indicator in (4, 5, 6) then`, inside the `portfolio_id = 2` branch only). `down()` = that same base `up()` body, verbatim and unchanged.
+  - `1783021729548-UpdateAlignmentValidation.ts` itself untouched (append-only migration discipline).
+- **Implementer verification (from `server/researchindicators/`):**
+  - Self-administered mechanical diff check against the true git LF blob (not the CRLF-converted disk copy — a real trap on this Windows checkout, see note below): `up()` vs base `up()` → exactly 1 differing line (the intended one); `down()` vs base `up()` → 0 differing lines.
+  - `npx eslint <path>` clean, no `--fix`. `npx tsc --noEmit` clean.
+  - Did not run `migration:run` or touch any database (correctly deferred to T-04).
+  - **Process note:** first build attempt (hand-retyping the SQL body) silently normalized CRLF→LF and stripped trailing whitespace, which would have failed the mechanical diff check with 134 spurious differing lines. Implementer caught this, discarded the attempt, and rebuilt via string-extraction + targeted single-line replace directly from the git blob — never retyped. Recorded as a real environment trap for future migration work on this checkout: reading-and-retyping is not verbatim copying here.
+- **Reviewer verdicts (2 parallel lens reviewers, both independent line-by-line comparisons against the base file — not just trusting the Implementer's self-report):**
+  - **RISK lens — `STATUS: PASS`.** "`1788972162238-includeInnovationUseImpactOutcomes.ts` copies `1783021729548-UpdateAlignmentValidation.ts`'s `up()` verbatim except the one correctly-scoped condition..., and its `down()` is a byte-exact revert to that base migration's `up()` body — satisfying design.md's DD-3 'provably unchanged' and §11 backout claims with no named-placeholder or accidental-branch-mutation risk." Also independently confirmed no newer migration supersedes `1783021729548`'s definition of `alignment_validation` (the two later `alignment_validation`-substring hits are scoped to the distinct `pool_funding_alignment_validation` function).
+  - **RELIABILITY lens — `STATUS: PASS`.** Independently verified `MigrationInterface` conformance, filename/class/timestamp convention (globbed all 312 migration files — no collision, correctly the newest), SQL logic correctness (`in (4,5,6)` triggers for exactly OICR/Policy Change/Innovation Use and no others, AC.5 satisfied structurally), balanced backticks/IF-nesting (no structural SQL risk), and no named-placeholder trap.
+  - **ADVISORY (both lenses, non-gating):** both reviewers independently flagged that `tasks.md` still showed T-03 unchecked at review time — expected pre-finalization state, not a defect; recorded so the Leader remembers evidence-before-checkbox (now being done here).
+- **Runtime note (not a review finding):** the first spawn attempt for both lens reviewers (on the default Opus/T3 wrapper model) failed to an API rate limit ("You've hit your session limit", resets 1:10pm America/Bogota) before either did any work. Per root `CLAUDE.md`'s "a delegated worker that does not deliver is not a worker that found nothing" and the Reviewer runtime-failure fallback (never inline; switch model / cross-host / waiver), both were re-dispatched on `fable` instead of `opus` — preserving author (Sonnet) ≠ auditor (Fable) — and both delivered full independent audits on retry.
+- **Requirements covered:** R-ALN-003's *code* half (the SQL branch widening) — fully implemented and reviewed. AC.1–AC.5's *behavioral proof* (does the function actually return the right boolean against real fixture rows) is explicitly T-04's job, not T-03's — T-03 only had to prove the SQL text is a correct, verbatim, single-line-scoped change, which both lenses independently confirmed.
+- **Decisions:** none beyond design.md's own (DD-2/DD-3 already covered this task).
+- **Issues encountered:** the CRLF hand-retyping trap (resolved by the Implementer before reporting); the Opus rate-limit runtime failure on both Reviewer spawns (resolved by model-switch retry).
+- **Final verification result:** PASS on both lenses — no code-level defects. **T-03 does NOT itself apply this migration to any database** — R-ALN-003's actual enforcement (blocking Submit when Impact Outcomes is empty for Policy Change/Innovation Use) remains inert until T-04 (manual verification against a disposable schema) and T-05 (Dev pre-flight count + go/no-go) clear it for Staging/Prod.
+
+---
+
 ## 3. Summary
 
 Run in progress. T-01 and T-02 executed in parallel (cross-package, safe per root `CLAUDE.md` §4.3 concurrency rule), both PASSed on attempt 1.

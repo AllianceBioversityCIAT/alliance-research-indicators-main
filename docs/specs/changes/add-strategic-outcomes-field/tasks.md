@@ -94,15 +94,15 @@ T-01 and T-02 are independent of each other and of T-03 (different tiers, no sha
   - **⚠ Named-placeholder trap (server `CLAUDE.md` §7, judgment.md C-3):** `orm.config.ts` sets `extra.namedPlaceholders: true`, so any bare `?` or `:word` — **including inside a SQL comment** — is consumed as a bind parameter and throws before MySQL parses the query, since this migration passes no parameters. If a `[SPEC ...]`-style comment is added (repo convention in this migration family), drop the colon (`[SPEC changes/add-strategic-outcomes-field]`) and don't end a comment sentence with `?`. A verbatim copy of the current body has none of these — introduce none.
   - Copy the body from the file directly (read it, don't retype from memory) — verbatim copying is the only way to guarantee the untouched branches (contract check, strategic-objectives check, non-OICR SDG requirement, Portfolio‑1 branch) are provably unchanged.
 - **Acceptance / done check:**
-  - [ ] `npm run migration:generate` naming convention followed (`<timestamp>-camelCaseAction.ts`); the migration is a new file, `1783021729548-UpdateAlignmentValidation.ts` is untouched.
-  - [ ] **Mechanical diff check (closes judgment.md S-4 and DD-3's "provably unchanged" claim):** a text diff of the new migration's `up()` SQL body against `1783021729548`'s `up()` SQL body shows **exactly one changed line**. If more than one line differs, the copy was not verbatim — stop and re-copy.
+  - [x] `npm run migration:generate` naming convention followed (`<timestamp>-camelCaseAction.ts`); the migration is a new file, `1783021729548-UpdateAlignmentValidation.ts` is untouched.
+  - [x] **Mechanical diff check (closes judgment.md S-4 and DD-3's "provably unchanged" claim):** a text diff of the new migration's `up()` SQL body against `1783021729548`'s `up()` SQL body shows **exactly one changed line**. If more than one line differs, the copy was not verbatim — stop and re-copy. (Confirmed independently by both Implementer and both Reviewer lenses.)
     - **What would fail this check:** any edit to the `portfolio_id = 1` branch, any reformatting/whitespace change to unrelated lines, any added/removed comment elsewhere in the body.
-  - [ ] `npx eslint <path>` clean (no `--fix`).
-  - [ ] Do **not** mark this task's "applied to a live environment" as done here — that is T-04/T-05.
+  - [x] `npx eslint <path>` clean (no `--fix`).
+  - [x] Did **not** mark this task's "applied to a live environment" as done here — that is T-04/T-05.
 - **Dependencies:** none (independent of T-01/T-02).
 - **Estimated effort:** S
 - **Owner:** —
-- **Status:** todo
+- **Status:** done
 - **Skills:** `nestjs-expert`
 
 ---
