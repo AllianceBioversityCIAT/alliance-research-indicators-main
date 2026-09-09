@@ -478,7 +478,7 @@ belongs to T-03 against the scratch schema and to the human applier per §11.1.
 
 | Field | Value |
 | --- | --- |
-| Status | **in rework** — attempt 1 FAIL, attempt 2 dispatched on an escalated tier |
+| Status | **in rework** — attempts 1 and 2 FAIL; **attempt 3 dispatched (FINAL — the ceiling is 3)** |
 | Date | 2026-09-09 |
 | Requirements | R-IUL-002, R-IUL-003, R-IUL-012, R-IUL-013 |
 | Design | §6.1, §6.2, §6.5, §6.6, DD-11 |
@@ -909,3 +909,367 @@ that test **must** stay green. Its silence is the correct outcome, not a gap.
 > incident, so they are SURFACED TO THE USER** rather than left buried in this log. They remain
 > advisory: the Leader may not action them, because an advisory may neither become a task nor widen
 > one. **A-7 is partly discharged by this very entry**, which links the runbook from `execution.md`.
+
+---
+
+## ⛔ Pivot Record: discovered at T-03 — Migration B breaks two committed fixture files, and the spec's Done definition structurally cannot see it
+
+**Status: STOPPED FOR THE USER.** `pre-approved` mode covers routine progress; it never absorbs a
+Pivot. No further task is dispatched against the affected surface until this is decided.
+
+### The finding
+
+T-03's Implementer, having bootstrapped the scratch schema and applied Migration B, ran the whole
+`test/fixtures/innovation-use` directory and reported 17 failures in two **already-committed** sibling
+files. **The Leader re-measured independently rather than escalating on a worker's claim:**
+
+```
+$ npx jest --config ./test/jest-fixtures.json test/fixtures/innovation-use --silent
+FAIL test/fixtures/innovation-use/innovation-use-result-creation.fixture-spec.ts
+FAIL test/fixtures/innovation-use/innovation-use-validation.fixture-spec.ts
+Test Suites: 2 failed, 15 passed, 17 total
+Tests:       17 failed, 110 passed, 127 total
+```
+
+| File | Failures | Shape |
+| --- | --- | --- |
+| `innovation-use-validation.fixture-spec.ts` | 15 (F17, F23, F26, F28, F32, F35, F38–F43) | every case whose base result has **no role-5 link** and previously returned `1` |
+| `innovation-use-result-creation.fixture-spec.ts` | 2 | both assert the green check flips to `true` **without ever creating a link** |
+
+### Why this is a spec-level gap and not a T-02 or T-03 defect
+
+**The break itself is intended.** R-IUL-009 *Scenario: No grandfathering*, user ruling OQ-1, and DD-8
+all mandate it: every pre-existing Innovation Use result goes green-check `FALSE` until linked, with
+no created-before cut-off of any kind. T-02 implemented exactly that and its review passed. T-03's own
+scope is complete and correct.
+
+**What nobody contemplated is that the retroactive break also invalidates committed *test* files** that
+encode the pre-rule-16 expectations as assertions. The spec reasons about production data throughout
+(§11.5 *Blast radius* even tells the applier to count affected rows) and never about the fixtures.
+
+**And the Done definition cannot detect it.** `tasks.md` §7 says *"Server suite green, 60% floor
+held"*, verified by `npm test`. That command's jest config sets `rootDir: "src"`, and every fixture
+lives under `test/fixtures/` matching `.fixture-spec.ts$` — collected **only** by
+`npm run test:fixtures`. So:
+
+> **The spec's own completion gate is structurally incapable of observing the breakage its own
+> migration causes.** This is KZ-017 at the level of the spec rather than a task: *a check narrower
+> than its claim returns a confident green.* `npm test` will report 358/358 green all the way to
+> archive while the fixture suite stays red.
+
+**Why it surfaced only now:** this is the **first `test:fixtures` run since Migration B landed**, and
+the pipeline never runs it (nor applies migrations — K-015). Migration B was merged at T-02 with a
+green `npm test`, exactly as the Done definition asked.
+
+### What the Leader did and did not do
+
+- **Did:** verify by independent re-measurement; confirm the failing files and counts; establish the mechanism (`rootDir` scope) rather than infer it.
+- **Did NOT:** touch either sibling file. That is not T-03's scope, and repairing them is **new work** — an advisory may never become a task, and a task absent from the approved `tasks.md` is scope the user never approved.
+- **Did NOT:** revert T-02. Its implementation is correct and reviewed; the defect is in what the spec asked for, not in what was built.
+
+### Decision required from the user
+
+| Option | What it means | Cost |
+| --- | --- | --- |
+| **A — Repair the two fixture files** | Update their expectations for rule 16: seed a valid role-5 link where the base result must stay green, and assert `FALSE` where the case is genuinely link-less. Needs a new approved task | Real work on 17 assertions; makes the fixture suite green again and keeps it a usable gate |
+| **B — Accept as a known break, record it** | The fixture suite stays red at 17/127. **The repo's own kaizen lesson argues against this:** `jest-fixtures.json` records that *"a gate that fails 1 in 3 gets ignored"* — a permanently-red gate is worse than an absent one | Cheap now, and the two files stop protecting anything |
+| **C — Amend the Done definition only** | Declare the fixture suite out of scope for §7 and state the break explicitly | Honest, but leaves the gate red under option B's objection |
+
+**Independent of A/B/C, §7's Done definition needs amending**, because *"Server suite green"* verified
+by `npm test` cannot mean what it appears to mean. Either it must name `npm run test:fixtures`
+alongside `npm test`, or it must say explicitly that the fixture suite is not part of the gate — and
+saying so would itself be a decision about R-IUL-009's coverage, since **T-03 (the only proof of rule
+16) lives in that very suite.**
+
+### Related item for the same decision
+
+The spec's **T-08 verification command corrupts T-12's** (recorded in full above): `tasks.md` T-08
+mandates `npx tsc -p tsconfig.spec.json`, which emits into `out-tsc/spec` because that is the
+tsconfig's `outDir`, and `jest.config.ts` does not ignore `out-tsc` — producing 157 phantom failed
+suites. Candidate remedy: `--noEmit` on the verify line, and/or `out-tsc` in
+`testPathIgnorePatterns`. Same class of defect (a mandated command that disarms a later gate), same
+kind of decision, so it belongs in the same conversation.
+
+#### T-09 attempt 2 — Reviewer FAIL. Issue 1 closed; Issue 2's fix is INERT.
+
+**Issue 1 is closed.** `text-[var(--ac-grey-800)]` at HTML `:177`/`:183`, matching the file's own `:8`
+and `:79`. The Reviewer **widened the Leader's grep**: a sweep for `#[0-9a-fA-F]{3,8}` across the whole
+`.html` *and* the whole `.ts` returns **zero** matches, so no `bg-[#`/`border-[#` form slipped in
+either. Nothing else restyled.
+
+##### The decisive finding — `GET_Results` cannot reject, so the error state exists only in the double
+
+The Leader routed one question as the thing that would decide whether the fix was real or inert:
+*does `ApiService.GET_Results` actually reject on failure, or does it swallow and resolve?* **It
+swallows.** The Reviewer traced the whole chain at the source:
+
+`client/research-indicators/src/app/shared/services/to-promise.service.ts:15-36`:
+```ts
+return firstValueFrom(
+  subscription.pipe(
+    map(data => ({ ...data, successfulRequest: true })),
+    catchError(error => {
+      console.error(error);
+      return [{ ...error, successfulRequest: false, errorDetail: error?.error }];
+    }),
+```
+
+`catchError` returns an **array**, which RxJS emits as a values-observable, so `firstValueFrom`
+**resolves**. Every `ToPromiseService` HTTP failure resolves; **none rejects.** `api.service.ts:315-316`
+then hands that object to `unwrapV2ResultsResponse` (`:379-406`), which guards every access and returns
+`{ ...raw, data: { results: [], total: 0 } }` — **no throw on any branch.**
+
+So on a real failed options request: `list.set([])`, the `catch` never runs, `error()` stays `false`,
+`loading.set(false)` executes normally — **byte-identical rendering to a legitimately empty list.**
+The user sees the disabled dropdown and *"There are no reported Innovation Development outputs to
+link."* **That is precisely the defect Issue 2 was opened for, unchanged.**
+
+**Spec 2a is green only because it calls `innoDevService.error.set(true)` on a mock** — a double
+asserting behaviour its subject cannot produce. This is **KZ-001 (Critical, 13 recurrences) in its
+purest form.** Falsifier 2 proved the template wiring from `error()` to the banner; it proved nothing
+about `error()` ever becoming `true`.
+
+**Violated:** `requirements.md:379` (R-IUL-012 — *"AND when the options request fails the section's
+existing error surface is used"*); `tasks.md:314` (T-09 Requirements: R-IUL-012 **all four states**)
+and `:343` (Done: *"Control renders in all four states"*); `client/research-indicators/src/CLAUDE.md`
+→ HTTP: *"Always handle `MainResponse<T>`"*.
+
+**The correct idiom already exists 200 lines above, in the very component being edited** —
+`innovation-use-details.component.ts:392-398` does
+`if (!response.successfulRequest) { … this._loadFailed.set(true); }`. `MainResponse<T>` declares
+`successfulRequest: boolean` (`responses.interface.ts:1-9`), and `unwrapV2ResultsResponse`'s
+`{ ...raw, data: … }` **preserves** `successfulRequest: false`, so envelope detection is viable at the
+service.
+
+##### The consequence the Reviewer found that the Leader did NOT ask about — `error` would be sticky
+
+Worth recording because it is the difference between a fix and a worse regression. The moment envelope
+detection lands, `error` becomes genuinely reachable — **and it never clears.**
+`GetInnoDevOutputService` is `providedIn: 'root'`, so its constructor-driven `main()` runs **once per
+session**; the only rerun path is `SelectComponent.loadData()` (`select.component.ts:137-145`), which
+requires `app-select` to **mount** — but `loadFailed()` renders the `@if` error branch
+(`innovation-use-details.component.html:5-10`) and the select never mounts. So the whole Innovation Use
+section would sit on the error banner **until a hard browser reload**.
+
+**Leader adjudication:** the retry/reset stays in **T-09**, not deferred to T-12 — the Reviewer offered
+that as the one judgment call, and its own argument decides it: *without the reset, the fix converts a
+silent-wrong-state bug into a stuck-section bug.* Shipping that would be worse than the defect.
+
+##### What the Reviewer cleared, so attempt 3 does not touch it
+
+| Check | Finding |
+| --- | --- |
+| Additive for the other consumer | `select.component.ts:147-157` (`bindServiceSignals`) reads only `list` and `loading`; `ServiceLocatorService` returns the instance unmodified; **nothing anywhere reads `error`**; no existing member changed name, type or behaviour. `policy-change.component.html:40` unaffected |
+| The forbidden enabled-empty dropdown (R-IUL-012:380) | **Unreachable today — for the same reason the fix is inert.** KZ-008 reachability: the Reviewer tried to construct a rejecting input (HTTP 4xx/5xx, network failure, malformed payload) and **could not**; all are swallowed. The original `main()` had no try/catch, so a rejection skipped `loading.set(false)` identically — the rethrow preserves that, i.e. genuinely additive |
+| 2b skeleton | Real: `select.component.html:14` gates `p-skeleton` vs `p-select` on `currentResultIsLoading()`; the test asserts skeleton present / `p-select` null **inside the RELATED card** |
+| 2c populated | **Genuine, and it closes attempt 1's hole.** `'STAR 456 - Populated test'` is a string `optionLabel="title"` could not produce (it would yield only `Populated test`), and the `#item` → `#itemX` falsifier reddened it |
+| 2d tooltip | Asserts the `Tooltip` directive's `content` input — the best jsdom can reach |
+| 2a's DOM reach | **Satisfied** — banner span, card absence, and the legitimately-empty contrast case. *"The problem is upstream of the DOM."* |
+| Scope | `innovation_dev_result_id` appears nowhere in the component `.ts`, so `buildPayload` is free of T-11's key; `select.component.{ts,html}` carry no T-09 marker and no `error` reference |
+
+##### Falsifier 1 was not run, and the worker said so plainly — adjudicated as advisory
+
+The worker's artifact states: *"I did not add a token-compliance assertion for Fix 1 because the
+instructions did not request one for this fix. The substitution … was correctly applied, but no new
+spec was added to assert it. Thus, there is no red output for this falsifier."*
+
+**That honesty is exactly right and is credited.** The Reviewer confirmed the Leader's reading:
+`tasks.md:339-340` names only the `!loading()` and `isRequired` falsifiers, NFR-IUL-003
+(`requirements.md:425-428`) states a *condition* which is satisfied, and its **verification is T-12's**
+(`tasks.md:431`, `ui-ux-pro-max`). The token assertion was the Leader's brief addition, not a task
+requirement — so its absence is an advisory, not a gate. It does mean Issue 1's fix is currently
+guarded by no test.
+
+##### Recovering the report — the transport defect cost a full worker turn
+
+Attempt 2's worker **never printed its structured report to the terminal.** It spent its remaining
+turns retrying `orca orchestration send --type worker_done` (three identical submissions, all
+rejected, because the dispatch capability is revoked on this transport). The Leader recovered the
+evidence by the documented step-2 fallback — *check whether the worker wrote its output to a file* —
+finding it at
+`~/.gemini/antigravity-cli/brain/36c3f924-…/falsifier_proofs.md`.
+
+**Attempt 3's brief now states the transport defect outright** and instructs the worker to print its
+report as plain terminal text and not to waste turns on `orchestration send`. Cost of not saying so
+earlier: one worker turn, and no suite total, coverage figure, or `tsc` delta was reported at all —
+**treated as absence, never as green.**
+
+##### `ADVISORY` — recorded, not actioned
+
+- **Reliability:** the constructor calls `initialize()` → `main()` **un-awaited**, so the current `throw e` would surface as an unhandled promise rejection if it ever fired. `SelectComponent.loadData()` wraps its own call in `try/catch {}`, so only the constructor path is exposed. **Reachability: could not construct a reaching input.** Removing the rethrow as part of the fix resolves it.
+- **Risk (blast radius):** routing a *control-list* failure into `loadFailed()` blanks the **entire** Innovation Use section, including a details GET that succeeded. This is what R-IUL-012:379 literally prescribes, so it is not a violation — recorded because a partial surface (error text inside the RELATED card only) would degrade better. **That is a design-level call for T-12 or the user, not the Implementer's**, and attempt 3's brief fences it off explicitly.
+- **Readability:** spec 2a bundles four distinct claims into one `it`. Once re-pointed at the envelope, splitting the empty-state contrast into its own `it` would make a future red unambiguous.
+
+##### Reviewer's declared limits (KZ-017)
+
+It ran nothing: it did **not** verify the four new tests pass, the suite total, coverage against the
+client floors, or the `tsc` delta — the quoted falsifier reds are **accepted as reported, not
+observed.** It read working-tree files rather than the git diff, so its scope claims for
+`select.component.*` and `docs/specs/` rest on the Leader's diff stat — **"a file read cannot observe
+the absence of a change."** Its hex sweep covered the component `.html` and `.ts` only, not
+`.spec.ts` and no `.scss`. Its *"cannot reject"* claim covers the HTTP failure path through
+`ToPromiseService.TP`; it could not exclude a synchronous throw during interceptor setup, though RxJS
+routes such throws through the same `catchError`.
+
+#### T-09 attempt 3 — dispatched (FINAL)
+
+Model held at **`gemini-3.1-pro-high`**: the rework rule bumps effort, but `agy models` offers only
+`gemini-3.1-pro-{high,low}` for the pro tier, so `high` is already the ceiling, and the alternatives
+are a downgrade (`gpt-oss-120b-medium`) or a Claude model that would collapse `author ≠ auditor`
+against the `opus` Reviewer. Compensated the same way T-02's attempt 2 was: **a surgical brief**, since
+the Reviewer supplied the exact remediation code and exact `file:line` references. This is no longer an
+under-thinking problem.
+
+**If attempt 3 fails review, the task HALTS:** `[~]`, automatic rollback of the working tree, full
+attempt history presented to the user. The Reviewer explicitly judged the remaining work
+*"mechanically closable — do not escalate"* (~6 lines in one shared service, plus a re-pointed fixture
+and one retry assertion, with the correct pattern already in-repo and in the same file), so the last
+attempt is being spent rather than pre-emptively escalated.
+
+---
+
+### T-03 — Real-MySQL fixture spec for rule 16
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 1** |
+| Date | 2026-09-09 |
+| Requirements | R-IUL-009 (both scenarios), D-1 |
+| Design | §9 |
+| Skills assigned | `nestjs-expert`, `tdd` |
+| Effort | **`xhigh`** — this is the only proof of rule 16's behavior in the spec |
+| Reviewer | `akili-reviewer` on `opus` |
+
+**File:** `server/researchindicators/test/fixtures/innovation-use/innovation-use-linked-dev-validation.fixture-spec.ts` (new).
+
+**Leader environment pre-check, run BEFORE dispatch** (per the command's environment-dependent
+verification rule, and per `.agents/leader.md` → *Deferring a check (test the assumption first)*).
+Rather than record "blocked on the stack", one bounded probe was spent falsifying the assumption:
+`npx jest --config ./test/jest-fixtures.json test/fixtures/smoke.fixture-spec.ts` → **`ECONNREFUSED 127.0.0.1:3307`**.
+A *probe-confirmed* blocker with a named cause, not a guess wearing a status. Docker itself was up
+(29.7.2), so the Leader brought up the purpose-built scratch container — `docker-compose.test.yml`
+documents it as *"a schema that can be freely created, dropped, and rebuilt"*, loopback-bound, with its
+own root password and a written warning never to point it at `ARI_MYSQL_*`. **`ari_scratch_test` then
+held 0 tables.** The bootstrap and the emptiness *proof* were deliberately left to the Implementer,
+because the Disqualifier makes that proof part of the task's evidence, where the Reviewer can audit it.
+
+**Verification — the ordering IS the evidence**
+
+| Step | Command | Result |
+| --- | --- | --- |
+| Emptiness proof (the Disqualifier) | `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ari_scratch_test'` | **`0`**, re-verified by the Implementer before bootstrapping |
+| Bootstrap | `npm run migration:test:bootstrap` | succeeded; last applied `1789100000000-AppendInnovationDevLinkRuleToInnovationUseValidation`, confirmed from `migrations ORDER BY timestamp DESC` |
+| **Migration A's role-5 row exists for real** | `SELECT link_result_role_id, name FROM link_result_roles WHERE link_result_role_id = 5` | `5 \| Innovation Use Linked Dev` — **discharges the gap T-01's Reviewer routed here**, since T-01's structural spec could only assert SQL text |
+| **PRE-MIGRATION RED** | `npm run migration:test:revert` (removed exactly `…1789100000000`, confirmed from output), then the fixture | `Tests: 6 failed, 2 passed, 8 total` — R16-1, R16-3, R16-4, R16-5, R16-6, R16-8 all `Expected 0, Received 1` |
+| POST-MIGRATION GREEN | `npm run migration:test:execute`, then the fixture | `Test Suites: 1 passed, 1 total` · `Tests: 8 passed, 8 total` |
+| Full server suite | not re-measured, **by construction**: `npm test` has `rootDir: "src"` (`package.json:131`) and this file lives under `test/fixtures/`, so the suite total cannot change. The figure in *Measured figures* stands | — |
+
+**🎁 A gap in ANOTHER task's evidence closed for free.** The pre-migration red requires
+`migration:test:revert`, which **executes Migration B's `down()`** — the exact `CREATE FUNCTION` body
+`runbook.md` carries as paste-ready recovery SQL. T-02's Reviewer had declared it could *not* prove
+that SQL even parses (no shell, and the runbook had never been executed). Now measured:
+`SHOW FUNCTION STATUS WHERE Db='ari_scratch_test' AND Name='innovation_use_validation'` returned the
+row, and `SELECT innovation_use_validation(999999999)` returned `0` without error. **The runbook's SQL
+parses and runs against real MySQL**, which also converts T-02's advisory **A-4** from an unverified
+caveat into a measured fact. The Leader put this in T-03's brief on purpose; it cost nothing.
+
+##### The Reviewer verified the monotonicity premise instead of accepting it
+
+`tasks.md` demands *"Every rule-16 case must go red"*, and only 6 of 8 reddened. The Implementer's
+reasoning was upheld — **but the Reviewer checked it against the migration's own delta** rather than
+trusting the argument: Migration B's `up()` RETURN (lines 254–269) and `down()`'s (458–462) differ
+**only** by the appended `AND (EXISTS …)` conjunct. Appending a conjunct is **monotone** — it can only
+turn `TRUE` → `FALSE`. R16-2's base is the sibling F17 shape, which returns `1` under the old body, so
+**a positive case can never redden against a strictly weaker predecessor.** The only way to make it red
+is to invert its expectation, which is then wrong post-migration.
+
+**And it named R16-7's REAL falsifier, which nobody had identified.** R16-7's seed is byte-for-byte the
+committed rule-2 violation shape already proven red by sibling **F8**
+(`innovation-use-validation.fixture-spec.ts:598-607`), so its `0` comes entirely from
+`tempActorViolations`, which pre-exists. Its falsifier is therefore **not** "pre-migration" but a
+**top-level `AND` → `OR` slip**: under `… AND (tempActorViolations = 0) … OR (EXISTS …)`, MySQL
+precedence yields `FALSE OR TRUE = TRUE` → `1`, and R16-7 reddens. That is exactly what the file's own
+comment claims, and the claim is accurate.
+
+##### ⚠️ A defect in the TASK TEXT, surfaced by this review
+
+`tasks.md` T-03 says *"Every rule-16 case must go red"* while its **own case list enumerates R16-2
+("valid link → `TRUE`")**. Read literally, **that clause is unsatisfiable.** §3's preamble already
+provides the correct handling — *"Where a check cannot fail for the property claimed, the task says so
+instead of pretending"* — so the omission is a defect in the **task text**, not the implementation.
+The clause's *intent* (*"A suite that is green before the migration exists is testing nothing"*) is
+comfortably met: all five negative rule-16 discriminators plus R16-8 reddened. **Added to the user's
+decision batch** alongside the other two spec-text defects; not silently patched.
+
+##### Every case asserts what its title claims
+
+The Reviewer walked each seed against the conjunct's five predicates. **No mis-seeded case** — the
+KZ-001 failure in its most direct form, and it is absent: R16-3 deactivates the **link row**
+(`link_results.is_active`), R16-4 the **target** (`results.is_active`), R16-5 varies **only**
+`indicator_id` (3, active), R16-6 varies **only** the role (4). `result_innovation_use.is_active` is
+omitted from the insert, which is safe — `baseline.sql` confirms `is_active tinyint NOT NULL DEFAULT '1'`,
+so the `SELECT … INTO` filter is satisfied and the base is genuinely `TRUE`-able. **R16-2 is the
+load-bearing control that stops all six `0`-expecting cases from passing vacuously**, and its base is
+identical to theirs.
+
+##### The `INSERT IGNORE` catalog seeding — precedent verified, cross-file effect ruled out
+
+The claimed precedent is real and byte-identical in **two** siblings
+(`innovation-use-result-creation.fixture-spec.ts:389,392` and
+`innovation-use-level-boundary.fixture-spec.ts:247,250`); T-03 only adds indicator id 3.
+`link_result_roles` id 4 is seeded with the same name the real migration uses, verified at
+`1763587336968-insertExternalLinkColumn.ts:14` → `'Link Result Section'`. **Can it change a sibling's
+outcome? No** — a grep of `test/fixtures` for `link_result_roles` matches **T-03's file only**, no
+fixture reads `indicators`/`indicator_types`, and indicator 3 can only affect rows T-03 itself creates.
+Band `902_400` and report year `2114` are unique across the directory (the Reviewer re-derived both
+lists rather than trusting the file header's grep claim).
+
+**Isolation is sound.** Every `it` seeds its own subject and target with a fresh
+`result_official_code`, and rule 16 keys on `lr.result_id = result_code`, so no case can see another's
+rows; ordering is irrelevant. `afterAll` deletes `link_results` in **both** FK directions before
+`results` — necessary and correct given `FK_037db…(result_id)` and `FK_a3ebe…(other_result_id)`. No DDL
+anywhere in the file.
+
+##### R16-8's honesty — upheld, with the Leader's forward pointer corrected FURTHER
+
+The file **does** record that R16-8 catches nothing uniquely, with the correct reason
+(`OR(FALSE,FALSE) = FALSE = AND(FALSE,FALSE)`) and it names R16-4/R16-5 as the cases that do catch the
+slip. **That is the substance, and keeping the case is the right call.** The Reviewer found three
+understatements, and the third sharpens the correction to the Leader's own pointer:
+
+1. The leading paragraph restates the Lens B rationale in the **assertive voice** — *"This case removes that escape"* — which is precisely the claim mutant 2 falsified. It should read as the *pointer's* claim, tested and not upheld in that shape.
+2. **Mutant 1's redundancy is not recorded** — the file says that slip "IS caught by this row" without noting R16-3/4/5/6 caught it too, which is the fact that makes R16-8 non-unique.
+3. *"the only case proving the two `r2` predicates are AND-combined"* reads stronger than the evidence: **R16-4 alone** discriminates `AND` from `OR` between them (target inactive + indicator 2 → `OR(FALSE,TRUE)=TRUE` → returns `1`, red). R16-8's true distinction is only that both fail on **one row**, which its author's own mutant 2 showed is non-discriminating.
+
+**Recorded against the Leader, not the worker.** The forward pointer was carried from T-02's Lens B and
+asked for a case on a rationale that empirical testing then contradicted — twice over, since the
+Reviewer's point 3 goes further than the Implementer's own finding. **The pointer was still worth
+carrying**: it is what caused the mutants to be run at all, and the mutants are now the strongest
+evidence in this task. But its stated rationale was wrong, and this log says so rather than letting the
+pointer's authority survive its own falsification.
+
+##### `ADVISORY` — recorded, not actioned
+
+- **READABILITY:** recast R16-8's comment per the three points above. The honest framing already exists in this directory — see F43's *"coverage-of-wording only, not a new behavioral discriminator"*.
+- **READABILITY (KZ-017):** the `CANNOT PROVE` block is substantive but never states that **`npm test` can never collect this file** (`rootDir: "src"`, `package.json:131`) — only `npm run test:fixtures` does. Precedent for saying so: `report-oicr-number-rendering.fixture-spec.ts:94`.
+- **READABILITY:** the file does not record *why* R16-2 and R16-7 cannot redden pre-migration (monotonicity; and R16-7's `0` coming from rule 2 per sibling F8). **That reasoning is the load-bearing part of T-03's falsifier and today lives only in the Implementer's report and in this log** — one sentence per case would make the file self-evidencing. Related: R-IUL-009 Scenario 2's no-grandfathering clause is gated by **T-02's** structural spec (`…1789100000000-…spec.ts:271`), not by this file, though T-03's header cites *"both scenarios"*. The Reviewer considered proposing a backdated-`created_at` case and **rejected it**: it would duplicate T-02's regex against the same shape and would still miss a temporal predicate worded on another column (e.g. `report_year_id`), escaping both gates. That residual hole needs someone to deliberately add such a clause in a future edit.
+- **RELIABILITY:** `afterAll` has no per-step error isolation and no `finally` around `dataSource.destroy()` — one failing DELETE aborts teardown and leaks the connection. **Reachability: could not construct a reaching sequence today.** Two siblings use a `tryStep` wrapper; the *closest* sibling does exactly what T-03 does, so this is idiom-consistent, not a violation.
+- **RISK:** T-03 becomes the second file to create-and-conditionally-delete `clarisa_actor_types` code 5. **Reachability: NOT reachable** under the committed `jest-fixtures.json` (`maxWorkers: 1`, serial file execution) — it becomes a race only if that serialization is reverted, which the repo records happening once already in the opposite direction. Consider a file-private actor-type code, since R16-7 needs only *some* type-5-shaped violation.
+
+##### Reviewer's declared limits (KZ-017)
+
+**No shell**, so it observed **none** of: the emptiness count, the bootstrap, the red run, the green
+run, either live mutant, the `migrations` bookkeeping query, or the `SHOW CREATE FUNCTION` diff — those
+are taken from the report. What it **corroborated by reading**: the monotonicity premise (the `up()`
+vs `down()` RETURN delta), every seed→predicate mapping, `LinkResultRolesEnum` (4/5) and
+`IndicatorsEnum` (2/3/6), the `INSERT IGNORE` precedents, band/year uniqueness, the `link_results` FK
+topology, `is_active DEFAULT '1'`, and T-02's no-grandfathering assertion. It did not observe
+`git status`, so **scope containment is argued from file content plus the Leader's diff stat.**
+
+**It also independently corroborated the Pivot Record's mechanism by reading:** T-03 is the **only**
+fixture file that writes `link_results` (grep: 1 file), while `innovation-use-validation.fixture-spec.ts`
+asserts `innovation_use_validation(…) === 1` at F3/F17/F18/F20/F39/F43 with **no role-5 link** — so
+post-Migration-B those assertions **must** fail by construction. *"It is a T-02/spec-level consequence
+with **no owning task** in `tasks.md` §3, and T-03's file neither causes nor can prevent it."*
+
+**Finalize order held:** this entry was written before `tasks.md` T-03 was flipped to `[x]`.
