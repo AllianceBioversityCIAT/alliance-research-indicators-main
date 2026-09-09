@@ -1,4 +1,5 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell)
+import { Tooltip } from 'primeng/tooltip';
 import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -20,6 +21,10 @@ import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels
 import { GetInnovationUseDetails, InnovationUseActor, InnovationUseOrganization } from '@shared/interfaces/get-innovation-use-details.interface';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { InputNumber } from 'primeng/inputnumber';
+import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
+import { formatInnovationDevLabel } from './innovation-use-details.component';
+import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 
 /** Family D-1: `id = level + 1`. Levels 0-9 -> ids 1-10. */
 const LEVELS_FIXTURE: InnovationUseLevel[] = Array.from({ length: 10 }, (_, level) => ({
@@ -39,7 +44,8 @@ const apiService = {
   GET_InstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
   GET_SubInstitutionTypes: jest.fn((_depthLevel?: number, code?: number) =>
     Promise.resolve({ data: code === 10 ? [{ code: 1, name: 'Sub A' }] : [], successfulRequest: true })
-  )
+  ),
+  GET_Results: jest.fn().mockResolvedValue({ data: { results: [] }, successfulRequest: true })
 };
 
 const actions = { showToast: jest.fn(), saveCurrentSection: jest.fn() };
@@ -363,12 +369,12 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Justification');
-      // Advisory (d), T-08 attempt-3: this page-wide `not.toContain` survives T-08's new
-      // Organization type/count asterisks (c10) only because this test's fixture resolves through
-      // the default `GetInnovationUseDetails`, whose `organizations` defaults to `[]` — zero
-      // organization cards render, so T-08's required message never gets a chance to appear here.
-      // Pre-existing pattern (predates T-08); T-08 widens the set of rows that would falsify it.
-      expect(fixture.nativeElement.textContent).not.toContain('This field is required');
+      // T-09: scoped to the detailsCard so T-09's new Related Innovation Development card's
+      // required state does not conflate with the justification's required message.
+      const detailsCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.trim() === 'INNOVATION USE DETAILS')?.parent?.nativeElement as HTMLElement;
+      expect(detailsCard.textContent).not.toContain('This field is required');
       // REWORK (Issue 5): "does not block completion" is the criterion's other half and has no
       // save path to exercise until buildPayload()/PATCH exist (T-08) — owned by T-08 c14 /
       // T-09 c6, not claimed as discharged here.
@@ -415,9 +421,8 @@ describe('InnovationUseDetailsComponent', () => {
 
       const cards = fixture.debugElement.queryAll(By.css('.section-title'));
       const organizationsCard = cards.find(card => card.nativeElement.textContent.trim() === 'ORGANIZATIONS')?.parent?.nativeElement as HTMLElement;
-      const quantificationsCard = cards
-        .find(card => card.nativeElement.textContent.trim() === 'OTHER QUANTITATIVE MEASURES')
-        ?.parent?.nativeElement as HTMLElement;
+      const quantificationsCard = cards.find(card => card.nativeElement.textContent.trim() === 'OTHER QUANTITATIVE MEASURES')?.parent
+        ?.nativeElement as HTMLElement;
 
       // T-08 REWORK (R-IUR-007 AC.1): T-12 pointed this half at T-07/T-08 rather than asserting it
       // unchanged, and it is not unchanged. On the unknown path (`is_organization_known: false`,
@@ -466,7 +471,7 @@ describe('InnovationUseDetailsComponent', () => {
     // assertions green regardless (no behavioural consequence: the resolved value is identical
     // either way). Assert the real child component's RESOLVED input values, not the template
     // text.
-    it('forwards DD-4\'s five bindings to the real QuantificationItemComponent instance, resolved', () => {
+    it("forwards DD-4's five bindings to the real QuantificationItemComponent instance, resolved", () => {
       component.body.set({
         ...component.body(),
         quantifications: [{ id: undefined, quantification_number: undefined, unit: undefined, description: undefined }]
@@ -639,9 +644,7 @@ describe('InnovationUseDetailsComponent', () => {
 
       const quantificationControls = fixture.debugElement.queryAll(By.css('app-quantification-item input, app-quantification-item textarea'));
       expect(quantificationControls.length).toBeGreaterThan(0);
-      quantificationControls.forEach(control =>
-        expect((control.nativeElement as HTMLInputElement | HTMLTextAreaElement).disabled).toBe(true)
-      );
+      quantificationControls.forEach(control => expect((control.nativeElement as HTMLInputElement | HTMLTextAreaElement).disabled).toBe(true));
     });
 
     it('hides every remove affordance (actor, organization, and quantification)', () => {
@@ -917,9 +920,7 @@ describe('InnovationUseDetailsComponent', () => {
     it('nulls organization_count on a known-path row that also carries a real institution_id, while still sending institution_id', () => {
       component.body.set({
         ...component.body(),
-        organizations: [
-          { ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501, organization_count: 12 }
-        ]
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: true, institution_id: 501, organization_count: 12 }]
       });
 
       const row = component.buildPayload().organizations[0];
@@ -928,12 +929,10 @@ describe('InnovationUseDetailsComponent', () => {
       expect(row.institution_id).toBe(501);
     });
 
-    it('sends an unknown-path row\'s organization_count verbatim, with institution_id null', () => {
+    it("sends an unknown-path row's organization_count verbatim, with institution_id null", () => {
       component.body.set({
         ...component.body(),
-        organizations: [
-          { ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 12 }
-        ]
+        organizations: [{ ...new InnovationUseOrganization(), is_organization_known: false, institution_type_id: 10, organization_count: 12 }]
       });
 
       const row = component.buildPayload().organizations[0];
@@ -1190,7 +1189,7 @@ describe('InnovationUseDetailsComponent', () => {
   // call unchanged. The server-side residual (`deactivateExistingRecords`'s actual behavior on a
   // matching id) is out of client-tier reach and is recorded as AR-1-bounded, not claimed as PASS.
   // -------------------------------------------------------------------------------------------------
-  describe('T-08 saveData() — c13: an unchanged section sends every existing row\'s id through the actual PATCH', () => {
+  describe("T-08 saveData() — c13: an unchanged section sends every existing row's id through the actual PATCH", () => {
     it('sends all three previously-saved ids unchanged when saving without editing anything', async () => {
       const loaded: GetInnovationUseDetails = {
         ...new GetInnovationUseDetails(),
@@ -1283,7 +1282,7 @@ describe('InnovationUseDetailsComponent', () => {
     // server's `type_${institution_type_id}` key and one is silently dropped. This spec proves
     // the *client* payload no longer gives both rows a live `institution_type_id: 10` to collide
     // on: only the row that is actually on the type path keeps it.
-    it("closes the removeDuplicates collision: a known-organization row no longer carries a live institution_type_id to collide on", () => {
+    it('closes the removeDuplicates collision: a known-organization row no longer carries a live institution_type_id to collide on', () => {
       component.body.set({
         ...component.body(),
         organizations: [
@@ -1351,7 +1350,7 @@ describe('InnovationUseDetailsComponent', () => {
   // holds, buildOrganizationPayload still sees the old values. Assert the emitted row" — the
   // parent-level half of that assertion belongs here per the task's own Verify split).
   // -------------------------------------------------------------------------------------------------
-  describe('T-10 (R-IUR-015 AC.1/AC.2, DD-12) — the toggle\'s clearing reaches the PARENT\'s body(), not just the card\'s local state', () => {
+  describe("T-10 (R-IUR-015 AC.1/AC.2, DD-12) — the toggle's clearing reaches the PARENT's body(), not just the card's local state", () => {
     it('ticking known clears the unknown-path fields in body() through the real (update) binding', () => {
       component.body.set({
         ...component.body(),
@@ -1574,7 +1573,10 @@ describe('InnovationUseDetailsComponent', () => {
     it('issues zero PATCH requests when saveData() is called while getData() has not yet resolved', async () => {
       let resolveGet!: (value: { data: GetInnovationUseDetails; successfulRequest: boolean }) => void;
       apiService.GET_InnovationUseDetails.mockImplementation(
-        () => new Promise(resolve => { resolveGet = resolve; })
+        () =>
+          new Promise(resolve => {
+            resolveGet = resolve;
+          })
       );
       // If the guard under test is absent, saveData() calls PATCH; keep it a *failure* response so
       // saveData()'s own success branch (which calls getData() again) is never reached — that
@@ -1791,7 +1793,9 @@ describe('InnovationUseDetailsComponent', () => {
     it('renders the same total the server echoes back after a save round trip', async () => {
       component.body.set({
         ...component.body(),
-        actors: [{ ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: false, women_youth_count: 3, men_not_youth_count: 2 }]
+        actors: [
+          { ...new InnovationUseActor(), actor_type_id: 1, sex_age_disaggregation_not_apply: false, women_youth_count: 3, men_not_youth_count: 2 }
+        ]
       });
 
       const serverEcho: GetInnovationUseDetails = {
@@ -1834,7 +1838,9 @@ describe('InnovationUseDetailsComponent', () => {
 
       const serverEcho: GetInnovationUseDetails = {
         ...new GetInnovationUseDetails(),
-        actors: [{ ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 1, total: 1 }]
+        actors: [
+          { ...new InnovationUseActor(), result_actors_id: 1, actor_type_id: 1, sex_age_disaggregation_not_apply: true, actors_count: 1, total: 1 }
+        ]
       };
       apiService.PATCH_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
       apiService.GET_InnovationUseDetails.mockResolvedValue({ data: serverEcho, successfulRequest: true });
@@ -2048,14 +2054,10 @@ describe('InnovationUseDetailsComponent', () => {
   // half: does the right set reach the right row, and does it stay LIVE off `body().actors` (AC.4).
   // =================================================================================================
   describe('T-21 (R-IUR-017/DD-18) — usedActorTypeIds wiring', () => {
-    it('wires each row the OTHER rows\' actor_type_ids, excluding its own index', () => {
+    it("wires each row the OTHER rows' actor_type_ids, excluding its own index", () => {
       component.body.set({
         ...component.body(),
-        actors: [
-          { ...new InnovationUseActor(), actor_type_id: 1 },
-          { ...new InnovationUseActor(), actor_type_id: 2 },
-          new InnovationUseActor()
-        ]
+        actors: [{ ...new InnovationUseActor(), actor_type_id: 1 }, { ...new InnovationUseActor(), actor_type_id: 2 }, new InnovationUseActor()]
       });
       fixture.detectChanges();
 
@@ -2339,11 +2341,18 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     it('renders no required message and issues a PATCH once the justification is filled in at level >= 6', async () => {
-      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: 'used across three countries' });
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(6),
+        innovation_use_level_explanation: 'used across three countries'
+      });
       fixture.detectChanges();
 
       expect(component.justificationMissing()).toBe(false);
-      expect(fixture.nativeElement.textContent).not.toContain('This field is required');
+      const detailsCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.trim() === 'INNOVATION USE DETAILS')?.parent?.nativeElement as HTMLElement;
+      expect(detailsCard.textContent).not.toContain('This field is required');
 
       await component.saveData();
 
@@ -2386,7 +2395,11 @@ describe('InnovationUseDetailsComponent', () => {
     });
 
     it('renders zero required-message nodes once real text is present', () => {
-      component.body.set({ ...component.body(), innovation_use_level_id: idForLevel(6), innovation_use_level_explanation: 'used across three countries' });
+      component.body.set({
+        ...component.body(),
+        innovation_use_level_id: idForLevel(6),
+        innovation_use_level_explanation: 'used across three countries'
+      });
       fixture.detectChanges();
 
       expect(countRequiredMessageNodes()).toBe(0);
@@ -2400,7 +2413,10 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(fixture.debugElement.query(By.css('textarea'))).toBeNull();
       expect(fixture.nativeElement.textContent).not.toContain('Justification');
-      expect(fixture.nativeElement.textContent).not.toContain('This field is required');
+      const detailsCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.trim() === 'INNOVATION USE DETAILS')?.parent?.nativeElement as HTMLElement;
+      expect(detailsCard.textContent).not.toContain('This field is required');
 
       await component.saveData();
 
@@ -2441,11 +2457,7 @@ describe('InnovationUseDetailsComponent', () => {
      *  and additionally closes the gap right at "(" / ")" — the one boundary where a reformatted
      *  template could legally insert a single space without normalize() alone catching it. */
     const normalize = (text: string | null | undefined): string =>
-      (text ?? '')
-        .replace(/\s+/g, ' ')
-        .replace(/\(\s+/g, '(')
-        .replace(/\s+\)/g, ')')
-        .trim();
+      (text ?? '').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim();
 
     const BULLET_1 =
       'In case the innovation use level differs across countries or regions, we advise to assign the highest current innovation use level that can be supported by the evidence provided.';
@@ -3054,7 +3066,7 @@ describe('InnovationUseDetailsComponent', () => {
   });
 
   describe('T-11 — R-MSD-001 :189/:190 — the spinner does not reintroduce the floor', () => {
-    it('does not bind [step] — PrimeNG\'s own default of 1 (whole-unit stepping) applies', () => {
+    it("does not bind [step] — PrimeNG's own default of 1 (whole-unit stepping) applies", () => {
       component.addQuantification();
       fixture.detectChanges();
 
@@ -3064,7 +3076,7 @@ describe('InnovationUseDetailsComponent', () => {
       expect(inputNumberInstance.step).toBe(1);
     });
 
-    it('decrementing from 0 goes below zero — min is negative here, so PrimeNG\'s validateValue() does not clamp at 0', () => {
+    it("decrementing from 0 goes below zero — min is negative here, so PrimeNG's validateValue() does not clamp at 0", () => {
       component.addQuantification();
       fixture.detectChanges();
 
@@ -3429,7 +3441,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     // the same formula reports a PASSING ratio — proving the validation role's failing reading
     // above is a genuine property of the amber, not an artifact of a contrastRatio() that always
     // reports below 4.5:1.
-    it('falsifying input: substituting --ac-red-1 (this role\'s pre-token value) reports 5.29:1 and PASSES 4.5:1', () => {
+    it("falsifying input: substituting --ac-red-1 (this role's pre-token value) reports 5.29:1 and PASSES 4.5:1", () => {
       const ratio = contrastRatio(RED_1, GREY_100);
       expect(ratio).toBeCloseTo(5.29, 1);
       expect(ratio).toBeGreaterThanOrEqual(4.5);
@@ -3661,6 +3673,300 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeCloseTo(3.21, 1);
     expect(ratio).toBeLessThan(4.5);
   });
+
+  // ===============================================================================================
+  // T-09 — The picker: a new "RELATED INNOVATION DEVELOPMENT" section card
+  // (R-IUL-002, R-IUL-003, R-IUL-012, R-IUL-013, §6.1, §6.2, §6.5, §6.6, DD-11)
+  // ===============================================================================================
+  describe('T-09 — The picker: RELATED INNOVATION DEVELOPMENT section card', () => {
+    let innoDevService: GetInnoDevOutputService;
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([]);
+      await component.getData();
+      fixture.detectChanges();
+    });
+
+    it('places the RELATED INNOVATION DEVELOPMENT card between INNOVATION USE DETAILS and ACTORS (R-IUL-013)', () => {
+      const titles = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.nativeElement.textContent.trim());
+      const detailsIndex = titles.findIndex(t => t.startsWith('INNOVATION USE DETAILS'));
+      const relatedIndex = titles.findIndex(t => t.startsWith('RELATED INNOVATION DEVELOPMENT'));
+      const actorsIndex = titles.findIndex(t => t.startsWith('ACTORS'));
+
+      expect(detailsIndex).toBeGreaterThanOrEqual(0);
+      expect(relatedIndex).toBeGreaterThanOrEqual(0);
+      expect(actorsIndex).toBeGreaterThanOrEqual(0);
+
+      expect(relatedIndex).toBeGreaterThan(detailsIndex);
+      expect(relatedIndex).toBeLessThan(actorsIndex);
+    });
+
+    it('uses the byte-identical card shell class string as its sibling cards', () => {
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      expect(relatedCard).toBeTruthy();
+      expect(relatedCard.className).toContain('rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]');
+    });
+
+    it('must NOT be nested inside the INNOVATION USE DETAILS card (R-IUL-013)', () => {
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const detailsCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('INNOVATION USE DETAILS'))!;
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      expect(detailsCard.contains(relatedCard)).toBe(false);
+      expect(relatedCard.parentElement).toBe(detailsCard.parentElement);
+    });
+
+    it('keeps the level stepper, definition box, and calculator link inside INNOVATION USE DETAILS (nothing moved out)', () => {
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const detailsCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('INNOVATION USE DETAILS'))!;
+
+      const stepperEl = fixture.debugElement.query(By.directive(InnovationUseLevelStepperComponent))?.nativeElement;
+      expect(detailsCard.contains(stepperEl)).toBe(true);
+
+      const guidanceBox = detailsCard.querySelector('[data-testid="use-level-guidance"]');
+      expect(guidanceBox).not.toBeNull();
+
+      const defsLink = detailsCard.querySelector('[data-testid="use-level-definitions-link"]');
+      expect(defsLink).not.toBeNull();
+
+      const calcLink = detailsCard.querySelector('a[href*="calculator"]');
+      expect(calcLink).not.toBeNull();
+    });
+
+    it('renders the red asterisk on the section title when isRequired is true (R-IUL-003, DD-11)', () => {
+      const relatedTitle = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))!;
+      const asterisk = relatedTitle.nativeElement.querySelector('.text-red-500');
+
+      expect(asterisk).not.toBeNull();
+      expect(asterisk?.textContent?.trim()).toBe('*');
+    });
+
+    it('renders the amber invalid border and "This field is required" message when empty (R-IUL-003)', () => {
+      component.body.update(b => ({ ...b, innovation_dev_result_id: undefined }));
+      fixture.detectChanges();
+
+      const selectComp = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance as SelectComponent;
+      expect(selectComp.isInvalid()).toBe(true);
+
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      expect(relatedCard.textContent).toContain('This field is required');
+      const pSelect = relatedCard.querySelector('p-select') as HTMLElement;
+      expect(pSelect.style.border.toLowerCase()).toContain('#e69f00');
+    });
+
+    it('clears the amber invalid border and "This field is required" message once a selection is set', () => {
+      component.body.update(b => ({ ...b, innovation_dev_result_id: 123 }));
+      fixture.detectChanges();
+
+      const selectComp = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance as SelectComponent;
+      expect(selectComp.isInvalid()).toBe(false);
+
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      expect(relatedCard.textContent).not.toContain('This field is required');
+    });
+
+    it('must NOT block draft save or navigation when empty (R-IUL-003 draft save preserved)', async () => {
+      component.body.update(b => ({ ...b, innovation_dev_result_id: undefined }));
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalled();
+    });
+
+    it('must NOT show the empty state while loading() is true (R-IUL-012, §6.5)', () => {
+      // Arrange transition: start loading with empty list
+      submission.isEditableStatus.mockReturnValue(true);
+      innoDevService.loading.set(true);
+      innoDevService.list.set([]);
+      fixture.detectChanges();
+
+      // Guarded by !loading(): disabled must be FALSE and tooltip must be EMPTY
+      expect(component.isInnovationDevDisabled()).toBe(false);
+      expect(component.innoDevTooltip()).toBe('');
+
+      const selectDebug = fixture.debugElement.query(By.directive(SelectComponent));
+      expect(selectDebug.componentInstance.disabled).toBe(false);
+
+      // Now transition to loading finished with empty list
+      innoDevService.loading.set(false);
+      fixture.detectChanges();
+
+      expect(component.isInnovationDevDisabled()).toBe(true);
+      expect(component.innoDevTooltip()).toBe('There are no reported Innovation Development outputs to link.');
+      expect(selectDebug.componentInstance.disabled).toBe(true);
+    });
+
+    it('disables the control when submission status is not editable', () => {
+      submission.isEditableStatus.mockReturnValue(false);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([{ result_id: 1, result_official_code: '100', title: 'Test', platform_code: 'STAR' } as any]);
+      fixture.detectChanges();
+
+      expect(component.isInnovationDevDisabled()).toBe(true);
+    });
+
+    it('formats option labels with platform prefix, bare fallback for null/empty platform, and handles edge cases (KZ-012, §6.3)', () => {
+      // 1. With platform code
+      expect(
+        formatInnovationDevLabel({
+          platform_code: 'STAR',
+          result_official_code: 284,
+          title: 'Rice bean-adzuki bean model'
+        })
+      ).toBe('STAR 284 - Rice bean-adzuki bean model');
+
+      // 2. Fallback to bare numeric code when platform_code is null (never prints "null 284" or hard-codes "STAR")
+      expect(
+        formatInnovationDevLabel({
+          platform_code: null,
+          result_official_code: 284,
+          title: 'Rice bean-adzuki bean model'
+        })
+      ).toBe('284 - Rice bean-adzuki bean model');
+
+      // 3. Fallback when platform_code is undefined or empty string
+      expect(
+        formatInnovationDevLabel({
+          platform_code: undefined,
+          result_official_code: 284,
+          title: 'Rice bean-adzuki bean model'
+        })
+      ).toBe('284 - Rice bean-adzuki bean model');
+
+      expect(
+        formatInnovationDevLabel({
+          platform_code: '',
+          result_official_code: 284,
+          title: 'Rice bean-adzuki bean model'
+        })
+      ).toBe('284 - Rice bean-adzuki bean model');
+
+      // 4. Null / undefined result handling
+      expect(formatInnovationDevLabel(null)).toBe('');
+      expect(formatInnovationDevLabel(undefined)).toBe('');
+    });
+
+    it('asserts the ERROR state uses the card-scoped error surface (2a) and keeps the control mounted', async () => {
+      // Set the options request failure via the API mock
+      apiService.GET_Results.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'Mock failure' } });
+      await innoDevService.main();
+      fixture.detectChanges();
+
+      // Assert that GET_Results was called with indicator-codes: [2]
+      expect(apiService.GET_Results).toHaveBeenCalledWith({ 'indicator-codes': [2] });
+
+      // R-IUL-012: options request fails -> uses the card-scoped error surface
+      expect(component.loadFailed()).toBe(false);
+
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'));
+      expect(relatedCard).toBeTruthy(); // Card must stay mounted
+
+      const errorText = Array.from(relatedCard!.querySelectorAll('span')).find(s =>
+        s.textContent?.includes('Innovation Development outputs could not be loaded')
+      );
+      expect(errorText).toBeTruthy();
+
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const selectComp = fixture.debugElement.query(By.directive(SelectComponent));
+      expect(selectComp).toBeTruthy(); // Control must stay mounted
+      expect(selectComp.componentInstance.disabled).toBe(true); // Control must be disabled
+    });
+
+    it('asserts that with error() true, a draft save still issues its PATCH and the section stays mounted (save-path falsifier)', async () => {
+      apiService.GET_Results.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'Mock failure' } });
+      await innoDevService.main();
+      fixture.detectChanges();
+
+      expect(innoDevService.error()).toBe(true);
+      expect(component.loadFailed()).toBe(false); // MUST NOT compose the error into loadFailed()
+
+      await component.saveData();
+
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalled();
+
+      const relatedCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .map(t => t.parent?.nativeElement as HTMLElement)
+        .find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'));
+      expect(relatedCard).toBeTruthy();
+    });
+
+    it('asserts the LOADING state shows a skeleton and no p-select (2b)', () => {
+      const cache = TestBed.inject(CacheService) as unknown as CacheServiceMock;
+      cache.currentResultIsLoading.set(true);
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      const skeleton = relatedCard.querySelector('p-skeleton');
+      expect(skeleton).toBeTruthy();
+
+      const select = relatedCard.querySelector('p-select');
+      expect(select).toBeNull();
+
+      cache.currentResultIsLoading.set(false);
+    });
+
+    it('asserts the POPULATED state projects the label with prefix correctly and itemTemplate is bound (2c)', async () => {
+      innoDevService.loading.set(false);
+      innoDevService.list.set([{ result_id: 123, platform_code: 'STAR', result_official_code: '456', title: 'Populated test' } as any]);
+      component.body.update(b => ({ ...b, innovation_dev_result_id: 123 }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+      const relatedCard = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+
+      const selectDebug = fixture.debugElement.query(By.directive(SelectComponent));
+      const selectComp = selectDebug.componentInstance as SelectComponent;
+
+      expect(selectComp.itemTemplate).toBeDefined();
+      expect(selectComp.selectedItemTemplate).toBeDefined();
+
+      const renderedText = relatedCard.textContent;
+      expect(renderedText).toContain('STAR 456 - Populated test');
+    });
+
+    it('asserts the pTooltip directive receives the empty state tooltip correctly (2d)', () => {
+      innoDevService.loading.set(false);
+      innoDevService.list.set([]);
+      fixture.detectChanges();
+
+      const selectDebug = fixture.debugElement.query(By.directive(SelectComponent));
+
+      const tooltipDirective = selectDebug.injector.get(Tooltip);
+      expect(tooltipDirective).toBeTruthy();
+      expect((tooltipDirective as any).content).toBe('There are no reported Innovation Development outputs to link.');
+    });
+
+    it('asserts the pTooltip directive does not receive the empty state tooltip on a failed load (R-IUL-012)', async () => {
+      apiService.GET_Results.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'Mock failure' } });
+      await innoDevService.main();
+      fixture.detectChanges();
+
+      const selectDebug = fixture.debugElement.query(By.directive(SelectComponent));
+
+      const tooltipDirective = selectDebug.injector.get(Tooltip);
+      expect(tooltipDirective).toBeTruthy();
+      expect((tooltipDirective as any).content).not.toBe('There are no reported Innovation Development outputs to link.');
+    });
+  });
 });
 
 // ===================================================================================================
@@ -3725,6 +4031,10 @@ describe('InnovationUseDetailsComponent — c11 (real HTTP layer)', () => {
     greenChecksReq.flush({ data: {}, status: 200, description: '', timestamp: '', path: '' });
     await fixture.whenStable();
 
+    // Flush any innoDevOutputService results request issued by the control or service initialization
+    const resultsReqs = httpMock.match(req => req.url.includes('results') && !req.url.includes('green-checks'));
+    resultsReqs.forEach(req => req.flush({ data: { results: [] }, status: 200, description: '', timestamp: '', path: '' }));
+
     component.addActor();
 
     httpMock.expectNone(() => true);
@@ -3760,7 +4070,8 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
     GET_ActorTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
     GET_Institutions: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
     GET_InstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
-    GET_SubInstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true })
+    GET_SubInstitutionTypes: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
+    GET_Results: jest.fn().mockResolvedValue({ data: { results: [] }, successfulRequest: true })
   };
   const routeTreeActions = { showToast: jest.fn(), saveCurrentSection: jest.fn() };
   const routeTreeSubmission = { isEditableStatus: jest.fn().mockReturnValue(true) };

@@ -22,6 +22,9 @@ import { QuantificationItemComponent, QuantificationItemData } from '@components
 import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
+import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { TooltipModule } from 'primeng/tooltip';
+import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
 import {
   RESULT_ENTRY_SOURCE_QUERY,
   RESULT_ENTRY_SOURCE_VALUE_HOME,
@@ -107,6 +110,23 @@ export interface InnovationUsePayload {
   quantifications: InnovationUseQuantificationPayload[];
 }
 
+// @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 / T-10 — §6.2 / §6.3 / KZ-012)
+export function formatInnovationDevLabel(
+  result:
+    | {
+        platform_code?: string | null;
+        result_official_code?: number | string | null;
+        title?: string | null;
+      }
+    | null
+    | undefined
+): string {
+  if (!result) return '';
+  const prefix = result.platform_code ? `${result.platform_code} ` : '';
+  const code = `${prefix}${result.result_official_code ?? ''}`.trim();
+  return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
+}
+
 /**
  * Page shell for the Innovation Use details section (indicator 6). Shape follows
  * `capacity-sharing` — `app-page-wrapper` -> `app-form-header` -> four titled cards ->
@@ -127,7 +147,9 @@ export interface InnovationUsePayload {
     QuantificationItemComponent,
     InnovationUseLevelStepperComponent,
     InnovationUseActorItemComponent,
-    InnovationUseOrganizationItemComponent
+    InnovationUseOrganizationItemComponent,
+    SelectComponent,
+    TooltipModule
   ],
   templateUrl: './innovation-use-details.component.html'
 })
@@ -140,6 +162,26 @@ export default class InnovationUseDetailsComponent {
   route = inject(ActivatedRoute);
   versionWatcher = inject(VersionWatcherService);
   levelsService = inject(GetInnovationUseLevelsService);
+  innoDevOutputService = inject(GetInnoDevOutputService);
+
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 — §6.5 / C5)
+  isInnovationDevDisabled = computed(() => {
+    return (
+      !this.submission.isEditableStatus() ||
+      this.innoDevOutputService.error() ||
+      (!this.innoDevOutputService.loading() && this.innoDevOutputService.list().length === 0)
+    );
+  });
+
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 — §6.5 / R-IUL-012)
+  innoDevTooltip = computed(() => {
+    if (!this.innoDevOutputService.loading() && this.innoDevOutputService.list().length === 0 && !this.innoDevOutputService.error()) {
+      return 'There are no reported Innovation Development outputs to link.';
+    }
+    return '';
+  });
+
+  readonly formatInnovationDevLabel = formatInnovationDevLabel;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
 
@@ -334,10 +376,7 @@ export default class InnovationUseDetailsComponent {
    */
   quantificationsView = computed<QuantificationItemData[]>(() =>
     this.body().quantifications.map(row => ({
-      number:
-        row.quantification_number === undefined || row.quantification_number === null
-          ? null
-          : Number(row.quantification_number),
+      number: row.quantification_number === undefined || row.quantification_number === null ? null : Number(row.quantification_number),
       unit: row.unit ?? '',
       comments: row.description ?? ''
     }))
@@ -492,18 +531,20 @@ export default class InnovationUseDetailsComponent {
       innovation_use_level_explanation: current.innovation_use_level_explanation ?? undefined,
       actors: current.actors.filter(row => !!row.actor_type_id).map(row => this.buildActorPayload(row)),
       organizations: current.organizations.filter(row => this.organizationIdentitySatisfied(row)).map(row => this.buildOrganizationPayload(row)),
-      quantifications: current.quantifications.filter(row => !this.quantificationRowAbsent(row)).map(row => ({
-        id: row.id,
-        // T-11 (DD-15): the payload's declared type (`InnovationUseQuantificationPayload`, below)
-        // stays `number` — the API always expects a number (DD-17) — so this narrows the widened
-        // read type back down at the one point the read and write paths meet. Reverting the read
-        // widening at `get-innovation-use-details.interface.ts` while keeping this narrowing makes
-        // the `typeof` check compare against a type with no `string` member, which does not compile
-        // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
-        quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
-        unit: row.unit,
-        description: row.description
-      }))
+      quantifications: current.quantifications
+        .filter(row => !this.quantificationRowAbsent(row))
+        .map(row => ({
+          id: row.id,
+          // T-11 (DD-15): the payload's declared type (`InnovationUseQuantificationPayload`, below)
+          // stays `number` — the API always expects a number (DD-17) — so this narrows the widened
+          // read type back down at the one point the read and write paths meet. Reverting the read
+          // widening at `get-innovation-use-details.interface.ts` while keeping this narrowing makes
+          // the `typeof` check compare against a type with no `string` member, which does not compile
+          // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
+          quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
+          unit: row.unit,
+          description: row.description
+        }))
     };
   }
 

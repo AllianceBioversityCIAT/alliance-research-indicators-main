@@ -403,15 +403,18 @@ is wired to **nothing outside that card**. Specifically it **MUST NOT** be compo
 `loadFailed()`.
 
 **Why not `loadFailed()`** — the coupling is not merely inelegant, it is a data-loss path.
+*(Line anchors in this section were re-verified against the working tree after T-09 landed; T-09's
++42 lines had shifted every one of them. They will drift again — treat them as of 2026-09-09 and
+grep the quoted text, not the number.)*
 `loadFailed()` feeds three consumers that were built on a narrower contract, documented in that
-file's own comments at `:201-205` and `:614-618`: *a failed GET leaves `body` untouched, so there is
+file's own comments at `:205-209` and `:616-620`: *a failed GET leaves `body` untouched, so there is
 nothing of the user's to lose.*
 
 | Consumer | Effect if the picker's failure reaches it |
 | --- | --- |
 | the whole-page render gate (`.component.html:5-10`) | the **entire** section unmounts, although its own GET succeeded |
-| `saveData()`'s PATCH guard (`.component.ts:651`) | *Save* becomes a **silent** no-op — no toast, no explanation |
-| `app-navigation-buttons` (`.component.html:322`) | sits **outside** the `@if`/`@else`, so it stays enabled and *Next* **discards unsaved edits unwarned** |
+| `saveData()`'s PATCH guard (`.component.ts:653`) | *Save* becomes a **silent** no-op — no toast, no explanation |
+| `app-navigation-buttons` (`.component.html:329`) | sits **outside** the `@if`/`@else`, so it stays enabled and *Next* **discards unsaved edits unwarned** |
 
 Reachable in six steps (KZ-008 — constructed, not hypothesized): open an editable result → the
 section GET resolves and the form renders → the user edits the justification or an actor row, unsaved

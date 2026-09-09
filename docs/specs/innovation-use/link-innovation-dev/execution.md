@@ -1882,3 +1882,52 @@ This clause is not optional decoration: it is one of Amendment 03's four error c
 ### Status
 
 T-09 stays **`[~]`**. Two reasons, either sufficient on its own: the worker's `Not Done` field is unresolved, and F6 cannot fail. Remainder owed: **one test** asserting the empty-state tooltip is suppressed while `error()` is true, so F6 reddens. Being client work, it is delegated to Antigravity per the standing ruling — not written by the Leader.
+
+### ✅ T-09 — Reviewer PASS (Amendment 03, attempt 1 of the restored budget)
+
+**Date** 2026-09-09 · **Reviewer** `akili-reviewer`, `opus` (T3), Lens-checklist mode · **Implementers** Antigravity `gemini-3.1-pro-high` ×2 (remediation, then the F6 remainder) · **Verdict `STATUS: PASS`**
+
+> **Summary (verbatim).** *"T-09 now implements design.md §6.8 and DD-12 exactly — the picker's load error is detected from the response envelope, surfaced inside the RELATED INNOVATION DEVELOPMENT card, leaves the control mounted-but-disabled, and reaches nothing outside that card; `loadFailed()` is back to its original plain-signal contract, so the silent-data-loss path attempt 3 opened is closed and is now held closed by a save-path test that F2 reddens. All four R-IUL-012 states are asserted on rendered output, R-IUL-002's request shape is asserted exactly, and no hex literal enters new code."*
+
+### Final verification — Leader-measured in isolation, both worker terminals closed first
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6911/6911 tests PASS**; coverage 98.25 / 96.26 / 97.99 / 98.53, all four floors held |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline, delta 0** (unfiltered count); `out-tsc` absent |
+| `npm run lint -- --quiet` | All files pass |
+| `npx prettier --check` (4 files) | All four pass |
+| **Falsifiers F1–F6** | **6 of 6 observed RED**, tree restored byte-identically after each (final diffstat 110 / 403 / 75 / 10 — 493 insertions, 105 deletions) |
+
+**The worker's declared `Not Done` is discharged.** Attempt 1's worker honestly reported all six falsifiers as *"NOT RUN (Reasoned only)"*; the Leader ran them and found **F6 could not fail**. The remainder — one test — was delegated (client lane), that worker **did** run the falsifier, and the Leader re-verified it: guard occurrences **2 → 1**, `git diff --stat` confirming the file changed, and the new test *asserts the pTooltip directive does not receive the empty state tooltip on a failed load (R-IUL-012)* going red. It touched only the spec file; the other three files' diffstats were unchanged (110 / 75 / 10).
+
+### What the Reviewer verified independently, and why it matters
+
+Two checks went beyond confirming the diff, and both are the kind that catch a vacuous green:
+
+- **The save-path falsifier could have been vacuous.** `expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalled()` would pass on an earlier test's call if mocks leaked. The Reviewer confirmed the enclosing `beforeEach` runs `jest.clearAllMocks()` and re-arms `isEditableStatus → true` (`spec.ts:3212-3213`), so the assertion is scoped to that test. `error()` is asserted true immediately before the save, `loadFailed()` false, and the card queried mounted after. **It is a real draft save through the real guard.**
+- **R-IUL-002's no-filter claim was checked in production code, not just the mock.** `GET_Results`'s real builder (`api.service.ts:301-312`) drops `create-user-codes` and emits `only-own-results=false`, so `toHaveBeenCalledWith({ 'indicator-codes': [2] })` — an exact single-arg match that any extra key would fail — holds against the real request shape too.
+
+Also confirmed clean: no `error.set(` anywhere in the spec file (KZ-001 closed); the loading test arranges the transition **in both directions** (KZ-015); the banner is token-identical to the page banner with only `rs-p-[20] rs-mb-[25]` → `rs-p-[12] rs-mb-[16]`, which are already this file's in-card banner values (guidance callout, save-error block), so the nesting adaptation needs no recorded decision; and the prettier reflow is **mandated** by T-09's own Verify line, so it is normalization rather than churn — the one place it could have bitten (the evidence callout's `(<button …>` split) runs through the suite's `normalize()` helper whose `\(\s+` rules exist for exactly that.
+
+**§6.8's Recovery clause is the one Amendment-03 sentence with no in-suite assertion.** It is implemented (`get-innovation-dev-output.service.ts:25`) and explicitly owned by T-12's visual checklist, so it is a gap recorded in the spec's own decomposition, not a silent omission.
+
+### ADVISORY — recorded, never gates, and may not mint a task in this spec
+
+1. **READABILITY** — the 17 new tests are nested inside `describe('… — R3: contrast, measured, extended to every text role …')` (`spec.ts:3179`), which now misdescribes its own contents; it works only because that describe owns a full TestBed fixture. Lift the T-09 block to a top-level sibling before T-12.
+2. **READABILITY/RELIABILITY** — `@if (innoDevSelect.isRequired)` (`html:159`) reads a child's input from a template position **preceding** that child's own binding, to gate an asterisk on a compile-time constant. DD-11 asks only for an asterisk on the title, so an unconditional span removes the forward reference entirely. The Reviewer **could not establish reachability** of an NG0100 read and the measured evidence points the other way (green suite, F3 proved the asterisk renders) — filed as simplification, not a defect. Worth a glance at the dev console during T-12's `ng serve` pass.
+3. **RELIABILITY (KZ-017 coverage scope)** — the dropdown-**list** half of §6.2's label clause rests on `expect(selectComp.itemTemplate).toBeDefined()`, a presence assertion; only the collapsed value is asserted on rendered text. The Reviewer tried to construct a divergence between the `#item` and collapsed labels and could not (both project the same `formatInnovationDevLabel(result)` call, and the `#item → #itemX` falsifier does redden). Opening the overlay in the populated test would close it cheaply.
+4. **RELIABILITY** — §6.8's Recovery clause could move out of T-12's human checklist into the harness with two lines: a second `main()` on the success mock, then assert `error()` false and the banner gone.
+5. **RESILIENCE** — the service no longer clears `list` on failure (the old code ran `list.set(...)` unconditionally), so **stale options survive an error**. No reachable harm today (the picker is disabled whenever `error()` is true, and the only other consumer, `policy-change.component.html:36-41`, binds `[disabled]="true"` unconditionally). **Worth remembering when T-10/T-11 land.**
+6. **READABILITY** — the old c10 advisory comment (`spec.ts:194-199`) explaining why the page-wide `not.toContain('This field is required')` survived T-08 was deleted rather than folded into the new T-09 note. Its content is superseded by the card-scoping, but the reasoning trail is gone.
+7. **RELIABILITY (nit)** — `formatInnovationDevLabel`'s `code === ''` fallback (bare title) is untested. Reachable (`mapV2ResultListItemToResult` emits `result_official_code: String(x ?? '')`), but the outcome is a harmless bare title.
+
+**Advisory 5 is the one to carry forward**, and it is carried here deliberately rather than left in the register — KZ-008's lesson from this very spec is that an advisory with no owner stops being acted on. It is **not** a task and does not widen T-10 or T-11; it is a fact their briefs must state: *the options list is not cleared on error, so a card built from `list()` must not assume the list is empty when `error()` is true.*
+
+### Doc-drift correction applied in the same commit
+
+The Reviewer found §6.8's line anchors stale — T-09's +42 lines shifted every one of the four it cites. Those anchors were written by the Leader earlier **in this session**, so correcting them is closing a factual error in this session's own text, not absorbing an advisory into new scope: `:201-205`/`:614-618` → `:205-209`/`:616-620`, `.component.ts:651` → `:653`, `.component.html:322` → `:329`, plus a note telling future readers to grep the quoted text rather than trust the number.
+
+### Status
+
+**T-09 → `[x]`.** Written to `tasks.md` only after this PASS entry existed, per the evidence-before-checkbox ordering. **6 of 14 tasks `[x]`.** Client code remains uncommitted pending the run's commit; nothing pushed.
