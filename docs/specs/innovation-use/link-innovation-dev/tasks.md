@@ -107,7 +107,7 @@ delete the `down()` body → the spec's "down is non-empty and restorative" asse
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | **L** |
 | Depends on | T-01 |
 | Requirements | R-IUL-009 (both scenarios + all `BUT`/`AND IT MUST` clauses) |
