@@ -500,7 +500,7 @@ correctness. Stated rather than dressed up as a behavioral gate.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | M |
 | Depends on | T-02, T-03 |
 | Requirements | R-IUL-009 (Scenario: No grandfathering) — **regression protection**, not new behavior |

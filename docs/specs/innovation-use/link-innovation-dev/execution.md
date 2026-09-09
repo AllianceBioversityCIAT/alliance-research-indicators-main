@@ -1377,3 +1377,152 @@ lesson has not been institutionalized where it needs to be — in the *authoring
 review. The one durable fix observed here: T-02's Implementer did not merely anchor its regex, it
 **rewrote the colliding comment in prose so the collision surface no longer exists.** Removing the
 surface beats guarding it.
+
+---
+
+### T-14 — Repair the two sibling fixture files rule 16 retroactively broke  *(Amendment 02)*
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS on attempt 1** |
+| Date | 2026-09-09 |
+| Requirements | R-IUL-009 (Scenario: No grandfathering) — regression protection |
+| Design | §3.3, §11.5 |
+| Skills assigned | `nestjs-expert`, `systematic-debugging` |
+| Effort | `high` |
+| Reviewer | `akili-reviewer` on `opus` |
+
+**Files changed:** `innovation-use-validation.fixture-spec.ts`, `innovation-use-result-creation.fixture-spec.ts`
+(both under `server/researchindicators/test/fixtures/innovation-use/`).
+
+##### The central constraint held — verified assertion by assertion, at the source
+
+T-14's binding framing was *restore isolation, never relax an assertion*. The Reviewer read every one:
+
+| Check | Finding |
+| --- | --- |
+| The 15 | **15 `toBe(1)` and 24 `toBe(0)` = 39** `it` blocks. The 15 sit at lines 620, 680, 757, 772, 796, 828, 888, 933, 961, 1017, 1053, 1095, 1112, 1161, 1191 — exactly F3, F7, F11, F17, F18, F20, F23, F26, F28, F32, F35, F38, F39, F42, F43, each still inside the `it` whose title claims the pass |
+| The 2 | both still `toBeTruthy()` — `beforeIpRights.innovation_use` (`:799`) and `after.innovation_use` (`:862`). `result3Id`'s is still `toBeFalsy()` (`:824`), `before.innovation_use` still `toBeFalsy()` (`:839`/`:861`) |
+| Relaxation | **No `it.skip` / `it.only` / `xit` / `.todo`; no `toBe(1)` became `toBe(0)`; nothing deleted.** Zero conversions to `FALSE` |
+
+**The 2 in `result-creation` were `toBeTruthy()`, not `toBe(1)`** — which is why the brief said *"read
+them, do not assume the shape"*. A repair driven by the wrong grep pattern would have missed both.
+
+##### How the 15 were repaired — one helper, as the Leader's measurement predicted
+
+A new `seedLinkedDevLink(resultId)` seeds one active `indicator_id = 2` target plus one active role-5
+`link_results` row, and is called from inside the shared `seedResult()` — **unconditionally, for every
+case, `TRUE`- and `FALSE`-expecting alike.**
+
+##### The monotonicity argument, and the Reviewer's STRONGER version of it
+
+The Implementer justified the unconditional seed as *"rule 16 is AND-ed onto the RETURN, so satisfying
+it can never flip an already-FALSE case to TRUE."* Sound — but the Reviewer verified it against the
+emitted `RETURN` (Migration B `up()`, lines 254–269) and produced a strictly stronger claim:
+
+> Rule 16 is the **last top-level conjunct**, parenthesized, with **no `OR` at the top level** (every
+> `AND`/`OR` chain lives inside the `EXISTS` `WHERE`). With that conjunct forced `TRUE` for every
+> subject the file creates, the expression is `X AND TRUE`, which is **identically `X`** — in
+> two-valued *and* in MySQL's three-valued logic. So every case now evaluates to **precisely the value
+> it evaluated to before Migration B.**
+
+That is more than "cannot flip `FALSE` to `TRUE`": **the repair restores the pre-migration semantics
+exactly**, so no `FALSE` case's `FALSE` can have moved to a different producer.
+
+##### The Leader's question 2 (meaning drift) — answered, and the answer inverts the concern
+
+The Leader asked whether any case that previously derived its `FALSE` from the *absence* of a link now
+derives it from something else — green for a different reason than its title claims, the KZ-001 shape.
+**No, and the direction of change is the opposite of the worry:**
+
+- **No rule other than 16 reads `link_results.`** Every other `SELECT` is keyed `WHERE <table>.result_id = result_code` over `result_innovation_use` / `result_actors` / `result_institution_types` / `result_quantifications`. The extra target `results` row carries a *different* `result_id` and is unreachable by rules 2–15.
+- The 24 `FALSE` cases predate rule 16 entirely, and the Leader's own measurement recorded **0** `link_results` writes in this file — the link's absence was **incidental, never a case's subject**. No title, comment or assertion in the file refers to a link.
+- **In the window between Migration B and this repair, those 24 were *over-determined*** (their own rule **and** rule 16), which is why they stayed green. **The repair removes the over-determination and restores single-rule attributability. Isolation increased.**
+
+Coverage of the link-less case lives in T-03's **R16-1**, and T-03's **R16-7** is the mirror invariant
+(rules 2–15 still discriminate *with* a valid link) — exactly the division `tasks.md` §4 assigns.
+
+##### The Leader's question 1 (row leakage) — settled by measurement, and the mechanism is the durable one
+
+The Leader suspected the helper leaked 39 `results` rows per run, since the `afterAll` loop iterates
+tracked *subject* ids and `jest-fixtures.json` documents that shared-row accumulation once produced
+*"3 spurious FK failures in 9 runs"*. **Measured instead of argued**, on the repaired tree after a
+clean run:
+
+```
+SELECT COUNT(*) FROM ari_scratch_test.results;       -> 0
+SELECT COUNT(*) FROM ari_scratch_test.link_results;  -> 0
+```
+
+**Nothing leaks. The Leader's hypothesis was wrong**, and the measurement was sent to the Reviewer
+mid-flight so it would not spend effort on a settled question or emit a finding the evidence
+contradicts.
+
+The Reviewer then answered the part that *was* still useful — **how** the teardown reaches those rows,
+which decides durability:
+
+> **Id-tracking, not a broad attribute-keyed delete.** `seedLinkedDevLink` pushes the target's
+> `insertId` into the **same** `resultIds` array the `afterAll` loop iterates, so it holds **78 ids per
+> run** (39 subjects + 39 targets); both deletes are id-keyed. **A case added later that calls
+> `seedResult()` gets its target tracked automatically, with no teardown edit** — and there is no
+> over-delete surface if a sibling ever reuses band `900_100` or year 2096. Push ordering is also
+> correct for partial failure: the subject id is tracked before the helper runs and the target id
+> before the `link_results` INSERT, so a throw at either point still leaves everything created so far
+> tracked for cleanup.
+
+`result-creation` uses an explicit `IN (?, ?, ?, ?)` over its four known ids — the pre-existing style
+of all nine of that file's deletes. It does not auto-extend to a fifth result, but it is id-keyed, so
+again no over-delete risk.
+
+##### Isolation on the shared schema, and `result2Id`'s reuse
+
+- New catalog seeding is `INSERT IGNORE` on `indicator_types (1, …)` and `indicators (2, …)`, **never torn down** — byte-for-byte the same rows and discipline as T-03's fixture and `result-creation`. All three insert-ignore and none delete, so there is **no delete race** under `maxWorkers: 1`.
+- **T-03's uniqueness holds:** band `902_400` and year `2114` appear only in T-03's file. The new targets draw from the validation file's own `900_100…` counter and its year 2096; `result-creation` stays on `901_000` / 2112. No new `clarisa_institution_types` rows, so the contention that motivated `maxWorkers: 1` is not re-opened.
+- `link_result_roles` id 5 is **not** seeded by either file — both depend on Migration A being applied. **Failure mode is a loud FK error, never a false green.**
+- **`result2Id` reuse: acceptable.** The assertion reading it is a **key-set** claim (`Object.keys(...).sort()` + `not.toHaveProperty('innovation_use')`), and `calculateGreenChecks` derives the key set from `indicator_id`. Becoming a link target changes neither its indicator, its `is_active`, nor its key set, and no *value* on it is asserted — so neither assertion is weakened and the "unrelated control" role survives.
+
+##### Verification
+
+| Check | Result |
+| --- | --- |
+| `npm run test:fixtures`, **Leader-re-measured** in the quiet window | **`Test Suites: 19 passed, 19 total`** · **`Tests: 130 passed, 130 total`** — the whole `test/fixtures` tree, wider than the 17-suite/127-test innovation-use-only scope the Pivot measured (the extra two are `smoke` and `sp-versioning-objective-blocks`, pre-existing and unaffected) |
+| Orphan check (Leader) | `results` = **0**, `link_results` = **0** |
+| Lint | `npx eslint <both files>` clean; `npx prettier --check` → *"All matched files use Prettier code style!"* (a **check**, not a rewrite) |
+| **Falsifier 1** — commented out `await seedLinkedDevLink(resultId)` inside `seedResult()` | RED: `Tests: 15 failed, 24 passed, 39 total`, reddening **the exact same 15 cases**. Reverted, full suite green |
+| **Falsifier 2** — commented out both `INSERT INTO link_results` in `result-creation` | RED: `Tests: 2 failed, 3 passed, 5 total`, both `toBeTruthy() / Received: 0` at the original lines. Reverted, full suite green |
+
+The falsifiers are the load-bearing evidence here: they prove the repair restored a **precondition**
+rather than silencing a failure — remove the seeded link and exactly the originally-broken cases break
+again, no more and no fewer.
+
+##### `ADVISORY` — recorded, not actioned. **The first one writes a falsehood into the repo and is surfaced to the user.**
+
+- **⚠️ RELIABILITY — `result3Id`'s in-file rationale is INVERTED.** `result-creation:824` asserts `toBeFalsy()` for a result with **no `result_innovation_use` row at all**. Post-migration that `FALSE` has **two independent producers** (missing detail row → `commonFields = FALSE`, *and* no rule-16 link), so the case no longer isolates the missing-row default: **were that default ever regressed to `TRUE`, the case would stay green via rule 16.** The in-file reason — *"adding a link there would prove nothing and could mask a regression in the pre-rule-16 gate"* — **is backwards**; a link would have *restored* the isolation T-14's own blockquote prescribes. Two mitigations kept it advisory: the case's *designed* falsifier (adding `innovation_use` to `VISUAL_ONLY_GREEN_CHECKS`) is unaffected by rule 16, and the missing-row default **is** isolated by **F1** in the sibling validation file, whose base now does carry a link. **Surfaced to the user because a wrong comment is the KZ-007 artifact class — it reads as settled fact, is rarely re-verified, and propagates.** Remedy if the file is touched again: seed `result3Id → result2Id` and rewrite the sentence to the honest reason.
+- **RESILIENCE:** the unconditional seed widens the blast radius for the 24 cases that do not need it — a schema without `link_result_roles` id 5 (Migration A reverted) reddens **all 39** on an FK error, not just the 15. It fails loudly, and conditional seeding would reintroduce the 15 per-case decisions the design deliberately avoided, so the trade is defensible. Worth one sentence in the helper's docstring naming Migration A as the precondition all 39 now share.
+- **RISK:** `result2Id` now carries two roles, so `result1Id`/`result4Id`'s `TRUE` assertions depend on it staying active and indicator-2. A future task repurposing that control would redden two `it`s with a message pointing at the wrong subject. Cheapest hardening, no new row: assert `result2Id`'s two required properties right after the link INSERTs, so a repurpose fails at the seed with an explanatory message.
+- **READABILITY — `T-14` is an overloaded token in this directory.** The validation file now contains **both** this spec's T-14 and, pre-existing at `:158` and `:1150`, **`changes/innovation-use-required-fields`'s own T-14** (with seven more instances in `institution-type-subtype-catalog-equivalence.fixture-spec.ts`). The new top-level comments qualify by spec path; the bare inline markers do not. Suggest `T-14 (link-innovation-dev)`. Also a small docstring imprecision: *"Both rows are tracked in `resultIds`"* — only the target `results` row is pushed; the `link_results` row is reached by the id-keyed `OR` predicate, which the same sentence's parenthetical then states correctly.
+
+##### In-file reasoning and KZ-017 — both sufficient
+
+The Reviewer judged the rationale reconstructible end to end: validation file header ¶ 95–129 (the
+break, the 15 named cases, why one helper, the monotonicity argument, the T-03 cross-reference, the
+KZ-017 disclaimer), the `seedLinkedDevLink` docstring at 199–209, catalog rationale at 372–378,
+teardown FK-direction rationale at 488–493; `result-creation` header ¶ 192–211 including the
+`result2Id` reuse and the `result3Id` exemption, the link INSERTs at 600–605, teardown at 634–638, and
+per-`it` notes at 786–788 / 833–835. **KZ-017 is declared in both** — validation `:127-129` (*"this
+file still cannot and does not prove rule 16's own runtime behavior — R-IUL-009's dedicated fixture
+does"*) and `result-creation` `:205-209`.
+
+##### Reviewer's declared limits (KZ-017)
+
+Corroborated **by reading**: every assertion and its line, the 39/15/24 counts, both teardown paths,
+the helper's push ordering, the emitted `RETURN`, band/report-year disjointness across all three
+fixtures, `INNOVATION_USE_LINKED_DEV = 5`, and scope containment via a repo-wide `Amendment 02` search
+(**exactly two** files under `server/researchindicators/` carry the marker — the two repaired ones).
+**Taken from the report, not measured:** `eslint`/`prettier` cleanliness and both falsifier runs.
+**The green it takes from the Leader's independent re-measurement, not the worker's.** Structurally out
+of reach: proving `docs/specs/**` unmodified without `git diff`, any future fixture depending on
+pre-rule-16 behavior (T-14's own declared *Cannot prove*), and MySQL's runtime evaluation of the
+repaired function.
+
+**Finalize order held:** this entry was written before `tasks.md` T-14 was flipped to `[x]`.
