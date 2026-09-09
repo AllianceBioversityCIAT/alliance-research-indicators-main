@@ -117,19 +117,19 @@ T-01 and T-02 are independent of each other and of T-03 (different tiers, no sha
   - **⚠ Full fixture prerequisites (judgment.md S-3) — the non-OICR branch also requires an active `result_sdgs` row.** `alignment_validation`'s `if result_indicator <> 5 then` block (present today, unchanged) requires `COUNT(rs.result_sdg_id) > 0` for indicators 4 and 6 same as it always has. A fixture result that is missing this will read `false` for reasons unrelated to `impact_outcomes` and produce a false failure. Each fixture result needs: one primary contract (`contract_role_id = 1`), one primary lever with `lever_role_id = 3` (Portfolio‑2 research-areas role), one `result_strategic_objectives` row (`role_id = 1`), and — for indicators 4 and 6 only — one active `result_sdgs` row, **before** varying `result_impact_outcomes` as the one thing under test.
   - **⚠ If `CREATE FUNCTION` fails mid-run (judgment.md S-2):** MySQL DDL auto-commits, so a failed `CREATE` after the `DROP FUNCTION IF EXISTS` leaves `alignment_validation` **missing entirely**, with no `migrations` table row recorded — `migration:revert` would then target the wrong (previous) migration, not restore this function. If this happens, the recovery is to manually re-apply `1783021729548`'s exact `up()` body directly (not via `migration:revert`) before anything else touches this schema.
 - **Acceptance / done check — the fixture matrix (8 cases, not 6; adds the two negative-branch cases judgment.md flagged as ungated):**
-  - [ ] Apply the migration to the disposable schema; confirm `alignment_validation` exists and the `migrations` table recorded the new row.
-  - [ ] `indicator_id = 4`, Portfolio 2, full prerequisites, **zero** active `impact_outcomes` rows → `SELECT alignment_validation(<id>)` returns `false`.
-  - [ ] Same result, add one active `impact_outcomes` row (`role_id = 1`) → returns `true`.
-  - [ ] `indicator_id = 6`, Portfolio 2, full prerequisites, zero active `impact_outcomes` rows → `false`.
-  - [ ] Same result, add one active `impact_outcomes` row → `true`.
-  - [ ] `indicator_id = 5` (OICR), Portfolio 2, both with and without `impact_outcomes` → same result as before this migration (spot-check against the pre-migration behavior if a snapshot/backup is available, or reason from the unchanged branch).
-  - [ ] **Negative — indicator outside the allow-list stays unaffected (closes S-4/AC.5):** `indicator_id = 3` (Knowledge Product), Portfolio 2, with and without an active `impact_outcomes` row → return value identical in both cases (the field is irrelevant to this indicator's completeness either way).
-  - [ ] **Negative — Portfolio 1 untouched (closes S-4/DD-3's "provably unchanged" claim):** a Portfolio‑1 OICR (`indicator_id = 5`) result with its existing lever-SDG-target/strategic-outcome fixtures unchanged returns the **same** value before and after the migration.
+  - [x] Apply the migration to the disposable schema; confirm `alignment_validation` exists and the `migrations` table recorded the new row. (Applied via the real TypeORM `queryRunner.query()` path, attempt 2 — see execution.md.)
+  - [x] `indicator_id = 4`, Portfolio 2, full prerequisites, **zero** active `impact_outcomes` rows → `SELECT alignment_validation(<id>)` returns `false`.
+  - [x] Same result, add one active `impact_outcomes` row (`role_id = 1`) → returns `true`.
+  - [x] `indicator_id = 6`, Portfolio 2, full prerequisites, zero active `impact_outcomes` rows → `false`.
+  - [x] Same result, add one active `impact_outcomes` row → `true`.
+  - [x] `indicator_id = 5` (OICR), Portfolio 2, both with and without `impact_outcomes` → same result as before this migration. (4-observation matrix incl. real `down()`/`up()` cycle, attempt 2 — see execution.md.)
+  - [x] **Negative — indicator outside the allow-list stays unaffected (closes S-4/AC.5):** `indicator_id = 3` (Knowledge Product), Portfolio 2, with and without an active `impact_outcomes` row → return value identical in both cases.
+  - [x] **Negative — Portfolio 1 untouched (closes S-4/DD-3's "provably unchanged" claim):** a Portfolio‑1 OICR (`indicator_id = 5`) result with its existing lever-SDG-target/strategic-outcome fixtures unchanged returns the **same** value before and after the migration.
   - **What this evidence cannot prove:** performance/concurrency behavior of the function under load — out of scope; this is a correctness-only gate.
 - **Dependencies:** T-03.
 - **Estimated effort:** M (schema setup + 8 fixture combinations)
 - **Owner:** —
-- **Status:** todo
+- **Status:** done
 - **Skills:** `nestjs-expert`
 
 ---
