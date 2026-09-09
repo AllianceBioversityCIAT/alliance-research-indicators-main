@@ -2227,3 +2227,70 @@ Both were adjudicated to T-11 rather than T-10, with reasons. Recorded here beca
 ### Status
 
 **T-10 → `[x]`**, written to `tasks.md` only after this PASS entry existed. **7 of 14 tasks `[x]`.** Next eligible: **T-11** (client, unblocked by T-10) and **T-04…T-07** (server lane, independent per §2).
+
+---
+
+## ✅ T-11 — Payload wiring — Reviewer PASS (attempt 1, no rework)
+
+**Date** 2026-09-09 · **Executor** Antigravity `gemini-3.1-pro-high` via Orca orchestration (task `task_0943e69409b9`, terminal closed after collection) · **Reviewer** `akili-reviewer`, `opus` (T3) · **Verdict `STATUS: PASS`** · **First task in this spec to pass on its first attempt.**
+
+> **Summary (verbatim).** *"The three-way discipline is real — a bare pass-through from a `number | null | undefined` read type into a `?: number | null` payload key, with no coalescing anywhere between `body()` and `http.patch`, asserted against the same `JSON.stringify` the wire uses and falsifier-proven in both directions. FIX B removes `as unknown as` without relocating it… both fixtures now `.set()` the live signal instance, closing the `optionsSig`-pinning gap."*
+
+### What landed
+
+| Fix | Result |
+| --- | --- |
+| **FIX A — three-way discipline** | `innovation_dev_result_id?: number \| null` added to `InnovationUsePayload` (`:107`); `buildPayload()` emits `current.innovation_dev_result_id` as a **bare pass-through** (`:570`) — no `??`, no `\|\|` |
+| **FIX B — carry-forward** | `as unknown as` **gone, not relocated** (zero matches in the component). Replaced by the exact four-field read shape, with `Number(option.result_official_code)` making the string→number conversion visible |
+| **Carry-forward rule** | both fixtures converted from `service.list = signal([...])` to `service.list.set([...])` |
+
+### The Reviewer traced the whole wire path, which is what makes FIX A's claim more than a unit-test artifact
+
+`body()` (read type `number | null | undefined`) → `buildPayload()` (bare pass-through) → `saveData()` (`:697`) → `api.PATCH_InnovationUseDetails` (`api.service.ts:601-604`) → `TP.patch` (`to-promise.service.ts:132-140`) → `http.patch`. The wrapper adds only an `X-Use-Year` header; the body reaches Angular's JSON serializer untouched. It also confirmed `jwt.interceptor`'s FormData-mutating branch (K-005) keys on `textMiningUrl`/`documentOverviewUrl`/`fileManagerUrl` and **cannot** match this endpoint.
+
+**So the transform the tests assert on (`JSON.stringify`) is the same transform the wire applies** — the assertion target is the real serialization, not a proxy for it. That is the difference between this test and the object-assertion the spec explicitly forbade.
+
+`?: number | null` is the right declaration: `?` carries *untouched/omitted*, `null` carries *clear*, `number` carries *selected*. Three states, three encodings, nothing unrepresentable and nothing redundant — and it matches §4.1's wire contract verbatim plus `InnovationUseOrganizationPayload`'s own idiom.
+
+### Gates — Leader-measured in isolation, worker terminal closed first
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6920/6920 tests PASS** |
+| `npx tsc -p tsconfig.spec.json --noEmit`, **grepped per-file** | **empty** for the touched files — the drift-proof method the client guide mandates. Total 934 = baseline, reference only. `out-tsc` absent |
+| `npm run build` (`strictTemplates`) | **exit 0**, zero `[ERROR]` blocks, bundle emitted |
+| `npm run lint -- --quiet` | passes |
+| `npx prettier --check` (2 files) | passes — the worker ran `--write` (a fixer); the **Leader ran `--check` as the gate**, per §4.3's *"worker may fix, Leader verifies, and no single command may do both"* |
+
+### Falsifiers — Leader-run, tree restored byte-identically after each
+
+| Mutation | Observed |
+| --- | --- |
+| emission → `?? undefined` | ✅ **1 red** — *3. cleared → the key is PRESENT with value null*. **The mandatory one:** it proves the assertion is on the serialization, because an object assertion could not detect a dropped key |
+| emission → `?? null` | ✅ **2 red** — *1. untouched → the key is ABSENT*, plus a pre-existing T-08 level-only save test |
+| **FIX B reverted to the cast** | ✅ **206/206 still pass — no red, as expected** |
+
+**The third one is the methodologically interesting result.** The brief told the worker that if no behavioral falsifier exists for a type-only fix, the correct answer is to **say so, not to invent a red**. It did exactly that — *"ACTUALLY RAN: No. Reason: there is no live defect for this type-safety-only fix, thus no behavioral falsifier exists"* — and the **Leader then verified the declaration rather than accepting it** by reverting FIX B and observing 206/206 green. A check that cannot fail for the property claimed must say so; this is the first time in this spec that rule produced a clean outcome instead of a defect.
+
+### Coverage boundaries the Reviewer established rather than assumed
+
+- **Nothing writes `null` into `body().innovation_dev_result_id` today**, proven by an exhaustive writer set: `SelectComponent.setValue()` is the only writer via `[optionValue]`, and the template hardcodes `[showClear]="false"` so p-select never emits a clear; `getData()`'s response spread cannot deliver it because `innovation_dev_result_id` has **zero occurrences in `server/researchindicators/src`** (T-04/T-07 are `[ ]`). So the `null` branch is **deliberately unreachable-but-tested**, exactly as T-11's Amendment 01 callout instructs — recorded as a **declared** gap, not live coverage.
+- **R-IUL-008's persistence halves are server-side and correctly deferred** — *"omitted key preserves the row"* and *"explicit null deactivates it"* are not provable from the client and belong to T-06/T-07. This is declared in three places already (§13's tier table scopes R-IUL-008 **Server**; R-IUL-004's note says the client half is not exercised by this surface; §6.4 says the path stays tested server-side), so the deferral is traceable rather than silent.
+- **R-IUL-001's *"multiplicity MUST NOT be representable"* is satisfied structurally** — a single scalar key, no array anywhere on the write path.
+- `Number()` **cannot yield `NaN`** here: the source is `String(row.result_official_code ?? '')` from `mapV2ResultListItemToResult`, whose only degenerate output is `''`, and `Number('') === 0`.
+
+### ADVISORY (recorded, never gates, may not mint a task)
+
+1. **RELIABILITY** — if a v2 row ever arrived without `result_official_code`, the mapper yields `''` and the projection stores `Number('') === 0`, so the card would read `STAR 0 - <title>` and the anchor would target `/result/STAR-0/…` — a **fabricated** code rather than an obviously broken one. The Reviewer constructed the client half but **could not demonstrate an API response that omits the field**, and the pre-FIX-B cast rendered the same case wrongly too (`STAR`, href `/result/STAR-/…`), so this is **neither a regression nor a named R-IUL-004 clause**. A `Number.isFinite(n) && n > 0` guard falling back to the unlinked state would close it.
+2. **READABILITY** — the new `:570` line is the only spec-driven line in this file with no `@akili-spec` marker, and the `?? undefined` comment block now sits *between* it and the field it actually describes, so its referent reads ambiguously. A one-line marker saying *"explicit null must survive — do NOT add `??` here"* would make §6.7's **intended** inconsistency legible. **Not a gate finding**, and the Reviewer's own reasoning is why: the invariant is guarded **behaviorally** — test 3 carries the mutation in a comment and the Leader observed it red — so a maintainer "tidying the inconsistency" is stopped by a failing test that names what they did. *Executable guard > comment.*
+3. **TEST REALISM (T-12 candidate)** — every fixture in the file writes `result_official_code` as a **number** behind `as any`, while production always delivers a **string**. So the projection's string→number conversion — the whole reason FIX B exists — is asserted nowhere. One render-path case with `result_official_code: '285'` asserting `PRMS 285 - …` and the `PRMS-285` href would cover it.
+
+### Process note — the reviewer's stale-`git status` false alarm, now twice
+
+The Reviewer flagged `innovation-use-details.component.html` and `get-innovation-dev-output.service.ts` as *"modified-uncommitted… T-09/T-10 residue to reconcile"*. **Verified false:** `git status` at that moment showed only T-11's two files; the `.html` was committed in `a5194f2a` and the service in `be4877c6`.
+
+The cause is structural, not carelessness: `akili-reviewer` has **no `Bash`**, so it cannot check `git`, and its context carries the **session-start** `git status` snapshot — which predates every commit this session made. The previous T-10 reviewer raised the identical false alarm. **Both times it flagged the concern with an explicit "please confirm" rather than asserting it, which is exactly right for a claim it cannot verify.** Fix belongs in the Leader's brief: state the current `git status` explicitly in future review briefs so the reviewer is not reasoning from a stale snapshot.
+
+### Status
+
+**T-11 → `[x]`**, written after this PASS entry existed. **8 of 14 tasks `[x]`.** The **client implementation lane is now complete** (T-08 … T-11). Remaining: **T-04 … T-07** (server, Claude lane, next by document order), **T-12** (client suite + human visual check — needs the user's eyes and a running app), **T-13** (doc sync).

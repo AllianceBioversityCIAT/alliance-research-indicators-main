@@ -104,6 +104,7 @@ interface InnovationUseQuantificationPayload {
 
 export interface InnovationUsePayload {
   innovation_use_level_id?: number;
+  innovation_dev_result_id?: number | null;
   innovation_use_level_explanation?: string;
   actors: InnovationUseActorPayload[];
   organizations: InnovationUseOrganizationPayload[];
@@ -210,9 +211,17 @@ export default class InnovationUseDetailsComponent {
     this.body.update(current => {
       if (current.linked_innovation_dev?.result_id !== resultId) {
         const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
-        // `linked_innovation_dev` is a READ projection on GetInnovationUseDetails, not a key of the
-        // write payload (InnovationUsePayload) — casting to the latter does not compile.
-        return { ...current, linked_innovation_dev: (option as unknown as GetInnovationUseDetails['linked_innovation_dev']) ?? null };
+        return {
+          ...current,
+          linked_innovation_dev: option
+            ? {
+                result_id: option.result_id,
+                result_official_code: Number(option.result_official_code),
+                title: option.title ?? '',
+                platform_code: option.platform_code ?? null
+              }
+            : null
+        };
       }
       return current;
     });
@@ -558,6 +567,7 @@ export default class InnovationUseDetailsComponent {
 
     return {
       innovation_use_level_id: current.innovation_use_level_id,
+      innovation_dev_result_id: current.innovation_dev_result_id,
       // REWORK hardening: `?? undefined` makes step 1's "never a present null" (c7) structural
       // rather than coincidental. The server's `findOne` can return `?? null`, and a plain object
       // spread in `getData()` would otherwise copy that literal `null` straight into `body()`.

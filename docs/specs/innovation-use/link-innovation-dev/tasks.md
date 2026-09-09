@@ -471,7 +471,7 @@ card, which is what attempt 2 implemented — and R-IUL-004 Scenario 2 requires 
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-09, T-10 |
 | Requirements | R-IUL-008 (both scenarios), R-IUL-001 |

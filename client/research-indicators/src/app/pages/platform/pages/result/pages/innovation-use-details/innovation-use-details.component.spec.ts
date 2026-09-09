@@ -1160,6 +1160,27 @@ describe('InnovationUseDetailsComponent', () => {
     });
   });
 
+  describe('T-11 buildPayload() — innovation_dev_result_id serialization (R-IUL-008)', () => {
+    it('1. untouched -> the key is ABSENT from the serialized body', () => {
+      component.body.set({ ...new GetInnovationUseDetails(), innovation_dev_result_id: undefined });
+      const serialized = JSON.stringify(component.buildPayload());
+      expect(JSON.parse(serialized).innovation_dev_result_id).toBeUndefined();
+    });
+
+    it('2. selected -> the key is present with the numeric id', () => {
+      component.body.set({ ...new GetInnovationUseDetails(), innovation_dev_result_id: 123 });
+      const serialized = JSON.stringify(component.buildPayload());
+      expect(JSON.parse(serialized).innovation_dev_result_id).toBe(123);
+    });
+
+    it('3. cleared -> the key is PRESENT with value null', () => {
+      component.body.set({ ...new GetInnovationUseDetails(), innovation_dev_result_id: null });
+      const serialized = JSON.stringify(component.buildPayload());
+      // FALSIFIER (binding): swap to ?? undefined in buildPayload -> this test MUST go red
+      expect(JSON.parse(serialized).innovation_dev_result_id).toBeNull();
+    });
+  });
+
   // buildPayload()-only support check — a pure-function precondition for c13's real assertion
   // below, not the criterion itself (REWORK Issue 6: a save was never actually issued here).
   describe('T-08 buildPayload() — c13 support: an unchanged section round-trips every row', () => {
@@ -4045,7 +4066,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     it('For the selection-change path, arrange the TRANSITION (render with a link, then change the selection, then detectChanges), never the end state', () => {
       // FALSIFIER (binding): deleting `(selectEvent)="onInnovationDevSelected($event)"` MUST turn this red.
       const service = TestBed.inject(GetInnoDevOutputService);
-      service.list = signal([
+      service.list.set([
         { result_id: 123, platform_code: 'STAR', result_official_code: 284, title: 'Test result' } as any,
         { result_id: 456, platform_code: 'PRMS', result_official_code: 285, title: 'Another result' } as any
       ]);
@@ -4115,7 +4136,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     it('soft-deleted target still renders (payload-only render source)', () => {
       // FALSIFIER (soft-deleted): re-point the card at innoDevSelect.selectedOption() instead of the payload -> this must go red.
       const service = TestBed.inject(GetInnoDevOutputService);
-      service.list = signal([{ result_id: 999, platform_code: 'STAR', result_official_code: 999, title: 'Unrelated result' } as any]);
+      service.list.set([{ result_id: 999, platform_code: 'STAR', result_official_code: 999, title: 'Unrelated result' } as any]);
 
       component.body.set({
         ...new GetInnovationUseDetails(),
