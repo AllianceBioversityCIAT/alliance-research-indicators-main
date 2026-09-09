@@ -9,8 +9,9 @@
 | Design | [`design.md`](design.md) **draft 2** |
 | Review ledger | [`judgment.md`](judgment.md) |
 | Approval Mode | pre-approved — Phase 3 gate **auto-approved (pre-approved mode)**, 2026-09-09 |
-| Task count | **13** (budget said 12; +1 for the doc-sync task that had no home — see §6) |
+| Task count | **14** (budget said 12; +1 for the doc-sync task that had no home, +1 for Amendment 02's fixture repair — see §6) |
 | **Amendment 01** | **2026-09-09** — user mock ([`mockup/`](mockup/)). Rescopes **T-08, T-09, T-10, T-11**; adds no task. Own section card, platform-prefixed label, `View innovation detail` action, no remove control. **Server lane T-01…T-07 unaffected** apart from `platform_code` in T-07's projection |
+| **Amendment 02** | **2026-09-09**, mid-execution, **user-approved**. Three verification-text corrections + one new task, all from defects found *while executing*: T-08's verify line emitted into `out-tsc` and disarmed T-12's gate; T-03's falsifier clause was unsatisfiable as written; §7's *"Server suite green"* could not see the fixture suite where T-03 lives. Adds **T-14** to repair the two sibling fixture files Migration B retroactively broke. **No requirement and no design decision changes** — this corrects verification text and closes an unowned consequence |
 | Created | 2026-09-09 |
 
 ---
@@ -55,6 +56,7 @@ T-01 enum + Migration A                       T-08 contract interface
   └──► T-05 DI wiring                                T-11 payload
          └──► T-06 write path                          └──► T-12 suite + visual
          └──► T-07 read path
+  └──► T-03 ──► T-14 fixture repair  (Amendment 02)
                                     ▼
                               T-13 doc sync
 ```
@@ -152,12 +154,21 @@ otherwise-invalid actor row with a valid link → `FALSE`).
 
 **Verify.** The fixture suite, run from a **provably empty** scratch schema.
 **FALSIFIER — and this one is mandatory before the task may be cited:** run this spec against the
-**pre-Migration-B** function. Every rule-16 case must go **red**. A suite that is green before the
-migration exists is testing nothing.
+**pre-Migration-B** function. Every **negative** rule-16 case — every case expecting `FALSE` — must go
+**red**. A suite that is green before the migration exists is testing nothing.
+
+> **Amendment 02 corrects this clause, which was unsatisfiable as first written** (*"Every rule-16
+> case must go red"*, while this task's own case list enumerates `valid link → TRUE`). Appending an
+> `AND` conjunct is **monotone**: it can only turn a `TRUE` into a `FALSE`, never the reverse. So the
+> positive case is *structurally incapable* of reddening against a strictly weaker predecessor, and the
+> rules-2–15 discrimination case reddens on a top-level `AND`→`OR` slip rather than on the migration's
+> absence. Both exemptions are **stated here rather than pretended**, per §3's own preamble. Measured
+> 2026-09-09: 6 of 8 cases red pre-migration, which is the full set the clause can demand.
 **Disqualifier.** If the scratch schema is not provably empty at start (table count 0 → migrated),
 the run is not evidence — report the state instead of the result.
-**Done.** All cases green post-migration, all rule-16 cases observed red pre-migration, both runs
-recorded.
+**Done.** All cases green post-migration, **every negative rule-16 case** observed red pre-migration
+(the positive case and the rules-2–15 case are exempt for the structural reasons stated in the
+FALSIFIER above — Amendment 02), both runs recorded.
 
 ---
 
@@ -296,7 +307,15 @@ to `GetInnovationUseDetails`. **`platform_code` is Amendment 01** — the `STAR 
 `InnovationUseOrganization.institution_id`: `undefined` is dropped by `JSON.stringify`, so the
 cleared state must be able to carry an explicit `null`.
 
-**Verify.** `npx tsc -p tsconfig.spec.json` (**not** `npm run lint` — it carries `--fix`)
+**Verify.** `npx tsc -p tsconfig.spec.json --noEmit` (**not** `npm run lint` — it carries `--fix`)
+
+> **`--noEmit` is load-bearing, added by Amendment 02.** `tsconfig.spec.json` sets
+> `"outDir": "./out-tsc/spec"`, and `jest.config.ts`'s `testPathIgnorePatterns` covers
+> `node_modules/` and `dist/` but **not `out-tsc`**. Without `--noEmit` this command emits a compiled
+> `.js` twin of every spec, which jest then discovers and runs outside the Angular preset. Measured
+> 2026-09-09: **157 phantom failed suites / 3971 phantom failed tests**, and the arithmetic closes it
+> — 317 real specs + 318 compiled twins = the 635 total jest reported. **One task's gate silently
+> disarmed T-12's.** If a run ever emits anyway, `rm -rf out-tsc` before measuring.
 **FALSIFIER.** Assign a `string` to `innovation_dev_result_id` in a scratch spec → `tsc` must error.
 **Watch (K-004, measured in this repo):** a *syntax* error aborts the `tsc` parse and can hide
 hundreds of type errors behind a report of three. Confirm the file parsed.
@@ -477,6 +496,74 @@ correctness. Stated rather than dressed up as a behavioral gate.
 
 ---
 
+### T-14 — Repair the two sibling fixture files rule 16 retroactively broke  *(Amendment 02)*
+
+| | |
+| --- | --- |
+| Status | `[ ]` |
+| Size | M |
+| Depends on | T-02, T-03 |
+| Requirements | R-IUL-009 (Scenario: No grandfathering) — **regression protection**, not new behavior |
+| Design | §3.3, §11.5 |
+| Skills | `nestjs-expert`, `systematic-debugging` |
+
+**Why this task exists.** Migration B's retroactive effect is **intended** (R-IUL-009 Scenario 2,
+OQ-1, DD-8) — but it also invalidated two **already-committed** fixture files that encode the
+pre-rule-16 expectations as assertions. Measured by the Leader 2026-09-09, in the quiet window:
+
+```
+$ npx jest --config ./test/jest-fixtures.json test/fixtures/innovation-use --silent
+Test Suites: 2 failed, 15 passed, 17 total
+Tests:       17 failed, 110 passed, 127 total
+```
+
+| File | Failures |
+| --- | --- |
+| `test/fixtures/innovation-use/innovation-use-validation.fixture-spec.ts` | 15 |
+| `test/fixtures/innovation-use/innovation-use-result-creation.fixture-spec.ts` | 2 |
+
+The spec reasoned about production data throughout (§11.5 even tells the applier to count affected
+rows) and never about the fixtures. **No existing task owns this**, which is why it is a task rather
+than an advisory.
+
+**Scope.** Restore both files to green **by restoring their test isolation**, not by relaxing their
+assertions.
+
+> **This is a correctness fix, not bookkeeping — and the distinction decides how you implement it.**
+> A test for rule 2 needs a base result that satisfies *every other rule*, so the rule under test is
+> the only variable. Adding rule 16 invalidated those bases. The repair is therefore to **seed a valid
+> active role-5 link in the bases that must stay green**, which makes each case measure what its title
+> says again. **Never** flip a `TRUE` expectation to `FALSE` merely to make a suite pass — a case that
+> genuinely tests a link-less result *should* now expect `FALSE`, but that is a different decision per
+> case and must be reasoned, not swept.
+
+**Leader-measured facts that size this** (verified 2026-09-09, not estimated):
+
+| Fact | Value |
+| --- | --- |
+| TRUE-expecting assertions in the validation file (`grep -c 'toBe(1)\|=== 1\|toBe(true)'`) | **15** — matches its 15 failures 1:1 |
+| Same, in the result-creation file | **0** — its 2 failures use different assertion phrasing; **read them, do not assume the shape** |
+| Either file writes `link_results`? (`grep -c 'link_results'`) | **0** and **0** — every base lacks a role-5 link *by construction* |
+| Shared seed helpers all cases funnel through | `seedResult()` (`:148`), `seedDetail()` (`:160`) |
+
+**So the validation file is one helper, not 15 edits.** Seeding the role-5 link inside the shared
+helper (or a small `seedLinkedDev()` it calls) repairs all 15 at once. The result-creation file's 2 are
+separate and must be read individually.
+
+**Verify.** `npm run test:fixtures` — **the whole fixture suite**, not just the two files, because the
+scratch schema is shared and `maxWorkers: 1` means a repair can perturb a sibling.
+**FALSIFIER.** Remove the seeded role-5 link from the repaired base → the repaired cases must go
+**red** again. That is what proves the repair restored *isolation* rather than merely silencing a
+failure. Report which cases reddened.
+**Cannot prove.** That no *other* uncommitted or future fixture depends on the pre-rule-16 behavior.
+The suite is the whole population today, but `npm test` will never surface a regression here (§7).
+**Disqualifier.** A run taken while any delegated worker is active is not evidence — the fixture suite
+holds a real MySQL connection to the shared scratch schema.
+**Done.** `npm run test:fixtures` green; the falsifier observed red; every case that legitimately now
+expects `FALSE` documented in-file with the reason.
+
+---
+
 ## 4. Requirement → task closure
 
 > Closure is at **scenario and clause** granularity, not requirement ID. A gap may **not** be
@@ -492,7 +579,7 @@ correctness. Stated rather than dressed up as a behavioral gate.
 | R-IUL-006 | Wrong indicator; Inactive target; Self-reference; the pre-`BEGIN` clause | T-06 |
 | R-IUL-007 | Read-back; all four clauses | T-07 |
 | R-IUL-008 | Omitted preserves; Explicit null clears; the "different paths" `BUT` | T-06 (server), T-11 (client) |
-| R-IUL-009 | Rule 16; No grandfathering; all `MUST NOT` clauses | T-02 (shape), **T-03 (behavior)** |
+| R-IUL-009 | Rule 16; No grandfathering; all `MUST NOT` clauses | T-02 (shape), **T-03 (behavior)**, **T-14 (regression protection of rules 2–15 after the retroactive break)** |
 | R-IUL-010 | Seed; the enum-not-literal clause | T-01 |
 | R-IUL-011 | Ordering; the ANSI `BUT` clause | §5 runbook + T-01 |
 | R-IUL-012 | All four states; the enabled-but-empty `BUT` | T-09 |
@@ -524,7 +611,7 @@ as covered.
 
 | Metric | Budget (design §12) | Planned | Δ |
 | --- | --- | --- | --- |
-| Tasks | 12 | **13** | **+1** — T-13 had no home until Judgment Day (A11) found it. Recorded rather than absorbed |
+| Tasks | 12 | **14** | **+2** — T-13 had no home until Judgment Day (A11) found it; **T-14 added by Amendment 02**, user-approved 2026-09-09, for a consequence of Migration B that no task owned and that §7's original gate could not detect. Both recorded rather than absorbed |
 | LOC | ~1,250 | ~1,250 | — |
 | Review rounds | ~20 | ~20 | — |
 
@@ -535,9 +622,19 @@ mistaken for a runaway.
 
 ## 7. Done definition
 
-- [ ] All 13 tasks `[x]`, each with its Reviewer PASS recorded in `execution.md` **before** the box is
-      flipped — the committed `PreToolUse` hook blocks the write otherwise, and a block is not a bug
-- [ ] Server suite green, 60% floor held
+- [ ] All **14** tasks `[x]`, each with its Reviewer PASS recorded in `execution.md` **before** the box
+      is flipped — the committed `PreToolUse` hook blocks the write otherwise, and a block is not a bug
+- [ ] Server **unit** suite green, 60% floor held — `npm test -- --silent`
+- [ ] Server **fixture** suite green — `npm run test:fixtures`
+
+> **Amendment 02 split that gate because it could not see its own subject.** `npm test` sets
+> `rootDir: "src"` (`package.json:131`), and every fixture lives under `test/fixtures/` matching
+> `.fixture-spec.ts$` — collected **only** by `npm run test:fixtures`. So *"Server suite green"*
+> verified by `npm test` was **structurally incapable of observing the breakage this spec's own
+> Migration B causes**, and would have reported 358/358 green all the way to archive while the fixture
+> suite sat red at 17/127. That is KZ-017 at the level of the spec rather than a task. **T-03 — the
+> only proof of rule 16 — lives in the suite the old gate could not reach**, which is what made the
+> omission load-bearing rather than cosmetic.
 - [ ] Client suite green, all four floors held
 - [ ] T-03's fixture observed **red pre-migration** and green post-migration
 - [ ] Every falsifier in §3 observed red at least once

@@ -654,7 +654,7 @@ From Lens B:
 
 ---
 
-## 🔭 FORWARD POINTER — must be COPIED into T-03's brief
+## 🔭 FORWARD POINTER — DISCHARGED at T-03 (kept as the record of what was carried, and of what turned out to be wrong)
 
 > **A pointer filed is not a pointer carried.** The record creates the appearance of ownership without
 > the mechanism of transfer; the brief carries it or nobody does. Re-read this section at the moment
@@ -912,9 +912,9 @@ that test **must** stay green. Its silence is the correct outcome, not a gap.
 
 ---
 
-## ⛔ Pivot Record: discovered at T-03 — Migration B breaks two committed fixture files, and the spec's Done definition structurally cannot see it
+## ⛔ Pivot Record (RESOLVED — user-approved 2026-09-09): discovered at T-03 — Migration B breaks two committed fixture files, and the spec's Done definition structurally cannot see it
 
-**Status: STOPPED FOR THE USER.** `pre-approved` mode covers routine progress; it never absorbs a
+**Status: RESOLVED — the user chose Option A on 2026-09-09.** (History below is left as written; the resolution is at the end of this section.) `pre-approved` mode covers routine progress; it never absorbs a
 Pivot. No further task is dispatched against the affected surface until this is decided.
 
 ### The finding
@@ -1273,3 +1273,107 @@ post-Migration-B those assertions **must** fail by construction. *"It is a T-02/
 with **no owning task** in `tasks.md` §3, and T-03's file neither causes nor can prevent it."*
 
 **Finalize order held:** this entry was written before `tasks.md` T-03 was flipped to `[x]`.
+
+---
+
+## ✅ Pivot resolution — Option A, user-approved 2026-09-09
+
+The user was given A / B / C with a recommendation of **A**, and approved it. Recorded here with the
+reasoning, because a decision without its argument is a decision that gets re-litigated.
+
+**Why A, and why it is a correctness fix rather than bookkeeping.** A test for rule 2 needs a base
+result that satisfies *every other rule*, so the rule under test is the only variable. Adding rule 16
+invalidated those bases. Repairing them by seeding a valid role-5 link **restores each case's
+isolation** — it makes the case measure what its title says again. That is what defeats the usual
+objection to A ("you are making the tests agree with the break"): the tests were not testing the break,
+they were testing rules 2–15, and rule 16 removed the precondition that made them valid.
+
+**Why not B.** The repo's own harness argues against it: `jest-fixtures.json` records that *"a gate
+that fails 1 in 3 gets ignored"*. This would be 17 of 127, permanently — and worse than usual for two
+reasons. That suite is the **regression protection for rules 2–15**, and this spec just rewrote that
+function; and **T-03, the only proof of rule 16, lives in it.** A suite nobody runs makes rule 16's
+proof invisible.
+
+**Why C was never an alternative.** It is the half of A and B that has to happen anyway: §7 had to be
+amended regardless, because the gate could not see its own subject.
+
+**Sizing, measured rather than estimated** (this is what moved A from "expensive" to "cheap"):
+
+| Fact | Value |
+| --- | --- |
+| TRUE-expecting assertions in `innovation-use-validation.fixture-spec.ts` | **15** — matches its 15 failures 1:1 |
+| Same in `innovation-use-result-creation.fixture-spec.ts` | **0** — its 2 failures use different phrasing, so they must be read individually |
+| Either file writes `link_results`? | **0** and **0** — every base lacks a role-5 link *by construction* |
+| Shared helpers all cases funnel through | `seedResult()` (`:148`), `seedDetail()` (`:160`) |
+
+**So the 15 are one helper, not 15 edits.**
+
+### What was amended (Pivot Protocol step 3)
+
+`tasks.md` only. **No requirement and no design decision changed** — three of the four items are
+verification *text* that could not do what it claimed, and the fourth is a consequence that no task
+owned.
+
+| # | Site | Correction |
+| --- | --- | --- |
+| 1 | T-08 **Verify** | `npx tsc -p tsconfig.spec.json` → **`--noEmit`**, with the measured mechanism recorded inline (157 phantom suites; 317 real + 318 twins = the 635 jest reported) |
+| 2 | T-03 **FALSIFIER** | *"Every rule-16 case must go red"* → *"Every **negative** rule-16 case"*, with both exemptions **stated** rather than pretended, per §3's own preamble |
+| 3 | §7 **Done definition** | *"Server suite green"* split into **unit** (`npm test`) and **fixture** (`npm run test:fixtures`), because `rootDir: "src"` made the original gate structurally blind to the suite holding T-03 |
+| 4 | **New T-14** | Repair the two sibling fixture files, by restoring isolation — never by relaxing assertions |
+
+Plus every derived site the amendment invalidated: the §2 dependency graph, §4's closure row for
+R-IUL-009, §6's budget reconciliation, and the Document Control task count.
+
+### Correction closure — the two-direction sweep, and what it caught
+
+Run per the Pivot Protocol, KZ-005 (6 recurrences) and K-003. **It caught a real survivor**, which is
+the whole reason the rule exists:
+
+> **`tasks.md:169` — T-03's `Done` line restated the corrected claim in different words:**
+> *"all rule-16 cases observed red pre-migration"*. The **FALSIFIER** was amended; the **Done** line
+> said the same superseded thing in another phrasing and would have survived a literal-string sweep.
+> Corrected, and the exemption reason carried with it.
+
+This is exactly KZ-005's escalation: *bound the search on every axis — phrasing, token, file set,
+exemption criterion — not only the axis that last failed.*
+
+| Direction | Checked | Result |
+| --- | --- | --- |
+| **Forward** — does the superseded value survive? | `Every rule-16 case` / `every rule-16 case` / `all rule-16 cases` / `rule-16 cases must`; `13 tasks` / `All 13` / `**13**`; `Server suite green`; `tsconfig.spec.json` without `--noEmit` | One survivor (above), fixed. Re-grep after: **none** in the spec's live documents. Task count `13`: **none**. All live `tsc` invocations in this spec now carry `--noEmit` |
+| **Backward** — who cites the corrected sections? | `§7`, `tasks.md … Done`, `T-03 … falsifier`, `T-08 … Verify` across the spec folder; plus `family.md`'s row #4 | No document asserts a now-false claim. `family.md:47` describes the lane split and says *"pending"* — **not** falsified by Amendment 02, and its update to `done` is already **T-13(c)**'s owned scope, not a sweep casualty |
+| **New values re-grepped** (KZ-005's second half) | `--noEmit` (3), `**14**` (3 sites: Document Control, §6, §7), `T-14` (5), `npm run test:fixtures` (4) | Consistent at every site |
+
+**One thing found and deliberately NOT fixed.** The same latent defect exists in a **different, active
+spec**: `docs/specs/changes/innovation-use-required-fields/tasks.md:612` mandates
+`tsc -p tsconfig.spec.json` with no `--noEmit`, so it will pollute `out-tsc` the same way. That is
+outside this spec's scope and belongs to whoever owns that one — **surfaced to the user, not silently
+edited.** Editing another spec's approved text under cover of this pivot is precisely the scope creep
+the rules forbid.
+
+### Budget tripwire — declared, not absorbed
+
+Tasks: design §12 expected **12**; now **14** (`+2`). T-13 was the first (Judgment Day A11 found it
+had no home); T-14 is the second. Both are recorded in §6 rather than quietly absorbed, so the tick is
+not mistaken for a runaway. LOC and review rounds are already over the design's estimate — this spec
+has run **7 review rounds across 5 tasks** against a budget of ~20 for 12 tasks, which is on pace, but
+the *rework* rate (3 of 5 tasks needed a second attempt, one needed a third) is the figure worth
+watching. The recurring cause is a single defect class, recorded in the Kaizen note below.
+
+### The defect class this spec keeps producing — for the archive Kaizen
+
+**Four times, in four files, by three different models**, an assertion claimed a property it could not
+fail on:
+
+| Task | The assertion claimed | What actually satisfied it |
+| --- | --- | --- |
+| T-01 | the **INSERT** interpolates the enum | the same token in `down()`'s DELETE |
+| T-02 | the **SQL** interpolates the enum | a **TSDoc comment** quoting the substring |
+| T-09 (attempt 1) | the label carries the code | nothing — the label was asserted nowhere in the DOM |
+| T-09 (attempt 2) | the options request failing shows the error surface | a **mock calling `error.set(true)`**, for a subject that can never reject |
+
+All four are **KZ-001** (*a property that lives in generated output must be asserted there*), whose
+recurrence count in this repo was already **13**. This spec's four instances make the case that the
+lesson has not been institutionalized where it needs to be — in the *authoring* step, not only in
+review. The one durable fix observed here: T-02's Implementer did not merely anchor its regex, it
+**rewrote the colliding comment in prose so the collision surface no longer exists.** Removing the
+surface beats guarding it.
