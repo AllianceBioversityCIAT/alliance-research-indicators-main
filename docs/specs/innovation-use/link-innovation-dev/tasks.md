@@ -446,9 +446,14 @@ falsifier above could reach the malformed-URL defect (KZ-017): the label falsifi
 `platform_code: null`, which is the case that happens to work, and deleting the anchor cannot detect a
 *wrong* href. Build the href from `result_official_code` and this spec must go red when it is built
 from the space-joined display code instead.
-For the remove path, arrange the **transition** (render with a link, then clear, then
-`detectChanges`), never the end state — a fixture that sets the cleared input before the first
-`detectChanges` tests a state the product never reaches (KZ-015).
+For the **selection-change** path, arrange the **transition** (render with a link, then select a
+*different* result through the real `app-select`, then `detectChanges`), never the end state — a
+fixture that sets the input before the first `detectChanges` tests a state the product never reaches
+(KZ-015), and one that calls the handler directly leaves the `(selectEvent)` binding untested.
+*(Corrected 2026-09-09 after attempt 2: this line said "the **remove** path … then **clear**",
+leftover draft-2 wording for a path **DD-7 withdrew**. Read literally it prescribes clearing the
+card, which is what attempt 2 implemented — and R-IUL-004 Scenario 2 requires the card to
+**re-render for the new result**, not disappear. Third paraphrase-drift defect in this spec.)*
 **Done.** Card renders from payload in the mock's layout; a soft-deleted target still renders; falsifiers observed.
 
 ---

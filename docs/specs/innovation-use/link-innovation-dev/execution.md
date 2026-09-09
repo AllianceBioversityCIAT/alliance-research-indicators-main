@@ -2007,3 +2007,83 @@ The worker added `dark:text-[var(--ac-grey-100)]` to the new label **and to T-09
 Attempt 1 FAILs on its own mandated verification, so **no Reviewer round was consumed** — the loop returns to the Implementer with the findings above passed through verbatim. Attempt 2 runs at bumped effort. `tasks.md` T-10's `<code>`-in-href paraphrase is corrected in the same commit as a **spec-text correction**, since leaving it would re-prescribe the defect; that is a correction of contradictory text against `design.md` §6.3, not new scope.
 
 T-10 stays `[ ]` → `[~]`.
+
+---
+
+## T-10 — attempt 2: Reviewer FAIL (5 issues), and issue 2 is a DESIGN GAP → rework loop STOPPED
+
+**Date** 2026-09-09 · **Reviewer** `akili-reviewer`, `opus` (T3), full four-lens sweep · **Executor** Antigravity `gemini-3.1-pro-high` (terminal closed after collection)
+
+**The loop is stopped with attempt 3 UNSPENT**, per the Pivot Protocol: *"If Implementer or Reviewer discoveries reveal that the approved requirements or design are wrong or technically unviable: stop the rework loop, mark the task `[~]` — even if rework attempts remain."* Issue 2 cannot be fixed by an Implementer without a `design.md` §6.3 ruling, and spending the final attempt on a spec question would HALT the task for a defect the code did not cause.
+
+### Attempt 1's three defects: all closed, independently verified
+
+| Defect | Verification |
+| --- | --- |
+| href from the space-joined display helper | **Closed.** `html:203` binds `'/result/' + devResult.result_official_code + '/general-information'`; the new spec asserts `toBe('/result/284/general-information')` with `platform_code: 'STAR'`, and the Leader observed it red under the re-introduced mutation |
+| `dark:` variants | **Closed.** `grep 'dark:'` over the whole directory returns **zero**; T-09's spans (`html:184-194`) are byte-unchanged |
+| non-token utilities | **Closed.** `rs-mr-[16]`, `rs-px-[16]`, `rs-py-[8]`, `rs-mt-[16]`, `rs-p-[16]`, `fs-[15]` all confirmed to exist in `styles/responsive-size.scss`; `hover:text-[var(--ac-white-1)]`; `rounded-[13px]` matches §6.1's verbatim sibling shell. No hex literal in the diff |
+
+`sr-only` was confirmed **real, not assumed** — six existing call sites in the client, and a Tailwind 4 core utility needing no config. `rel="noopener"` vs T-09's `noopener noreferrer` is **not** an issue: §6.3, R-IUL-004 and NFR-IUL-002 all say `noopener` exactly, the test pins it, and this is a same-origin link. Scope discipline clean.
+
+### Gates — Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | 317/317 suites, **6915/6915** PASS; coverage 98.25 / 96.26 / 97.99 / 98.52 |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline, delta 0**; `out-tsc` absent |
+| `npm run lint -- --quiet` | passes |
+| `npx prettier --check` (3 files) | **passes** — attempt 1's implicit FAIL closed |
+| Falsifiers | **3 of 3 observed RED** by the Leader, tree restored byte-identically (19 / 83 / 23 — 122 insertions, 3 deletions) |
+
+The Leader-added *FALSIFIER (href form)* is what makes defect 1 non-recurrable: re-pointing the href at the display helper reddens it immediately, where neither of the spec's two original falsifiers could reach it (the label falsifier supplies `platform_code: null`, which is the case that happened to work).
+
+### Reviewer FAIL — 5 issues
+
+**Issue 1 (rework) — changing the selection makes the card DISAPPEAR; the requirement says it must re-render.**
+`onInnovationDevSelected` (`.ts:196-205`) nulls `linked_innovation_dev` whenever the incoming `result_id` differs, and **nothing repopulates it**: the only writer is `getData()`, reached only after a successful PATCH (`.ts:673-681`). So the reporter picks a different output and the card vanishes until they save.
+*Violated:* `requirements.md` **R-IUL-004, Scenario "Changing the selection"** — *"THEN the card re-renders for the new result AND IT MUST NOT leave the previous result in the payload on the next save."* The diff implements the **second clause only**; T-10's Requirements row binds **both** scenarios, and its shorter *Clauses* list is a subset, not a substitute.
+*Contributing spec-text defect — the third instance in this spec.* `tasks.md` T-10 still reads *"For the **remove** path, arrange the transition … then **clear**"* — leftover draft-2 wording for a path **DD-7 withdrew**. Read literally it prescribes clearing. That is plausibly what steered the implementer, and it is the same paraphrase-drift class as the href line (corrected after attempt 1) and as R-IUL-012's error clause (which HALTed T-09 and produced Amendment 03).
+*Remediation:* on `selectEvent`, resolve the picked option out of `innoDevOutputService.list()` by `result_id` and write it into `linked_innovation_dev`, falling back to `null` only when no match. This does **not** breach DD-6/C12 — a just-picked option is in the list by construction, the *render source* stays `linked_innovation_dev`, and the initial/soft-deleted path is untouched. Then flip the spec at `.spec.ts:4045-4050`, which currently **codifies the wrong end state** (`expect(...linked_innovation_dev).toBeNull()`).
+
+**Issue 2 (DESIGN GAP — the reason the loop stopped) — the href is platform-blind and misroutes a linked non-STAR result.**
+Reaching sequence, constructed from server + client code, not hypothesized:
+1. `indicator.homologation.ts:12` maps PRMS `INNOVATION_DEVELOPMENT` → `IndicatorsEnum.INNOVATION_DEV` (= 2).
+2. `prms.opensearch.service.ts:281-282` passes `{ platformCode: ReportingPlatformEnum.PRMS }` and `save-all-sections.service.ts:88` persists `platform_code`. **A row exists with `platform_code='PRMS'`, `indicator_id=2`, `result_official_code=284`.**
+3. The picker's options are `GET_Results({'indicator-codes':[2]})`; `api.service.ts:272-299` sends **no platform parameter**, and **R-IUL-002 forbids adding one**. The PRMS result is a selectable option.
+4. Linked and saved, `GET` returns `linked_innovation_dev.platform_code = 'PRMS'` (already typed `string | null`).
+5. The card renders the correct label `PRMS 284 - …` beside `href="/result/284/general-information"`.
+6. `platformFromResultCodeOrNull('284')` matches `/^\d+$/` → **STAR** (`platform-code.util.ts:21`), so `result.interceptor.ts:59-65` appends `reportingPlatforms=STAR`. **The user is shown STAR-284 — a different result — or "Result not found".** That interceptor's own comment documents this exact failure mode.
+Same reachability for TIP and AICCRA. No data loss (new tab), but **the label and the destination silently disagree.**
+*Violated:* `requirements.md` **R-IUL-004, Scenario "Selected card"** read together with **R-IUL-002**'s no-platform-filter mandate.
+**Honest attribution, and it decides the disposition:** the implementation matches `design.md` **§6.3's Target row literally** (*bare `result_official_code`*). The origin is a **design gap, not implementer drift** — the Reviewer filed it as FAIL rather than advisory precisely because KZ-008's lesson in this spec is that an advisory naming a reachable state is an unfiled defect.
+*Remediation is a Leader/user decision:* the app's own precedent (`select-linked-results-modal.component.ts:112-130`) builds `${platform_code}-${result_official_code}` when `platform_code` is set — which `platformFromResultCodeOrNull` resolves correctly for STAR/TIP/PRMS/AICCRA — and keeps the bare number only for the NULL case, where numeric ⟺ STAR is the intended resolution. **But that precedent also routes TIP to `external_link`, which `linked_innovation_dev` does not carry**, so closing TIP needs a payload widening (a T-07 projection change), not a T-10 edit.
+
+**Issue 3 (rework) — nothing tests the `(selectEvent)` binding, the only production path into the handler.**
+`.spec.ts:4045` invokes `component.onInnovationDevSelected(456)` **directly**. Delete `(selectEvent)="onInnovationDevSelected($event)"` from `html:183` and **all four new specs stay green** — the handler is unreachable in the product and the suite cannot tell. KZ-001 class.
+*Remediation:* drive the real control — `query(By.directive(SelectComponent)).componentInstance.setValue(456)` then `detectChanges()`. The Reviewer **confirmed the emitted shape rather than assuming it**: `select.component.ts:163-165` emits `selectEvent` with the `result_id` because `select.component.html:21` binds `(ngModelChange)="setValue($event)"` with `[optionValue]="this.optionValue.option"` = `'result_id'`. It emits **before** its own `signal.update`, and both writers spread from `current`, so ordering is safe — worth pinning with an assertion that `innovation_dev_result_id` survives the handler.
+*Half of the payload question is clean:* `buildPayload()` (`.ts:542-568`) never reads `linked_innovation_dev`, so the nulling **cannot corrupt the PATCH** today — `innovation_dev_result_id` is the field that travels.
+
+**Issue 4 (rework) — the card row renders on white where §6.3 and the mock specify a subtle grey surface.**
+`html:198` uses `bg-[var(--ac-white-1)]`, the **identical** surface to the enclosing card shell (`:156`), leaving only the border to separate them. `mockup/02-related-innovation-development-card.png` renders the inner row on a light grey fill inside a white card.
+*Violated:* `design.md` §6.3 — *"on the section's **subtle grey surface** with a light border"*; Amendment 01 makes the mock the visual authority.
+*Remediation:* `bg-[var(--ac-grey-100)]` — a real token in both themes (`colors.scss:28` `#f4f7f9` / `:143` `#2b2b2b`), already this section's established subtle-grey surface (`html:165`, `:218`), and the existing R3 contrast suite already carries the `GREY_800`-on-`GREY_100` pair, so **no new contrast measurement is owed.**
+
+**Issue 5 (rework) — T-10's Done line *"a soft-deleted target still renders"* has no test that names itself as that case.**
+The property is **de facto** covered — the `describe`'s `beforeEach` provides no `GET_Results` resolution, so `list() === []` and re-pointing the template at `selectedOption()` would redden all four specs. But the coverage is **incidental**: it evaporates the day anyone adds a matching-options mock to that `beforeEach`, and nothing names the invariant.
+*Remediation:* one named test — `list` non-empty but **excluding** the linked `result_id`, `linked_innovation_dev` set to that result, assert the card still renders its code and title.
+
+### ADVISORY (recorded, never gates, may not mint a task)
+
+1. **READABILITY** — `formatInnovationDevCode` is exported and mirrored onto the component (`.ts:192`) but the template never binds it; its only consumer is `formatInnovationDevLabel`. Either bind it or drop the `readonly` mirror.
+2. **READABILITY** — the new `describe('T-10: Page-owned card')` is nested inside the R3 **contrast** suite. Functionally fine (`jest.clearAllMocks()`, real component, no `toHaveBeenCalled` assertions so no leaked-mock exposure) but it hides T-10's coverage under an unrelated heading. Same advisory as T-09's; both want the same lift before T-12.
+3. **READABILITY** — `innovation-detail-link` has no rule in any stylesheet and the component declares no `styleUrl`; it is purely the specs' DOM selector. Fine as a hook, but `data-testid` would say so out loud.
+4. **READABILITY** — `rel="noopener"` differs from the three sibling anchors in the same template (`:64`, `:80`, `:227`), which use `noopener noreferrer`. Spec-conformant and correct here — recorded so the inconsistency is not later mistaken for an oversight.
+5. **RELIABILITY** — the label falsifier asserts against `fixture.nativeElement.textContent` (whole component) rather than the card's own span. It discriminates today only because the options list is empty; scoping it to the anchor's parent would make it immune to that fixture detail.
+6. **RISK (declared, not reachable by this harness)** — "visually hidden" for the `sr-only` span, focus visibility and hover-state contrast **cannot** be evaluated in jsdom (no CSS is loaded). That is NFR-IUL-002's declared gap and T-12's human check; the tests correctly assert only text presence. Recorded so it is not read as covered.
+
+### Status
+
+**T-10 `[~]`.** Attempt 2 of 3 spent; **attempt 3 deliberately unspent** pending the user's ruling on issue 2. Issues 1, 3, 4, 5 are ordinary rework and are ready to dispatch the moment issue 2's direction is decided — bundling them into one attempt is what keeps the last attempt sufficient.
+
+**Three paraphrase-drift defects in `tasks.md`/`requirements.md` have now caused three separate failures in this one spec** (R-IUL-012's error clause → T-09 HALT + Amendment 03; T-10's `<code>`-in-href line → attempt 1 FAIL; T-10's leftover *"remove path … then clear"* → attempt 2 issue 1). That is a pattern in the spec text, not in the workers, and it is the single highest-value thing for the Kaizen pass to address.
