@@ -111,6 +111,14 @@ export interface InnovationUsePayload {
 }
 
 // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 / T-10 — §6.2 / §6.3 / KZ-012)
+export function formatInnovationDevCode(
+  result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
+): string {
+  if (!result) return '';
+  const prefix = result.platform_code ? `${result.platform_code} ` : '';
+  return `${prefix}${result.result_official_code ?? ''}`.trim();
+}
+
 export function formatInnovationDevLabel(
   result:
     | {
@@ -122,9 +130,18 @@ export function formatInnovationDevLabel(
     | undefined
 ): string {
   if (!result) return '';
-  const prefix = result.platform_code ? `${result.platform_code} ` : '';
-  const code = `${prefix}${result.result_official_code ?? ''}`.trim();
+  const code = formatInnovationDevCode(result);
   return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
+}
+
+export function formatInnovationDevUrl(
+  result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
+): string {
+  if (!result) return '';
+  if (result.platform_code) {
+    return `/result/${result.platform_code}-${result.result_official_code}/general-information`;
+  }
+  return `/result/${result.result_official_code}/general-information`;
 }
 
 /**
@@ -182,8 +199,24 @@ export default class InnovationUseDetailsComponent {
   });
 
   readonly formatInnovationDevLabel = formatInnovationDevLabel;
+  readonly formatInnovationDevCode = formatInnovationDevCode;
+  readonly formatInnovationDevUrl = formatInnovationDevUrl;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+
+  onInnovationDevSelected(resultId: number): void {
+    // R-IUL-004: must NOT leave the previous result in the payload after the selection changes.
+    // AND the card re-renders for the new result.
+    this.body.update(current => {
+      if (current.linked_innovation_dev?.result_id !== resultId) {
+        const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
+        // `linked_innovation_dev` is a READ projection on GetInnovationUseDetails, not a key of the
+        // write payload (InnovationUsePayload) — casting to the latter does not compile.
+        return { ...current, linked_innovation_dev: (option as unknown as GetInnovationUseDetails['linked_innovation_dev']) ?? null };
+      }
+      return current;
+    });
+  }
 
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
   readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;

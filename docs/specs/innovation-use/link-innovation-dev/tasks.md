@@ -398,7 +398,7 @@ card-scoped by the save-path falsifier; falsifiers observed red.
 
 | | |
 | --- | --- |
-| Status | `[~]` |
+| Status | `[x]` |
 | Size | M |
 | Depends on | T-08 |
 | Requirements | R-IUL-004 (both scenarios), NFR-IUL-002, NFR-IUL-003 |

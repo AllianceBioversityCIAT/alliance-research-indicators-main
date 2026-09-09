@@ -2160,3 +2160,70 @@ Step 4's automatic rollback exists so a HALT does not leave **broken** code. Tha
 ### Status
 
 **T-10 `[~]`.** Three attempts spent. Nothing committed from the client, nothing pushed. Escalated to the user, per the HALT rule that a HALT always stops for a human regardless of `pre-approved` mode.
+
+### ✅ T-10 — Reviewer PASS (after the user-approved Leader-inline fallback)
+
+**Date** 2026-09-09 · **Reviewer** `akili-reviewer`, `opus` (T3), re-audited on the updated diff · **Verdict `STATUS: PASS`**
+**Executors:** Antigravity `gemini-3.1-pro-high` ×3 attempts, then the **Leader-inline fallback the user explicitly approved** once the loop was exhausted (three type annotations + the contrast fix below). All four worker terminals closed after collection.
+
+> **Summary (verbatim).** *"T-10 satisfies R-IUL-004 (both scenarios, including Amendment 04's hyphenated URL for all four platforms, verified against `platformFromResultCodeOrNull`'s prefix loop and its `/^\d+$/`→STAR fallback), NFR-IUL-002 and now NFR-IUL-003 in both themes; DD-6/C12 holds because the render source is `body().linked_innovation_dev` and the options list is read only inside the user-driven handler, and `buildPayload()` still never reads the field."*
+
+### The two issues that FAILed the first re-review, and how they closed
+
+**Issue 1 — the card's only interactive element was illegible in dark theme.** The anchor's resting state was `--ac-light-blue-400` on the row's own `--ac-grey-100`. Under `[data-theme='dark']` (`colors.scss:122`) those are `#23466b` on `#2b2b2b` = **1.46:1** — the label *and* the 2px border effectively vanish. The Leader confirmed the mechanism independently, which is what makes it reachable rather than theoretical: **`DarkModeService.applyTheme` sets `data-theme="dark"` on `document.documentElement`** (`dark-mode.service.ts:35-40`), exactly the selector `colors.scss:122` uses, so those tokens genuinely apply.
+
+This was **in T-10's own gate, not deferrable to T-12**: NFR-IUL-003 is in T-10's Requirements row and states outright that the card must be legible in both themes and that *"this requirement does not inherit"* the module's light-only QA sign-off.
+
+Fixed by giving the anchor its own `bg-[var(--ac-white-1)]` — **6.83:1 light** (`#035ba9` on `#fff`) and **7.72:1 dark** (`#23466b` on `#e5e5e5`), both AA. **No visual-consistency-versus-AA tradeoff to adjudicate:** the mock shows the pill on a lighter fill than the grey row, so the accessible form is also the one closer to the design. The Reviewer re-derived both figures independently and they matched, and additionally verified that hover specificity is safe (`.hover\:bg-\[…\]:hover` is (0,2,0) against the new fill's (0,1,0), so hover wins regardless of class order) and that the instrument's non-standard `0.03928` luminance threshold cannot shift any of the four values.
+
+The pair was added to the R3 instrument as a new test asserting both ratios, asserting `bg-[var(--ac-white-1)]` is actually on the element (this is what binds the CSS to the arithmetic), and asserting the **superseded** pair is `< 4.5` so the regression is **named** rather than merely avoided. **Falsifier observed red:** dropping the class reddens exactly that test.
+
+**Issue 2 — the mandated app-code/template gate had never been run, and that was the Leader's error.** `client/research-indicators/src/CLAUDE.md` requires **two** gates and the Leader had been running one all session. `npm run build` is the only one that type-checks templates (`tsconfig.app.json` + `strictTemplates`); `tsconfig.spec.json` does not compile templates, `ts-jest` runs `isolatedModules` (no type-check at all), and `ng lint` applies template *lint* rules, not types. This diff adds a new `[href]` binding and an `@if (…; as …)` block — precisely the property no gate was covering.
+
+Run: **exit 0, `Output location:` emitted, zero `[ERROR]` blocks.** And a K-014 near-miss worth recording in the Leader's own direction: a first grep for `error` over the build log matched three lines reading *"Error occurs in the template of component …"* — which sit **inside WARNING blocks** about pre-existing templates (`pool-funding-alignment.component.html:178`/`:228`, `create-oicr-form.component.html:116`), not T-10's files. Reporting on that grep would have produced a **false red**. The rule cuts both ways.
+
+**Also corrected in method, not just result:** the client guide says *"Do NOT gate on a total"* for the spec tsconfig, because the number drifts, and to grep **your own files** instead. The Leader had been gating on the 934 total. It happened to catch attempt 3's +3 regression, but by luck rather than method; the per-file grep (zero errors in `innovation-use-details/innovation-use-details*`) is now the primary evidence.
+
+### Final verification — all FIVE gates, Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6917/6917 tests PASS**; coverage 98.25 / 96.26 / 97.99 / 98.52, all four floors held |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline, delta 0**, and **zero errors in the touched files** (the drift-proof per-file method) |
+| **`npm run build`** (`strictTemplates`) | **exit 0, no errors** — the previously-missing gate |
+| `npm run lint -- --quiet` | passes |
+| `npx prettier --check` (3 files) | passes |
+
+**Falsifiers — 7 of 7 observed RED by the Leader**, tree restored byte-identically after each:
+
+| Mutation | Observed red |
+| --- | --- |
+| href built from the **bare** code (the Amendment 04 regression) | the href-form spec (STAR **and** PRMS cases) |
+| `(selectEvent)` binding **deleted** from the template | the selection-change spec — the binding is genuinely exercised |
+| card re-pointed at `innoDevSelect.selectedOption()` | 4 red incl. *soft-deleted target still renders (payload-only render source)* |
+| option lookup forced to `null` (revert to attempt 2's clearing) | the selection-change spec — *"the card re-renders"* is test-enforced |
+| null-platform fallback hard-coded to `'STAR '` | T-10's label falsifier **and** T-09's own label spec |
+| the `<a>` element deleted | link-DOM, href-form and selection-change specs |
+| `bg-[var(--ac-white-1)]` dropped from the anchor | the new NFR-IUL-003 both-themes contrast test |
+
+### Carried forward to T-11 — the Reviewer's ruling, and these MUST be copied into T-11's brief
+
+Both were adjudicated to T-11 rather than T-10, with reasons. Recorded here because a forward pointer is only carried if the next brief carries it — the failure this spec already suffered once (KZ-008).
+
+1. **Never replace a service's signal instance in a fixture; always `.set()` on the existing one.** Two T-10 fixtures use `service.list = signal([...])`. `SelectComponent.bindServiceSignals()` captures the signal **instance** at `ngOnInit` (`select.component.ts:154`), so replacing the service's property leaves `optionsSig` pinned to the old empty signal: **the `p-select` renders zero options while the assertion still goes green**, and any pre-existing `computed()` over that signal is permanently stale. It gates nothing today (no assertion reads the options) and T-11 touches this same file. **The rule is what must travel, not the two-line edit** — a worker will not re-derive this mechanism. The file's own idiom is `list.set([...])` (`.spec.ts:3687`, `:3813`, `:3927`).
+2. **T-11 must make the `as unknown as` cast disappear rather than move it.** The cast exists only because the write-side and read-side declarations disagree: `Result.result_official_code: string` (`result.interface.ts:19`) vs `result_official_code: number` (`get-innovation-use-details.interface.ts:15`). That is a **read/write boundary** decision and T-11 is the task that owns that boundary (§6.7 / DD-4's three-way discipline) — settling it inside a rendering task would pre-empt T-11's design. When T-11 adds `innovation_dev_result_id` to `buildPayload()`, it should either project the four fields explicitly or reconcile the two declarations. **Acceptance bar: `as unknown as` disappears, not relocates.**
+
+### ADVISORY (recorded, never gates, may not mint a task)
+
+1. **RISK — the R3 instrument has a transcription-drift blind spot, and it is NOT the light/dark gap already declared at `.spec.ts:3335-3341`.** The RGB triples are **transcribed** from `colors.scss`, so if anyone edits `--ac-light-blue-400` or `--ac-white-1`, **nothing reddens** — the test keeps asserting 6.83/7.72 over stale literals while the app regresses. The instrument verifies *"the pair I transcribed has ratio R"* and *"class X is on the element"*, never *"the token's current value has ratio R"*. The Reviewer's judgement: extending the instrument was still the **right** call here (established idiom, committed reviewable number, and it carries a falsifier — more than most contrast assertions in this repo), but the caveat must be recorded so **the next contrast task inherits the caveat rather than the confidence**. The drift-proof form would derive the triples from `colors.scss` and would touch all ~20 pairs — not T-10's to fix.
+2. **READABILITY — advisory partly WITHDRAWN by the Reviewer.** Its earlier *"promote the T-10 describe out of the R3 contrast describe"* no longer holds as stated: the new contrast test **depends on** the R3 closure's `contrastRatio` (`.spec.ts:3189`), so promoting the block would break it. The clean end state is the inverse — the contrast test belongs in the R3 instrument, and the **other five** T-10 tests are the ones that should move out. Same for T-09's block.
+3. **READABILITY** — the dead `readonly formatInnovationDevCode` mirror (`.ts:202`) has **zero** consumers (neither template nor spec); the module-level function is alive via `formatInnovationDevLabel`. Drop the mirror, keep the function.
+4. **RELIABILITY** — `formatInnovationDevUrl` omits the `?? ''` guard its sibling `formatInnovationDevCode` has. **No reaching sequence constructible** — both source types declare `result_official_code` required. Filed as an asymmetry, not a defect; the two helpers should agree.
+5. **RELIABILITY (a11y)** — the `↗` glyph sits inside the anchor's accessible name; some screen readers announce it as "north east arrow". `<span aria-hidden="true">↗</span>` would keep the affordance out of the name.
+6. **READABILITY** — `onInnovationDevSelected` splits the field-declaration block; and the T-10 fixtures use `result_official_code: 284` (number) where T-09's use `'456'` (string, matching `Result`) — the string form is the more faithful one.
+
+**One advisory was applied rather than recorded**, because it concerned the Leader's own newly-written code and was provably unnecessary: the `as any` on the new contrast test's `body.set` argument is not needed — the identical shape appears without it at `.spec.ts:129-138` in the same file. Removed; the touched files still carry zero `tsc` errors and the suite stays at 6917/6917.
+
+### Status
+
+**T-10 → `[x]`**, written to `tasks.md` only after this PASS entry existed. **7 of 14 tasks `[x]`.** Next eligible: **T-11** (client, unblocked by T-10) and **T-04…T-07** (server lane, independent per §2).

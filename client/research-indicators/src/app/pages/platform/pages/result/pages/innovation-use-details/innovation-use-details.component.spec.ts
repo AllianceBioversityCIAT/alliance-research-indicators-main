@@ -3967,6 +3967,172 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect((tooltipDirective as any).content).not.toBe('There are no reported Innovation Development outputs to link.');
     });
   });
+
+  describe('T-10: Page-owned card', () => {
+    it('FALSIFIER (link): assert on the RENDERED DOM — the <a> href, target, and accessible name', () => {
+      // FALSIFIER: If the anchor is removed from the DOM, this test MUST fail.
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        linked_innovation_dev: {
+          result_id: 123,
+          platform_code: 'STAR',
+          result_official_code: 284,
+          title: 'Test result'
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.query(By.css('a.innovation-detail-link'));
+      expect(card).toBeTruthy();
+      expect(card.nativeElement.getAttribute('href')).toBeTruthy();
+      expect(card.nativeElement.getAttribute('target')).toBe('_blank');
+      expect(card.nativeElement.getAttribute('rel')).toBe('noopener');
+      expect(card.nativeElement.textContent).toContain('(opens in a new tab)');
+    });
+
+    it('FALSIFIER (href form): assert a STAR result yields /result/STAR-284/general-information EXACTLY, and a PRMS result yields /result/PRMS-284/general-information EXACTLY', () => {
+      // FALSIFIER: Build the href from the bare code instead -> the PRMS case must go red. Build it from the space-joined display code -> both must go red.
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        linked_innovation_dev: {
+          result_id: 123,
+          platform_code: 'STAR',
+          result_official_code: 284,
+          title: 'Test result'
+        }
+      });
+      fixture.detectChanges();
+
+      let card = fixture.debugElement.query(By.css('a.innovation-detail-link'));
+      expect(card).toBeTruthy();
+      expect(card.nativeElement.getAttribute('href')).toBe('/result/STAR-284/general-information');
+
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        linked_innovation_dev: {
+          result_id: 124,
+          platform_code: 'PRMS',
+          result_official_code: 284,
+          title: 'Test result'
+        }
+      });
+      fixture.detectChanges();
+
+      card = fixture.debugElement.query(By.css('a.innovation-detail-link'));
+      expect(card).toBeTruthy();
+      expect(card.nativeElement.getAttribute('href')).toBe('/result/PRMS-284/general-information');
+    });
+
+    it('FALSIFIER (label): render with platform_code: null -> the card must read 284 - …', () => {
+      // FALSIFIER: If the fallback in formatInnovationDevCode/formatInnovationDevLabel is removed, this test must fail.
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        linked_innovation_dev: {
+          result_id: 123,
+          platform_code: null,
+          result_official_code: 284,
+          title: 'Test result'
+        }
+      });
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement.textContent;
+      expect(el).toContain('284 - Test result');
+      expect(el).not.toContain('null 284 - Test result');
+      expect(el).not.toContain('STAR 284 - Test result');
+    });
+
+    it('For the selection-change path, arrange the TRANSITION (render with a link, then change the selection, then detectChanges), never the end state', () => {
+      // FALSIFIER (binding): deleting `(selectEvent)="onInnovationDevSelected($event)"` MUST turn this red.
+      const service = TestBed.inject(GetInnoDevOutputService);
+      service.list = signal([
+        { result_id: 123, platform_code: 'STAR', result_official_code: 284, title: 'Test result' } as any,
+        { result_id: 456, platform_code: 'PRMS', result_official_code: 285, title: 'Another result' } as any
+      ]);
+
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        innovation_dev_result_id: 123,
+        linked_innovation_dev: {
+          result_id: 123,
+          platform_code: 'STAR',
+          result_official_code: 284,
+          title: 'Test result'
+        }
+      });
+      fixture.detectChanges();
+
+      expect(fixture.debugElement.query(By.css('a.innovation-detail-link'))).toBeTruthy();
+
+      // Act: select a new item via the real control
+      const selectComp = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance;
+      selectComp.setValue(456);
+      fixture.detectChanges();
+
+      // Assert: The card re-renders with the new result's code and title
+      const cardText = fixture.nativeElement.textContent;
+      expect(cardText).toContain('PRMS 285 - Another result');
+      expect(component.body().linked_innovation_dev?.result_id).toBe(456);
+      expect(component.body().innovation_dev_result_id).toBe(456);
+    });
+
+    // NFR-IUL-003 — the card MUST be legible in BOTH themes, and this requirement explicitly does
+    // NOT inherit the module's light-only QA sign-off. Measured, not assumed: the anchor's resting
+    // state on the row's own grey surface is 1.46:1 in dark ([data-theme='dark'] sets
+    // --ac-light-blue-400 #23466b and --ac-grey-100 #2b2b2b, colors.scss:127/:143) — the label and
+    // the 2px border effectively vanish. Giving the anchor its own --ac-white-1 fill restores
+    // 6.83:1 light and 7.72:1 dark, and is also closer to the mock, which shows the pill on a
+    // lighter fill than the row. FALSIFIER: drop bg-[var(--ac-white-1)] from the anchor -> the
+    // dark-theme assertion below goes red.
+    it('NFR-IUL-003 — the View innovation detail anchor holds AA in BOTH themes, on its own fill not the grey row', () => {
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        innovation_dev_result_id: 123,
+        linked_innovation_dev: { result_id: 123, platform_code: 'STAR', result_official_code: 284, title: 'Test result' }
+      });
+      fixture.detectChanges();
+
+      const anchor = fixture.debugElement.query(By.css('a.innovation-detail-link'));
+      expect(anchor).toBeTruthy();
+      // The fill is what makes the dark theme legible — assert it is actually on the element.
+      expect((anchor.nativeElement as HTMLElement).className).toContain('bg-[var(--ac-white-1)]');
+
+      // Light: --ac-light-blue-400 #035ba9 on --ac-white-1 #fff
+      const light = contrastRatio([3, 91, 169], [255, 255, 255]);
+      expect(light).toBeCloseTo(6.83, 1);
+      expect(light).toBeGreaterThanOrEqual(4.5);
+
+      // Dark ([data-theme='dark']): --ac-light-blue-400 #23466b on --ac-white-1 #e5e5e5
+      const dark = contrastRatio([35, 70, 107], [229, 229, 229]);
+      expect(dark).toBeCloseTo(7.72, 1);
+      expect(dark).toBeGreaterThanOrEqual(4.5);
+
+      // The pair this replaces, recorded so the regression is named: the same ink on the row's own
+      // grey surface fails AA in dark by a wide margin.
+      expect(contrastRatio([35, 70, 107], [43, 43, 43])).toBeLessThan(4.5);
+    });
+
+    it('soft-deleted target still renders (payload-only render source)', () => {
+      // FALSIFIER (soft-deleted): re-point the card at innoDevSelect.selectedOption() instead of the payload -> this must go red.
+      const service = TestBed.inject(GetInnoDevOutputService);
+      service.list = signal([{ result_id: 999, platform_code: 'STAR', result_official_code: 999, title: 'Unrelated result' } as any]);
+
+      component.body.set({
+        ...new GetInnovationUseDetails(),
+        innovation_dev_result_id: 123,
+        linked_innovation_dev: {
+          result_id: 123,
+          platform_code: 'STAR',
+          result_official_code: 284,
+          title: 'Deleted result'
+        }
+      });
+      fixture.detectChanges();
+
+      const cardText = fixture.nativeElement.textContent;
+      expect(cardText).toContain('STAR 284 - Deleted result');
+    });
+  });
 });
 
 // ===================================================================================================
