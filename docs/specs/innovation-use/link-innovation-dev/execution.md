@@ -1526,3 +1526,99 @@ pre-rule-16 behavior (T-14's own declared *Cannot prove*), and MySQL's runtime e
 repaired function.
 
 **Finalize order held:** this entry was written before `tasks.md` T-14 was flipped to `[x]`.
+
+---
+
+## 🅿️ Session wind-down — 2026-09-09, user-requested stop (context budget)
+
+**The user stopped the run at ~97% token usage.** Parking per `.agents/leader.md` → *Winding down*:
+the task in flight is parked explicitly rather than left looking untouched, and the remaining budget
+went into this log, because **the audit trail is the handoff.**
+
+### State at stop
+
+| Task | State | Commit |
+| --- | --- | --- |
+| T-01 enum + Migration A | `[x]` PASS attempt 2 | `50466573` |
+| T-02 Migration B + rule 16 + `runbook.md` | `[x]` PASS attempt 2 | `30cfd3ba` |
+| T-03 real-MySQL fixture (proves rule 16) | `[x]` PASS attempt 1 | `2b431092` |
+| T-08 client contract keys | `[x]` PASS attempt 1 | `a2ae4bd7` |
+| Amendment 02 (3 text corrections + T-14) | — | `880c99f3` |
+| T-14 fixture repair | `[x]` PASS attempt 1 | `403049ee` |
+| **T-09 the picker** | **`[~]` PARKED — attempt 3 of 3 implemented, NOT reviewed** | uncommitted, in the working tree |
+| T-04, T-05, T-06, T-07 (server) · T-10, T-11, T-12 (client) · T-13 (docs) | `[ ]` not started | — |
+
+**5 of 14 tasks `[x]`.** Nothing is pushed (the user owns pushing).
+
+### ⚠️ T-09 is PARKED, and this is exactly what the next session needs to know
+
+**Attempt 3 was implemented and looks correct, but NO Reviewer ran on it.** A review loop was not
+opened because the remaining context could not see one through — opening a 6-round-trip loop that is
+guaranteed to be abandoned mid-flight is worse than parking.
+
+**Uncommitted changes sitting in the working tree** (4 files, all client):
+`innovation-use-details.component.{html,ts,spec.ts}` and
+`shared/services/control-list/get-innovation-dev-output.service.ts`.
+
+**Attempt history:**
+
+| Attempt | Model | Outcome |
+| --- | --- | --- |
+| 1 | `gemini-3.8-flash-high` | **FAIL** — two hex literals in new code (NFR-IUL-003); R-IUL-012's four states not each asserted, and **the error state neither implemented nor declared** |
+| 2 | `gemini-3.1-pro-high` (tier escalated) | **FAIL** — hex closed, but the error-state fix was **inert**: `ToPromiseService`'s `catchError` returns an array so `firstValueFrom` always **resolves**, meaning the `try/catch` could never fire. Spec 2a was green only because a mock called `error.set(true)` — KZ-001 |
+| 3 | `gemini-3.1-pro-high` | **Implemented; UNREVIEWED.** The Leader verified the decisive parts by reading the diff (below) but issued no verdict — that is the Reviewer's job, not the Leader's |
+
+**What the Leader confirmed by reading attempt 3's diff** (evidence, not a verdict):
+
+```ts
+// get-innovation-dev-output.service.ts — envelope detection, as prescribed
+if (!response?.successfulRequest) {
+  this.error.set(true);
+} else {
+  this.list.set(response?.data?.results ?? []);
+}
+this.loading.set(false);          // now runs on BOTH paths; the rethrow is gone
+```
+- `innovation-use-details.component.ts:207` — `loadFailed = computed(() => this._loadFailed() || this.innoDevOutputService.error())`
+- `innovation-use-details.component.ts:383` — `this.innoDevOutputService.error.set(false)` → addresses the **sticky-error** consequence (the service is `providedIn: 'root'`, `main()` runs once per session, and the only rerun path needs `app-select` to mount — which the error branch prevents)
+
+So all three prescribed fix parts appear present. **That is not a PASS.**
+
+**The worker's report was NOT recovered.** It echoed the report through a `Bash(echo …)` call rather
+than printing it, so the content sits inside a collapsed tool call in the Antigravity TUI and could not
+be read back. **No suite total, no coverage figure and no `tsc` delta exist for attempt 3** — treat
+their absence as absence, never as green.
+
+### What the next session must do for T-09, in order
+
+1. **Do not re-implement.** Read the four uncommitted files first; the work is done.
+2. **Run the client gates the Leader never got to** — from `client/research-indicators`:
+   `npm test -- --silent` (full suite; the last Leader-measured figure was **317 suites / 6905 tests**, coverage 98.25 / 96.26 / 97.99 / 98.53) and `npx tsc -p tsconfig.spec.json --noEmit` (baseline **934**, delta must be 0). **`--noEmit` is mandatory** — Amendment 02 exists because omitting it emits into `out-tsc` and produced 157 phantom failed suites. If anything was emitted, `rm -rf out-tsc` before measuring.
+3. **Spawn `akili-reviewer` on `opus`** (author was a Gemini worker, so `author ≠ auditor` is strong) with the attempt-3 diff. The questions that matter: does the envelope check actually fire for a *real* failure shape; is spec 2a now arranged on a **mocked `ApiService.GET_Results` resolving `{ successfulRequest: false }`** rather than on `error.set(true)`; is the reset at `:383` in a lifecycle position that actually runs; and is the `#item` → `#itemX` falsifier still red.
+4. **This is attempt 3 of 3.** A FAIL means **HALT**: mark `[~]`, `git restore .` + `git clean -fd` on the client paths, and present the audit trail to the user. Do **not** open an attempt 4.
+5. Also verify: trailing whitespace on the new blank lines in the service diff (prettier would flag it), and whether the two `text-[var(--ac-grey-800)]` replacements survived attempt 3 intact.
+
+### Open items the next session inherits
+
+| Item | Status |
+| --- | --- |
+| **The same `--noEmit` defect in another ACTIVE spec** | `docs/specs/changes/innovation-use-required-fields/tasks.md:612` mandates `tsc -p tsconfig.spec.json` with no `--noEmit`. **Surfaced to the user, deliberately not edited** — editing another spec's approved text under cover of this pivot would be scope creep |
+| **`out-tsc` root cause** | Adding `out-tsc` to `jest.config.ts`'s `testPathIgnorePatterns` would fix it permanently, but that is client-package hygiene outside this spec. **User's call** |
+| **`runbook.md` advisories A-3, A-4, A-5** | A-4 is now discharged (T-03 proved the SQL runs against real MySQL). **A-5 remains and is reachable**: the runbook omits `DROP FUNCTION IF EXISTS`, so a re-paste after a mid-operation disconnect fails with `1304 ER_SP_ALREADY_EXISTS`. A-3 remains: its *Source of truth* section says the two files must not disagree, and they already do by one deliberate comment adaptation |
+| **`result3Id`'s inverted rationale** (T-14 advisory) | A comment in `innovation-use-result-creation.fixture-spec.ts` states the opposite of the truth. Advisory by the rules, but it is the KZ-007 artifact class — reads as settled fact, rarely re-verified, propagates |
+| **Both migrations still unapplied to any real environment** | B-1/B-3 and §11.1 — **user-only**, never an agent. Migration A's `down()` is destructive (the FK forces a hard delete of `link_results` rows) |
+| **Husky `pre-commit` is a 0-byte file** | So the repo's *"never `--no-verify` without approval"* rule guards a gate that cannot fail. Outside this spec's scope; worth knowing |
+| **Scratch container left running** | `research_indicators_server_test_mysql` on `127.0.0.1:3307`, Migration B applied, `results`/`link_results` empty. `npm run compose:test:down` tears it down; it is disposable |
+
+### Transport lesson for the next session (cost measured)
+
+Every Antigravity dispatch on this run returned `agent_prompt_stalled` and had its **dispatch
+capability revoked**, so `worker_done` and `heartbeat` are dead on that path — **the report must be
+collected from the terminal buffer.** Two concrete costs were paid before that was fully understood:
+attempt 2's worker burned its remaining turns retrying `orchestration send` three times and never
+printed its report (recovered from a file it wrote), and attempt 3's worker echoed its report through
+`Bash(echo …)` where it could not be read back at all. **Tell the worker in the brief: the transport is
+dead, print the report as plain terminal text, and do not call `orchestration send`.** The brief for
+attempt 3 said the first two things but not the third precisely enough.
+
+Resume with `/akili-resume` or `/akili-execute docs/specs/innovation-use/link-innovation-dev`.

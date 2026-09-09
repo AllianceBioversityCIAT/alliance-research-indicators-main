@@ -327,7 +327,7 @@ hundreds of type errors behind a report of three. Confirm the file parsed.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[~]` |
 | Size | M |
 | Depends on | T-08 |
 | Requirements | R-IUL-002, R-IUL-003 (all clauses), R-IUL-012 (all four states), **R-IUL-013** |
