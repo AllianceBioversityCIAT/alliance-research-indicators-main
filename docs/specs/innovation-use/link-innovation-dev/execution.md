@@ -70,7 +70,7 @@ buffer.
 
 | Field | Value |
 | --- | --- |
-| Status | **in rework** — attempt 1 FAIL, attempt 2 dispatched |
+| Status | **PASS on attempt 2** (1 rework round) |
 | Date | 2026-09-09 |
 | Requirements | R-IUL-010 (all clauses), R-IUL-011 |
 | Design | §3.1 (the C3 binding note), §11.1, §11.2 |
@@ -153,11 +153,70 @@ lands in `link_result_roles` — that is D-1's property, owned by T-03.
 - **READABILITY (positive):** the file headers resolve — every cited anchor was verified, including
   `1730900555793-addedPolicyChangeDataModel.ts:40` as the FK claimed.
 
-#### Attempt 2 — dispatched
+#### Attempt 2 — Reviewer PASS
 
-Effort `high`. Brief carries the Reviewer report verbatim, the Attempt History (*the two-sided
+Effort `high`. Brief carried the Reviewer report verbatim, the Attempt History (*the two-sided
 falsifier is already recorded and is not sufficient evidence — do not re-run it as the answer*), and
 an explicit instruction **not** to act on any advisory finding.
+
+**Files changed:** `server/researchindicators/src/db/migration-specs/1789000000000-insertInnovationUseLinkedDevRole.spec.ts` — one assertion. The migration and the enum are byte-identical to attempt 1.
+
+The file-wide substring check became a statement-anchored regex, mirroring the DELETE test already in the file:
+
+```ts
+// before (attempt 1) — satisfied by either the INSERT's or the DELETE's occurrence
+expect(src).toContain('${LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV}');
+
+// after (attempt 2) — bound to the INSERT statement's own text
+expect(src).toMatch(
+  /INSERT INTO link_result_roles \(link_result_role_id, name\) VALUES \(\$\{LinkResultRolesEnum\.INNOVATION_USE_LINKED_DEV\}/,
+);
+```
+
+The test's title was corrected to *"in the INSERT's own statement"* so it claims only what the body verifies.
+
+**Verification**
+
+| Check | Command (from `server/researchindicators`) | Result |
+| --- | --- | --- |
+| Task spec | `npx jest src/db/migration-specs/1789000000000-insertInnovationUseLinkedDevRole.spec.ts --silent` | `Test Suites: 1 passed, 1 total` · `Tests: 10 passed, 10 total` |
+| **One-sided falsifier** — bare `5` in `up()` ONLY, `down()`'s interpolation left intact | spec re-run | **RED, `Tests: 1 failed, 9 passed, 10 total`.** The failure names the anchored INSERT test; `Expected pattern` is the new regex, `Received string` shows `VALUES (5, 'Innovation Use Linked Dev')`. Reverted from backup, `diff` identical, green 10/10 |
+| Full server suite (after revert) | `npm test -- --silent` | `Test Suites: 357 passed, 357 total` · `Tests: 2754 passed, 2754 total` |
+| Lint | `npx eslint <the spec path>` | no output (clean). `npx prettier --write` → `unchanged`; eslint re-run → clean |
+
+**Reviewer verdict: `STATUS: PASS`**
+
+> The attempt-2 edit closes the attempt-1 FAIL exactly and only — the INSERT assertion is now
+> statement-anchored, mirroring the DELETE test already in the file, so the forbidden bare `5` in
+> `up()` alone can no longer pass green, and the one-sided falsifier red (1 of 10, the anchored INSERT
+> test) is the correct and complete discrimination signature.
+
+**Why `1 failed / 9 passed` is the right signature, not a partial gate.** The Reviewer walked all ten
+tests against the one-sided defect: exactly one *can* discriminate it. The `up()` behavioral tests
+assert **emitted** SQL and are structurally blind to source form (the enum evaluates to `5` either
+way), and the `down()` and import tests are correctly unaffected because `down()` and the import
+genuinely still hold. **The other nine tests' silence is therefore not a gap** — this is the
+distinction between a check that missed a defect and a check that is out of the defect's region.
+
+**Evidence authenticity, checked rather than assumed.** The reported `Expected pattern` is
+byte-identical to line 62 of the file, the `Received string` shows the injected literal, and the
+reported `10 total` matches the Reviewer's own count of the file (3 source + 4 `up()` + 3 `down()`).
+That output could only have come from this file.
+
+**Residual blind spot, named and judged non-gating.** Inherent to raw-source assertion: a bare `5` in
+`up()` **plus** a hand-written comment reproducing the full SQL string verbatim would pass. That needs
+two coordinated edits; `tasks.md` T-01's FALSIFIER asks for the one-edit form, which is now closed.
+
+**Reviewer's declared scope limits (KZ-017).** Its `grep` for `VALUES \(5|link_result_role_id = 5|role_id = 5`
+covers `server/researchindicators/src` **only** and would not catch a no-space `VALUES(5` — both
+settled by its direct read of the migration file. No `.bak`/`.orig`/`.tmp` residue anywhere under the
+package, so the pre-edit backup was cleaned up.
+
+**Attempt 1's five cleared checks were deliberately not re-derived**, and no new violation was found
+elsewhere. The three attempt-1 advisories remain non-gating: none names a clause `tasks.md` T-01
+binds, and the never-executed one is discharged at T-03.
+
+**Finalize order held:** this entry was written **before** `tasks.md` T-01 was flipped to `[x]`.
 
 ---
 

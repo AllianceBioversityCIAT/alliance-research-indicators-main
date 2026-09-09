@@ -80,7 +80,7 @@ Hard edges: `T-01 → T-02` (Migration B must be ordered after A **and** needs t
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | — |
 | Requirements | R-IUL-010 (all clauses), R-IUL-011 |
