@@ -359,9 +359,13 @@ Remove `isRequired` → the asterisk/message specs must go red.
 the options list, and not via `app-select`'s `#rows` (C12: a soft-deleted target would silently
 vanish).
 
-One row: `<platform_code> <code> - <title>` on the left, a right-aligned
-**`View innovation detail ↗`** anchor styled as a secondary button on the right.
-**Not zero-padded** — draft 2's 3-digit rule came from Links-to-Result and the mock contradicts it.
+One row: `<code> - <title>` on the left, a right-aligned **`View innovation detail ↗`** anchor styled
+as a secondary button on the right. **Not zero-padded** — draft 2's 3-digit rule came from
+Links-to-Result and the mock contradicts it.
+
+`<code>` composes **two** columns: `` `${platform_code} ${result_official_code}` `` → `STAR 284`.
+`platform_code` is **nullable** (KZ-012), so fall back to the bare number. Never print `null 284`,
+and never hard-code `STAR` as a default.
 The anchor carries `href="/result/<code>/general-information"`, `target="_blank"`, `rel="noopener"`,
 and a visually-hidden *"(opens in a new tab)"* in its accessible name.
 
@@ -373,7 +377,10 @@ leave the previous result in the payload after the selection changes · **must N
 handler on a non-interactive element.
 
 **Verify.** `npm test -- --silent`
-**FALSIFIER.** Assert on the **rendered DOM** — `<a>`'s `href`, `target`, and accessible name. A spec
+**FALSIFIER (label).** Render with `platform_code: null` → the card must read `284 - …`, never
+`null 284 - …` and never `STAR 284 - …`. A spec that only ever supplies a non-null platform cannot
+fail for this and is not evidence of the fallback.
+**FALSIFIER (link).** Assert on the **rendered DOM** — `<a>`'s `href`, `target`, and accessible name. A spec
 that asserts a click *handler* was called passes with the anchor entirely absent (KZ-001). Delete the
 anchor → the spec must go red.
 For the remove path, arrange the **transition** (render with a link, then clear, then

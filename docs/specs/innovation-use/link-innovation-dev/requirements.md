@@ -45,7 +45,7 @@ green check.
 | **Role 5** | New `link_result_roles` row, `INNOVATION_USE_LINKED_DEV` |
 | **Green check** | The MySQL function `innovation_use_validation(result_code)`, which gates submission of the section |
 | **Rule 16** | The new conjunct this spec appends to that function |
-| **Official code** | `results.result_official_code` — a plain number. **Amendment 01:** this feature renders it as `<platform_code> <code>` (e.g. `STAR 284`), **not** zero-padded. The 3-digit padding used by the Links-to-Result section does not apply here |
+| **Official code** | `results.result_official_code` — a `bigint`, e.g. `284`. **Amendment 01:** displayed prefixed by `results.platform_code` (a **nullable** `varchar(50)`) as `STAR 284`, falling back to the bare number when the prefix is `NULL` (KZ-012). **Not** zero-padded — the 3-digit rule of the Links-to-Result section does not apply here |
 
 ---
 
@@ -191,7 +191,9 @@ browser tab.
 - GIVEN Innovation Dev result `284` on platform `STAR`, titled "Rice bean-adzuki bean multitrait near infrared reflectance spectroscopy prediction model", is linked
 - WHEN the section renders
 - THEN a card below the control reads `STAR 284 - Rice bean-adzuki bean multitrait near infrared reflectance spectroscopy prediction model`
-- AND the same `<platform> <code> - <title>` format is used for the dropdown's own options and its collapsed value, so the two never disagree
+- AND the same `<code> - <title>` format is used for the dropdown's own options and its collapsed value, so the two never disagree
+- AND IT MUST fall back to the bare `result_official_code` when `platform_code` is `NULL` — the two are separate columns and the prefix is nullable (KZ-012)
+- BUT it must NOT render the literal `null`, `undefined`, or a hard-coded `STAR` when the prefix is absent
 - AND the card carries a right-aligned action labelled **"View innovation detail"** with an external-link affordance
 - AND that action targets `/result/<official-code>/general-information` and opens in a **new** browser tab
 - BUT it must NOT navigate the current tab, losing unsaved section data

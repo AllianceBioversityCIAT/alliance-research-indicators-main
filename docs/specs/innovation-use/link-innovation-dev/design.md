@@ -294,7 +294,8 @@ grey surface with a light border.
 
 | Property | Value |
 | --- | --- |
-| Content | `<platform_code> <result_official_code> - <title>` — e.g. `STAR 284 - Rice bean-adzuki bean …`. **Not** zero-padded; draft 2's 3-digit rule came from the Links-to-Result section and the mock contradicts it |
+| Content | `<code> - <title>`, where `<code>` is `` `${platform_code} ${result_official_code}` `` when `platform_code` is set (→ `STAR 284 - Rice bean-adzuki bean …`) and the **bare `result_official_code`** when it is `NULL`. **Not** zero-padded; draft 2's 3-digit rule came from Links-to-Result and the mock contradicts it |
+| **Null platform (KZ-012)** | `result_official_code` is a `bigint` and `platform_code` is a **nullable** `varchar(50)` — they are two columns, not one string. KZ-012 records that a NULL `platform_code` renders bare-numeric and is *classified* as STAR without validation. The label **MUST NOT** print `null 284`, and **MUST NOT** hard-code the string `STAR` as a default — a fabricated prefix is worse than none |
 | Action | a right-aligned **`View innovation detail ↗`** anchor styled as a secondary button |
 | Target | `href="/result/<result_official_code>/general-information"`, `target="_blank"`, `rel="noopener"` |
 | **AT discoverability** | a visually-hidden *"(opens in a new tab)"* inside the anchor's accessible name (C13) |
