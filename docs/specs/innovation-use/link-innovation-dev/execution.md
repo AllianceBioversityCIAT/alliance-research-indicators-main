@@ -2294,3 +2294,72 @@ The cause is structural, not carelessness: `akili-reviewer` has **no `Bash`**, s
 ### Status
 
 **T-11 → `[x]`**, written after this PASS entry existed. **8 of 14 tasks `[x]`.** The **client implementation lane is now complete** (T-08 … T-11). Remaining: **T-04 … T-07** (server, Claude lane, next by document order), **T-12** (client suite + human visual check — needs the user's eyes and a running app), **T-13** (doc sync).
+
+---
+
+## ✅ T-04 — DTO field + Swagger — Reviewer PASS (attempt 1, no rework)
+
+**Date** 2026-09-09 · **Lane** SERVER (never Antigravity, per the user's ruling) · **Implementer** `akili-implementer`, `sonnet` (T2) · **Reviewer** `akili-reviewer`, `opus` (T3) — `author ≠ auditor` on both axes · **Verdict `STATUS: PASS`**
+
+> **Summary (verbatim).** *"The field, its decorator pair, and the Swagger form match `design.md` §4.1/§4.2 exactly; `null` genuinely passes (verified in the pinned `class-validator` source, not recalled), and the Leader's `@IsNotEmpty()` mutation proves that contract is pinned by a test that reddens when it breaks rather than passing incidentally."*
+
+### What landed
+
+`innovation_dev_result_id?: number | null` on `CreateResultInnovationUseDto`, with `@IsOptional()` + `@IsInt()` + `@ApiProperty({ required: false, nullable: true, type: Number })`, plus four DTO tests. **Additive only** — 68 insertions, 0 deletions, two files.
+
+### The Reviewer verified library semantics at source rather than from memory, which is what makes the central claim evidence
+
+The whole task turns on `@IsOptional()` letting an explicit `null` through, and that was **read out of the pinned dependency**, not recalled:
+
+- `class-validator ^0.14.2` → `node_modules/class-validator/cjs/decorator/common/IsOptional.js:20` registers a `CONDITIONAL_VALIDATION` whose predicate is `object[propertyName] !== null && object[propertyName] !== undefined`, and `ValidationExecutor.js:132-135` returns early from `performValidations` when it is false. **Every** other validator — `@IsInt()` included — is skipped for both `null` and `undefined`.
+- **No global pipe exists**: `grep 'useGlobalPipes'` over `src` returns zero hits. The only pipe on the route is the per-handler one at `result-innovation-use.controller.ts:61`, which the spec file instantiates identically — so the test exercises the real pipe, not an approximation.
+
+**No coercion happens, and that too was verified rather than assumed.** `class-transformer/cjs/TransformOperationExecutor.js:250-257` reads `design:type` **only** when `enableImplicitConversion` is set; the pipe passes no `transformOptions`, so it is off. Consequence stated as fact: `"284"` stays a string, `@IsInt()` rejects, clean **400**. That is the strict reading of §4.1's `number | null` and is acceptable.
+
+**`@IsInt()` vs `@IsNumber()` — T-04 picked the better one, not the consistent one.** §4.2's Validation row mandates `@IsInt()`, and the Reviewer's judgement is that correctness should win: several sibling id fields in the same DTO use `@IsNumber()`, which would accept `284.5` for a MySQL PK. The sibling drift is pre-existing and out of scope.
+
+**Cross-host check the Reviewer ran unasked** — and it is the one `@IsInt()`'s strictness actually risks: the committed client lane sends the key verbatim **as a number**. `[optionValue]="{ body: 'innovation_dev_result_id', option: 'result_id' }"` (`.component.html:174`), passed through untouched by `buildPayload()` (`.component.ts:570`), and T-11's own spec asserts the serialized value is `123`/`456` as numbers. No STAR path sends a stringified id, so the no-coercion strictness is **not reachable from the client**.
+
+### Gates — Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` (server) | **358/358 suites, 2776/2776 tests PASS** |
+| `npx eslint <both files>` | **exit 0, no output** — bare `eslint`, per **K-001**: `npm run lint` carries `--fix`, so it mutates files and cannot verify. A fixer is not a gate |
+| Coverage | global 90.01 / 77.51 / 85.47 / 89.57 against a **60%** floor; the DTO file at 98.55 / 94.11 / 100 / 100 |
+
+### Falsifiers — Leader-run, tree restored byte-identically after each
+
+| Mutation | Observed |
+| --- | --- |
+| `@IsInt()` removed, `@IsOptional()` kept | ✅ **1 red** — *a non-int ("abc") rejects with a clean 400 naming the property* |
+| **`@IsOptional()` → `@IsNotEmpty()`** | ✅ **9 red**, including the mandatory target *innovation_dev_result_id: null resolves — MUST PASS (R-IUL-008 clear signal)* and *key absent validates clean*. The other 7 are collateral — sibling `quantification_number` tests that omit the field — and the worker **predicted that collateral in advance** |
+
+The second mutation is the one that matters: without it, a green `null` test cannot distinguish *"the contract is right"* from *"the contract is wrong but the test does not look at it"*. The Reviewer made the same point about the absent-key case's weaker `resolves.toBeDefined()`: *"in the abstract it is weak, but the Leader's `@IsNotEmpty()` mutation reddened that exact test — it is falsifiable by measurement, not by argument."*
+
+### Comment-accuracy audit (KZ-007 artifact class) — four of five claims verbatim true, one wrong and corrected
+
+The Reviewer was asked to check every factual claim in the new doc comment, because a comment that reads as settled fact but is wrong propagates and is rarely re-verified. Four checked out at source: the `@IsOptional()` two-value skip, `innovation_dev_result_id` being verbatim §4.1 (`design.md:152`), R-IUL-003's submit-not-save boundary (`requirements.md:176-179`), and `forbidNonWhitelisted` staying off (`design.md:169` + controller `:61`).
+
+**One citation was wrong and has been corrected in this commit.** The comment read *"`undefined` (omitted — **DD-1's** three-way write preserves the stored link)"*. DD-1 is *"Scalar `number | null`, not an array"* and says nothing about a write; the three-way write is **DD-4** (*"Three-way on `undefined`/`null`/id, never `??`"*) plus §5.1's step 9b. Corrected to `DD-4 / §5.1 step 9b`. The comment's *second* DD-1 reference (*"a scalar, never an array"*) was already correct and is unchanged. Re-verified after the edit: the DTO suite is 28/28 and `eslint` exits 0.
+
+This is a **one-token fix to a factual error the task itself introduced**, not an advisory absorbed as new scope — the same disposition used earlier when the Leader corrected §6.8's own stale line anchors.
+
+### Other confirmations
+
+- **DD-1 honored**: no array admitted, and **no `@ArrayMaxSize` or equivalent added** — DD-1 explicitly rejects that class of guard, citing KZ-001's record of it failing green 13 times. An `innovation_dev_result_id: [284]` payload passes `@IsOptional()` (non-null) and then fails `@IsInt()` → 400.
+- **Pipe options untouched**: `forbidNonWhitelisted` appears nowhere in the diff, and `whitelist: true` still strips `linked_innovation_dev` — `ValidationExecutor.whitelist()` (`:84-105`) deletes exactly the zero-metadata keys, and that GET-only key has none.
+- **Swagger**: character-for-character §4.2's mandated form. No endpoint was added, and the controller already carries `@ApiOperation` + `@ApiBody({ type: CreateResultInnovationUseDto })` (`:59-60`), so nothing is outstanding under the root guide's Swagger rule.
+- **T-04's Done line is met**, and R-IUL-008's *"different paths"* half is assigned by §4's closure table to **T-06**, not T-04 — so `Not Done: None` holds.
+
+### ADVISORY → carried to T-06's brief (recorded so it is carried, not merely filed)
+
+**The `null` test asserts resolution, not survival, and the asymmetry is the telling part.** The valid-int test explicitly asserts the value survives the pipe (*"whitelist must not strip it"*), so the author had the strip hazard in view — yet the case where a silent strip would be **harmful** asserts only `resolves.toBeDefined()`, which `{}` also satisfies. A `null` degraded to `undefined` would flip T-06's three-way from *"clear the link"* to *"preserve it"*, so **R-IUL-008's Explicit-null-clears scenario would fail while this test stayed green.**
+
+**Reachability verdict: none constructible, and the Reviewer looked.** `TransformOperationExecutor.js:303` assigns any `finalValue !== undefined`, so `null` is written to the instance, and `whitelist()` deletes only zero-metadata keys. `dto.innovation_dev_result_id === null` holds today and T-06's three-way is feasible.
+
+**T-06's brief must carry:** add `expect(result.innovation_dev_result_id).toBeNull();` to T-04's existing null test — one line, pinning the property at the layer that **creates** it rather than only at the layer that consumes it.
+
+### Status
+
+**T-04 → `[x]`**, written after this PASS entry existed. **9 of 14 tasks `[x]`.** Next by document order: **T-05** (module & DI wiring, `forwardRef`).

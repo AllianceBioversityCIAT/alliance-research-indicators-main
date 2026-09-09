@@ -178,7 +178,7 @@ FALSIFIER above — Amendment 02), both runs recorded.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-01 |
 | Requirements | R-IUL-001, R-IUL-006, R-IUL-008 |

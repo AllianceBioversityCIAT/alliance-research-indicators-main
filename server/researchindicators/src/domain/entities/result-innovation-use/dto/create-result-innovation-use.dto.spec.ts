@@ -183,3 +183,42 @@ describe('CreateResultInnovationUseDto — quantification_number scale+range con
     });
   });
 });
+
+/**
+ * T-04 (`docs/specs/innovation-use/link-innovation-dev`; R-IUL-001,
+ * R-IUL-006, R-IUL-008; `design.md` §4.1 (wire contract — normative), §4.2,
+ * DD-1).
+ *
+ * Same idiom as the suite above: the exact pipe the controller installs,
+ * asserted on status code rather than merely "it threw".
+ */
+describe('CreateResultInnovationUseDto — innovation_dev_result_id (T-04)', () => {
+  it('key absent validates clean', async () => {
+    await expect(pipe.transform({}, metadata)).resolves.toBeDefined();
+  });
+
+  // R-IUL-008: explicit null is the CLEAR signal, and @IsOptional() treats
+  // undefined and null identically — it skips @IsInt() for both. A DTO
+  // that rejected this would encode the wrong contract and break
+  // draft-save clearing an existing link.
+  it('innovation_dev_result_id: null resolves — MUST PASS (R-IUL-008 clear signal)', async () => {
+    await expect(
+      pipe.transform({ innovation_dev_result_id: null }, metadata),
+    ).resolves.toBeDefined();
+  });
+
+  it('a valid int (284) resolves and survives the pipe (whitelist must not strip it)', async () => {
+    const result = (await pipe.transform(
+      { innovation_dev_result_id: 284 },
+      metadata,
+    )) as CreateResultInnovationUseDto;
+    expect(result.innovation_dev_result_id).toBe(284);
+  });
+
+  it('a non-int ("abc") rejects with a clean 400 naming the property', async () => {
+    await expectBadRequestNaming(
+      { innovation_dev_result_id: 'abc' },
+      'innovation_dev_result_id',
+    );
+  });
+});
