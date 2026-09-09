@@ -2087,3 +2087,21 @@ The property is **de facto** covered — the `describe`'s `beforeEach` provides 
 **T-10 `[~]`.** Attempt 2 of 3 spent; **attempt 3 deliberately unspent** pending the user's ruling on issue 2. Issues 1, 3, 4, 5 are ordinary rework and are ready to dispatch the moment issue 2's direction is decided — bundling them into one attempt is what keeps the last attempt sufficient.
 
 **Three paraphrase-drift defects in `tasks.md`/`requirements.md` have now caused three separate failures in this one spec** (R-IUL-012's error clause → T-09 HALT + Amendment 03; T-10's `<code>`-in-href line → attempt 1 FAIL; T-10's leftover *"remove path … then clear"* → attempt 2 issue 1). That is a pattern in the spec text, not in the workers, and it is the single highest-value thing for the Kaizen pass to address.
+
+### ✅ Pivot resolution — Amendment 04, user-approved 2026-09-09
+
+**User ruling (verbatim):** *"deben poder todos tanto PRMS/TIP/AICCRA y STAR entonces si todos deben tener PLATFORMCODE-CODE"* — all four platforms must work, all with the `PLATFORMCODE-CODE` form.
+
+**Directly implementable with no server change, and the Reviewer's one open worry is resolved.** Issue 2's remediation note said closing TIP would need a payload widening because `linked_innovation_dev` does not carry `external_link`. It does not: **STAR's own result page renders non-STAR results.** `form-header.component.ts:39-48` — the same `app-form-header` this section already uses — computes `externalLink` from the result metadata and labels it *"Open result in PRMS"* / *"Open result in MARLO"* / *"Open link to result"* for PRMS/AICCRA/TIP. So `/result/PRMS-284/general-information` opens in STAR and the page itself offers the hand-off. The linked-results modal special-cases TIP because it links straight out; routing into STAR's page is equally valid and arguably better. **T-07 is untouched.**
+
+**Amendment 04 applied to all three normative documents:**
+
+- `requirements.md` — R-IUL-004's *Selected card* target clause becomes the hyphenated form, plus three new clauses: it applies to every platform (with R-IUL-002's no-filter mandate named as the reason), the bare code is the `NULL`-platform fallback only, and the URL **must not** be built from the space-joined display code.
+- `design.md` — §6.3's Target row rewritten; **new DD-13** records the decision, the full reaching sequence, the *"no server change needed"* finding, and all three rejected alternatives (bare code; routing TIP to `external_link`; filtering the picker to STAR — the last one rejected because it contradicts the user's own *"todos los inno dev"* ruling).
+- `tasks.md` — T-10's href line rewritten, the href falsifier updated from `/result/284/…` to `/result/STAR-284/…` **plus a second PRMS case**, and §4's R-IUL-004 closure row corrected (it said *"Removing"*, a path DD-7 withdrew, and omitted the *"card re-renders"* clause that issue 1 is about).
+
+**The distinction that caused attempt 1's defect is now stated in all three documents:** the label is space-joined (`STAR 284 - title`, per the mock) and the URL is hyphen-joined (`STAR-284`). They are different strings.
+
+**Correction closure swept both directions.** Forward: no normative document still states the bare-code href. Backward: every reference to R-IUL-004 and §6.3's Target row re-read and updated where it asserted the superseded form. **Note the honest record — `tasks.md`'s href line has now been corrected twice**: first from the space-joined display form (which attempt 1 implemented and FAILed for), then from the bare code (which matched `design.md` but misrouted every non-STAR result). The second correction was not a fix of the first; it was a different defect underneath it.
+
+**Attempt 3 is still unspent.** It now carries all five issues plus Amendment 04's URL form, which is what keeps one attempt sufficient rather than two.

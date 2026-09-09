@@ -13,6 +13,7 @@
 | **Amendment 01** | **2026-09-09** — user mock ([`mockup/`](mockup/)). Rescopes **T-08, T-09, T-10, T-11**; adds no task. Own section card, platform-prefixed label, `View innovation detail` action, no remove control. **Server lane T-01…T-07 unaffected** apart from `platform_code` in T-07's projection |
 | **Amendment 02** | **2026-09-09**, mid-execution, **user-approved**. Three verification-text corrections + one new task, all from defects found *while executing*: T-08's verify line emitted into `out-tsc` and disarmed T-12's gate; T-03's falsifier clause was unsatisfiable as written; §7's *"Server suite green"* could not see the fixture suite where T-03 lives. Adds **T-14** to repair the two sibling fixture files Migration B retroactively broke. **No requirement and no design decision changes** — this corrects verification text and closes an unowned consequence |
 | **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed at attempt 3 of 3. Root cause was a **spec gap, not three bad implementations**: R-IUL-012 required an error state and `design.md` draft 2 specified no error surface for it, so the only referent was the page-level `loadFailed()` gate — and the literal reading is a reachable silent-data-loss path. Rewrites **R-IUL-012's error clause**, adds **`design.md` §6.8 + DD-12**, and **rescopes T-09** (clauses, falsifiers, Cannot-prove, Done) against the corrected text. **T-09's attempt budget is restored to 3** — see §5 R-6. Adds no task; no other task changes |
+| **Amendment 04** | **2026-09-09**, mid-execution, **user-approved** after T-10 attempt 2. Ruling: *"deben poder todos tanto PRMS/TIP/AICCRA y STAR entonces si todos deben tener PLATFORMCODE-CODE"*. The anchor's URL becomes the **hyphenated** `<platform_code>-<result_official_code>` for every platform, not the bare code. Cause: R-IUL-002 forbids a platform filter, so a PRMS/TIP/AICCRA Innovation Dev result is selectable, and a bare `/result/284` resolves to **STAR** via the numeric ⟺ STAR invariant — the card showed `PRMS 284` beside a link that opened STAR-284. **Display format is unchanged** (space-joined, per the mock); only the URL changes. **No server or payload change** — STAR's own result page renders non-STAR results and surfaces their external link |
 | Created | 2026-09-09 |
 
 ---
@@ -415,14 +416,19 @@ Links-to-Result and the mock contradicts it.
 `<code>` composes **two** columns: `` `${platform_code} ${result_official_code}` `` → `STAR 284`.
 `platform_code` is **nullable** (KZ-012), so fall back to the bare number. Never print `null 284`,
 and never hard-code `STAR` as a default.
-The anchor carries `href="/result/<result_official_code>/general-information"` — the **bare
-`result_official_code`**, per `design.md` §6.3's Target row, **NOT** the space-joined `<code>` above.
-`<code>` is the *display* form only; a space cannot appear in a URL path segment, and
-`platformFromResultCodeOrNull` (`src/app/shared/utils/platform-code.util.ts`) resolves a
-platform by the **hyphenated** prefix (`STAR-284`), so `/result/STAR 284` derives `null`.
-*(Corrected 2026-09-09: this line previously read `/result/<code>/...`, which read literally
-prescribes a malformed URL. T-10 attempt 1 implemented it literally and FAILed for it — the same
-paraphrase-drift failure mode that HALTed T-09 and produced Amendment 03.)*
+The anchor carries `href="/result/<platform_code>-<result_official_code>/general-information"` —
+the **HYPHENATED** code, e.g. `/result/STAR-284/general-information`, for **every** platform
+(`STAR-`, `PRMS-`, `TIP-`, `AICCRA-`), per `design.md` §6.3's Target row and **DD-13**. Fall back to
+the **bare** `result_official_code` **only** when `platform_code` is `NULL`.
+**Display and URL are different strings and must not be conflated:** the label is space-joined
+(`STAR 284 - title`, per the mock) and the URL is hyphen-joined (`STAR-284`). A space cannot appear
+in a URL path segment, and `platformFromResultCodeOrNull`
+(`src/app/shared/utils/platform-code.util.ts`) resolves a platform by the **hyphenated** prefix only.
+Precedent: `select-linked-results-modal.component.ts:112-130`.
+*(This line has now been corrected twice. It first read `/result/<code>/...` — the space-joined
+display form — which T-10 attempt 1 implemented literally and FAILed for. It then read "the bare
+`result_official_code`", which matched `design.md` but silently misrouted every non-STAR result;
+**Amendment 04** is the user's ruling that all four platforms must work.)*
 Plus `target="_blank"`, `rel="noopener"`, and a visually-hidden *"(opens in a new tab)"* in its
 accessible name.
 
@@ -441,7 +447,10 @@ fail for this and is not evidence of the fallback.
 that asserts a click *handler* was called passes with the anchor entirely absent (KZ-001). Delete the
 anchor → the spec must go red.
 **FALSIFIER (href form) — added 2026-09-09 after attempt 1.** Assert the href for a result **with a
-non-null `platform_code`** equals `/result/284/general-information` exactly. Neither mandated
+non-null `platform_code`** equals `/result/STAR-284/general-information` exactly — **hyphenated**
+*(updated by Amendment 04; it previously asserted the bare `/result/284/…`)*. Add a second case
+asserting a **PRMS** result yields `/result/PRMS-284/general-information`, since a bare code would
+resolve that to STAR and open the wrong result. Neither mandated
 falsifier above could reach the malformed-URL defect (KZ-017): the label falsifier supplies
 `platform_code: null`, which is the case that happens to work, and deleting the anchor cannot detect a
 *wrong* href. Build the href from `result_official_code` and this spec must go red when it is built
@@ -626,7 +635,7 @@ expects `FALSE` documented in-file with the reason.
 | R-IUL-001 | One result linked; Replacing; reactivation clause; other-roles clause | T-06, T-11 |
 | R-IUL-002 | Only Innovation Dev, all of them; both `BUT`/`MUST NOT` clauses | T-09 |
 | R-IUL-003 | Empty and required; the draft-save `BUT`; the same-token `AND IT MUST` | T-09 (+ T-12 visual) |
-| R-IUL-004 | Selected card; Removing; both `BUT`/`MUST` clauses | T-10 |
+| R-IUL-004 | Selected card; **Changing the selection (the card re-renders for the new result — not merely cleared)**; Amendment 04's four URL clauses; both `BUT`/`MUST` clauses | T-10 |
 | R-IUL-005 | Atomic with the section; the manager clause | T-06 |
 | R-IUL-006 | Wrong indicator; Inactive target; Self-reference; the pre-`BEGIN` clause | T-06 |
 | R-IUL-007 | Read-back; all four clauses | T-07 |

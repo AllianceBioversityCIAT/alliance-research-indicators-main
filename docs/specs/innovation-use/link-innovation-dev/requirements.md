@@ -14,6 +14,7 @@
 | Phase 1 gate | **auto-approved (pre-approved mode)** — 2026-09-09 |
 | **Amendment 01** | **2026-09-09** — user supplied a mock after Phase 3. The field becomes **its own card** titled *RELATED INNOVATION DEVELOPMENT*, placed **below the level-stepper card**; the display format gains the platform prefix; and the selected result carries a labelled **"View innovation detail ↗"** button instead of being a whole-card link. Affects R-IUL-004, R-IUL-007, R-IUL-012 and the new R-IUL-013. **Server contract unchanged except for one added read field.** Mock: [`mockup/`](mockup/) |
 | **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed at attempt 3 of 3. R-IUL-012's error clause said only *"the section's existing error surface is used"*, which under its plain text means the page-level load-failure gate — and implementing it literally produced a reachable silent-data-loss path that violates R-IUL-003. The two requirements were in conflict. **Revises R-IUL-012's error clause only**; adds no requirement and changes no other behavior. Companion: `design.md` §6.8 + DD-12, which is the surface R-IUL-012 previously never specified |
+| **Amendment 04** | **2026-09-09**, mid-execution, **user-approved** after T-10 attempt 2. Ruling: *"deben poder todos tanto PRMS/TIP/AICCRA y STAR entonces si todos deben tener PLATFORMCODE-CODE"*. The anchor's URL becomes the **hyphenated** `<platform_code>-<result_official_code>` for every platform, not the bare code. Cause: R-IUL-002 forbids a platform filter, so a PRMS/TIP/AICCRA Innovation Dev result is selectable, and a bare `/result/284` resolves to **STAR** via the numeric ⟺ STAR invariant — the card showed `PRMS 284` beside a link that opened STAR-284. **Display format is unchanged** (space-joined, per the mock); only the URL changes. **No server or payload change** — STAR's own result page renders non-STAR results and surfaces their external link |
 | Created | 2026-09-09 |
 
 ---
@@ -196,7 +197,10 @@ browser tab.
 - AND IT MUST fall back to the bare `result_official_code` when `platform_code` is `NULL` — the two are separate columns and the prefix is nullable (KZ-012)
 - BUT it must NOT render the literal `null`, `undefined`, or a hard-coded `STAR` when the prefix is absent
 - AND the card carries a right-aligned action labelled **"View innovation detail"** with an external-link affordance
-- AND that action targets `/result/<official-code>/general-information` and opens in a **new** browser tab
+- AND that action targets `/result/<platform_code>-<result_official_code>/general-information` and opens in a **new** browser tab *(Amendment 04 — the **hyphenated** code, e.g. `/result/STAR-284/general-information`)*
+- AND that URL form applies to **every** platform — `STAR-284`, `PRMS-284`, `TIP-284`, `AICCRA-284` — because R-IUL-002 forbids filtering the options by platform, so any of them can be linked *(Amendment 04)*
+- AND it falls back to the **bare** `result_official_code` **only** when `platform_code` is `NULL`, where the numeric ⟺ STAR invariant is the intended resolution — a fabricated prefix is still forbidden *(Amendment 04)*
+- BUT the URL **MUST NOT** be built from the space-joined *display* code: a space cannot appear in a URL path segment, and `platformFromResultCodeOrNull` resolves a platform by the **hyphenated** prefix only *(Amendment 04 — T-10 attempt 1 FAILed for exactly this conflation)*
 - BUT it must NOT navigate the current tab, losing unsaved section data
 - AND IT MUST be a real anchor — keyboard-reachable and activatable — carrying `rel="noopener"`, never a `click` handler on a non-interactive element
 - AND IT MUST announce that it opens a new tab to assistive technology
