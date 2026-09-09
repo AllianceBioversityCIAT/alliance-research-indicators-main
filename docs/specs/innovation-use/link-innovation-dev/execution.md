@@ -1797,3 +1797,16 @@ T-09 stays **`[~]`**. No code was written or reverted in this Pivot — only spe
 ### ✅ Pivot approval — Amendment 03 approved by the user, 2026-09-09
 
 *"Apruebo, reanuda T-09."* Pivot Protocol step 4 satisfied. Execution resumes at **T-09 attempt 1 of the restored budget** (§5 R-6), against the corrected §6.8 / DD-12 text. Client lane → Antigravity via `/orchestration`, per the user's standing ruling.
+
+### 📎 Kaizen: this Pivot is a KZ-008 recurrence, and the mechanism is worth naming
+
+`docs/specs/kaizen-log.md` **KZ-008** (Active Lessons) already states it:
+
+> *"An advisory that names a reachable state is not an advisory — it is an unfiled defect. The advisory register has no owner and no gate, so a finding placed there stops being acted on."*
+
+That is exactly the chain that produced this HALT, and it went one step further than the lesson describes. The attempt-2 Reviewer's advisory at `execution.md:1100` **named the reachable state** (*"blanks the entire Innovation Use section"*) and even named the better design (*"a partial surface … would degrade better"*). Because it was filed as an advisory it had no owner and no gate — and the Leader then converted the unowned finding into a **positive instruction** in attempt 3's brief, which is worse than the register merely dropping it. The advisory register did not just fail to act; it laundered an open design question into a settled constraint.
+
+**Two mechanism notes for the next Kaizen pass** (recorded here, not actioned — an advisory may not mint a task in this spec):
+
+1. The `/akili-execute` rules say an advisory *"is recorded and dies there"* and that a serious one must be **restated as a spec-violation FAIL or escalated via the Pivot Protocol**. Attempt 2 did neither: it invented a third disposition — *"a design-level call for T-12 or the user"* — which is not one of the available outcomes. A deferral to a later task is a **forward pointer**, and forward pointers are only carried if the later brief carries them. This one was carried into the *wrong* task's brief, as an instruction.
+2. The Reviewer's reasoning was sound at the time (*"R-IUL-012:379 literally prescribes it, so it is not a violation"*) — and this is the tell. When a Reviewer has to reason *"the spec literally requires the harmful thing, so it is not a violation"*, that conclusion is itself Pivot evidence. The correct disposition was to stop and escalate the spec, not to pass the implementation and file the harm as advice.
