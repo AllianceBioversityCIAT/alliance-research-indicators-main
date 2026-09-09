@@ -397,7 +397,7 @@ card-scoped by the save-path falsifier; falsifiers observed red.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[~]` |
 | Size | M |
 | Depends on | T-08 |
 | Requirements | R-IUL-004 (both scenarios), NFR-IUL-002, NFR-IUL-003 |
@@ -415,8 +415,16 @@ Links-to-Result and the mock contradicts it.
 `<code>` composes **two** columns: `` `${platform_code} ${result_official_code}` `` → `STAR 284`.
 `platform_code` is **nullable** (KZ-012), so fall back to the bare number. Never print `null 284`,
 and never hard-code `STAR` as a default.
-The anchor carries `href="/result/<code>/general-information"`, `target="_blank"`, `rel="noopener"`,
-and a visually-hidden *"(opens in a new tab)"* in its accessible name.
+The anchor carries `href="/result/<result_official_code>/general-information"` — the **bare
+`result_official_code`**, per `design.md` §6.3's Target row, **NOT** the space-joined `<code>` above.
+`<code>` is the *display* form only; a space cannot appear in a URL path segment, and
+`platformFromResultCodeOrNull` (`src/app/shared/utils/platform-code.util.ts`) resolves a
+platform by the **hyphenated** prefix (`STAR-284`), so `/result/STAR 284` derives `null`.
+*(Corrected 2026-09-09: this line previously read `/result/<code>/...`, which read literally
+prescribes a malformed URL. T-10 attempt 1 implemented it literally and FAILed for it — the same
+paraphrase-drift failure mode that HALTed T-09 and produced Amendment 03.)*
+Plus `target="_blank"`, `rel="noopener"`, and a visually-hidden *"(opens in a new tab)"* in its
+accessible name.
 
 **No remove button** — the mock exposes none and the field is required (design §6.4). Do not build
 one, and do not add `showClear` to the shared select.
@@ -432,6 +440,12 @@ fail for this and is not evidence of the fallback.
 **FALSIFIER (link).** Assert on the **rendered DOM** — `<a>`'s `href`, `target`, and accessible name. A spec
 that asserts a click *handler* was called passes with the anchor entirely absent (KZ-001). Delete the
 anchor → the spec must go red.
+**FALSIFIER (href form) — added 2026-09-09 after attempt 1.** Assert the href for a result **with a
+non-null `platform_code`** equals `/result/284/general-information` exactly. Neither mandated
+falsifier above could reach the malformed-URL defect (KZ-017): the label falsifier supplies
+`platform_code: null`, which is the case that happens to work, and deleting the anchor cannot detect a
+*wrong* href. Build the href from `result_official_code` and this spec must go red when it is built
+from the space-joined display code instead.
 For the remove path, arrange the **transition** (render with a link, then clear, then
 `detectChanges`), never the end state — a fixture that sets the cleared input before the first
 `detectChanges` tests a state the product never reaches (KZ-015).

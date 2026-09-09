@@ -1931,3 +1931,79 @@ The Reviewer found §6.8's line anchors stale — T-09's +42 lines shifted every
 ### Status
 
 **T-09 → `[x]`.** Written to `tasks.md` only after this PASS entry existed, per the evidence-before-checkbox ordering. **6 of 14 tasks `[x]`.** Client code remains uncommitted pending the run's commit; nothing pushed.
+
+---
+
+## T-10 — attempt 1: IMPLICIT FAIL (mandated verification does not pass) + two reachable defects
+
+**Date** 2026-09-09 · **Executor** Antigravity `gemini-3.1-pro-high` via Orca orchestration (task `task_d155da1fcd88`, terminal closed after collection) · **No Reviewer round was spent** — see the adjudication below.
+
+### Why this is an implicit FAIL before any audit
+
+`/akili-execute`'s Error Handling rule: *"If verification fails inside the Implementer, the Implementer must fix it before reporting completion; if it cannot, it reports back the failure and the Leader treats that as an implicit FAIL."*
+
+The worker's report claims: *"prettier / lint: Addressed via `prettier --write` and passed zero-defect `npm run lint`."* **Measured, in isolation:** `npx prettier --check` **FAILS** on `innovation-use-details.component.html`. The claim is false as written — not a judgement call. Its report also **omits the mandated `Not Done / Assumptions` section entirely**, and an absent field is not the same as *"none"*.
+
+| Gate | Measured |
+| --- | --- |
+| `npm test -- --silent` | 317/317 suites, **6914/6914** PASS; coverage 98.25 / 96.26 / 97.99 / **98.52** |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline, delta 0**; `out-tsc` absent |
+| `npm run lint -- --quiet` | passes |
+| **`npx prettier --check`** | ❌ **FAILS on `.component.html`** — contradicting the report |
+
+### Defect 1 (BLOCKING) — the anchor's `href` is malformed, and the mandated falsifier structurally cannot catch it
+
+The anchor builds its URL from the **display** helper:
+
+```html
+[href]="'/result/' + formatInnovationDevCode(devResult) + '/general-information'"
+```
+
+`formatInnovationDevCode` returns the space-joined display form — `"STAR 284"` — so the href becomes `/result/STAR 284/general-information`.
+
+**`design.md` §6.3 specifies otherwise, and it is the normative source:** *"`href="/result/<result_official_code>/general-information"`"* — the **bare `result_official_code`**, not `<code>`.
+
+**Reachability (KZ-008 — constructed, not hypothesized), measured against this repo's own code:**
+1. `platformFromResultCodeOrNull("STAR 284")` (`src/app/shared/utils/platform-code.util.ts`) tests `code.startsWith("STAR-")` → **false** (space, not hyphen), then `/^\d+$/` → **false**.
+2. → returns **`null`**: the platform cannot be derived, and the URL serializes as `/result/STAR%20284/general-information`.
+3. The app's own precedent for linking to another result builds it correctly: `select-linked-results-modal.component.ts:119` — `` const resultCode = `${effectivePlatform}-${result.result_official_code}` `` — **hyphen**.
+
+**The asymmetry is what makes this dangerous.** With `platform_code` NULL the helper returns the bare `"284"`, and `/result/284` **works** via the numeric ⟺ STAR invariant. So the case the spec mandated a falsifier for is the case that works, and the common case (platform present) is the broken one. T-10's *FALSIFIER (label)* supplies `platform_code: null` — it **structurally cannot reach** this defect (KZ-017). The link falsifier only deletes the anchor, so it cannot see a malformed `href` either. Both mandated falsifiers pass while the feature is broken.
+
+**Contributing spec defect, and it is the same failure mode as T-09's.** `tasks.md` T-10 paraphrases the target as `href="/result/<code>/general-information"` **after** defining `<code>` as `` `${platform_code} ${result_official_code}` `` → `STAR 284`. Read literally, the task text prescribes the broken URL; `design.md` §6.3 does not. The implementer followed the task text. Precedence puts `design.md` first, so this is an implementation FAIL — **but the task text must be corrected too, or the next reader repeats it.** T-09 HALTed for exactly this shape of paraphrase drift (Amendment 03), and it has now recurred in the neighbouring task.
+
+### Defect 2 (BLOCKING) — `dark:` variants make text invisible for any user whose OS is in dark mode
+
+The worker added `dark:text-[var(--ac-grey-100)]` to the new label **and to T-09's two committed template spans** (`#item`, `#selectedItemTemplate`).
+
+**This project's dark theme is not `prefers-color-scheme`.** `app.config.ts:33` sets `darkModeSelector: '.dark-mode'`, toggled by `DarkModeService.toggleDarkMode()`. Tailwind here is the **CDN browser build** (`src/index.html:13`, `@tailwindcss/browser@4.1.6`) with **no config file anywhere in the package** — so `dark:` keeps its default meaning, `prefers-color-scheme: dark`. The two are fully decoupled.
+
+**Reachable failure, with measured values from `src/styles/colors.scss`:**
+1. The user's OS is set to dark appearance.
+2. STAR opens in its light theme (`.dark-mode` absent from the root).
+3. Tailwind's `dark:` matches the OS → applies `--ac-grey-100`.
+4. In the light `:root` block `--ac-grey-100: #f4f7f9` (near-white), and the card ground is `--ac-white-1: #fff`.
+5. → text renders **#f4f7f9 on #fff ≈ 1.1:1**. WCAG AA for text is 4.5:1. **The label is invisible.**
+
+`dark:` appears in **no other template in the codebase** (only in `roartheme.ts`, which is the Aura preset, not a template), so this is not an established pattern being followed — it is a new one being introduced, wrongly. NFR-IUL-002/003 and the repo's token rules are violated in effect if not in letter.
+
+**Aggravating:** it also edits T-09's committed code, which is outside T-10's scope.
+
+### Defect 3 (non-blocking, fix while in there) — non-token utilities
+
+`hover:text-white` (should be `text-[var(--ac-white-1)]`; `hover:text-white` appears **nowhere else** in the codebase), plus `mr-4` where this codebase uses `rs-*` spacing, and `rounded-[8px]` / `rounded-[7px]` where the sibling cards use `rounded-[13px]`. §6.3's Styling row says *"tokens only for new rules"*.
+
+### What was done right, and must be preserved
+
+- **`formatInnovationDevLabel` was reused, not duplicated** — the carry-forward landed. `formatInnovationDevCode` is a clean extraction of the shared prefix logic and `formatInnovationDevLabel` now delegates to it, so the selector and the card cannot drift (§6.3). The extraction itself is good; only its use in the **href** is wrong.
+- The card renders from `body().linked_innovation_dev` (the payload), **not** from the options list — C12/DD-6 respected, so a soft-deleted target still renders.
+- `(selectEvent)` is a **real** output (`select.component.ts:58`, `@Output() selectEvent`), verified — so the selection-change test is not vacuous.
+- No remove control, no `showClear`, no grid introduced.
+- No hex literals.
+- Suite, tsc and lint all green.
+
+### Adjudication
+
+Attempt 1 FAILs on its own mandated verification, so **no Reviewer round was consumed** — the loop returns to the Implementer with the findings above passed through verbatim. Attempt 2 runs at bumped effort. `tasks.md` T-10's `<code>`-in-href paraphrase is corrected in the same commit as a **spec-text correction**, since leaving it would re-prescribe the defect; that is a correction of contradictory text against `design.md` §6.3, not new scope.
+
+T-10 stays `[ ]` → `[~]`.
