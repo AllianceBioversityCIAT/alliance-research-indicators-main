@@ -10,6 +10,7 @@
 | Review ledger | [`judgment.md`](judgment.md) |
 | Approval Mode | pre-approved — Phase 3 gate **auto-approved (pre-approved mode)**, 2026-09-09 |
 | Task count | **13** (budget said 12; +1 for the doc-sync task that had no home — see §6) |
+| **Amendment 01** | **2026-09-09** — user mock ([`mockup/`](mockup/)). Rescopes **T-08, T-09, T-10, T-11**; adds no task. Own section card, platform-prefixed label, `View innovation detail` action, no remove control. **Server lane T-01…T-07 unaffected** apart from `platform_code` in T-07's projection |
 | Created | 2026-09-09 |
 
 ---
@@ -288,8 +289,8 @@ absent" spec must go red. Filter out soft-deleted targets → the C12 spec must 
 | Skills | `angular-developer` |
 
 **Scope.** Add `innovation_dev_result_id: number \| null \| undefined` and
-`linked_innovation_dev: { result_id; result_official_code; title } | null | undefined` to
-`GetInnovationUseDetails`.
+`linked_innovation_dev: { result_id; result_official_code; title; platform_code } | null | undefined`
+to `GetInnovationUseDetails`. **`platform_code` is Amendment 01** — the `STAR 284 - …` label needs it.
 
 **The widened types are deliberate** — mirror the reasoning already written on
 `InnovationUseOrganization.institution_id`: `undefined` is dropped by `JSON.stringify`, so the
@@ -310,21 +311,29 @@ hundreds of type errors behind a report of three. Confirm the file parsed.
 | Status | `[ ]` |
 | Size | M |
 | Depends on | T-08 |
-| Requirements | R-IUL-002, R-IUL-003 (all clauses), R-IUL-012 (all four states) |
-| Design | §6.1, §6.2, §6.5, §6.6 |
+| Requirements | R-IUL-002, R-IUL-003 (all clauses), R-IUL-012 (all four states), **R-IUL-013** |
+| Design | §6.1, §6.2, §6.5, §6.6, DD-11 |
 | Skills | `angular-developer`, `ui-ux-pro-max` |
 
-**Scope.** `app-select` appended as **one more full-width block at the end of the flat flow** of the
-*INNOVATION USE DETAILS* card.
+**Scope (Amendment 01).** Create a **new sibling card** titled `RELATED INNOVATION DEVELOPMENT`,
+placed **between the *INNOVATION USE DETAILS* card and *ACTORS*** — not inside the details card.
+
+Copy the shell class string **verbatim** from the four existing cards:
+`rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]`, with
+`<h2 class="section-title">`. Per DD-11 the title carries the required asterisk.
 
 > **There is no grid in this file.** `grep -c grid` returns **0**. Do not introduce one, and do not
-> copy `policy-change.component.html`'s `grid grid-cols-12` — that is a different file (C1).
+> copy `policy-change.component.html`'s `grid grid-cols-12` — different file (C1).
 
-Config per §6.2 exactly. `hideSelected` stays **`true`** — the card is T-10's, not the select's.
-`disabled` per §6.5: `!submission.isEditableStatus() || (!loading() && list().length === 0)`.
+`app-select` inside that card. `hideSelected` stays **`true`** — the card is T-10's. Option label is a
+computed `<platform_code> <result_official_code> - <title>`, applied through the `#item` template so
+the list and the collapsed value match T-10's card exactly (precedent:
+`innovation-details.component.html:390-394`). `disabled` per design §6.5:
+`!submission.isEditableStatus() || (!loading() && list().length === 0)`.
 
-**Clauses:** red asterisk · amber border · "This field is required" · **must NOT** block draft save or
-navigation · **must NOT** show the empty state while `loading()` is true.
+**Clauses:** card between the right siblings (R-IUL-013) · nothing moved out of the details card ·
+red asterisk · amber border · "This field is required" · **must NOT** block draft save or navigation ·
+**must NOT** show the empty state while `loading()` is true · **must NOT** nest inside the details card.
 
 **Verify.** `npm test -- --silent`
 **FALSIFIER.** Drop the `!loading()` guard → the "no empty state during load" spec must go red.
@@ -346,14 +355,22 @@ Remove `isRequired` → the asterisk/message specs must go red.
 | Design | §6.3, §6.4, DD-6, DD-7 |
 | Skills | `angular-developer`, `ui-ux-pro-max` |
 
-**Scope.** Render the card **from `linked_innovation_dev` in the payload** — not from the options
-list, and not via `app-select`'s `#rows` (C12: a soft-deleted target would silently vanish). Content
-`<code padded to 3> - <title>`; a real `<a>` with `href`, `target="_blank"`, `rel="noopener"`, and a
-**visually-hidden "(opens in a new tab)"** in its accessible name. A remove button, shown only when
-`submission.isEditableStatus()`, writing `null` into the page signal **with a new object reference**.
+**Scope (Amendment 01).** Render the card **from `linked_innovation_dev` in the payload** — not from
+the options list, and not via `app-select`'s `#rows` (C12: a soft-deleted target would silently
+vanish).
+
+One row: `<platform_code> <code> - <title>` on the left, a right-aligned
+**`View innovation detail ↗`** anchor styled as a secondary button on the right.
+**Not zero-padded** — draft 2's 3-digit rule came from Links-to-Result and the mock contradicts it.
+The anchor carries `href="/result/<code>/general-information"`, `target="_blank"`, `rel="noopener"`,
+and a visually-hidden *"(opens in a new tab)"* in its accessible name.
+
+**No remove button** — the mock exposes none and the field is required (design §6.4). Do not build
+one, and do not add `showClear` to the shared select.
 
 **Clauses:** **must NOT** navigate the current tab · **must** be keyboard-operable · **must NOT**
-leave the old value in the payload after removal.
+leave the previous result in the payload after the selection changes · **must NOT** be a `click`
+handler on a non-interactive element.
 
 **Verify.** `npm test -- --silent`
 **FALSIFIER.** Assert on the **rendered DOM** — `<a>`'s `href`, `target`, and accessible name. A spec
@@ -362,7 +379,7 @@ anchor → the spec must go red.
 For the remove path, arrange the **transition** (render with a link, then clear, then
 `detectChanges`), never the end state — a fixture that sets the cleared input before the first
 `detectChanges` tests a state the product never reaches (KZ-015).
-**Done.** Card renders from payload; a soft-deleted target still renders; falsifiers observed.
+**Done.** Card renders from payload in the mock's layout; a soft-deleted target still renders; falsifiers observed.
 
 ---
 
@@ -379,6 +396,10 @@ For the remove path, arrange the **transition** (render with a link, then clear,
 
 **Scope.** `buildPayload()` emits `undefined` untouched · the id when selected · an **explicit
 `null`** when cleared.
+
+> **Amendment 01:** the UI exposes no clear, so the `null` branch has no caller from this surface
+> today. **Build and test it anyway** — the server contract (R-IUL-008) accepts it, and narrowing the
+> client silently is how the two drift apart.
 
 > **§6.7 — do not pattern-match the neighbour.** `innovation-use-details.component.ts:489-492` uses
 > `?? undefined` deliberately, for a field that must *never* be clearable. Copying it here makes

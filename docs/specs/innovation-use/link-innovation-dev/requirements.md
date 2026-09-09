@@ -12,6 +12,7 @@
 | Module prefix | `IUL` (Innovation Use — Link). Verified unused across `docs/` on 2026-09-09. |
 | Source | [`proposal.md`](proposal.md), approved 2026-09-09 with OQ-1/2/3 answered |
 | Phase 1 gate | **auto-approved (pre-approved mode)** — 2026-09-09 |
+| **Amendment 01** | **2026-09-09** — user supplied a mock after Phase 3. The field becomes **its own card** titled *RELATED INNOVATION DEVELOPMENT*, placed **below the level-stepper card**; the display format gains the platform prefix; and the selected result carries a labelled **"View innovation detail ↗"** button instead of being a whole-card link. Affects R-IUL-004, R-IUL-007, R-IUL-012 and the new R-IUL-013. **Server contract unchanged except for one added read field.** Mock: [`mockup/`](mockup/) |
 | Created | 2026-09-09 |
 
 ---
@@ -44,7 +45,7 @@ green check.
 | **Role 5** | New `link_result_roles` row, `INNOVATION_USE_LINKED_DEV` |
 | **Green check** | The MySQL function `innovation_use_validation(result_code)`, which gates submission of the section |
 | **Rule 16** | The new conjunct this spec appends to that function |
-| **Official code** | `results.result_official_code`, rendered zero-padded to 3 digits in STAR |
+| **Official code** | `results.result_official_code` — a plain number. **Amendment 01:** this feature renders it as `<platform_code> <code>` (e.g. `STAR 284`), **not** zero-padded. The 3-digit padding used by the Links-to-Result section does not apply here |
 
 ---
 
@@ -90,7 +91,7 @@ green check.
 | **D-4** | A non-Innovation-Dev, or inactive, target is accepted | Service spec with a falsifying id (an indicator-4 result, and a soft-deleted indicator-2 result) | Yes |
 | **D-5** | Cardinality drift — two rows persisted for one section | Type-level (scalar DTO field) + a service spec asserting exactly one active row | Yes |
 | **D-6** | Clearing semantics inverted — an omitted key wipes the link, or an explicit `null` fails to | Service spec on **both** paths separately | Yes. This is the DD-14 trap already documented in `result-innovation-use.service.ts` |
-| **D-7** | **Visual** — asterisk/amber-border/spacing wrong, card layout broken, dark theme unreadable | jsdom component spec asserts **class and DOM presence only** | **No.** jsdom cannot measure layout or evaluate contrast. **Substituted:** a human visual check against the running app at the Phase-3 HITL pause, plus a screenshot in the task's evidence. Recorded as a named gap, not covered by `npm test` |
+| **D-7** | **Visual** — asterisk/amber-border/spacing wrong, card layout broken, the new section card mismatched against its siblings, dark theme unreadable | jsdom component spec asserts **class and DOM presence only** | **No.** jsdom cannot measure layout or evaluate contrast. **Substituted:** a human visual check against the running app at the Phase-3 HITL pause, plus a screenshot in the task's evidence. Recorded as a named gap, not covered by `npm test` |
 | **D-8** | Navigation opens the wrong result, or in the same tab | Component spec asserting the **rendered** `<a href>` and `target` | Yes — provided it asserts the DOM, never a handler call (KZ-001) |
 | **D-9** | Stale options list — a result created after page load is invisible | Component/service spec on the refresh path | Yes |
 | **D-10** | Retroactive green-check break surprises reporters | **Not a code defect.** Accepted by user ruling (OQ-1); the applier owns timing and comms | N/A — recorded, not gated |
@@ -177,28 +178,37 @@ this section — a red asterisk on the label, an amber invalid border, and the m
 
 ---
 
-### R-IUL-004 — The selected result renders as a clickable `official-code - title` card
+### R-IUL-004 — The selected result renders as a card with a "View innovation detail" action
 
-The selection **SHALL** render beneath the control as a card showing the linked result's official
-code and title, and that card **SHALL** open the linked result in a separate browser tab.
+*(Amended 01 — supersedes the whole-card-link form.)*
+
+The selection **SHALL** render beneath the control as a card showing the linked result's
+**platform-prefixed code and title**, with a labelled action that opens that result in a separate
+browser tab.
 
 #### Scenario: Selected card
 
-- GIVEN Innovation Dev result `42` titled "Drought-tolerant bean variety" is linked
+- GIVEN Innovation Dev result `284` on platform `STAR`, titled "Rice bean-adzuki bean multitrait near infrared reflectance spectroscopy prediction model", is linked
 - WHEN the section renders
-- THEN a card below the control reads `042 - Drought-tolerant bean variety`
-- AND the official code is zero-padded to three digits, matching the Links-to-Result section
-- AND the card is a real link to `/result/<official-code>/general-information`
-- AND activating it opens that route in a **new** browser tab
+- THEN a card below the control reads `STAR 284 - Rice bean-adzuki bean multitrait near infrared reflectance spectroscopy prediction model`
+- AND the same `<platform> <code> - <title>` format is used for the dropdown's own options and its collapsed value, so the two never disagree
+- AND the card carries a right-aligned action labelled **"View innovation detail"** with an external-link affordance
+- AND that action targets `/result/<official-code>/general-information` and opens in a **new** browser tab
 - BUT it must NOT navigate the current tab, losing unsaved section data
-- AND IT MUST be reachable and activatable by keyboard alone, and carry `rel="noopener"`
+- AND IT MUST be a real anchor — keyboard-reachable and activatable — carrying `rel="noopener"`, never a `click` handler on a non-interactive element
+- AND IT MUST announce that it opens a new tab to assistive technology
 
-#### Scenario: Removing the selection
+#### Scenario: Changing the selection
 
 - GIVEN a linked result is displayed
-- WHEN the reporter clears the selection
-- THEN the card disappears and the field returns to its required-and-empty state
-- AND IT MUST NOT leave the previously selected value in the payload on the next save
+- WHEN the reporter picks a different Innovation Dev result from the dropdown
+- THEN the card re-renders for the new result
+- AND IT MUST NOT leave the previous result in the payload on the next save
+
+> **No remove control (Amendment 01).** The mock exposes none, and the field is required — the only
+> supported way to change it is to pick another option. The **server** still honours an explicit
+> `null` as a clear (R-IUL-008); this requirement only says the **UI does not offer one**, so
+> R-IUL-008's client half is not exercised by this surface.
 
 ---
 
@@ -253,13 +263,14 @@ before any write occurs.
 ### R-IUL-007 — The link is returned on read
 
 `GET` on the section **SHALL** return the linked result with enough detail to render R-IUL-004's
-card without a second request: at minimum its `result_id`, `result_official_code` and `title`.
+card without a second request: its `result_id`, `result_official_code`, `title` and — **added by
+Amendment 01** — its `platform_code`, without which the `STAR 284 - …` format cannot be produced.
 
 #### Scenario: Read-back
 
 - GIVEN a saved link
 - WHEN the section is read
-- THEN the response carries the linked result's id, official code and title
+- THEN the response carries the linked result's id, official code, title and platform code
 - AND when no link exists the field is present and null, never absent
 - BUT it must NOT return a deactivated link row
 - AND IT MUST NOT throw when the section has no link — an unlinked section reads normally
@@ -365,6 +376,26 @@ The control **SHALL** present a defined state for loading, empty, populated and 
 - AND when a link is set the card of R-IUL-004 is shown
 - AND when the options request fails the section's existing error surface is used
 - BUT it must NOT render an enabled, empty dropdown that looks selectable but is not
+
+---
+
+### R-IUL-013 — The field occupies its own section card *(Amendment 01)*
+
+The field **SHALL** live in its own titled card, **RELATED INNOVATION DEVELOPMENT**, positioned
+immediately **after** the *INNOVATION USE DETAILS* card and **before** *ACTORS*.
+
+#### Scenario: Placement
+
+- GIVEN the Innovation Use page renders
+- THEN a card titled `RELATED INNOVATION DEVELOPMENT` appears between *INNOVATION USE DETAILS* and *ACTORS*
+- AND it uses the same card shell as the sibling sections — same radius, padding, border, background and bottom spacing
+- AND its title uses the same `section-title` treatment as `ACTORS` and `ORGANIZATIONS`
+- BUT it must NOT be nested inside the *INNOVATION USE DETAILS* card
+- BUT it must NOT introduce a grid; the page uses a flat block flow
+- AND IT MUST keep the level stepper, its definition box and the "Click here" definitions link inside the *INNOVATION USE DETAILS* card, above it — the new card is a sibling, not a relocation of any existing content
+
+> **Supersedes the placement ruling of 2026-09-09** (*"Al final de INNOVATION USE DETAILS"*). The
+> mock is the later and more specific instruction, and it shows a separate card.
 
 ---
 
@@ -482,6 +513,7 @@ No new endpoint. No new controller. Swagger decorators are updated in place.
 | R-IUL-010 | Role 5 exists in the catalog | Database |
 | R-IUL-011 | Release sequencing | Ops |
 | R-IUL-012 | UI states of the control | Client |
+| R-IUL-013 | The field occupies its own section card *(Amendment 01)* | Client |
 | NFR-IUL-001 | Options list responsiveness | Client |
 | NFR-IUL-002 | Accessibility | Client |
 | NFR-IUL-003 | Design tokens and dark theme | Client |

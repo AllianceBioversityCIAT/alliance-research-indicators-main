@@ -10,6 +10,7 @@
 | Depth | Standard + Full-depth Rollout/Rollback (§11) |
 | Approval Mode | pre-approved — Phase 2 gate **auto-approved (pre-approved mode)**, 2026-09-09 |
 | Design agent | Inline (no subagent). Review delegated: 2 blind judges, Fable + Sonnet |
+| **Amendment 01** | **2026-09-09**, post-Phase-3, from a user-supplied mock ([`mockup/`](mockup/)). Own section card; platform-prefixed label; a labelled "View innovation detail" action instead of a whole-card link; no remove control. **Client-only, plus one added read field.** Revises §4.1, §6.1, §6.3, §6.4, DD-6, DD-7; adds DD-11 |
 | Created / revised | 2026-09-09 |
 
 ---
@@ -147,7 +148,7 @@ turn an application-layer invariant violation into a red check the user cannot c
 | Key | Direction | Type | Meaning |
 | --- | --- | --- | --- |
 | `innovation_dev_result_id` | `PATCH` body **and** `GET` response | `number \| null` | The linked result's id. Drives the picker |
-| `linked_innovation_dev` | `GET` response only | `object \| null` | `{ result_id, result_official_code, title }`. Drives the card |
+| `linked_innovation_dev` | `GET` response only | `object \| null` | `{ result_id, result_official_code, title, platform_code }`. Drives the card. **`platform_code` added by Amendment 01** — the `STAR 284 - …` format needs it, and `link_results.other_result` already carries it (`map-link-other-result-to-result.ts:48,52`) |
 
 The scalar and the object are both returned because they serve different consumers: the scalar
 hydrates `app-select`'s value, the object renders the card **without** depending on the options list
@@ -236,18 +237,30 @@ Precedent for exactly this edge: `link-results.service.ts` and `result-oicr.serv
 
 ## 6. Frontend Component Architecture
 
-### 6.1 Placement — **corrected (C1)**
+### 6.1 Placement — **own card (Amendment 01)**
 
 Draft 1 said the card uses `grid grid-cols-12`. **It does not** — `grep -c grid` on
-`innovation-use-details.component.html` returns **0**. That pattern lives in
-`policy-change.component.html`, a different file.
+`innovation-use-details.component.html` returns **0** (C1). That pattern lives in
+`policy-change.component.html`, a different file. **No grid is introduced.**
 
-The *INNOVATION USE DETAILS* card is a **flat vertical flow** of full-width blocks: `h2.section-title`
-→ label span → guidance callout → `app-innovation-use-level-stepper` → definitions-link `<p>` →
-`@if (showJustification())` evidence callout + `app-textarea`.
+**Amendment 01 supersedes draft 2's "append to the end of the details card".** The field gets its
+**own sibling card**, between *INNOVATION USE DETAILS* and *ACTORS* (R-IUL-013):
 
-**The new field is appended as one more full-width block at the end of that flow.** No grid is
-introduced. Vertical rhythm matches the blocks above it.
+```
+INNOVATION USE DETAILS   ── question, guidance callout, level stepper,
+                            definition box, "Click here" definitions link   (unchanged)
+RELATED INNOVATION DEVELOPMENT   ◄── NEW CARD
+ACTORS
+ORGANIZATIONS
+OTHER QUANTITATIVE MEASURES
+```
+
+Shell copied verbatim from its siblings — the class string is identical on all four existing cards:
+
+`rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]`
+
+with `<h2 class="section-title">RELATED INNOVATION DEVELOPMENT</h2>`. Nothing is moved out of the
+details card; this is a sibling, not a relocation.
 
 ### 6.2 The picker
 
@@ -257,7 +270,7 @@ introduced. Vertical rhythm matches the blocks above it.
 | --- | --- |
 | `serviceName` | `innoDevOutput` |
 | `optionValue` | `{ body: 'innovation_dev_result_id', option: 'result_id' }` |
-| `optionLabel` | `title` |
+| `optionLabel` | a computed `<platform_code> <result_official_code> - <title>` label (Amendment 01). Applied via the `#item` content-projection template so the dropdown list and the collapsed value match the card exactly — the same technique `innovation-details.component.html:390-394` already uses |
 | `isRequired` | `true` |
 | `hideSelected` | **`true`** (the default) — the card is rendered by the page, not by the select (C12) |
 | `disabled` | see §6.5 |
@@ -271,34 +284,46 @@ configuration.
 > inherits a pre-existing literal. Recorded as inherited, not introduced, and not fixed here — editing
 > `SelectComponent` would trigger a full-suite run across every route (KZ-002).
 
-### 6.3 The card — page-owned (C12, C13)
+### 6.3 The card — page-owned (C12, C13; **revised by Amendment 01**)
 
 Rendered by the page template from `linked_innovation_dev` in the GET payload, immediately beneath the
-picker. Not `app-select`'s `#rows`, and not derived from the options list.
+picker inside the new card. Not `app-select`'s `#rows`, and not derived from the options list.
+
+Layout per the mock: a single row, title on the left, action on the right, on the section's subtle
+grey surface with a light border.
 
 | Property | Value |
 | --- | --- |
-| Content | `<official_code padded to 3> - <title>` — reuse the 3-digit rule from `LinksToResultComponent.formatResultCode` |
-| Element | a real `<a>`, `href="/result/<official_code>/general-information"` |
-| New tab | `target="_blank"` + `rel="noopener"` |
-| **AT discoverability** | a visually-hidden suffix — *"(opens in a new tab)"* — inside the anchor's accessible name. **C13: without this, NFR-IUL-002's third clause is unmet** |
-| Remove | a button, rendered only when `submission.isEditableStatus()`, writing `null` into the page signal (§6.4) |
+| Content | `<platform_code> <result_official_code> - <title>` — e.g. `STAR 284 - Rice bean-adzuki bean …`. **Not** zero-padded; draft 2's 3-digit rule came from the Links-to-Result section and the mock contradicts it |
+| Action | a right-aligned **`View innovation detail ↗`** anchor styled as a secondary button |
+| Target | `href="/result/<result_official_code>/general-information"`, `target="_blank"`, `rel="noopener"` |
+| **AT discoverability** | a visually-hidden *"(opens in a new tab)"* inside the anchor's accessible name (C13) |
+| Remove | **none** — see §6.4 |
 | Styling | tokens only for new rules — `.abc-*` / `.atc-*` / `var(--ac-*)` |
 
-Because the card reads the payload, a **soft-deleted** target still renders — with the picker showing
-no match and rule 16 returning `FALSE`. The user sees what is wrong and can fix it, instead of facing
-a red check with a blank field.
+**The anchor is the whole interactive surface** (Amendment 01). Draft 2 made the entire card a link;
+the mock puts a labelled button on the right instead. That is also the better accessible name — *"View
+innovation detail"* says what activation does, where a card-wide link announces the whole title.
 
-### 6.4 Clearing — **corrected (C9)**
+Because the card reads the **payload**, a **soft-deleted** target still renders — with the picker
+showing no match and rule 16 returning `FALSE`. The user sees what is wrong and can fix it, instead of
+facing a red check with a blank field (C12).
 
-Draft 1 claimed `SelectComponent`'s internal `body` "only re-syncs on `currentResultIsLoading()`", and
-carried a fallback to add `@Input() showClear`. **The premise was inverted.** The effect reads
-`this.signal()` inside its own body (`select.component.ts:95,106`), so those reads are tracked and the
-effect re-runs whenever the page signal emits a new reference.
+### 6.4 Clearing — **no UI control (Amendment 01)**
 
-Therefore: the remove button writes `innovation_dev_result_id: null` into the page's `body()` signal
-with a **new object reference**, the effect re-runs, `SelectComponent.body.value` becomes `null`, and
-`isInvalid()` flips true. **No shared-component change, and no fallback branch is owed.**
+Draft 1 claimed `SelectComponent`'s internal `body` "only re-syncs on `currentResultIsLoading()`" and
+carried a fallback to add `@Input() showClear`. **The premise was inverted** (C9): the effect reads
+`this.signal()` inside its own body (`select.component.ts:95,106`), so those reads are tracked and it
+does re-run.
+
+That correction stands, but **the mock exposes no remove control at all**, and the field is required —
+so the only supported change is picking another option. Therefore:
+
+- **No remove button is built.** Draft 2's in-card remove control is withdrawn.
+- **No shared-component change**, and no `showClear` fallback is owed.
+- The **server** still honours an explicit `null` as a clear (R-IUL-008). That path simply has no
+  client caller from this surface; it stays specified and tested server-side so the contract is not
+  silently narrowed.
 
 ### 6.5 The `disabled` condition (C5)
 
@@ -393,11 +418,12 @@ verify their own scope; the Leader re-measures the full suite after each worker 
 | **DD-3** | Validate the target **before** `BEGIN` | Makes "a failure persists nothing" a property of ordering, not of rollback correctness | Validate inside, rely on rollback |
 | **DD-4** | Three-way on `undefined` / `null` / id, never `??` | `??` cannot distinguish an omitted key from an explicit `null` — DD-14's recorded bypass in this very service | `??` with a stored fallback |
 | **DD-5** | Rule 16 uses `EXISTS`, not `COUNT(*) = 1` | A SQL cardinality assertion would turn an invariant violation into a red check the user cannot clear | `COUNT(*) = 1` |
-| **DD-6** | **Revised (C12).** `app-select` is the picker only; the **page** renders the card from the GET payload | The component's `selectedOption()` resolves from the options list, so a soft-deleted target would make the card vanish while rule 16 went red — the exact DD-0 "nothing on screen to fix" failure | `hideSelected=false` + `#rows` |
-| **DD-7** | **Simplified (C9).** Remove button writes `null` into the page signal; no shared-component change | The select's effect tracks `this.signal()`, so the reset propagates. Draft 1's `showClear` fallback was planned against an inverted premise | Adding `@Input() showClear` |
+| **DD-6** | **Revised (C12 + Amendment 01).** `app-select` is the picker only; the **page** renders the card from the GET payload, with a labelled `View innovation detail` anchor rather than a card-wide link | The component's `selectedOption()` resolves from the options list, so a soft-deleted target would make the card vanish while rule 16 went red — the DD-0 "nothing on screen to fix" failure. The labelled action also gives a better accessible name than a card-wide link | `hideSelected=false` + `#rows`; whole-card link |
+| **DD-7** | **Withdrawn (Amendment 01).** No remove control is built | The mock exposes none and the field is required — changing the selection is the only supported edit. C9's correction (the reset *would* have propagated) stands and is simply no longer needed | A remove button; `@Input() showClear` |
 | **DD-8** | No backfill; rule 16 applies retroactively | Direct user ruling (OQ-1) | A cut-off clause |
 | **DD-9** | **New (C7).** `forwardRef` on both the module import and the service injection | `ResultsModule` already imports `ResultInnovationUseModule`, so this edge closes a cycle. Precedent: `link-results.service.ts`, `result-oicr.service.ts` | Naive import (boot failure); direct repository access (kept as the §5.3 fallback) |
 | **DD-10** | **New (C10).** Migration B is verified against a scratch schema before it is applied anywhere shared | A failed `CREATE` after a successful `DROP` leaves **no function at all** — worse than a closed gate | Applying straight to Dev |
+| **DD-11** | **New (Amendment 01).** The required asterisk sits on the **section title** — `RELATED INNOVATION DEVELOPMENT *` — because the mock gives the control no field label to carry one | The user's ruling was explicit that the field is required with the section's usual affordances; the mock (a *filled* state) shows no label. The amber border and "This field is required" still come from `isInvalid()` when empty. **Cosmetic and reversible — flagged for overrule at T-12's visual check** rather than blocking on a question | An invented field label above the control; dropping the asterisk |
 
 ---
 
