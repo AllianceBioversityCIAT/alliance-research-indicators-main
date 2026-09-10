@@ -2,7 +2,7 @@
 
 - **Module:** results (`result-innovation-use`) + STAR client (`innovation-use-details`)
 - **Spec id:** `docs/specs/innovation-use/dev-card-details`
-- **Status:** not-started
+- **Status:** **agent-complete — NOT `done`** (2026-09-10). T-01…T-09 closed with Reviewer PASS; **T-10 `[~]` deferred by user decision** behind the `RB-7` QA restyle, and T-04 `[~]` with two verification-tier criteria owed. 12 checkboxes remain open: 10 are T-10's deferred visual checklist, 2 are T-04's (a live `401` owed to `test:e2e`, and the `/swagger` response shape owed to a human). `/akili-archive` waits with them.
 - **Owner:** ARI squad
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) (revision 3)
