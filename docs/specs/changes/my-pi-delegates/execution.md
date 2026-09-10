@@ -421,3 +421,10 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
 ## v4 Summary (per-project assignments + history) — COMPLETE (2026-09-10)
 
 All 7 v4 tasks (T-15…T-21) Reviewer-PASS. `POST /pi-delegates` payload is now **per-project** (`{assignments:[{project_id, delegates}]}`); each project synced to its own list; **empty `delegates` = revoke all** of that project. Every assign/revoke movement is logged in the new append-only **`pi_delegate_history`** table (correct context + actor, in the mutation's transaction) — `pi_delegates` unchanged, reflects the last state. Revoke targets the specific (delegate, project) relationship. Full unit suite **2731/2731 green**; no client change. History migration applied to local `alliancereportingdb`. Rework rounds: T-10 only (v3); v4 clean (0 reworks across T-15–T-21).
+
+## Behavioral verification of the history (2026-09-10) — real local DB, 10/10
+
+Ran a full assign→revoke cycle against `alliancereportingdb` (real data: G232, PI 15, delegate 1, revoker 7). Full cleanup (both tables back to 0). **10/10 PASS:**
+- **assign** history row: `action='assign'`, `pi_user_id=15` (grantor), `created_by=15` (actor), `created_at` set.
+- **revoke** (actor 7, different from the grantor): `action='revoke'`, **`pi_user_id=15` = the ROW's provenance (NOT the revoker 7)**, `created_by=7` = the actor. This is the R-PID-012 crux, proven at the DB level.
+- Append-only trail keeps BOTH movements; `pi_delegates` reflects only the last state (`is_active=0`).
