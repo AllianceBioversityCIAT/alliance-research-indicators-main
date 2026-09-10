@@ -9,6 +9,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * revoked rows to coexist (design decision DD-F — MySQL has no filtered
  * unique index). Inactive rows carry NULL in `active_delegate_key`, and
  * MySQL's unique-index semantics do not consider NULLs as duplicates.
+ *
+ * Charset: the table is pinned to utf8mb3 / utf8mb3_general_ci so that
+ * `project_id` matches `agresso_contracts.agreement_id` (that legacy column is
+ * utf8mb3 in the target schema). Without this the column would inherit the
+ * server default (utf8mb4) and the `FK_pi_delegates_project_id` FK would fail
+ * with MySQL errno 3780 (referencing/referenced charset mismatch). Confirmed
+ * by applying against the real schema — a plain `ENGINE=InnoDB` fails the FK.
  */
 export class CreatePiDelegates1787600000000 implements MigrationInterface {
   name = 'CreatePiDelegates1787600000000';
@@ -28,7 +35,7 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
         `\`delegate_user_id\` bigint NOT NULL, ` +
         `\`active_delegate_key\` varchar(80) GENERATED ALWAYS AS (IF(\`is_active\` = 1, CONCAT(\`project_id\`, ':', \`delegate_user_id\`), NULL)) STORED, ` +
         `PRIMARY KEY (\`pi_delegate_id\`)` +
-        `) ENGINE=InnoDB`,
+        `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`,
     );
     await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` ADD UNIQUE INDEX \`uq_pi_delegates_active_delegate_key\` (\`active_delegate_key\`)`,

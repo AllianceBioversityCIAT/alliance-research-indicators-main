@@ -44,7 +44,22 @@
 **Reviewer CAVEAT (scope of static review, KZ-017 / K-006):** the migration was **not executed** — static review cannot prove MySQL accepts the STORED generated column in the same CREATE TABLE, nor that FK column collations match. Design §5 defers the run to a human step (K-015).
 
 **ADVISORY (4R — recorded, does not gate):**
-- **RISK/Reliability:** FK **collation mismatch** is the most likely execution-time failure (MySQL errno 3780). `CREATE TABLE` has no explicit `CHARSET/COLLATE`, so the table inherits the schema default; confirm `project_id` (varchar 36) shares `agresso_contracts.agreement_id`'s collation during the human apply. Cannot be seen in the diff.
+- **RISK/Reliability:** FK **collation mismatch** is the most likely execution-time failure (MySQL errno 3780). `CREATE TABLE` has no explicit `CHARSET/COLLATE`, so the table inherits the schema default; confirm `project_id` (varchar 36) shares `agresso_contracts.agreement_id`'s collation during the human apply. Cannot be seen in the diff. **→ CONFIRMED REAL + FIXED (2026-09-10): see the apply record below.**
+
+---
+
+### Post-execution: migration APPLIED to local DB + charset fix (2026-09-10)
+
+**Applied** the `pi_delegates` migration to the developer's local Docker DB (`localhost:3307`, schema **`alliancereportingdb`** — the real app schema with data + 368 tracked migrations; NOT the shared Dev DB, and NOT `ari_scratch_test` which the `.env` points CORE at but is empty). User-directed, local disposable DB.
+
+**The T-01 collation advisory was CONFIRMED as a real defect during the apply:** `agresso_contracts.agreement_id` is `varchar(36)` **utf8mb3 / utf8mb3_general_ci** (legacy). The committed migration's plain `) ENGINE=InnoDB` lets `project_id` inherit the server default (utf8mb4) → `FK_pi_delegates_project_id` fails with **errno 3780**. Proven empirically (a plain apply would fail the FK).
+
+**Fix committed to the migration (T-01):** pinned the table to `DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci` so `project_id` matches `agreement_id`. Verified: `npx eslint` clean, `npm run build` clean, placeholder-safe, **and the real apply succeeded** (all 5 statements incl. all 3 FKs, no errno 3780). Structure verified in-DB: generated column + unique index + 3 FKs all correct.
+
+**Still outstanding / notes for the real Dev/Prod apply:**
+- The charset fix assumes `agresso_contracts.agreement_id` is utf8mb3 on Dev/Prod too (this local schema mirrors it). Re-confirm on the target before the real apply.
+- The `.env` CORE target is `ari_scratch_test` (empty); the app must point at `alliancereportingdb` to see `pi_delegates` when testing locally.
+- The e2e behavioral suite (T-09) can now run against `alliancereportingdb` once the app is pointed there + seed data exists.
 - **Reliability (index coverage):** the unique index on `active_delegate_key` covers the hot delegate-lookup (`project_id + delegate_user_id + is_active`) for active rows — no extra index needed.
 - **Readability:** `varchar(80)` sizing correct (36 + 1 + ≤20 digits = 57 max); TSDoc references DD-F.
 
