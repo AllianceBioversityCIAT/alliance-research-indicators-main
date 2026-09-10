@@ -2739,3 +2739,48 @@ The full current list is 14 slugs, recorded verbatim in `CLAUDE.md`. **`gemini-3
 **T-13 → `[x]`.** **13 of 14 tasks `[x]`.**
 
 **Only T-12 remains, and no agent action can close it** — its Done bar is screenshots a human eye confirms, and part of its checklist needs Migration A applied first, which is a human decision (B-1/B-3).
+
+---
+
+## ✅ Amendment 07 — the picker's placeholder (user-requested at T-12's visual check)
+
+**Date** 2026-09-09 · **Source** the user, reviewing the running application · **Applied by** the Leader in-session
+
+> *"lo unico es que el drop down no tiene un placeholder deveria decir algo parecido a un Select the innovation development"*
+
+### This is the first finding in the whole spec that came from a human eye
+
+Every other defect in this run was caught by a gate, a falsifier, or a reviewer reading a diff. **This one was invisible to all of them** — an empty `placeholder` input is valid TypeScript, renders without error, breaks no assertion, and looks perfectly correct in a diff. **T-12 exists precisely for this class**, and it earned its place the first time it was actually exercised against a running app.
+
+### What changed
+
+One attribute on the `app-select` in the RELATED INNOVATION DEVELOPMENT card:
+
+```html
+placeholder="Select the innovation development"
+```
+
+**The wording is not invented — it follows the established house convention**, verified by grepping every placeholder in the client: `Select the actor type` (3×), `Select the organization type` (3×), `Select the year` (4×), `Select the levers`, `Select the countries`, `Select the main contact person`, `Select the MEL Regional Expert`. The pattern is `Select the <lowercase noun phrase>`, and the user's own proposed wording already matched it exactly.
+
+Confirmed the input is not dead before using it: `placeholder` is a real `@Input()` (`select.component.ts:47`) bound to the `p-select`'s `[placeholder]` (`select.component.html:26`).
+
+### The test asserts the rendered control, not the input
+
+`expect(selectCmp.placeholder).toBe(...)` alone would be the KZ-001 shape — an input is what goes *in*, and what the reporter sees is what must be checked. The spec asserts the string appears in the **rendered `p-select`'s** text content, and only additionally pins the input.
+
+**FALSIFIER observed red:** deleting the `placeholder` attribute reddens *Amendment 07 — the picker renders a placeholder on the p-select, in the house "Select the ..." style* — 1 failed / 207 total. Restored.
+
+### Gates — Leader-measured in isolation, all five
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` | **317/317 suites, 6921/6921 tests PASS** (+1) |
+| Coverage | 98.23 / 96.19 / 98.00 / 98.52 — all four floors held |
+| `npx tsc -p tsconfig.spec.json --noEmit` | **934 = baseline**; **0 errors** in the touched files (per-file grep) |
+| `npm run build` (`strictTemplates`) | **exit 0**, zero `[ERROR]` blocks |
+| `npm run lint -- --quiet` | *All files pass linting* — re-run explicitly, because a `tail -1` had returned an ambiguous `0` and a lint result may not be inferred from a stray digit |
+| `npx prettier --check` | passes |
+
+### Note on execution route
+
+Applied **in-session** rather than dispatched to Antigravity. The user's standing ruling routes the spec's client *implementation* to Antigravity, and that held for T-08…T-12. This is a one-attribute adjustment the user asked for directly, after the implementation lane closed; a dispatch plus a review round for a single attribute would cost more than the change and would repeat the disproportion the user called out at T-05. Recorded rather than assumed — if the preference is to delegate even this class, it is a one-line correction to make.

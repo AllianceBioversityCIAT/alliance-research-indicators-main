@@ -4133,6 +4133,29 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(contrastRatio([35, 70, 107], [43, 43, 43])).toBeLessThan(4.5);
     });
 
+    // Amendment 07 (user request during T-12's visual check, 2026-09-09): the
+    // picker had no placeholder, so an unselected control read as blank. Wording
+    // follows this codebase's established convention — "Select the <thing>", as in
+    // "Select the actor type" / "Select the organization type" / "Select the year".
+    // Asserted on the RENDERED p-select, not on the SelectComponent input: an input
+    // is what goes in, and what the reporter sees is what must be checked (KZ-017).
+    // FALSIFIER: delete the placeholder attribute -> this spec goes red.
+    it('Amendment 07 — the picker renders a placeholder on the p-select, in the house "Select the ..." style', () => {
+      const pSelect = fixture.debugElement
+        .queryAll(By.css('p-select'))
+        .find(el => (el.nativeElement as HTMLElement).closest('div')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'));
+
+      const host = pSelect ?? fixture.debugElement.query(By.directive(SelectComponent));
+      expect(host).toBeTruthy();
+
+      // The placeholder must reach the rendered control, not merely the wrapper.
+      const rendered = (host.nativeElement as HTMLElement).textContent ?? '';
+      const selectCmp = fixture.debugElement.query(By.directive(SelectComponent)).componentInstance as SelectComponent;
+
+      expect(selectCmp.placeholder).toBe('Select the innovation development');
+      expect(rendered).toContain('Select the innovation development');
+    });
+
     it('soft-deleted target still renders (payload-only render source)', () => {
       // FALSIFIER (soft-deleted): re-point the card at innoDevSelect.selectedOption() instead of the payload -> this must go red.
       const service = TestBed.inject(GetInnoDevOutputService);
