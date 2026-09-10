@@ -163,7 +163,18 @@ Every hex in the OICR pattern maps to an **exact existing token** — so §4.2 c
 
 **Six of eight fail AA.** The eyebrow's 2.91:1 is the pair `dev-card-details`' T-08 uses as its *failure* case, and ≈ the defect child #3 shipped live.
 
-Per the standing ruling — *visual consistency wins over WCAG AA; state the ratio, then apply* — this is **not proposed as a blocker**. But it must be an explicit, dated decision, because it **rewrites `NFR-IUC-002`**, a requirement that currently passes. `/akili-specify` should record either "the pattern is adopted as-is, AA relaxed for these roles" or "these three roles use `--ac-grey-800` instead", and T-08's tests follow that decision rather than contradicting it.
+> ### ✅ RESOLVED 2026-09-10 (user): adopt the pattern's colours as-is
+>
+> **User ruling, verbatim in substance:** *"si en el componente se usa debes usarlo porque anteriormente fue aprobado"* — if the OICR component already uses it, use it, because it was approved when that component shipped.
+>
+> **So: every role takes the token equal to the hex the OICR card already uses.** No substitution of `--ac-grey-800` into the failing roles, no divergence "to be safe". The eyebrow is `--ac-grey-600`, the separator `--ac-grey-400`, the labels `--ac-grey-700`, the badge `--ac-green-500` on `--ac-green-300`, the icon `--ac-orange-1`.
+>
+> **What this means for the spec, stated so it is a decision and not a side effect:**
+> - **`NFR-IUC-002` is superseded for these roles.** It currently requires 4.5:1 for the two labels and the description, and T-08 passes it. After this change the **description keeps `--ac-grey-800` at 7.44:1** (unchanged, still AA), while the metadata row's labels move to `--ac-grey-700` at **3.91:1** — AA-large but not AA. That is the trade being accepted.
+> - **T-08's tests get rewritten to assert the adopted pairs and their measured ratios**, not deleted. The record then says what the card *is*, with numbers, instead of asserting a threshold the design no longer targets.
+> - The ratios above are recorded **because** they were accepted, not as an objection. Anyone auditing this later sees the figure and the decision together.
+>
+> This is the standing ruling applied — *visual consistency wins over WCAG AA; state the ratio, then apply* — and it is now dated and attributed rather than implicit.
 
 ### Other risks
 
@@ -177,11 +188,11 @@ Per the standing ruling — *visual consistency wins over WCAG AA; state the rat
 
 ### Open questions
 
-| # | Question | Needed by |
+| # | Question | Status |
 | --- | --- | --- |
-| OQ-1 | Does the badge show the **result status** (`PUBLISHED`…) as in the OICR card, or the Innovation Dev **readiness**? The user said "status", and the mockup shows `PUBLISHED` | Before the template task |
-| OQ-2 | With a **null** field — no readiness, or no geo scope — does its `Label → value` pair disappear, or render a dash? The OICR card never shows an empty one | Before the template task |
-| OQ-3 | Does **⊗** clear immediately, or confirm first? | Before the clear task |
+| ~~OQ-1~~ | Badge = **result status** (`PUBLISHED`…), as in the OICR card — **not** the readiness, which is its own `Innovation Dev level →` pair | ✅ **CLOSED** — the user's message names status and level as separate fields, and the mockup shows `PUBLISHED` |
+| ~~OQ-2~~ | A **null** field's `Label → value` pair is **omitted entirely** — no dash, no empty label | ✅ **CLOSED by the adopt-the-component rule.** The OICR card wraps its optional field in `@if (item?.handle_link)` and renders nothing when absent; `dev-card-details` already established the same per-field `@if` (`R-IUC-003` AC.4), so both precedents agree |
+| OQ-3 | Does **⊗** clear immediately, or confirm first? | Open — but the OICR card's ⊗ clears immediately, so the same rule resolves it unless told otherwise |
 
 ---
 
@@ -205,4 +216,4 @@ Per the standing ruling — *visual consistency wins over WCAG AA; state the rat
 Two things to settle at that gate, both about speed:
 
 1. **Approval Mode.** This proposal records `gated`. Given tonight's deadline, **`pre-approved` is worth granting** — it auto-passes the routine continue gates while still stopping for a HALT, a Pivot, a budget tripwire or a `FATAL_FAIL`. Those are exactly the cases nobody can pre-approve.
-2. **`OQ-1` and `OQ-2`** are the only two answers that block the template task. Everything else can be decided in flight.
+2. **All blocking questions are now closed** — `OQ-1`, `OQ-2` and R-1 were all resolved by the user's *adopt-what-the-component-uses* rule, which is a better decision procedure than three separate answers: it settles the colours, the null-field behaviour and the ⊗'s immediacy from one precedent. Nothing blocks the template task.
