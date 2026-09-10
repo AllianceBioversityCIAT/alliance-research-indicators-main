@@ -25,6 +25,7 @@ import { ResultsService } from '../results/results.service';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+import { Result } from '../results/entities/result.entity';
 
 describe('ResultInnovationUseService', () => {
   let service: ResultInnovationUseService;
@@ -48,9 +49,36 @@ describe('ResultInnovationUseService', () => {
     findOne: levelFindOne,
   };
 
+  // `docs/specs/innovation-use/dev-card-details` T-01 —
+  // `readInnovationDevCardFacts`'s `QueryBuilder` chain, mocked the way
+  // `bilateral-mapping-coverage.service.ts` exemplifies for this repo:
+  // `leftJoinAndSelect`/`where` return `this` (chainable), `getOne` is the
+  // terminal call whose resolution drives each acceptance case below. This
+  // mock has no `getQuery` key — the ACTUAL emitted SQL is asserted only in
+  // the `test:fixtures` tier (`innovation-dev-card-facts.fixture-spec.ts`),
+  // per `NFR-IUC-001`'s disqualifier: a mocked repository proves the call,
+  // never the SQL.
+  const resultQueryBuilderLeftJoinAndSelect = jest.fn().mockReturnThis();
+  const resultQueryBuilderWhere = jest.fn().mockReturnThis();
+  const resultQueryBuilderGetOne = jest.fn();
+  const resultQueryBuilder = {
+    leftJoinAndSelect: resultQueryBuilderLeftJoinAndSelect,
+    where: resultQueryBuilderWhere,
+    getOne: resultQueryBuilderGetOne,
+  };
+  const resultCreateQueryBuilder = jest
+    .fn()
+    .mockReturnValue(resultQueryBuilder);
+  const resultRepo = {
+    createQueryBuilder: resultCreateQueryBuilder,
+  };
+
   const getRepository = jest.fn((entity: unknown) => {
     if (entity === ClarisaInnovationUseLevel) {
       return levelRepo;
+    }
+    if (entity === Result) {
+      return resultRepo;
     }
     return mainRepo;
   });
@@ -167,6 +195,12 @@ describe('ResultInnovationUseService', () => {
     // across this file closes that leak.
     mainFindOne.mockReset();
     levelFindOne.mockReset();
+    // T-01 — same `...Once()` leak-closing discipline: `getOne` is driven
+    // by `mockResolvedValueOnce` in every case below.
+    resultQueryBuilderGetOne.mockReset();
+    resultQueryBuilderLeftJoinAndSelect.mockReturnThis();
+    resultQueryBuilderWhere.mockReturnThis();
+    resultCreateQueryBuilder.mockReturnValue(resultQueryBuilder);
     // Part C.4 (fold-in, T-06 attempt 2) — `clearAllMocks()` clears call
     // history but NOT a queued `mockResolvedValueOnce` implementation. The
     // isolation fix above covered only `mainFindOne` / `levelFindOne`; these
@@ -185,6 +219,9 @@ describe('ResultInnovationUseService', () => {
     getRepository.mockImplementation((entity: unknown) => {
       if (entity === ClarisaInnovationUseLevel) {
         return levelRepo;
+      }
+      if (entity === Result) {
+        return resultRepo;
       }
       return mainRepo;
     });
@@ -1773,6 +1810,249 @@ describe('ResultInnovationUseService', () => {
       ).resolves.toBeDefined();
 
       expect(loggerWarnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-01 —
+   * `readInnovationDevCardFacts`'s 9 acceptance criteria. The method is
+   * private (not yet wired into `findOne` — that is T-02's scope), so it is
+   * invoked here via bracket-notation cast, the standard way this repo
+   * reaches a private method under test.
+   *
+   * **What this describe block CANNOT prove (`NFR-IUC-001`'s disqualifier,
+   * `design.md` §11 limit 3).** `resultQueryBuilder` above is a plain mock:
+   * `getOne` returns whatever fixture object each `it` hands it, so these
+   * tests prove the METHOD'S OWN branching (the `[0] ?? null`, the
+   * `hasReadiness` guard, the `?? null` projections) given a shape the join
+   * COULD produce — never that the real `QueryBuilder` produces that shape,
+   * and never the emitted SQL. The `is_active`-in-`ON`-not-`WHERE`
+   * assertion at the end of this block is a call-argument check on the
+   * mocked builder, which is evidence the method CALLS `leftJoinAndSelect`
+   * correctly — not evidence of what MySQL receives. `DC-14`'s real gate is
+   * `innovation-dev-card-facts.fixture-spec.ts` (`test:fixtures`), against
+   * a REAL `getQuery()` over a REAL connection — see that file.
+   */
+  describe('readInnovationDevCardFacts (T-01 shared read, dev-card-details)', () => {
+    const resultId = 900;
+
+    it('AC.1 — active detail row + readiness present: all three facts return', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'A digital advisory service.',
+        geo_scope: { code: 2, name: 'Regional' },
+        result_innovation_dev: [
+          {
+            result_id: resultId,
+            innovation_readiness_id: 7,
+            innovationReadiness: { id: 7, level: 7, name: 'Widely used' },
+          },
+        ],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts).toEqual({
+        innovation_readiness: { id: 7, level: 7, name: 'Widely used' },
+        description: 'A digital advisory service.',
+        geo_scope: { code: 2, name: 'Regional' },
+      });
+    });
+
+    it('AC.2 — no detail row at all: readiness is null, description and geo_scope still return', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'Still returned.',
+        geo_scope: { code: 2, name: 'Regional' },
+        result_innovation_dev: [],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.innovation_readiness).toBeNull();
+      expect(facts.description).toBe('Still returned.');
+      expect(facts.geo_scope).toEqual({ code: 2, name: 'Regional' });
+    });
+
+    it('AC.3 — a detail row exists but is_active = FALSE: same as no row (the ON-clause join already excludes it, so it never reaches `result_innovation_dev`)', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'Still returned.',
+        geo_scope: null,
+        // What the ON-clause join produces for an inactive detail row: the
+        // parent survives, the child array is empty — indistinguishable
+        // from AC.2 from this method's perspective, which is the point of
+        // DD-3/DD-4.
+        result_innovation_dev: [],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.innovation_readiness).toBeNull();
+      expect(facts.description).toBe('Still returned.');
+    });
+
+    it('AC.4 — innovation_readiness_id is NULL on the detail row: innovation_readiness is null', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: null,
+        geo_scope: null,
+        result_innovation_dev: [
+          {
+            result_id: resultId,
+            innovation_readiness_id: null,
+            innovationReadiness: null,
+          },
+        ],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.innovation_readiness).toBeNull();
+    });
+
+    it('AC.5 — level NULL, name present: the object returns with level: null — NOT collapsed to a bare null (DD-9)', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: null,
+        geo_scope: null,
+        result_innovation_dev: [
+          {
+            result_id: resultId,
+            innovation_readiness_id: 9,
+            innovationReadiness: { id: 9, level: null, name: 'Piloted' },
+          },
+        ],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.innovation_readiness).toEqual({
+        id: 9,
+        level: null,
+        name: 'Piloted',
+      });
+    });
+
+    it("AC.6 — description NULL: the key is null, never ''", async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: null,
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.description).toBeNull();
+      expect(facts.description).not.toBe('');
+    });
+
+    it("AC.7 — geo_scope_id = 50 (THIS_IS_YET_TO_BE_DETERMINED): that scope's CLARISA name returns like any other, not suppressed as a sentinel", async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: null,
+        geo_scope: { code: 50, name: 'This is yet to be determined' },
+        result_innovation_dev: [],
+      });
+
+      const facts = await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(facts.geo_scope).toEqual({
+        code: 50,
+        name: 'This is yet to be determined',
+      });
+    });
+
+    it('AC.8 — a non-existent target id: all three facts are null and nothing throws', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce(undefined);
+
+      await expect(
+        (
+          service as unknown as {
+            readInnovationDevCardFacts: (
+              id: number,
+            ) => Promise<Record<string, unknown>>;
+          }
+        ).readInnovationDevCardFacts(999999),
+      ).resolves.toEqual({
+        innovation_readiness: null,
+        description: null,
+        geo_scope: null,
+      });
+    });
+
+    it('AC.9 (design-conformance only — the real gate is the fixtures-tier getQuery() assertion) — the is_active predicate is attached to the leftJoinAndSelect ON-clause argument, and where() carries only the parent id, never is_active', async () => {
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: null,
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      await (
+        service as unknown as {
+          readInnovationDevCardFacts: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFacts(resultId);
+
+      expect(resultQueryBuilderLeftJoinAndSelect).toHaveBeenCalledWith(
+        'result.result_innovation_dev',
+        'detail',
+        'detail.is_active = :isActive',
+        { isActive: true },
+      );
+      expect(resultQueryBuilderWhere).toHaveBeenCalledWith(
+        'result.result_id = :resultId',
+        { resultId },
+      );
+      // The where() call carries no is_active reference at all.
+      const whereArgs = resultQueryBuilderWhere.mock.calls[0];
+      expect(JSON.stringify(whereArgs)).not.toContain('is_active');
     });
   });
 });

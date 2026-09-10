@@ -88,22 +88,22 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Project every value `?? null`. Never `?? ''` and never `?? 0`.
   - `innovation_readiness` returns `{ id, level, name }` with **each part as stored** — `level` and `name` are independently nullable. Do **not** collapse a partially-null readiness to `null` here; the client guards the parts (T-06).
 - **Acceptance / done check:**
-  - [ ] With a target holding an active detail row and a readiness, all three facts return
-  - [ ] With a target holding **no** detail row, `innovation_readiness` is `null` **and `description` and `geo_scope` still return**
-  - [ ] With a target whose detail row is `is_active = FALSE`, same as no row
-  - [ ] With `innovation_readiness_id` NULL, `innovation_readiness` is `null`
-  - [ ] With `level` NULL and `name` present, the object returns with `level: null` — not collapsed to `null`
-  - [ ] With `description` NULL, the key is `null` — not `''`
-  - [ ] With `geo_scope_id = 50`, that scope's CLARISA name returns like any other
-  - [ ] With a non-existent id, all three are `null` and **nothing throws**
-  - [ ] **The emitted SQL** (`getQuery()`) carries the `is_active` predicate in the `ON` clause and **not** in `WHERE`
+  - [x] With a target holding an active detail row and a readiness, all three facts return
+  - [x] With a target holding **no** detail row, `innovation_readiness` is `null` **and `description` and `geo_scope` still return**
+  - [x] With a target whose detail row is `is_active = FALSE`, same as no row
+  - [x] With `innovation_readiness_id` NULL, `innovation_readiness` is `null`
+  - [x] With `level` NULL and `name` present, the object returns with `level: null` — not collapsed to `null`
+  - [x] With `description` NULL, the key is `null` — not `''`
+  - [x] With `geo_scope_id = 50`, that scope's CLARISA name returns like any other
+  - [x] With a non-existent id, all three are `null` and **nothing throws**
+  - [x] **The emitted SQL** (`getQuery()`) carries the `is_active` predicate in the `ON` clause and **not** in `WHERE`
 - **Verification:** `npm test -- --silent` (unit) **and** `npm run test:fixtures` (the SQL assertion — the unit lane structurally cannot see emitted SQL).
 - **Falsifying input, named before the test is written (K-012):** move the `is_active` predicate from the join condition into `.where(...)`, then read a target that has **no** `result_innovation_dev` row → the parent row is excluded, the read returns `null`, and **both** the "description still returns" criterion and the `getQuery()` assertion go red. This is round 1's `S3` verbatim.
 - **What disqualifies the evidence:** a green run over a **mocked** repository proves the call count, not the SQL. `NFR-IUC-001`'s disqualifier now holds unconditionally, whatever query API is used — if the SQL assertion did not run in the fixtures tier, this task is **not** verified, regardless of the unit lane's colour.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 - **Dependencies:** none
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** **done** (Reviewer PASS 2026-09-10, 3 attempts — see [`./execution.md`](./execution.md))
 
 ---
 
@@ -483,8 +483,8 @@ mistaken for work items or lost.
 | Gate | Why it is owed | Blocks |
 | --- | --- | --- |
 | **Security review — REQUIRED** | `judgment.md` **N-2**: revisions 1–2 waived it on the ground *"no new endpoint"* while §6 of the same file read *"One new endpoint"*. The waiver is revoked. The reviewer signs off specifically on `R-IUC-008` AC.6–AC.9 — the bounded target set and the no-existence-oracle rule | Merge of **PR 1** |
-| **`OQ-3` — does geographic scope ship?** | It was *"potentially"* in the reviewer's comment, not *"for sure"*. If dropped: one field leaves T-01/T-02, one label leaves T-07, one assertion leaves T-08, and `DD-10` falls away entirely | Start of **T-01** |
-| **`OQ-1` — readiness format** | `Level 7 - <name>` is provisional (`DD-9`). One function to change | Start of **T-06** |
+| ~~**`OQ-3` — does geographic scope ship?**~~ **CLOSED 2026-09-10 — YES, it ships** (user, at the `/akili-execute` gate). Nothing leaves T-01/T-02/T-07/T-08; `DD-10` holds | Was blocking the start of **T-01** | ✅ discharged |
+| ~~**`OQ-1` — readiness format**~~ **CLOSED 2026-09-10 — `Level 7 - <name>`** (user, at the `/akili-execute` gate). `DD-9` is now settled, not provisional; T-06's acceptance table stands unchanged | Was blocking the start of **T-06** | ✅ discharged |
 | **T-10's visual check** | It is a task above, but it is discharged by a person and gates the spec's completion | Spec `done` |
 
 Not owed: DevOps (no migration, no infra, no environment change).
@@ -497,10 +497,11 @@ Append-only.
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-09-10 | `OQ-3` unresolved — the geo scope may not be in scope at all | Ask before T-01. Removal is cheap and localized; discovering it after T-08 is not | Product owner | **open** |
+| RB-1 | 2026-09-10 | `OQ-3` unresolved — the geo scope may not be in scope at all | Asked before T-01, as mitigated. **Answer: it ships.** | Product owner | **closed 2026-09-10** |
 | RB-2 | 2026-09-10 | The security review that `N-2` un-waived has no named reviewer | Name one before PR 1 opens | Engineering lead | **open** |
-| RB-3 | 2026-09-10 | `DC-14`'s gate lives in `test:fixtures`, a tier this spec's authors have not run | Run it **empty** first to confirm the tier executes at all, before trusting a green | Server lane | open |
+| RB-3 | 2026-09-10 | `DC-14`'s gate lives in `test:fixtures`, a tier this spec's authors have not run | Pre-flighted by the Leader before T-01 was dispatched. The premise was **wrong in this spec's favour**: the tier holds **18** `*.fixture-spec.ts` files, 14 of them under `test/fixtures/innovation-use/`. `npm run test:fixtures -- smoke.fixture-spec` ran **PASS 1/1**, and that spec asserts a real `SELECT 1` over the initialized TEST datasource, so the tier reaches a live scratch schema rather than compiling and exiting | Server lane | **closed 2026-09-10 — tier observed executing** |
 | RB-4 | 2026-09-10 | Antigravity delegation: `worker-start --agent gemini` is disabled here; the model list has drifted twice | Use `terminal create` + `orchestration dispatch --inject`; re-probe `agy models` before each dispatch; treat a silent worker as a **runtime failure** and re-dispatch | Leader | open |
+| RB-6 | 2026-09-10 | **`test:fixtures` is red before this spec changed anything.** 5 pre-existing files fail with `Nest cannot create the ResultPolicyChangeModule instance ... imports array is undefined` — a circular import (`ResultPolicyChangeModule.imports[0]` = `LinkResultsModule`; `LinkResultsModule` imports `forwardRef(() => ResultsModule)`; `results.module.ts:58` imports `ResultPolicyChangeModule` back **without** a `forwardRef`) that manifests only under ts-jest require order, not the app's normal bootstrap. Baselined under `git stash` on clean HEAD by the Implementer and independently corroborated by the Reviewer, which confirmed exactly 5 committed callers of `createInnovationUseHarness`. **Consequence for this spec: §9's *"`test:fixtures` green"* checkbox cannot be honestly ticked by any task here** | Do **not** absorb it — T-01's fixture bypasses the broken harness and instantiates the service directly against the real TEST `DataSource`, which the Reviewer accepted as valid `DC-14` evidence (SQL text is a pure function of builder calls + entity metadata, and both datasource targets build the same `entities` glob). Needs its own spec. §9's wording needs amending to *"`test:fixtures`: this spec's own specs green, with the 5-file pre-existing baseline recorded"* | Engineering lead | **open — raised at the T-01 gate** |
 | RB-5 | 2026-09-10 | `OQ-4` / `OQ-5` are real defects this spec deliberately does not fix — the section read documents **no** Swagger response shape, and `GetGeoFocusService` omits geo-scope code `3` | Both need their own spec. Do **not** absorb them here; `DD-10` routes around the second | Engineering lead | open (carried) |
 
 ---

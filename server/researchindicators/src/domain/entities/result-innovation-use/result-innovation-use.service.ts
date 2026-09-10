@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationUse } from './entities/result-innovation-use.entity';
+import { Result } from '../results/entities/result.entity';
 import {
   CurrentUserUtil,
   SetAuditEnum,
@@ -32,6 +33,25 @@ import { ResultsService } from '../results/results.service';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+
+/**
+ * `docs/specs/innovation-use/dev-card-details` T-01 — the three Innovation
+ * Dev card facts, shared by both entry points (T-02's section read, T-04's
+ * targeted endpoint). See `readInnovationDevCardFacts` below for the
+ * mechanism. `innovation_readiness` carries `level` and `name` **each
+ * independently nullable** — never collapsed to a bare `null` object when
+ * only one part is missing (`design.md` DD-9; the client, not this read,
+ * guards the parts for display).
+ */
+interface InnovationDevCardFacts {
+  innovation_readiness: {
+    id: number;
+    level: number | null;
+    name: string | null;
+  } | null;
+  description: string | null;
+  geo_scope: { code: number; name: string | null } | null;
+}
 
 /**
  * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
@@ -618,6 +638,103 @@ export class ResultInnovationUseService {
             title: innovationDevLink.other_result.title ?? null,
             platform_code: innovationDevLink.other_result.platform_code ?? null,
           }
+        : null,
+    };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-01 — `design.md` §3.1,
+   * §3.2, §5.1, `DD-3`, `DD-4` (`R-IUC-001`, `R-IUC-002`, `NFR-IUC-001`).
+   *
+   * The single source of truth for the Innovation Dev card's three facts —
+   * readiness, description, geographic scope — for a given result id. Both
+   * entry points call it: T-02's section read (keyed off the LINK's
+   * `other_result_id`, never the viewed result's own id) and T-04's
+   * targeted endpoint (keyed off its path param, already bounded by T-03).
+   * Sharing one method is what makes the two structurally incapable of
+   * disagreeing (`R-IUC-007` AC.2, `DC-10`) — this task adds the method
+   * only; wiring it into `findOne` is T-02's scope, not this one's.
+   *
+   * **Why a `QueryBuilder`, not `relations` (§3.2, DD-3) — round 1's
+   * sharpest finding.** Expressing the `result_innovation_dev.is_active`
+   * filter the way `relations` allows —
+   * `where: { result_id, result_innovation_dev: { is_active: true } }` —
+   * puts the predicate in the **`WHERE`** clause against a `LEFT JOIN`. A
+   * target with no detail row, or an inactive one, then yields
+   * `detail.is_active IS NULL` and the **parent `Result` row is excluded
+   * entirely** — losing `description` and `geo_scope`, neither of which
+   * depends on that row at all. The fix: attach the predicate to the join's
+   * **`ON`** clause instead (the third argument to `leftJoinAndSelect`), so
+   * the parent always comes back when it exists and the detail is simply
+   * absent when missing or inactive. `geo_scope` is joined
+   * **unconditionally**; `where` constrains only the parent's own id — this
+   * is the shape `DC-14`'s `test:fixtures` assertion checks against the
+   * real emitted SQL (`NFR-IUC-001`'s disqualifier: a mocked-repository
+   * call-count assertion proves the call, never the SQL, whatever query API
+   * is used — §11 limit 3).
+   *
+   * **`[0] ?? null` on the relation array (§3.1).** `result.result_innovation_dev`
+   * is typed `@OneToMany`, but `ResultInnovationDev.result_id` is the
+   * child's `@PrimaryColumn` — the join can return at most one row per
+   * result, never a scalar fan-out.
+   *
+   * **Every value projected `?? null` — never `?? ''`, never `?? 0`
+   * (§5.1).** `innovation_readiness` is built only when the detail row
+   * carries a non-null `innovation_readiness_id` (checked with
+   * `!== undefined && !== null`, never `??` — the id itself may legitimately
+   * be a falsy-looking value under other coercions, and this mirrors the
+   * `!== undefined` discipline `update()` already uses elsewhere in this
+   * file for the same reason: distinguishing "absent" from "a value that
+   * happens to coerce falsy"). When it is built, `level` and `name` are
+   * each `?? null` **independently** and never collapsed to a bare `null`
+   * object when only one part is missing — the client guards the parts for
+   * display (DD-9, T-06). No `is_active` filter is applied to the
+   * `innovationReadiness` join itself: a stored FK's readiness is a fact
+   * about the detail row, not about catalog currency (mirrors this file's
+   * own `innovation_use_level` relation join in `findOne`, which applies no
+   * such filter for the identical reason).
+   *
+   * A missing target `Result` row returns all three facts `null` and never
+   * throws (§5.1's closing row) — reachable from the **targeted** read
+   * (T-04) with an unknown id; unreachable from the section read as the
+   * code stands today (§5.2's note).
+   */
+  private async readInnovationDevCardFacts(
+    resultId: number,
+  ): Promise<InnovationDevCardFacts> {
+    const result = await this.dataSource
+      .getRepository(Result)
+      .createQueryBuilder('result')
+      .leftJoinAndSelect(
+        'result.result_innovation_dev',
+        'detail',
+        'detail.is_active = :isActive',
+        { isActive: true },
+      )
+      .leftJoinAndSelect('detail.innovationReadiness', 'readiness')
+      .leftJoinAndSelect('result.geo_scope', 'geoScope')
+      .where('result.result_id = :resultId', { resultId })
+      .getOne();
+
+    if (!result) {
+      return { innovation_readiness: null, description: null, geo_scope: null };
+    }
+
+    const detail = result.result_innovation_dev?.[0] ?? null;
+    const readinessId = detail?.innovation_readiness_id;
+    const hasReadiness = readinessId !== undefined && readinessId !== null;
+
+    return {
+      innovation_readiness: hasReadiness
+        ? {
+            id: readinessId,
+            level: detail?.innovationReadiness?.level ?? null,
+            name: detail?.innovationReadiness?.name ?? null,
+          }
+        : null,
+      description: result.description ?? null,
+      geo_scope: result.geo_scope
+        ? { code: result.geo_scope.code, name: result.geo_scope.name ?? null }
         : null,
     };
   }

@@ -634,9 +634,9 @@ delivery.
 
 | ID | Question | Owner | Target |
 | --- | --- | --- | --- |
-| **OQ-1** | Readiness as `Level 7 - <name>`, or just the name, or just the ordinal? | Product owner / reviewer | Before T-04 (client render). Assumed **both**; one-expression change |
+| **OQ-1** | Readiness as `Level 7 - <name>`, or just the name, or just the ordinal? | Product owner / reviewer | **RESOLVED 2026-09-10 (user, at the `/akili-execute` gate): `Level 7 - <name>` — ordinal + name joined.** T-06's acceptance table stands as written, including the partial-null cases. `DD-9` is no longer provisional |
 | **OQ-2** | What stable hook identifies the unlabelled description in tests — a `data-testid` or a scoped structural selector? | `design.md` | Phase 2 |
-| **OQ-3** | Geographic scope was **"potentially"** in the reviewer's comment, not "for sure". Confirm it ships in this spec | Product owner | Before T-02. If dropped: one relation and one field less, no restructuring |
+| **OQ-3** | Geographic scope was **"potentially"** in the reviewer's comment, not "for sure". Confirm it ships in this spec | Product owner | **RESOLVED 2026-09-10 (user, at the `/akili-execute` gate): it SHIPS.** `geo_scope` stays in T-01/T-02, the `Geographic scope:` label in T-07, its contrast assertion in T-08, and `DD-10` (server resolves the CLARISA name) holds |
 | **OQ-4** | The section read documents **no** response shape in Swagger today (no response DTO, no `@ApiOkResponse`). Retrofit one for the whole payload as a follow-up spec? | Engineering lead | After this spec. Out of scope here |
 | **OQ-5** | `GetGeoFocusService` hardcodes the geo-scope catalog and **omits code `3`**. Repoint it at CLARISA as a follow-up? | Engineering lead | After this spec. It is a shared service; changing it here would be scope creep |
 
@@ -663,7 +663,7 @@ delivery.
 ## 12. Sign-off
 
 - [ ] Engineering lead — <name>
-- [ ] MEL / product owner — <name> *(owns `OQ-1`, `OQ-3`)*
+- [x] MEL / product owner — **user, 2026-09-10** *(owned `OQ-1`, `OQ-3`; both resolved at the `/akili-execute` gate — see §10)*
 - [ ] **Security review — REQUIRED** — <name>
   > **Revision 3 (`judgment.md` N-2).** Revisions 1–2 read *"not required: read-only, no auth change,
   > **no new endpoint**, no secret"* — a line carried over unedited while §6 of the same file gained
