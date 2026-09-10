@@ -139,3 +139,26 @@ Give a project's work PI-level review by a **PI Delegate**, modeled **only** as 
 - `DELETE /pi-delegates` — **bulk revoke** (R-PID-010). Supersedes the single-by-id revoke.
 - `GET /pi-delegates?projectId` (list) and `GET /pi-delegates/verify` — **unchanged** from v2.
 - `isPi` + `queryPrincipalInvestigator` delegate fallbacks — **unchanged** (v2, done).
+
+---
+
+## 12. Amendment v4 — per-project assignment + history table (2026-09-10, Product-confirmed)
+
+> Product refined the bulk design after v3 shipped (T-10…T-14 done): the POST becomes **per-project** (each project carries its own delegate list) instead of one cartesian set across all projects, and every movement is recorded in a **separate append-only history table**. This amends R-PID-009 and adds R-PID-011/012/013. The `pi_delegates` main table is UNCHANGED (still reflects the last state via its audit fields).
+
+### R-PID-011 — Per-project assignment (supersedes R-PID-009 AC.1 cartesian shape)
+- **AC.1** — POST payload: `{ assignments: [ { project_id: string, delegates: DelegateInput[] } ] }`. `assignments` MUST be non-empty. Each project is synced to **its own** `delegates` list (no cross-project cartesian).
+- **AC.2 — SYNC per project (Model B):** for each assignment, the project's active delegate set becomes **exactly** its `delegates`: missing → revoked, new → created, present → kept.
+- **AC.3 — Empty list = revoke all (Product Option B):** a `delegates: []` for a project is VALID and **revokes ALL** of that project's active delegates. (`assignments` itself must be non-empty; the inner `delegates` array may be empty.)
+- **AC.4** — All v3 rules still hold: ONE transaction over all assignments (fail-fast, atomic), PI-exclusion per (project, delegate) pair, authorization per project, delegates provisioned **once** and reused across assignments, per-project summary `{ project_id, created, revoked, kept }`.
+
+### R-PID-012 — PI Delegate history (append-only movement log)
+- **As a** platform, **I want** every delegation movement recorded, **so that** a full history (not just the last state) is queryable.
+- **AC.1** — A new table `pi_delegate_history` (separate from `pi_delegates`). Append-only — one row per movement.
+- **AC.2** — Every **assign** (create) and every **revoke** (soft-delete) writes a history row carrying the delegate/project context (`pi_delegate_id`, `project_id`, `pi_user_id`, `delegate_user_id`), the **action** (`'assign'` | `'revoke'`), the **action date**, and the **actor** (the user who executed it — `created_by`).
+- **AC.3** — The history write happens in the **SAME transaction** as the mutation (no orphan movements; a rolled-back assign/revoke leaves no history row).
+- **AC.4** — `pi_delegates` (main table) is **unchanged** — it keeps its current audit fields (created/updated/deleted) and reflects the **last** state; the history holds every movement.
+
+### R-PID-013 — Revoke targets the specific (delegate, project) relationship + records history
+- **AC.1** — `DELETE` Shape B `{ project_ids, delegate_user_ids }` revokes the specific `(project_id, delegate_user_id)` relationship — NOT the user globally.
+- **AC.2** — Every revoke (Shape A by `pi_delegate_ids` and Shape B by pair) records a `'revoke'` row in `pi_delegate_history` (R-PID-012).

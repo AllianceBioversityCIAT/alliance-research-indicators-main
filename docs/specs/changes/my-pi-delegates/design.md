@@ -148,3 +148,52 @@ So the client `is_principal_investigator` flag reflects delegates with **no fron
 
 ### 10.6 Budget (v3 delta)
 ~5 tasks (bulk DTOs, repo methods, service sync+revoke, controller, tests) · ~450 LOC · ~2 review rounds. Correctness-critical (destructive sync + PI-auth path).
+
+---
+
+## 11. Amendment v4 — per-project assignment + history table (2026-09-10)
+
+> Implements R-PID-011/012/013. Reuses the v3 repo/service transaction backbone; changes the assign DTO shape, the service `assign` loop, and adds a history table + write-on-mutation. `pi_delegates` unchanged.
+
+### 11.1 New table `pi_delegate_history` (append-only)
+| Column | Type | Notes |
+| --- | --- | --- |
+| `pi_delegate_history_id` | bigint PK | generated |
+| `pi_delegate_id` | bigint | the affected `pi_delegates` row (plain column, no FK — history is decoupled + immutable) |
+| `project_id` | varchar(36) | context (utf8mb3 to match schema) |
+| `pi_user_id` | bigint | context |
+| `delegate_user_id` | bigint | context |
+| `action` | varchar(10) | `'assign'` \| `'revoke'` (enum `PiDelegateHistoryActionEnum`) |
+| *AuditableEntity* | — | `created_at` = action date, `created_by` = actor; `updated_*`/`deleted_at` unused (append-only) |
+
+- No unique constraint, no generated column (multiple movements per relationship). Table charset `utf8mb3` (same reason as `pi_delegates`). Migration append-only; local apply already done for v2 — this is a NEW migration (its own local + human apply).
+
+### 11.2 Assign DTO change (R-PID-011)
+- Replace `BulkAssignPiDelegatesDto { project_ids[], delegates[] }` with `{ assignments: ProjectAssignmentDto[] }`, `ProjectAssignmentDto { project_id: string; delegates: DelegateInputDto[] }`.
+- `assignments`: `@ArrayNotEmpty @ValidateNested({each}) @Type`. `project_id`: `@IsString @IsNotEmpty`. **`delegates`: `@IsArray` only — NO `@ArrayNotEmpty`** (empty = revoke-all, R-PID-011 AC.3). `DelegateInputDto` reused unchanged.
+
+### 11.3 Service change (R-PID-011 + R-PID-012)
+- `assign(dto)` — ONE transaction:
+  1. Auth per `assignment.project_id` (fail-fast).
+  2. **Resolve+dedupe delegates ONCE across ALL assignments** (a delegate in two projects provisioned once).
+  3. PI-exclusion per (assignment.project_id × its resolved delegate ids), fail-fast.
+  4. Per assignment: `desired = its delegate ids` (may be empty → revoke all); `current = listActiveDelegateUserIds`; create desired\current, revoke current\desired; **for each create → `recordHistory('assign', …)`; for each revoke → `recordHistory('revoke', …)`** (same manager/tx).
+  5. Per-project summary.
+- `bulkRevoke(dto)` — unchanged shapes; **each revoked row → `recordHistory('revoke', …)`** in the same tx. Shape B stays the (project, delegate) pair revoke (R-PID-013 AC.1).
+
+### 11.4 Repository (R-PID-012)
+- New `PiDelegateHistoryRepository` (or a method on the existing repo) `recordHistory(entry, manager)` inserting one `pi_delegate_history` row via the passed `manager`. `insertDelegate`/`softDeleteDelegatePairs`/`softDeleteDelegateIds` must return enough context (the `pi_delegate_id` + delegate/project) so the service can write history — or the service records history from the ids it already holds.
+
+### 11.5 Controller
+- `POST /` `@Body() BulkAssignPiDelegatesDto` (new `assignments` shape) — updated Swagger examples (per-project lists, incl. an empty-list "revoke all" example). Everything else unchanged.
+
+### 11.6 Design decisions (v4)
+| DD | Decision | Rationale |
+| --- | --- | --- |
+| **DD-L** | POST payload = per-project `assignments[]` (supersedes cartesian DD-K) | Product: each project its own list |
+| **DD-M** | Empty `delegates` per project = revoke-all (Option B) | Product-confirmed; pure declarative sync |
+| **DD-N** | History in a SEPARATE append-only table, written in the mutation's tx | Full movement log; `pi_delegates` stays last-state |
+| **DD-O** | `pi_delegate_id` in history is a plain column (no FK) | Decouple the immutable log from the mutable row |
+
+### 11.7 Budget (v4 delta)
+~7 tasks (history migration + entity, DTO reshape, repo history method, service loop + history writes, controller, tests) · ~500 LOC · ~2 review rounds.

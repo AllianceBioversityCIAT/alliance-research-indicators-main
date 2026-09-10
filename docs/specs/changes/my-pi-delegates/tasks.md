@@ -170,3 +170,61 @@ graph TD
 - **Dep:** T-13 · **Effort:** M · **Skills:** nestjs-expert, tdd
 
 **v3 first task:** T-10.
+
+---
+
+## 8. Amendment v4 — per-project assignment + history (2026-09-10, Product-confirmed)
+
+> Product refined bulk after v3: POST becomes per-project (`assignments: [{project_id, delegates}]`, empty delegates = revoke-all), and every assign/revoke is logged in a new append-only `pi_delegate_history` table. `pi_delegates` unchanged. See `requirements.md §12` / `design.md §11`.
+
+### T-15 — Migration: `pi_delegate_history` table
+- **Covers:** R-PID-012
+- **Files:** `db/migrations/<ts>-createPiDelegateHistory.ts`
+- **Desc:** append-only `pi_delegate_history` (PK, `pi_delegate_id` bigint no-FK, `project_id` varchar(36), `pi_user_id`, `delegate_user_id`, `action` varchar(10), AuditableEntity). **`DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`** (same as pi_delegates). No unique, no generated column.
+- **Done:** [ ] builds + placeholder-safe; [ ] local apply to alliancereportingdb (Leader will apply after PASS).
+- **Effort:** M · **Skills:** nestjs-expert
+
+### T-16 — Entity + module: `PiDelegateHistory`
+- **Covers:** R-PID-012
+- **Files:** `entities/pi-delegates/entities/pi-delegate-history.entity.ts`, `enum/pi-delegate-history-action.enum.ts`, register in `pi-delegates.module.ts` (TypeOrmModule.forFeature)
+- **Done:** [ ] `PiDelegateHistory extends AuditableEntity`; enum `assign`/`revoke`; registered.
+- **Dep:** T-15 · **Effort:** S · **Skills:** nestjs-expert
+
+### T-17 — DTO reshape: `assignments[]`
+- **Covers:** R-PID-011
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts`
+- **Desc:** replace `{project_ids[], delegates[]}` with `{ assignments: ProjectAssignmentDto[] }`; `ProjectAssignmentDto {project_id, delegates: DelegateInputDto[]}`. `assignments` `@ArrayNotEmpty`; inner `delegates` `@IsArray` only (**no @ArrayNotEmpty** — empty = revoke-all).
+- **Done:** [ ] empty `assignments` → 400; [ ] empty inner `delegates` ALLOWED.
+- **Dep:** T-10 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
+
+### T-18 — Repository: history write
+- **Covers:** R-PID-012
+- **Files:** `repositories/pi-delegates.repository.ts` (or a history repo)
+- **Desc:** `recordHistory({pi_delegate_id, project_id, pi_user_id, delegate_user_id, action}, actorId, manager)` inserts one `pi_delegate_history` row via the passed manager. Ensure `insertDelegate`/soft-delete paths expose the ids the service needs.
+- **Done:** [ ] one row inserted per call via manager; action assign/revoke.
+- **Dep:** T-16 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-19 — Service: per-project sync + history writes
+- **Covers:** R-PID-011, R-PID-012, R-PID-013
+- **Files:** `pi-delegates.service.ts`
+- **Desc:** `assign` iterates `dto.assignments`; resolve/dedupe delegates ONCE across all assignments; per assignment sync to its OWN list (empty → revoke all); write `recordHistory('assign')` per create and `recordHistory('revoke')` per revoke in the same tx. `bulkRevoke` writes `recordHistory('revoke')` per revoked row.
+- **Named red input (K-012):** empty `delegates` for a project → all its active delegates revoked + a revoke-history row each.
+- **Disqualifies:** a rolled-back assign/revoke leaves NO history row (same tx).
+- **Done:** [ ] per-project sync correct; [ ] history row per movement; [ ] atomic.
+- **Dep:** T-17, T-18 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
+
+### T-20 — Controller: Swagger for `assignments`
+- **Covers:** R-PID-011
+- **Files:** `pi-delegates.controller.ts`
+- **Desc:** POST `@Body() BulkAssignPiDelegatesDto` (new shape); update `@ApiBody` examples (per-project lists + an empty-delegates "revoke all" example). Keep ValidationPipe, no @Roles.
+- **Done:** [ ] `/swagger` shows the new payload + examples.
+- **Dep:** T-19 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
+
+### T-21 — Tests: per-project sync + history
+- **Covers:** R-PID-011/012/013
+- **Files:** `pi-delegates.service.spec.ts` (extend/adapt), `test/pi-delegates.e2e-spec.ts`
+- **Desc:** per-project sync (distinct lists per project); empty delegates → revoke all; history row written per assign + per revoke (assert the recordHistory call args); rolled-back tx → no history; revoke-by-pair records revoke history. KZ-001 (assert values/args), KZ-004 (distinct ids).
+- **Done:** [ ] `npm test -- --silent` green; [ ] `git diff --stat client/` empty.
+- **Dep:** T-20 · **Effort:** M · **Skills:** nestjs-expert, tdd
+
+**v4 first task:** T-15.
