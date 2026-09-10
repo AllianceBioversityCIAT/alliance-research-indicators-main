@@ -610,7 +610,7 @@ instead of its serialization would let that swap pass**, because the difference 
 
 | | |
 | --- | --- |
-| Status | `[~]` — suite half PASSES (317/317, 6920/6920, all four floors held). Visual half needs the user, and is blocked twice over: **STAR's client is not served anywhere** (the `:4200` front measured earlier belongs to a different project, `Personal/variacion-y-cambio` — Leader error, corrected in `execution.md`) and `environment.dev.ts` points Cognito's redirect at the **deployed** test host, so a locally-served front cannot complete auth. Separately, the migration-dependent items need Migration A applied (B-1's FK, confirmed). **Most likely home: the deployed Dev/test environment after merge + migrations.** |
+| Status | `[x]` — **both halves done, 2026-09-09.** Suite: 317/317 suites, 6921/6921 tests, all four floors held. Visual + functional: **confirmed by the user against the running application with BOTH migrations applied** — UI reviewed, a link saved, and the green check verified (*"vi la ui guarde verifique el green aplique migraciones todo"*). Amendment 07 came out of that check. ⚠️ **Recorded honestly: no screenshots were retained and dark theme was not separately evidenced** — the substance of the Done bar (a human eye confirming) was met; its artifact (*"screenshots attached for both themes"*) was not. See `execution.md`. |
 | Size | M |
 | Depends on | T-09, T-10, T-11 |
 | Requirements | NFR-IUL-002, NFR-IUL-003, NFR-IUL-004, **D-7** |
@@ -767,9 +767,9 @@ as covered.
 
 | # | Risk | Owner |
 | --- | --- | --- |
-| **B-1** | **Migrations are applied by hand by the user** (OQ-1). Until Migration A lands in an environment, every save there 500s on the FK | User. Blocks step 4 of §11.1, not the code |
+| **B-1** | ✅ **DISCHARGED 2026-09-09** — the user applied both migrations and verified the flow end to end. Leader-measured after the fact: `migration:show` reports **325 total, 325 applied, 0 pending**, with `[X] 389 InsertInnovationUseLinkedDevRole` and `[X] 390 AppendInnovationDevLinkRuleToInnovationUseValidation`; the raw output was checked for an error **before** counting (K-014). The prediction this row carried — *"until Migration A lands, every save 500s on the FK"* — was confirmed while it was pending and is now moot | Closed |
 | **B-2** | Migration B mid-`up()` failure leaves **no function at all** (design §11.4). Verify against the scratch schema first; keep `down()`'s body as copy-pasteable recovery SQL | Claude (T-02), user (apply) |
-| **B-3** | Migration A's `down()` is **destructive** — the FK forces a hard delete of `link_results` rows (design §11.2). Never run by an agent | User only |
+| **B-3** | **STILL LIVE, and now more so than before.** Migration A's `down()` is destructive — the `link_result_role_id` FK blocks deleting the role-5 catalog row while **any** `link_results` row references it, active or not, so reverting now requires hard-deleting real link rows. **There is at least one such row as of 2026-09-09** (the user saved a link during verification). Never run by an agent; a revert is a human decision with data loss | User only — unchanged |
 | **B-4** | Concurrent-PATCH race → two active rows. **Accepted**, not mitigated (design §3.2) | Recorded |
 | **B-5** | If T-05's cycle resists `forwardRef`, fall back to direct repository access — only after running T-05's falsifier | Claude |
 | **B-6** | The Orca `agent_prompt_stalled` false negative may mask a *genuine* worker failure. A silent worker is still a runtime failure; verify by reading the terminal, not by trusting either signal | Claude |
@@ -809,7 +809,7 @@ mistaken for a runaway.
 
 ## 7. Done definition
 
-- [ ] All **14** tasks `[x]`, each with its Reviewer PASS recorded in `execution.md` **before** the box
+- [x] All **14** tasks `[x]`, each with its Reviewer PASS recorded in `execution.md` **before** the box
       is flipped — the committed `PreToolUse` hook blocks the write otherwise, and a block is not a bug
 - [ ] Server **unit** suite green, 60% floor held — `npm test -- --silent`
 - [ ] Server **fixture** suite green — `npm run test:fixtures`

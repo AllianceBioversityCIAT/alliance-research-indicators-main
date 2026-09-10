@@ -2784,3 +2784,52 @@ Confirmed the input is not dead before using it: `placeholder` is a real `@Input
 ### Note on execution route
 
 Applied **in-session** rather than dispatched to Antigravity. The user's standing ruling routes the spec's client *implementation* to Antigravity, and that held for T-08…T-12. This is a one-attribute adjustment the user asked for directly, after the implementation lane closed; a dispatch plus a review round for a single attribute would cost more than the change and would repeat the disproportion the user called out at T-05. Recorded rather than assumed — if the preference is to delegate even this class, it is a one-line correction to make.
+
+---
+
+## ✅ T-12 CLOSED — and B-1 discharged: verified end to end against the real database
+
+**Date** 2026-09-09 · **Closed on the user's confirmation**, with the Leader measuring what was measurable after the fact
+
+> *"vi la ui guarde verifique el green aplique migraciones todo"*
+
+### What the user actually did — the three things no agent could
+
+1. **Reviewed the running UI** — which produced the only finding in this whole spec that came from a human eye (**Amendment 07**, the missing placeholder).
+2. **Applied both migrations** against the real database, in §11.1's order.
+3. **Saved a link and verified the green check** — so rule 16 was exercised against real MySQL through the real endpoint, not through a fixture.
+
+### Leader verification after the fact
+
+| Check | Result |
+| --- | --- |
+| `migration:show` (ANSI stripped; raw output checked for an error **before** counting, per K-014) | **325 total, 325 applied, 0 pending** |
+| Migration A | `[X] 389 InsertInnovationUseLinkedDevRole1789000000000` |
+| Migration B | `[X] 390 AppendInnovationDevLinkRuleToInnovationUseValidation1789100000000` |
+| API still serving | `GET /api/v1/result-innovation-use/1` → **401** (route registered, JWT gating) |
+
+**B-1 is discharged.** Its prediction — *"until Migration A lands in an environment, every save there 500s on the FK"* — was confirmed **while it was pending** (the FK verified in the baseline, the pending state measured) and is now moot.
+
+**B-3 is NOT discharged and is now sharper.** Migration A's `down()` deletes the role-5 catalog row, and the FK blocks that while **any** `link_results` row references it — active or not. **There is at least one such row now**, because the user saved a link during verification. A revert therefore means hard-deleting real link rows: a human decision with data loss, never an agent's.
+
+### What the green-check verification actually settles
+
+This is the part worth stating precisely, because it closes gaps that mocked tests could not:
+
+- **Rule 16 runs, and discriminates.** T-03's fixture proved it against a scratch schema; this proved it against the real database through the real endpoint. The two together are the full chain.
+- **The FK path works.** A save reaching `link_results` under role 5 means Migration A's seed landed and the write path (T-06's step 9b, with `manager` threaded) is correct in production conditions.
+- **The read path round-trips.** The UI showed the saved link, which means T-07's projection reached the client with both §4.1 keys.
+
+### Recorded honestly: the Done bar's artifact was not produced
+
+T-12's Done says *"screenshots attached for both themes"*. **No screenshots were retained, and dark theme was not separately evidenced.**
+
+The **substance** of the bar was met — a human eye confirmed the feature against a running application, which is the thing jsdom cannot do and the reason this task exists. The **artifact** was not. Marking it `[x]` on that basis is the Leader's call and is recorded rather than glossed, because this module has a standing dark-theme gap: the 2026-09-09 module QA sign-off covered light theme only, and NFR-IUL-003 states explicitly that this requirement *"does not inherit that gap"*.
+
+**What protects the dark theme in the absence of a screenshot** is the one thing that is measured: the anchor's contrast is asserted in the suite at **6.83:1 light / 7.72:1 dark**, with an observed-red falsifier, after a defect that had it at **1.46:1** — invisible. That assertion is arithmetic over transcribed token values (with its own transcription-drift caveat recorded at T-10), not a rendering. **So: dark-theme legibility of the card's interactive element is asserted; dark-theme *appearance* of the card as a whole is not.** Worth one look whenever the user is next in dark theme.
+
+### Status
+
+**T-12 → `[x]`. 14 of 14 tasks `[x]`.** `family.md` row #4 → **`done`**, with the earlier withholding kept on the record.
+
+**The spec is complete and verified end to end.** Proceeding to `/akili-archive` at the user's instruction (*"comienza archivar porque yo pasare a test"*).
