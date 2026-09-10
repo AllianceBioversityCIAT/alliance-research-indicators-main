@@ -1,4 +1,4 @@
-// @akili-spec docs/specs/changes/my-pi-delegates — T-10
+// @akili-spec docs/specs/changes/my-pi-delegates — T-17/T-19/T-20
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -17,7 +17,7 @@ import { DelegateIdentityDto } from './create-pi-delegate.dto';
 export { DelegateIdentityDto };
 
 /**
- * The per-delegate entry in a bulk-assign request (R-PID-009 AC.1).
+ * The per-delegate entry in a bulk-assign request (R-PID-009 AC.1 / R-PID-011 AC.1).
  *
  * Mirrors the union from CreatePiDelegateDto so the same reciprocal
  * @ValidateIf pattern is preserved:
@@ -79,45 +79,63 @@ export class DelegateInputDto {
 }
 
 /**
- * Payload for POST /pi-delegates — bulk sync (R-PID-009, design.md §10.1).
+ * One project + its desired delegate list (R-PID-011 AC.1 / design.md §11.2).
  *
- * project_ids × delegates is the Cartesian set applied: the same `delegates`
- * list is synchronised into every `project_id` in the request (DD-K).
- *
- * Sync semantics (R-PID-009 AC.2 — Model B):
- *   created  = delegates in the list but not currently active for the project.
- *   revoked  = active delegates for the project not in the list.
- *   kept     = intersection (active and in the list).
- *
- * Authorization: the caller must be PI/active-delegate/SYSTEM_ADMIN for every
- * project_id (R-PID-007, R-PID-009 AC.3) — fail-fast, nothing applied.
- * PI-exclusion (R-PID-008) is enforced per (project, delegate) pair — fail-fast.
- * The whole operation runs in one transaction (R-PID-009 AC.6).
+ * An empty `delegates` array is VALID — it instructs the service to revoke
+ * ALL active delegates for this project (R-PID-011 AC.3, Option B).
+ * Therefore @ArrayNotEmpty is intentionally absent on `delegates`.
  */
-export class BulkAssignPiDelegatesDto {
+export class ProjectAssignmentDto {
   @ApiProperty({
-    type: [String],
-    description:
-      'Agresso agreement IDs of the projects to synchronise. ' +
-      'The same delegates list is applied to each project (cartesian). ' +
-      'At least one project_id is required.',
-    example: ['INIT-268', 'INIT-269'],
+    type: String,
+    description: 'Agresso agreement ID of the project to synchronise.',
+    example: 'INIT-268',
   })
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsString({ each: true })
-  project_ids!: string[];
+  @IsString()
+  @IsNotEmpty()
+  project_id!: string;
 
   @ApiProperty({
     type: [DelegateInputDto],
     description:
-      'Desired set of delegates to assign to every project_id. ' +
-      'Each entry is either an existing delegate_user_id or an identity object ' +
-      '(email + names) to provision. At least one delegate is required.',
+      'Desired set of delegates for this project. ' +
+      'An empty array revokes ALL active delegates (R-PID-011 AC.3).',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DelegateInputDto)
+  delegates!: DelegateInputDto[];
+}
+
+/**
+ * Payload for POST /pi-delegates — per-project bulk sync (R-PID-011 / design.md §11.2).
+ *
+ * Each entry in `assignments` carries its own project_id and delegate list.
+ * No cross-project cartesian — each project is synced to its own list (DD-L).
+ *
+ * Sync semantics per project (R-PID-011 AC.2 — Model B):
+ *   created  = delegates in the list but not currently active for the project.
+ *   revoked  = active delegates for the project not in the list.
+ *   kept     = intersection (active and in the list).
+ *   (empty list → all current delegates revoked — R-PID-011 AC.3)
+ *
+ * Authorization: the caller must be PI/active-delegate/SYSTEM_ADMIN for every
+ * project_id (R-PID-007) — fail-fast, nothing applied on any 403.
+ * PI-exclusion (R-PID-008) is enforced per (project, delegate) pair — fail-fast.
+ * Delegates are provisioned ONCE across all assignments and reused (R-PID-011 AC.4).
+ * The whole operation runs in ONE transaction (R-PID-011 AC.4).
+ */
+export class BulkAssignPiDelegatesDto {
+  @ApiProperty({
+    type: [ProjectAssignmentDto],
+    description:
+      'Per-project assignment list. Each entry carries a project_id and its ' +
+      'desired delegate set. At least one assignment is required. ' +
+      'An empty delegates array for a project revokes all its active delegates.',
   })
   @IsArray()
   @ArrayNotEmpty()
   @ValidateNested({ each: true })
-  @Type(() => DelegateInputDto)
-  delegates!: DelegateInputDto[];
+  @Type(() => ProjectAssignmentDto)
+  assignments!: ProjectAssignmentDto[];
 }

@@ -1,4 +1,4 @@
-// @akili-spec docs/specs/changes/my-pi-delegates — T-13
+// @akili-spec docs/specs/changes/my-pi-delegates — T-17/T-19/T-20
 import {
   Body,
   Controller,
@@ -40,62 +40,99 @@ export class PiDelegatesController {
   constructor(private readonly piDelegatesService: PiDelegatesService) {}
 
   // ─────────────────────────────────────────────────────────────────────────
-  // POST /pi-delegates — bulk sync (R-PID-009)
+  // POST /pi-delegates — per-project bulk sync (R-PID-011 / v4)
   // ─────────────────────────────────────────────────────────────────────────
   @Post()
   @ApiOperation({
-    summary: 'Bulk-assign (sync) PI delegates to one or more projects',
+    summary: 'Bulk-assign (per-project sync) PI delegates',
     description:
-      'Synchronises the desired delegate set into every project_id in the request ' +
-      '(cartesian — DD-K). For each project the active delegation set becomes EXACTLY ' +
-      'the delegates list: pairs in the list but not active are CREATED; active pairs ' +
-      'not in the list are REVOKED; pairs already active are KEPT. ' +
-      'The whole operation runs in ONE transaction — any error rolls back all projects (R-PID-009 AC.6). ' +
+      'Synchronises the desired delegate set for each project independently (DD-L). ' +
+      'Each assignment in the payload carries its own project_id and delegate list. ' +
+      'For each project the active delegation set becomes EXACTLY its delegate list: ' +
+      'pairs in the list but not active are CREATED; active pairs not in the list are REVOKED; ' +
+      'pairs already active are KEPT. ' +
+      'An empty delegates array for a project revokes ALL its active delegates (R-PID-011 AC.3). ' +
+      'Every movement (create and revoke) writes a history row in the SAME transaction (R-PID-012). ' +
+      'The whole operation runs in ONE transaction — any error rolls back all projects (R-PID-011 AC.4). ' +
       'Authorization per project (R-PID-007): caller must be PI, active delegate, or SYSTEM_ADMIN ' +
       'of every project_id — fail-fast, nothing applied on any 403. ' +
       'PI-exclusion (R-PID-008): if any (project, delegate) pair names a user who is the PI ' +
       'of that project the whole request is rejected. ' +
+      'Delegates are provisioned once across all assignments and reused (R-PID-011 AC.4). ' +
       'Returns a per-project summary { project_id, created, revoked, kept }.',
   })
   @ApiBody({
     type: BulkAssignPiDelegatesDto,
-    description: 'Bulk-sync payload: N delegates × M projects (cartesian)',
+    description:
+      'Per-project sync payload: each assignment has its own project_id and delegate list (DD-L)',
     examples: {
       byUserId: {
-        summary: 'Existing sec_users (delegate_user_id)',
+        summary: 'Per-project — existing sec_users (delegate_user_id)',
         value: {
-          project_ids: ['INIT-268', 'INIT-269'],
-          delegates: [{ delegate_user_id: 42 }, { delegate_user_id: 55 }],
+          assignments: [
+            {
+              project_id: 'INIT-268',
+              delegates: [{ delegate_user_id: 42 }, { delegate_user_id: 55 }],
+            },
+            {
+              project_id: 'INIT-269',
+              delegates: [{ delegate_user_id: 42 }],
+            },
+          ],
         },
       },
       byIdentity: {
-        summary: 'New delegates to provision',
+        summary: 'Per-project — new delegates to provision',
         value: {
-          project_ids: ['INIT-268'],
-          delegates: [
+          assignments: [
             {
-              delegate: {
-                email: 'j.doe@cgiar.org',
-                first_name: 'Jane',
-                last_name: 'Doe',
-              },
+              project_id: 'INIT-268',
+              delegates: [
+                {
+                  delegate: {
+                    email: 'j.doe@cgiar.org',
+                    first_name: 'Jane',
+                    last_name: 'Doe',
+                  },
+                },
+              ],
             },
           ],
         },
       },
       mixed: {
-        summary: 'Mixed — existing + new',
+        summary: 'Per-project — mixed existing + new',
         value: {
-          project_ids: ['INIT-268'],
-          delegates: [
-            { delegate_user_id: 42 },
+          assignments: [
             {
-              delegate: {
-                email: 'j.smith@cgiar.org',
-                first_name: 'John',
-                last_name: 'Smith',
-              },
-              carnet: 'C012345',
+              project_id: 'INIT-268',
+              delegates: [
+                { delegate_user_id: 42 },
+                {
+                  delegate: {
+                    email: 'j.smith@cgiar.org',
+                    first_name: 'John',
+                    last_name: 'Smith',
+                  },
+                  carnet: 'C012345',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      revokeAll: {
+        summary:
+          'Empty delegates list — revoke ALL active delegates for a project (R-PID-011 AC.3)',
+        value: {
+          assignments: [
+            {
+              project_id: 'INIT-268',
+              delegates: [{ delegate_user_id: 42 }, { delegate_user_id: 55 }],
+            },
+            {
+              project_id: 'INIT-269',
+              delegates: [],
             },
           ],
         },

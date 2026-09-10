@@ -190,7 +190,7 @@ graph TD
 - **Done:** [ ] `PiDelegateHistory extends AuditableEntity`; enum `assign`/`revoke`; registered.
 - **Dep:** T-15 · **Effort:** S · **Skills:** nestjs-expert
 
-### T-17 — DTO reshape: `assignments[]`
+### T-17 — DTO reshape: `assignments[]`  ✅ [x] PASS 2026-09-10 (with T-19/T-20)
 - **Covers:** R-PID-011
 - **Files:** `dto/bulk-assign-pi-delegates.dto.ts`
 - **Desc:** replace `{project_ids[], delegates[]}` with `{ assignments: ProjectAssignmentDto[] }`; `ProjectAssignmentDto {project_id, delegates: DelegateInputDto[]}`. `assignments` `@ArrayNotEmpty`; inner `delegates` `@IsArray` only (**no @ArrayNotEmpty** — empty = revoke-all).
@@ -204,7 +204,7 @@ graph TD
 - **Done:** [ ] one row inserted per call via manager; action assign/revoke.
 - **Dep:** T-16 · **Effort:** M · **Skills:** nestjs-expert
 
-### T-19 — Service: per-project sync + history writes
+### T-19 — Service: per-project sync + history writes  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-011, R-PID-012, R-PID-013
 - **Files:** `pi-delegates.service.ts`
 - **Desc:** `assign` iterates `dto.assignments`; resolve/dedupe delegates ONCE across all assignments; per assignment sync to its OWN list (empty → revoke all); write `recordHistory('assign')` per create and `recordHistory('revoke')` per revoke in the same tx. `bulkRevoke` writes `recordHistory('revoke')` per revoked row.
@@ -213,7 +213,7 @@ graph TD
 - **Done:** [ ] per-project sync correct; [ ] history row per movement; [ ] atomic.
 - **Dep:** T-17, T-18 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
 
-### T-20 — Controller: Swagger for `assignments`
+### T-20 — Controller: Swagger for `assignments`  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-011
 - **Files:** `pi-delegates.controller.ts`
 - **Desc:** POST `@Body() BulkAssignPiDelegatesDto` (new shape); update `@ApiBody` examples (per-project lists + an empty-delegates "revoke all" example). Keep ValidationPipe, no @Roles.

@@ -395,3 +395,15 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
 - **Files:** `repositories/pi-delegates.repository.ts` — added `recordHistory(entry, actorId, manager)` inserting one `pi_delegate_history` row via the passed `manager` (`created_by=actorId`), mirroring `insertDelegate`.
 - **Reviewer PASS (zero findings):** manager-accepting (no own tx — atomic with the mutation per AC.3); `entry` keys match the entity properties exactly; `action` typed as the enum; scope clean (unused until T-19, expected).
 - **Verification:** `npm run build` clean; `npx eslint <file>` clean.
+
+### T-17 + T-19 + T-20 — per-project `assignments` + service sync + history + controller — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-011, R-PID-012, R-PID-013. Effort XHIGH. Executed as ONE cohesive interface change (a DTO shape change breaks the service/controller build — they move together to keep the build green). Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts` (`{assignments: ProjectAssignmentDto[]}`, inner `delegates` NO `@ArrayNotEmpty` → empty=revoke-all); `pi-delegates.service.ts` (`assign` per-project sync + history; `bulkRevoke` + history); `pi-delegates.controller.ts` (POST new shape + Swagger empty-delegates "revoke all" example).
+- **Reviewer PASS (10/10 checks, zero drift):**
+  - Per-project sync bounded to each project's own current set (no cross-project revoke); empty `delegates` → revoke ALL (AC.3).
+  - Provision-once dedupe across ALL assignments; PI-exclusion fail-fast.
+  - **History correct:** create → `recordHistory(ASSIGN)` with `insertDelegate`'s returned `pi_delegate_id`; revoke → **fetch the active rows BEFORE soft-delete** and record `REVOKE` with the ROW's own `pi_delegate_id` + original `pi_user_id` (provenance, NOT the caller). All in ONE transaction (rolled-back tx = no history). `bulkRevoke` writes history for both shapes.
+  - No `@Roles`; ValidationPipe intact.
+- **ADVISORY (non-gating):** bulkRevoke Shape A's context read uses non-tx `findOne` (writes are tx-bound — harmless); `resolveId`'s non-null assertion is sound but implicit.
+- **Verification:** `npm run build` clean; `npx eslint <3 files>` clean.

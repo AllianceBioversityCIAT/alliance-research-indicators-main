@@ -1,30 +1,34 @@
-// @akili-spec docs/specs/changes/my-pi-delegates — T-12, T-13
+// @akili-spec docs/specs/changes/my-pi-delegates — T-17/T-19/T-20
 //
-// Service contract (design.md §10.3 / requirements.md §11):
+// Service contract (design.md §11.3 / requirements.md §12):
 //
-//   assign()     — R-PID-009 (bulk sync, Model B).
-//                  Wraps ALL work in ONE dataSource.transaction (AC.6).
+//   assign()     — R-PID-011 (per-project sync, Model B) + R-PID-012 (history).
+//                  Wraps ALL work in ONE dataSource.transaction (R-PID-011 AC.4).
 //                  Steps inside the tx:
-//                    1. Auth per project (assertCanManageProject) — fail-fast 403 (AC.3).
-//                    2. Resolve + deduplicate delegates ONCE via resolveDelegateUserId
-//                       (AC.5 — provision new sec_user inside the tx, reuse across projects).
-//                    3. PI-exclusion (isPiOfProject) per (project, delegate) pair — fail-fast
-//                       BadRequestException (R-PID-008 / AC.4).
-//                    4. Per-project SYNC diff: create desired\current, revoke current\desired,
-//                       keep intersection (AC.2).
-//                    5. Return per-project summary { project_id, created, revoked, kept } (AC.7).
+//                    1. Auth per assignment.project_id (assertCanManageProject) —
+//                       fail-fast 403 (R-PID-011 AC.4).
+//                    2. Resolve + deduplicate delegates ONCE across ALL assignments
+//                       (R-PID-011 AC.4 — provision new sec_user inside the tx,
+//                        reuse across projects; DD-L).
+//                    3. PI-exclusion (isPiOfProject) per (project, delegate) pair —
+//                       fail-fast BadRequestException (R-PID-008 / R-PID-011 AC.4).
+//                    4. Per-assignment SYNC diff:
+//                         - desired may be EMPTY → revoke-all (R-PID-011 AC.3).
+//                         - for each created delegate: insertDelegate then recordHistory('assign').
+//                         - for each revoked delegate: fetch active rows to get full context,
+//                           recordHistory('revoke') per row, then softDeleteDelegatePairs.
+//                    5. Return per-project summary { project_id, created, revoked, kept } (R-PID-011 AC.4).
 //
-//   bulkRevoke() — R-PID-010 (targeted bulk revoke, NOT a sync).
+//   bulkRevoke() — R-PID-010 (targeted bulk revoke, NOT a sync) + R-PID-013 (history).
 //                  Ambiguity guard: exactly one shape must be present — Shape A
 //                  (pi_delegate_ids) OR Shape B (project_ids + delegate_user_ids).
 //                  Both present, Shape B partial, or neither → BadRequestException (400).
-//                  Auth per row's/project's project_id (AC.3). Transactional.
+//                  Auth per row's/project's project_id (R-PID-010 AC.3). Transactional.
+//                  Each revoked row writes recordHistory('revoke') in the same tx (R-PID-013 AC.2).
 //
 //   list()       — unchanged from v2 (R-PID-004 AC.1).
 //   verify()     — unchanged from v2 (R-PID-004 AC.1).
 //   assertCanManageProject() — unchanged from v2 (R-PID-007).
-//
-// v2 create() and revoke() removed in T-13 (controller now uses bulk endpoints).
 //
 // Authorization contract (R-PID-007 / DD-B):
 //   Three cases decide whether a caller may manage a project's delegations:
@@ -36,22 +40,18 @@
 //        (agresso_contracts PI join UNION pi_delegates active row).
 //     3. Neither — ForbiddenException (403).
 //
-// Named red input (K-012):
-//   A caller who is none of the above → 403 ForbiddenException.
-//
 // pi_user_id on create (DD-B §4):
 //   When the caller IS the PI (or SYSTEM_ADMIN), pi_user_id = the caller's
 //   own user_id (provenance context).  The delegate check alone does not
 //   determine who the PI is — it only says "this caller may act here."
 //   SYSTEM_ADMIN acting on behalf of a project: pi_user_id is still set to
-//   the caller's user_id as audit provenance (no separate pi resolution is
-//   done here — see Not Done / Assumptions in the task report).
+//   the caller's user_id as audit provenance.
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { PiDelegatesRepository } from './repositories/pi-delegates.repository';
 import { DelegateInput } from './repositories/pi-delegates.repository';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
@@ -63,12 +63,13 @@ import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { PiDelegate } from './entities/pi-delegate.entity';
+import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Response shapes
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Per-project sync summary returned by assign() (R-PID-009 AC.7). */
+/** Per-project sync summary returned by assign() (R-PID-011 AC.4). */
 export interface ProjectSyncSummary {
   project_id: string;
   created: number[];
@@ -86,8 +87,8 @@ export interface BulkRevokeSummary {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Maps a DelegateInputDto (T-10 DTO shape) to the repo DelegateInput union
- * (T-04 repository shape).
+ * Maps a DelegateInputDto (DTO shape) to the repo DelegateInput union
+ * (repository shape).
  *
  * DelegateInputDto:  { delegate_user_id?, delegate?: { email, first_name, last_name }, carnet? }
  * DelegateInput:     DelegateByUserId | DelegateNewUserIdentity
@@ -170,31 +171,37 @@ export class PiDelegatesService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // v3 — Bulk assign (sync) — R-PID-009
+  // v4 — Bulk assign (per-project sync) — R-PID-011 + R-PID-012
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Bulk assign delegates to one or more projects (sync / Model B).
+   * Bulk assign delegates to one or more projects (per-project sync / Model B).
    *
-   * The same desired delegate set is applied to EVERY project in dto.project_ids
-   * (cartesian — DD-K).  For each project, the active delegation set is
-   * reconciled so it becomes EXACTLY the desired set:
-   *   created  = desired \ current  (pairs to insert)
-   *   revoked  = current \ desired  (pairs to soft-delete)
-   *   kept     = desired ∩ current  (unchanged)
+   * Each assignment carries its own project_id and desired delegate list (DD-L).
+   * No cross-project cartesian: each project is synced to its own list.
+   * An empty delegates list for a project revokes ALL its active delegates (R-PID-011 AC.3).
    *
-   * Everything runs in ONE transaction (AC.6) — any error rolls back all projects.
+   * Every movement (create AND revoke) writes one history row in the SAME transaction
+   * (R-PID-012 AC.3).  A rolled-back operation leaves no history rows.
+   *
+   * Everything runs in ONE transaction (R-PID-011 AC.4) — any error rolls back
+   * all projects and all history rows.
    *
    * Order of operations inside the transaction:
-   *   1. Auth per project — fail-fast 403 if any project is unauthorized (AC.3).
-   *   2. Resolve + de-duplicate delegates ONCE → Set<number> of delegate_user_ids (AC.5).
+   *   1. Auth per project — fail-fast 403 if any project is unauthorized (R-PID-011 AC.4).
+   *   2. Resolve + de-duplicate delegates ONCE across ALL assignments → Map<key, id>
+   *      (R-PID-011 AC.4 — provision new sec_user inside the tx, reuse across projects).
    *   3. PI-exclusion — fail-fast BadRequestException for any (project, delegate)
-   *      where the delegate is the PI of that project (R-PID-008 / AC.4).
-   *   4. Per-project SYNC diff (AC.2): insertDelegate / softDeleteDelegatePairs.
-   *   5. Return per-project summary (AC.7).
+   *      where the delegate is the PI of that project (R-PID-008 / R-PID-011 AC.4).
+   *   4. Per-assignment SYNC diff (R-PID-011 AC.2):
+   *        - desired may be EMPTY → revoke-all (R-PID-011 AC.3).
+   *        - For each created delegate: insertDelegate → recordHistory('assign').
+   *        - For each revoked delegate: fetch active rows for full context →
+   *          recordHistory('revoke') per row → softDeleteDelegatePairs.
+   *   5. Return per-project summary (R-PID-011 AC.4).
    *
-   * @param dto  BulkAssignPiDelegatesDto
-   * @returns    Array of ProjectSyncSummary, one entry per project_id.
+   * @param dto  BulkAssignPiDelegatesDto with assignments[] shape
+   * @returns    Array of ProjectSyncSummary, one entry per project assignment.
    */
   async assign(dto: BulkAssignPiDelegatesDto): Promise<ProjectSyncSummary[]> {
     const callerUserId = this.currentUserUtil.user_id;
@@ -202,66 +209,85 @@ export class PiDelegatesService {
     return this.dataSource.transaction(
       async (manager: EntityManager): Promise<ProjectSyncSummary[]> => {
         // ── Step 1: Auth per project (fail-fast) ──────────────────────────
-        for (const projectId of dto.project_ids) {
-          await this.assertCanManageProject(projectId);
+        for (const a of dto.assignments) {
+          await this.assertCanManageProject(a.project_id);
         }
 
-        // ── Step 2: Resolve + de-duplicate delegates ONCE (AC.5) ─────────
+        // ── Step 2: Resolve + de-duplicate delegates ONCE across ALL assignments ─
         //
-        // Build a unique-by-identity map: stringify the DelegateInput key to
-        // detect truly duplicate entries (same delegate_user_id, or same email).
-        // Each unique entry is resolved via resolveDelegateUserId ONCE, and the
-        // result is reused across all projects.
+        // Collect every DelegateInput from every assignment's delegates list,
+        // de-dupe by identity key (id:<uid> or email:<email>), then resolve
+        // each unique input to a sec_user_id exactly once (provision-once AC.4).
+        // The result is a Map<inputKey, delegate_user_id> for fast lookup.
         //
         // This prevents double-inserting the same sec_user when the same new
-        // delegate appears more than once in dto.delegates.
+        // delegate appears in multiple assignments.
         const inputMap = new Map<string, DelegateInput>();
-        for (const dtoEntry of dto.delegates) {
+        for (const a of dto.assignments) {
+          for (const dtoEntry of a.delegates) {
+            const input = toDelegateInput(dtoEntry);
+            const key =
+              'delegate_user_id' in input
+                ? `id:${input.delegate_user_id}`
+                : `email:${input.email}`;
+            if (!inputMap.has(key)) {
+              inputMap.set(key, input);
+            }
+          }
+        }
+
+        // Resolve each unique input to a sec_user_id (provisions absent users).
+        const resolvedMap = new Map<string, number>();
+        for (const [key, input] of inputMap.entries()) {
+          const resolvedId =
+            await this.piDelegatesRepository.resolveDelegateUserId(
+              input,
+              manager,
+            );
+          resolvedMap.set(key, resolvedId);
+        }
+
+        // Build a helper that converts a DelegateInputDto to its resolved id.
+        const resolveId = (dtoEntry: DelegateInputDto): number => {
           const input = toDelegateInput(dtoEntry);
           const key =
             'delegate_user_id' in input
               ? `id:${input.delegate_user_id}`
               : `email:${input.email}`;
-          if (!inputMap.has(key)) {
-            inputMap.set(key, input);
-          }
-        }
+          return resolvedMap.get(key)!;
+        };
 
-        // Resolve each unique input to a sec_user_id (provisions absent users).
-        const resolvedIds: number[] = [];
-        for (const input of inputMap.values()) {
-          const userId = await this.piDelegatesRepository.resolveDelegateUserId(
-            input,
-            manager,
-          );
-          resolvedIds.push(userId);
-        }
-
-        const desiredSet = new Set<number>(resolvedIds);
-
-        // ── Step 3: PI-exclusion (fail-fast) — R-PID-008 / AC.4 ──────────
-        for (const projectId of dto.project_ids) {
-          for (const delegateUserId of desiredSet) {
+        // ── Step 3: PI-exclusion (fail-fast) — R-PID-008 / R-PID-011 AC.4 ─
+        for (const a of dto.assignments) {
+          // Compute this assignment's resolved delegate ids.
+          const assignmentResolvedIds = [
+            ...new Set(a.delegates.map(resolveId)),
+          ];
+          for (const delegateUserId of assignmentResolvedIds) {
             const isPI = await this.piDelegatesRepository.isPiOfProject(
-              projectId,
+              a.project_id,
               delegateUserId,
             );
             if (isPI) {
               throw new BadRequestException(
-                `PI-exclusion violation: user ${delegateUserId} is the PI of project "${projectId}" and cannot be a delegate of the same project (R-PID-008).`,
+                `PI-exclusion violation: user ${delegateUserId} is the PI of project "${a.project_id}" and cannot be a delegate of the same project (R-PID-008).`,
               );
             }
           }
         }
 
-        // ── Step 4: Per-project SYNC diff (AC.2) ─────────────────────────
+        // ── Step 4: Per-assignment SYNC diff (R-PID-011 AC.2) + History ──
         const summaries: ProjectSyncSummary[] = [];
 
-        for (const projectId of dto.project_ids) {
+        for (const a of dto.assignments) {
+          // Desired set for THIS assignment (may be EMPTY → revoke-all AC.3).
+          const desiredIds = [...new Set(a.delegates.map(resolveId))];
+          const desiredSet = new Set<number>(desiredIds);
+
           // Current active set for this project (read inside the tx).
           const currentIds =
             await this.piDelegatesRepository.listActiveDelegateUserIds(
-              projectId,
+              a.project_id,
               manager,
             );
           const currentSet = new Set<number>(currentIds);
@@ -270,27 +296,66 @@ export class PiDelegatesService {
           const toRevoke = setDifference(currentSet, desiredSet);
           const kept = setIntersection(desiredSet, currentSet);
 
-          // Insert new delegations.
+          // ── Creates: insertDelegate → recordHistory('assign') ──────────
           for (const delegateUserId of toCreate) {
-            await this.piDelegatesRepository.insertDelegate(
-              projectId,
+            const row = await this.piDelegatesRepository.insertDelegate(
+              a.project_id,
               callerUserId, // pi_user_id = caller (provenance)
               delegateUserId,
               callerUserId, // createdBy = caller (audit)
               manager,
             );
+            await this.piDelegatesRepository.recordHistory(
+              {
+                pi_delegate_id: row.pi_delegate_id,
+                project_id: a.project_id,
+                pi_user_id: callerUserId,
+                delegate_user_id: delegateUserId,
+                action: PiDelegateHistoryActionEnum.ASSIGN,
+              },
+              callerUserId,
+              manager,
+            );
           }
 
-          // Revoke removed delegations (no-op when empty).
-          await this.piDelegatesRepository.softDeleteDelegatePairs(
-            projectId,
-            toRevoke,
-            callerUserId,
-            manager,
-          );
+          // ── Revokes: fetch row context → recordHistory('revoke') → soft-delete ─
+          //
+          // softDeleteDelegatePairs only needs delegate_user_ids, but history
+          // requires the full row context (pi_delegate_id, pi_user_id).
+          // Fetch the active rows BEFORE deleting to capture that context.
+          if (toRevoke.length > 0) {
+            const rowsToRevoke = await manager.getRepository(PiDelegate).find({
+              where: {
+                project_id: a.project_id,
+                delegate_user_id: In([...toRevoke]),
+                is_active: true,
+              },
+            });
+
+            for (const revokedRow of rowsToRevoke) {
+              await this.piDelegatesRepository.recordHistory(
+                {
+                  pi_delegate_id: revokedRow.pi_delegate_id,
+                  project_id: revokedRow.project_id,
+                  pi_user_id: revokedRow.pi_user_id,
+                  delegate_user_id: revokedRow.delegate_user_id,
+                  action: PiDelegateHistoryActionEnum.REVOKE,
+                },
+                callerUserId,
+                manager,
+              );
+            }
+
+            await this.piDelegatesRepository.softDeleteDelegatePairs(
+              a.project_id,
+              toRevoke,
+              callerUserId,
+              manager,
+            );
+          }
 
           summaries.push({
-            project_id: projectId,
+            project_id: a.project_id,
             created: toCreate,
             revoked: toRevoke,
             kept,
@@ -303,7 +368,7 @@ export class PiDelegatesService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // v3 — Bulk targeted revoke — R-PID-010
+  // v3/v4 — Bulk targeted revoke — R-PID-010 + R-PID-013
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -321,6 +386,7 @@ export class PiDelegatesService {
    *                                       also fires for safety).
    *
    * Auth is enforced per each row's project_id (R-PID-007 / R-PID-010 AC.3).
+   * Every revoked row records a 'revoke' history row in the same tx (R-PID-013 AC.2).
    * All writes run in one transaction.
    *
    * @param dto  BulkRevokePiDelegatesDto
@@ -365,6 +431,7 @@ export class PiDelegatesService {
           // ── Shape A: revoke by primary key ─────────────────────────────
           //
           // Resolve each row to obtain its project_id, then authorize.
+          // Fetch full row context so history can be written (R-PID-013 AC.2).
           // Rows that are already revoked or not found are skipped (no error).
           const idsToRevoke: number[] = [];
 
@@ -379,6 +446,20 @@ export class PiDelegatesService {
             }
 
             await this.assertCanManageProject(row.project_id);
+
+            // Write history before the soft-delete (R-PID-013 AC.2 / R-PID-012 AC.3).
+            await this.piDelegatesRepository.recordHistory(
+              {
+                pi_delegate_id: row.pi_delegate_id,
+                project_id: row.project_id,
+                pi_user_id: row.pi_user_id,
+                delegate_user_id: row.delegate_user_id,
+                action: PiDelegateHistoryActionEnum.REVOKE,
+              },
+              callerUserId,
+              manager,
+            );
+
             idsToRevoke.push(piDelegateId);
           }
 
@@ -392,8 +473,34 @@ export class PiDelegatesService {
           }
         } else {
           // ── Shape B: revoke by (project × delegate) pairs ──────────────
+          //
+          // Fetch full row context per project before soft-deleting so history
+          // can be written with pi_delegate_id and pi_user_id (R-PID-013 AC.2).
           for (const projectId of dto.project_ids!) {
             await this.assertCanManageProject(projectId);
+
+            // Fetch the active rows to revoke for history context.
+            const rowsToRevoke = await manager.getRepository(PiDelegate).find({
+              where: {
+                project_id: projectId,
+                delegate_user_id: In(dto.delegate_user_ids!),
+                is_active: true,
+              },
+            });
+
+            for (const revokedRow of rowsToRevoke) {
+              await this.piDelegatesRepository.recordHistory(
+                {
+                  pi_delegate_id: revokedRow.pi_delegate_id,
+                  project_id: revokedRow.project_id,
+                  pi_user_id: revokedRow.pi_user_id,
+                  delegate_user_id: revokedRow.delegate_user_id,
+                  action: PiDelegateHistoryActionEnum.REVOKE,
+                },
+                callerUserId,
+                manager,
+              );
+            }
 
             const affected =
               await this.piDelegatesRepository.softDeleteDelegatePairs(
