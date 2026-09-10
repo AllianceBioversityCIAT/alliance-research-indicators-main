@@ -207,6 +207,206 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     );
   }
 
+  // @akili-spec docs/specs/changes/my-pi-delegates — T-11
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PI-only check (R-PID-008 / design §10.2)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns true when userId is the PI of projectId.
+   *
+   * This is the PI-ONLY half of isPiOrActiveDelegateOfProject — it resolves the
+   * agresso_contracts.projectLeadId → alliance_user_staff.carnet → sec_users.email
+   * chain without consulting pi_delegates.
+   *
+   * Used by the service's assign() to enforce R-PID-008: a PI of a project cannot
+   * be made a delegate of that same project. The delegate branch is intentionally
+   * absent to avoid a false-negative for a user who is both PI and an existing
+   * delegate of another project.
+   *
+   * @param projectId  Agresso agreement_id
+   * @param userId     sec_user_id to test
+   */
+  async isPiOfProject(projectId: string, userId: number): Promise<boolean> {
+    const query = `
+      SELECT 1
+      FROM agresso_contracts ac
+        INNER JOIN alliance_user_staff aus ON aus.carnet = ac.projectLeadId
+        INNER JOIN sec_users su ON su.email = aus.email
+      WHERE ac.agreement_id = ?
+        AND su.sec_user_id = ?
+      LIMIT 1;
+    `;
+    const rows = await this.dataSource.query(query, [projectId, userId]);
+    return rows?.length > 0;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Active delegate set read (design §10.2)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the current set of active delegate_user_ids for a project.
+   *
+   * Used by the service's sync diff to determine which delegates to create
+   * (desired \ current) and which to revoke (current \ desired).
+   *
+   * Accepts an optional transaction manager so the service may call this
+   * inside the same transaction that is about to apply writes — guaranteeing
+   * the diff is computed against the tx's uncommitted state when needed.
+   *
+   * @param projectId  Agresso agreement_id
+   * @param manager    Optional EntityManager from the owning transaction
+   */
+  async listActiveDelegateUserIds(
+    projectId: string,
+    manager?: EntityManager,
+  ): Promise<number[]> {
+    const query = `
+      SELECT delegate_user_id
+      FROM pi_delegates
+      WHERE project_id = ?
+        AND is_active = TRUE;
+    `;
+    const runner = manager ?? this.dataSource;
+    const rows: Array<{ delegate_user_id: number }> = await runner.query(
+      query,
+      [projectId],
+    );
+    return rows.map((r) => Number(r.delegate_user_id));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Manager-accepting mutation primitives (design §10.2 / R-PID-009 AC.6)
+  //
+  // The SERVICE (T-12) owns the dataSource.transaction() and passes `manager`
+  // into every method below.  None of these methods open their own transaction.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Resolves or provisions the delegate's sec_user_id inside the caller's transaction.
+   *
+   * - When delegate_user_id is provided directly, return it without any DB work.
+   * - Otherwise provision the user via the existing _findOrCreateSecUserInTx,
+   *   reusing its carnet-resolution and INSERT-in-tx logic (DD-D / R-PID-005 AC.2).
+   *
+   * @param input    DelegateInput union — existing id or identity to provision
+   * @param manager  EntityManager from the owning transaction
+   * @returns        Resolved sec_user_id
+   */
+  async resolveDelegateUserId(
+    input: DelegateInput,
+    manager: EntityManager,
+  ): Promise<number> {
+    if (isDelegateByUserId(input)) {
+      return input.delegate_user_id;
+    }
+    return this._findOrCreateSecUserInTx(manager, input);
+  }
+
+  /**
+   * Inserts a single pi_delegates row through the caller's transaction manager.
+   *
+   * Does NOT set active_delegate_key (it is a STORED GENERATED column in MySQL —
+   * the DB computes it; writing it would fail the INSERT). Same pattern as
+   * createDelegate step 2.
+   *
+   * @param project_id         Agresso agreement_id
+   * @param pi_user_id         sec_user_id of the delegating PI (provenance)
+   * @param delegate_user_id   sec_user_id of the delegate
+   * @param createdBy          sec_user_id of the caller (audit)
+   * @param manager            EntityManager from the owning transaction
+   * @returns                  The newly-created PiDelegate row
+   */
+  async insertDelegate(
+    project_id: string,
+    pi_user_id: number,
+    delegate_user_id: number,
+    createdBy: number,
+    manager: EntityManager,
+  ): Promise<PiDelegate> {
+    const repo = manager.getRepository(PiDelegate);
+    const row = repo.create({
+      project_id,
+      pi_user_id,
+      delegate_user_id,
+      is_active: true,
+      created_by: createdBy,
+      updated_by: createdBy,
+    });
+    return repo.save(row);
+  }
+
+  /**
+   * Soft-deletes all ACTIVE pi_delegates rows for a project whose
+   * delegate_user_id is in the provided list.
+   *
+   * Used by the sync logic (T-12 assign): revokes the "current \ desired" set.
+   * For a bulk revoke spanning multiple projects the service calls this once
+   * per project — a per-project signature keeps the WHERE clause tight.
+   *
+   * No-ops gracefully when delegate_user_ids is empty (nothing to revoke).
+   *
+   * @param project_id        Agresso agreement_id
+   * @param delegate_user_ids Delegate sec_user_ids to revoke in this project
+   * @param userId            sec_user_id of the caller (audit)
+   * @param manager           EntityManager from the owning transaction
+   * @returns                 Number of rows affected
+   */
+  async softDeleteDelegatePairs(
+    project_id: string,
+    delegate_user_ids: number[],
+    userId: number,
+    manager: EntityManager,
+  ): Promise<number> {
+    if (!delegate_user_ids.length) return 0;
+    const now = new Date();
+    const result = await manager
+      .getRepository(PiDelegate)
+      .createQueryBuilder()
+      .update(PiDelegate)
+      .set({ is_active: false, deleted_at: now, updated_by: userId })
+      .where(
+        'project_id = :project_id AND delegate_user_id IN (:...delegate_user_ids) AND is_active = TRUE',
+        { project_id, delegate_user_ids },
+      )
+      .execute();
+    return result.affected ?? 0;
+  }
+
+  /**
+   * Soft-deletes ACTIVE pi_delegates rows by primary key (pi_delegate_id).
+   *
+   * Used by T-12 bulkRevoke when the caller supplies pi_delegate_ids directly
+   * (R-PID-010 AC.1 first shape).
+   *
+   * No-ops gracefully when pi_delegate_ids is empty.
+   *
+   * @param pi_delegate_ids   PKs of the pi_delegates rows to revoke
+   * @param userId            sec_user_id of the caller (audit)
+   * @param manager           EntityManager from the owning transaction
+   * @returns                 Number of rows affected
+   */
+  async softDeleteDelegateIds(
+    pi_delegate_ids: number[],
+    userId: number,
+    manager: EntityManager,
+  ): Promise<number> {
+    if (!pi_delegate_ids.length) return 0;
+    const now = new Date();
+    const result = await manager
+      .getRepository(PiDelegate)
+      .createQueryBuilder()
+      .update(PiDelegate)
+      .set({ is_active: false, deleted_at: now, updated_by: userId })
+      .where('pi_delegate_id IN (:...pi_delegate_ids) AND is_active = TRUE', {
+        pi_delegate_ids,
+      })
+      .execute();
+    return result.affected ?? 0;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Private: sec_user provisioning inside a transaction (R-PID-005 AC.2)
   // ─────────────────────────────────────────────────────────────────────────

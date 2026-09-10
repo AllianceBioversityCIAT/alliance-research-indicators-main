@@ -311,3 +311,11 @@
 - **OQ-B / OQ-D** product confirmations still open (requirements §9).
 
 **Requirements covered:** R-PID-002/003/005/006/007 (unit control-flow + auth), NFR-PID-001/002 (verified), NFR-PID-003 (rollback proof deferred to e2e/migration-apply).
+
+### T-11 — Repository: PI-only check + bulk/sync data methods — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-008, R-PID-009 AC.2/AC.5/AC.6. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `repositories/pi-delegates.repository.ts` (extend) — `isPiOfProject` (PI-only, no `pi_delegates`/UNION), `listActiveDelegateUserIds(projectId, manager?)`, `resolveDelegateUserId`, `insertDelegate`, `softDeleteDelegatePairs`, `softDeleteDelegateIds` — all mutations via the passed `manager` (service owns the one transaction). Existing methods untouched.
+- **Reviewer PASS:** PI-only check correct (R-PID-008 — a delegate can't read as PI); no self-transaction; `active_delegate_key` not written; soft-deletes guard `is_active=TRUE`, no-op on empty; QB `.update()` correctly bumps `updated_at`.
+- **⚠ CARRY TO T-12 (Reviewer advisory):** `_findOrCreateSecUserInTx`'s existence lookup runs on the pooled connection, NOT the tx `manager`. So **T-12 must resolve/dedupe each unique delegate ONCE up front** (design §10.3 step 2) — provisioning the same new email twice in one transaction would double-insert the sec_user (second lookup misses the first uncommitted insert).
+- **Verification:** `npm run build` clean; `npx eslint <file>` clean.

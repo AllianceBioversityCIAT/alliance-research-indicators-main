@@ -138,7 +138,7 @@ graph TD
 - **Done:** [ ] empty arrays / both-revoke-shapes / neither → 400.
 - **Dep:** T-03 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
 
-### T-11 — Repository: PI-only check + bulk/sync data methods
+### T-11 — Repository: PI-only check + bulk/sync data methods  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-008, R-PID-009 AC.2/AC.5
 - **Files:** `repositories/pi-delegates.repository.ts` (extend)
 - **Desc:** `isPiOfProject(projectId, userId)` (PI-only half of the auth join); `listActiveDelegateUserIds(projectId, manager)`; `bulkCreate`/`bulkSoftDelete` through a tx manager (reuse sec_user provisioning).
