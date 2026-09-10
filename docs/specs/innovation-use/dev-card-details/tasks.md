@@ -396,9 +396,9 @@ worker reports — never while one is active**, and never two full-suite runs at
 - **Verification:** screenshots attached to `execution.md`, one per theme, plus the quoted observation per checklist item.
 - **What disqualifies the evidence:** a quoted observation that covers an **adjacent** property. Ticking "the description clamps" because a reviewer said "the card looks good" discharges nothing — that observation covers the card's general appearance. If the quoted words do not cover the clause, re-class the item as **blocked** on whatever would cover it. Precedent in this repo: a criterion asserting a live `200` was ticked on an observation that covered a page merely *rendering*.
 - **Skills:** none — human observation
-- **Dependencies:** T-07, T-08, T-09
+- **Dependencies:** T-07, T-08, T-09, **and now the `RB-7` restyle child spec** (user deferral 2026-09-10)
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **`[~]` DEFERRED by decision (user, 2026-09-10)** — held until the `RB-7` QA restyle lands, so one human session validates the definitive design instead of two validating a layout already known to be changing. **The item *"reads as prose, not `Label: value` rows"* is SUPERSEDED by `RB-7`** — recorded as superseded, not deleted, so the reversal stays visible and dated. Every other item survives the restyle; see `execution.md` for the item-by-item map
 
 ---
 
@@ -524,7 +524,7 @@ Append-only.
 - [ ] `npx eslint` clean on touched server paths; `npm run lint -- --quiet` clean on the client
 - [ ] The new route appears in `/swagger` with a documented response shape, confirmed by a quoted human observation of **that route's shape**
 - [ ] Every gate named in each task has been **observed red** for the reason it exists
-- [ ] **T-10's checklist discharged with quoted observations and screenshots in both themes**
+- [ ] **T-10's checklist discharged with quoted observations and screenshots in both themes** — ⚠️ **DEFERRED by decision (user, 2026-09-10) until after the `RB-7` restyle.** This spec is therefore **agent-complete but NOT `done`**: T-01…T-09 are closed, and this item plus the three batched human gates await one session on the final design. `/akili-archive` waits with it
 - [ ] **Security review signed off** (§7)
 - [ ] `OQ-1` and `OQ-3` resolved into decisions, or the spec records why they were carried
 - [ ] `family.md` row #5 updated to reflect reality — **and not to a word it has not earned**

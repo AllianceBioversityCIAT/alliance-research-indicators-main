@@ -1378,3 +1378,41 @@ figure failed.
 6. **`KZ-017`, owned by T-10:** nothing here proves the class `text-[var(--ac-grey-800)]` **resolves** to `#4c5158` / `#c2c2c2` at runtime. jsdom applies no stylesheet and the utilities come from a runtime CDN script that never executes under it. This block proves *class presence* ∧ *arithmetic over hex read from `colors.scss`*; **the join between them is T-10's human check in both themes.**
 
 **Constitution impact:** none. Test-only.
+
+### T-10 DEFERRED by decision (user, 2026-09-10) — and this spec therefore cannot reach `done` here
+
+**Decision:** hold T-10's human visual check until **after** the QA restyle (`RB-7`) lands, so one human
+session validates the **definitive** design rather than two sessions validating a layout that is
+already known to be changing.
+
+**Why the question arose.** T-10 is ~10 checklist items across two themes, and one of them reads
+*"the card reads as **prose**, not as a list of `Label: value` rows — the user's stated intent."*
+`RB-7` reverses exactly that. Running T-10 as written would have a person validate a decision already
+superseded, then look again after the restyle — with the second look invalidating part of the first.
+
+**The trade the user accepted, stated plainly rather than buried:** T-10 is what closes this spec
+(§9: *"T-10's checklist discharged with quoted observations and screenshots in both themes"*), so
+deferring it means **this spec stays open**. Its status is now:
+
+> **agent-complete, human-gated, deferred by decision** — T-01…T-09 done, T-10 `[~]` blocked on the
+> child spec, and `/akili-archive` waits with it.
+
+**What survives the restyle and what does not** — recorded now so the deferred check is not
+re-derived later:
+
+| T-10 item | Survives the restyle? |
+| --- | --- |
+| The description **visibly clamps** at three lines with a 400-character value | ✅ yes — `R-IUC-004` is untouched by `RB-7`, and the description keeps its place *below* the metadata row |
+| The anchor is **vertically centred** against a title long enough to wrap | ✅ yes |
+| The anchor still sits at the **right edge** | ✅ yes |
+| With readiness null, **no visible gap** where it would have been | ✅ yes |
+| With all three null, the card looks exactly as today | ✅ yes |
+| Both labelled fields on the **same row** at desktop width | ⚠️ becomes the metadata row — same property, new markup |
+| They **stack** rather than overflow at narrow width | ⚠️ same |
+| Confirmed in **light** and **dark** | ✅ yes, and dark matters more after `RB-7`: four of the OICR pattern's six colours fail AA on this fill |
+| **"Reads as prose, not `Label: value` rows"** | ❌ **superseded by `RB-7`** — deliberately recorded as superseded, **not deleted**, so the reversal stays visible and dated |
+
+**Sequence from here:** T-09 → record the spec as agent-complete → `/akili-propose` the restyle child
+spec (QA screenshots as Visual Reference, description below the metadata row per the user's ruling) →
+**one** human session covering T-10 on the final design **plus** the three batched gates (`/swagger`
+response shape, the `platform_code` `SELECT COUNT`, and naming `RB-2`'s security reviewer).
