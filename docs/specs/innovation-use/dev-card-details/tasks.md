@@ -247,12 +247,12 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Place it beside the existing `formatInnovationDevLabel` so it is unit-testable without the component.
   - `OQ-1` may still overrule the joined format — keep it to one function.
 - **Acceptance / done check:**
-  - [ ] `{ id: 7, level: 7, name: 'X' }` → `Level 7 - X`
-  - [ ] `{ id: 7, level: null, name: 'X' }` → `X` — **never** `Level null - X`
-  - [ ] `{ id: 7, level: 7, name: null }` → `Level 7`
-  - [ ] `{ id: 7, level: null, name: null }` → empty string
-  - [ ] `null` / `undefined` → empty string
-  - [ ] `npm run build` exits 0, and the existing `onInnovationDevSelected` literal still compiles
+  - [x] `{ id: 7, level: 7, name: 'X' }` → `Level 7 - X`
+  - [x] `{ id: 7, level: null, name: 'X' }` → `X` — **never** `Level null - X`
+  - [x] `{ id: 7, level: 7, name: null }` → `Level 7`
+  - [x] `{ id: 7, level: null, name: null }` → empty string
+  - [x] `null` / `undefined` → empty string
+  - [x] `npm run build` exits 0, and the existing `onInnovationDevSelected` literal still compiles
 - **Verification:** `npm test -- --silent` from `client/research-indicators/`, plus **`npm run build`**.
 - **Why `npm run build` and not a bare `tsc -p tsconfig.json`** (checked 2026-09-10, and the first draft of this task got it wrong): `client/research-indicators/tsconfig.json` declares **no `include`, no `files` and no `references`**, so it defaults to every `.ts` under the package — specs included — and is *not* the app's compilation unit. It would drown a real regression in pre-existing noise. `tsconfig.app.json` is the app's unit (`files: ["src/main.ts"]`), and `npm run build` is what actually type-checks **templates** under `strictTemplates`, which is where a widened interface bites. If a bare type-check is wanted, it is `npx tsc -p tsconfig.app.json --noEmit`, and its **pre-existing error count must be recorded as a baseline first** — this repo has been burned by a client type-check that reported 3 errors while hiding 945.
 - **Falsifying input, named before the test is written (K-012):** `{ id: 7, level: null, name: 'X' }`. A formatter that interpolates without guarding emits the literal string `Level null - X`, which `R-IUC-003` forbids **by name**. This exact input is what round 1's `S5` was about.
@@ -260,7 +260,7 @@ worker reports — never while one is active**, and never two full-suite runs at
 - **Skills:** `angular-developer`
 - **Dependencies:** none
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **done** (Antigravity implemented, `akili-reviewer` PASS 2026-09-10, 1 attempt — see [`./execution.md`](./execution.md))
 
 ---
 

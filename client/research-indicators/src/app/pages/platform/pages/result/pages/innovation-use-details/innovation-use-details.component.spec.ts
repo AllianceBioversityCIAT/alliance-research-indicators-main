@@ -3878,6 +3878,29 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(formatInnovationDevLabel(undefined)).toBe('');
     });
 
+    describe('formatInnovationDevReadiness', () => {
+      it('formats correctly when both level and name are present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 1, level: 3, name: 'Validation' })).toBe('Level 3 - Validation');
+      });
+
+      it('returns name alone when only name is present (falsifier)', () => {
+        expect(component.formatInnovationDevReadiness({ id: 7, level: null, name: 'X' })).toBe('X');
+      });
+
+      it('returns level alone when only level is present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 2, level: 5, name: null })).toBe('Level 5');
+      });
+
+      it('returns empty string when neither level nor name are present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 4, level: null, name: null })).toBe('');
+      });
+
+      it('returns empty string when input is null or undefined', () => {
+        expect(component.formatInnovationDevReadiness(null)).toBe('');
+        expect(component.formatInnovationDevReadiness(undefined)).toBe('');
+      });
+    });
+
     it('asserts the ERROR state uses the card-scoped error surface (2a) and keeps the control mounted', async () => {
       // Set the options request failure via the API mock
       apiService.GET_Results.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'Mock failure' } });

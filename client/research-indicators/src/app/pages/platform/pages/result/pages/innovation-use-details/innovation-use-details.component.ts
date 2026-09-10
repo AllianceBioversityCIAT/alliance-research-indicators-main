@@ -135,6 +135,16 @@ export function formatInnovationDevLabel(
   return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
 }
 
+export function formatInnovationDevReadiness(
+  readiness: { id?: number; level: number | null; name: string | null } | null | undefined
+): string {
+  if (!readiness) return '';
+  if (readiness.level !== null && readiness.name !== null) return `Level ${readiness.level} - ${readiness.name}`;
+  if (readiness.level !== null) return `Level ${readiness.level}`;
+  if (readiness.name !== null) return readiness.name;
+  return '';
+}
+
 export function formatInnovationDevUrl(
   result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
 ): string {
@@ -202,6 +212,7 @@ export default class InnovationUseDetailsComponent {
   readonly formatInnovationDevLabel = formatInnovationDevLabel;
   readonly formatInnovationDevCode = formatInnovationDevCode;
   readonly formatInnovationDevUrl = formatInnovationDevUrl;
+  readonly formatInnovationDevReadiness = formatInnovationDevReadiness;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
 

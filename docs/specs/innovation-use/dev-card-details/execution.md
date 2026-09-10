@@ -869,3 +869,162 @@ which stands at 10.
 fixtures-tier spec `11/11` (re-run after T-03 modified T-01's method); `npm run build` exit 0;
 `npx eslint` clean on every touched path; coverage **90.04%** global against a 60% floor.
 `link-results.service.ts` **never modified** — confirmed three times independently.
+
+### Budget tripwire — escalated at the server/client lane boundary, user-decided 2026-09-10
+
+**The overrun is in review rounds, and it is certain: 11 of ~14 spent with four client tasks left.**
+Realistic total 15–19.
+
+**Cause, stated precisely because it changes what the number means.** Every extra round bought an
+**evidence** defect; **no production logic was ever rejected in this spec.** T-01 spent two rounds on
+a red that belonged to a different acceptance criterion, then on a correction record that overstated
+its own red. T-03 spent two on a hand-written predicate gated by nothing and on a composition defence
+that proved factually false — `filterResultByIndicators`'s own `describe` held two tests, **neither
+asserting the `where` object**, so the clauses AC.6/AC.7 delegate to were asserted by nothing in the
+package. These are the `K-004` / `KZ-001` / `KZ-014` family, this repo's most recurrent, and the
+reviewers found something real on every round.
+
+**Decision (user): default depth, accept the overrun.** Single-lens checklist for T-06/T-07/T-08 —
+small, non-security, which is already the mode table's default — and `xhigh` + parallel lenses **only**
+for T-09, whose superseded-response race is the one defect both `judgment.md` judges found
+independently and whose obvious test cannot see it. **Not** re-scoped into a child spec: §13's
+escalation rule keys on **task count** (>12 → split) and this spec stands at **10**, so the trigger
+has not fired. **Not** reviewed at minimum depth: T-09 is exactly where a thin review has historically
+missed things here.
+
+**PR 1 (user): leave it on the branch.** Committed to `AC-1679-Create-the-innovation-use-section`,
+not pushed, no PR opened. `RB-2`'s security review gates the merge regardless, and §6 requires PR 2
+not merge first, so waiting costs nothing.
+
+**Human gates (user): batched at the end** — `/swagger` shape + T-10's visual check both need a
+running stack, so one session of looking rather than two; the `platform_code` `SELECT COUNT(*)` and
+the security reviewer's name travel with them.
+
+---
+
+## 5. Client lane — T-06 … T-09, delegated to Antigravity
+
+Per the user's standing ruling: client work goes to **Antigravity** via the `orchestration` skill;
+the server lane stayed in this session. The Reviewer for each client task remains
+`akili-reviewer` (Opus) **here**, which makes `author ≠ auditor` hold across **hosts**, not merely
+across models.
+
+**Dispatch mechanics, re-probed rather than assumed (`RB-4`):** `agy models` returns **14** slugs
+this run — **no drift** from the guide's list, the first time in three probes. `gemini-3.1-pro-high`
+selected (it executed the previous spec's entire client lane); note there is still **no `-medium`**
+in the pro tier, so `high` is the middle rung's only available neighbour upward.
+`worker-start --agent gemini` remains disabled on this install, so the route is
+`terminal create --command "agy …"` + `orchestration dispatch --inject`, which preserves full
+Run/Task/Dispatch provenance.
+
+> **The false negative, recorded before it is met:** these dispatches settle as
+> `[failed] stage=dispatch_input` — `agent_prompt_stalled` — because Orca cannot confirm the agent
+> consumed the injected prompt, **not because the work failed.** All 10 retained dispatches from the
+> previous run read exactly that, with `Interactive wait: unknown (not evaluated)`. **Judge an
+> Antigravity worker by its terminal output, never by the dispatch status.** The converse is the
+> sharper edge and also binds: a **genuinely silent** worker is a runtime failure, not a clean
+> result — re-dispatch it, never read absence of signal as "found nothing" (`K-009`).
+
+**Lanes run sequentially inside the client package too.** T-07 depends on T-06 and T-08 on T-07, but
+T-09 could in principle run beside T-07 once T-06 lands. It will not: **two tasks in the same package
+are not safe to run concurrently** (root `CLAUDE.md` §4.3), and every client task verifies with a
+package-root `npm test`.
+
+### T-06 — Widen the client interface and add the per-part readiness formatter — `PASS` ✅ (1 attempt)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS**, first attempt |
+| Date | 2026-09-10 |
+| Lane | **client — implemented by Antigravity** (`gemini-3.1-pro-high`, print mode) → reviewed by `akili-reviewer` (Opus) **in this session** |
+| Author ≠ auditor | **Across hosts**, not merely across models — the strongest form of the separation this spec has achieved |
+| Requirements covered | `R-IUC-003` (AC.7), `R-IUC-006` (AC.3) |
+| Defect classes gated | `DC-5` |
+| Skills assigned | `angular-developer` |
+
+**Files changed:** `get-innovation-use-details.interface.ts` (9/2) ·
+`innovation-use-details.component.ts` (11/0) · `innovation-use-details.component.spec.ts` (23/0).
+**The 2 deletions are reformatting only** — the single-line type became a multi-line block; the
+Reviewer confirmed the four original keys **and** their `| null | undefined = undefined` tail survive
+verbatim.
+
+The three new keys are **optional**, which is exactly what keeps `onInnovationDevSelected`'s
+four-key literal (`:227-234`) compiling — acceptance criterion 6. The formatter is a pure exported
+function beside `formatInnovationDevCode` / `formatInnovationDevLabel` / `formatInnovationDevUrl`,
+re-exposed as `readonly` alongside the three identical bindings at `:212-214`.
+
+**Verification.** Worker's falsifier is the exact input `tasks.md` names, observed RED against a
+deliberately unguarded implementation:
+
+```
+● … › formatInnovationDevReadiness › returns name alone when only name is present (falsifier)
+    Expected: "X"
+    Received: "Level null - X"
+    3887 | expect(component.formatInnovationDevReadiness({ id: 7, level: null, name: 'X' })).toBe('X');
+```
+
+Then GREEN. Lint: `All files pass linting.`
+
+**Leader re-measurement — the worker ran only a targeted spec file:**
+
+| Gate | Result |
+| --- | --- |
+| Full client suite | **317 suites / 6926 tests passed** |
+| Client coverage (floors 40/20/45/30) | **98.23 / 96.19 / 98 / 98.52** — held. *Note: the client's `npm test` computes coverage automatically, unlike the server's; no separate `test:cov` run is needed on this lane* |
+| `npm run build` | `Application bundle generation complete`, **exit 0** — the real type gate, since only `ng build` type-checks templates under `strictTemplates` |
+
+#### 🔴 The strict-`null` question — ruled NOT reachable, with the construction attempted
+
+I asked whether `!== null` guards let an **`undefined`** `level` interpolate as the literal
+`Level undefined` — the same class of forbidden render `R-IUC-003` bans by name. **Three independent
+closures, any one sufficient:**
+
+1. **Type level.** `level` and `name` are **required** properties typed `number | null` / `string | null` in *both* the formatter parameter and the interface, and `tsconfig.json:24` sets `strict: true` — so `undefined` is not assignable and omission is a missing-property error. **No well-typed call site can deliver it.** (Independent of `exactOptionalPropertyTypes`, since those props are not optional.)
+2. **Wire level.** The only producer is `readInnovationDevCardFacts` (`:766-778`), which builds the object only when `hasReadiness` and projects `level: … ?? null` / `name: … ?? null`. T-04's DTO `implements InnovationDevCardFacts`, so both entry points carry both keys as value-or-`null`. **`JSON.stringify` has no `undefined` to drop.**
+3. **Client level.** A grep over `client/.../src` finds **zero** client-side construction of `innovation_readiness` outside the interface declaration. `onInnovationDevSelected` omits the key wholesale, so `readiness` is `undefined` and the `if (!readiness)` guard catches it — **which also covers the old-server / partial-`JSON.parse` case:** a payload missing the *whole* key is safe. The only breaking shape is the object present with its inner keys absent, **and no producer emits it.**
+
+**The strict form is also the *better* guard** — truthiness would swallow a legitimate `level: 0`,
+which correctly renders `Level 0`. Here strict fails **closed**, unlike T-03's `=== false` question
+where the same shape of reasoning also landed on strict but for the opposite reason.
+
+**Carried to T-09 as a forward pointer, not filed as an issue here:** if T-09's merge hand-builds a
+**partial** readiness object, or a future server swaps `?? null` for a spread, then
+`Level undefined - undefined` becomes reachable and **`!= null` closes it for one character.**
+
+#### A gate gap the Reviewer found, and the Leader closed with a measurement
+
+The Reviewer declared (`KZ-017`) that **`npm test` type-checks no spec code at all** — Jest runs with
+`isolatedModules`, so the five new `it` blocks' *types* are covered by neither the suite nor
+`ng build`. Only `npx tsc -p tsconfig.spec.json --noEmit` reaches them, and that command is **not** in
+T-06's verification set.
+
+**Leader-measured, and the baseline matters more than the number:**
+
+```
+npx tsc -p tsconfig.spec.json --noEmit   →   934 errors  (grep -c "error TS", counted from the
+                                              raw output, not inferred from a tail)
+errors in innovation-use-details.component.spec.ts   →   0
+```
+
+**934 pre-existing errors confirms root `CLAUDE.md` §4.3's warning about this exact command** (it once
+reported 3 while hiding 945). It is therefore **unusable as a whole-package pass/fail gate** — but the
+**per-file** reading is usable and decisive: **T-06's new spec code contributes zero.** Adopted as a
+client-lane gate for T-07/T-08/T-09: *the global count stays at its 934 baseline and the
+innovation-use-details spec stays at 0.* Top offenders are unrelated
+(`submit-result-content` 232, `mock-services.mock` 68, `create-result-form` 68).
+
+#### Other rulings
+
+- **`KZ-015` does not engage** — all five blocks call the function directly with literal arguments; no fixture state, so there is no transition to mis-arrange. Calling through the **bound field** rather than the import is a small bonus: it also proves the `readonly` binding exists.
+- **One criterion per block holds.** The fifth block carries two `expect`s (`null`, `undefined`), but those are the *single* `tasks.md` bullet ``null` / `undefined` → empty string``, so Jest's first-failure abort cannot hide a **second** criterion — the risk the rule exists to prevent.
+- **Scope clean, verified by grep rather than trust:** the template has no new `geo_scope` / `Readiness level` / `Geographic scope` / `line-clamp` (no T-07 markup leaked in), the component has no card-facts call (no T-09 work leaked in), no server file in the diff.
+- **Non-gating house-style note:** neighbouring declarations carry `// @akili-spec` provenance tags; the new formatter and the three new interface keys carry none. **This spec does not mandate the tag** (`grep '@akili-spec'` over the spec folder: no matches), so it is a note for whoever touches T-07/T-09, not a finding.
+
+**Reviewer's declared limits:** it ran **nothing** (`Read`/`Grep`/`Glob` only) — every run above is the
+Leader's measurement, and it verified the *source facts* those runs must be consistent with. It could
+not verify `git status` or commit state. Its `undefined` ruling rests on reading `strict: true` plus
+the declared property types, **not** on running `tsc`. And the formatter's output is never asserted in
+a rendered DOM here — only the binding's existence — so *that the template actually calls it* is T-07.
+
+**Constitution impact:** none. A new exported function in an existing component file and three
+optional keys on an existing interface.
