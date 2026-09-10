@@ -379,3 +379,12 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
 - **Reviewer PASS (zero findings):** columns match design §11.1 exactly; no FK/unique/generated per DD-O; utf8mb3 charset; placeholder-safe; correct `down()`; timestamp `1787601000000` > max.
 - **Applied to local `alliancereportingdb`** (2026-09-10) + recorded in `migrations`. Verified 12 columns present. (Dev/Prod apply = human step, K-015.)
 - **Verification:** `npm run build` clean; `npx eslint <file>` clean.
+
+### T-16 — Entity + module: `PiDelegateHistory` — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-012. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `enum/pi-delegate-history-action.enum.ts` (new, `ASSIGN`/`REVOKE`), `entities/pi-delegate-history.entity.ts` (new, extends AuditableEntity, plain columns, no relations/`@Index`/generated — DD-O), `pi-delegates.module.ts` (added `PiDelegateHistory` to `forFeature`).
+- **Reviewer PASS (zero findings):** perfect entity↔migration parity; NO `@Index` (avoids the T-02 FAIL class); `action` typed as the enum; module registration intact.
+- **Verification:** `npm run build` clean; `npx eslint <3 files>` clean.
+
+**Sequencing note:** T-17 (DTO reshape `{project_ids,delegates}` → `{assignments}`) is a breaking interface change that won't build until the service (T-19) + controller (T-20) consume it. Executing T-18 (repo, independent) first, then T-17+T-19+T-20 as one cohesive interface change to keep the build green per step.

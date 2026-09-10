@@ -2,12 +2,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PiDelegate } from './entities/pi-delegate.entity';
+import { PiDelegateHistory } from './entities/pi-delegate-history.entity';
 import { PiDelegatesRepository } from './repositories/pi-delegates.repository';
 import { PiDelegatesService } from './pi-delegates.service';
 import { PiDelegatesController } from './pi-delegates.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PiDelegate])],
+  imports: [TypeOrmModule.forFeature([PiDelegate, PiDelegateHistory])],
   controllers: [PiDelegatesController],
   providers: [PiDelegatesRepository, PiDelegatesService],
   exports: [TypeOrmModule, PiDelegatesRepository, PiDelegatesService],

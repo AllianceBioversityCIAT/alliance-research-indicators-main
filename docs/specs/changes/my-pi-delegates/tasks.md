@@ -184,7 +184,7 @@ graph TD
 - **Done:** [ ] builds + placeholder-safe; [ ] local apply to alliancereportingdb (Leader will apply after PASS).
 - **Effort:** M · **Skills:** nestjs-expert
 
-### T-16 — Entity + module: `PiDelegateHistory`
+### T-16 — Entity + module: `PiDelegateHistory`  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-012
 - **Files:** `entities/pi-delegates/entities/pi-delegate-history.entity.ts`, `enum/pi-delegate-history-action.enum.ts`, register in `pi-delegates.module.ts` (TypeOrmModule.forFeature)
 - **Done:** [ ] `PiDelegateHistory extends AuditableEntity`; enum `assign`/`revoke`; registered.
