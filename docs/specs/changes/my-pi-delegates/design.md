@@ -103,3 +103,48 @@ So the client `is_principal_investigator` flag reflects delegates with **no fron
 | LOC | ~700 (migration + entity + DTO + repo + service + controller + 2 query edits + tests) |
 | Review rounds | ~2 |
 | PRs | **1** (cohesive backend change; the two query edits ship with the table + CRUD + tests) |
+
+---
+
+## 10. Amendment v3 — bulk (many×many) design (2026-09-10)
+
+> Implements R-PID-008/009/010. Reuses the v2 entity/repo/auth unchanged; changes the DTOs, service, and controller from single-item to bulk. The `pi_delegates` table is unchanged (sync = insert new rows + soft-delete removed rows; the unique-active generated key already makes re-grant safe).
+
+### 10.1 DTOs (`dto/`)
+- `BulkAssignPiDelegatesDto` — `{ project_ids: string[] (@ArrayNotEmpty, @IsString each), delegates: DelegateInputDto[] (@ArrayNotEmpty, @ValidateNested) }`. `DelegateInputDto` reuses the v2 union (`delegate_user_id?` **or** nested `{email, first_name, last_name}`) with the same reciprocal `@ValidateIf`.
+- `BulkRevokePiDelegatesDto` — union of two shapes, validated so **exactly one** is provided: `{ pi_delegate_ids?: number[] }` **or** `{ project_ids?: string[], delegate_user_ids?: number[] }`. Cross-field `@ValidateIf` + a guard that at least one shape is complete.
+- `DelegateInputDto` may carry an optional `carnet?` (resolved via `alliance_user_staff`, per OQ-D).
+
+### 10.2 Repository (`pi-delegates.repository.ts`) — new methods
+- `isPiOfProject(projectId, userId): Promise<boolean>` — **PI-only** check (the `agresso_contracts.projectLeadId → aus.carnet → su.email` half of `isPiOrActiveDelegateOfProject`, without the delegate branch). Used for R-PID-008.
+- `listActiveDelegateUserIds(projectId, manager?): Promise<number[]>` — current active `delegate_user_id`s for a project (for the sync diff). Accepts an optional tx `manager`.
+- `bulkCreate(pairs, manager)` / `bulkSoftDelete(pairs | ids, manager, userId)` — set-based insert/soft-delete through the tx manager (reuse `createDelegate`'s sec_user provisioning for new users).
+- All bulk mutation runs inside **one** `dataSource.transaction` owned by the service.
+
+### 10.3 Service (`pi-delegates.service.ts`)
+- **`assign(dto)` (R-PID-009, sync):** in one `dataSource.transaction`:
+  1. **Auth per project** (existing `assertCanManageProject`) for every `project_id` — fail-fast 403.
+  2. Resolve/provision each delegate → `delegate_user_id` (provision new once, reuse across projects).
+  3. **PI-exclusion (R-PID-008):** for every (project, delegate) pair, `isPiOfProject` must be false — else `BadRequestException` naming the pair, whole request aborted.
+  4. For each project: `desired = resolved delegate ids`; `current = listActiveDelegateUserIds`; **create** `desired\current`, **revoke** `current\desired`, keep intersection.
+  5. Commit; return per-project `{created, revoked, kept}`.
+- **`bulkRevoke(dto)` (R-PID-010):** resolve target rows (by `pi_delegate_ids` or by `project_ids × delegate_user_ids`); auth on each row's `project_id`; soft-delete in one transaction. No sync.
+- The v2 single `create`/`revoke` are **replaced** by these (list/verify unchanged).
+
+### 10.4 Controller (`pi-delegates.controller.ts`)
+- `POST /` → `@Body() BulkAssignPiDelegatesDto` → `service.assign` → `ResponseUtils.format` (200/207-style summary). Keep the `@UsePipes(ValidationPipe{whitelist,transform,forbidNonWhitelisted})`, no `@Roles`.
+- `DELETE /` → `@Body() BulkRevokePiDelegatesDto` → `service.bulkRevoke`. (Drop the `:pi_delegate_id` path-param variant; ids now come in the body.)
+- `GET /` list + `GET /verify` — unchanged.
+- Full Swagger with the new payload examples.
+
+### 10.5 Design decisions (v3)
+| DD | Decision | Rationale |
+| --- | --- | --- |
+| **DD-G** | `POST` = per-project SYNC (declarative, revokes missing) | Product Model B; frontend sends the desired set |
+| **DD-H** | `DELETE` = independent targeted bulk revoke (no sync) | Product needs a standalone delete for other flows |
+| **DD-I** | Whole bulk op in ONE transaction, fail-fast on auth/PI-exclusion | Atomicity — no partial sync (NFR-PID-003 extended) |
+| **DD-J** | PI-exclusion via `isPiOfProject` (PI-only half of the auth join) | R-PID-008; reuse the vetted PI chain |
+| **DD-K** | Same `delegates` set applies to every `project_id` (cartesian) | Product-confirmed; per-project sets = future `assignments[]` shape |
+
+### 10.6 Budget (v3 delta)
+~5 tasks (bulk DTOs, repo methods, service sync+revoke, controller, tests) · ~450 LOC · ~2 review rounds. Correctness-critical (destructive sync + PI-auth path).

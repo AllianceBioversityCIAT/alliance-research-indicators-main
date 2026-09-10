@@ -99,10 +99,43 @@ Give a project's work PI-level review by a **PI Delegate**, modeled **only** as 
 | --- | --- | --- |
 | ~~OQ-A~~ | Extend **both** `isPi` + `queryPrincipalInvestigator` — **RESOLVED: both** (2026-09-09). | Closed |
 | ~~OQ-C~~ | CRUD auth — **RESOLVED: PI/delegate of project + SYSTEM_ADMIN** (2026-09-09). | Closed |
-| OQ-B | Key delegation by **project** (`agreement_id`) so it covers all the project's results — confirm (vs per-result). Design assumes project. | Confirm |
-| OQ-D | Minimal identity to provision an absent delegate (email + names). | Confirm |
+| ~~OQ-B~~ | **RESOLVED (Product, 2026-09-10): by PROJECT** (`agreement_id`) — a delegate is assigned per project, mirroring how a project has one PI. The delegate is keyed to the project, not to individual results. | Closed |
+| ~~OQ-D~~ | **RESOLVED (Product, 2026-09-10): email + first_name + last_name**; the **carnet** is resolved server-side via `alliance_user_staff` (the same chain `isPi` uses: `projectLeadId → aus.carnet → su.email`). Existing users are reused by email/carnet; absent ones are provisioned. | Closed |
 
 ## 10. Sign-off
 - [ ] Engineering lead — <name>
 - [ ] Security review (PI-auth path touched) — <name>
 - [ ] DevOps (migration on shared DB) — <name>
+
+---
+
+## 11. Amendment v3 — bulk operations + PI-exclusion (2026-09-10, Product-confirmed)
+
+> Product confirmed after v2 shipped (T-01…T-09 done) that the CRUD must be **bulk (many×many)**, not one-to-one, and added a PI-exclusion rule. This amends R-PID-004/007 and adds R-PID-008/009/010. The data model (`pi_delegates`), `isPi`/metadata fallbacks, and auth join from v2 are unchanged and reused.
+
+### R-PID-008 — A PI cannot be a delegate of their own project
+- **AC.1** — On assign, if a candidate `delegate_user_id` is the **PI of that `project_id`** (resolved via the existing `agresso_contracts.projectLeadId → alliance_user_staff.carnet → sec_users.email` chain), the pair is **rejected**.
+- **AC.2** — The same user MAY be a delegate of a **different** project where they are not the PI (PI of A ⇒ not a delegate of A, but may be a delegate of B).
+- **AC.3** — Rejection is **fail-fast and atomic**: if any (project, delegate) pair in a bulk request violates this, the **whole request is rejected** (nothing applied) with an error naming the offending pair.
+
+### R-PID-009 — Bulk assign with per-project synchronization (`POST /pi-delegates`)
+- **As a** PI/delegate/admin, **I want** to assign many delegates to many projects in one call, **so that** delegation is managed in bulk.
+- **AC.1** — Payload: `{ project_ids: string[], delegates: (existing sec_user_id | {email, first_name, last_name})[] }`. The `delegates` list applies to **each** project in `project_ids` (same set per project — cartesian).
+- **AC.2 — SYNC (Model B):** for each `project_id`, the active delegate set becomes **exactly** `delegates`: pairs in the list but not active → **created**; active pairs **not** in the list → **revoked** (soft-delete); pairs already active and in the list → **kept**. This is declarative/destructive by design.
+- **AC.3** — Authorization (R-PID-007) is enforced **per project**; the caller must be PI/active-delegate/SYSTEM_ADMIN of **every** `project_id` in the request, else 403 (fail-fast, nothing applied).
+- **AC.4** — R-PID-008 (PI-exclusion) is enforced per pair, fail-fast.
+- **AC.5** — Absent delegates are provisioned once (R-PID-005) and reused across all projects in the request. Duplicate-active is impossible by construction (sync).
+- **AC.6** — The whole operation is a **single transaction** (all projects reconciled atomically; any error → nothing committed).
+- **AC.7** — Response: per-project summary `{ project_id, created: [...], revoked: [...], kept: [...] }`.
+
+### R-PID-010 — Bulk targeted revoke (`DELETE /pi-delegates`) — independent of sync
+- **As a** PI/delegate/admin, **I want** a standalone bulk-revoke endpoint (used by other flows, e.g. a per-row delete action).
+- **AC.1** — Two accepted shapes: `{ pi_delegate_ids: number[] }` (revoke by PK) **or** `{ project_ids: string[], delegate_user_ids: number[] }` (revoke each project×delegate active pair).
+- **AC.2** — Soft-delete only the specified active delegations; it does **NOT** synchronize (does not touch anything not named).
+- **AC.3** — Authorization per project (R-PID-007); revoke resolves each row's `project_id` and authorizes on it (no revoke on an unmanaged project). Transactional.
+
+### Amended surface (supersedes R-PID-004 AC.1 single-item POST/DELETE)
+- `POST /pi-delegates` — **bulk sync** (R-PID-009). Supersedes the single-create.
+- `DELETE /pi-delegates` — **bulk revoke** (R-PID-010). Supersedes the single-by-id revoke.
+- `GET /pi-delegates?projectId` (list) and `GET /pi-delegates/verify` — **unchanged** from v2.
+- `isPi` + `queryPrincipalInvestigator` delegate fallbacks — **unchanged** (v2, done).

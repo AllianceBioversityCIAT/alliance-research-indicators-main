@@ -60,6 +60,23 @@
 - The charset fix assumes `agresso_contracts.agreement_id` is utf8mb3 on Dev/Prod too (this local schema mirrors it). Re-confirm on the target before the real apply.
 - The `.env` CORE target is `ari_scratch_test` (empty); the app must point at `alliancereportingdb` to see `pi_delegates` when testing locally.
 - The e2e behavioral suite (T-09) can now run against `alliancereportingdb` once the app is pointed there + seed data exists.
+
+---
+
+## Amendment v3 — bulk (many×many) + PI-exclusion (2026-09-10, Product-confirmed)
+
+**Trigger:** During the OQ-B/OQ-D product confirmation, Product clarified two things the approved v2 spec did NOT contain:
+1. **PI-exclusion:** a PI cannot be a delegate of their own project (PI of A ⇒ not delegate of A, but may be delegate of B).
+2. **Bulk, not one-to-one:** `POST` must assign **many delegates × many projects** with **per-project SYNC** (declarative — active set becomes exactly the sent list, revoking the missing; the "Mateo se revoca" case); `DELETE` must be an **independent bulk targeted revoke** (no sync) usable by other flows.
+
+**Product confirmations recorded (2026-09-10):** OQ-B = by project (closed); OQ-D = email+names, carnet via `alliance_user_staff` (closed); delegate has the SAME powers as a PI (can create/revoke delegates); no expiration (manual revoke only); `pi_user_id`/audit stores who created/revoked (for a future history feature); metadata SPI stays true/false; same delegate set applies to all projects in a POST (cartesian).
+
+**Spec updated + user-approved (design confirmed in chat before build):** `requirements.md §11` (R-PID-008/009/010), `design.md §10` (DD-G…DD-K, DTOs/repo/service/controller), `tasks.md §7` (T-10…T-14). Entity/migration/`isPi`/metadata from v2 unchanged and reused.
+
+**Approval mode:** remains auto-continue (pre-approved) per the 2026-09-10 user directive; stop only on HALT/Pivot/FATAL_FAIL/budget.
+
+### v3 Task Execution History
+_(below)_
 - **Reliability (index coverage):** the unique index on `active_delegate_key` covers the hot delegate-lookup (`project_id + delegate_user_id + is_active`) for active rows — no extra index needed.
 - **Readability:** `varchar(80)` sizing correct (36 + 1 + ≤20 digits = 57 max); TSDoc references DD-F.
 

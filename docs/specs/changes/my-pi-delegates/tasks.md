@@ -124,3 +124,49 @@ graph TD
 - [ ] OQ-B (project-keyed) and OQ-D (provisioning identity) confirmed with Product — **still open.**
 
 **Post-implementation status:** all code merged on branch; unit-verified. Two gates remain, both human/infra: (1) apply the migration to the shared DB (K-015) — this also un-defers the e2e behavioral suite; (2) Product sign-off on OQ-B/OQ-D.
+
+---
+
+## 7. Amendment v3 — bulk (many×many) tasks (2026-09-10, Product-confirmed)
+
+> After v2 shipped, Product confirmed the CRUD must be **bulk** (POST = per-project sync, DELETE = independent bulk revoke) + a **PI-exclusion** rule (a PI can't be a delegate of their own project). See `requirements.md §11` / `design.md §10`. Entity/migration/`isPi`/metadata from v2 are reused unchanged.
+
+### T-10 — Bulk DTOs
+- **Covers:** R-PID-009 AC.1, R-PID-010 AC.1, R-PID-008
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts`, `dto/bulk-revoke-pi-delegates.dto.ts` (+ reuse/extract `DelegateInputDto` from the v2 create DTO)
+- **Desc:** `BulkAssignPiDelegatesDto {project_ids[], delegates[]}` (delegate union reused, optional `carnet`); `BulkRevokePiDelegatesDto` = `{pi_delegate_ids[]}` XOR `{project_ids[], delegate_user_ids[]}` with a cross-field "exactly one shape" guard.
+- **Done:** [ ] empty arrays / both-revoke-shapes / neither → 400.
+- **Dep:** T-03 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
+
+### T-11 — Repository: PI-only check + bulk/sync data methods
+- **Covers:** R-PID-008, R-PID-009 AC.2/AC.5
+- **Files:** `repositories/pi-delegates.repository.ts` (extend)
+- **Desc:** `isPiOfProject(projectId, userId)` (PI-only half of the auth join); `listActiveDelegateUserIds(projectId, manager)`; `bulkCreate`/`bulkSoftDelete` through a tx manager (reuse sec_user provisioning).
+- **Named red input (K-012):** delegate who IS the PI of the project → `isPiOfProject` true.
+- **Done:** [ ] PI→true, non-PI→false; [ ] active ids listed correctly for the diff.
+- **Dep:** T-04 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-12 — Service: bulk assign (sync) + bulk revoke + PI-exclusion
+- **Covers:** R-PID-008, R-PID-009, R-PID-010, NFR-PID-003
+- **Files:** `pi-delegates.service.ts` (replace single create/revoke with `assign`/`bulkRevoke`)
+- **Desc:** `assign(dto)` — one transaction: auth per project (fail-fast) → resolve/provision delegates → PI-exclusion per pair (fail-fast) → per-project reconcile (create desired\current, revoke current\desired, keep ∩) → per-project summary. `bulkRevoke(dto)` — auth per row's project → soft-delete, no sync.
+- **Named red input (K-012):** (a) caller not authorized on ANY project → 403, nothing applied; (b) any delegate is PI of its project → 400, nothing applied.
+- **Disqualifies:** the sync test must prove **revocation of a missing delegate** (Mateo case) AND that an unrelated project is untouched (KZ-004: distinct projects).
+- **Done:** [ ] sync creates+revokes+keeps correctly; [ ] fail-fast atomic on auth/PI-exclusion; [ ] bulkRevoke soft-deletes only named pairs.
+- **Dep:** T-10, T-11, T-05 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
+### T-13 — Controller: bulk POST/DELETE + Swagger
+- **Covers:** R-PID-009, R-PID-010
+- **Files:** `pi-delegates.controller.ts` (change POST/DELETE to bulk; keep list/verify)
+- **Desc:** `POST /` body `BulkAssignPiDelegatesDto` → `assign`; `DELETE /` body `BulkRevokePiDelegatesDto` → `bulkRevoke`. Keep `@UsePipes(ValidationPipe)`, NO `@Roles`. Full Swagger with bulk examples.
+- **Done:** [ ] endpoints in `/swagger` with bulk payloads; [ ] no `@Roles`.
+- **Dep:** T-12 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
+
+### T-14 — Tests: bulk sync + revoke + PI-exclusion
+- **Covers:** R-PID-008/009/010, NFR-PID-003
+- **Files:** `pi-delegates.service.spec.ts` (extend), `test/pi-delegates.e2e-spec.ts` (extend)
+- **Desc:** sync creates/revokes/keeps; the Mateo-revoke; fail-fast atomicity on auth-denied and on PI-exclusion; provision-once-reuse-across-projects; bulkRevoke by ids and by pairs; cross-project isolation (KZ-004).
+- **Disqualifies (KZ-001):** assert on persisted rows / returned summary, not mock call order.
+- **Done:** [ ] `npm test -- --silent` green; [ ] `git diff --stat client/` empty.
+- **Dep:** T-13 · **Effort:** M · **Skills:** nestjs-expert, tdd
+
+**v3 first task:** T-10.
