@@ -155,6 +155,46 @@
 
 ---
 
+### Task T-05 — Pre-flight production-data measurement and rollout decision
+
+- **Status:** DONE — measurement complete, GO recorded
+- **Date:** 2026-09-09
+- **Requirements covered:** R-ALN-003 (rollout safety; closes judgment.md C-1)
+
+**Pre-flight measurement (read-only, against the real Dev MySQL database via `.env` credentials, `npm run typeorm query` — explicitly approved by the user after the auto-mode classifier correctly flagged querying a live shared system):**
+
+Total Portfolio-2 (`get_portfolio_id_by_result = 2`) active, non-snapshot results for indicators 4 (Policy Change) and 6 (Innovation Use):
+
+| Indicator | Status | Count |
+| --- | --- | --- |
+| 4 (Policy Change) | Submitted | 2 |
+| 4 | Draft | 16 |
+| 4 | Approved | 1 |
+| 4 | Not approved | 1 |
+| 6 (Innovation Use) | Submitted | 1 |
+| 6 | Draft | 7 |
+| **Total population** | | **28** |
+
+Of that population, results with **zero active `result_impact_outcomes` rows** (i.e. would flip `alignment_validation` from `true`→`false` the moment this migration is applied):
+
+| Status | Count |
+| --- | --- |
+| Submitted | 3 |
+| Draft | 22 |
+| Approved | 1 |
+| Not approved | 1 |
+| **Total flip count** | **27 of 28** |
+
+**Interpretation:** only 1 of the 28 existing Portfolio-2 Policy Change / Innovation Use results already has an active Impact Outcomes entry — this field is newly rolled out and almost nobody has filled it in yet, consistent with T-04's independent finding that no naturally-qualifying full-prerequisite Portfolio-2 result existed for indicators 4/6 in the production backup either. **The case that matters most (per this task's own framing):** 3 Submitted + 1 Approved = **4 results already past Draft** would immediately show as incomplete/non-green the moment this migration is applied — anyone revising or resubmitting one of those 4 would be blocked from Submit until they add an Impact Outcome. The 22 Draft results are lower-stakes (still being actively edited, not yet through review).
+
+- **Decision recorded (2026-09-09): GO.** User approved proceeding with applying the migration to Staging/Prod, having seen the 27-of-28 flip count and the 3 Submitted + 1 Approved detail, and accepted that those 4 will show incomplete until someone adds an Impact Outcome — consistent with R-ALN-003's own intent that the field should have been enforced all along. No backfill or advance notification to affected result owners was requested.
+- **Rollout order correction applied:** deploy T-01+T-02 (client+server code, already committed) first and confirm live in each environment, THEN apply T-03's migration only after that — never migration-before-code. `design.md` §11 updated in the same commit to state this corrected order and record the go/no-go.
+- **Status: PASS/DONE.** T-05's own deliverable (measurement + recorded decision, not a code change) is complete. **Note:** T-05 does not itself apply the migration to Staging/Prod — per root `CLAUDE.md` §4.3 (K-015), the CI/CD pipeline deploys code only; applying a migration to a shared environment is a separate, human-executed step outside this AKILI session's scope. That step is now unblocked by this go/no-go, but remains the user's/engineering lead's action to perform against Staging/Prod, following the corrected order above.
+- **Requirements covered:** R-ALN-003's rollout-safety gap (judgment.md C-1) is closed — measured, not assumed.
+- **Decisions:** GO (recorded above).
+- **Issues encountered:** the first query attempt used a wrong column name (`status_name` instead of `name` on `result_status`) — fixed on retry, no data risk (read-only, failed cleanly).
+- **Final verification result:** measurement complete, decision recorded, `design.md` §11 corrected.
+
 ## 3. Summary
 
 Run in progress. T-01 and T-02 executed in parallel (cross-package, safe per root `CLAUDE.md` §4.3 concurrency rule), both PASSed on attempt 1.
@@ -163,4 +203,4 @@ Run in progress. T-01 and T-02 executed in parallel (cross-package, safe per roo
 - Client (`npm test -- --silent` from `client/research-indicators/`): **314/314 suites, 6568/6568 tests passed.** Coverage 98.17% statements / 96.11% branches / 97.77% functions / 98.48% lines — well above the 40/20/45/30 floor.
 - Server (`npm test -- --silent` from `server/researchindicators/`): **338/338 suites, 2421/2421 tests passed**, including `portfolio-2-alignment.handler.spec.ts`. (A "worker process failed to exit gracefully" Jest teardown warning appeared — pre-existing Jest/RabbitMQ-mock teardown noise, not a test failure; all suites reported passed.)
 
-T-03 (migration), T-04 (manual DB verification), T-05 (pre-flight measurement + rollout decision) remain.
+T-03, T-04, T-05 are all complete (see below). **All five tasks (T-01…T-05) are now `done`.** The spec's own scope is complete; applying the migration to Staging/Prod is the one remaining action, and it belongs to the user/engineering lead outside this AKILI session (CI/CD deploys code, not migrations — root `CLAUDE.md` §4.3 K-015).

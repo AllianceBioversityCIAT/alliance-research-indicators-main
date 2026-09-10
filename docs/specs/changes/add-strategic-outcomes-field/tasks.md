@@ -2,7 +2,7 @@
 
 - **Module:** results (Alliance Alignment tab, Portfolio 2 / 2026‑2030)
 - **Spec id:** 2026-09-add-strategic-outcomes-field
-- **Status:** not-started
+- **Status:** complete — all tasks T-01…T-05 done (see execution.md)
 - **Owner:** Manuel Ricardo Almanzar
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -144,13 +144,13 @@ T-01 and T-02 are independent of each other and of T-03 (different tiers, no sha
   - Present the count to the user/product owner **before** this migration is proposed for Staging/Prod. This is the human decision point R-ALN-003 itself does not resolve — the requirement says the field *should* be mandatory; it does not say what happens to results that already violate the new rule.
   - **Rollout order correction (judgment.md — Judge B's sharper framing of the same root risk):** `design.md` §11 currently says the migration should be applied "before or alongside" the client/server code deploy. That order is backwards for a different reason too: if the migration lands before T-01/T-02's code, the field becomes required for indicator 6 while the client still doesn't render it and the server still drops it — an unfixable-from-the-UI lock-out. Deploy T-01+T-02 first, confirm they're live, **then** apply T-03 only after this task's count has been reviewed.
 - **Acceptance / done check:**
-  - [ ] Count query run against Dev; result recorded here (or in a linked follow-up note) broken out by status.
-  - [ ] Explicit go/no-go recorded from the product owner/user, referencing the count.
-  - [ ] `design.md` §11 updated to state the corrected deploy order (code first, migration after this sign-off) once the decision is recorded.
+  - [x] Count query run against Dev; result recorded here (or in a linked follow-up note) broken out by status. (27 of 28 flip; 3 Submitted, 22 Draft, 1 Approved, 1 Not approved — see execution.md.)
+  - [x] Explicit go/no-go recorded from the product owner/user, referencing the count. (GO, 2026-09-09.)
+  - [x] `design.md` §11 updated to state the corrected deploy order (code first, migration after this sign-off) once the decision is recorded.
 - **Dependencies:** T-04 (the count is only meaningful once T-03's logic is confirmed correct — measuring against unverified SQL risks a wrong number).
 - **Estimated effort:** S
 - **Owner:** —
-- **Status:** todo
+- **Status:** done
 - **Skills:** none (data/process task)
 
 ---
@@ -187,9 +187,11 @@ One PR per task where practical; T-01+T-02 could reasonably ship as a single PR 
 
 ## 8. Done definition
 
-- [ ] All T-01…T-05 are `done`.
-- [ ] R-ALN-001/002/003's ACs are all checked (client/server ACs via Jest; R-ALN-003's via T-04's manual matrix).
-- [ ] Client and server coverage thresholds still green (re-run full suites, not per-file — see client `CLAUDE.md`'s K-020 note on targeted-run coverage floors).
-- [ ] T-05's pre-flight count is recorded and the go/no-go decision is explicit before the migration reaches Staging/Prod.
-- [ ] `design.md` §11 rollout order is corrected to reflect T-05's decision.
-- [ ] Open questions from `proposal.md`/`requirements.md` (missing Innovation Use results-detail tab; "Strategic Outcomes" naming) remain explicitly recorded as non-goals, not silently dropped.
+- [x] All T-01…T-05 are `done`.
+- [x] R-ALN-001/002/003's ACs are all checked (client/server ACs via Jest; R-ALN-003's via T-04's manual matrix, attempt 2 PASS).
+- [x] Client and server coverage thresholds still green (re-run full suites, not per-file — see client `CLAUDE.md`'s K-020 note on targeted-run coverage floors). Client 314/314 suites, server 338/338 suites, both green (see execution.md T-01/T-02 entry).
+- [x] T-05's pre-flight count is recorded and the go/no-go decision is explicit before the migration reaches Staging/Prod. (27 of 28 flip; GO recorded 2026-09-09.)
+- [x] `design.md` §11 rollout order is corrected to reflect T-05's decision.
+- [x] Open questions from `proposal.md`/`requirements.md` (missing Innovation Use results-detail tab; "Strategic Outcomes" naming) remain explicitly recorded as non-goals, not silently dropped. (design.md §13 and requirements.md — unchanged, still recorded as non-goals.)
+
+**Remaining human action (outside this AKILI session's scope, per root `CLAUDE.md` §4.3 K-015):** applying the T-03 migration to Staging/Prod is a separate, manually-triggered step — the CI/CD pipeline deploys code only. Apply it after confirming T-01/T-02's code is live in each environment, following the corrected order in `design.md` §11.
