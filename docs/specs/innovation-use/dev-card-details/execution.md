@@ -278,3 +278,69 @@ was precisely that — a correction record overstating its own red.
 
 **Constitution impact:** none. No new module, no moved boundary, no changed public surface — the new
 method is `private` and has no caller in `src/` until T-02.
+
+### T-02 — Wire the three facts into the section read — `PASS` ✅ (1 attempt)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS**, first attempt |
+| Date | 2026-09-10 |
+| Lane | server — `akili-implementer` (Sonnet, T2, effort `high`) → `akili-reviewer` (Opus, T3) |
+| Requirements covered | `R-IUC-001`, `R-IUC-002`, `R-IUC-006` |
+| Defect classes gated | `DC-1`, `DC-3` |
+| Skills assigned | `nestjs-expert` |
+
+**Files changed:** `result-innovation-use.service.ts` (**+26, 0 deletions**) ·
+`result-innovation-use.service.spec.ts` (+170, 0 deletions — a 4-test `findOne — T-02 wiring` block,
+plus one pre-existing test modified to stub the new call).
+
+**The change:** `findOne` now computes
+`innovationDevLink ? await this.readInnovationDevCardFacts(innovationDevLink.other_result_id) : null`
+and spreads the three facts into `linked_innovation_dev` beside the four pre-existing sub-keys.
+**Zero deletions is itself most of AC.2** — the four old keys could not have changed, because nothing
+was removed; the Reviewer confirmed they survive verbatim at `:655-659` including both `?? null`
+coercions.
+
+**Verification:** falsifier RED (call mutated to `readInnovationDevCardFacts(resultId)`) →
+`Expected: 500 / Received: 9` at `:1639`; restored GREEN `75 passed`; full unit suite
+`359 suites / 2807 tests passed`; `npx eslint` exit 0. **Leader additionally ran `npm run build`
+(clean)** — T-02's verification line names only `npm test`, and the new code dereferences a value
+typed `InnovationDevCardFacts | null`, so the type gate was worth closing separately.
+
+**All 5 acceptance criteria met.** The Reviewer verified each at source, one test per sub-point:
+exact seven-key `toEqual` (`:1672-1680`), `null` not an object of nulls (`:1694`),
+`not.toHaveBeenCalled()` with no link (`:1695` — and that spy has no `mockImplementation`, so under a
+mutation it calls through and reddens either way), `toHaveBeenCalledTimes(1)` with a link (`:1715`).
+
+#### Three Leader questions the Reviewer was asked to rule on, and its rulings
+
+1. **Abort ordering — ruled in the code's favour, on grounds that distinguish it from T-01.** The observed red is on the **call-argument** assertion (`:1639`), not the level-7 *value* assertion `tasks.md` T-02's prose names. The Reviewer's ruling: `requirements.md` §8 defines `DC-1` as *"reads the value from the Innovation Use result instead of the linked result"* and names **no** assertion, so the task prose is the narrower granularity; *"keyed off the wrong id"* is exactly what `:1639` measures. **Critically, this is not T-01's pattern** — there the aborted-past assertion was the *only* thing standing behind the criterion; here the aborting and aborted assertions measure the same defect from two sides. **Stated so the record does not overstate itself:** the level-7 value assertion at `:1641` has **not** been observed red, nor has any assertion in the other three new tests (the Implementer's own `1 failed, 74 skipped` confirms they stay green under the mutation, `DC-3`'s stub being id-independent). The Reviewer verified `:1641` is *capable* of red — but capability is reasoning, not observation, and is recorded as such.
+2. **`KZ-001` test-double fidelity — does not fire, and the Reviewer found a second closure the Leader had not claimed.** A spy on `readInnovationDevCardFacts` is the **instrument** for T-02's property (which id, how many times, whether at all), not a stand-in for it. Beyond that, the value path is not fully doubled: the spy's return flows through **real production spread code** at `:663-665`, so `DC-3`'s `toEqual` exercises the actual assignment. The residual drift risk — a canned shape diverging from the real return — is closed by the **type gate, not the spy**: the spy is cast to `Promise<unknown>` so its literal is unchecked, but the production spread reads its keys off a value typed `InnovationDevCardFacts`, so renaming a key reddens `npm run build` — which the Leader ran.
+3. **AC.5 (envelope unchanged) is adequate and is *not* a `KZ-002` proxy.** The literals exist at exactly one site — `result-innovation-use.controller.ts:49` and `:51`, inside `ResponseUtils.format` — and the service returns a bare object that never touches them. *"Non-modification of the sole source of a value is direct evidence about that value, not a convenient adjacent observation"*, which is the distinction `KZ-002` draws. **Scope limit (`KZ-017`):** neither the controller spec nor `npm test` observes the assembled envelope **on the wire**; only a supertest/e2e could. That bounds end-to-end envelope verification, not this criterion, whose claim is "unchanged".
+
+**On the modified pre-existing test** (`still returns a link whose target is soft-deleted`): the
+Reviewer found it **strictly more deterministic, not weakened**. The four original assertions keep
+their original values under an exact `toEqual` (`:1527-1535`), and `R-2`'s deliberate behaviour is
+preserved — `other_result.is_active: false` at `:1503` still yields a non-null `linked_innovation_dev`
+carrying the target's title. The added stub replaces a fall-through to the file's shared,
+**order-dependent** QueryBuilder mock, which could have reddened the `toEqual` for a reason unrelated
+to soft deletion. And `toEqual` ignores `undefined` properties but **not** a missing key against
+`null`, so a dropped spread key still reddens it.
+
+**Leader correction, recorded because the log should not preserve my wrong reading.** I flagged
+`:660-662`'s comment as asserting narrowing TypeScript does not perform. The Reviewer's reading is
+better: read literally it asserts a **runtime** fact and gives the correct runtime reason (both `:634`
+and `:650` branch on the same unreassigned `const innovationDevLink`), and never claims the compiler
+narrows anything. My `strictNullChecks: false` finding explains why it *compiles*; that is a different
+question from why it is *true*. Advisory, not a defect.
+
+#### `ADVISORY` (4R lenses) — recorded, non-gating, not convertible into tasks
+
+1. **RELIABILITY (record accuracy).** `DC-3`'s value-spread `toEqual` — the assertion that actually proves the three keys come *from* `innovationDevCardFacts` — has **no observed red**. One extra one-line mutation (delete `description: innovationDevCardFacts.description` at `:664`, or rename the source key) would close the last unobserved gate in this task at near-zero cost. The Reviewer deliberately did **not** file it as an issue: the assertion is a concrete seven-key `toEqual`, structurally capable of red, in a file demonstrably collected (75 tests ran). **Left advisory per §2.4.**
+2. **RISK (unmeasured, not failed) — and this one has a Leader action attached.** `npm test -- --silent` computes **no coverage**; Jest thresholds apply only under `--coverage`. So the **60% server floor named in `tasks.md` §5 was not measured by the cited evidence** — the three added expressions are all exercised through `findOne`, so a drop below floor is implausible, but the figure is *unmeasured rather than verified*. Same `KZ-017` family as the `rootDir: "src"` limit §5 already declares. **Leader ruling: `npm run test:cov` will be run once at the T-05 gate, when the server lane's diff is complete, and its result recorded there.** Measuring it per-task would be five runs to answer one question, and §9's *"coverage floors held"* is a lane-level claim.
+3. **READABILITY.** `:660-662` — prefer *"because both are conditioned on the same `innovationDevLink`"*, plus a note that this is a runtime invariant the compiler does **not** enforce under `strictNullChecks: false`. If that flag ever flips, this access needs a narrowing form and the comment as written would not tell the next maintainer why.
+4. **RELIABILITY (pre-existing, untouched). Reachability verdict: could not construct.** `:655` dereferences `innovationDevLink.other_result` unguarded — a non-null link with a missing target throws. The Reviewer *could not build a reaching payload*: `findAndDetails` loads `other_result` as a relation over a **non-nullable FK**, so the row's absence is FK-prevented. Zero deletions means the line is untouched, `design.md` §5.2 / `judgment.md` G4 already record it as unreachable on this path, and the new code keys off the **scalar** `other_result_id`, adding no exposure.
+
+**Constitution impact:** none. No new module, no moved boundary; `findOne`'s response **shape** widened
+by three keys inside an existing object, which `R-IUC-006` covers by design (the three keys are
+additive and the client's four are untouched).

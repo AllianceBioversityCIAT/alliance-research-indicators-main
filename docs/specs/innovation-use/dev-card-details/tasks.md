@@ -10,7 +10,7 @@
 - **Last updated:** 2026-09-10
 
 > **Budget from `design.md` §13 — `/akili-execute` trips against this:** **10 tasks · ~820 LOC ·
-> ~14 review rounds.** This decomposition lands **exactly at 10**. §13's own escalation rule stands:
+> ~14 review rounds.** ⚠️ **Re-baselined 2026-09-10 to ~1,450–1,600 LOC** after T-01 measured **838** on its own — the test-LOC figure never costed the fixtures tier it mandates. See `design.md` §13's re-baseline block; **review rounds, not LOC, are now the figure to watch** (T-01 spent 3 of ~14). This decomposition lands **exactly at 10**. §13's own escalation rule stands:
 > if execution needs to add tasks and the count passes **12**, the honest move is to **split the spec**
 > (server contract + endpoint as one child, client card + enrichment as another) — not to relabel the
 > depth.
@@ -122,18 +122,18 @@ worker reports — never while one is active**, and never two full-suite runs at
   - The four existing sub-keys are constructed **exactly** as before, including the `?? null` coercion on `title` and `platform_code`. Do not touch them.
   - `linked_innovation_dev` stays `null` — not an object of nulls — when there is no link.
 - **Acceptance / done check:**
-  - [ ] The three facts belong to the **linked** result, not the Innovation Use result being viewed
-  - [ ] The four pre-existing sub-keys are unchanged in name, type and null semantics
-  - [ ] With no link, `linked_innovation_dev` is `null` and T-01 is **not** invoked
-  - [ ] With a link, T-01 is invoked **at most once** per read
-  - [ ] The envelope's `status` and `description` are unchanged from the current read
+  - [x] The three facts belong to the **linked** result, not the Innovation Use result being viewed
+  - [x] The four pre-existing sub-keys are unchanged in name, type and null semantics
+  - [x] With no link, `linked_innovation_dev` is `null` and T-01 is **not** invoked
+  - [x] With a link, T-01 is invoked **at most once** per read
+  - [x] The envelope's `status` and `description` are unchanged from the current read
 - **Verification:** `npm test -- --silent`
 - **Falsifying input, named before the test is written (K-012):** build a fixture with **two** results whose readiness, description and scope all differ — the Innovation Use result at level 3 and the linked Innovation Dev result at level 7. Point the call at the section's own `resultId` → the level-7 assertion reads 3 and goes red. A single-result fixture **cannot** falsify this (`DC-1`).
 - **What disqualifies the evidence:** a fixture in which both results carry the same values. It passes whichever id the code uses, and certifies nothing.
 - **Skills:** `nestjs-expert`
 - **Dependencies:** T-01
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **done** (Reviewer PASS 2026-09-10, 1 attempt — see [`./execution.md`](./execution.md))
 
 ---
 
@@ -510,7 +510,7 @@ Append-only.
 
 - [ ] All ten `T-<NN>` are `done`
 - [ ] Every scenario and every `BUT` / `AND IT MUST` clause has an owning task, verified by the two `grep -c` commands in §4 — not by trusting §4's table
-- [ ] Server unit **and** `test:fixtures` green; client unit green; coverage floors held
+- [ ] Server unit green; **`test:fixtures`: every fixture spec belonging to this spec green, with the 5-file pre-existing failure baseline recorded verbatim in `execution.md`** *(amended 2026-09-10, user-approved — the original read "`test:fixtures` green", which `RB-6` makes unachievable by any task in this spec: 5 files were already red on clean `HEAD` from a circular import none of this spec's tasks caused. Ticking the original wording would have required either absorbing a cross-module fix nobody approved or lying)*; client unit green; coverage floors held
 - [ ] `npm run build` exits 0 (see §5 for why this is the type gate)
 - [ ] `npx eslint` clean on touched server paths; `npm run lint -- --quiet` clean on the client
 - [ ] The new route appears in `/swagger` with a documented response shape, confirmed by a quoted human observation of **that route's shape**

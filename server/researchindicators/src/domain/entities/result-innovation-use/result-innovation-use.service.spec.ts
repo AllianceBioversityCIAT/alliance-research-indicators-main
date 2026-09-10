@@ -1504,6 +1504,22 @@ describe('ResultInnovationUseService', () => {
           },
         },
       ]);
+      // T-02 — this scenario is about the four pre-existing sub-keys, not
+      // about the three new facts, so `readInnovationDevCardFacts` (T-01) is
+      // stubbed explicitly rather than left to fall through to the
+      // QueryBuilder mock's shared, order-dependent default.
+      jest
+        .spyOn(
+          service as unknown as {
+            readInnovationDevCardFacts: (id: number) => Promise<unknown>;
+          },
+          'readInnovationDevCardFacts',
+        )
+        .mockResolvedValue({
+          innovation_readiness: null,
+          description: null,
+          geo_scope: null,
+        });
 
       const result = await service.findOne(9);
 
@@ -1513,6 +1529,9 @@ describe('ResultInnovationUseService', () => {
         result_official_code: 284,
         title: 'A soft-deleted Innovation Dev result',
         platform_code: 'STAR',
+        innovation_readiness: null,
+        description: null,
+        geo_scope: null,
       });
     });
 
@@ -1543,6 +1562,157 @@ describe('ResultInnovationUseService', () => {
       expect(wire.linked_innovation_dev.platform_code).toBeNull();
       expect('title' in wire.linked_innovation_dev).toBe(true);
       expect(wire.linked_innovation_dev.title).toBeNull();
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-02 (`design.md` §4.1,
+   * §5.2; `R-IUC-001`, `R-IUC-002`, `R-IUC-006`; `DC-1`, `DC-3`). Wires T-01's
+   * private `readInnovationDevCardFacts` into `findOne`'s
+   * `linked_innovation_dev`. `readInnovationDevCardFacts` itself is spied at
+   * the instance (it stays private) rather than re-exercised — its own 9
+   * acceptance criteria are covered by the describe block below this one;
+   * this block owns only the wiring: which id it is called with, whether it
+   * is called at all, and that the four pre-existing sub-keys survive
+   * untouched.
+   */
+  describe('findOne — T-02 wiring the three Innovation Dev card facts into linked_innovation_dev', () => {
+    const sectionResultId = 9;
+    const linkedOtherResultId = 500;
+
+    const linkRow = {
+      link_result_id: 501,
+      result_id: sectionResultId,
+      other_result_id: linkedOtherResultId,
+      other_result: {
+        result_id: linkedOtherResultId,
+        result_official_code: 19707,
+        title: 'STAR 19707 - Climate Information Services',
+        platform_code: 'STAR',
+      },
+    };
+
+    beforeEach(() => {
+      mainFindOne.mockResolvedValue(null);
+    });
+
+    // Named falsifier (K-012, tasks.md T-02): two results whose readiness,
+    // description and scope all differ — the Innovation Use result (keyed
+    // by the section's own resultId, 9) at level 3, the linked Innovation
+    // Dev result (keyed by other_result_id, 500) at level 7. If the
+    // production code were changed to call
+    // `readInnovationDevCardFacts(resultId)` instead of
+    // `readInnovationDevCardFacts(innovationDevLink.other_result_id)`, this
+    // spy would be invoked with 9, resolve to the level-3 facts, and the
+    // `.level).toBe(7)` assertion below would go red. A single-result
+    // fixture, or one where both ids resolved to the same values, could not
+    // falsify this (DC-1's disqualifier, named in tasks.md).
+    it("DC-1 — keys the read off other_result_id, never the section's own resultId: the level-7 linked facts appear, not the level-3 section-id facts", async () => {
+      mockFindAndDetails.mockResolvedValue([linkRow]);
+      const readCardFactsSpy = jest
+        .spyOn(
+          service as unknown as {
+            readInnovationDevCardFacts: (id: number) => Promise<unknown>;
+          },
+          'readInnovationDevCardFacts',
+        )
+        .mockImplementation(async (id: number) => {
+          if (id === sectionResultId) {
+            return {
+              innovation_readiness: { id: 1, level: 3, name: 'Piloted' },
+              description: 'Innovation Use result description',
+              geo_scope: { code: 1, name: 'National' },
+            };
+          }
+          if (id === linkedOtherResultId) {
+            return {
+              innovation_readiness: { id: 2, level: 7, name: 'Widely used' },
+              description: 'Innovation Dev result description',
+              geo_scope: { code: 2, name: 'Regional' },
+            };
+          }
+          throw new Error(`unexpected id ${id}`);
+        });
+
+      const result = await service.findOne(sectionResultId);
+
+      expect(readCardFactsSpy).toHaveBeenCalledWith(linkedOtherResultId);
+      expect(readCardFactsSpy).not.toHaveBeenCalledWith(sectionResultId);
+      expect(result.linked_innovation_dev.innovation_readiness).toEqual({
+        id: 2,
+        level: 7,
+        name: 'Widely used',
+      });
+      expect(result.linked_innovation_dev.description).toBe(
+        'Innovation Dev result description',
+      );
+      expect(result.linked_innovation_dev.geo_scope).toEqual({
+        code: 2,
+        name: 'Regional',
+      });
+    });
+
+    it('DC-3 — the four pre-existing sub-keys are unchanged in name, type and null semantics, alongside the three new facts', async () => {
+      mockFindAndDetails.mockResolvedValue([linkRow]);
+      jest
+        .spyOn(
+          service as unknown as {
+            readInnovationDevCardFacts: (id: number) => Promise<unknown>;
+          },
+          'readInnovationDevCardFacts',
+        )
+        .mockResolvedValue({
+          innovation_readiness: { id: 2, level: 7, name: 'Widely used' },
+          description: 'A description',
+          geo_scope: { code: 2, name: 'Regional' },
+        });
+
+      const result = await service.findOne(sectionResultId);
+
+      expect(result.linked_innovation_dev).toEqual({
+        result_id: linkedOtherResultId,
+        result_official_code: 19707,
+        title: 'STAR 19707 - Climate Information Services',
+        platform_code: 'STAR',
+        innovation_readiness: { id: 2, level: 7, name: 'Widely used' },
+        description: 'A description',
+        geo_scope: { code: 2, name: 'Regional' },
+      });
+    });
+
+    it('with no link, linked_innovation_dev stays null (not an object of nulls) and readInnovationDevCardFacts is NOT invoked at all', async () => {
+      mockFindAndDetails.mockResolvedValue([]);
+      const readCardFactsSpy = jest.spyOn(
+        service as unknown as {
+          readInnovationDevCardFacts: (id: number) => Promise<unknown>;
+        },
+        'readInnovationDevCardFacts',
+      );
+
+      const result = await service.findOne(sectionResultId);
+
+      expect(result.linked_innovation_dev).toBeNull();
+      expect(readCardFactsSpy).not.toHaveBeenCalled();
+    });
+
+    it('with a link, readInnovationDevCardFacts is invoked at most once per read', async () => {
+      mockFindAndDetails.mockResolvedValue([linkRow]);
+      const readCardFactsSpy = jest
+        .spyOn(
+          service as unknown as {
+            readInnovationDevCardFacts: (id: number) => Promise<unknown>;
+          },
+          'readInnovationDevCardFacts',
+        )
+        .mockResolvedValue({
+          innovation_readiness: null,
+          description: null,
+          geo_scope: null,
+        });
+
+      await service.findOne(sectionResultId);
+
+      expect(readCardFactsSpy).toHaveBeenCalledTimes(1);
     });
   });
 

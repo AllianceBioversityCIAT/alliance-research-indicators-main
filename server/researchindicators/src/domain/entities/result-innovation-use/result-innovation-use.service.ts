@@ -618,6 +618,23 @@ export class ResultInnovationUseService {
      */
     const innovationDevLink = innovationDevLinks?.[0] ?? null;
 
+    /**
+     * `docs/specs/innovation-use/dev-card-details` T-02 (`design.md` §4.1,
+     * §5.2; `R-IUC-001`, `R-IUC-002`, `R-IUC-006`; `DC-1`, `DC-3`).
+     *
+     * Keyed off **`innovationDevLink.other_result_id`** — the LINKED
+     * Innovation Dev result — never off this method's own `resultId`. That
+     * is the whole point of the task: the three facts describe the linked
+     * result, not the Innovation Use result being viewed. Called **only**
+     * when a link exists, and **at most once** per read: when
+     * `innovationDevLink` is `null` there is no target to read and
+     * `readInnovationDevCardFacts` is not invoked at all — zero extra
+     * queries, matching §5.2's "when it is null, §5.1 is not called".
+     */
+    const innovationDevCardFacts = innovationDevLink
+      ? await this.readInnovationDevCardFacts(innovationDevLink.other_result_id)
+      : null;
+
     return {
       innovation_use_level_id: detail?.innovation_use_level_id ?? null,
       innovation_use_level: detail?.innovation_use_level?.level ?? null,
@@ -632,11 +649,20 @@ export class ResultInnovationUseService {
       innovation_dev_result_id: innovationDevLink?.other_result_id ?? null,
       linked_innovation_dev: innovationDevLink
         ? {
+            // The four pre-existing sub-keys — byte-identical to before this
+            // task (`R-IUC-006`): same names, same types, same `?? null`
+            // coercion on `title` and `platform_code`. Not touched.
             result_id: innovationDevLink.other_result.result_id,
             result_official_code:
               innovationDevLink.other_result.result_official_code,
             title: innovationDevLink.other_result.title ?? null,
             platform_code: innovationDevLink.other_result.platform_code ?? null,
+            // The three new facts, from the linked result via T-01's shared
+            // read (`innovationDevCardFacts` is non-null here, because
+            // `innovationDevLink` is non-null in this branch).
+            innovation_readiness: innovationDevCardFacts.innovation_readiness,
+            description: innovationDevCardFacts.description,
+            geo_scope: innovationDevCardFacts.geo_scope,
           }
         : null,
     };

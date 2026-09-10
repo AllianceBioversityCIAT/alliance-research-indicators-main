@@ -682,6 +682,38 @@ reporting. `R-IUC-007` AC.5, `DC-11`.
 | **LOC** | ~400 | ~620 | **~820** (≈ 260 production, ≈ 560 test) |
 | **Review rounds** | ~10 | ~12 | **~14** |
 
+> ### Re-baselined 2026-09-10 against T-01's measured actuals (user-approved at the `/akili-execute` T-01 gate)
+>
+> **The test-LOC figure was wrong, and T-01 alone consumed the whole spec's LOC budget.**
+>
+> | Metric | Rev 3 estimate | T-01 measured | Note |
+> | --- | --- | --- | --- |
+> | Production LOC | ~150 for the **whole** server lane (T-01…T-05) | **117** on T-01 alone | On plan in shape, but one task took 78% of a five-task allowance |
+> | Test LOC | ~330 for the whole server lane | **721** (280 unit + 441 fixtures) | **2.2× the entire server lane's allowance, on one task** |
+> | Total | ~820 for the **entire 10-task spec** | **838** on T-01 | The spec's whole LOC budget, spent on task 1 of 10 |
+>
+> **Cause, and why it is a mis-estimate rather than an overrun.** §13 above already names the
+> fixtures tier as *"a lane the earlier budgets did not include at all"* — so revision 3 knew the
+> lane existed and still costed it as though it were mocked unit specs. A fixtures-tier spec that
+> proves emitted SQL against a live database must insert a real `result`, a real
+> `result_innovation_dev`, a readiness, and CLARISA catalog rows, then tear down exactly what it owns
+> and nothing it does not, **per case** — that is the 441 lines. `NFR-IUC-001` disqualifies the cheap
+> alternative by name, so this cost is mandated by the spec, not chosen by the Implementer.
+>
+> **Revised projection: ~1,450–1,600 LOC** for the full spec (T-01 measured at 838; T-02…T-05 are
+> S/M/M/S and reuse T-01's fixture scaffolding, so ~350–450; the client lane's ~340 estimate is
+> untouched by this finding because it has no fixtures tier — jsdom is its harness). **Review rounds
+> are the figure to watch now, not LOC:** T-01 spent **3 of ~14** on one task, and both extra rounds
+> went to evidence integrity rather than implementation defects.
+>
+> **What would invalidate this re-baseline (`K-013`):** it is derived from exactly **one** measured
+> task, and that task is the only one in the spec that carries a `getQuery()` SQL assertion. If
+> T-02…T-05 land closer to their original estimates, the correct reading is that T-01 was
+> *singular* rather than that the budget was *systematically* wrong. Re-check at the T-05 gate.
+>
+> **Decision taken:** re-baseline and continue — **not** split the spec, and **not** weaken the
+> fixtures requirement for T-03 (the security property the revoked security review signs off on).
+
 **Why it grew again:** `DD-13`'s bounded target set (three predicates + the indistinguishability rule)
 and `DD-14`'s two async rules are each independently testable, and they bring four more defect classes
 (`DC-14`…`DC-16` plus `DC-9`'s bookkeeping). `DC-14` also needs a **fixtures-tier** task, a lane the
