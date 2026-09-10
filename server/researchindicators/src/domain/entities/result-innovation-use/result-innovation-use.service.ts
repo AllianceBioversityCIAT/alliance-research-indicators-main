@@ -547,16 +547,56 @@ export class ResultInnovationUseService {
       relations: { innovation_use_level: true },
     });
 
-    const [actors, organizations, quantifications] = await Promise.all([
-      this._resultActorsService.find(resultId, ActorRolesEnum.INNOVATION_USE),
-      this._resultInstitutionTypesService.find(
-        resultId,
-        InstitutionTypeRoleEnum.INNOVATION_USE,
-      ),
-      this._resultQuantificationsService.findByResultIdAndRoles(resultId, [
-        QuantificationRolesEnum.INNOVATION_USE,
-      ]),
-    ]);
+    const [actors, organizations, quantifications, innovationDevLinks] =
+      await Promise.all([
+        this._resultActorsService.find(resultId, ActorRolesEnum.INNOVATION_USE),
+        this._resultInstitutionTypesService.find(
+          resultId,
+          InstitutionTypeRoleEnum.INNOVATION_USE,
+        ),
+        this._resultQuantificationsService.findByResultIdAndRoles(resultId, [
+          QuantificationRolesEnum.INNOVATION_USE,
+        ]),
+        this._linkResultsService.findAndDetails(
+          resultId,
+          LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+        ),
+      ]);
+
+    /**
+     * `design.md` §4.1/§5.2 (R-IUL-007) — the row count here is 0 or 1 **in
+     * the absence of §3.2's accepted A8 race**, which can commit two active
+     * role-5 rows (no unique index on `(result_id, link_result_role_id,
+     * is_active)`; recorded as `tasks.md` §5 **R-10**). With two, `[0]` is
+     * arbitrary but self-healing: the next save deactivates all role-5 rows
+     * and re-inserts one. A deterministic `ORDER BY` would mean editing the
+     * shared `findAndDetails`, which is out of this task's scope.
+     * (`findAndDetails` already filters `is_active` on the link row itself
+     * but applies none to `other_result`, so a soft-deleted target still
+     * comes back — deliberate, it is what makes C12's visible-invalid-state
+     * possible; rule 16 independently returns `FALSE` for it). Both keys are
+     * projected present-and-`null` when unlinked, never absent.
+     *
+     * `platform_code` is coerced `undefined → null` explicitly: the entity
+     * declares it `platform_code?: string` (can arrive `undefined`), but
+     * §4.1's contract — and the already-committed client — declare
+     * `platform_code: string | null`. Left as `undefined`, `JSON.stringify`
+     * would drop the key entirely (present-vs-absent, R-IUL-007's whole
+     * point) and Amendment 04's anchor-URL branch (`platform_code` present →
+     * hyphenated `PLATFORM-CODE`, `null` → bare code) would take the wrong
+     * branch.
+     *
+     * **`title` is coerced the same way, and for the same `JSON.stringify`
+     * reason** — `results.title` is `@Column('text', { nullable: true })`, so
+     * a null title is reachable, and R-IUL-007 requires the sub-key to be
+     * *returned*, not omitted. Coercing to `''` instead would **invent
+     * data**: "no title" and "empty title" are different facts. Note the
+     * committed client declares `title: string` (non-nullable) while
+     * tolerating null in its formatter (`?? ''`) — a latent typing
+     * inaccuracy, not a live defect; widening it belongs to the next client
+     * touch rather than to a reopening of T-08/T-10/T-11.
+     */
+    const innovationDevLink = innovationDevLinks?.[0] ?? null;
 
     return {
       innovation_use_level_id: detail?.innovation_use_level_id ?? null,
@@ -569,6 +609,16 @@ export class ResultInnovationUseService {
       })),
       organizations: organizations ?? [],
       quantifications: quantifications ?? [],
+      innovation_dev_result_id: innovationDevLink?.other_result_id ?? null,
+      linked_innovation_dev: innovationDevLink
+        ? {
+            result_id: innovationDevLink.other_result.result_id,
+            result_official_code:
+              innovationDevLink.other_result.result_official_code,
+            title: innovationDevLink.other_result.title ?? null,
+            platform_code: innovationDevLink.other_result.platform_code ?? null,
+          }
+        : null,
     };
   }
 

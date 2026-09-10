@@ -2490,3 +2490,86 @@ It is **accepted, not scheduled** — an advisory may not mint scope in this spe
 ### Status
 
 **T-06 → `[x]`.** **11 of 14 tasks `[x]`.** Remaining: **T-07** (read path, server, next by document order), **T-12** (client suite + human visual check — feasible now, the stack is up), **T-13** (doc sync).
+
+---
+
+## ✅ T-07 — Service read path: `findOne` — Reviewer PASS (attempt 1, no rework) — **SERVER LANE COMPLETE**
+
+**Date** 2026-09-09 · **Lane** SERVER · Size S · **Implementer** `akili-implementer`, `sonnet` (T2) · **Reviewer** `akili-reviewer`, `opus` (T3) · **Verdict `STATUS: PASS`** · One review round.
+
+> **Summary (verbatim).** *"The fourth Promise.all entry, the role, and the two-key projection conform to design.md §4.1/§4.3/§5.2 and R-IUL-007 in both states; the unguarded `other_result` dereference is safe by a NOT NULL + RESTRICT foreign key at the schema level, not merely by routine discipline; and the four clauses each own a red-capable assertion, with the deactivated-row clause honestly deferred to the file that owns the filter. The `title` coercion is a truthful projection of a nullable column and is not a T-07 defect."*
+
+### Gates — Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` (server) | **359/359 suites, 2794/2794 tests PASS** (baseline 359/2788; **+6**) |
+| `npx eslint` (2 files) | **exit 0, no output** — bare `eslint`, per K-001 |
+
+### Falsifiers — Leader-run, tree restored byte-identically after each
+
+| Mutation | Observed |
+| --- | --- |
+| `undefined` instead of `null` for the unlinked case | ✅ **3 red**, incl. *returns both keys present-and-null when unlinked, never absent* |
+| an `is_active` filter added on `other_result` | ✅ **2 red**, incl. *still returns a link whose target is soft-deleted (§5.2 — this is what makes C12 possible)* |
+| **added after the review:** `?? null` dropped from `title` alone | ✅ **1 red** — see *Advisories applied* |
+
+### The worker corrected an error in the Leader's brief, and it was consequential
+
+The brief instructed asserting key presence with `'innovation_dev_result_id' in result`. The worker refused it and explained why: **`'k' in { k: undefined }` is `true`** — an explicitly-`undefined` value is an own property. Since the projection is an object literal that *always* lists both keys, `in` on the in-memory object is a **tautology**: it measures nothing under any mutation of the values. It built the assertion on `JSON.parse(JSON.stringify(result))` instead, which reproduces the wire shape where `stringify` drops `undefined` keys and keeps `null` ones.
+
+**Falsifier 1's red proves the correction was necessary — under the Leader's original instruction the test would have stayed green**, leaving R-IUL-007's central clause (*present-and-`null`, never absent*) covered by a check incapable of failing. Third time this session a worker or reviewer corrected a Leader instruction; the most consequential of the three.
+
+The Reviewer then verified the **proxy is faithful**, which is the part that could still have been a blind spot: `result-innovation-use.controller.ts:44-53` passes the service result straight into `ResponseUtils.format({ data: res })` — no response DTO, no `ClassSerializerInterceptor`, no `@ApiOkResponse` schema — so the only remaining transform before the wire is `res.json`'s own `JSON.stringify`, which is the operation the test performs.
+
+### What the Reviewer established at source, and it is stronger than the worker's own argument
+
+**The unguarded `other_result` dereference is safe at the SCHEMA level, not by routine discipline.** The worker had traced the routines; the Reviewer found the decisive layer underneath:
+
+1. `src/db/baseline/baseline.sql:2185` declares `other_result_id bigint NOT NULL`, and `:2194` adds the FK to `results(result_id)` with **no `ON DELETE` clause** — i.e. RESTRICT. **The engine rejects a dangling reference.** That is why `1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts:11` describes a *"1451 on the routine's final `DELETE FROM results`"*.
+2. Routine ordering as the worker claimed — `1787083305648-AmendLifecycleRoutinesForInnovationUse.ts:1137-1140`, `:1313-1316`, `:2681-2684`, `:2853-2856` each delete `link_results` in **both** directions before `DELETE FROM results`.
+3. `link-results.service.ts:49` already dereferences `lr.other_result` unconditionally, so `findAndDetails` would throw *before* returning — **T-07 introduces no new failure mode.**
+
+**And the C12 case is confirmed reachable by design**, not merely permitted: the soft-delete path (`1787083305648:1584-1588`) deactivates only `lr.result_id = resultId` and **never** the `other_result_id` side — which is precisely why an active role-5 row can point at a soft-deleted target.
+
+**`result_official_code`'s cross-host `number` contract holds, measured not assumed:** `orm.config.ts:53` sets `bigNumberStrings: false` and never sets `supportBigNumbers`, so mysql2 hydrates `BIGINT` as a JS number, and the projection is a bare passthrough with no `String()` or template literal.
+
+### The deactivated-link-row clause: an honest deferral, with its scope declared
+
+Three clauses own red-capable assertions (two proven red). The fourth is deferred to the file that owns the filter: `link-results.service.spec.ts:85-94` asserts `find` is called with `is_active: true`, so deleting that filter reddens a test **there**. §5.2 explicitly assigns the filtering to `findAndDetails`, so the split follows the design; the describe-block docstring states it rather than hiding it.
+
+**KZ-017 scope declaration:** no executed test in *either* file runs an actual deactivated row through SQL — both are mock-level. A TypeORM regression dropping the `where` at execution time would be invisible to both. That residual is explicitly sanctioned by `server/researchindicators/src/CLAUDE.md` §9 (*"Mock TypeORM repositories… Do NOT spin up MySQL in unit tests"*), so it is a **named** gap, not a gate failure.
+
+### The `title` cross-host disagreement — adjudicated as option (b), not a T-07 defect
+
+The worker coerced `title` to `null` beyond what the brief named. Measured on both sides:
+
+| Side | Declares |
+| --- | --- |
+| Server | `Result.title` is `@Column('text', { nullable: true })` — a null title **is** reachable |
+| Client (T-08, committed) | `linked_innovation_dev.title: string` — **non**-nullable |
+| Client formatter | accepts `title?: string \| null`, does `?? ''` |
+
+The Reviewer constructed the full sequence and it **terminates in a cosmetic trailing separator**: a null-titled Innovation Dev result is selectable (R-IUL-006's validator filters on active + `indicator_id = 2` only, no title predicate), GET returns `title: null`, it lands in a `string`-declared slot where types are erased, and the card renders `"STAR 284 - "` — **the identical string the client already produces on its own write path** (`innovation-use-details.component.ts:220` does `title: option.title ?? ''`). The two paths agree; there is no live defect.
+
+**The coercion is nonetheless the right server behavior:** §4.1 fixes the sub-key *set*, not per-sub-key nullability; R-IUL-007 requires the key be returned; and coercing to `''` instead would **invent data** — *"no title"* and *"empty title"* are different facts. Reopening T-08/T-10/T-11 over a latent typing inaccuracy would be disproportionate. **Recorded, with the widening deferred to the next client touch** — the latent hazard being that the declared type licenses a future `…title.trim()` with the compiler's blessing.
+
+### Advisories applied in place (one-round rule)
+
+1. **The docstring justified only the `platform_code` coercion** — the `title ?? null` one, which went beyond the brief and created the cross-host disagreement, was unexplained. Now documented with the *"coercing to `''` would invent data"* reasoning and the client-type note.
+2. **The docstring repeated §5.2's *"0 or 1"* without reconciling it with §3.2's accepted doubled-row race.** Now states that `[0]` is arbitrary but **self-healing** (the next save deactivates all role-5 rows and re-inserts one), and that a deterministic `ORDER BY` would mean editing the shared `findAndDetails` — out of scope.
+3. **The `title ?? null` branch was executed by no test** — both mocks reaching the projection supplied a string title, so deleting it reddened nothing. Fixed with the Reviewer's own cheapest suggestion: the existing coercion test now supplies `title: undefined` **and** `platform_code: undefined`, so **one stimulus covers both branches and deleting either `?? null` reddens it**. Verified: dropping `?? null` from `title` alone now produces **1 red**.
+
+Re-verified after the edits: **359/359 suites, 2794/2794 tests, eslint exit 0.**
+
+### Recorded, not actioned
+
+**RESILIENCE — one compound sequence can make the UI and the green check disagree, inside §3.2's accepted risk.** Two concurrent PATCHes race to two active role-5 rows (target X active, target Y later soft-deleted); rule 16's `EXISTS` finds X and stays **green** while `[0]` may render Y in C12's invalid-link state. Reachable only by composing the already-accepted A8 race (**R-10**) with a target soft-delete, and the consequence is a stale-looking card on a green section that the next save clears. The fix would be an `ORDER BY` inside the shared `findAndDetails` — correctly out of T-07's scope.
+
+**The wire-shape test asserts one layer below the property it certifies.** Faithful today (verified above), but adding a response DTO or serializer to this controller later would leave it green while the wire changed.
+
+### Status
+
+**T-07 → `[x]`.** **12 of 14 tasks `[x]`. THE SERVER LANE IS COMPLETE** (T-01 … T-07). The client implementation lane completed at T-11. Remaining: **T-12** (client suite + human visual check — feasible now that the user's stack is up: API :3001, front :4200) and **T-13** (documentation sync).
+
+**Still outstanding and user-only:** both migrations are unapplied in every environment (**B-1/B-3**, §11.1). Nothing in T-01…T-11 required them, but the feature cannot work end-to-end against a real database until they are applied — and Migration A's `down()` is destructive.

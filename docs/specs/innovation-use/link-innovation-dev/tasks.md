@@ -376,7 +376,7 @@ genuinely tested** at the mechanism. What no task owns is the **end-to-end DB** 
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-04, T-05 |
 | Requirements | R-IUL-007 (all clauses) |
