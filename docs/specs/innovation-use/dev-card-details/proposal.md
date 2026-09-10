@@ -21,6 +21,7 @@
 | Source of intent | Reviewer comment, quoted verbatim in §Intent. No Jira ticket, no Figma. Two scope questions resolved by the user 2026-09-10 (see §Scope) |
 | Branch in flight | `AC-1679-Create-the-innovation-use-section` |
 | Created | 2026-09-10 |
+| Amendment 01 | **2026-09-10, post Judgment Day round 1.** Three *factual* corrections swept in from [`judgment.md`](judgment.md) (G1 `clarisa_geo_scope` is singular; G2 a drifted line citation replaced by an anchor; G3 `link-results` is authenticated, not public). **The recommendation is unchanged** — Option A still wins on the three-caller blast radius alone. Two later rulings supersede this document's scope: the depth (Lite -> **Standard**, see `requirements.md`) and the selection-time behavior (**`R-IUC-007`** — a targeted read, which this proposal did not anticipate) |
 | Escalated from | `/akili-quick` — triviality gate **failed** on three criteria (see §Why this is not a quick change) |
 
 ---
@@ -45,7 +46,7 @@ scoped in, but flagged as the one a product owner could still drop without inval
 
 ## Problem / Current Behavior
 
-`innovation-use-details.component.html:196-211` renders the card from `formatInnovationDevLabel()`,
+the card in `innovation-use-details.component.html` renders from `formatInnovationDevLabel()`,
 which produces `STAR 19707 - Climate Information Services Dissemination System Sanchez` and nothing
 else. To learn *anything* about the innovation they just linked, the reporter must click
 **View innovation detail ↗**, which opens the Innovation Development result in a new tab.
@@ -89,7 +90,7 @@ away**:
 | --- | --- | --- |
 | Readiness level | `Level 7 — <name>` | `result_innovation_dev.innovation_readiness_id` → `clarisa_innovation_readiness_levels` (`.level`, `.name`) |
 | Short description | The result description text | `results.description` — the field labelled *"Describe the result"* on General Information (`general-information.component.html:20`, max 400 chars) |
-| Geographic scope | The scope name: `Global` / `Regional` / `Multi-national` / `National` / `Sub-national` | `results.geo_scope_id` → `clarisa_geo_scopes.name` |
+| Geographic scope | The scope name: `Global` / `Regional` / `Multi-national` / `National` / `Sub-national` | `results.geo_scope_id` → `clarisa_geo_scope.name` |
 
 Each field renders only when it has a value; an unset field is omitted rather than shown blank or
 zero-filled — the same "absent is a fact, not an empty string" rule child #4 established for `title`.
@@ -118,7 +119,7 @@ Three consequences for `/akili-specify`:
 | --- | --- |
 | No `Description:` label exists | The description is unlabelled body text. Nothing in the DOM should name it — which also means the client suite cannot find it by label and must assert it another way. |
 | The two labelled fields share one row | Not two stacked rows. They wrap to two lines only when the viewport forces it. |
-| The card's current single-row flex layout must change | `innovation-use-details.component.html:197` is `flex items-center justify-between` — a one-line row. It becomes a block with the title+anchor row on top and the new content beneath, which is why `R-3` below is a layout decision the spec must make rather than inherit. |
+| The card's current single-row flex layout must change | the card's outer container is `flex items-center justify-between` — a one-line row. It becomes a block with the title+anchor row on top and the new content beneath, which is why `R-3` below is a layout decision the spec must make rather than inherit. |
 
 ### Resolved: which field is the "short description"
 
@@ -215,7 +216,7 @@ This also matches the user's own account of where the data lives: two fields in 
 | # | Approach | Cost | Risk |
 | --- | --- | --- | --- |
 | **A** | **Dedicated read for the linked dev result.** Leave `findAndDetails` alone; after resolving the link, fetch the linked result's readiness + description + geo scope in one targeted query owned by Innovation Use. | 1 extra query per details read (bounded: 0 or 1 link) | **Low.** Blast radius is one module. |
-| B | **Widen the shared `findAndDetails`** with `geo_scope` and `result_innovation_dev.innovationReadiness` relations. | No extra query | **Medium-high.** Three callers — `result-policy-change.service.ts:141`, `link-results.controller.ts:38`, and Innovation Use. Policy Change and the generic controller would silently start returning innovation-dev relations they never asked for, and `link-results.controller.ts` is a **public endpoint**, so the widening is externally visible. Child #4 already declared touching this function out of scope for the same reason. |
+| B | **Widen the shared `findAndDetails`** with `geo_scope` and `result_innovation_dev.innovationReadiness` relations. | No extra query | **Medium-high.** Three callers — `result-policy-change.service.ts:141`, `link-results.controller.ts:38`, and Innovation Use. Policy Change and the generic controller would silently start returning innovation-dev relations they never asked for, and `link-results.controller.ts` is a **generic authenticated endpoint** (`@ApiBearerAuth()`, not in `JwtMiddleware`'s exclusion list) — so the widening reaches a consumer this spec has no relationship with. Child #4 already declared touching this function out of scope for the same reason. |
 | C | **Client-side second fetch.** The card calls the Innovation Development details endpoint for the linked id. | No server change | **Medium.** A second round-trip on every page load, a new loading/error state on the card, and it violates the client convention of one envelope per screen. Also makes the card's content depend on the *viewer's* permissions on the other result rather than on the link. |
 
 ---
@@ -227,8 +228,8 @@ This also matches the user's own account of where the data lives: two fields in 
 Three reasons, in order of weight:
 
 1. **It confines the blast radius to one module.** Option B changes what two unrelated consumers
-   receive, one of them through a public endpoint. That is a contract change to code nobody asked to
-   change, which is how contract drift starts.
+   receive, one of them through a generic authenticated endpoint. That is a contract change to code
+   nobody asked to change, which is how contract drift starts.
 2. **The cost is genuinely bounded.** The link is 0-or-1 rows by design (child #4's `R-IUL-007`), so
    this is one extra query per details read — not an N+1.
 3. **It leaves the existing four sub-keys byte-identical.** Purely additive means no coordinated
