@@ -23,6 +23,7 @@ import { InnovationUseLevelStepperComponent } from './components/innovation-use-
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
 import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
 import {
@@ -177,7 +178,8 @@ export function formatInnovationDevUrl(
     InnovationUseActorItemComponent,
     InnovationUseOrganizationItemComponent,
     SelectComponent,
-    TooltipModule
+    TooltipModule,
+    CustomTagComponent
   ],
   templateUrl: './innovation-use-details.component.html'
 })

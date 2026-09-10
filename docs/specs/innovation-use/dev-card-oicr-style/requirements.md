@@ -51,9 +51,11 @@ The card **SHALL** render, in order: an eyebrow row, the title, the description,
 - **GIVEN** an Innovation Dev result with a status, a readiness level, a reporting year, a geographic scope and a description
 - **WHEN** the user selects it in the picker
 - **THEN** the card shows an eyebrow (icon + `INNOVATION DEVELOPMENT`), the title as `<platform>-<code> - <title>`, the description, and one metadata row
-- **AND** the row reads `[status] · Innovation Dev level → <n> · Reporting year → <year> · Geographic scope → <name>`
+- **AND** the row reads `[status] · Innovation Dev level → <n> · Reporting year → <year> · Geographic scope → <name> · Innovation detail → <link>`
+- **AND IT MUST** keep the **`View innovation detail ↗` anchor** as that fourth pair, with its href, its text and its accessible name **unchanged** — `dev-card-details` `R-IUC-003` AC.6 still binds
 - **AND IT MUST** place the description **between the title and the metadata row**
 - **BUT it must NOT** render a `CGSpace link` pair, or a `Maturity level` label — those are the OICR card's fields, replaced here
+- **BUT it must NOT** remove the anchor. **Gap closed 2026-09-10:** the OICR pattern has no anchor and its link slot is taken by the geographic scope, so the target design was **silent** on where ours goes. An Implementer deleted it. The user's ruling: **it stays, as the row's fourth pair** — the same shape the OICR card used for its CGSpace link
 
 #### Scenario: A field is absent
 

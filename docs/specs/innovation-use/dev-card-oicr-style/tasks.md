@@ -51,6 +51,8 @@ graph TD
   - [ ] The badge renders a **non-published** fixture's own status name (`DC-2`)
   - [ ] The outer wrapper's chrome classes are unchanged from today
   - [ ] **Zero hex literals**
+  - [ ] 🔴 **The `View innovation detail ↗` anchor survives as the row's FOURTH pair** — `Innovation detail → <link>` — with href, text and accessible name unchanged (`R-IUC-003` AC.6, still binding). *Added 2026-09-10 after an attempt deleted it: the target design was silent, so the decomposition was too*
+  - [ ] 🔴 **Zero tests are disabled.** `grep -c 'it\.skip\|describe\.skip\|xit(' <spec>` → **0**. Assertions about the *old* layout that this task invalidates are **rewritten here** — the task that changed the structure owns them. Only the pure-contrast ones belong to T-05
 - **Verification:** `npm test -- --silent` · `npm run lint -- --quiet` · `npm run build` · `grep -c '#[0-9a-fA-F]\{6\}' <template>` → **0**
 - **Falsifying input:** set `geo_scope: null` and assert no `Geographic scope` text and no trailing `|`; hardcode `Published` in the badge → the non-published fixture's assertion reddens.
 - **Disqualifier — read this one:** **every criterion here is a DOM-presence assertion and none proves layout.** jsdom does not lay out, and this build has **no Tailwind** (runtime CDN script, never executed under the harness), so a green class assertion proves the string is in the attribute and **nothing about how it looks**. Do not report this task as covering appearance — that is `DC-6`, owned by T-10.
