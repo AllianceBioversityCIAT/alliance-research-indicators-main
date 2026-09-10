@@ -4609,7 +4609,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       return (lighter + 0.05) / (darker + 0.05);
     };
 
-    // The background is the card's own fill: --ac-grey-100 (asserted by T-07 at :4473 and :4564).
+    // The background is the card's own fill: --ac-grey-100 (asserted by T-07 in 'The title + anchor row preserves the class list across the outer and inner wrappers' and 'With all three null, the card\'s DOM equals today\'s card plus no extra containers').
     // The ratio is computed from hex read out of colors.scss, not from computed style.
     const GREY_100_LIGHT: Rgb = [244, 247, 249];
     const GREY_800_LIGHT: Rgb = [76, 81, 88];
@@ -4633,9 +4633,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       component = fixture.componentInstance;
     });
 
-    // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
-    // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
-    // this block must be able to show — see the reverted-swap check run separately during verification.
+
     it('renders the text-[var(--ac-grey-800)] class on the Readiness level, Geographic scope, and description elements', () => {
       component.body.set({
         ...component.body(),
@@ -4673,15 +4671,23 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(lightRatio).toBeGreaterThanOrEqual(4.5);
     });
 
-    // Dark theme gate (test 1 ∧ test 3): The falsifier in dark mode is REMOVAL of the colour class, not substitution.
-    // Reason: No grey in the [data-theme='dark'] block fails 4.5 on --ac-grey-100 — 600 -> 4.67, 700 -> 6.24, 800 -> 7.95.
-    // If the token is removed, it inherits the UA black, which fails AA.
+    // Dark theme gate (test 1 ∧ test 3): the falsifier for the dark half is REMOVAL of the colour
+    // class, not substitution of --ac-grey-600. Of the three tokens design.md §8.3 evaluated, all
+    // three clear 4.5 on dark --ac-grey-100 (#2b2b2b): 600 -> 4.67, 700 -> 6.24, 800 -> 7.95 — so the
+    // light-half substitution falsifier has no analogue AMONG THE CANDIDATES. Lower greys in the same
+    // [data-theme='dark'] block do fail (grey-500 #7d7d7d is ~3.44:1), but none was ever a candidate
+    // for this text. Removal is what test 1 catches — it was observed RED under a real template
+    // mutation of the Readiness level outer span, and removal fails toContain exactly as substitution
+    // does. Test 4 pins the value the element would inherit if the token were removed.
     it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in dark mode', () => {
       const darkRatio = contrastRatio(GREY_800_DARK, GREY_100_DARK);
       expect(darkRatio).toBeCloseTo(7.95, 1);
       expect(darkRatio).toBeGreaterThanOrEqual(4.5);
     });
 
+    // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving
+    // they are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
+    // this block must be able to show — see the reverted-swap check run separately during verification.
     it('falsifying input: inherited UA black on --ac-grey-100 (dark theme removal falsifier) reports less than 4.5:1 and fails AA', () => {
       expect(contrastRatio([0, 0, 0], GREY_100_DARK)).toBeLessThan(4.5);
     });
