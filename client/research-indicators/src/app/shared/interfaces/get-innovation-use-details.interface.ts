@@ -1,5 +1,20 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-01 — contract layer)
 export class GetInnovationUseDetails {
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-08 — §4.1 wire contract)
+  // Widened from `number | undefined`, mirroring `InnovationUseOrganization.institution_id`:
+  // `undefined` is dropped by `JSON.stringify`, so a cleared state must be able to carry an explicit
+  // `null` (e.g. when clearing the link via PATCH). Do not narrow to `number | undefined`.
+  innovation_dev_result_id: number | null | undefined = undefined;
+
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-08 — §4.1 wire contract)
+  // Read-only object returned by GET to hydrate the card without an extra request.
+  // Widened to `| null | undefined`: present as `null` when unlinked (never absent on GET response).
+  // `platform_code` is a NULLABLE `varchar(50)` on the server (`results.platform_code`). It is a
+  // SEPARATE column from `result_official_code` (a `bigint`). They are two columns, never one string.
+  // A NULL `platform_code` is real and must be representable — hence `string | null`.
+  linked_innovation_dev: { result_id: number; result_official_code: number; title: string; platform_code: string | null } | null | undefined =
+    undefined;
+
   innovation_use_level_id: number | undefined = undefined;
   /** The resolved scale point, server-derived. Read-only; never sent. */
   innovation_use_level: number | undefined = undefined;

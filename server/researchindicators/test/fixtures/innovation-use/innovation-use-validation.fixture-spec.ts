@@ -1,4 +1,6 @@
 import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
+import { LinkResultRolesEnum } from '../../../src/domain/entities/link-result-roles/enum/link-result-roles.enum';
+import { IndicatorsEnum } from '../../../src/domain/entities/indicators/enum/indicators.enum';
 
 /**
  * T-12 (`docs/specs/innovation-use/data-model-and-catalog`) — fixture harness
@@ -89,6 +91,42 @@ import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
  * performed manually against this file and is reported in the T-12
  * execution note — it is not baked into this file, which asserts only the
  * function's correct, shipped behavior.
+ *
+ * **Repaired at T-14 (`docs/specs/innovation-use/link-innovation-dev`,
+ * Amendment 02, R-IUL-009 "No grandfathering") — every base now carries a
+ * rule-16-satisfying link, not just the 15 that used to need it.** Migration
+ * B (`1789100000000-appendInnovationDevLinkRuleToInnovationUseValidation
+ * .ts`) appended rule 16 to this function: the green check now additionally
+ * requires an active role-5 `link_results` row pointing at an active,
+ * `indicator_id = 2` (Innovation Dev) result, retroactively and with no
+ * grandfathering. That broke every one of this file's TRUE-expecting bases
+ * (F3, F7, F11, F17, F18, F20, F23, F26, F28, F32, F35, F38, F39, F42, F43)
+ * — 15 failures, matching the 15 `toBe(1)` assertions 1:1 — because every
+ * one of them (and every other case in this file) seeds its subject through
+ * the single shared `seedResult()` helper below (grepped 2026-09-09: no
+ * `it` in this file calls `seedResult()` a second time for a secondary
+ * result, so none of them needs the link's target for any reason other than
+ * satisfying rule 16 on the subject itself).
+ *
+ * **The fix is inside `seedResult()`, not 15 per-case edits.** It now also
+ * seeds one target result (`indicator_id = 2`, active) and one active
+ * role-5 `link_results` row from the subject to that target, via
+ * `seedLinkedDevLink()` below — for EVERY result this file creates,
+ * including the 25+ FALSE-expecting cases that never touch rule 16. That is
+ * deliberate and safe: rule 16 is AND-ed onto the function's `RETURN`
+ * statement, so a satisfied rule 16 term can never turn an already-FALSE
+ * result TRUE (`AND` with `FALSE` stays `FALSE`) — it can only restore the
+ * TRUE cases' isolation, which is the whole point (see `seedLinkedDevLink`'s
+ * own comment). **No assertion in this file was weakened, relaxed, or
+ * flipped to make the suite pass** — R-IUL-009's own scenario ("no
+ * grandfathering") is precisely why none of this file's pre-existing bases
+ * may be treated as an exemption; rules 2-15's regression protection is
+ * exactly what this repair restores. The link shape (active role-5 →
+ * active indicator-2 target) matches `innovation-use-linked-dev-validation.
+ * fixture-spec.ts`'s R16-2 case exactly — that file is rule 16's own
+ * behavioral proof; this file only needs to satisfy the rule, not re-prove
+ * it (KZ-017: this file still cannot and does not prove rule 16's own
+ * runtime behavior — R-IUL-009's dedicated fixture does).
  */
 describe('innovation_use_validation stored function (T-12/T-19, F1-F43)', () => {
   const uniqueSuffix = Date.now();
@@ -154,7 +192,36 @@ describe('innovation_use_validation stored function (T-12/T-19, F1-F43)', () => 
     );
     const resultId = result.insertId;
     resultIds.push(resultId);
+    await seedLinkedDevLink(resultId);
     return resultId;
+  }
+
+  /**
+   * T-14 (Amendment 02, R-IUL-009 "No grandfathering") — see this describe
+   * block's top-level comment for the full reasoning. Seeds one active,
+   * `indicator_id = 2` target result plus one active role-5 `link_results`
+   * row from `resultId` to it, so `resultId` satisfies rule 16 regardless
+   * of what the calling case asserts. Both rows are tracked in `resultIds`
+   * / cleaned up the same way every other row in this file is (the target
+   * is just another row in `results`, so `afterAll`'s existing per-id loop
+   * already tears it down; `link_results` is deleted there too — see that
+   * block's own comment for the FK-direction reason it runs first).
+   */
+  async function seedLinkedDevLink(resultId: number): Promise<void> {
+    const officialCode = nextOfficialCode();
+    const target = await dataSource.query(
+      `INSERT INTO results (is_active, result_official_code, indicator_id, report_year_id, is_snapshot, result_status_id)
+       VALUES (1, ?, ?, ?, 0, NULL)`,
+      [officialCode, IndicatorsEnum.INNOVATION_DEV, reportYear],
+    );
+    const targetId = target.insertId;
+    resultIds.push(targetId);
+
+    await dataSource.query(
+      `INSERT INTO link_results (result_id, other_result_id, link_result_role_id, is_active, created_by, updated_by)
+       VALUES (?, ?, ?, 1, 1, 1)`,
+      [resultId, targetId, LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV],
+    );
   }
 
   async function seedDetail(
@@ -302,6 +369,21 @@ describe('innovation_use_validation stored function (T-12/T-19, F1-F43)', () => 
       reportYearSeeded = true;
     }
 
+    // T-14 (Amendment 02) — `indicators` / `indicator_types` FK target for
+    // `seedLinkedDevLink`'s target rows (`indicator_id = 2`, Innovation
+    // Dev). Both tables were EMPTY (0 rows) in this scratch schema — the
+    // same environment finding `innovation-use-linked-dev-validation.
+    // fixture-spec.ts`'s header already records for the identical FK.
+    // `INSERT IGNORE`, never torn down — same discipline as every other
+    // foundational catalog top-up in this block.
+    await dataSource.query(
+      `INSERT IGNORE INTO indicator_types (indicator_type_id, name) VALUES (1, 'Fixture indicator type')`,
+    );
+    await dataSource.query(
+      `INSERT IGNORE INTO indicators (indicator_id, name, indicator_type_id) VALUES (?, 'Innovation Development', 1)`,
+      [IndicatorsEnum.INNOVATION_DEV],
+    );
+
     // `baseline.sql` is schema-only (`src/db/baseline/README.md`: "Zero
     // business-data INSERT statements anywhere else in the file") — the
     // `clarisa_actor_types` catalog rows a much earlier migration inserted
@@ -403,6 +485,16 @@ describe('innovation_use_validation stored function (T-12/T-19, F1-F43)', () => 
       if (resultId === undefined || resultId === null) {
         continue;
       }
+      // T-14 — `seedLinkedDevLink` gives every result here a `link_results`
+      // row, and that table carries FKs in BOTH directions (`result_id` AND
+      // `other_result_id`), so it must be gone before `results` itself is
+      // deleted below. `resultIds` holds both the subject and the target
+      // id for every case, so this runs twice per link row (once per side)
+      // — harmless: the second delete matches zero rows.
+      await dataSource.query(
+        `DELETE FROM link_results WHERE result_id = ? OR other_result_id = ?`,
+        [resultId, resultId],
+      );
       await dataSource.query(`DELETE FROM result_actors WHERE result_id = ?`, [
         resultId,
       ]);
