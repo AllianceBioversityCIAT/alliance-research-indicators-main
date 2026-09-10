@@ -3879,6 +3879,29 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(formatInnovationDevLabel(undefined)).toBe('');
     });
 
+    describe('T-01 — Carry result_status and year into the card\'s object', () => {
+      it('populates result_status and year from the picker option', async () => {
+        // Falsifier: this literal must compile exactly as is.
+        const option = {
+          result_id: 1,
+          result_official_code: 1,
+          title: 'Title',
+          platform_code: 'P-1',
+          result_status: { id: 1, name: 'Published', description: 'desc', is_active: 1 },
+          year: '2026'
+        };
+        
+        // We spy on list() to return our option
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any]);
+
+        await component.onInnovationDevSelected(1);
+
+        const linked = component.body().linked_innovation_dev;
+        expect(linked?.result_status?.name).toBe('Published');
+        expect(linked?.year).toBe('2026');
+      });
+    });
+
     describe('formatInnovationDevReadiness', () => {
       it('formats correctly when both level and name are present', () => {
         expect(component.formatInnovationDevReadiness({ id: 1, level: 3, name: 'Validation' })).toBe('Level 3 - Validation');

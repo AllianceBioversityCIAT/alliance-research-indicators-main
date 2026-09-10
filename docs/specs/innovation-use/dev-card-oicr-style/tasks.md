@@ -29,9 +29,9 @@ graph TD
 - **Files:** `get-innovation-use-details.interface.ts` · `innovation-use-details.component.ts`
 - **Scope:** widen `linked_innovation_dev` with `result_status?: ResultStatus` and `year?: string`, both **optional**, and populate them from `option` inside `onInnovationDevSelected`.
 - **Done:**
-  - [ ] Both keys are **optional** — `npm run build` exits 0 with the existing literal still compiling
-  - [ ] Selecting a result populates both from the picker option
-  - [ ] The three enrichment keys T-09 merges are untouched
+  - [x] Both keys are **optional** — `npm run build` exits 0 with the existing literal still compiling
+  - [x] Selecting a result populates both from the picker option
+  - [x] The three enrichment keys T-09 merges are untouched
 - **Verification:** `npm test -- --silent` · `npm run build`
 - **Falsifying input:** make either key non-optional → the four-key literal stops compiling and `ng build` fails. If it still compiles, the keys were added somewhere the literal does not construct.
 - **Disqualifier:** a test that seeds `linked_innovation_dev` directly. The product builds it **inside `onInnovationDevSelected`** — **drive that method** (inherited `KZ-015`; this exact trap cost the parent spec a round).

@@ -238,7 +238,9 @@ export default class InnovationUseDetailsComponent {
               result_id: option.result_id,
               result_official_code: Number(option.result_official_code),
               title: option.title ?? '',
-              platform_code: option.platform_code ?? null
+              platform_code: option.platform_code ?? null,
+              result_status: option.result_status,
+              year: option.year
             }
           : null
       };

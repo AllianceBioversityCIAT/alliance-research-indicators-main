@@ -1,3 +1,5 @@
+import { ResultStatus } from './result-config.interface';
+
 // @akili-spec docs/specs/innovation-use/details-page (T-01 — contract layer)
 export class GetInnovationUseDetails {
   // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-08 — §4.1 wire contract)
@@ -20,6 +22,8 @@ export class GetInnovationUseDetails {
     innovation_readiness?: { id: number; level: number | null; name: string | null } | null;
     description?: string | null;
     geo_scope?: { code: number; name: string | null } | null;
+    result_status?: ResultStatus;
+    year?: string;
   } | null | undefined = undefined;
 
   innovation_use_level_id: number | undefined = undefined;
