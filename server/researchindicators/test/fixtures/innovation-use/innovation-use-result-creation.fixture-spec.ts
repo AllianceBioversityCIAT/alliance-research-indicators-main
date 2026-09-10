@@ -14,6 +14,7 @@ import { ResultsService } from '../../../src/domain/entities/results/results.ser
 import { GreenCheckRepository } from '../../../src/domain/entities/green-checks/repository/green-checks.repository';
 import { GreenChecksService } from '../../../src/domain/entities/green-checks/green-checks.service';
 import { IndicatorsEnum } from '../../../src/domain/entities/indicators/enum/indicators.enum';
+import { LinkResultRolesEnum } from '../../../src/domain/entities/link-result-roles/enum/link-result-roles.enum';
 import { ActorRolesEnum } from '../../../src/domain/entities/actor-roles/enum/actor-roles.enum';
 import { ContractRolesEnum } from '../../../src/domain/entities/result-contracts/enum/contract-roles.enum';
 import { LeverRolesEnum } from '../../../src/domain/entities/lever-roles/enum/lever-roles.enum';
@@ -187,6 +188,27 @@ import { StubCurrentUserUtil } from './nest-harness';
  * transition, not just the post-save value (KZ-001: a post-save-only
  * assertion cannot distinguish "the save did it" from "it was already
  * true").
+ *
+ * **Repaired at T-14 (`docs/specs/innovation-use/link-innovation-dev`,
+ * Amendment 02, R-IUL-009 "No grandfathering").** Migration B
+ * (`1789100000000-appendInnovationDevLinkRuleToInnovationUseValidation
+ * .ts`) appended rule 16 to `innovation_use_validation`: the green check
+ * now additionally requires an active role-5 `link_results` row pointing at
+ * an active, `indicator_id = 2` result. That broke two `it`s in this file —
+ * both `expect(...).toBeTruthy()` on `innovation_use` — because
+ * `result1Id` and `result4Id` (the two subjects this file's own
+ * `innovation_use` assertions expect TRUE for) had no such link.
+ * `result2Id` already IS exactly the needed target (`indicator_id = 2`,
+ * active, created for the unrelated "control" key-set assertion) — reused
+ * rather than seeding a fifth result. Seeded once, in `beforeAll`, right
+ * after `result4Id` exists: `result1Id → result2Id` and `result4Id →
+ * result2Id`, both active role-5 links. **`result3Id` deliberately gets no
+ * link** — its `innovation_use: false` assertion isolates the MISSING
+ * `result_innovation_use` row (no detail row at all), not rule 16; adding a
+ * link there would prove nothing and could mask a regression in the
+ * pre-rule-16 gate this file also covers. **No assertion here was
+ * weakened or flipped** — both `toBeTruthy()` calls stay `toBeTruthy()`;
+ * only the missing precondition was restored.
  */
 describe('Creating an indicator-6 result wires both child rows and makes the green-check gate genuinely reachable (T-12, F-E)', () => {
   const uniqueSuffix = Date.now();
@@ -575,6 +597,21 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
       )
     ).insertId;
 
+    // T-14 (Amendment 02) — rule 16 (Migration B) requires an active
+    // role-5 `link_results` row pointing at an active `indicator_id = 2`
+    // result for `innovation_use` to read TRUE. `result2Id` already IS
+    // that target (created above for the unrelated key-set control) —
+    // reused here rather than seeding a fifth result. See the file header
+    // for why `result3Id` deliberately gets none.
+    await dataSource.query(
+      `INSERT INTO link_results (result_id, other_result_id, link_result_role_id, is_active, created_by, updated_by) VALUES (?, ?, ?, 1, 1, 1)`,
+      [result1Id, result2Id, LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV],
+    );
+    await dataSource.query(
+      `INSERT INTO link_results (result_id, other_result_id, link_result_role_id, is_active, created_by, updated_by) VALUES (?, ?, ?, 1, 1, 1)`,
+      [result4Id, result2Id, LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV],
+    );
+
     await seedCompletableSections(result1Id);
     await seedCompletableSections(result3Id);
 
@@ -594,6 +631,24 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
       return;
     }
 
+    // T-14 — `link_results` carries FKs in BOTH directions (`result_id` AND
+    // `other_result_id`), so it must be deleted before `results` itself
+    // (below). The `OR` covers both link rows this file seeded
+    // (`result1Id`/`result4Id` as `result_id`, `result2Id` as
+    // `other_result_id`) in one statement.
+    await dataSource.query(
+      `DELETE FROM link_results WHERE result_id IN (?, ?, ?, ?) OR other_result_id IN (?, ?, ?, ?)`,
+      [
+        result1Id,
+        result2Id,
+        result3Id,
+        result4Id,
+        result1Id,
+        result2Id,
+        result3Id,
+        result4Id,
+      ],
+    );
     await dataSource.query(
       `DELETE FROM result_actors WHERE result_id IN (?, ?, ?, ?)`,
       [result1Id, result2Id, result3Id, result4Id],
@@ -728,7 +783,9 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
     // Complete Innovation Use details themselves: a low use level (no
     // justification required below level 6) plus one aggregate-mode actor
     // row, matching innovation_use_validation's requirements verified at
-    // source in the file header.
+    // source in the file header. (T-14: rule 16's own requirement — the
+    // active role-5 link to result2Id — is seeded once in beforeAll, not
+    // here, since it does not change across this file's `it`s.)
     await dataSource.query(
       `UPDATE result_innovation_use SET innovation_use_level_id = 1 WHERE result_id = ?`,
       [result1Id],
@@ -773,7 +830,9 @@ describe('Creating an indicator-6 result wires both child rows and makes the gre
     // (mirrors `ResultInnovationDevService.create`; no raw SQL). No level,
     // no actors yet: `innovation_use_validation` requires
     // `innovation_use_level_id IS NOT NULL` (commonFields) and at least one
-    // actor row (`tempFullActors > 0`), so this state is `false`.
+    // actor row (`tempFullActors > 0`), so this state is `false` regardless
+    // of rule 16 (T-14: `result4Id`'s role-5 link to `result2Id` is already
+    // seeded in `beforeAll` — it is necessary but not sufficient here).
     await harness.innovationUseService.create(result4Id);
 
     const before = await readGreenChecks(result4Id);

@@ -304,4 +304,33 @@ export class CreateResultInnovationUseDto {
   @Type(() => InnovationUseQuantificationDto)
   @ApiProperty({ type: [InnovationUseQuantificationDto], required: false })
   quantifications?: InnovationUseQuantificationDto[];
+
+  /**
+   * T-04 (`docs/specs/innovation-use/link-innovation-dev`; R-IUL-001,
+   * R-IUL-006, R-IUL-008; `design.md` §4.1 (wire contract — normative),
+   * §4.2, DD-1).
+   *
+   * `innovation_dev_result_id` is verbatim from §4.1 — the cross-host
+   * contract with the client lane, which executed this spec's client tasks
+   * on a different machine against this exact key. Do not rename.
+   *
+   * Optional **at transport** only: `@IsOptional()` skips every other
+   * validator for both `undefined` (omitted — DD-4 / §5.1 step 9b's
+   * three-way write preserves the stored link) and explicit `null` (clears it, R-IUL-008).
+   * R-IUL-003 makes the field required at *submit*, via the green check /
+   * rule 16 — never at save, so a DTO that rejected a missing or null value
+   * here would break draft-save.
+   *
+   * `@IsInt()` — never `@IsNumber()` — because the id is a MySQL PK.
+   * `type: number | null` (DD-1): a scalar, never an array;
+   * single-cardinality is a type property here, not a validator, so no
+   * `@ArrayMaxSize` is involved.
+   *
+   * `forbidNonWhitelisted` stays off on the controller's `ValidationPipe`
+   * (§4.2) — unrelated to this field, do not add it here either.
+   */
+  @IsOptional()
+  @IsInt()
+  @ApiProperty({ required: false, nullable: true, type: Number })
+  innovation_dev_result_id?: number | null;
 }

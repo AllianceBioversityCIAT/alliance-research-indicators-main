@@ -22,6 +22,9 @@ import { QuantificationItemComponent, QuantificationItemData } from '@components
 import { InnovationUseLevelStepperComponent } from './components/innovation-use-level-stepper/innovation-use-level-stepper.component';
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
+import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { TooltipModule } from 'primeng/tooltip';
+import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
 import {
   RESULT_ENTRY_SOURCE_QUERY,
   RESULT_ENTRY_SOURCE_VALUE_HOME,
@@ -101,10 +104,45 @@ interface InnovationUseQuantificationPayload {
 
 export interface InnovationUsePayload {
   innovation_use_level_id?: number;
+  innovation_dev_result_id?: number | null;
   innovation_use_level_explanation?: string;
   actors: InnovationUseActorPayload[];
   organizations: InnovationUseOrganizationPayload[];
   quantifications: InnovationUseQuantificationPayload[];
+}
+
+// @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 / T-10 — §6.2 / §6.3 / KZ-012)
+export function formatInnovationDevCode(
+  result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
+): string {
+  if (!result) return '';
+  const prefix = result.platform_code ? `${result.platform_code} ` : '';
+  return `${prefix}${result.result_official_code ?? ''}`.trim();
+}
+
+export function formatInnovationDevLabel(
+  result:
+    | {
+        platform_code?: string | null;
+        result_official_code?: number | string | null;
+        title?: string | null;
+      }
+    | null
+    | undefined
+): string {
+  if (!result) return '';
+  const code = formatInnovationDevCode(result);
+  return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
+}
+
+export function formatInnovationDevUrl(
+  result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
+): string {
+  if (!result) return '';
+  if (result.platform_code) {
+    return `/result/${result.platform_code}-${result.result_official_code}/general-information`;
+  }
+  return `/result/${result.result_official_code}/general-information`;
 }
 
 /**
@@ -127,7 +165,9 @@ export interface InnovationUsePayload {
     QuantificationItemComponent,
     InnovationUseLevelStepperComponent,
     InnovationUseActorItemComponent,
-    InnovationUseOrganizationItemComponent
+    InnovationUseOrganizationItemComponent,
+    SelectComponent,
+    TooltipModule
   ],
   templateUrl: './innovation-use-details.component.html'
 })
@@ -140,8 +180,52 @@ export default class InnovationUseDetailsComponent {
   route = inject(ActivatedRoute);
   versionWatcher = inject(VersionWatcherService);
   levelsService = inject(GetInnovationUseLevelsService);
+  innoDevOutputService = inject(GetInnoDevOutputService);
+
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 — §6.5 / C5)
+  isInnovationDevDisabled = computed(() => {
+    return (
+      !this.submission.isEditableStatus() ||
+      this.innoDevOutputService.error() ||
+      (!this.innoDevOutputService.loading() && this.innoDevOutputService.list().length === 0)
+    );
+  });
+
+  // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-09 — §6.5 / R-IUL-012)
+  innoDevTooltip = computed(() => {
+    if (!this.innoDevOutputService.loading() && this.innoDevOutputService.list().length === 0 && !this.innoDevOutputService.error()) {
+      return 'There are no reported Innovation Development outputs to link.';
+    }
+    return '';
+  });
+
+  readonly formatInnovationDevLabel = formatInnovationDevLabel;
+  readonly formatInnovationDevCode = formatInnovationDevCode;
+  readonly formatInnovationDevUrl = formatInnovationDevUrl;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+
+  onInnovationDevSelected(resultId: number): void {
+    // R-IUL-004: must NOT leave the previous result in the payload after the selection changes.
+    // AND the card re-renders for the new result.
+    this.body.update(current => {
+      if (current.linked_innovation_dev?.result_id !== resultId) {
+        const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
+        return {
+          ...current,
+          linked_innovation_dev: option
+            ? {
+                result_id: option.result_id,
+                result_official_code: Number(option.result_official_code),
+                title: option.title ?? '',
+                platform_code: option.platform_code ?? null
+              }
+            : null
+        };
+      }
+      return current;
+    });
+  }
 
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
   readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
@@ -334,10 +418,7 @@ export default class InnovationUseDetailsComponent {
    */
   quantificationsView = computed<QuantificationItemData[]>(() =>
     this.body().quantifications.map(row => ({
-      number:
-        row.quantification_number === undefined || row.quantification_number === null
-          ? null
-          : Number(row.quantification_number),
+      number: row.quantification_number === undefined || row.quantification_number === null ? null : Number(row.quantification_number),
       unit: row.unit ?? '',
       comments: row.description ?? ''
     }))
@@ -486,24 +567,27 @@ export default class InnovationUseDetailsComponent {
 
     return {
       innovation_use_level_id: current.innovation_use_level_id,
+      innovation_dev_result_id: current.innovation_dev_result_id,
       // REWORK hardening: `?? undefined` makes step 1's "never a present null" (c7) structural
       // rather than coincidental. The server's `findOne` can return `?? null`, and a plain object
       // spread in `getData()` would otherwise copy that literal `null` straight into `body()`.
       innovation_use_level_explanation: current.innovation_use_level_explanation ?? undefined,
       actors: current.actors.filter(row => !!row.actor_type_id).map(row => this.buildActorPayload(row)),
       organizations: current.organizations.filter(row => this.organizationIdentitySatisfied(row)).map(row => this.buildOrganizationPayload(row)),
-      quantifications: current.quantifications.filter(row => !this.quantificationRowAbsent(row)).map(row => ({
-        id: row.id,
-        // T-11 (DD-15): the payload's declared type (`InnovationUseQuantificationPayload`, below)
-        // stays `number` — the API always expects a number (DD-17) — so this narrows the widened
-        // read type back down at the one point the read and write paths meet. Reverting the read
-        // widening at `get-innovation-use-details.interface.ts` while keeping this narrowing makes
-        // the `typeof` check compare against a type with no `string` member, which does not compile
-        // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
-        quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
-        unit: row.unit,
-        description: row.description
-      }))
+      quantifications: current.quantifications
+        .filter(row => !this.quantificationRowAbsent(row))
+        .map(row => ({
+          id: row.id,
+          // T-11 (DD-15): the payload's declared type (`InnovationUseQuantificationPayload`, below)
+          // stays `number` — the API always expects a number (DD-17) — so this narrows the widened
+          // read type back down at the one point the read and write paths meet. Reverting the read
+          // widening at `get-innovation-use-details.interface.ts` while keeping this narrowing makes
+          // the `typeof` check compare against a type with no `string` member, which does not compile
+          // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
+          quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
+          unit: row.unit,
+          description: row.description
+        }))
     };
   }
 

@@ -9,6 +9,7 @@ export class GetInnoDevOutputService {
   api = inject(ApiService);
   list = signal<Result[]>([]);
   loading = signal(true);
+  error = signal(false);
   isOpenSearch = signal(false);
 
   constructor() {
@@ -21,10 +22,17 @@ export class GetInnoDevOutputService {
 
   async main() {
     this.loading.set(true);
+    this.error.set(false);
+
     const response = await this.api.GET_Results({
       'indicator-codes': [2]
     });
-    this.list.set(response?.data?.results ?? []);
+
+    if (!response?.successfulRequest) {
+      this.error.set(true);
+    } else {
+      this.list.set(response?.data?.results ?? []);
+    }
 
     this.loading.set(false);
   }
