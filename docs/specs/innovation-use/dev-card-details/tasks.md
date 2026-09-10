@@ -282,21 +282,21 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Each of the two labelled fields gets its own `@if`, so a null field contributes **no element**.
   - Labels are `font-medium`; values are normal weight. The distinction is **weight, never contrast**.
 - **Acceptance / done check:**
-  - [ ] No element in the card names the description — no `Description:` label, no `aria-label` naming it
-  - [ ] The full, unclamped description text is present in the DOM
-  - [ ] The title + anchor row's class list is byte-identical to before
-  - [ ] The anchor's `href`, text and accessible name are unchanged
-  - [ ] With readiness null, no `Readiness level:` label element exists
-  - [ ] With scope null, no `Geographic scope:` label element exists
-  - [ ] With all three null, the card's DOM equals today's card plus no extra containers
-  - [ ] The labelled row's class list contains `flex-wrap` and no `justify-between`
+  - [x] No element in the card names the description — no `Description:` label, no `aria-label` naming it
+  - [x] The full, unclamped description text is present in the DOM
+  - [x] The title + anchor row's class list is byte-identical to before — **read per `execution.md`'s recorded reading, and the criterion is deliberately NOT reworded.** §8.1 splits the original single div's nine classes: chrome to the outer wrapper, `flex items-center justify-between` to the inner row. Literal byte-identity on one element is therefore unsatisfiable *by design*, and restoring the chrome to the inner row to satisfy the sentence would render a bordered, padded box inside an identical one. Satisfied as: the two elements together preserve every original class, asserted at `spec.ts:4472` (`.toBe`, exact) and `:4473` (contiguous substring, pinning order)
+  - [x] The anchor's `href`, text and accessible name are unchanged
+  - [x] With readiness null, no `Readiness level:` label element exists
+  - [x] With scope null, no `Geographic scope:` label element exists
+  - [x] With all three null, the card's DOM equals today's card plus no extra containers
+  - [x] The labelled row's class list contains `flex-wrap` and no `justify-between`
 - **Verification:** `npm test -- --silent`; `npm run lint -- --quiet`.
 - **Falsifying input, named before the test is written (K-012):** set `description` to a non-empty string and add a `<span>Description:</span>` beside it → the "no element names the description" assertion goes red. And: set all three to `null` → any assertion that still finds a label element reddens.
 - **What disqualifies the evidence, stated plainly:** every criterion above is a **DOM-presence** assertion. **None of them proves layout.** jsdom does not lay out, and the utility classes are not even loaded under it (§11 limit 2 — there is no Tailwind in the build; the utilities come from a runtime CDN script). So a green `line-clamp-3` class assertion proves the class is in the attribute and **nothing about whether it clamps**. That property belongs to T-10, and this task must not be reported as covering it.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Dependencies:** T-06
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** **done** (Antigravity implemented, `akili-reviewer` FAIL → PASS 2026-09-10, 2 work attempts + 1 evidence re-dispatch after a `K-009` non-delivery — see [`./execution.md`](./execution.md))
 
 ---
 

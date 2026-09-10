@@ -4377,4 +4377,215 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
 
     expect(navigateSpy).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1' } });
   });
+
+  // ===============================================================================================
+  // T-07 — Restructure the card: prose, not a property list
+  // ===============================================================================================
+  describe('T-07 — Restructure the card: prose, not a property list', () => {
+    let component: InnovationUseDetailsComponent;
+    let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+        providers: [
+          { provide: ApiService, useValue: apiService },
+          { provide: CacheService, useClass: CacheServiceMock },
+          { provide: ActionsService, useValue: actions },
+          { provide: Router, useValue: router },
+          { provide: SubmissionService, useValue: submission },
+          { provide: VersionWatcherService, useValue: versionWatcher },
+          { provide: ActivatedRoute, useValue: activatedRouteMock }
+        ]
+      }).compileComponents();
+      fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+      component = fixture.componentInstance;
+    });
+
+    it('No element in the card names the description — no `Description:` label, no `aria-label` naming it', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'A non-empty description',
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Description:');
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement?.getAttribute('aria-label')).toBeNull();
+    });
+
+    it('The full, unclamped description text is present in the DOM', () => {
+      const longDesc = 'A'.repeat(400);
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: longDesc,
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]') as HTMLElement;
+      expect(descElement.textContent).toContain(longDesc);
+      expect(descElement.className).toContain('line-clamp-3');
+    });
+
+    it('The title + anchor row preserves the class list across the outer and inner wrappers', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'x',
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
+      const innerRow = anchor.parentElement as HTMLElement;
+      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center justify-between');
+      expect(innerRow.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+    });
+
+    it('The anchor\'s href, text and accessible name are unchanged', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
+      expect(anchor.getAttribute('href')).toContain('P-1-1');
+      expect(anchor.textContent).toContain('View innovation detail ↗');
+      expect(anchor.querySelector('.sr-only')?.textContent).toBe('(opens in a new tab)');
+    });
+
+    it('With readiness null, no `Readiness level:` label element exists', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: null,
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Readiness level:');
+    });
+
+    it('With scope null, no `Geographic scope:` label element exists', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Geographic scope:');
+    });
+
+    it('With all three null, the card\'s DOM equals today\'s card plus no extra containers', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: null,
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      // Select the element immediately following the app-select (the card content)
+      const contentNodes = Array.from(card.children).filter(el => el.tagName !== 'H2' && el.tagName !== 'APP-SELECT');
+      expect(contentNodes.length).toBe(1); // No extra containers, just the single flex row
+      const singleFlexRow = contentNodes[0] as HTMLElement;
+      expect(singleFlexRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center justify-between rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+    });
+
+    it('The labelled row\'s class list contains `flex-wrap` and no `justify-between`', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const labelledRow = card.querySelector('.flex-wrap') as HTMLElement;
+      expect(labelledRow).not.toBeNull();
+      expect(labelledRow.className).toContain('flex-wrap');
+      expect(labelledRow.className).not.toContain('justify-between');
+    });
+  });
 });

@@ -196,19 +196,54 @@
       </app-select>
 
       @if (body().linked_innovation_dev; as devResult) {
-        <div class="flex items-center justify-between rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]">
-          <span class="rs-mr-[16] font-medium text-[var(--ac-grey-800)]">
-            {{ formatInnovationDevLabel(devResult) }}
-          </span>
-          <a
-            [href]="formatInnovationDevUrl(devResult)"
-            target="_blank"
-            rel="noopener"
-            class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
-            View innovation detail ↗
-            <span class="sr-only">(opens in a new tab)</span>
-          </a>
-        </div>
+        @if (devResult.description || formatInnovationDevReadiness(devResult.innovation_readiness) || devResult.geo_scope) {
+          <div class="flex flex-col rs-gap-[16] rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]">
+            <div class="flex items-center justify-between">
+              <span class="rs-mr-[16] font-medium text-[var(--ac-grey-800)]">
+                {{ formatInnovationDevLabel(devResult) }}
+              </span>
+              <a
+                [href]="formatInnovationDevUrl(devResult)"
+                target="_blank"
+                rel="noopener"
+                class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
+                View innovation detail ↗
+                <span class="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
+            
+            @if (devResult.description) {
+              <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] line-clamp-3 m-0">
+                {{ devResult.description }}
+              </p>
+            }
+
+            @if (formatInnovationDevReadiness(devResult.innovation_readiness) || devResult.geo_scope) {
+              <div class="flex flex-wrap gap-[16px]">
+                @if (formatInnovationDevReadiness(devResult.innovation_readiness)) {
+                  <span class="text-[var(--ac-grey-800)]"><span class="font-medium text-[var(--ac-grey-800)]">Readiness level:</span> {{ formatInnovationDevReadiness(devResult.innovation_readiness) }}</span>
+                }
+                @if (devResult.geo_scope) {
+                  <span class="text-[var(--ac-grey-800)]"><span class="font-medium text-[var(--ac-grey-800)]">Geographic scope:</span> {{ devResult.geo_scope.name }}</span>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="flex items-center justify-between rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]">
+            <span class="rs-mr-[16] font-medium text-[var(--ac-grey-800)]">
+              {{ formatInnovationDevLabel(devResult) }}
+            </span>
+            <a
+              [href]="formatInnovationDevUrl(devResult)"
+              target="_blank"
+              rel="noopener"
+              class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
+              View innovation detail ↗
+              <span class="sr-only">(opens in a new tab)</span>
+            </a>
+          </div>
+        }
       }
     </div>
 
