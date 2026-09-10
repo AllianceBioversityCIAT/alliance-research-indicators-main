@@ -56,7 +56,10 @@ export class DelegateIdentityDto {
  *   The @ValidateIf decorators below make each field required when the other is
  *   absent. This is DTO-level — when both fields are omitted, class-validator
  *   fires on the @IsNotEmpty / @ValidateNested / @IsEmail checks, causing a 400
- *   from the global ValidationPipe before the service is reached (Done criterion).
+ *   before the service is reached (Done criterion).
+ *   This repo has NO global ValidationPipe; validation is activated per-handler
+ *   via @UsePipes(new ValidationPipe({...})) on the controller handler that
+ *   accepts this DTO (pi-delegates.controller.ts — T-06).
  *   It is intentionally not a custom class-level validator so the error messages
  *   land on the specific field path rather than on the class root, matching the
  *   existing error vocabulary used across this codebase.

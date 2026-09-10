@@ -75,7 +75,7 @@ graph TD
 - **Done:** [ ] non-authorized caller → 403; [ ] SYSTEM_ADMIN allowed; [ ] PI/delegate of project allowed.
 - **Dep:** T-03, T-04 · **Effort:** M · **Skills:** nestjs-expert
 
-### T-06 — Controller + Swagger + route
+### T-06 — Controller + Swagger + route  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-004
 - **Files:** `entities/pi-delegates/pi-delegates.controller.ts`
 - **Desc:** `POST /pi-delegates`, `GET /pi-delegates?projectId`, `GET /pi-delegates/verify`, `PATCH`/`DELETE`; `@ApiTags`, `@ApiBearerAuth`, `ServerResponseDto`.

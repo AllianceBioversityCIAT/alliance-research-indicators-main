@@ -161,3 +161,29 @@
 4. PRODUCT (OQ-D): `pi_user_id = callerUserId` even when caller is SYSTEM_ADMIN or a delegate (not the actual project PI) — matches design §4 "provenance/authorization context"; flag for OQ-D confirmation.
 
 **Requirements covered:** R-PID-004 (CRUD service methods), R-PID-007 (AC.1 PI/delegate/SYSTEM_ADMIN gate; AC.2 reuse existing relationship, no new role).
+
+---
+
+### T-06 — Controller + Swagger + route — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode.
+- **Covers:** R-PID-004.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed:**
+- `entities/pi-delegates/pi-delegates.controller.ts` (new) — `@ApiTags('PI Delegates')`, `@ApiBearerAuth`, `@UseGuards(RolesGuard)`, `@Controller()`. `POST /` (create, 201), `GET /?projectId` (list), `GET /verify` (declared before the dynamic route), `DELETE /:pi_delegate_id` (ParseIntPipe). Full Swagger; `ResponseUtils.format` envelope.
+- `entities/pi-delegates/pi-delegates.module.ts` (edit) — added `controllers: [PiDelegatesController]`.
+- `dto/create-pi-delegate.dto.ts` (edit) — reworded the stale "global ValidationPipe" comment to per-handler wiring.
+
+**Verification:** `npm run build` clean; `npx eslint <controller+module+dto>` clean.
+
+**Reviewer verdict:** `STATUS: PASS` — all 8 checks:
+- **NO restrictive `@Roles`** (the crux, R-PID-007/DD-B): `RolesGuard` passes when no `@Roles` present → any authenticated user reaches the handler; the T-05 service `assertCanManageProject` is the 403 gate. A role gate here would lock out PIs/delegates.
+- **ValidationPipe carry-forwards RESOLVED:** create `{whitelist, forbidNonWhitelisted, transform}` (empty body → 400 via union `@ValidateIf`); verify `{whitelist, transform}` coerces the query int so `delegate_user_id` can't be dropped (resolves the T-05 verify advisory).
+- Route ordering (verify before `:id`), `ParseIntPipe` matches `service.revoke(number)`, complete Swagger, envelope correct, scope clean (no PATCH — T-05 has no `update()`).
+
+**ADVISORY (recorded; sweep into T-09 commit — non-gating):**
+1. `RevokePiDelegateDto` is now dead code (revoke uses `ParseIntPipe`, never binds the DTO) — remove or annotate as Swagger-only.
+2. `verify-pi-delegate.dto.ts:12` still has the stale "global ValidationPipe" wording (T-06 fixed only the create DTO sibling) — reword for consistency.
+
+**Requirements covered:** R-PID-004 (create/list/verify/revoke REST surface + Swagger).
