@@ -315,11 +315,11 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Expected: `--ac-grey-800` gives ≈ 7.44:1 light and ≈ 7.95:1 dark.
   - Also assert the **rendered class** is on each element, not just the arithmetic — a ratio computed from hardcoded tuples verifies maths, not the render.
 - **Acceptance / done check:**
-  - [ ] The `Readiness level:` label clears 4.5:1 in light and in dark
-  - [ ] The `Geographic scope:` label clears 4.5:1 in light and in dark
-  - [ ] The **description** clears 4.5:1 in light and in dark
-  - [ ] Each of the three elements is asserted to carry `text-[var(--ac-grey-800)]` in the rendered DOM
-  - [ ] The background token used in the computation is named in a comment, and it is `--ac-grey-100`
+  - [x] The `Readiness level:` label clears 4.5:1 in light and in dark
+  - [x] The `Geographic scope:` label clears 4.5:1 in light and in dark
+  - [x] The **description** clears 4.5:1 in light and in dark
+  - [x] Each of the three elements is asserted to carry `text-[var(--ac-grey-800)]` in the rendered DOM
+  - [x] The background token used in the computation is named in a comment, and it is `--ac-grey-100`
 - **Verification:** `npm test -- --silent`
 - **Falsifying input, named before the test is written (K-012):** ⚠️ **CORRECTED 2026-09-10 during execution, then corrected AGAIN before landing — the first correction carried a false universal. Both rounds are recorded because the second is the instructive one.**
   - **Light half:** change one element's class to `text-[var(--ac-grey-600)]` and recompute → **2.91:1**, which fails 4.5 and reddens. That pair is ≈ the one child #3 shipped as a live AA defect (**2.9115:1**), which is why this NFR is stated rather than inherited. *(Unchanged — this half was always sound.)*
@@ -330,7 +330,7 @@ worker reports — never while one is active**, and never two full-suite runs at
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 - **Dependencies:** T-07
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **done** (Antigravity implemented, `akili-reviewer` FAIL → FAIL → PASS 2026-09-10, 3 attempts — see [`./execution.md`](./execution.md)). **The spec's own falsifier was corrected mid-task:** it could only reach the light half
 
 ---
 

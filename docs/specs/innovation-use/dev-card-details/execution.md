@@ -1282,3 +1282,99 @@ by accident in a restyle.
 item remains the governing intent, and **no task was minted here** — `/akili-execute` §2.4 forbids
 growing this spec from feedback that arrived mid-run, and the gate's own escalation path is the
 correct route. Carried as **`RB-7`**.
+
+### T-08 — WCAG AA on all three new text elements, in both themes — `PASS` ✅ (3 attempts)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-10 |
+| Lane | client — Antigravity (`gemini-3.1-pro-high`) → `akili-reviewer` (Opus), 3 rounds |
+| Requirements covered | `NFR-IUC-002` |
+| Defect classes gated | `DC-7` |
+| Files | `innovation-use-details.component.spec.ts` — tests only, **no production change** (T-07 had already put the token on all three elements) |
+
+**Four blocks:** the rendered class on all three elements · the light ratio · the dark ratio · a pin on
+what the element would inherit if the token were removed.
+
+**The gate is observed red from a REAL component mutation.** Changing the `Readiness level` outer span
+to `--ac-grey-600` reddens the class assertion:
+`Received string: "text-[var(--ac-grey-600)] ng-star-inserted"`. The Reviewer identified the decisive
+detail, which the Leader had not claimed: **`ng-star-inserted` is emitted only by Angular's `@if` at
+render time, so a mutated constant could not have produced it** — and the absence of `font-medium`
+identifies the mutated element as the outer span, exactly the one the brief named. The red is
+self-authenticating, independent of any line-number reasoning.
+
+**Attempt 1 FAILed on `KZ-014`'s named instance:** the "falsifier" was
+`expect(wrongRatio).toBeGreaterThanOrEqual(4.5)` flipped over hardcoded tuples — *"the **assertion**
+mutated, not the code."* It was also a byte-equivalent duplicate of the standing pin at `:3670-3674`
+and carried `// Fixed to pass`, a record of the flip left in the file as a rationale. Dropped.
+
+**Attempt 2 delivered the real mutation** and disclosed its own line offset unprompted (`:4660`
+pre-mutation → `:4663` delivered) — the discipline an earlier task in this spec failed by citing a
+line whose assertion was absent from the delivered file.
+
+**Attempt 3 fixed one false clause** (below). Gates throughout: **317 suites / 6938 tests**,
+spec type-check **934** package-wide baseline / **0** in this file. **Lint is structurally irrelevant
+to this diff** — the flat ESLint config ignores `*.spec.ts` (`K-002`) and the change is spec-only, so
+it is deliberately not cited as evidence.
+
+#### The spec's own falsifier could not reach half the requirement — found by measurement
+
+`NFR-IUC-002` is 3 elements × 2 themes. `tasks.md`'s falsifier named **one** mutation (substitute
+`--ac-grey-600`), and in **dark** that pair is **4.67:1 — it clears 4.5.** So the named mutation could
+only ever redden the light half. `grey-700` (6.24) and `grey-800` (7.95) also clear.
+
+**The dark half's falsifier is REMOVAL of the colour class**, not substitution: an element with no
+token inherits UA black on `#2b2b2b` at **1.4832:1**. Removal reddens the class assertion identically
+in **both** themes, because that assertion is theme-independent while the token resolves per theme.
+
+**The information already existed and its consequence was never drawn.** `design.md` §8.3's table
+recorded `4.67:1 ⚠️` with *"clears it in dark by only 3.7%"*, and `judgment.md` **W1** records both
+judges recomputing **4.6676** after catching that table carrying `6.2` — grey-700's value, copied one
+row up. **W1 warned that *"a test written from this table would encode a false expectation"*, and the
+artifact that warning applied to was this falsifier line.** Three judgment rounds passed over it.
+`tasks.md` corrected at `20bd32e5`; the in-file record at `cc3c2a88`.
+
+#### Two Leader errors in this task, both recorded
+
+1. **I lost my own correction.** I applied the `tasks.md` fix **uncommitted**, then dispatched a worker whose brief told it to revert a template mutation. It used git — which cannot distinguish its mutation from my edit to a different file — and discarded mine. The Reviewer caught the absence by grepping for it. **Rule adopted: Leader-side spec edits are committed before any worker runs.** I had been careful about workers colliding with each other and careless about a worker colliding with me.
+2. **The lost correction was wrong anyway, and I had put the error in the worker's brief.** It asserted *"no grey in the `[data-theme='dark']` block fails 4.5 on `--ac-grey-100`."* That block holds **nine** greys; **`grey-500` `#7d7d7d` is 3.4397:1 and fails**, as do 400 and below. A dark substitution falsifier **does** exist — it simply uses a token that was never a candidate for this text. As written it told the next maintainer not to look, which is `judgment.md` **W5**'s named harm: *"saying otherwise removes the reason to look."* Now scoped to §8.3's candidates in both documents, with the false universal explicitly recorded **as false** so it cannot be reintroduced.
+
+#### 🔴 And the closing audit's own correction was the wrong one — the near-miss ran backwards
+
+The closing Reviewer flagged **`6.24` as wrong**, computing **`6.2327`**, and additionally called
+`judgment.md` W1's *"verified exact 6.2373"* wrong — noting the irony that *"W1 caught `6.2` sitting
+in the wrong row, and then recorded grey-700's own dark value slightly wrong in the same cell."*
+
+**It hand-computed by series expansion with no interpreter, declared that limit, and asked that
+`6.2327` be confirmed with one line of JS before any edit.** It was, and **the Reviewer's figure was
+the wrong one:** with an interpreter calibrated against the canonical `Y(#808080) = 0.21586` (matched
+exactly), `Y(#acacac) = 0.4125426` and the ratio is **6.23729** — **W1's 6.2373 exactly**, rounding to
+`design.md`'s **6.24**. The Reviewer's `Y` was off by **0.00034**. **All eight figures verify**:
+4.66760 · 6.23729 · 7.94901 · 2.91149 · 1.48315 · 3.43968 · 4.6676 · 2.9115.
+
+**Nothing was corrected, and that is the finding.** Trusting the audit would have rewritten **four
+correct sites** to a wrong value **while citing a reviewer as authority** — the `KZ-007` propagation
+harm, committed in the name of preventing it. The requested interpreter check is the only reason it
+did not happen, and it is the strongest argument in this run for `K-004`'s rule applying to *arguments*
+as tightly as to commands (`KZ-014`): the audit's reasoning was careful, cited, internally consistent,
+and wrong.
+
+**The Reviewer's second point stood and was acted on** (`259172fa`): my provenance sentence claimed its
+independent arithmetic as corroboration, which is a **`KZ-017` scope gap inside the very sentence
+asserting provenance** — its calibration set was three figures that **all pass** (2.9115 / 4.6676 /
+7.9490), and a calibration set of passing values **cannot surface an error in a fourth**. The sentence
+now states the full eight-figure sweep with its calibration basis, and records that the audit's own
+figure failed.
+
+#### `ADVISORY` — recorded, non-gating
+
+1. **`4.67` and `6.24` are asserted in the block as fact and no test computes either** — only `7.95` (`:4684`) and the black bound (`:4692`) are computed. Both are now triple-verified, but a change to a dark token would drift the comment silently. Same for `3.4397`, which lives in two places (exact in `tasks.md`, `~3.44` in the comment) and is computed by nothing.
+2. **`design.md` §8.3's `≈ 1.45` for the removal case is not a rounding of 1.4832** — it is off by 2.2%; a rounding would read ≈1.48. *"Imprecise" is generous — it is mildly wrong.* **Deliberately not propagated**: the exact value has one home and the test computes it, per §8.3's own instruction to re-derive. Correcting §8.3 and `judgment.md` S6 is a one-line archive-time job, not a gate item.
+3. **`:4636-4638`'s comment is a byte-identical copy of `:3665-3667`** and claims *"proving the assertions above are discriminating"* where **no assertions precede it** in this block. Its last clause is now genuinely true of the observed mutation.
+4. **`:4612` cites T-07's `:4473`/`:4564` by line number** into a file that is the change surface of T-06, T-07 **and** T-08 — the case `FP-50` refuses. **This very task moved `:4660` to `:4663`.** Test titles would be a grep-resolvable anchor.
+5. **Third local copy of `contrastRatio`/`relativeLuminance`** (`:2845`, `:3210`, `:4605`). Two pre-date T-08, so this follows the file's pattern rather than breaking one; a formula fix now has three sites.
+6. **`KZ-017`, owned by T-10:** nothing here proves the class `text-[var(--ac-grey-800)]` **resolves** to `#4c5158` / `#c2c2c2` at runtime. jsdom applies no stylesheet and the utilities come from a runtime CDN script that never executes under it. This block proves *class presence* ∧ *arithmetic over hex read from `colors.scss`*; **the join between them is T-10's human check in both themes.**
+
+**Constitution impact:** none. Test-only.
