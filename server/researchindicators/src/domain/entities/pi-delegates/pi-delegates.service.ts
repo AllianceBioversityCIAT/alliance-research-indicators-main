@@ -1,4 +1,4 @@
-// @akili-spec docs/specs/changes/my-pi-delegates — T-12
+// @akili-spec docs/specs/changes/my-pi-delegates — T-12, T-13
 //
 // Service contract (design.md §10.3 / requirements.md §11):
 //
@@ -24,9 +24,7 @@
 //   verify()     — unchanged from v2 (R-PID-004 AC.1).
 //   assertCanManageProject() — unchanged from v2 (R-PID-007).
 //
-// v2 create() and revoke() are KEPT (see below) because the current controller
-// (T-06) still references them.  T-13 will replace the controller with bulk
-// endpoints and can safely remove them then.
+// v2 create() and revoke() removed in T-13 (controller now uses bulk endpoints).
 //
 // Authorization contract (R-PID-007 / DD-B):
 //   Three cases decide whether a caller may manage a project's delegations:
@@ -50,15 +48,12 @@
 //   done here — see Not Done / Assumptions in the task report).
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PiDelegatesRepository } from './repositories/pi-delegates.repository';
 import { DelegateInput } from './repositories/pi-delegates.repository';
-import { CreatePiDelegateDto } from './dto/create-pi-delegate.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
 import {
   BulkAssignPiDelegatesDto,
@@ -450,84 +445,5 @@ export class PiDelegatesService {
     });
 
     return { exists: row != null };
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // v2 single-item create/revoke — KEPT for controller backward-compat (T-06).
-  // T-13 will replace the controller with bulk endpoints; remove these then.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Create a new delegation (R-PID-004 AC.1, R-PID-005, R-PID-007).
-   *
-   * Auth is enforced before any write.  The transactional find-or-create of the
-   * delegate's sec_user row is delegated entirely to
-   * PiDelegatesRepository.createDelegate() (T-04).
-   *
-   * pi_user_id: the caller's own user_id.  The PI/delegate auth check above
-   * already confirmed the caller may act on behalf of this project; their
-   * user_id is recorded as the provenance of the delegation.
-   *
-   * Duplicate active delegation (R-PID-006): the DB unique-active constraint on
-   * active_delegate_key will cause the INSERT to throw a MySQL duplicate-key
-   * error.  TypeORM surfaces this as a QueryFailedError with errno 1062.
-   * We catch it and re-throw as ConflictException (409) with a clear message.
-   */
-  async create(dto: CreatePiDelegateDto): Promise<PiDelegate> {
-    await this.assertCanManageProject(dto.project_id);
-
-    const callerUserId = this.currentUserUtil.user_id;
-
-    // Determine delegate input: prefer delegate_user_id when present.
-    const delegateInput =
-      dto.delegate_user_id != null
-        ? { delegate_user_id: dto.delegate_user_id }
-        : dto.delegate!;
-
-    try {
-      return await this.piDelegatesRepository.createDelegate(
-        dto.project_id,
-        callerUserId,
-        delegateInput,
-        callerUserId,
-      );
-    } catch (err: unknown) {
-      // MySQL errno 1062 — duplicate unique key (active_delegate_key constraint).
-      if (
-        err instanceof Error &&
-        'errno' in err &&
-        (err as NodeJS.ErrnoException).errno === 1062
-      ) {
-        throw new ConflictException(
-          'An active delegation already exists for this (project, delegate) pair.',
-        );
-      }
-      throw err;
-    }
-  }
-
-  /**
-   * Revoke (soft-delete) a delegation by its primary key (R-PID-004 AC.2).
-   *
-   * The row is fetched first to obtain project_id for the auth check.
-   * If the row does not exist or is already revoked, a NotFoundException is thrown.
-   */
-  async revoke(piDelegateId: number): Promise<void> {
-    const row = await this.piDelegatesRepository.findOne({
-      where: { pi_delegate_id: piDelegateId, is_active: true },
-    });
-
-    if (!row) {
-      throw new NotFoundException(
-        `Active delegation with id ${piDelegateId} not found.`,
-      );
-    }
-
-    await this.assertCanManageProject(row.project_id);
-
-    await this.piDelegatesRepository.softDeleteDelegate(
-      piDelegateId,
-      this.currentUserUtil.user_id,
-    );
   }
 }

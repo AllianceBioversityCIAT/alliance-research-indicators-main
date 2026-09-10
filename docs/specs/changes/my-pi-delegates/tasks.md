@@ -154,7 +154,7 @@ graph TD
 - **Disqualifies:** the sync test must prove **revocation of a missing delegate** (Mateo case) AND that an unrelated project is untouched (KZ-004: distinct projects).
 - **Done:** [ ] sync creates+revokes+keeps correctly; [ ] fail-fast atomic on auth/PI-exclusion; [ ] bulkRevoke soft-deletes only named pairs.
 - **Dep:** T-10, T-11, T-05 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
-### T-13 — Controller: bulk POST/DELETE + Swagger
+### T-13 — Controller: bulk POST/DELETE + Swagger  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-009, R-PID-010
 - **Files:** `pi-delegates.controller.ts` (change POST/DELETE to bulk; keep list/verify)
 - **Desc:** `POST /` body `BulkAssignPiDelegatesDto` → `assign`; `DELETE /` body `BulkRevokePiDelegatesDto` → `bulkRevoke`. Keep `@UsePipes(ValidationPipe)`, NO `@Roles`. Full Swagger with bulk examples.

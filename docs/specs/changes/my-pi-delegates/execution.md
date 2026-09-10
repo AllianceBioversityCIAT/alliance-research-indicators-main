@@ -328,3 +328,11 @@
 - **⚠ ROUTE TO T-14 (Reviewer advisory — the sharp edge):** `assign` with an empty resolved `desiredSet` → `toRevoke = entire current set` → mass revoke of a project's delegates. This is intended declarative Model-B (DD-G / R-PID-009 AC.2); `@ArrayNotEmpty` on `delegates` backstops the literal empty case. T-14 MUST cover the mass-revoke path deliberately.
 - **ADVISORY (non-gating):** bulkRevoke Shape B interleaves auth with delete (vs assign's pre-loop) — correct transactionally; dedupe-by-input comment nicety.
 - **Verification:** `npm run build` clean; `npx eslint <service>` clean.
+
+### T-13 — Controller: bulk POST/DELETE + Swagger — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-009, R-PID-010. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `pi-delegates.controller.ts` (POST→`assign` bulk, DELETE→`bulkRevoke` by body no path param, ValidationPipe on both, NO `@Roles`, list/verify unchanged, rich Swagger examples for both shapes); `pi-delegates.service.ts` (removed dead v2 `create`/`revoke` + unused imports).
+- **Reviewer PASS:** all 8 checks — no `@Roles` (service is the gate), POST/DELETE wired to bulk service, ValidationPipe present on both, list/verify intact, handler signatures match, dead code removed cleanly, Swagger complete, scope clean.
+- **⚠ EXPECTED RED — routed to T-14:** removing `create`/`revoke` makes `pi-delegates.service.spec.ts` stale (calls removed methods + 2-arg constructor vs 3). **`npm test` is RED until T-14 rewrites the service spec.** Not a T-13 defect (T-14 owns the test rewrite). `npm run build` (excludes `*spec.ts`) stayed green — do NOT read that as test-green; the green gate is at T-14 close.
+- **Verification:** `npm run build` clean; `npx eslint <controller+service>` clean.
