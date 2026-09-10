@@ -721,9 +721,17 @@ export class ResultInnovationUseService {
    * such filter for the identical reason).
    *
    * A missing target `Result` row returns all three facts `null` and never
-   * throws (§5.1's closing row) — reachable from the **targeted** read
-   * (T-04) with an unknown id; unreachable from the section read as the
-   * code stands today (§5.2's note).
+   * throws (§5.1's closing row) — unreachable from the section read as the
+   * code stands today (§5.2's note). **Also unreachable from the targeted
+   * path (T-04/T-03) for an unknown id**, post-T-03: `!result` here would
+   * require `readInnovationDevCardFacts` to run at all, but
+   * `readInnovationDevCardFactsForTarget` below short-circuits an unknown
+   * id at the bound (`inBounds` false) and never calls this method in the
+   * first place — see that method's own `inBounds` ternary, just below,
+   * for that structure. The one way `!result`
+   * still fires from the targeted path is a TOCTOU race between the
+   * bounding queries above and this read: the row is deleted in between,
+   * so the bound saw it and this method does not.
    */
   private async readInnovationDevCardFacts(
     resultId: number,
@@ -743,7 +751,7 @@ export class ResultInnovationUseService {
       .getOne();
 
     if (!result) {
-      return { innovation_readiness: null, description: null, geo_scope: null };
+      return ResultInnovationUseService.emptyInnovationDevCardFacts();
     }
 
     const detail = result.result_innovation_dev?.[0] ?? null;
@@ -763,6 +771,81 @@ export class ResultInnovationUseService {
         ? { code: result.geo_scope.code, name: result.geo_scope.name ?? null }
         : null,
     };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-03 (`design.md` DD-13;
+   * `R-IUC-008` AC.6–AC.9). The literal `{ innovation_readiness: null,
+   * description: null, geo_scope: null }` shape shared by two callers: the
+   * "target row does not exist" branch above, and the out-of-bounds branch
+   * of `readInnovationDevCardFactsForTarget` below. Factored into one
+   * method so the two cases are **structurally**, not just coincidentally,
+   * identical (`AC.9`) — a future edit to one cannot silently drift from
+   * the other the way two independent object literals could.
+   */
+  private static emptyInnovationDevCardFacts(): InnovationDevCardFacts {
+    return { innovation_readiness: null, description: null, geo_scope: null };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-03 (`design.md` DD-13;
+   * `R-IUC-008` AC.6–AC.9). This is the **only** entry point T-04's targeted
+   * endpoint may call — never `readInnovationDevCardFacts` directly — and
+   * it exists to bound that read's target set to exactly the three
+   * predicates the section read already gets for free from
+   * `SetUpInterceptor` → `ResultsUtil.setup()`: `indicator_id = 2`
+   * (Innovation Development), `is_active = TRUE`, `is_snapshot = FALSE`.
+   *
+   * **Do NOT wire this into T-02's section read.** `findOne`'s call to
+   * `readInnovationDevCardFacts` above stays exactly as T-02 left it: the
+   * section read's target arrives through an existing link row already
+   * pinned by `SetUpInterceptor`, and adding these predicates there would
+   * silently start hiding links to results that are legitimately reachable
+   * today (`design.md` §4.2's note on `judgment.md` N-1).
+   *
+   * **`indicator_id = 2` and `is_active = TRUE` are bounded by
+   * `ResultsService.filterResultByIndicators`** — the same method
+   * `validateInnovationDevLinkTarget` above already calls for the identical
+   * purpose, and the one `LinkResultsService.saveLinkResults` uses to bound
+   * the linkable set. **Never hand-rolled** — `R-IUC-008` AC.6 names this
+   * explicitly, and design.md DD-13 records revision 2's failure mode: an
+   * ungated target set with every *other* acceptance criterion green.
+   *
+   * **`is_snapshot = FALSE` has no existing service method to reuse** —
+   * `filterResultByIndicators` does not filter it, and neither
+   * `ResultsUtil.setup()` nor the `GET /api/results` list query expose it
+   * as a callable predicate; both just hard-filter the column inline. So it
+   * is checked directly, alongside, against the same `resultId` — never
+   * folded into a hand-rolled `where` that duplicates the indicator/active
+   * bound `filterResultByIndicators` already owns.
+   *
+   * **Out-of-bounds and unknown resolve to the exact same object**
+   * (`emptyInnovationDevCardFacts()` above) — not two call sites that
+   * happen to build equal-looking literals. No status code, message, field
+   * presence or field ordering can differ between them, because there is
+   * only one code path producing that shape (`AC.9` — no existence oracle).
+   */
+  async readInnovationDevCardFactsForTarget(
+    resultId: number,
+  ): Promise<InnovationDevCardFacts> {
+    const [matches, target] = await Promise.all([
+      this._resultsService.filterResultByIndicators(
+        [resultId],
+        [IndicatorsEnum.INNOVATION_DEV],
+        false,
+      ),
+      this.dataSource.getRepository(Result).findOne({
+        select: { result_id: true, is_snapshot: true },
+        where: { result_id: resultId },
+      }),
+    ]);
+
+    const inBounds =
+      matches.includes(resultId) && target?.is_snapshot === false;
+
+    return inBounds
+      ? this.readInnovationDevCardFacts(resultId)
+      : ResultInnovationUseService.emptyInnovationDevCardFacts();
   }
 
   /**

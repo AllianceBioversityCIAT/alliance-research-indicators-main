@@ -152,19 +152,19 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Add `is_snapshot = FALSE` alongside — `ResultsUtil.setup()` and the `GET /api/results` list query both hard-filter it.
   - The **section read** (T-02) is unaffected: its target arrives through an existing link row and is already pinned by `SetUpInterceptor`. Do **not** add these predicates to T-02's path.
 - **Acceptance / done check:**
-  - [ ] A target with `indicator_id ≠ 2` returns the unknown-id response
-  - [ ] A target with `is_active = FALSE` returns the unknown-id response
-  - [ ] A target with `is_snapshot = TRUE` returns the unknown-id response
-  - [ ] All four out-of-bounds cases and the unknown-id case return **byte-identical** responses
-  - [ ] No status code, message, field presence or field ordering separates *"does not exist"* from *"out of bounds"*
-  - [ ] The bounding uses `filterResultByIndicators`, not a hand-written `where`
+  - [x] A target with `indicator_id ≠ 2` returns the unknown-id response
+  - [x] A target with `is_active = FALSE` returns the unknown-id response
+  - [x] A target with `is_snapshot = TRUE` returns the unknown-id response
+  - [x] All four out-of-bounds cases and the unknown-id case return **byte-identical** responses
+  - [x] No status code, message, field presence or field ordering separates *"does not exist"* from *"out of bounds"*
+  - [x] The bounding uses `filterResultByIndicators`, not a hand-written `where`
 - **Verification:** `npm test -- --silent`
 - **Falsifying input, named before the test is written (K-012):** seed a soft-deleted (`is_active = FALSE`) indicator-2 result carrying a distinctive description string, then read it by id. Before the fix that string appears in the response; with any one of the three predicates removed, the corresponding assertion goes red. For AC.9 specifically: make the out-of-bounds branch return `404` while unknown returns `200` with nulls → the byte-identity assertion reddens.
 - **What disqualifies the evidence:** asserting only that the *readiness* is absent. `description` is the field with the disclosure risk, and a check that omits it leaves the actual exposure ungated. Also: a test that compares only status codes cannot see a differing body.
 - **Skills:** `nestjs-expert`, `api-design-principles`
 - **Dependencies:** T-01
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** **done** (both lens Reviewers PASS 2026-09-10, 2 attempts — see [`./execution.md`](./execution.md))
 
 ---
 
@@ -498,7 +498,7 @@ Append-only.
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-09-10 | `OQ-3` unresolved — the geo scope may not be in scope at all | Asked before T-01, as mitigated. **Answer: it ships.** | Product owner | **closed 2026-09-10** |
-| RB-2 | 2026-09-10 | The security review that `N-2` un-waived has no named reviewer | Name one before PR 1 opens | Engineering lead | **open** |
+| RB-2 | 2026-09-10 | The security review that `N-2` un-waived has no named reviewer | Name one before PR 1 opens. **Partial progress 2026-09-10:** T-03 now carries a structured **security sign-off record** in `execution.md` (AC.6–AC.9, each with its observed red and its declared scope limit), produced by a dedicated RISK/SECURITY lens Reviewer across two rounds. That is the *material* a human reviewer signs; it does **not** substitute for the named human | Engineering lead | **open — material prepared, signatory still unnamed** |
 | RB-3 | 2026-09-10 | `DC-14`'s gate lives in `test:fixtures`, a tier this spec's authors have not run | Pre-flighted by the Leader before T-01 was dispatched. The premise was **wrong in this spec's favour**: the tier holds **18** `*.fixture-spec.ts` files, 14 of them under `test/fixtures/innovation-use/`. `npm run test:fixtures -- smoke.fixture-spec` ran **PASS 1/1**, and that spec asserts a real `SELECT 1` over the initialized TEST datasource, so the tier reaches a live scratch schema rather than compiling and exiting | Server lane | **closed 2026-09-10 — tier observed executing** |
 | RB-4 | 2026-09-10 | Antigravity delegation: `worker-start --agent gemini` is disabled here; the model list has drifted twice | Use `terminal create` + `orchestration dispatch --inject`; re-probe `agy models` before each dispatch; treat a silent worker as a **runtime failure** and re-dispatch | Leader | open |
 | RB-6 | 2026-09-10 | **`test:fixtures` is red before this spec changed anything.** 5 pre-existing files fail with `Nest cannot create the ResultPolicyChangeModule instance ... imports array is undefined` — a circular import (`ResultPolicyChangeModule.imports[0]` = `LinkResultsModule`; `LinkResultsModule` imports `forwardRef(() => ResultsModule)`; `results.module.ts:58` imports `ResultPolicyChangeModule` back **without** a `forwardRef`) that manifests only under ts-jest require order, not the app's normal bootstrap. Baselined under `git stash` on clean HEAD by the Implementer and independently corroborated by the Reviewer, which confirmed exactly 5 committed callers of `createInnovationUseHarness`. **Consequence for this spec: §9's *"`test:fixtures` green"* checkbox cannot be honestly ticked by any task here** | Do **not** absorb it — T-01's fixture bypasses the broken harness and instantiates the service directly against the real TEST `DataSource`, which the Reviewer accepted as valid `DC-14` evidence (SQL text is a pure function of builder calls + entity metadata, and both datasource targets build the same `entities` glob). Needs its own spec. §9's wording needs amending to *"`test:fixtures`: this spec's own specs green, with the 5-file pre-existing baseline recorded"* | Engineering lead | **open — raised at the T-01 gate** |

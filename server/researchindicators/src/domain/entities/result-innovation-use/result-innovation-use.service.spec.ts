@@ -69,8 +69,16 @@ describe('ResultInnovationUseService', () => {
   const resultCreateQueryBuilder = jest
     .fn()
     .mockReturnValue(resultQueryBuilder);
+  // T-03 (`design.md` DD-13, `R-IUC-008` AC.6–AC.9) —
+  // `readInnovationDevCardFactsForTarget`'s own bounding check: a plain
+  // `findOne` on the SAME `Result` repository `readInnovationDevCardFacts`
+  // already reaches via `createQueryBuilder` above. Both keys coexist on
+  // one mock object because the real `dataSource.getRepository(Result)`
+  // returns one repository either method can call.
+  const resultRepoFindOne = jest.fn();
   const resultRepo = {
     createQueryBuilder: resultCreateQueryBuilder,
+    findOne: resultRepoFindOne,
   };
 
   const getRepository = jest.fn((entity: unknown) => {
@@ -201,6 +209,8 @@ describe('ResultInnovationUseService', () => {
     resultQueryBuilderLeftJoinAndSelect.mockReturnThis();
     resultQueryBuilderWhere.mockReturnThis();
     resultCreateQueryBuilder.mockReturnValue(resultQueryBuilder);
+    // T-03 — same `...Once()` leak-closing discipline as `getOne` above.
+    resultRepoFindOne.mockReset();
     // Part C.4 (fold-in, T-06 attempt 2) — `clearAllMocks()` clears call
     // history but NOT a queued `mockResolvedValueOnce` implementation. The
     // isolation fix above covered only `mainFindOne` / `levelFindOne`; these
@@ -2223,6 +2233,279 @@ describe('ResultInnovationUseService', () => {
       // The where() call carries no is_active reference at all.
       const whereArgs = resultQueryBuilderWhere.mock.calls[0];
       expect(JSON.stringify(whereArgs)).not.toContain('is_active');
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-03 (`design.md` DD-13,
+   * `R-IUC-008` AC.6–AC.9) — `readInnovationDevCardFactsForTarget`'s six
+   * acceptance criteria. Each out-of-bounds scenario seeds a DISTINCTIVE
+   * description string on the row `readInnovationDevCardFacts`'s own
+   * `getOne` would return, so a bound that has been broken (one that lets
+   * the method fall through to the real read anyway) is caught by the
+   * actual leaked text — not merely by an assertion that "readiness is
+   * absent" (`tasks.md`'s named disqualifier: `description` is the field
+   * with the disclosure risk, and a check that omits it leaves the actual
+   * exposure ungated).
+   *
+   * **Blind region, declared rather than discovered (`KZ-017`):** this
+   * describe block calls the service method directly — there is no
+   * controller for this endpoint yet (`T-04` is not started). "No status
+   * code... separates does-not-exist from out-of-bounds" is therefore
+   * provable here only at the return-VALUE level (shape, field presence,
+   * field order, `JSON.stringify` equality); the HTTP-status half of that
+   * same acceptance criterion is unreachable from this file and is T-04's
+   * to prove once the route exists.
+   */
+  describe('readInnovationDevCardFactsForTarget (T-03 bounded target set, dev-card-details)', () => {
+    const resultId = 950;
+    const EMPTY_CARD_FACTS = {
+      innovation_readiness: null,
+      description: null,
+      geo_scope: null,
+    };
+
+    const callBoundedRead = () =>
+      (
+        service as unknown as {
+          readInnovationDevCardFactsForTarget: (
+            id: number,
+          ) => Promise<Record<string, unknown>>;
+        }
+      ).readInnovationDevCardFactsForTarget(resultId);
+
+    it('AC.6 — indicator_id ≠ 2: returns the unknown-id shape, never the leaked description', async () => {
+      // A wrong-indicator row is excluded by filterResultByIndicators's own
+      // `indicator_id: In(indicators)` clause — simulated here by an empty
+      // match list, since that real predicate is exercised elsewhere
+      // (`validateInnovationDevLinkTarget`'s own tests), not re-proven here.
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-WRONG-INDICATOR',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      await expect(callBoundedRead()).resolves.toEqual(EMPTY_CARD_FACTS);
+      expect(mockFilterResultByIndicators).toHaveBeenCalledWith(
+        [resultId],
+        [IndicatorsEnum.INNOVATION_DEV],
+        false,
+      );
+    });
+
+    it('AC.7 — is_active = FALSE (soft-deleted): returns the unknown-id shape, never the leaked description', async () => {
+      // A soft-deleted row is excluded by filterResultByIndicators's own
+      // `is_active: true` clause — the SAME reused call AC.6 exercises,
+      // deliberately: `design.md` DD-13's "why all three" table binds both
+      // predicates to this one method.
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-SOFT-DELETED',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      await expect(callBoundedRead()).resolves.toEqual(EMPTY_CARD_FACTS);
+    });
+
+    it('AC.8 — is_snapshot = TRUE: returns the unknown-id shape, never the leaked description', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([resultId]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: true,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-SNAPSHOT',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      await expect(callBoundedRead()).resolves.toEqual(EMPTY_CARD_FACTS);
+    });
+
+    // AKILI rework attempt 2 — AC.9a used to be a single `it` running all
+    // four arms through one `for` loop, so a failing arm 1 aborted arms
+    // 2-4 silently (T-01's shadowing pattern). Split into four independent
+    // `it`s: each arm now stands or falls on its own, and each arm also
+    // primes `resultQueryBuilderGetOne` with a distinctive `LEAK-<CASE>`
+    // row. Before this priming, a bound that let the arm through in error
+    // would fall to the unprimed `getOne` mock resolving `undefined` →
+    // `!result` → the SAME empty shape, for the wrong reason (green under
+    // a broken bound). Now, if the bound lets the read through, the real
+    // read consumes the leak row and the byte-identity assertion catches
+    // it — proving identity against a row that would otherwise leak, not
+    // against an unprimed mock.
+    const assertByteIdenticalToEmpty = (outcome: unknown) => {
+      expect(outcome).toEqual(EMPTY_CARD_FACTS);
+      expect(Object.keys(outcome as object)).toEqual([
+        'innovation_readiness',
+        'description',
+        'geo_scope',
+      ]);
+      expect(JSON.stringify(outcome)).toBe(JSON.stringify(EMPTY_CARD_FACTS));
+    };
+
+    it('AC.9a[1] — wrong-indicator arm is byte-identical to the unknown-id shape, proven against a row that would otherwise leak', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-WRONG-INDICATOR',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      assertByteIdenticalToEmpty(await callBoundedRead());
+    });
+
+    it('AC.9a[2] — soft-deleted (is_active = FALSE) arm is byte-identical to the unknown-id shape, proven against a row that would otherwise leak', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-SOFT-DELETED',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      assertByteIdenticalToEmpty(await callBoundedRead());
+    });
+
+    it('AC.9a[3] — is_snapshot = TRUE arm is byte-identical to the unknown-id shape, proven against a row that would otherwise leak', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([resultId]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: true,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-SNAPSHOT',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      assertByteIdenticalToEmpty(await callBoundedRead());
+    });
+
+    it('AC.9a[4] — unknown-id arm is byte-identical to the three out-of-bounds shapes, proven against a row that would otherwise leak', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce(null);
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-UNKNOWN',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      assertByteIdenticalToEmpty(await callBoundedRead());
+    });
+
+    it('AC.9b — no field, presence, or ordering signal distinguishes an out-of-bounds target from an unknown one (existence-oracle guard)', async () => {
+      // Same pairing as AC.9a, asserted as a direct pairwise comparison
+      // rather than a loop, so a diff on failure names the two shapes
+      // being compared rather than an index into an array. Both arms are
+      // primed with a distinctive LEAK row for the same reason as AC.9a:
+      // identity must hold against a row that would otherwise leak, not
+      // against an unprimed mock resolving `undefined`.
+      mockFilterResultByIndicators.mockResolvedValueOnce([resultId]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: true,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-OUT-OF-BOUNDS',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+      const outOfBounds = await callBoundedRead();
+
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+      resultRepoFindOne.mockResolvedValueOnce(null);
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'LEAK-UNKNOWN',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+      const unknown = await callBoundedRead();
+
+      expect(outOfBounds).toEqual(unknown);
+      expect(Object.keys(outOfBounds)).toEqual(Object.keys(unknown));
+    });
+
+    it('bounds indicator_id and is_active through ResultsService.filterResultByIndicators, never a hand-written where', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([resultId]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'in bounds',
+        geo_scope: null,
+        result_innovation_dev: [],
+      });
+
+      await callBoundedRead();
+
+      expect(mockFilterResultByIndicators).toHaveBeenCalledTimes(1);
+      expect(mockFilterResultByIndicators).toHaveBeenCalledWith(
+        [resultId],
+        [IndicatorsEnum.INNOVATION_DEV],
+        false,
+      );
+      // The is_snapshot check is a plain findOne keyed only by result_id —
+      // it does not duplicate the indicator/is_active bound itself in a
+      // hand-written where clause.
+      expect(resultRepoFindOne).toHaveBeenCalledWith({
+        select: { result_id: true, is_snapshot: true },
+        where: { result_id: resultId },
+      });
+    });
+
+    it('positive-path guard (not one of the six ACs): an in-bounds target still resolves the real facts through readInnovationDevCardFacts', async () => {
+      mockFilterResultByIndicators.mockResolvedValueOnce([resultId]);
+      resultRepoFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_snapshot: false,
+      });
+      resultQueryBuilderGetOne.mockResolvedValueOnce({
+        result_id: resultId,
+        description: 'A real Innovation Development result.',
+        geo_scope: { code: 2, name: 'Regional' },
+        result_innovation_dev: [
+          {
+            result_id: resultId,
+            innovation_readiness_id: 7,
+            innovationReadiness: { id: 7, level: 7, name: 'Widely used' },
+          },
+        ],
+      });
+
+      await expect(callBoundedRead()).resolves.toEqual({
+        innovation_readiness: { id: 7, level: 7, name: 'Widely used' },
+        description: 'A real Innovation Development result.',
+        geo_scope: { code: 2, name: 'Regional' },
+      });
     });
   });
 });

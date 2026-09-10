@@ -344,3 +344,265 @@ question from why it is *true*. Advisory, not a defect.
 **Constitution impact:** none. No new module, no moved boundary; `findOne`'s response **shape** widened
 by three keys inside an existing object, which `R-IUC-006` covers by design (the three keys are
 additive and the client's four are untouched).
+
+### T-03 — Bound the target set: three predicates, and no existence oracle
+
+| Field | Value |
+| --- | --- |
+| Status | *(in progress — see attempts below)* |
+| Date | 2026-09-10 |
+| Lane | server — `akili-implementer` (Sonnet, T2, effort `xhigh`) → **two parallel lens Reviewers** (Opus, T3) |
+| Review mode | **Parallel lens reviewers**, per `/akili-execute` §2.3 — triggered on *both* available grounds: effort `xhigh` **and** a security surface |
+| Requirements covered | `R-IUC-008` AC.6–AC.9 |
+| Defect classes gated | `DC-16` |
+| Skills assigned | `nestjs-expert`, `api-design-principles` |
+
+> This is the task `judgment.md` **N-2** un-waived the security review for. Revisions 1–2 waived it on
+> the ground *"no new endpoint"* while §6 of the same file read *"One new endpoint"*.
+
+#### Attempt 1 — **both** lens Reviewers `STATUS: FAIL`. They converge, and the second found the worse defect.
+
+**Files changed:** `result-innovation-use.service.ts` (+76, **1 deletion**) ·
+`result-innovation-use.service.spec.ts` (+229, 0).
+
+**What was built:** a new **public** `readInnovationDevCardFactsForTarget(resultId)` — the only entry
+point T-04 may call. It bounds `indicator_id = 2` + `is_active = TRUE` via
+`ResultsService.filterResultByIndicators([resultId], [IndicatorsEnum.INNOVATION_DEV], false)` (the
+mandated reuse, and the same call `validateInnovationDevLinkTarget` already makes), and
+`is_snapshot = FALSE` via a separate `findOne` on the `Result` repo, since no existing service method
+carries that predicate. **The lone deletion** replaced T-01's not-found literal with a new shared
+`private static emptyInnovationDevCardFacts()`, so the unknown-id and out-of-bounds returns are
+**structurally** identical rather than two literals that could drift.
+
+**Leader measurement the Implementer's checks structurally could not reach.** T-03 modified T-01's
+method, whose `DC-14` evidence lives in a tier `npm test` (`rootDir: "src"`) cannot run. Re-ran it:
+`PASS innovation-dev-card-facts.fixture-spec.ts — 11 passed, 11 total`. **T-01's SQL-shape evidence
+survives the refactor.** The Implementer had reported "no fixtures-tier component owed" — true of its
+*new* work, but not of its **blast radius**, and that distinction is the whole reason the Leader
+re-measures after every worker reports.
+
+##### RISK/SECURITY lens — `FAIL`: the one predicate T-03 hand-writes was never falsified
+
+The bound is `matches.includes(resultId) && target?.is_snapshot === false` (`:835-836`). Falsifier
+part 1 deleted the **left** conjunct; part 2 mutated the **shared return branch**. **Neither deleted
+the right conjunct** — the only predicate not delegated to a separately-tested method.
+
+**And the AC.9 tests cannot cover it — proven by the Implementer's own output, not by argument.**
+`resultQueryBuilderGetOne` is a bare `jest.fn()` (`:63`) `mockReset()` in `beforeEach` (`:208`), so
+unprimed it resolves `undefined` → the read takes `if (!result)` → returns the empty shape. AC.9a and
+AC.9b prime `filterResultByIndicators` and `resultRepoFindOne` but **never prime `getOne`**, so with
+*either* conjunct deleted they fall through and return the empty shape **anyway — green under a
+broken bound**. Part 1's reported output was `2 failed`: **AC.6 and AC.7 only.** AC.9a/AC.9b stayed
+green while the indicator/active bound was gone. Measured, not inferred.
+
+Violated: `tasks.md` T-03's `K-012` falsifier (*"with **any one of the three predicates removed**,
+the corresponding assertion goes red"*), `CLAUDE.md` §4.3 `K-004`, and `design.md` `DD-13`'s recorded
+failure mode — *"an ungated target set with every other acceptance criterion green."*
+
+##### RELIABILITY lens — `FAIL`: **the composition defence is factually false**
+
+The Implementer justified mocking the bound with *"that predicate's own correctness is
+`ResultsService`'s existing test surface, not re-verified here."* The Reviewer **read that surface**:
+`describe('filterResultByIndicators')` (`results.service.spec.ts:3337-3358`) holds **exactly two
+tests** — one exercising the `isEmpty(indicators)` early return, one stubbing `find` to resolve
+`[{result_id:1},{result_id:3}]` and asserting the `.map()` returns `[1,3]`.
+
+> **Neither test asserts the `where` object at any point.** There is no
+> `expect(mockMainRepo.find).toHaveBeenCalledWith(...)` for this method anywhere.
+
+So `is_active: true` (`results.service.ts:873`) and
+`indicator_id: not ? Not(In(...)) : In(...)` (`:872`) — **the two clauses that *are* AC.6 and
+AC.7** — are asserted by **zero tests in the package**. Search scope declared per `KZ-017`: grepped
+across **both** `src/` and `test/`; five call sites total, four replace the method with a `jest.fn()`,
+the fifth is its own spec. **No fixture, e2e or integration test instantiates the real method.**
+
+The Reviewer named the mutations without claiming to have run them (it holds no execute tools, and
+said so — `K-004` applied to itself): deleting `is_active: true`, or inverting the ternary, leaves
+every test green. **The second turns the bound into *"any indicator except 2"*** — precisely the
+widening `DD-13` exists to prevent.
+
+It also found the AC.9a `for`-loop shadowing pattern — four arms in one `it` body, so the first
+failing arm aborts the rest. **T-01's exact defect, third appearance in this spec.** Currently
+harmless only because all four arms are equivalent; it stops being harmless the moment leak rows are
+queued.
+
+##### Leader adjudication
+
+Both FAILs are in scope and are evidence defects, not implementation defects — **neither Reviewer
+found a disclosure path, and the security lens states the implementation is correct and fail-closed.**
+Attempt 2 dispatched at `xhigh` with both reports verbatim and six ordered requirements.
+
+**Scope ruling, recorded because it admits a file T-03's task block does not list.** The fix requires
+adding an assertion to **`results.service.spec.ts`**, outside T-03's *"files touched (intended)"*.
+I am allowing it, and the reasoning is not "it is only a test": **AC.6 mandates that the bounding use
+`filterResultByIndicators` rather than a hand-written `where`** — so that helper's predicate *is* the
+substance of AC.6 and AC.7, and proving it is T-03's own business, not new scope. Refusing the file
+would leave T-03 unable to discharge its own criteria while appearing to respect a scope boundary.
+`results.service.ts` itself stays untouched.
+
+**Model routing note.** The rework rule bumps effort one level per retry, but attempt 1 already ran
+`xhigh`, and the registry's *"never `max` a cheaper tier — escalate the tier instead"* would put the
+Implementer on Opus — which is the **Reviewer's** model, breaking `author ≠ auditor` on both axes for
+a task whose whole subject is review independence. Held at Sonnet/`xhigh` with a prescriptive
+six-step brief instead, which is what converted T-01's last attempt.
+
+**Carried forward to T-04 as forward pointers** (recorded here so the brief carries them, since a
+pointer filed three tasks ago is not carried by having been filed):
+
+1. **The empty shape must return `200`, not `404`** — for unknown *and* out-of-bounds alike. `NotFoundException` on an unknown id is the obvious NestJS idiom and it **is** the existence oracle AC.9 forbids. The security lens calls this *"the single highest-risk decision remaining in the spec."*
+2. **No serializer path may drop or reorder `null`-valued keys** — no `ClassSerializerInterceptor` / `@Exclude` / `excludeExtraneousValues`. Key presence and order are half of what AC.9 means by byte-identical, and the `ServerResponseDto` envelope's own `description`/`status`/`path` must be identical across both cases too.
+3. **The `result_id` echo must come from the path param**, never from a fetched row — otherwise the field itself becomes the oracle.
+4. T-04's *"matches T-02's `linked_innovation_dev` sub-keys field for field"* is scoped to **in-bounds** targets only. An out-of-bounds target legitimately disagrees between the two paths, because `design.md` §4.2 deliberately refused to bound T-02. **Designed divergence, not a T-04 defect** — do not let a Reviewer read it as one.
+5. Export `InnovationDevCardFacts` when T-04 builds its DTO (carried from T-01's advisory 5) so the fixture stops hand-copying the contract behind an `as unknown as` cast.
+
+##### `ADVISORY` (both lenses, attempt 1) — recorded, non-gating
+
+1. **RISK — `is_snapshot === false` treats a NULL as out-of-bounds. Reachability: *could not construct* (both lenses, independently).** The column permits NULL (`baseline.sql:4114` `tinyint DEFAULT NULL`; entity `nullable: true`), and TypeORM's `MysqlDriver.prepareHydratedValue` returns early on `null`, so `null === false` is `false`. Consequence is **strictly fail-closed** — an empty card, never a disclosure — and it matches the platform precedents `DD-13` names (`results.util.ts:43` `where.is_snapshot = false`; `results.service.ts:258` `andWhere('r.is_snapshot = :snapshot')`), both of which exclude NULL identically. Neither Reviewer had DB access. Worth knowing the repo holds the **opposite** convention elsewhere for the same column — `query.service.ts:63` uses `=== true` and `query.service.spec.ts:104` is titled *"should treat null is_snapshot as live"*. **Cheapest retirement:** one human `SELECT COUNT(*) FROM results WHERE is_snapshot IS NULL AND indicator_id = 2 AND is_active = TRUE` against Dev. Mitigating: `validateCreateConfig` defaults `isSnapshot` to `false`, so only legacy rows are candidates.
+2. **RISK — check-then-act between the bound and the fact read. Reachability: reachable in principle, no exploit constructible.** Two queries, no shared snapshot, so a row flipped between them still yields its facts. But it was in bounds at check time, the window is one event-loop turn, and **no caller gains access to anything they could not have read a millisecond earlier** — no privilege gain, so no payload with security value exists. A single query would close it and would cost the `filterResultByIndicators` reuse AC.6 mandates. Not worth the trade.
+3. **A near-miss worth recording permanently.** `matches.includes(resultId)` is **new** in this diff (the precedent at `:534` used the type-insensitive `!matches?.length`). It is number-vs-number only because `orm.config.ts:53` sets `bigNumberStrings: false`; the `bigint` `result_id` would otherwise hydrate as a **string**, `.includes()` would never match, and **the endpoint would have been silently dead — fail-closed, with every mocked test green.**
+4. **READABILITY — the spec file casts away a `public` modifier.** `callBoundedRead` (`:2268-2275`) reaches the method via `service as unknown as { … }`, a leftover from when the target was private. Now unnecessary, and it is *"the one construct in the file that models the exact bypass point [T-04 must not take]"*. Fix so nobody copies the cast into T-04's controller spec.
+5. **RELIABILITY — the fidelity question this lens exists to ask came out clean.** `target?.is_snapshot === false` is strict against a JS boolean while the mock hand-feeds `false`; the Reviewer checked whether the real driver could deliver `0` instead (which would make *every* target out-of-bounds behind a green suite) and confirmed `prepareHydratedValue` coerces `boolean` columns via `value ? true : false`, with `Result.is_snapshot` declared `@Column('boolean')`. **The double is faithful and the strict comparison is correct. No action.**
+
+##### Positive findings worth keeping (security lens)
+
+- **The existence oracle is closed structurally, not coincidentally.** Exactly one expression produces the out-of-bounds body and exactly one the unknown-id body, and they are the **same call**. Three properties the tests do not state: it is a **factory, not a shared constant** (no request can mutate a module-level singleton a later request returns); its key order matches T-01's **in-bounds** return literal, so key order cannot separate in-bounds from empty either; and all five cases execute the *same two* queries via `Promise.all` and never the third, so the timing asymmetry falls between *in-bounds* and *everything else*, which AC.9 does not govern.
+- **`Promise.all` gives no partial-failure serve.** Both queries must settle before `inBounds` is computed, and the fact read is downstream of `inBounds === true`. If the second query throws, the method rejects and **no body is produced at all** — a 500 keyed to DB failure, not to the target's existence, so not an oracle.
+- **T-04 cannot bypass the bound: enforced by the compiler, not the comment.** T-01's read is `private`, the new one `public`; a controller calling the private one fails `tsc` and `npx eslint`.
+- **Blast radius on T-01/T-02 is clean.** T-01's not-found test asserts **values** via `toEqual`, not object identity, so it still reddens if the shared static's values or keys change. The new `findOne` key on the `Result` repo double cannot cross-talk: `validateInnovationDevLinkTarget` reaches the helper through `_resultsService`, not `getRepository(Result)`, so no pre-existing test consumes it.
+
+#### Attempt 2 — **both** lens Reviewers `STATUS: PASS` ✅
+
+**Files changed:** `result-innovation-use.service.spec.ts` (+283, 0) ·
+`result-innovation-use.service.ts` (+87, 4 — the *only* new change is a comment hunk at `:724-734`;
+the 4 deletions are 3 comment lines plus attempt 1's already-reviewed literal substitution) ·
+`results.service.spec.ts` (**+23, 0** — the file admitted by the scope ruling above).
+
+**Leader-verified before re-review:** `results.service.ts` shows **zero delta** — both step-2
+mutations fully restored — and `const inBounds = matches.includes(resultId) && target?.is_snapshot === false;`
+is intact at `:843-844`. No production logic changed in this attempt.
+
+**Six required items, all delivered.** The `where`-object assertion added to
+`describe('filterResultByIndicators')`; that assertion observed red under **two separate** mutations;
+`LEAK-<CASE>` rows primed into **every** arm of AC.9a/AC.9b; AC.9a's `for` loop split into four
+independent `it` blocks; the missing own-reason falsifier run; the stale comment corrected.
+
+**The evidence that closes both FAILs:**
+
+| Mutation | Verbatim result |
+| --- | --- |
+| `is_active: true` deleted from `results.service.ts:873` | `- "is_active": true,` → `Tests: 1 failed, 93 skipped, 2 passed, 96 total` |
+| the `not` ternary inverted at `:872` | received `FindOperator { "_type": "not", … }`, expected the bare `In` → `1 failed` |
+| **`inBounds` reduced to `matches.includes(resultId)` alone** | `✕ AC.8 → "LEAK-SNAPSHOT"` · `✕ AC.9a[3] → "LEAK-SNAPSHOT"` · `✕ AC.9b → "LEAK-OUT-OF-BOUNDS"` → `Tests: 3 failed, 75 skipped, 7 passed, 85 total` |
+
+Full suite after restoration: `359 suites / 2818 tests passed`. `npx eslint` clean on all three files.
+
+**The `is_snapshot` predicate now has a red for its own reason** — the leak string is the assertion's
+*received value*, not a collateral shape mismatch — and AC.9a[3]/AC.9b reddening alongside it is the
+proof that the leak-row priming took.
+
+##### RISK/SECURITY lens — `PASS`
+
+It **re-derived the mutation by hand rather than trusting the pasted output**, and confirmed the three
+still-green AC.9a arms are green for the correct structural reason **by reasoning about the reverse
+mutation** rather than assuming: arms [1] and [2] prime `filterResultByIndicators → []` so the first
+conjunct alone excludes them — genuinely insensitive to `is_snapshot`, and they *would* redden under
+`inBounds = target?.is_snapshot === false`; arm [4] (`resultRepoFindOne → null`) is insensitive to
+both conjuncts individually, which is **correct for a reference arm** since an unknown id fails both,
+and it reddens under `inBounds = true`.
+
+**AC.9 is unweakened and strictly stronger.** The three assertions in `assertByteIdenticalToEmpty`
+(`toEqual`, `Object.keys` order, `JSON.stringify` identity) are unchanged; only the priming changed,
+and priming cannot weaken an assertion. `EMPTY_CARD_FACTS` is a **test-local literal**, not sourced
+from the production factory, so every previously-detected mutant (key reorder, key drop, value drift
+in `emptyInnovationDevCardFacts`) still reds. What was **added** is a mutant class previously
+undetectable: bound bypass → unprimed `getOne` → `!result` → the same empty shape. **Superset,
+nothing subtracted.**
+
+It also noted the rewrite now *depends* on test isolation and verified it: all three
+`mockResolvedValueOnce`-driven mocks get explicit `mockReset()` in `beforeEach` (`:204-213`, `:226`),
+and `mockReset` clears the `...Once()` **queue**, not merely call history. Without that reset,
+AC.9b's two-call sequence would be order-fragile.
+
+**No regression on the certified posture:** the factory still `private static` with exactly two call
+sites; `Promise.all` intact with no partial serve; `readInnovationDevCardFacts` still `private` and
+the new method `public` as T-04's sole entry point; T-02's path still deliberately unbounded at
+`:635`. And the corrected comment is *factually* correct, not merely plausible — for an unknown id
+`filterResultByIndicators` returns `[]` **and** `findOne` returns `null`, so both conjuncts fail and
+the real read is never entered, with TOCTOU correctly named as the sole residual reachability.
+
+It called `results.service.spec.ts:3367-3380` **a real strengthening beyond its own finding**:
+AC.6/AC.7 now have a **two-link chain** — T-03 proves the delegation args, the new test proves the
+delegate's predicate.
+
+##### RELIABILITY lens — `PASS`, and it overturned my `[1 as any]` concern
+
+I had flagged the new test passing `[1 as any]` instead of `IndicatorsEnum.INNOVATION_DEV` as a
+possible weakening. **It is the opposite, and the reasoning is worth keeping:** the test's property is
+*passthrough* — whatever array arrives becomes `indicator_id: In(<that array>)`. Passing `1`
+(≠ `INNOVATION_DEV = 2`) means **a mutation hard-coding `In([IndicatorsEnum.INNOVATION_DEV])` inside
+the shared method reddens; had the test passed the enum, that mutation would have passed.** AC.6's
+binding to indicator 2 is asserted at the *caller* seam instead (`:2295-2299`, `:2471-2475`,
+`toHaveBeenCalledWith([resultId], [IndicatorsEnum.INNOVATION_DEV], false)`). The two halves compose
+and neither is redundant.
+
+**Queue hygiene clean, and no test-isolation debt added.** `mockMainRepo` — including
+`find: jest.fn()` — is **re-created inside the root `beforeEach`** (`:110-120`), so despite
+`afterEach` being only `jest.clearAllMocks()` (which does *not* clear implementations), the new
+test's persistent `mockResolvedValue([])` cannot leak into any downstream describe. The four `it`
+blocks are genuinely independent; `resultQueryBuilderGetOne` still has **no default reinstated after
+reset**, which is now *correct* precisely because every arm primes it.
+
+**The two mutations partition the arms exactly as the two conjuncts of `inBounds` predict, so no arm
+is green by vacuity** — each clause has at least one own-reason red. The lens was explicit that this
+complementary red is *verified by construction from source, not re-measured in attempt 2*, which is
+`K-004` applied honestly to its own reasoning.
+
+**On the FP-50 refusal — the Implementer was right and I was wrong to ask.** I had instructed it to
+point the corrected comment at a line range in the same file the rework was editing. It substituted a
+prose anchor and cited FP-50. The lens confirmed: the rule permits a line citation *"only when the
+cited file is **outside the spec's change surface**"*, and this file is the change surface of T-01,
+T-02 **and** T-03 — *"the exact distribution that produced the amendment."* A symbol name is an
+admissible anchor, and this one grep-resolves.
+
+---
+
+### T-03 — FINAL: `PASS` ✅ (2 attempts; 4 Reviewer verdicts across 2 parallel lenses: FAIL+FAIL → PASS+PASS)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-10 |
+| Requirements covered | `R-IUC-008` AC.6, AC.7, AC.8, AC.9 |
+| Defect classes gated | `DC-16` |
+
+**All 6 acceptance criteria met.**
+
+#### Security sign-off record — the artifact `judgment.md` N-2 un-waived the review for
+
+| Criterion | Status at the service level |
+| --- | --- |
+| **AC.6** `indicator_id = 2` | **Dischargeable.** Bounded through `filterResultByIndicators`, not a hand-written `where`; call args pinned at the caller seam; the delegate's own predicate now asserted (two-link chain); red observed |
+| **AC.7** `is_active = TRUE` | **Dischargeable.** Same mechanism; `is_active: true` deletion observed red on the new `where`-object assertion |
+| **AC.8** `is_snapshot = FALSE` | **Dischargeable** — this was the one item blocking sign-off after attempt 1. Own-reason red now observed (`LEAK-SNAPSHOT`) |
+| **AC.9** no existence oracle | **Dischargeable at the return-value level:** values, key presence, key order, `JSON.stringify` identity, plus a same-work/same-query-count argument for timing. Now proven **against rows that would otherwise have leaked** |
+
+**Still owed to T-04 at the HTTP level** — carried into T-04's brief, not merely filed here:
+
+1. **`200` + the empty shape for unknown *and* out-of-bounds.** No `NotFoundException` on the route — that **is** the existence oracle AC.9 forbids, and both lenses call it the highest-risk decision left in the spec.
+2. **No serializer that drops or reorders `null`-valued keys** (no `ClassSerializerInterceptor` / `@Exclude` / `excludeExtraneousValues`), and the `ServerResponseDto` envelope's own `status` / `description` / `path` identical across both cases.
+3. **The controller must call `readInnovationDevCardFactsForTarget` only.** `private` on the direct reader enforces this **at compile time** — so **`npm run build` is that gate, not the unit suite**.
+4. **`ParseIntPipe` on the param — see the reachable advisory below.** This one is a constructed defect, not a caution.
+5. The `result_id` echo must come from the **path param**, never a fetched row, or the field itself becomes the oracle.
+6. T-04's *"matches T-02's sub-keys field for field"* is scoped to **in-bounds** targets only — an out-of-bounds target legitimately disagrees, because §4.2 deliberately refused to bound T-02. **Designed divergence, not a defect.**
+
+#### `ADVISORY` (attempt 2) — one of these is REACHABLE with a constructed payload
+
+1. **🔴 RELIABILITY — REACHABLE, payload constructed. This is `KZ-008`'s lesson applied: it is filed as a T-04 requirement, not parked here.** `readInnovationDevCardFactsForTarget` bounds via `matches.includes(resultId)`, a strict `===` over array members, and every test in the block calls it with a **number**. If T-04's handler passes the raw `@Param` **string**, the endpoint **fails closed and silently**: `GET …/innovation-dev-card/950` with `@Param('resultCode') resultCode: string` and no `ParseIntPipe` — **the `(\d+)` route regex does not coerce** — gives `filterResultByIndicators(['950'], …)`, the repo returns `result_id: 950` as a number, `[950].includes('950')` is **false**, `inBounds` is false, and **all three facts come back null for every valid target** — while `resultRepoFindOne({ where: { result_id: '950' } })` still matches under MySQL's loose typing, so **nothing errors**. The existing `@Get` at `result-innovation-use.controller.ts:41` reads `ResultsUtil.resultId` rather than a param, so **T-04 is the first place this seam appears in this module.** Remediation, now a T-04 requirement: `ParseIntPipe` on the param **plus one controller test that invokes the handler with the string form**.
+2. **RISK — AC.9's literal *timing* clause (`requirements.md:430-433`) is gated by nothing, here or planned. Reachability verdict: COULD NOT construct a distinguishing payload.** Unknown and out-of-bounds run the identical two queries and both skip the third, so the only residue is MySQL's primary-key hit-vs-miss latency, inseparable from jitter by any writable input. **Recorded as measured-unreachable rather than covered**, so it is not later read as discharged.
+3. **RISK — `target?.is_snapshot === false` denies a row whose `is_snapshot` is SQL NULL.** Neither a widening nor a novel availability regression: `ResultsUtil.setup()` sets `where.is_snapshot = false` → `is_snapshot = 0`, which **also excludes NULL**, so such a row is unreachable through the section read today either. Fail-closed and posture-matching. **Flagged so a future reader does not "fix" it to `!== true`, which would silently widen the target set.**
+4. **READABILITY — a latent trap for future tests in this block.** `mockFilterResultByIndicators`'s `beforeEach` default is `[1]` (`:247`) while the block's `resultId` is `950`, so a future test added here that forgets to prime it **passes as "out of bounds" for the wrong reason**. All nine current tests prime explicitly. A block-local `beforeEach` priming `[950]` would remove the trap.
+5. **RELIABILITY — disclosed duplication, no action.** AC.6, AC.7, AC.9a[1] and AC.9a[2] share one arrangement (`matches: []`, `is_snapshot: false`) and differ only in the LEAK string — four tests over one observable, because the indicator and `is_active` clauses are **indistinguishable at this seam**. The spec comments at `:2278-2281` and `:2303-2306` declare this openly, and the `is_active` half now has real evidence in `results.service.spec.ts`.
+6. **RELIABILITY (evidence scope, `KZ-017`) — stated by the lens against its own evidence.** Both mutation runs were filtered to one suite (`93 skipped`), so they establish *"this test reddens"* but **cannot** establish *"and only this test"* package-wide. Immaterial — additional sensitivity would not be a defect — but the *"no other test was ever sensitive"* half remains **reasoned from the attempt-1 audit rather than measured in attempt 2.**
+
+**Constitution impact:** none. No new module or moved boundary. `readInnovationDevCardFactsForTarget`
+is a new **public** method on an existing service, and its only intended caller is T-04.
