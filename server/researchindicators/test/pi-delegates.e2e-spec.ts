@@ -437,11 +437,20 @@ describe('PI Delegates — Bulk endpoints (T-14, R-PID-009/010)', () => {
   //   - Actual sync-diff rows created/revoked (needs pi_delegates table + seed).
   //   - The per-project summary body (same prerequisite).
   // ─────────────────────────────────────────────────────────────────────────
-  describe('E2E-E — POST /api/pi-delegates bulk sync (R-PID-009)', () => {
-    it('valid bulk payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+  // @akili-spec docs/specs/changes/my-pi-delegates — T-21
+  // E2E-E: adapted from T-14 to the v4 assignments shape (T-17 changed the DTO;
+  // the old project_ids/delegates payload is now rejected — see v4 E2E-G block below).
+  describe('E2E-E — POST /api/pi-delegates bulk sync (R-PID-009 / adapted to v4 shape)', () => {
+    it('valid v4 assignments payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      // T-17 changed the DTO from {project_ids, delegates} to {assignments: [{project_id, delegates}]}.
+      // This test uses the v4 shape so it probes the live endpoint correctly.
       const payload = {
-        project_ids: ['E2E-BULK-PROBE-POST'],
-        delegates: [{ delegate_user_id: 800_003 }],
+        assignments: [
+          {
+            project_id: 'E2E-BULK-PROBE-POST',
+            delegates: [{ delegate_user_id: 800_003 }],
+          },
+        ],
       };
 
       const res = await request(bulkApp.getHttpServer())
@@ -455,40 +464,42 @@ describe('PI Delegates — Bulk endpoints (T-14, R-PID-009/010)', () => {
 
       if (await isMissingTable(res)) {
         console.warn(
-          '[T-14 E2E-E] POST /api/pi-delegates — route mounted, DTO valid, ' +
+          '[T-14/T-21 E2E-E] POST /api/pi-delegates — route mounted, DTO valid, ' +
             'but pi_delegates table does not exist. ' +
             'Behavioral assertion deferred (migration unapplied, K-015).',
         );
       } else {
         console.info(
-          `[T-14 E2E-E] POST /api/pi-delegates → ${res.status}. ` +
+          `[T-14/T-21 E2E-E] POST /api/pi-delegates (assignments) → ${res.status}. ` +
             'Route mounted and service reached.',
         );
       }
     });
 
-    it('empty project_ids → 400 (ValidationPipe: @ArrayNotEmpty)', async () => {
+    it('empty assignments array → 400 (ValidationPipe: @ArrayNotEmpty on assignments)', async () => {
       const res = await request(bulkApp.getHttpServer())
         .post('/api/pi-delegates')
-        .send({ project_ids: [], delegates: [{ delegate_user_id: 1 }] });
+        .send({ assignments: [] });
 
       expect(res.status).not.toBe(404);
       expect(res.status).toBe(400);
     });
 
-    it('empty delegates array → 400 (ValidationPipe: @ArrayNotEmpty)', async () => {
+    it('empty inner delegates → NOT 400 (R-PID-011 AC.3: revoke-all is valid)', async () => {
       const res = await request(bulkApp.getHttpServer())
         .post('/api/pi-delegates')
-        .send({ project_ids: ['PROJ-X'], delegates: [] });
+        .send({
+          assignments: [{ project_id: 'E2E-REVOKE-ALL', delegates: [] }],
+        });
 
       expect(res.status).not.toBe(404);
-      expect(res.status).toBe(400);
+      expect(res.status).not.toBe(400);
     });
 
-    it('missing project_ids entirely → 400 (ValidationPipe: @IsArray @ArrayNotEmpty)', async () => {
+    it('missing assignments key entirely → 400 (ValidationPipe: required field)', async () => {
       const res = await request(bulkApp.getHttpServer())
         .post('/api/pi-delegates')
-        .send({ delegates: [{ delegate_user_id: 1 }] });
+        .send({});
 
       expect(res.status).not.toBe(404);
       expect(res.status).toBe(400);
@@ -569,6 +580,207 @@ describe('PI Delegates — Bulk endpoints (T-14, R-PID-009/010)', () => {
         .send({ project_ids: ['PROJ-PARTIAL'] });
 
       expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @akili-spec docs/specs/changes/my-pi-delegates — T-21
+//
+// E2E probes for the v4 per-project `assignments` payload (R-PID-011).
+//
+// Probe strategy (KZ-017 — declare what we CAN reach):
+//   1. Valid assignments payload → NOT 404 (route mounted) + NOT 400 (DTO valid).
+//   2. Empty assignments array  → 400 (ValidationPipe @ArrayNotEmpty on assignments).
+//   3. Empty inner delegates    → NOT 400 (R-PID-011 AC.3 — revoke-all is valid).
+//   4. Missing assignments key  → 400 (ValidationPipe: required field).
+//
+// What we CANNOT reach in this probe:
+//   - Per-project sync diff results (needs pi_delegates table + seed data, K-015).
+//   - History rows written (pi_delegate_history table — same prerequisite).
+//
+// KZ-001: assertions on HTTP status codes — not on internal call order.
+// KZ-004: distinct project_ids in payloads where multiple projects are tested.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PI Delegates — v4 assignments payload (T-21, R-PID-011)', () => {
+  let v4App: INestApplication;
+
+  beforeAll(async () => {
+    jest
+      .spyOn(JwtMiddleware.prototype, 'use')
+      .mockImplementation(async (req: any, _res: any, next: any) => {
+        req.user = {
+          sec_user_id: 800_010,
+          email: 'pi-delegates-v4-e2e@example.org',
+          first_name: 'V4',
+          last_name: 'E2E',
+          roles: [SecRolesEnum.SYSTEM_ADMIN],
+        };
+        return next();
+      });
+
+    const { Test: TestFactory } = await import('@nestjs/testing');
+    const { VersioningType } = await import('@nestjs/common');
+    const { AppModule } = await import('../src/app.module');
+
+    const moduleFixture = await TestFactory.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    v4App = moduleFixture.createNestApplication();
+    v4App.setGlobalPrefix('api');
+    v4App.enableVersioning({ type: VersioningType.URI });
+    await v4App.init();
+  }, 120_000);
+
+  afterAll(async () => {
+    await v4App?.close();
+  });
+
+  // Helper: checks if the response indicates the pi_delegates table is missing.
+  async function isMissingTableV4(res: request.Response): Promise<boolean> {
+    if (res.status === 500) {
+      const txt = JSON.stringify(res.body);
+      return (
+        txt.includes('pi_delegates') &&
+        (txt.includes('1146') ||
+          txt.includes("doesn't exist") ||
+          txt.includes('no such table'))
+      );
+    }
+    return false;
+  }
+
+  // ─── E2E-G — POST /api/pi-delegates with assignments shape (R-PID-011) ─────
+  describe('E2E-G — POST /api/pi-delegates with assignments payload (R-PID-011)', () => {
+    it('valid assignments payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      const payload = {
+        assignments: [
+          {
+            project_id: 'E2E-V4-PROBE-G1',
+            delegates: [{ delegate_user_id: 800_011 }],
+          },
+        ],
+      };
+
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send(payload);
+
+      // 404 = route not mounted (the guard against v3 payload regressing to v4).
+      expect(res.status).not.toBe(404);
+      // 400 = DTO validation rejected a structurally valid payload.
+      expect(res.status).not.toBe(400);
+
+      if (await isMissingTableV4(res)) {
+        console.warn(
+          '[T-21 E2E-G] POST /api/pi-delegates (assignments) — route mounted, DTO valid, ' +
+            'but pi_delegates table does not exist. ' +
+            'Behavioral assertion deferred (migration unapplied, K-015).',
+        );
+      } else {
+        console.info(
+          `[T-21 E2E-G] POST /api/pi-delegates (assignments) → ${res.status}. ` +
+            'Route mounted and service reached.',
+        );
+      }
+    });
+
+    it('empty assignments array → 400 (ValidationPipe @ArrayNotEmpty on assignments)', async () => {
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send({ assignments: [] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('missing assignments key entirely → 400 (ValidationPipe: required field)', async () => {
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send({});
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('empty inner delegates list is ACCEPTED (R-PID-011 AC.3 — revoke-all is valid)', async () => {
+      // An empty delegates array is intentionally valid per the DTO design (T-17):
+      // it instructs the service to revoke ALL active delegates for the project.
+      // The DTO must NOT reject this with 400.
+      const payload = {
+        assignments: [
+          {
+            project_id: 'E2E-V4-PROBE-G2',
+            delegates: [], // empty = revoke-all (valid)
+          },
+        ],
+      };
+
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send(payload);
+
+      expect(res.status).not.toBe(404);
+      // Must NOT be 400 — an empty inner delegates array is valid DTO input
+      expect(res.status).not.toBe(400);
+
+      console.info(
+        `[T-21 E2E-G] POST with empty delegates (revoke-all) → ${res.status}. ` +
+          'DTO accepted. Behavioral outcome deferred pending migration apply (K-015).',
+      );
+    });
+
+    it('two projects in assignments — both accepted (route + DTO, KZ-004)', async () => {
+      // KZ-004: distinct project_ids and delegate_user_ids per project
+      const payload = {
+        assignments: [
+          {
+            project_id: 'E2E-V4-PROBE-G3A',
+            delegates: [{ delegate_user_id: 800_012 }],
+          },
+          {
+            project_id: 'E2E-V4-PROBE-G3B',
+            delegates: [{ delegate_user_id: 800_013 }],
+          },
+        ],
+      };
+
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send(payload);
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(400);
+
+      console.info(
+        `[T-21 E2E-G] POST with two assignments → ${res.status}. ` +
+          'Route mounted. Per-project sync behavior deferred pending DB seed (K-015).',
+      );
+    });
+
+    it('old v3 shape {project_ids, delegates} → 400 (superseded by v4 assignments shape)', async () => {
+      // Verifies that the v3 payload (project_ids[] + delegates[] cartesian) is no longer
+      // accepted — the v4 DTO expects assignments[]. This is a negative probe: the old
+      // shape must yield 400 (DTO validation) not 200/201.
+      //
+      // KZ-017 scope: we assert on DTO validation (route + ValidationPipe), NOT on
+      // whether the service internally handles the old shape.
+      const oldShapePayload = {
+        project_ids: ['E2E-V4-OLD-PROJ'],
+        delegates: [{ delegate_user_id: 800_014 }],
+      };
+
+      const res = await request(v4App.getHttpServer())
+        .post('/api/pi-delegates')
+        .send(oldShapePayload);
+
+      expect(res.status).not.toBe(404);
+      // Old shape has no `assignments` field — DTO @ArrayNotEmpty on assignments fires → 400
       expect(res.status).toBe(400);
     });
   });

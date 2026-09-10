@@ -407,3 +407,17 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
   - No `@Roles`; ValidationPipe intact.
 - **ADVISORY (non-gating):** bulkRevoke Shape A's context read uses non-tx `findOne` (writes are tx-bound — harmless); `resolveId`'s non-null assertion is sound but implicit.
 - **Verification:** `npm run build` clean; `npx eslint <3 files>` clean.
+
+### T-21 — Tests: per-project sync + history — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-011/012/013. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `pi-delegates.service.spec.ts` (adapted v3→v4, 30 tests: per-project sync, empty=revoke-all, history on create+revoke, fail-fast→no history, provision-once, bulkRevoke history both shapes); `test/pi-delegates.e2e-spec.ts` (E2E-G assignments probe).
+- **Reviewer PASS:** KZ-001 provenance crux discriminates — every REVOKE-history assertion pins the **fetched row's** `pi_user_id` (99/88/77/33/55/66) distinct from the caller (50/71/120/130); a service using the caller's id for revoke history goes RED. ASSIGN asserts caller + returned `pi_delegate_id`. KZ-004 distinct ids + cross-project non-containment checks. Fail-fast → recordHistory NOT called.
+- **Gate met:** **`npm test -- --silent` → 2731/2731 green.** e2e 19 passed (route-mount + DTO validation: empty assignments→400, empty inner delegates accepted, old v3 shape→400). `git diff --stat client/` empty. No PRODUCT_BUG.
+- **ADVISORY (KZ-017, deferred gap — noted honestly):** the "rolled-back tx → no history" is proven at unit level only as a fail-fast-**before-write** proxy; a true mid-tx ROLLBACK of an already-written history row cannot be represented by the mock transaction — that DB-atomicity proof is deferred to e2e/migration-apply (same `[~]` class as T-04/T-09). Also the `recordHistory` same-tx `manager` arg is asserted as `expect.anything()` (wiring is correct; the true guarantee is DB-level).
+
+---
+
+## v4 Summary (per-project assignments + history) — COMPLETE (2026-09-10)
+
+All 7 v4 tasks (T-15…T-21) Reviewer-PASS. `POST /pi-delegates` payload is now **per-project** (`{assignments:[{project_id, delegates}]}`); each project synced to its own list; **empty `delegates` = revoke all** of that project. Every assign/revoke movement is logged in the new append-only **`pi_delegate_history`** table (correct context + actor, in the mutation's transaction) — `pi_delegates` unchanged, reflects the last state. Revoke targets the specific (delegate, project) relationship. Full unit suite **2731/2731 green**; no client change. History migration applied to local `alliancereportingdb`. Rework rounds: T-10 only (v3); v4 clean (0 reworks across T-15–T-21).

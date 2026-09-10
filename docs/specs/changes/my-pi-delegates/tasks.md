@@ -220,7 +220,7 @@ graph TD
 - **Done:** [ ] `/swagger` shows the new payload + examples.
 - **Dep:** T-19 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
 
-### T-21 — Tests: per-project sync + history
+### T-21 — Tests: per-project sync + history  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-011/012/013
 - **Files:** `pi-delegates.service.spec.ts` (extend/adapt), `test/pi-delegates.e2e-spec.ts`
 - **Desc:** per-project sync (distinct lists per project); empty delegates → revoke all; history row written per assign + per revoke (assert the recordHistory call args); rolled-back tx → no history; revoke-by-pair records revoke history. KZ-001 (assert values/args), KZ-004 (distinct ids).
