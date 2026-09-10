@@ -72,9 +72,32 @@ Applying the user's *use-what-the-component-uses* rule to the **right** componen
 
 This is the non-obvious half. `dev-card-details` T-09 added `enrichmentSuccessForId`, and `onInnovationDevSelected` early-returns when `sameId && wasSuccessful`.
 
-**So clearing to `null` and re-picking the same result would early-return and render a bare card** — the exact dead-end class T-09's own review constructed. The clear path **must** set `linked_innovation_dev = null` **and** `enrichmentSuccessForId = null`.
+> ### ⚠️ CORRECTED 2026-09-10 — my original reasoning here was wrong, and a Reviewer traced why
+>
+> **I wrote that clearing and re-picking the same result would early-return. It cannot.** After
+> `clearInnovationDev()`, `linked_innovation_dev` is `null`, so
+> `sameId = currentLinked?.result_id === resultId` evaluates `undefined === 42` — **structurally
+> false, whatever the flag holds.** The guard never fires on the clear-then-repick path, and the
+> reset's absence is invisible to it. **Verified by running it:** with the reset deleted and the
+> white-box flag assertion neutralised, the test passes.
+>
+> **The reset is still necessary — the trigger is a REHYDRATION between the clear and the
+> re-selection**, which the Reviewer constructed:
+>
+> 1. select 42 → enrichment succeeds → `enrichmentSuccessForId = 42`, card full
+> 2. ⊗ clear → `linked_innovation_dev = null`; **the flag survives** if the reset is missing
+> 3. **`getData()` runs** — a version switch (`versionWatcher`), a Back/Next save, any reload. The GET rehydrates `linked_innovation_dev = { result_id: 42, … }` **bare**: `innovation_readiness`, `description` and `geo_scope` are **optional** keys that only `GET_InnovationDevCard` ever writes
+> 4. the user picks 42 again → **now `sameId` IS true and `wasSuccessful` IS true** → early return → **title + anchor only, for the rest of the session**
+>
+> **This was a `K-004`/`KZ-014` argument-side defect in my own design** — reasoned from the design's
+> own frame, asserted in two documents, and never seen. It is exactly the failure this repo's
+> kaizen log warns about: *"a falsifier authored from the design's own frame tends to name a
+> mutation the design already excludes."*
 
-`R-OICR-003`'s scenario asserts precisely this, and it is the one behaviour in this spec that a reasonable implementer would not think to test.
+The clear path **must** set `linked_innovation_dev = null` **and** `enrichmentSuccessForId = null`.
+`R-OICR-003`'s scenario asserts the outcome, and it remains the one behaviour in this spec that a
+reasonable implementer would not think to test — but **the test must include the rehydration step**,
+or it proves nothing.
 
 ### `DD-4` — See more / See less is one signal, and the clamp stays CSS
 

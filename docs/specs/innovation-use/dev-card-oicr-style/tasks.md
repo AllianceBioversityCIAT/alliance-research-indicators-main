@@ -72,7 +72,9 @@ graph TD
   - [ ] Still single-select; no confirmation step
   - [ ] The save payload no longer carries the cleared link
 - **Verification:** `npm test -- --silent` · `npm run build`
-- **Falsifying input, and it is the point of this task:** **omit the `enrichmentSuccessForId` reset**, then clear and re-select the same id → `sameId && wasSuccessful` are both true, `onInnovationDevSelected` early-returns, and the card renders **title + anchor only**. That criterion must redden. A test that clears and picks a *different* result **cannot** see this defect.
+- **Falsifying input — ⚠️ CORRECTED 2026-09-10, the original was wrong and is recorded as such:** omit the `enrichmentSuccessForId` reset, then run the **four-step** sequence — select 42 (enrichment succeeds) → ⊗ clear → **`getData()` rehydrates `linked_innovation_dev` BARE** (only `result_id`/`code`/`title`/`platform_code`; the three enrichment keys are optional and only `GET_InnovationDevCard` writes them) → re-select 42. **Only now** are `sameId` and `wasSuccessful` both true, the early return fires, and the card renders **title + anchor only**. The **DOM** assertions must redden.
+  - **What the original said, and why it was false:** it claimed clear-then-repick alone suffices. It does not — after a clear `linked_innovation_dev` is `null`, so `sameId` is `undefined === 42`, **structurally false whatever the flag holds**. **Measured:** with the reset deleted and the white-box flag assertion removed, the test **passes**. The rehydration in step 3 is what makes `sameId` true again.
+  - A test that clears and picks a **different** result cannot see this defect either — `sameId` is false on a different id.
 - **Disqualifier:** asserting only that `linked_innovation_dev` became `null`. That is the easy half; the re-selection is the half that breaks.
 - **Skills:** `angular-developer`, `systematic-debugging` · **Size:** S
 
