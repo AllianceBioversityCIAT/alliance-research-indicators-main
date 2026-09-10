@@ -131,7 +131,7 @@ graph TD
 
 > After v2 shipped, Product confirmed the CRUD must be **bulk** (POST = per-project sync, DELETE = independent bulk revoke) + a **PI-exclusion** rule (a PI can't be a delegate of their own project). See `requirements.md §11` / `design.md §10`. Entity/migration/`isPi`/metadata from v2 are reused unchanged.
 
-### T-10 — Bulk DTOs
+### T-10 — Bulk DTOs  ✅ [x] PASS 2026-09-10 (attempt 2)
 - **Covers:** R-PID-009 AC.1, R-PID-010 AC.1, R-PID-008
 - **Files:** `dto/bulk-assign-pi-delegates.dto.ts`, `dto/bulk-revoke-pi-delegates.dto.ts` (+ reuse/extract `DelegateInputDto` from the v2 create DTO)
 - **Desc:** `BulkAssignPiDelegatesDto {project_ids[], delegates[]}` (delegate union reused, optional `carnet`); `BulkRevokePiDelegatesDto` = `{pi_delegate_ids[]}` XOR `{project_ids[], delegate_user_ids[]}` with a cross-field "exactly one shape" guard.

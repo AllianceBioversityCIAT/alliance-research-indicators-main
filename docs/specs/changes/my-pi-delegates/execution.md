@@ -76,7 +76,14 @@
 **Approval mode:** remains auto-continue (pre-approved) per the 2026-09-10 user directive; stop only on HALT/Pivot/FATAL_FAIL/budget.
 
 ### v3 Task Execution History
-_(below)_
+
+### T-10 — Bulk DTOs — **PASS on attempt 2** (2026-09-10)
+
+- **Covers:** R-PID-008/009 AC.1, R-PID-010 AC.1. Attempts: 2 Implementer + 1 Reviewer + Leader inline re-verify.
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts` (new — `DelegateInputDto` union reusing `DelegateIdentityDto` + optional `carnet`; `BulkAssignPiDelegatesDto {project_ids[], delegates[]}` with `@ArrayNotEmpty`), `dto/bulk-revoke-pi-delegates.dto.ts` (new — two-shape `@ValidateIf` union).
+- **Attempt 1 FAIL:** revoke DTO omitted `@ArrayNotEmpty` on its 3 array fields → empty arrays passed (violates T-10 Done "empty → 400"). **Attempt 2:** added `@ArrayNotEmpty()` to all 3 — the Reviewer's exact prescribed remediation, Leader-verified inline (grep = 3, nothing else changed, build+eslint clean).
+- **⚠ CARRY TO T-12 (Reviewer advisory):** the revoke DTO's `@ValidateIf` only guarantees "at least one shape complete"; a **partial-mixed** payload like `{pi_delegate_ids:[7], project_ids:['X']}` (Shape A + incomplete Shape B) passes the DTO. T-12's `bulkRevoke` ambiguity guard must reject mixed/partial shapes, not only both-fully-supplied.
+- **Verification:** `npm run build` clean; `npx eslint dto/` clean.
 - **Reliability (index coverage):** the unique index on `active_delegate_key` covers the hot delegate-lookup (`project_id + delegate_user_id + is_active`) for active rows — no extra index needed.
 - **Readability:** `varchar(80)` sizing correct (36 + 1 + ≤20 digits = 57 max); TSDoc references DD-F.
 
