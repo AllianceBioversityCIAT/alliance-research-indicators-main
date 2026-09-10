@@ -609,7 +609,7 @@ instead of its serialization would let that swap pass**, because the difference 
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[~]` — suite half PASSES (317/317, 6920/6920, all four floors held); visual half needs the user, and part of the checklist is blocked until Migration A is applied (B-1's FK, confirmed) |
 | Size | M |
 | Depends on | T-09, T-10, T-11 |
 | Requirements | NFR-IUL-002, NFR-IUL-003, NFR-IUL-004, **D-7** |

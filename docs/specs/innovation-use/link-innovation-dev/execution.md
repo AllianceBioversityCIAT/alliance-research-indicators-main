@@ -2573,3 +2573,81 @@ Re-verified after the edits: **359/359 suites, 2794/2794 tests, eslint exit 0.**
 **T-07 → `[x]`.** **12 of 14 tasks `[x]`. THE SERVER LANE IS COMPLETE** (T-01 … T-07). The client implementation lane completed at T-11. Remaining: **T-12** (client suite + human visual check — feasible now that the user's stack is up: API :3001, front :4200) and **T-13** (documentation sync).
 
 **Still outstanding and user-only:** both migrations are unapplied in every environment (**B-1/B-3**, §11.1). Nothing in T-01…T-11 required them, but the feature cannot work end-to-end against a real database until they are applied — and Migration A's `down()` is destructive.
+
+---
+
+## 🅿️ T-12 — Client suite PASSES (Leader-measured); visual half is `[~]` and PARTLY BLOCKED on B-1
+
+**Date** 2026-09-09 · **Status** `[~]` — half 1 complete and measured, half 2 needs the user
+
+T-12 has two halves and they have different owners. Half 1 is measurable and is **done**. Half 2 is *"the human visual check that no automated gate in this repo can perform"* — and a measurement below shows **part of it is not reachable at all yet**, for a reason that is neither the client's nor the server's fault.
+
+### Half 1 — the client suite and coverage floors: PASS
+
+**Leader-measured, in isolation, with NO delegated worker active** — which is T-12's own Disqualifier (*"a suite run concurrently with an active worker is not evidence… the result is wrong, not merely slow"*).
+
+| Metric | Measured | Floor | Margin |
+| --- | --- | --- | --- |
+| Test Suites | **317 / 317 passed** | — | — |
+| Tests | **6920 / 6920 passed** | — | — |
+| Statements | **98.23%** | 40 | +58.2 |
+| Branches | **96.19%** | 20 | +76.2 |
+| Functions | **98.00%** | 30 | +68.0 |
+| Lines | **98.52%** | 45 | +53.5 |
+
+All four floors held with wide margin. NFR-IUL-004's client half is satisfied.
+
+### Half 2 — the visual checklist is SPLIT, and the split was measured not assumed
+
+**Both migrations are still pending.** Measured against the environment the user's running stack points at, with the K-014 discipline applied (ANSI stripped first, then the raw output checked for an error before counting — the one `error` match turned out to be a migration *name*, `AddedErrorMessageAiReport`, not a failure):
+
+```
+total rows: 325 | applied: 323 | pending: 2
+[ ] InsertInnovationUseLinkedDevRole1789000000000
+[ ] AppendInnovationDevLinkRuleToInnovationUseValidation1789100000000
+```
+
+**And the FK that B-1 predicted is real, verified in the committed baseline** (`src/db/baseline/baseline.sql`):
+
+```sql
+CONSTRAINT `FK_290df3566c4fde66ce6ceecc10d`
+  FOREIGN KEY (`link_result_role_id`) REFERENCES `link_result_roles` (`link_result_role_id`)
+```
+
+So until **Migration A** seeds `link_result_roles` row 5, any attempt to save a link fails on that FK — exactly what §5 **B-1** wrote in advance: *"Until Migration A lands in an environment, every save there 500s on the FK."* That prediction is now confirmed rather than anticipated.
+
+#### Reachable NOW, with the stack as it stands (no migration needed)
+
+These need only the section to render and the options request to run, and the options request is a plain `GET /v2/results?indicators=2` that no migration touches:
+
+| Checklist item | Why it is reachable |
+| --- | --- |
+| Field position — the RELATED card between *INNOVATION USE DETAILS* and *ACTORS* | pure render |
+| Vertical rhythm against the blocks above | pure render |
+| Asterisk + amber border + *"This field is required"* (the empty/required state) | pure render; the field is empty because nothing can be saved yet |
+| The picker's options list populating, and the *"official-code - title"* label format | reads indicator-2 results only |
+| The disabled/empty state and its tooltip | render + an empty options list |
+| **The picker's error state (Amendment 03 / §6.8)** — error inside the RELATED card, rest of the section still visible and editable, draft save still succeeds, empty-list tooltip absent, and leaving + re-entering clears it | forcing the options request to fail needs no migration |
+| **Light *and* dark theme** for every item above | pure render |
+
+#### BLOCKED until Migration A is applied — and this is the honest reason
+
+| Checklist item | Blocker |
+| --- | --- |
+| Saving a selection at all | FK 1452 on `link_result_role_id` → the save 500s |
+| The populated card (T-10) | needs `linked_innovation_dev` from the GET, which needs a saved row |
+| *"card layout with a long title"* | same — needs a saved link |
+| *"new tab actually opens the right result"* | the anchor only exists on a populated card |
+| Keyboard focus visible **on the anchor** | same |
+| Green-check behavior (rule 16) | needs **Migration B** |
+
+Note the checklist's *"keyboard focus visible on the anchor and the **remove button**"* also names a control that **DD-7 withdrew** — there is no remove button, by design (Amendment 01). That clause is stale text, not a missing feature.
+
+### Why T-12 stays `[~]` rather than `[x]`
+
+Two independent reasons, either sufficient:
+
+1. **Its Done bar is screenshots** — *"Nothing here is claimed beyond what a human eye confirmed; the screenshots are the evidence, not the suite."* An agent cannot satisfy that, and this task exists precisely because jsdom measures no layout.
+2. **Applying the migrations is a human decision, never an agent's** (**B-1/B-3**, §11.1). The Dev database is remote and shared, Migration A's `down()` is destructive (the FK forces a hard delete of `link_results` rows), and §11.1 fixes the order.
+
+**No agent action can close this task.** Recording the split so the remaining work is precise rather than a vague *"needs QA"*.
