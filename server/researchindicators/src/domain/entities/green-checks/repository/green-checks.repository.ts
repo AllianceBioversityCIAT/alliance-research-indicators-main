@@ -204,7 +204,7 @@ export class GreenCheckRepository {
     `;
 
     const principal = await this.dataSource
-      .query(queryPrincipalInvestigator(), [userId, resultId])
+      .query(queryPrincipalInvestigator(), [userId, userId, resultId])
       .then((result) => result?.[0]?.is_principal ?? 0);
 
     const roles = await this.dataSource

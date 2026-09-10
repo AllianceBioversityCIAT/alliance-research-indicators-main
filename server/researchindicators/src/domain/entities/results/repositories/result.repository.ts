@@ -518,9 +518,12 @@ GROUP BY rl.result_id) tmp_rl ON tmp_rl.result_id = r.result_id`;
   }
 
   async metadataPrincipalInvestigator(result_id: number, userId: number) {
-    return this.query(queryPrincipalInvestigator(), [userId, result_id]).then(
-      (res: { result_id: number; is_principal: number }[]) =>
-        res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
+    return this.query(queryPrincipalInvestigator(), [
+      userId,
+      userId,
+      result_id,
+    ]).then((res: { result_id: number; is_principal: number }[]) =>
+      res?.length ? res[0] : { result_id: result_id, is_principal: 0 },
     );
   }
 

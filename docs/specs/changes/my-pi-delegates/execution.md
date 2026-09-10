@@ -209,3 +209,27 @@
 5. Columns exist per migration/entity. 6. Placeholder-safe (params passed). 7. Scope: only `isPi()`; `queryPrincipalInvestigator` untouched. Sole caller `isPiValidation` consumes the boolean unchanged — no contract break.
 
 **Requirements covered:** R-PID-002 (AC.1–AC.5), NFR-PID-002 (PI behavior-preserving).
+
+---
+
+### T-08 — Extend `queryPrincipalInvestigator()` with a delegate fallback — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode. Effort steered MAX (correctness-critical + placeholder trap).
+- **Covers:** R-PID-003, NFR-PID-001/002.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed:**
+- `shared/const/gloabl-queries.const.ts` (edit) — added `LEFT JOIN pi_delegates pd on pd.project_id = ac.agreement_id and pd.delegate_user_id = ${user} and pd.is_active = true`; SELECT → `if(su.sec_user_id is not null OR pd.pi_delegate_id is not null, true, false)`. Existing name-match join semantically unchanged.
+- **3 callers** updated `[userId, resultId]` → `[userId, userId, resultId]` (the query now has 3 `?` in order [user, user, result]): `green-checks.repository.ts:207`, `result.repository.ts:521`, `result-users.service.ts:435`.
+
+**The placeholder trap (resolved):** adding `pd.delegate_user_id = ?` introduced a 2nd user placeholder. Implementer chose **Option A (positional)** — verified mysql2 short-circuits named-placeholders when `values` is an array + TypeORM types params as `any[]`, so positional `?`+array is the correct path. All 3 (and ONLY 3) callers rewired; grep confirms no un-updated caller.
+
+**Verification:** `npm run build` clean; `npx eslint <4 files>` clean; **`git diff --stat client/` EMPTY (NFR-PID-001)**; **`npm test -- results.service` → 141/141 green** (real-PI unchanged, AC.3).
+
+**Reviewer verdict:** `STATUS: PASS` — 7 critical checks: placeholder order [user,user,result] matches every caller; SELECT `OR` logic preserves the real-PI truth table; cross-project + revoked delegations can't flip the flag; name-match join semantically identical; `pd` columns exist; no client file; scope = const + 3 caller arrays only.
+
+**⚠ ROUTED TO T-09 (Reviewer's explicit note):** the 141 results.service tests cover the REAL-PI path only. The **delegate-true** and **cross-project-false** behavioral cases for `queryPrincipalInvestigator` (and `isPi`) are NOT yet proven — T-09 MUST assert PI/delegate/neither for BOTH functions (per the Defect-classes table / R-PID-002+003).
+
+**ADVISORY (recorded, non-gating):** the duplicated `userId, userId` in the 3 call arrays is a silent-corruption trap for a future editor (dropping one shifts `resultId` into a user slot, no type error). A named-param object or a `metadataPrincipalInvestigatorParams()` wrapper would self-document. Optional.
+
+**Requirements covered:** R-PID-003 (AC.1 PI-or-delegate flag, AC.2 no frontend change, AC.3 real-PI unchanged), NFR-PID-001 (`git diff client/` empty), NFR-PID-002.

@@ -90,7 +90,7 @@ graph TD
 - **Done:** [ ] PI → true, `pi_delegates` NOT queried; [ ] delegate of the result's project → true; [ ] neither → false; [ ] delegate of another project → false; [ ] existing `isPi` tests unchanged & green.
 - **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert, systematic-debugging
 
-### T-08 — Extend `queryPrincipalInvestigator()` with a delegate fallback
+### T-08 — Extend `queryPrincipalInvestigator()` with a delegate fallback  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-003, NFR-PID-002
 - **Files:** `shared/const/gloabl-queries.const.ts`
 - **Desc:** Add a `LEFT JOIN pi_delegates` (by project + `delegate_user_id` + active); `is_principal = (name-match matched) OR (delegate row present)`. Real-PI result unchanged.

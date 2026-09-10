@@ -432,7 +432,7 @@ export class ResultUsersService extends BaseServiceSimple<
     userId: number,
   ): Promise<boolean> {
     const result = await this.dataSource
-      .query(queryPrincipalInvestigator(), [userId, resultId])
+      .query(queryPrincipalInvestigator(), [userId, userId, resultId])
       .then((res: { is_principal: number | string | boolean }[]) =>
         res?.length ? res[0] : { is_principal: 0 },
       );
