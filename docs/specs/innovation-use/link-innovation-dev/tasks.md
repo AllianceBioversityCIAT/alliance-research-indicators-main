@@ -609,7 +609,7 @@ instead of its serialization would let that swap pass**, because the difference 
 
 | | |
 | --- | --- |
-| Status | `[~]` — suite half PASSES (317/317, 6920/6920, all four floors held); visual half needs the user, and part of the checklist is blocked until Migration A is applied (B-1's FK, confirmed) |
+| Status | `[~]` — suite half PASSES (317/317, 6920/6920, all four floors held). Visual half needs the user, and is blocked twice over: **STAR's client is not served anywhere** (the `:4200` front measured earlier belongs to a different project, `Personal/variacion-y-cambio` — Leader error, corrected in `execution.md`) and `environment.dev.ts` points Cognito's redirect at the **deployed** test host, so a locally-served front cannot complete auth. Separately, the migration-dependent items need Migration A applied (B-1's FK, confirmed). **Most likely home: the deployed Dev/test environment after merge + migrations.** |
 | Size | M |
 | Depends on | T-09, T-10, T-11 |
 | Requirements | NFR-IUL-002, NFR-IUL-003, NFR-IUL-004, **D-7** |

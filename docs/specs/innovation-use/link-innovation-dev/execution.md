@@ -2616,7 +2616,38 @@ CONSTRAINT `FK_290df3566c4fde66ce6ceecc10d`
 
 So until **Migration A** seeds `link_result_roles` row 5, any attempt to save a link fails on that FK — exactly what §5 **B-1** wrote in advance: *"Until Migration A lands in an environment, every save there 500s on the FK."* That prediction is now confirmed rather than anticipated.
 
-#### Reachable NOW, with the stack as it stands (no migration needed)
+> ### ⚠️ CORRECTION, 2026-09-09 — "reachable now" was WRONG, and the error was the Leader's own
+>
+> This entry originally said the visual half was *"feasible now that the user's stack is up: API :3001,
+> front :4200"*. **The :4200 front is not this project's.** Measured: PID 42047, `ng serve`, cwd
+> `/Users/pelitos/Documents/Personal/variacion-y-cambio`, running since **Sep 8 21:38** — a different
+> project, in a directory that is not a worktree of this repo. A `curl` returning HTTP 200 was taken as
+> evidence for a claim it could not support: **the port answered, and the Leader inferred the
+> application.** Exactly the K-014 class it kept correcting elsewhere in this spec.
+>
+> **STAR's client is not served on any port.** What IS up and does belong here: `:3001`
+> (`server/researchindicators`, and `environment.dev.ts`'s `mainApiUrl` correctly targets it) and
+> `:3002` (the separate `…-management` repo's `app-authorization`).
+>
+> **And the blocker is auth, not the port collision.** `client/research-indicators/src/environments/environment.dev.ts`
+> sets `cognitoRedirectUri: "https://allianceindicatorstest.ciat.cgiar.org/auth"` and
+> `frontBaseUrl` to the same deployed host — so even with `:4200` freed and the front served locally,
+> the OAuth round trip returns to the **deployed** site and no token reaches the local instance. The
+> visual checklist requires an authenticated session.
+>
+> **Revised routing for the visual half** — the honest one, replacing "screenshot it locally":
+> 1. **Preferred:** do it on the deployed test environment after merging to `dev` (CI deploys code but
+>    **never** migrations — K-015) and after the user applies Migration A then B. Auth already works
+>    there, and it is the only place the migration-dependent items can be checked at all.
+> 2. Serve locally and reuse an existing JWT in `localStorage` — workable, manual, and it still cannot
+>    reach the migration-dependent items.
+> 3. Repoint `cognitoRedirectUri` at `http://localhost:4200/auth` — **only if that URI is registered in
+>    the Cognito app client**, and it means editing shared config. Not recommended.
+>
+> The reachable-vs-blocked split below stands **as a split**; what changed is that the "reachable"
+> column needs a served, authenticated STAR front, which does not exist yet — not merely a browser.
+
+#### Reachable once STAR's front is served AND authenticated (no migration needed)
 
 These need only the section to render and the options request to run, and the options request is a plain `GET /v2/results?indicators=2` that no migration touches:
 
