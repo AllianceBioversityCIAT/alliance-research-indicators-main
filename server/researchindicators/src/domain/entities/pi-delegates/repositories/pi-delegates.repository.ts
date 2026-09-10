@@ -13,6 +13,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PiDelegate } from '../entities/pi-delegate.entity';
+import { PiDelegateHistory } from '../entities/pi-delegate-history.entity';
+import { PiDelegateHistoryActionEnum } from '../enum/pi-delegate-history-action.enum';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
@@ -405,6 +407,43 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       })
       .execute();
     return result.affected ?? 0;
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates — T-18
+  // ─────────────────────────────────────────────────────────────────────────
+  // History write (R-PID-012)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Inserts one row into `pi_delegate_history` through the caller's transaction manager.
+   *
+   * The method is manager-accepting — it does NOT open its own transaction.
+   * The service (T-19) owns the one dataSource.transaction() and passes `manager`
+   * so this write is atomic with the mutation that triggered it (R-PID-012 AC.3).
+   *
+   * @param entry    Context captured at the moment of the mutation:
+   *                 pi_delegate_id, project_id, pi_user_id, delegate_user_id, action.
+   * @param actorId  sec_user_id of the user who executed the assign/revoke (created_by).
+   * @param manager  EntityManager from the owning transaction.
+   */
+  async recordHistory(
+    entry: {
+      pi_delegate_id: number;
+      project_id: string;
+      pi_user_id: number;
+      delegate_user_id: number;
+      action: PiDelegateHistoryActionEnum;
+    },
+    actorId: number,
+    manager: EntityManager,
+  ): Promise<void> {
+    const repo = manager.getRepository(PiDelegateHistory);
+    const row = repo.create({
+      ...entry,
+      created_by: actorId,
+      updated_by: actorId,
+    });
+    await repo.save(row);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

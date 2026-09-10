@@ -388,3 +388,10 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
 - **Verification:** `npm run build` clean; `npx eslint <3 files>` clean.
 
 **Sequencing note:** T-17 (DTO reshape `{project_ids,delegates}` → `{assignments}`) is a breaking interface change that won't build until the service (T-19) + controller (T-20) consume it. Executing T-18 (repo, independent) first, then T-17+T-19+T-20 as one cohesive interface change to keep the build green per step.
+
+### T-18 — Repository: history write (`recordHistory`) — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-012. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `repositories/pi-delegates.repository.ts` — added `recordHistory(entry, actorId, manager)` inserting one `pi_delegate_history` row via the passed `manager` (`created_by=actorId`), mirroring `insertDelegate`.
+- **Reviewer PASS (zero findings):** manager-accepting (no own tx — atomic with the mutation per AC.3); `entry` keys match the entity properties exactly; `action` typed as the enum; scope clean (unused until T-19, expected).
+- **Verification:** `npm run build` clean; `npx eslint <file>` clean.

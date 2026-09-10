@@ -197,7 +197,7 @@ graph TD
 - **Done:** [ ] empty `assignments` → 400; [ ] empty inner `delegates` ALLOWED.
 - **Dep:** T-10 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
 
-### T-18 — Repository: history write
+### T-18 — Repository: history write  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-012
 - **Files:** `repositories/pi-delegates.repository.ts` (or a history repo)
 - **Desc:** `recordHistory({pi_delegate_id, project_id, pi_user_id, delegate_user_id, action}, actorId, manager)` inserts one `pi_delegate_history` row via the passed manager. Ensure `insertDelegate`/soft-delete paths expose the ids the service needs.
