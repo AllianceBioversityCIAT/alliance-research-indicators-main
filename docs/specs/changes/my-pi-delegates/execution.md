@@ -106,3 +106,31 @@
 3. READABILITY: the union rationale comment is clear; keep it in sync if the both-present validation is tightened.
 
 **Requirements covered:** R-PID-004 (CRUD DTO surface), R-PID-005 (provision identity: email+names or existing id).
+
+---
+
+### T-04 — Repository: insert/soft-delete + find-or-create sec_user (transactional) — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode. Effort steered HIGH (correctness-critical atomicity).
+- **Covers:** R-PID-005, NFR-PID-003.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed:**
+- `entities/pi-delegates/repositories/pi-delegates.repository.ts` (new) — `PiDelegatesRepository extends Repository<PiDelegate>`. `createDelegate()` runs `dataSource.transaction(manager => …)`: step 1 resolve/provision sec_user via `manager.query` INSERT (reusing `createUserInSecUsers` column/carnet logic, transaction-bound); step 2 `manager.getRepository(PiDelegate).save()`. `softDeleteDelegate()` sets `is_active=false` + `deleted_at` + `updated_by` (releases the unique-active key). Read helpers use pooled `this.query` (pre-tx reads only).
+- `entities/pi-delegates/pi-delegates.module.ts` (edit) — registered `PiDelegatesRepository` in `providers` + `exports`.
+
+**Verification:** `npm run build` clean; `npx eslint <repo + module>` clean.
+
+**Reviewer verdict:** `STATUS: PASS` — all 6 critical checks:
+1. **Atomicity (crux):** both writes through the SAME `manager`; no `this.query`/`this.save` in the write path; throw at step 2 rolls back step 1. R-PID-005 AC.3 / NFR-PID-003 satisfied. The trap (naively reusing the non-transactional `createUserInSecUsers`) was correctly avoided — logic reused, execution moved to `manager`.
+2. **Runtime DI:** `AppConfig` provided+exported by `@Global() GlobalUtilsModule` — resolves at boot without local re-provide (same as `ResultRepository`).
+3. Generated `active_delegate_key` not written.
+4. Soft-delete matches design §4.
+5. INSERT column set/carnet resolution mirrors the sanctioned mechanism; params → `?` safe.
+6. Scope: only repo (new) + minimal module provider registration.
+
+**ADVISORY (recorded; do NOT gate):**
+- **⚠ ROUTE TO T-09 TEST:** `_findUserByEmailInTx` re-fetches the just-inserted row with `email LIKE CONCAT('%', ?, '%')` + `LIMIT 1`, **no `ORDER BY`, and drops the `is_active = TRUE` filter** the exemplar carries → a substring/inactive-row collision could return the wrong `sec_user_id`. Low practical risk (row just inserted is active), but T-09's provisioning test should assert the created `pi_delegates` row points at the CORRECT (just-provisioned) `sec_user_id` — persisted-row assertion, KZ-001 spirit. Cheap future hardening: restore `AND su.is_active = TRUE` + `ORDER BY su.sec_user_id DESC`.
+- Reliability: `created.sec_user_id` dereferenced with no null-guard — a failed re-fetch throws a raw `TypeError` instead of a Nest exception through `GlobalExceptions`.
+
+**Requirements covered:** R-PID-005 (AC.1 lookup, AC.2 provision-before-associate, AC.3 transactional), NFR-PID-003.

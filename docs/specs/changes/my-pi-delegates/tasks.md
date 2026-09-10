@@ -59,7 +59,7 @@ graph TD
 - **Done:** [ ] invalid/empty payloads → 400.
 - **Dep:** T-02 · **Effort:** S · **Skills:** api-design-principles
 
-### T-04 — Repository: insert/soft-delete + find-or-create sec_user (transactional)
+### T-04 — Repository: insert/soft-delete + find-or-create sec_user (transactional)  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-005, NFR-PID-003
 - **Files:** `entities/pi-delegates/repositories/pi-delegates.repository.ts`
 - **Desc:** In one transaction: `findUserByEmailOrCarnet`; if absent `createUserInSecUsers` (reuse `result.repository.ts` mechanism); then insert `pi_delegates`. Soft-delete on revoke.

@@ -2,9 +2,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PiDelegate } from './entities/pi-delegate.entity';
+import { PiDelegatesRepository } from './repositories/pi-delegates.repository';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PiDelegate])],
-  exports: [TypeOrmModule],
+  providers: [PiDelegatesRepository],
+  exports: [TypeOrmModule, PiDelegatesRepository],
 })
 export class PiDelegatesModule {}
