@@ -82,7 +82,7 @@ graph TD
 - **Done:** [ ] all endpoints in `/swagger`.
 - **Dep:** T-05 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
 
-### T-07 — Extend `isPi()` with a delegate fallback
+### T-07 — Extend `isPi()` with a delegate fallback  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-002, NFR-PID-002
 - **Files:** `result-status-workflow/repositories/result-status-workflow.repository.ts`
 - **Desc:** Keep the existing PI query **byte-for-byte**. After it, only when it returns no rows, run the delegate query (result→primary project→`pi_delegates` by `delegate_user_id`). `return existingPiRows>0 || delegateRows>0`.

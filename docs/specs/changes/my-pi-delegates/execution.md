@@ -187,3 +187,25 @@
 2. `verify-pi-delegate.dto.ts:12` still has the stale "global ValidationPipe" wording (T-06 fixed only the create DTO sibling) — reword for consistency.
 
 **Requirements covered:** R-PID-004 (create/list/verify/revoke REST surface + Swagger).
+
+---
+
+### T-07 — Extend `isPi()` with a delegate fallback — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode. Effort steered HIGH (correctness-critical PI path).
+- **Covers:** R-PID-002, NFR-PID-002.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed:**
+- `entities/result-status-workflow/repositories/result-status-workflow.repository.ts` (edit) — `isPi()` only. Existing PI query preserved **byte-for-byte**; added `if (piResult?.length > 0) return true;` then a delegate fallback query (`result_contracts → agresso_contracts → pi_delegates` on the result's primary+active contract, `delegate_user_id` + `is_active`). Returns `delegateResult?.length > 0`.
+
+**Verification:** `npm run build` clean; `npx eslint <file>` clean; **`npm test -- result-status-workflow.repository` → 10/10 existing `isPi` tests green** (NFR-PID-002 / R-PID-002 AC.5 — real evidence the PI behavior is preserved).
+
+**Reviewer verdict:** `STATUS: PASS` — 7 critical checks:
+1. Existing PI query byte-for-byte (diff shows only the result-handling lines changed; 10/10 spec corroborates).
+2. **Short-circuit (AC.1):** `pi_delegates` never queried for a real PI (return true before the delegate query is even declared).
+3. DD-A: two sequential queries, not a combined OR.
+4. **Cross-project safety (AC.4 / K-012 red input):** delegate lookup bound to the result's OWN primary+active contract, so a delegate of project A cannot authorize a result of project B; both `delegate_user_id = ?` and `is_active = true` guards present.
+5. Columns exist per migration/entity. 6. Placeholder-safe (params passed). 7. Scope: only `isPi()`; `queryPrincipalInvestigator` untouched. Sole caller `isPiValidation` consumes the boolean unchanged — no contract break.
+
+**Requirements covered:** R-PID-002 (AC.1–AC.5), NFR-PID-002 (PI behavior-preserving).
