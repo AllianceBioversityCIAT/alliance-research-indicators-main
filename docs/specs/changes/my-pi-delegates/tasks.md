@@ -97,7 +97,7 @@ graph TD
 - **Done:** [ ] metadata `is_principal_investigator` true for a delegate; [ ] true & unchanged for a real PI; [ ] false for neither; [ ] **`git diff --stat client/` empty** (no frontend change — NFR-PID-001).
 - **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert
 
-### T-09 — Tests: unit + e2e + existing suite green
+### T-09 — Tests: unit + e2e + existing suite green  ✅ [x] PASS 2026-09-10 (+ surfaced/fixed P0 module-wiring bug)
 - **Covers:** R-PID-002/003/005/006/007, NFR-PID-001/002/003
 - **Files:** `pi-delegates.service.spec.ts`, `result-status-workflow.repository.spec.ts` (extend), `test/pi-delegates.e2e-spec.ts`
 - **Desc (the 12 scenarios):** PI→true; delegate→true; neither→false; PI without delegates unchanged; delegate exists in sec_users; delegate absent → created first; association created; duplicate rejected; revoke → isPi false; delegate of other project → false; error during sec_user/association; **existing `isPi` tests still pass**. Plus metadata-flag PI/delegate/neither, and auth allowed/denied.
@@ -116,9 +116,11 @@ graph TD
 | RB-3 | The two PI functions resolve PI differently (projectLeadId vs name-match) | Delegate lookup identical; each keeps its own result→project resolution | open |
 
 ## 6. Done definition
-- [ ] T-01…T-09 done.
-- [ ] PI / delegate / neither verified for **both** `isPi` and the metadata flag; existing `isPi` tests green.
-- [ ] Create provisions absent sec_user first, transactional; no orphan; duplicate rejected.
-- [ ] **No role created, no roles-table change, `git diff --stat client/` empty.**
-- [ ] `/swagger` documents the CRUD; migration applies+reverts and is **applied** to the target DB (human step).
-- [ ] OQ-B (project-keyed) and OQ-D (provisioning identity) confirmed with Product.
+- [x] T-01…T-09 done (all 9 tasks Reviewer-PASS; code complete, committed).
+- [x] PI / delegate / neither verified for **both** `isPi` and the metadata flag *at the unit/control-flow level*; existing `isPi` tests green (10/10) + full unit suite 2718/2718. **[~] the SQL-semantic behavioral proof (cross-project false, metadata delegate→true) is written as e2e but deferred to the DB migration-apply.**
+- [x] Create provisions absent sec_user first, transactional (atomicity verified by review + unit control-flow); **[~] duplicate-rejected + rollback-no-orphan proven at the DB level are deferred to the e2e/migration-apply.**
+- [x] **No role created, no roles-table change, `git diff --stat client/` empty.**
+- [x] `/swagger` documents the CRUD (controller wired + route now reachable — P0 wiring bug fixed). **[~] migration applies+reverts and is applied to the target DB — HUMAN STEP (K-015), still pending.**
+- [ ] OQ-B (project-keyed) and OQ-D (provisioning identity) confirmed with Product — **still open.**
+
+**Post-implementation status:** all code merged on branch; unit-verified. Two gates remain, both human/infra: (1) apply the migration to the shared DB (K-015) — this also un-defers the e2e behavioral suite; (2) Product sign-off on OQ-B/OQ-D.

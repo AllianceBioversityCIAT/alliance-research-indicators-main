@@ -233,3 +233,42 @@
 **ADVISORY (recorded, non-gating):** the duplicated `userId, userId` in the 3 call arrays is a silent-corruption trap for a future editor (dropping one shifts `resultId` into a user slot, no type error). A named-param object or a `metadataPrincipalInvestigatorParams()` wrapper would self-document. Optional.
 
 **Requirements covered:** R-PID-003 (AC.1 PI-or-delegate flag, AC.2 no frontend change, AC.3 real-PI unchanged), NFR-PID-001 (`git diff client/` empty), NFR-PID-002.
+
+---
+
+### T-09 — Tests: unit + e2e + existing suite green — **PASS on attempt 1** (2026-09-10) + surfaced & fixed a P0 wiring bug
+
+- **Status:** PASS (Reviewer, covering the tests AND the wiring fix). Auto-continue mode. Effort HIGH.
+- **Covers:** R-PID-002/003/005/006/007, NFR-PID-001/002/003.
+- **Attempts:** 1 Implementer (tests) + 1 Implementer (defect fix) + 1 Reviewer (both).
+
+**Files changed:**
+- `entities/pi-delegates/pi-delegates.service.spec.ts` (new, unit) — auth allowed (SYSTEM_ADMIN/PI/delegate) / denied (→403), create union mapping, errno 1062→ConflictException, revoke NotFound.
+- `entities/result-status-workflow/repositories/result-status-workflow.repository.spec.ts` (extended) — isPi Sc-1 (PI→true, `pi_delegates` queried ONCE), Sc-2 (delegate→true), Sc-3 (neither→false), Sc-10 (cross-project→false); the 10 pre-existing tests preserved.
+- `test/pi-delegates.e2e-spec.ts` (new, e2e) — DB-semantic scenarios (unique-active constraint, transactional rollback, cross-project SQL, metadata delegate→true); execution DEFERRED (see below).
+
+**Verification:** **`npm test -- --silent` → 2718/2718 (346 suites) green** incl. the extended isPi + results.service specs (T-09 Done gate met); `npx eslint` clean; **`git diff --stat client/` EMPTY** (NFR-PID-001).
+
+**Reviewer verdict:** `STATUS: PASS` — tests assert on values/exceptions not mock order (KZ-001; the only call-count assertions are structurally required by AC.1/SYSTEM_ADMIN and were verified to actually discriminate); Sc-10 uses distinct project/user (KZ-004); honest unit-control-flow vs deferred-SQL split (KZ-017); full scenario coverage; existing tests preserved; no production code papered over.
+
+---
+
+#### 🔴 P0 DEFECT SURFACED BY T-09's e2e — fixed (module wiring)
+
+**Bug:** `/api/pi-delegates` returned **404 in the booted app** — the entire CRUD HTTP surface was unreachable **in production**, not just in the test harness. Root cause: **T-02 registered the route in `main.routes.ts` (RouterModule path map) but never imported `PiDelegatesModule` into the app module graph.** `RouterModule.register` maps paths; NestJS only instantiates a module (and mounts its controller) if it is in the graph. The sibling `BilateralProjectMappingModule` is wired in BOTH `main.routes.ts` AND `entities.module.ts` — `PiDelegatesModule` was in `main.routes.ts` only.
+
+**Why every prior gate missed it (KZ-017 — a check narrower than its claim):** T-01…T-08 verified via `build` + `eslint` + unit tests. **None booted the app.** T-02's Reviewer confirmed "module registered at pi-delegates" against `main.routes.ts` — which is true but NOT the same as "route reachable." The e2e (T-09) was the first boot, and it 404'd. The T-09 Implementer initially MISDIAGNOSED this as a "test-harness route issue"; the Leader rejected that unverified claim and confirmed the real bug by grep (`PiDelegatesModule` absent from `entities.module.ts`, count 0).
+
+**Fix:** added `PiDelegatesModule` to `entities.module.ts` imports (2-line change, mirrors the sibling; `exports` untouched — leaf module). File: `domain/entities/entities.module.ts`.
+
+**Reachability proof:** e2e `POST /api/pi-delegates` went **404 → 409** (route mounted, controller instantiated, service reached, DB constraint fired). Full unit suite still **2718/2718** (no regression). Reviewer confirmed the fix is correct + minimal.
+
+**→ KAIZEN CANDIDATE (for `/akili-archive`):** "Route registered in `main.routes.ts` ≠ route reachable — a module must ALSO be in the app graph (`entities.module.ts`). Verify HTTP reachability by booting, not by grepping the route table." T-02's "module registered" check was structurally narrower than the requirement.
+
+---
+
+#### Outstanding (human / deferred — the code is complete & unit-verified):
+- **Human DB migration apply (K-015):** the `pi_delegates` migration is unapplied. The e2e DB-semantic assertions (unique-active constraint, transactional rollback, cross-project SQL, metadata delegate→true) + the T-04 rollback "Disqualifies" proof RIDE on this apply — written but deferred, honestly (not claimed passing). Advisory: tighten the e2e's `not.toBe(500)` fallback once the table exists.
+- **OQ-B / OQ-D** product confirmations still open (requirements §9).
+
+**Requirements covered:** R-PID-002/003/005/006/007 (unit control-flow + auth), NFR-PID-001/002 (verified), NFR-PID-003 (rollback proof deferred to e2e/migration-apply).
