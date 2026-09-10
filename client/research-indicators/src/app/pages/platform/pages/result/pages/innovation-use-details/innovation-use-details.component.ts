@@ -216,26 +216,77 @@ export default class InnovationUseDetailsComponent {
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
 
-  onInnovationDevSelected(resultId: number): void {
+  enrichmentSuccessForId = signal<number | null>(null);
+
+  async onInnovationDevSelected(resultId: number): Promise<void> {
+    const currentLinked = this.body().linked_innovation_dev;
+    const sameId = currentLinked?.result_id === resultId;
+    const wasSuccessful = this.enrichmentSuccessForId() === resultId;
+
+    if (sameId && wasSuccessful) {
+      return; // R-IUC-007 AC.7: no refetch after success
+    }
+
     // R-IUL-004: must NOT leave the previous result in the payload after the selection changes.
     // AND the card re-renders for the new result.
     this.body.update(current => {
-      if (current.linked_innovation_dev?.result_id !== resultId) {
-        const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
-        return {
-          ...current,
-          linked_innovation_dev: option
-            ? {
-                result_id: option.result_id,
-                result_official_code: Number(option.result_official_code),
-                title: option.title ?? '',
-                platform_code: option.platform_code ?? null
-              }
-            : null
-        };
-      }
-      return current;
+      const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
+      return {
+        ...current,
+        linked_innovation_dev: option
+          ? {
+              result_id: option.result_id,
+              result_official_code: Number(option.result_official_code),
+              title: option.title ?? '',
+              platform_code: option.platform_code ?? null
+            }
+          : null
+      };
     });
+
+    if (!resultId) {
+      this.enrichmentSuccessForId.set(null);
+      return;
+    }
+
+    try {
+      const response = await this.api.GET_InnovationDevCard(resultId);
+
+      // DC-12 / DC-15: discarded if superseded (the selected ID changed while we were waiting)
+      if (this.body().linked_innovation_dev?.result_id !== resultId) {
+        return;
+      }
+
+      if (response.successfulRequest) {
+        this.enrichmentSuccessForId.set(resultId);
+        const data = (response.data || {}) as {
+          innovation_readiness?: { id: number; level: number | null; name: string | null } | null;
+          description?: string | null;
+          geo_scope?: { code: number; name: string | null } | null;
+        };
+        const { innovation_readiness, description, geo_scope } = data;
+        this.body.update(current => {
+          if (current.linked_innovation_dev?.result_id !== resultId) return current;
+          return {
+            ...current,
+            linked_innovation_dev: {
+              ...current.linked_innovation_dev!,
+              innovation_readiness: innovation_readiness ?? null,
+              description: description ?? null,
+              geo_scope: geo_scope ?? null
+            }
+          };
+        });
+      } else {
+        // DD-14 / DD-12: Failure is never a gate. Retryable.
+        this.enrichmentSuccessForId.set(null);
+      }
+    } catch {
+      if (this.body().linked_innovation_dev?.result_id !== resultId) {
+        return;
+      }
+      this.enrichmentSuccessForId.set(null);
+    }
   }
 
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */

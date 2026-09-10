@@ -1057,6 +1057,15 @@ describe('ApiService', () => {
       });
     });
 
+    it('should call GET_InnovationDevCard', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+      service.GET_InnovationDevCard(123);
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(
+        'results/innovation-use/innovation-dev-card/123',
+        { useResultInterceptor: true }
+      );
+    });
+
     it('should call GET_InnovationDetails', () => {
       const resultCode = 123;
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });

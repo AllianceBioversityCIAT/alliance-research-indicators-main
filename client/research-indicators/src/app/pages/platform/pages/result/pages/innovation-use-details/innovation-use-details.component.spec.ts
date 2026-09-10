@@ -36,6 +36,7 @@ const LEVELS_FIXTURE: InnovationUseLevel[] = Array.from({ length: 10 }, (_, leve
 const idForLevel = (level: number) => level + 1;
 
 const apiService = {
+  GET_InnovationDevCard: jest.fn().mockResolvedValue({ data: null, successfulRequest: true }),
   GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
   PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
   GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true }),
@@ -4012,6 +4013,265 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     });
   });
 
+  describe('T-09 — Enrichment rules (fetch, id guard, retry)', () => {
+    let innoDevService: GetInnoDevOutputService;
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([
+        { result_id: 1, platform_code: 'A', result_official_code: 10, title: 'Result A' } as any,
+        { result_id: 2, platform_code: 'B', result_official_code: 20, title: 'Result B' } as any
+      ]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockClear();
+      apiService.PATCH_InnovationUseDetails.mockClear();
+      (actions.showToast as jest.Mock).mockClear();
+      fixture.detectChanges();
+    });
+
+    it('While the read is in flight, the card shows title + anchor and no placeholder values', async () => {
+      let resolveA!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+
+      component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result A');
+      expect(card.textContent).not.toContain('Readiness level:');
+      expect(card.textContent).not.toContain('Geographic scope:');
+      expect(card.textContent).not.toContain('description');
+
+      resolveA({ successfulRequest: true, data: { innovation_readiness: { id: 1, level: 1, name: 'Idea' }, description: 'Desc A', geo_scope: { code: 1, name: 'Global' } } });
+      await fixture.whenStable();
+    });
+
+    it('Selecting an option renders the three fields with no page reload and no save', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          description: 'Desc A',
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Readiness level:');
+      expect(card.textContent).toContain('Level 1 - Idea');
+      expect(card.textContent).toContain('Desc A');
+      expect(card.textContent).toContain('Geographic scope:');
+      expect(card.textContent).toContain('Global');
+    });
+
+    it('On failure the card shows title + anchor, no error dialog, no invalid state, and link is savable', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: false,
+        errorDetail: { errors: 'Failed' }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result A');
+      expect(card.textContent).not.toContain('Readiness level:');
+      expect(component.loadFailed()).toBe(false);
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+
+      component.body.update(current => ({ ...current, innovation_dev_result_id: 1 }));
+      await component.saveData();
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, payload] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(payload.innovation_dev_result_id).toBe(1);
+    });
+
+    it('Re-selecting the same result after a failure re-attempts the read', async () => {
+      apiService.GET_InnovationDevCard.mockRejectedValueOnce(new Error('fail'));
+      await component.onInnovationDevSelected(1);
+      
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+    });
+
+    it('Re-selecting the same result after a reachable failure (successfulRequest: false) re-attempts the read', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: false });
+      await component.onInnovationDevSelected(1);
+      
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+    });
+
+    it('Selection changes before a failure clear the success flag so the new result can be re-attempted (DD-14 reachable failure)', async () => {
+      // 1. select A -> succeeds
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      // 2. select B -> rebuild to B's four keys, B's read in flight (deferred)
+      let bResolve: any;
+      apiService.GET_InnovationDevCard.mockImplementationOnce(() => new Promise(r => { bResolve = r; }));
+      const bPromise = component.onInnovationDevSelected(2);
+      
+      // 3. re-select A -> linked is B, so sameId is false. Fetch A, A fails at envelope level
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: false });
+      await component.onInnovationDevSelected(1);
+      
+      // 4. re-select A -> if the failure didn't clear the success flag, A would early return
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(4);
+      bResolve({ successfulRequest: true, data: {} }); // cleanup
+    });
+
+    it('Re-selecting the same result after a success does not refetch', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(1);
+    });
+
+    it('Selecting A then B clears A\'s three fields synchronously', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: { description: 'Desc A' }
+      });
+      await component.onInnovationDevSelected(1);
+      
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+      
+      component.onInnovationDevSelected(2);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result B');
+      expect(card.textContent).not.toContain('Desc A');
+
+      resolveB({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('A\'s response settling after B is selected does not render A\'s values under B\'s title', async () => {
+      let resolveA!: (value: any) => void;
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+
+      component.onInnovationDevSelected(1);
+      component.onInnovationDevSelected(2);
+
+      resolveA({
+        successfulRequest: true,
+        data: { description: 'Desc A from late response' }
+      });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Desc A from late response');
+
+      resolveB({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('The holds above are order-independent — they hold for B-then-A as well as A-then-B', async () => {
+      let resolveA!: (value: any) => void;
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+
+      component.onInnovationDevSelected(2);
+      component.onInnovationDevSelected(1);
+
+      resolveB({
+        successfulRequest: true,
+        data: { description: 'Desc B from late response' }
+      });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Desc B from late response');
+
+      resolveA({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('The scope name comes from the server response, never from GetGeoFocusService', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          geo_scope: { code: 3, name: 'MULTI_NATIONAL' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('MULTI_NATIONAL');
+    });
+
+    it('The rendered content is identical at selection and after a save + section re-read, for the same result', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          description: 'Desc A',
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const cardBefore = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      const contentBefore = cardBefore.textContent;
+
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          ...new GetInnovationUseDetails(),
+          linked_innovation_dev: {
+            result_id: 1, result_official_code: 10, title: 'Result A', platform_code: 'A',
+            innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+            description: 'Desc A',
+            geo_scope: { code: 1, name: 'Global' }
+          }
+        } as any
+      });
+      await component.getData();
+      fixture.detectChanges();
+
+      const cardAfter = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(cardAfter.textContent).toBe(contentBefore);
+    });
+  });
+
   describe('T-10: Page-owned card', () => {
     it('FALSIFIER (link): assert on the RENDERED DOM — the <a> href, target, and accessible name', () => {
       // FALSIFIER: If the anchor is removed from the DOM, this test MUST fail.
@@ -4297,6 +4557,7 @@ class ResultRouteStubComponent {}
 
 describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful result/:id -> innovation-use-details route tree)', () => {
   const routeTreeApiService = {
+    GET_InnovationDevCard: jest.fn().mockResolvedValue({ data: null, successfulRequest: true }),
     GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
     PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
     GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
