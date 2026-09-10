@@ -67,7 +67,7 @@ graph TD
 - **Done:** [ ] existing delegate reused; [ ] absent delegate created then associated; [ ] injected failure → nothing committed.
 - **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert, error-handling-patterns
 
-### T-05 — Service: CRUD + project authorization
+### T-05 — Service: CRUD + project authorization  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-004, R-PID-007
 - **Files:** `entities/pi-delegates/pi-delegates.service.ts`
 - **Desc:** `create/list/verify/update/revoke`. **Auth:** allow if `SYSTEM_ADMIN` (existing bypass) or caller is PI/active-delegate of `project_id` (reuse the PI join, project-scoped, unioned with `pi_delegates`). No new role/permission.

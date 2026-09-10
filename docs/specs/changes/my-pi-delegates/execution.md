@@ -134,3 +134,30 @@
 - Reliability: `created.sec_user_id` dereferenced with no null-guard — a failed re-fetch throws a raw `TypeError` instead of a Nest exception through `GlobalExceptions`.
 
 **Requirements covered:** R-PID-005 (AC.1 lookup, AC.2 provision-before-associate, AC.3 transactional), NFR-PID-003.
+
+---
+
+### T-05 — Service: CRUD + project authorization — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode. Effort steered HIGH (security-critical).
+- **Covers:** R-PID-004, R-PID-007.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed:**
+- `entities/pi-delegates/pi-delegates.service.ts` (new) — `create/list/verify/revoke`; `assertCanManageProject()` gates every method: SYSTEM_ADMIN via `roles.includes(SecRolesEnum.SYSTEM_ADMIN)` → else `isPiOrActiveDelegateOfProject` → else `ForbiddenException`. `create` maps the DTO union, catches errno 1062 → `ConflictException`. `revoke` fetches the row first, authorizes on `row.project_id`.
+- `entities/pi-delegates/repositories/pi-delegates.repository.ts` (edit) — added `isPiOrActiveDelegateOfProject(projectId, userId)`: the `isPi()` join (`projectLeadId → aus.carnet → su.email`) keyed on `ac.agreement_id`, UNION `pi_delegates` active-delegate check; params passed (placeholder-safe).
+- `entities/pi-delegates/pi-delegates.module.ts` (edit) — registered `PiDelegatesService`.
+
+**Verification:** `npm run build` clean; `npx eslint <service+repo+module>` clean.
+
+**Reviewer verdict:** `STATUS: PASS` — security audit: K-012 red input → 403 on ALL four methods; PI branch faithfully reproduces `isPi()` join project-scoped, no false-allow/false-deny; no cross-project leak / no empty-200 (judgment S4 satisfied); `revoke` authorizes on the DB row's project_id; SYSTEM_ADMIN via `roles.includes` (correct, not `validateRoles`); no new role; `isPi`/`queryPrincipalInvestigator` untouched.
+
+**ADVISORY — ⚠ CARRY-FORWARD to T-06 (do NOT gate T-05, but T-06 MUST handle):**
+1. **`create` uses `dto.delegate!` + this repo has NO global `ValidationPipe`.** T-06 MUST attach `@UsePipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }))` on the controller/handlers, or an unvalidated body (neither union arm) reaches `createDelegate(..., undefined, ...)` → 500 instead of 400. Also reword the DTO comment `create-pi-delegate.dto.ts:59` ("global ValidationPipe" — factually wrong for this repo).
+2. **`verify` passes `dto.delegate_user_id` straight into `findOne` `where`.** If undefined (no pipe / DTO not requiring it), TypeORM drops the predicate → false `{exists:true}`. Ensure `VerifyPiDelegateDto.delegate_user_id` required + pipe wired.
+
+**ADVISORY (recorded, optional/product):**
+3. RISK (existence oracle): `revoke` throws 404 before the auth check → an unauthorized caller can probe whether a `pi_delegate_id` exists. Low severity (opaque autoincrement PK, no data disclosed). Optional future tightening.
+4. PRODUCT (OQ-D): `pi_user_id = callerUserId` even when caller is SYSTEM_ADMIN or a delegate (not the actual project PI) — matches design §4 "provenance/authorization context"; flag for OQ-D confirmation.
+
+**Requirements covered:** R-PID-004 (CRUD service methods), R-PID-007 (AC.1 PI/delegate/SYSTEM_ADMIN gate; AC.2 reuse existing relationship, no new role).

@@ -49,6 +49,52 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Auth query (R-PID-007 / DD-B)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns true when userId is the PI of projectId OR has an active delegation
+   * for that project.
+   *
+   * PI resolution reuses the same agresso_contracts → alliance_user_staff →
+   * sec_users join from isPi() (result-status-workflow.repository.ts:181-196),
+   * keyed directly on ac.agreement_id instead of through result_contracts.
+   * The delegate branch checks pi_delegates (project_id, delegate_user_id, is_active).
+   * Both branches are combined via UNION so a single boolean is returned.
+   *
+   * This method is called BEFORE any write in create/list/verify/revoke — it is
+   * the sole project-scoped authorization gate (R-PID-007 AC.1).
+   */
+  async isPiOrActiveDelegateOfProject(
+    projectId: string,
+    userId: number,
+  ): Promise<boolean> {
+    const query = `
+      SELECT 1
+      FROM agresso_contracts ac
+        INNER JOIN alliance_user_staff aus ON aus.carnet = ac.projectLeadId
+        INNER JOIN sec_users su ON su.email = aus.email
+      WHERE ac.agreement_id = ?
+        AND su.sec_user_id = ?
+      LIMIT 1
+      UNION
+      SELECT 1
+      FROM pi_delegates pd
+      WHERE pd.project_id = ?
+        AND pd.delegate_user_id = ?
+        AND pd.is_active = TRUE
+      LIMIT 1;
+    `;
+    const rows = await this.dataSource.query(query, [
+      projectId,
+      userId,
+      projectId,
+      userId,
+    ]);
+    return rows?.length > 0;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Read helpers
   // ─────────────────────────────────────────────────────────────────────────
 
