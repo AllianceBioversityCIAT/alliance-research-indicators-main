@@ -2651,3 +2651,60 @@ Two independent reasons, either sufficient:
 2. **Applying the migrations is a human decision, never an agent's** (**B-1/B-3**, §11.1). The Dev database is remote and shared, Migration A's `down()` is destructive (the FK forces a hard delete of `link_results` rows), and §11.1 fixes the order.
 
 **No agent action can close this task.** Recording the split so the remaining work is precise rather than a vague *"needs QA"*.
+
+---
+
+## ✅ T-13 — Documentation sync — DONE, with one deliberate deviation from its own scope text
+
+**Date** 2026-09-09 · **Executed by** the Leader in-session (a docs task; unlike T-08…T-12 it carries no ⟨Antigravity⟩ marker) · **No Reviewer round** — T-13's own text says its verification is a **presence assertion** and *"FALSIFIER. None meaningful — this is a presence assertion, and it proves presence, not correctness. Stated rather than dressed up as a behavioral gate."* Honouring that rather than manufacturing a gate.
+
+**Why the task exists at all** (its own words): *"Judgment Day (A11) found these had no home. An unowned doc-sync item is one that does not happen."*
+
+### All four edits present — verified by the grep T-13 prescribes
+
+| Scope item | Target | Verified |
+| --- | --- | --- |
+| (a) | `docs/trd/trd.md` §2.4 — **ADR-13** | ✅ 1 match on `^\| ADR-13 \|` |
+| (b) | `docs/ux-ui/design.md` §12.2 [STAR] client decision record | ✅ 1 match |
+| (c) | `docs/specs/innovation-use/family.md` row #4 | ✅ synced, **not** to `done` — see below |
+| (d) | root `CLAUDE.md` model-registry drift | ✅ 1 match |
+
+Table integrity re-checked after the edits (141 / 101 / 57 / 40 rows respectively — no broken pipes).
+
+### (a) ADR-13 — filed as an architectural decision, not a changelog line
+
+The substance worth having in the TRD is **not** *"we added a link"* — it is that **cardinality here is a property of the writer, not of a constraint**, and why that was chosen: `LinkResultsService.create` deactivates every row in the role before inserting and **reactivates the same PK** on re-selection, while there is deliberately **no** unique index on `(result_id, link_result_role_id, is_active)` — a partial unique index is not expressible in MySQL and a full one would break the soft-delete history. That is tolerable **because** the submission gate uses `EXISTS` (DD-5) rather than `COUNT(*) = 1`: a doubled row leaves the green check correct, where a SQL cardinality assertion would turn an invariant violation into **a red check the user cannot clear**. ADR-13 also ties rule 16 back to ADR-11's stored-routine pattern and ADR-12's baseline.
+
+### (b) The STAR decision record — seven decisions, each with its rationale
+
+Written as a decision record and explicitly **not** a claim of visual conformance (T-12 is still open). The entries that will matter to a future reader are the ones where the *reason* is non-obvious: why the asterisk sits on the **section title** (the mock gives the control no label — DD-11); why the card renders from the **payload** and never the options list (a soft-deleted target would vanish while the check went red — the user would face a red check over a blank field); why the URL carries the **platform prefix** for every platform (a bare `/result/284` resolves to STAR, so a PRMS target linked to a *different* result); why the error is **card-scoped** (the page-level gate unmounted the section, silenced *Save*, and let *Next* discard edits); and why the anchor carries **its own fill** (measured **1.46:1** in dark theme on the row's grey — invisible; **7.72:1** with the fill).
+
+### (c) The deviation, stated plainly
+
+**T-13 item (c) says: *"`family.md` row #4 → `done`"*. It is not written that way.** Writing `done` would be **false** on three independently sufficient counts:
+
+1. **T-12 is `[~]`** — its visual half needs a human eye, and part of its checklist is unreachable until Migration A is applied.
+2. **Both migrations are unapplied in every environment** (B-1/B-3), measured: `325 rows, 323 applied, 2 pending`. The feature cannot work end-to-end anywhere yet.
+3. **Rows #1–#3 use `done` to mean *archived after a validate pass*** — this chunk has had neither.
+
+The row now reads **`implemented — NOT done`** with the full verification figures, the two open tasks, the unapplied migrations, and the open risk rows (R-7, R-9, R-10). A note under the table explains the deviation so the next reader does not read it as an oversight.
+
+**This is the KZ-007 artifact class, and this spec has been bitten by it twice.** A status cell reads as settled fact and is rarely re-verified. **A task instruction to write a word is not authority to write it when it is untrue** — the *intent* of (c) was to sync the row to reality, and that is what was done. It will read `done` when T-12 closes, the migrations are applied, and the chunk is archived.
+
+### (d) The model-registry drift — measured, and worse than the task described
+
+T-13 said the registry lists `gemini-3.7/3.6/3.5-flash` while `agy models` returned `gemini-3.8-flash-{high,medium,low}`. Re-probed **2026-09-09**, and the drift runs in **three** directions, not one:
+
+| Drift | Detail |
+| --- | --- |
+| **Missing** | `gemini-3.8-flash-{high,medium,low}` — the newest flash tier, absent from the registry |
+| **Phantom** | `gemini-3.5-flash` was still listed and **no longer exists** |
+| **Shape** | `gemini-3.1-pro` has only **`-high`** and **`-low`** — there is **no `-medium`**, so the otherwise-uniform *"effort is baked into the slug"* pattern has a hole exactly where a T1/T3 task would reach for the middle |
+
+The full current list is 14 slugs, recorded verbatim in `CLAUDE.md`. **`gemini-3.1-pro-high` is the model that executed this spec's entire client lane.** The line now ends with *"re-probe before planning a dispatch — this list has now been wrong twice, in both directions"*, because a phantom model reads as an available option and a missing one rules a host out unexamined; the registry has done both.
+
+### Status
+
+**T-13 → `[x]`.** **13 of 14 tasks `[x]`.**
+
+**Only T-12 remains, and no agent action can close it** — its Done bar is screenshots a human eye confirms, and part of its checklist needs Migration A applied first, which is a human decision (B-1/B-3).

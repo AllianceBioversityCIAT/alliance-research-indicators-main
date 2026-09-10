@@ -642,7 +642,7 @@ evidence, not the suite.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` — all four edits present; item (c) deliberately synced row #4 to `implemented — NOT done` rather than `done`, because `done` would be false while T-12 is `[~]` and both migrations are unapplied. Deviation recorded in `execution.md` and in a note under `family.md`'s table |
 | Size | S |
 | Depends on | T-07, T-12 |
 | Requirements | — (traceability hygiene) |
