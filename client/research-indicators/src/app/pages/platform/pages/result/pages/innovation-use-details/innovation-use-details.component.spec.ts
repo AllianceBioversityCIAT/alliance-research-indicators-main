@@ -3918,6 +3918,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
           result_official_code: 1,
           title: 'Title',
           platform_code: 'P-1',
+          description: 'A test description',
           result_status: {
             result_status_id: 1,
             name: 'Draft',
@@ -3932,7 +3933,8 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         };
         const fetchedData = {
           innovation_readiness: { id: 1, level: 7, name: 'Validation' },
-          geo_scope: { id: 1, name: 'Global' }
+          geo_scope: { id: 1, name: 'Global' },
+          description: 'A test description from api'
         };
         apiService.GET_InnovationDevCard.mockResolvedValueOnce({ data: fetchedData, successfulRequest: true });
         jest.spyOn(innoDevService, 'list').mockReturnValue([option as any]);
@@ -3943,11 +3945,25 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         let detailsEl = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
         expect(detailsEl.textContent).toContain('Geographic scope');
         
+        // Issue 2: Verify Reporting year rendering
+        expect(detailsEl.textContent).toContain('Reporting year');
+        expect(detailsEl.textContent).toContain('2026');
+
+        // Issue 3: Verify the block order is eyebrow, title, description, metadata row
+        const titleEl = detailsEl.querySelector('p.font-\\[500\\]');
+        const descEl = detailsEl.querySelector('[data-testid="innovation-dev-description"]');
+        const rowEl = detailsEl.querySelector('.flex-wrap');
+        expect(titleEl).toBeTruthy();
+        expect(descEl).toBeTruthy();
+        expect(rowEl).toBeTruthy();
+        expect(titleEl!.compareDocumentPosition(descEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(descEl!.compareDocumentPosition(rowEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        
         // Count separators
         let separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
-        expect(separators.length).toBe(2);
+        expect(separators.length).toBe(3);
 
-        // Now absent
+        // Now absent geo_scope
         const option2 = { ...option, result_id: 2 };
         const fetchedDataAbsent = {
           innovation_readiness: { id: 1, level: 7, name: 'Validation' },
@@ -3961,6 +3977,21 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         fixture.detectChanges();
         
         expect(detailsEl.textContent).not.toContain('Geographic scope');
+        
+        separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+        expect(separators.length).toBe(2);
+
+        // Issue 2: Now absent year as well
+        const option3 = { ...option2, result_id: 3 };
+        delete (option3 as any).year;
+        apiService.GET_InnovationDevCard.mockResolvedValueOnce({ data: fetchedDataAbsent, successfulRequest: true });
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any, option2 as any, option3 as any]);
+        await component.onInnovationDevSelected(3);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        
+        expect(detailsEl.textContent).not.toContain('Reporting year');
         
         separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
         expect(separators.length).toBe(1);
@@ -4157,8 +4188,8 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
       
       expect(card.textContent).toContain('Result A');
-      expect(card.textContent).not.toContain('Readiness level:');
-      expect(card.textContent).not.toContain('Geographic scope:');
+      expect(card.textContent).not.toContain('Innovation Dev level');
+      expect(card.textContent).not.toContain('Geographic scope');
       expect(card.textContent).not.toContain('description');
 
       resolveA({ successfulRequest: true, data: { innovation_readiness: { id: 1, level: 1, name: 'Idea' }, description: 'Desc A', geo_scope: { code: 1, name: 'Global' } } });
@@ -4199,7 +4230,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
       
       expect(card.textContent).toContain('Result A');
-      expect(card.textContent).not.toContain('Readiness level:');
+      expect(card.textContent).not.toContain('Innovation Dev level');
       expect(component.loadFailed()).toBe(false);
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
 
@@ -4389,7 +4420,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
   });
 
   describe('T-10: Page-owned card', () => {
-    it.skip('FALSIFIER (link): assert on the RENDERED DOM — the <a> href, target, and accessible name', () => {
+    it('FALSIFIER (link): assert on the RENDERED DOM — the <a> href, target, and accessible name', () => {
       // FALSIFIER: If the anchor is removed from the DOM, this test MUST fail.
       component.body.set({
         ...new GetInnovationUseDetails(),
@@ -4410,7 +4441,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(card.nativeElement.textContent).toContain('(opens in a new tab)');
     });
 
-    it.skip('FALSIFIER (href form): assert a STAR result yields /result/STAR-284/general-information EXACTLY, and a PRMS result yields /result/PRMS-284/general-information EXACTLY', () => {
+    it('FALSIFIER (href form): assert a STAR result yields /result/STAR-284/general-information EXACTLY, and a PRMS result yields /result/PRMS-284/general-information EXACTLY', () => {
       // FALSIFIER: Build the href from the bare code instead -> the PRMS case must go red. Build it from the space-joined display code -> both must go red.
       component.body.set({
         ...new GetInnovationUseDetails(),
@@ -4462,7 +4493,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(el).not.toContain('STAR 284 - Test result');
     });
 
-    it.skip('For the selection-change path, arrange the TRANSITION (render with a link, then change the selection, then detectChanges), never the end state', () => {
+    it('For the selection-change path, arrange the TRANSITION (render with a link, then change the selection, then detectChanges), never the end state', () => {
       // FALSIFIER (binding): deleting `(selectEvent)="onInnovationDevSelected($event)"` MUST turn this red.
       const service = TestBed.inject(GetInnoDevOutputService);
       service.list.set([
@@ -4504,7 +4535,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     // 6.83:1 light and 7.72:1 dark, and is also closer to the mock, which shows the pill on a
     // lighter fill than the row. FALSIFIER: drop bg-[var(--ac-white-1)] from the anchor -> the
     // dark-theme assertion below goes red.
-    it.skip('NFR-IUL-003 — the View innovation detail anchor holds AA in BOTH themes, on its own fill not the grey row', () => {
+    it('NFR-IUL-003 — the View innovation detail anchor holds AA in BOTH themes, on its own fill not the grey row', () => {
       component.body.set({
         ...new GetInnovationUseDetails(),
         innovation_dev_result_id: 123,
@@ -4826,7 +4857,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(descElement.className).toContain('line-clamp-3');
     });
 
-    it.skip('The title + anchor row preserves the class list across the outer and inner wrappers', () => {
+    it('The anchor row preserves the class list across the inner wrappers and parent container', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -4834,9 +4865,9 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
           title: 'A title',
           result_official_code: 1,
           platform_code: 'P-1',
-          description: 'x',
-          innovation_readiness: null,
-          geo_scope: null
+          innovation_readiness: { id: 1, name: 'Level', level: 1 },
+          geo_scope: { code: 1, name: 'Global' },
+          description: 'A desc'
         }
       });
       fixture.detectChanges();
@@ -4846,11 +4877,12 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       
       const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
       const innerRow = anchor.parentElement as HTMLElement;
-      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center justify-between');
-      expect(innerRow.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center');
+      expect(innerRow.parentElement!.className).toContain('flex flex-wrap items-center gap-x-2 gap-y-1');
+      expect(innerRow.parentElement!.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
     });
 
-    it.skip('The anchor\'s href, text and accessible name are unchanged', () => {
+    it('The anchor\'s href, text and accessible name are unchanged', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -4874,7 +4906,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(anchor.querySelector('.sr-only')?.textContent).toBe('(opens in a new tab)');
     });
 
-    it('With readiness null, no `Readiness level:` label element exists', () => {
+    it('With readiness null, no `Innovation Dev level` label element exists', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -4892,10 +4924,13 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       const card = fixture.debugElement.queryAll(By.css('.section-title'))
         .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
       
-      expect(card.textContent).not.toContain('Readiness level:');
+      expect(card.textContent).not.toContain('Innovation Dev level');
+      
+      const separators = Array.from(card.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+      expect(separators.length).toBe(1);
     });
 
-    it('With scope null, no `Geographic scope:` label element exists', () => {
+    it('With scope null, no `Geographic scope` label element exists', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -4913,10 +4948,10 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       const card = fixture.debugElement.queryAll(By.css('.section-title'))
         .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
       
-      expect(card.textContent).not.toContain('Geographic scope:');
+      expect(card.textContent).not.toContain('Geographic scope');
     });
 
-    it.skip('With all three null, the card\'s DOM equals today\'s card plus no extra containers', () => {
+    it('With all three null, the card still renders the column layout but without the description element', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -4934,14 +4969,20 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       const card = fixture.debugElement.queryAll(By.css('.section-title'))
         .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
       
-      // Select the element immediately following the app-select (the card content)
       const contentNodes = Array.from(card.children).filter(el => el.tagName !== 'H2' && el.tagName !== 'APP-SELECT');
-      expect(contentNodes.length).toBe(1); // No extra containers, just the single flex row
-      const singleFlexRow = contentNodes[0] as HTMLElement;
-      expect(singleFlexRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center justify-between rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+      expect(contentNodes.length).toBe(1); // The main outer container
+      const container = contentNodes[0] as HTMLElement;
+      expect(container.className.replace(' ng-star-inserted', '')).toBe('flex flex-col gap-2 rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+      
+      // Ensure description is absent
+      const descElement = container.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement).toBeNull();
+      
+      // Check inner structure
+      expect(container.children.length).toBe(3); // header, title, footer (metadata)
     });
 
-    it.skip('The labelled row\'s class list contains `flex-wrap` and no `justify-between`', () => {
+    it('The labelled row\'s class list contains `flex-wrap` and no `justify-between`', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -5011,7 +5052,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
     });
 
 
-    it.skip('renders the text-[var(--ac-grey-800)] class on the Readiness level, Geographic scope, and description elements', () => {
+    it('renders the text-[var(--ac-grey-800)] class on the title and description elements (T-05 to restate fully)', () => {
       component.body.set({
         ...component.body(),
         linked_innovation_dev: {
@@ -5019,7 +5060,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
           title: 'A title',
           result_official_code: 1,
           platform_code: 'P-1',
-          description: 'A test description',
+          description: 'A description',
           innovation_readiness: { id: 1, level: 1, name: 'Idea' },
           geo_scope: { code: 1, name: 'Global' }
         }
@@ -5033,13 +5074,10 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(descElement).toBeTruthy();
       expect((descElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
 
-      const readinessElements = Array.from(card.querySelectorAll('span')).filter(s => s.textContent?.includes('Readiness level:'));
-      expect(readinessElements.length).toBeGreaterThan(0);
-      readinessElements.forEach(el => expect(el.className).toContain('text-[var(--ac-grey-800)]'));
-
-      const scopeElements = Array.from(card.querySelectorAll('span')).filter(s => s.textContent?.includes('Geographic scope:'));
-      expect(scopeElements.length).toBeGreaterThan(0);
-      scopeElements.forEach(el => expect(el.className).toContain('text-[var(--ac-grey-800)]'));
+      // The title carries this as well now
+      const titleP = Array.from(card.querySelectorAll('p')).find(p => p.textContent?.includes('A title'));
+      expect(titleP).toBeTruthy();
+      expect((titleP as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
     });
 
     it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in light mode', () => {
