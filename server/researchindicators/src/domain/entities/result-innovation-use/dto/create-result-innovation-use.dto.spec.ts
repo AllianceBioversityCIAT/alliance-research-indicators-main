@@ -202,9 +202,16 @@ describe('CreateResultInnovationUseDto — innovation_dev_result_id (T-04)', () 
   // that rejected this would encode the wrong contract and break
   // draft-save clearing an existing link.
   it('innovation_dev_result_id: null resolves — MUST PASS (R-IUL-008 clear signal)', async () => {
-    await expect(
-      pipe.transform({ innovation_dev_result_id: null }, metadata),
-    ).resolves.toBeDefined();
+    const result = (await pipe.transform(
+      { innovation_dev_result_id: null },
+      metadata,
+    )) as CreateResultInnovationUseDto;
+    // T-06 (service write path) review: pin the resolved VALUE, not merely
+    // that the pipe resolved. A `null` silently degraded to `undefined` by
+    // the pipe would flip T-06's step 9b three-way from "clear the link" to
+    // "preserve it", so R-IUL-008's Explicit-null-clears scenario would fail
+    // while this test stayed green if it asserted resolution alone.
+    expect(result.innovation_dev_result_id).toBeNull();
   });
 
   it('a valid int (284) resolves and survives the pipe (whitelist must not strip it)', async () => {

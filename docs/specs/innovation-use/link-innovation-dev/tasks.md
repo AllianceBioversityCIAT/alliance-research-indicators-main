@@ -331,7 +331,7 @@ longer describes this task: three of them can now fail, and have.
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | **L** |
 | Depends on | T-04, T-05 |
 | Requirements | R-IUL-001 (both scenarios), R-IUL-005, R-IUL-006 (all three scenarios), R-IUL-008 (both scenarios) |
@@ -360,7 +360,14 @@ Replace the three-way with `??` → the omitted-vs-null pair must go red (one of
 way, which is exactly why they are **two separate specs**).
 **Cannot prove.** That the DB actually holds one row — these are mocked. The reactivation and
 single-row properties are asserted on the **call arguments** to `create`; their *database* truth
-rides on `create`'s own already-tested behavior plus T-03's harness.
+rides on `create`'s own already-tested behavior.
+
+*(Citation corrected 2026-09-09 after the T-06 review: this line also said **"plus T-03's harness"**,
+and that half does not resolve — **T-03 covers rule 16 only.** What DOES hold is the first half, and
+it was verified at source: `shared/utils/array.util.spec.ts` (*"should merge backend into client by
+comparison key"*) asserts `is_active === true && id === 1`, i.e. **PK-preserving reactivation is
+genuinely tested** at the mechanism. What no task owns is the **end-to-end DB** proof — see §5
+**R-9**.)*
 **Done.** Every row above asserted; both falsifiers observed red.
 
 ---
@@ -765,6 +772,8 @@ as covered.
 | **B-4** | Concurrent-PATCH race → two active rows. **Accepted**, not mitigated (design §3.2) | Recorded |
 | **B-5** | If T-05's cycle resists `forwardRef`, fall back to direct repository access — only after running T-05's falsifier | Claude |
 | **B-6** | The Orca `agent_prompt_stalled` false negative may mask a *genuine* worker failure. A silent worker is still a runtime failure; verify by reading the terminal, not by trusting either signal | Claude |
+| **R-9** | **§9's "Cardinality" falsification row is owned by NO task, and this is a recorded accepted gap rather than a minted one** *(found by the T-06 review, 2026-09-09)*. `design.md` §9:502 requires: *save `A`, save `B`, assert exactly one active row; then clear, re-select `A`, assert the **same** `link_result_id` was reactivated*. That is a **database** property and every T-06 test is mocked. T-06's Cannot-prove cited T-03's fixture harness for it; T-03 covers **rule 16 only**, so the citation did not resolve. **Why it is accepted rather than turned into a task:** an advisory may not mint scope in this spec, and the exposure is bounded on both sides — the *mechanism* is tested (`array.util.spec.ts` asserts PK-preserving reactivation, `is_active === true && id === 1`), the role-scoping half holds by construction (`base-service.ts` builds `updateWhere` with `{ [this.roleKey]: dataRole }` and `LinkResultsService` passes `'link_result_role_id'`), and rule 16 uses `EXISTS` (DD-5), so **even a doubled row leaves the green check correct and the UI showing one link**. What remains unproven is only that the two composed factors behave as expected against real MySQL. **A fixture task closing it is the user's call** — it would be a sibling of T-03 in the `test:fixtures` suite, and per FP-45 it would need its own `result_official_code` band | User decision — recorded, not scheduled |
+| **R-10** | **§3.2's concurrent-PATCH race (A8) is now REACHABLE through T-06's code**, so its acceptance should be read as **live rather than prospective** *(T-06 review, 2026-09-09)*. Reaching sequence: two overlapping PATCHes of the same result with different targets; each `create` computes `persistId` from what it can see, each deactivates, each inserts, committing **two active role-5 rows** — there is no unique index on `(result_id, link_result_role_id, is_active)`, and `link_results` carries only its PK and FKs. Already accepted in `requirements.md` R-IUL-001's bounded-by-design note and `design.md` §3.2, with the rationale that a partial unique index is not expressible in MySQL, a full one would break the soft-delete history, and the exposure is one user double-submitting one section. Rule 16's `EXISTS` keeps the green check correct | Accepted (unchanged); recorded as live |
 | **R-7** | **Nothing in this repo verifies that the server boots** *(found at T-05, 2026-09-09)*. `npm run test:e2e` — the only spec importing the real `AppModule` and calling `app.init()` — crashes with `RangeError: Maximum call stack size exceeded` in `InstanceWrapper.cloneStaticInstance`. **Genuinely pre-existing — re-verified by FILE-REVERT, not by stash.** *(Amendment 06: the original
 claim said "stash-verified", and that citation had to be withdrawn — a `git stash push -u` earlier in
 this task **silently failed** to stash, because a `git add -N` entry was present, so a probe ran

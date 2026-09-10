@@ -2425,3 +2425,68 @@ Two throwaway probe files created during measurement (`zz-probe.spec.ts`, `zz-pr
 ### Status
 
 **T-05 → `[x]`.** **10 of 14 tasks `[x]`.** Server lane remaining: **T-06** (write path), **T-07** (read path). Then **T-12** (client suite + human visual check — **now feasible, the front is up on :4200**) and **T-13** (doc sync).
+
+---
+
+## ✅ T-06 — Service write path — Reviewer PASS (attempt 1, no rework)
+
+**Date** 2026-09-09 · **Lane** SERVER · Size **L** · **Implementer** `akili-implementer`, `sonnet` (T2) · **Reviewer** `akili-reviewer`, `opus` (T3) · **Verdict `STATUS: PASS`** · **One review round, per the rule adopted at T-05.**
+
+> **Summary (verbatim).** *"Step 4c is genuinely pre-BEGIN with the exact §5.1 guard, step 9b implements §5.1's three-way discriminant on `!== undefined` with no surviving `??` and no reachable fourth state, and `manager` is positional argument five against `BaseServiceSimple.create`'s real signature. All seven clause rows own a falsifiable assertion, the transaction double invokes its callback and per-test isolation is closed, and both Leader-observed falsifiers (including the predicted asymmetry) confirm the discriminating tests discriminate."*
+
+### What landed
+
+**Step 4c** (pre-`BEGIN`, extracted as `private async validateInnovationDevLinkTarget`): runs only when the key is `!== undefined && !== null`, calls `filterResultByIndicators([id], [INNOVATION_DEV], false)`, throws `BadRequestException([...])` on an empty return. **Step 9b** (inside the transaction, after step 9): the three-way on `!== undefined`, with `manager` as positional argument five.
+
+### Gates — Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` (server) | **359/359 suites, 2788/2788 tests PASS** (baseline 359/2780; **+8**) |
+| `npx eslint` (3 files) | **exit 0, no output** — bare `eslint`, per K-001 |
+
+### Falsifiers — Leader-run, tree restored byte-identically after each
+
+| Mutation | Observed |
+| --- | --- |
+| step 4c's validation moved **inside** `dataSource.transaction` | ✅ **1 red** — *an invalid link target is rejected before BEGIN — dataSource.transaction is never entered* |
+| the three-way collapsed to `?? undefined` | ✅ **2 red** — *an explicit null calls create with an empty array — deactivates all* (plus the reactivation test), **and the *omitted* test stayed GREEN** |
+
+**The asymmetry is the evidence, and `tasks.md` predicted it verbatim**: *"one of them will pass either way, which is exactly why they are two separate specs."* A single combined spec would have missed the defect half the time. This is the first falsifier in the spec whose *predicted shape* was confirmed rather than merely its colour.
+
+### What the Reviewer established at source rather than accepting
+
+- **The self-reference scenario needs no separate guard, and this was traced rather than argued.** `result_innovation_use` rows are created only under `case IndicatorsEnum.INNOVATION_USE` in `results.service.ts:546-547`'s detail switch, no path mutates `results.indicator_id` after creation, and `update()` cannot be entered without that detail row (step 2 → 404). So a self-target is **always** indicator 6 and fails 4c on the indicator predicate alone. **No bypass constructible.**
+- **The step-4c tests reject for 4c's own reason, not an upstream one.** `resolveInnovationUseLevel` returns early on a null/undefined level with no DB read and no throw, so with no level key in those payloads 4c is the only rejection source.
+- **No reachable fourth state in step 9b.** The only value that could degrade `[{other_result_id: X}]` back to `[]` is one where `create`'s `!isEmpty` filter drops it (i.e. `0`) — and that input is unreachable at 9b because 4c already rejected it (`filterResultByIndicators([0], [2], false)` → empty → 400).
+- **The mock is faithful.** `transaction.mockImplementation(async cb => { await cb(fakeManager) })` genuinely invokes the callback, so the step-9b assertions are not vacuous; `beforeEach` does `jest.clearAllMocks()` **plus** explicit `mockReset()` on both new mocks, so no sibling call can satisfy an assertion.
+- **The role-5 assertion is not a KZ-001 tautology**: the same enum contains `INNOVATION_DEV = 2`, the exact confusable value, and passing it would redden the test.
+- **`manager` matches `BaseServiceSimple.create`'s real signature** in order and presence, and both named precedents byte-for-byte in shape.
+
+**Leader-verified separately:** the new docstring claims step 4c rejects a *soft-deleted* target. `filterResultByIndicators` (`results/results.service.ts:869-875`) does filter `is_active: true` — the claim is **true**. It also does **not** filter `result_status_id`, which matches the user's binding ruling *"todos los que estén activos"*.
+
+### Advisories applied in place (per the one-round rule) — three wrong citations, none in the code's behavior
+
+The standing rule sent textual findings to `ADVISORY` instead of a second round. All are now fixed, and **each was verified before being corrected** rather than swapped for another guess:
+
+1. **`design.md` §5.1 cited DD-10 for manager-threading.** DD-10 is *"Migration B is verified against a scratch schema"* — unrelated. And **there is no DD about manager-threading at all**; the property lives in **DD-2**, whose rationale says `create` *"is manager-aware already"*. §5.1 now cites DD-2 with the correction noted. The drift was in the **design doc**, and the implementer had faithfully mirrored it — so the code comment inherited a doc error, not the reverse.
+2. **The validator's log comment cited "§9 — result_id and the rule".** In *this* spec §8 is Observability and §9 is Testing Strategy. Corrected to §8, with a note that the sibling comments in the same file inherit "§9" from the details-api spec, where the numbering differed — so the convention *reads* consistent while pointing at the wrong section.
+3. **Two tautological assertions removed**: `expect(...[4]).not.toBeUndefined()` after a `toBe(fakeManager)` on the same subscript, and `.not.toBe(LINK_RESULT_SECTION)` after `toBe(INNOVATION_USE_LINKED_DEV)` (5 !== 4 by enum definition). Neither could fail independently of the line above it — coverage in appearance only.
+
+Re-verified after the edits: **359/359 suites, 2788/2788 tests, eslint exit 0.**
+
+### Two gaps recorded rather than minted — §5 R-9 and R-10
+
+**R-9 — `design.md` §9's "Cardinality" falsification row is owned by NO task**, and T-06's Cannot-prove cited a harness that does not cover it. §9:502 requires *save `A`, save `B`, assert exactly one active row; then clear, re-select `A`, assert the same `link_result_id` was reactivated* — a **database** property, and every T-06 test is mocked. The cited *"plus T-03's harness"* does not resolve: **T-03 covers rule 16 only.** That citation is corrected in T-06's Cannot-prove.
+
+It is **accepted, not scheduled** — an advisory may not mint scope in this spec — and the exposure is bounded on three sides, each verified at source: the mechanism is tested (`array.util.spec.ts` asserts `is_active === true && id === 1`, i.e. PK-preserving reactivation), the role-scoping half holds by construction (`base-service.ts` builds `updateWhere` with `{ [this.roleKey]: dataRole }` and `LinkResultsService` passes `'link_result_role_id'`), and rule 16 uses `EXISTS` (DD-5), so **even a doubled row leaves the green check correct and the UI showing one link**. What is unproven is only that the two composed factors behave as expected against real MySQL. **A closing fixture task is the user's call** — it would be a T-03 sibling in `test:fixtures` and, per FP-45, would need its own `result_official_code` band.
+
+**R-10 — §3.2's concurrent-PATCH race (A8) is now REACHABLE through this code**, so its acceptance reads **live rather than prospective**. Two overlapping PATCHes with different targets each deactivate what they can see and each insert, committing two active role-5 rows; there is no unique index on `(result_id, link_result_role_id, is_active)`. Already accepted in R-IUL-001's bounded-by-design note and §3.2 — a partial unique index is not expressible in MySQL, a full one would break the soft-delete history, and the exposure is one user double-submitting one section.
+
+### One residue with no measurement, declared
+
+**R-IUL-005's *"Atomic with the section"* scenario has no executed rollback proof** — a mocked `dataSource.transaction` cannot roll back. It is *structurally* satisfied (every failure mode is either pre-`BEGIN` or ordered before step 9b, and a post-9b failure at step 10 rolls the link back **because** `manager` is threaded), but that is an argument, not a measurement. Recorded here so the next reader inherits the distinction.
+
+### Status
+
+**T-06 → `[x]`.** **11 of 14 tasks `[x]`.** Remaining: **T-07** (read path, server, next by document order), **T-12** (client suite + human visual check — feasible now, the stack is up), **T-13** (doc sync).

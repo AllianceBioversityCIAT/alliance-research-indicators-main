@@ -30,6 +30,8 @@ import {
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { ResultsService } from '../results/results.service';
 import { LinkResultsService } from '../link-results/link-results.service';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 
 /**
  * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
@@ -219,6 +221,21 @@ export class ResultInnovationUseService {
       resultId,
     );
 
+    // Step 4c — the Innovation Dev link target, before `BEGIN` (R-IUL-006,
+    // DD-3). Runs ONLY when the key is present and non-null: an omitted key
+    // and an explicit `null` both skip it — there is no target to validate
+    // (`!== undefined` twice, never `??`, for the same DD-4/DD-14 reason the
+    // rest of this method already uses that discipline).
+    if (
+      createResultInnovationUseDto?.innovation_dev_result_id !== undefined &&
+      createResultInnovationUseDto?.innovation_dev_result_id !== null
+    ) {
+      await this.validateInnovationDevLinkTarget(
+        createResultInnovationUseDto.innovation_dev_result_id,
+        resultId,
+      );
+    }
+
     await this.dataSource.transaction(async (manager) => {
       // Step 6 — "omitted = preserve" still governs the *write* at catalog
       // level >= 6: TypeORM's `UpdateQueryBuilder` skips `undefined`
@@ -258,6 +275,28 @@ export class ResultInnovationUseService {
         QuantificationRolesEnum.INNOVATION_USE,
         manager,
       );
+
+      // Step 9b — the Innovation Dev link write, three-way on the key
+      // (§5.1, DD-4). `manager` is positional argument five — omitting it is
+      // the defect (`upsertByCompositeKeys`'s writes escape the transaction
+      // in OICR for exactly this reason). The manager-aware property of
+      // `create` is DD-2's; §5.1 used to cite DD-10 here, which is about
+      // Migration B's scratch schema — corrected in the same commit.
+      if (
+        createResultInnovationUseDto?.innovation_dev_result_id !== undefined
+      ) {
+        const linkTargetId =
+          createResultInnovationUseDto.innovation_dev_result_id;
+        await this._linkResultsService.create(
+          resultId,
+          linkTargetId === null ? [] : [{ other_result_id: linkTargetId }],
+          'other_result_id',
+          LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+          manager,
+        );
+      }
+      // omitted (`undefined`) — do NOT call `create` at all: the stored
+      // link survives with its `link_result_id` intact (R-IUL-008).
 
       // Step 10.
       await this._updateDataUtil.updateLastUpdatedDate(resultId, manager);
@@ -444,6 +483,45 @@ export class ResultInnovationUseService {
           `organizations.${index}.institution_type_id: an organization row must identify its organization — supply institution_type_id, or is_organization_known together with institution_id`,
         ]);
       }
+    }
+  }
+
+  /**
+   * `design.md` §5.1 step 4c (R-IUL-006, DD-3). Called only when the caller
+   * (`update()`) has already established `innovation_dev_result_id` is
+   * present and non-null — an omitted key or an explicit `null` have no
+   * target to validate and never reach here.
+   *
+   * Rejects when the id does not resolve to an **active**, `indicator_id =
+   * 2` (Innovation Development) result — a wrong indicator, a soft-deleted
+   * target, or a self-reference (an Innovation Use result is never
+   * indicator 2, so it fails for the indicator reason alone, per
+   * R-IUL-006's self-reference scenario). Runs before `BEGIN`, so "nothing
+   * persisted" is a property of ordering rather than of rollback
+   * correctness — the same argument `validateOrganizationsAreIdentified`
+   * and `validateNoDuplicateActorTypes` already make.
+   */
+  private async validateInnovationDevLinkTarget(
+    innovationDevResultId: number,
+    resultId: number,
+  ): Promise<void> {
+    const matches = await this._resultsService.filterResultByIndicators(
+      [innovationDevResultId],
+      [IndicatorsEnum.INNOVATION_DEV],
+      false,
+    );
+
+    if (!matches?.length) {
+      // §8 (Observability) — result_id and the rule, never the payload: the
+      // submitted target id is not logged. (§9 is Testing Strategy; the
+      // sibling comments in this file inherit a "§9" from the details-api
+      // spec, where the numbering differed.)
+      this.logger.warn(
+        `Innovation use save rejected for result ${resultId}: innovation_dev_result_id is not an active Innovation Development result (R-IUL-006)`,
+      );
+      throw new BadRequestException([
+        'innovation_dev_result_id: target is not an active Innovation Development result',
+      ]);
     }
   }
 

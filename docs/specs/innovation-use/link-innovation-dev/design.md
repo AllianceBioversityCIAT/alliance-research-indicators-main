@@ -194,8 +194,12 @@ discipline:
 | **explicit `null`** | `create(resultId, [], 'other_result_id', INNOVATION_USE_LINKED_DEV, manager)` → deactivates all |
 | **an id** | `create(resultId, [{ other_result_id: id }], 'other_result_id', INNOVATION_USE_LINKED_DEV, manager)` |
 
-The `manager` argument is what keeps the write inside the transaction (DD-10). **Omitting it is the
-defect** — `upsertByCompositeKeys`'s writes escape the transaction in OICR for exactly this reason.
+The `manager` argument is what keeps the write inside the transaction — **DD-2**, which is the
+decision that reuses `LinkResultsService.create` precisely because *"it is manager-aware already"*.
+**Omitting it is the defect** — `upsertByCompositeKeys`'s writes escape the transaction in OICR for
+exactly this reason. *(Corrected 2026-09-09: this line cited **DD-10**, which is "Migration B is
+verified against a scratch schema" and has nothing to do with the manager. There is no DD about
+manager-threading itself; DD-2 is the one that carries the property.)*
 
 ### 5.2 The read path
 

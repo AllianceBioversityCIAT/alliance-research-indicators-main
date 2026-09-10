@@ -23,6 +23,8 @@ import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-acto
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
 import { ResultsService } from '../results/results.service';
 import { LinkResultsService } from '../link-results/link-results.service';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
 
 describe('ResultInnovationUseService', () => {
   let service: ResultInnovationUseService;
@@ -110,12 +112,20 @@ describe('ResultInnovationUseService', () => {
     updateLastUpdatedDate: jest.fn().mockResolvedValue(undefined),
   };
 
-  // T-05 (design.md §5.3, DD-9) — DI wiring only. Neither service is called
-  // anywhere in this file's exercised paths yet (T-06/T-07 wire the calls);
-  // these mocks exist solely so `ResultInnovationUseService`'s constructor
-  // resolves in this providers-array TestingModule.
-  const mockResultsService = {};
-  const mockLinkResultsService = {};
+  // T-06 (design.md §5.1 step 4c / step 9b, R-IUL-005/006/008) — wired for
+  // real now. `filterResultByIndicators` defaults to a match (so tests that
+  // don't care about the link target don't have to arrange it); `create`
+  // defaults to resolving, and its call args are asserted per-test.
+  const mockFilterResultByIndicators = jest
+    .fn()
+    .mockResolvedValue([1] as number[]);
+  const mockLinkResultsCreate = jest.fn().mockResolvedValue(undefined);
+  const mockResultsService = {
+    filterResultByIndicators: mockFilterResultByIndicators,
+  };
+  const mockLinkResultsService = {
+    create: mockLinkResultsCreate,
+  };
 
   // A single, stable manager instance for every transaction run in this
   // file — so an assertion that a child call received *this* object (rather
@@ -162,6 +172,10 @@ describe('ResultInnovationUseService', () => {
     mockResultActors.find.mockReset();
     mockResultInstitutionTypes.find.mockReset();
     mockResultQuantifications.findByResultIdAndRoles.mockReset();
+    // T-06 — `mockFilterResultByIndicators` receives `...Once()` values in
+    // the R-IUL-006 clauses below; same leak-closing discipline as above.
+    mockFilterResultByIndicators.mockReset();
+    mockLinkResultsCreate.mockReset();
     getRepository.mockImplementation((entity: unknown) => {
       if (entity === ClarisaInnovationUseLevel) {
         return levelRepo;
@@ -177,6 +191,8 @@ describe('ResultInnovationUseService', () => {
     mockResultQuantifications.findByResultIdAndRoles.mockResolvedValue([]);
     mockResultQuantifications.upsertByCompositeKeys.mockResolvedValue([]);
     mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+    mockFilterResultByIndicators.mockResolvedValue([1]);
+    mockLinkResultsCreate.mockResolvedValue(undefined);
     levelFindOne.mockResolvedValue(null);
     managerUpdate.mockResolvedValue(undefined);
     fakeManager.getRepository.mockReturnValue({ update: managerUpdate });
@@ -1098,6 +1114,213 @@ describe('ResultInnovationUseService', () => {
       expect(out.quantifications).toEqual([
         { id: 1, quantification_number: 3, unit: 'ha' },
       ]);
+    });
+  });
+
+  /**
+   * T-06 (`docs/specs/innovation-use/link-innovation-dev`; R-IUL-001,
+   * R-IUL-005, R-IUL-006, R-IUL-008; `design.md` §5.1 step 4c / step 9b,
+   * §3.2, DD-2, DD-3, DD-4). Every row of `tasks.md`'s T-06 clause table
+   * owns exactly one assertion below.
+   *
+   * **Cannot prove (tasks.md).** `_linkResultsService.create` is mocked in
+   * this file, so the reactivation and single-active-row properties cannot
+   * be observed against a real database here — that DB truth rides on
+   * `create`'s own already-tested behavior (`base-service.ts`, per §3.2)
+   * plus T-03's fixture harness. The two R-IUL-001 tests below assert only
+   * the call arguments this service passes to `create`, never a row count
+   * or a persisted `link_result_id`.
+   */
+  describe('update — Innovation Dev link (design.md §5.1 step 4c / step 9b, R-IUL-001/005/006/008)', () => {
+    const resultId = 42;
+    const linkedResultId = 500;
+
+    const postCommitReadRow = {
+      result_id: resultId,
+      innovation_use_level_id: null,
+      innovation_use_level_explanation: null,
+      innovation_use_level: null,
+    };
+
+    // R-IUL-005 `AND IT MUST thread the manager`.
+    it('threads the transaction manager into the link write, never undefined', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true }) // step 2
+        .mockResolvedValueOnce(postCommitReadRow); // step 12
+
+      await expect(
+        service.update(resultId, {
+          innovation_dev_result_id: linkedResultId,
+        } as CreateResultInnovationUseDto),
+      ).resolves.toBeDefined();
+
+      expect(mockLinkResultsCreate).toHaveBeenCalledWith(
+        resultId,
+        [{ other_result_id: linkedResultId }],
+        'other_result_id',
+        LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+        fakeManager,
+      );
+      // Pinned separately: the 5th positional argument is the real
+      // manager, not `undefined` — the exact OICR-style defect DD-10 names.
+      expect(mockLinkResultsCreate.mock.calls[0][4]).toBe(fakeManager);
+    });
+
+    // R-IUL-006 `AND IT MUST validate before BEGIN`.
+    it('an invalid link target is rejected before BEGIN — dataSource.transaction is never entered', async () => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      }); // step 2 only
+      mockFilterResultByIndicators.mockResolvedValueOnce([]); // empty = not a valid target
+
+      await expect(
+        service.update(resultId, {
+          innovation_dev_result_id: 999,
+        } as CreateResultInnovationUseDto),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(transaction).not.toHaveBeenCalled();
+      expect(mockLinkResultsCreate).not.toHaveBeenCalled();
+    });
+
+    // R-IUL-006 `BUT must NOT report success with the link dropped`.
+    it('an invalid link target fails with 400, never 200', async () => {
+      mainFindOne.mockResolvedValueOnce({
+        result_id: resultId,
+        is_active: true,
+      });
+      mockFilterResultByIndicators.mockResolvedValueOnce([]);
+
+      let caught: BadRequestException | undefined;
+      try {
+        await service.update(resultId, {
+          innovation_dev_result_id: 999,
+        } as CreateResultInnovationUseDto);
+      } catch (e) {
+        caught = e as BadRequestException;
+      }
+
+      expect(caught).toBeInstanceOf(BadRequestException);
+      expect(caught.getStatus()).toBe(400);
+    });
+
+    // R-IUL-008 omitted.
+    it('an omitted key does not call create at all — the stored link survives untouched', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+
+      await expect(
+        service.update(resultId, {} as CreateResultInnovationUseDto),
+      ).resolves.toBeDefined();
+
+      expect(mockLinkResultsCreate).not.toHaveBeenCalled();
+      // The omitted key also skips step 4c's validation entirely — there is
+      // no target to validate.
+      expect(mockFilterResultByIndicators).not.toHaveBeenCalled();
+    });
+
+    // R-IUL-008 explicit null.
+    it('an explicit null calls create with an empty array — deactivates all', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+
+      await expect(
+        service.update(resultId, {
+          innovation_dev_result_id: null,
+        } as CreateResultInnovationUseDto),
+      ).resolves.toBeDefined();
+
+      expect(mockLinkResultsCreate).toHaveBeenCalledWith(
+        resultId,
+        [],
+        'other_result_id',
+        LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+        fakeManager,
+      );
+      // Explicit null is a clear signal, not a target — step 4c must not
+      // run its DB validation for it either.
+      expect(mockFilterResultByIndicators).not.toHaveBeenCalled();
+    });
+
+    // R-IUL-001 reactivation (call-argument level only — see the describe
+    // block's doc comment on "Cannot prove").
+    it("clearing A then re-selecting A reaches `create` with the same generalCompareKey and role both times, so create's own tested reactivation applies (R-IUL-001 reactivation)", async () => {
+      const resultA = 700;
+
+      // Call 1 — clear A.
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+      await service.update(resultId, {
+        innovation_dev_result_id: null,
+      } as CreateResultInnovationUseDto);
+
+      expect(mockLinkResultsCreate).toHaveBeenNthCalledWith(
+        1,
+        resultId,
+        [],
+        'other_result_id',
+        LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+        fakeManager,
+      );
+
+      // Call 2 — re-select A.
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+      await service.update(resultId, {
+        innovation_dev_result_id: resultA,
+      } as CreateResultInnovationUseDto);
+
+      expect(mockLinkResultsCreate).toHaveBeenNthCalledWith(
+        2,
+        resultId,
+        [{ other_result_id: resultA }],
+        'other_result_id',
+        LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+        fakeManager,
+      );
+    });
+
+    // R-IUL-001 other roles untouched (call-argument level only — see the
+    // describe block's doc comment on "Cannot prove").
+    it("the link write always carries role 5 (INNOVATION_USE_LINKED_DEV) — never a role that would let create's dataRole-scoped deactivation touch a role-4 row for the same result", async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+
+      await service.update(resultId, {
+        innovation_dev_result_id: linkedResultId,
+      } as CreateResultInnovationUseDto);
+
+      expect(mockLinkResultsCreate.mock.calls[0][3]).toBe(
+        LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV,
+      );
+      expect(mockLinkResultsCreate.mock.calls[0][3]).not.toBe(
+        LinkResultRolesEnum.LINK_RESULT_SECTION, // role 4
+      );
+    });
+
+    // Not a table row, but the step 4c call-shape itself (R-IUL-006):
+    // pins the exact real signature so a future signature change is caught
+    // here rather than silently degrading the validation.
+    it('validates the target via filterResultByIndicators([id], [INNOVATION_DEV], false)', async () => {
+      mainFindOne
+        .mockResolvedValueOnce({ result_id: resultId, is_active: true })
+        .mockResolvedValueOnce(postCommitReadRow);
+
+      await service.update(resultId, {
+        innovation_dev_result_id: linkedResultId,
+      } as CreateResultInnovationUseDto);
+
+      expect(mockFilterResultByIndicators).toHaveBeenCalledWith(
+        [linkedResultId],
+        [IndicatorsEnum.INNOVATION_DEV],
+        false,
+      );
     });
   });
 
