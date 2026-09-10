@@ -350,3 +350,20 @@
 ## v3 Summary (bulk many×many) — COMPLETE (2026-09-10)
 
 All 5 v3 tasks (T-10…T-14) Reviewer-PASS. `POST /pi-delegates` = per-project SYNC (many delegates × many projects; declarative — revokes the missing); `DELETE /pi-delegates` = independent bulk targeted revoke (two shapes); PI-exclusion (a PI can't be a delegate of their own project); all transactional + fail-fast. Full unit suite **2728/2728 green**; no client change. v2 single-item create/revoke removed. Rework rounds: T-10 (1 — missing `@ArrayNotEmpty`). Outstanding: the same human gates as v2 — real Dev/Prod migration apply (K-015; local `alliancereportingdb` already applied) + the behavioral e2e (deferred to a seeded DB the harness points at).
+
+---
+
+## Behavioral verification against the REAL local DB (2026-09-10) — the deferred e2e, done at SQL level
+
+Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using the ACTUAL code queries and real data (project **G232**, real PI `sec_user_id 15`, real result **13521**, delegate `sec_user_id 1`). Full cleanup — all test rows hard-deleted, `pi_delegates` left at 0 rows.
+
+**12/12 checks PASS:**
+- Baseline: `isPi` delegate-fallback + metadata `is_principal` both false for a non-delegate.
+- **T-11 `isPiOfProject`** correctly distinguishes the real PI (15→true) from a non-PI (1→false) — PI-exclusion basis proven on real data.
+- Grant → `active_delegate_key` generated = `"G232:1"` (STORED generated column works with the utf8mb3 charset fix + FKs).
+- **T-07 `isPi()` delegate fallback → TRUE** for the delegate on result 13521 (real cross-join through result_contracts→agresso_contracts→pi_delegates).
+- **T-08 `queryPrincipalInvestigator` metadata `is_principal` → TRUE** for the delegate (the 3-placeholder query on real data).
+- **T-01 unique-active:** a second active `(G232,1)` insert rejected with **errno 1062**.
+- Revoke (soft-delete) → `active_delegate_key` NULL → `isPi` false again → re-grant succeeds (revoke→re-grant cycle safe).
+
+**Coverage now:** SQL/data layer proven here (real DB); service orchestration proven by 27 unit tests; HTTP layer (route-mount + DTO-validation) proven by the T-14 e2e. The only untested-in-one-shot path is a full authenticated HTTP round-trip (needs a running server + valid JWT — a manual environment step). The behavioral e2e is no longer "deferred" at the data level.
