@@ -1237,3 +1237,48 @@ anchor is centred — **T-10's and T-08's, exactly as `tasks.md` assigns them.**
 | Runtime failures | **1** — `K-009` non-delivery by reference (attempt 1's evidence) |
 
 **Constitution impact:** none — template and test changes inside an existing standalone component.
+
+### QA feedback 2026-09-10 — `/akili-quick` invoked, **escalated by the triviality gate**, routed to a child spec
+
+**The request.** QA reviewed the card with the user and asked that it adopt the **"OICR selected"** card
+style already shipped in the OICR creation modal
+(`client/.../custom-fields/oicr-form-fields/oicr-form-fields.component.html`): an eyebrow row
+(`pi-chart-pie` icon + a small `OICR`-style label), a bold title, and one metadata row of
+`Label → value` pairs separated by `|`, with a status pill. The user's read was *"siento que es un
+quick porque el componente ya existe y la data ya está llegando"* — the component exists and the data
+already arrives.
+
+**Both halves of that read are correct**, and it is still not a quick. `/akili-quick`'s gate failed on
+three criteria, each measured rather than asserted:
+
+1. **The target pattern has no slot for the description.** The OICR card is eyebrow → title → one metadata row. This card carries a **clamped description paragraph** (`R-IUC-002`, `R-IUC-004`), which is one of the three fields the whole spec exists to add, and which T-01/T-02's server work delivers. Where it goes is a **layout decision**, not a style tweak — the gate's *"cosmetic or copy-only"* and *"no behaviour change"* criteria both fail.
+2. **It reverses a recorded design decision that four tasks depend on.** `DD-6`/`DD-7` chose *"prose, not a property list"*; the QA style is exactly a `Label → value | Label → value` property list. **T-07** is committed against that decision (2 review attempts), **T-08**'s contrast assertions target those specific label spans (2 attempts), **T-09** renders them, and **T-10's human checklist asserts *"the card reads as prose, not as a list of `Label: value` rows — the user's stated intent."*** The gate's *"small and local (≤ ~20 LOC, one component)"* criterion fails.
+3. **The pattern cannot be copied as written** — it carries **11 hardcoded hex literals** (`#1689CA #345B8F #358540 #4C5158 #777C83 #7CB580 #8D9299 #B9C0C5 #CF0808 #E69F00 #F58220`), and root `CLAUDE.md` §4.2 bans hex literals in components. Each needs mapping to a token, which the gate routes explicitly: *"introduces a new design token or visual pattern not in `docs/ux-ui/design.md` → route through `/akili-propose` (Visual Reference) or `/akili-specify`."*
+
+**Measured, and stated rather than re-asked** (per the standing ruling that visual consistency wins
+over WCAG AA — *state the ratio, then apply*). The pattern's own colours on this card's
+`--ac-grey-100` fill:
+
+| Pattern colour | Ratio on `#f4f7f9` | |
+| --- | --- | --- |
+| title `#4C5158` — **this IS `--ac-grey-800` light** | **7.44:1** | pass |
+| value `#345B8F` | **6.42:1** | pass |
+| pill `#358540` | **4.26:1** | fails |
+| link `#1689CA` | **3.57:1** | fails |
+| **eyebrow `#8D9299` — this IS `--ac-grey-600` light** | **2.91:1** | **fails** |
+| pipe `#B9C0C5` | **1.71:1** | fails |
+
+**The eyebrow's 2.91:1 is the exact pair T-08's falsifier uses as its failure case**, and ≈ the defect
+child #3 shipped live (2.9115:1). Adopting the pattern verbatim imports it. That is a legitimate
+product call — but it means `NFR-IUC-002` and T-08 change **deliberately**, in a document, rather than
+by accident in a restyle.
+
+**User decisions (2026-09-10):**
+
+1. **Route: a new child spec, after this one.** Finish `dev-card-details` as approved — T-08's remaining one-clause fix, then T-09 — then `/akili-propose` the restyle with the QA screenshots as its **Visual Reference**. Nothing already reviewed is discarded, the hex→token mapping gets designed once, and `DD-6`/`DD-7` get superseded on the record instead of silently. **Not** pivoted mid-spec: that would discard four passed review attempts and re-open a round budget already at 15 of ~14.
+2. **The description stays, below the metadata row.** Layout becomes eyebrow → title → metadata row → clamped description. This **preserves `R-IUC-004`'s 3-line clamp and max-length behaviour** and deliberately diverges from the OICR card, which has no such paragraph. Recorded now so the child spec starts from a settled answer rather than rediscovering the question.
+
+**For this spec, nothing changes.** `DD-6`/`DD-7` remain in force, T-10's *"reads as prose"* checklist
+item remains the governing intent, and **no task was minted here** — `/akili-execute` §2.4 forbids
+growing this spec from feedback that arrived mid-run, and the gate's own escalation path is the
+correct route. Carried as **`RB-7`**.

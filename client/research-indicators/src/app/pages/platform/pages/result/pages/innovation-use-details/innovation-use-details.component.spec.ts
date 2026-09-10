@@ -4588,4 +4588,102 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(labelledRow.className).not.toContain('justify-between');
     });
   });
+
+  // ===============================================================================================
+  // T-08 — WCAG AA on all three new text elements, in both themes
+  // ===============================================================================================
+  describe('T-08 — WCAG AA on all three new text elements', () => {
+    let component: InnovationUseDetailsComponent;
+    let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+
+    type Rgb = [number, number, number];
+    const relativeLuminance = ([r8, g8, b8]: Rgb): number => {
+      const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+      const [r, g, b] = [r8, g8, b8].map(v => channel(v / 255));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrastRatio = (fg: Rgb, bg: Rgb): number => {
+      const l1 = relativeLuminance(fg);
+      const l2 = relativeLuminance(bg);
+      const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+      return (lighter + 0.05) / (darker + 0.05);
+    };
+
+    // The background is the card's own fill: --ac-grey-100 (asserted by T-07 at :4473 and :4564).
+    // The ratio is computed from hex read out of colors.scss, not from computed style.
+    const GREY_100_LIGHT: Rgb = [244, 247, 249];
+    const GREY_800_LIGHT: Rgb = [76, 81, 88];
+    const GREY_100_DARK: Rgb = [43, 43, 43];
+    const GREY_800_DARK: Rgb = [194, 194, 194];
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+        providers: [
+          { provide: ApiService, useValue: apiService },
+          { provide: CacheService, useClass: CacheServiceMock },
+          { provide: ActionsService, useValue: actions },
+          { provide: Router, useValue: router },
+          { provide: SubmissionService, useValue: submission },
+          { provide: VersionWatcherService, useValue: versionWatcher },
+          { provide: ActivatedRoute, useValue: activatedRouteMock }
+        ]
+      }).compileComponents();
+      fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+      component = fixture.componentInstance;
+    });
+
+    // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving the
+    // assertions above are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
+    // this block must be able to show — see the reverted-swap check run separately during verification.
+    it('renders the text-[var(--ac-grey-800)] class on the Readiness level, Geographic scope, and description elements', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'A test description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement).toBeTruthy();
+      expect((descElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+
+      const readinessElements = Array.from(card.querySelectorAll('span')).filter(s => s.textContent?.includes('Readiness level:'));
+      expect(readinessElements.length).toBeGreaterThan(0);
+      readinessElements.forEach(el => expect(el.className).toContain('text-[var(--ac-grey-800)]'));
+
+      const scopeElements = Array.from(card.querySelectorAll('span')).filter(s => s.textContent?.includes('Geographic scope:'));
+      expect(scopeElements.length).toBeGreaterThan(0);
+      scopeElements.forEach(el => expect(el.className).toContain('text-[var(--ac-grey-800)]'));
+    });
+
+    it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in light mode', () => {
+      const lightRatio = contrastRatio(GREY_800_LIGHT, GREY_100_LIGHT);
+      expect(lightRatio).toBeCloseTo(7.44, 1);
+      expect(lightRatio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Dark theme gate (test 1 ∧ test 3): The falsifier in dark mode is REMOVAL of the colour class, not substitution.
+    // Reason: No grey in the [data-theme='dark'] block fails 4.5 on --ac-grey-100 — 600 -> 4.67, 700 -> 6.24, 800 -> 7.95.
+    // If the token is removed, it inherits the UA black, which fails AA.
+    it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in dark mode', () => {
+      const darkRatio = contrastRatio(GREY_800_DARK, GREY_100_DARK);
+      expect(darkRatio).toBeCloseTo(7.95, 1);
+      expect(darkRatio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('falsifying input: inherited UA black on --ac-grey-100 (dark theme removal falsifier) reports less than 4.5:1 and fails AA', () => {
+      expect(contrastRatio([0, 0, 0], GREY_100_DARK)).toBeLessThan(4.5);
+    });
+  });
 });
