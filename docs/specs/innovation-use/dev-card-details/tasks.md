@@ -216,17 +216,17 @@ worker reports — never while one is active**, and never two full-suite runs at
   - `findAndDetails` has three callers: `ResultPolicyChangeService.findOne`, `LinkResultsController`, and this module. It is a **non-goal** to modify it.
   - Run the existing Policy Change suite as part of this task's evidence — it is the behavioural half of the guard.
 - **Acceptance / done check:**
-  - [ ] `findAndDetails`'s relation set is asserted and unchanged
-  - [ ] The existing Policy Change suite is green
-  - [ ] The `link-results` controller's response shape is unchanged
-  - [ ] `git diff` shows **no** change to `link-results.service.ts`
+  - [x] `findAndDetails`'s relation set is asserted and unchanged
+  - [x] The existing Policy Change suite is green
+  - [x] The `link-results` controller's response shape is unchanged
+  - [x] `git diff` shows **no** change to `link-results.service.ts`
 - **Verification:** `npm test -- --silent`, plus `git diff --stat -- '*link-results.service.ts'` returning empty.
 - **Falsifying input, named before the test is written (K-012):** add `geo_scope: true` to `findAndDetails`'s `relations` → the relation-set assertion goes red. If it does not, the assertion is comparing something other than the relation set and is not evidence.
 - **What disqualifies the evidence:** an assertion written against a mock of `findAndDetails` rather than the real options object. It would pass with any relation set.
 - **Skills:** `nestjs-expert`
 - **Dependencies:** none — but run it **last** on the server lane, when there is a diff to guard
 - **Estimated effort:** S
-- **Status:** todo
+- **Status:** **done** (Reviewer PASS 2026-09-10, 1 attempt — see [`./execution.md`](./execution.md)). **AC.3 is discharged by composition, NOT by the controller spec's green** — that spec mocks `LinkResultsService` wholesale and structurally cannot see the relation set
 
 ---
 

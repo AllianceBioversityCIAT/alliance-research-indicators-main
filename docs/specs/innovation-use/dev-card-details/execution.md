@@ -744,3 +744,128 @@ criterion asserting a live `200` was ticked on an observation covering a page me
 **Constitution impact:** a new public HTTP route on an existing controller and a new DTO file in an
 existing `dto/` folder. No new module, no moved boundary. `/akili-archive` should note the route in
 any API inventory.
+
+### T-05 — Guard that the shared link reader was not touched — `PASS` ✅ (1 attempt)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS**, first attempt |
+| Date | 2026-09-10 |
+| Lane | server — `akili-implementer` (Sonnet, `high`) → `akili-reviewer` (Opus) |
+| Requirements covered | `R-IUC-005` |
+| Defect classes gated | `DC-4` |
+
+**Files changed:** `link-results.service.spec.ts` — **20 insertions, 0 deletions**, one new `it` inside
+the existing `describe('findAndDetails')`. **No production code touched anywhere.** Blast radius: nil.
+
+**The guard works against the real thing.** T-05's disqualifier was *"an assertion written against a
+**mock** of `findAndDetails` rather than the real options object — it would pass with any relation
+set."* The Reviewer verified at source that it does not apply: `LinkResultsService` is registered as
+**itself** in `providers` (`:38`) and resolved via `module.get` (`:52`); the only double in the path is
+`mockRepository.find`. So `find.mock.calls[0][0]` **is** the literal object `findAndDetails`
+constructs at `link-results.service.ts:34-42`, and the asserted relation set —
+`{ other_result: { indicator: true, result_status: true } }` — matches `R-IUC-005` AC.1 verbatim.
+
+**Verification:** falsifier (`geo_scope: true` added to the relations) reddened **two** tests — the new
+dedicated `it` *and* a pre-existing bundled assertion. Restored: `4 passed`. Policy Change suite run
+explicitly as the behavioural half: `2 suites / 10 tests passed`. Full suite:
+`359 suites / 2831 tests passed`. `npx eslint` clean. `git diff --stat -- '*link-results.service.ts'`
+**empty**, `git status --porcelain` empty — the Leader independently confirmed the numstat lists only
+the spec file, and the Reviewer read all 82 lines of the service: **no `geo_scope`, no residue.**
+
+**Leader-measured at this gate — the coverage floor deferred from T-02** (`npm test` computes none):
+
+| Scope | Statements | Branches | Functions | Lines |
+| --- | --- | --- | --- | --- |
+| **Global** (floor **60%**) | **90.04** | 77.72 | 85.51 | 89.61 |
+| `result-innovation-use.service.ts` | **100** | 93.54 | 100 | 100 |
+| `result-innovation-use.controller.ts` | **100** | 100 | 100 | 100 |
+| `link-results.service.ts` | **100** | 100 | 100 | 100 |
+
+**§9's *"coverage floors held"* is discharged for the server lane, by measurement rather than by
+plausibility.**
+
+#### Leader correction — my "substituted criterion" concern was wrong
+
+I flagged the Implementer's AC.4 (*"the new data is fetched by a read path owned by Innovation Use"*)
+as a `KZ-002` substitution, since `tasks.md` T-05's fourth criterion is *"`git diff` shows no change to
+`link-results.service.ts`"*. **The Reviewer found the real explanation: that text is
+`requirements.md` R-IUC-005 AC.4 verbatim (`requirements.md:274`).** The requirement has its own
+four-item AC list, which is **not** the same four as the task's done-check. A **two-document numbering
+collision**, not a substitution — the label swap is cosmetic and **both** sets of four are discharged.
+Recorded because a reviewer's own correction record is worth as much as the finding it corrects
+(`KZ-007`).
+
+#### 🔴 AC.3 is discharged **by composition** — and must be recorded that way
+
+My `KZ-001` question was whether a consumer spec that mocks `LinkResultsService` **wholesale** can
+guard that service's response shape. **The Reviewer's answer: no, it cannot** —
+`link-results.controller.spec.ts` mocks the service at `:29`, feeds `details = []` at `:52`, and
+asserts only the wrapping (`ResponseUtils.format` args). **It structurally cannot see a field added to
+`other_result`.**
+
+AC.3 is nevertheless genuinely discharged, by composing two independently verified facts:
+
+1. the controller's transform is **identity on the payload** — `getLinkResultsDetails` returns `{ link_results: linkResults }` passed straight through (`link-results.controller.ts:37-50`), and that file is unchanged; and
+2. the payload's relation set is **pinned by AC.1's assertion against the real options object**.
+
+Response = (unchanged wrapper) ∘ (pinned payload). **If a future reader credits the controller spec's
+green with guarding the shape, they will be wrong, and the guard will look stronger than it is.**
+The same division applies to AC.2: `result-policy-change.service.spec.ts` mocks `findAndDetails`
+wholesale and asserts the Policy Change service's **own projection** — its green proves the
+*consumer's* logic is intact, not the *reader's* relation set. Which is precisely the division of
+labour T-05 designed, so *"the behavioural half"* is an accurate description of it.
+
+#### Why the new `it` is not redundant with the pre-existing assertion
+
+The pre-existing check is a `toHaveBeenCalledWith` over the **whole** options object, `where`
+included — *"exactly why it is a weaker guard than it looks"*: a **legitimate** future change to
+`where` reddens it, and the natural fix is to rewrite the whole literal, **at which point the relation
+set can be loosened in the same edit with nothing objecting.** The new assertion is scoped to
+`relations` only, so it survives that edit and keeps guarding. Intended redundancy today,
+non-redundant durability tomorrow.
+
+**Three-caller premise re-confirmed by grep**, not assumed: `result-policy-change.service.ts:141`,
+`link-results.controller.ts:38`, `result-innovation-use.service.ts:585`. `result-oicr.service.ts` and
+`result-innovation-dev.service.ts` inject the service but call no `findAndDetails`.
+
+#### `ADVISORY`
+
+1. **RELIABILITY — `toEqual` ignores explicitly-`undefined` properties**, so `{ indicator: true, result_status: true, geo_scope: undefined }` would pass. **Reachability: payload constructed, and behaviourally inert** — TypeORM treats an `undefined` relation flag as not-loaded, so the state cannot widen the response. Not worth a `toStrictEqual` rework; noted so nobody rediscovers it as a hole.
+2. **READABILITY — `find.mock.calls[0][0]` throws a `TypeError` rather than a legible assertion failure if `find` is never called.** Loud either way, so not a defect; an `expect(find).toHaveBeenCalledTimes(1)` first would name the cause.
+3. **The four uncovered branch sites, mapped from source** (my secondary question). **`648-653`** — the null sides of `(actors ?? [])` / `organizations ?? []` / `quantifications ?? []`, pre-existing sub-keys T-02 was forbidden to touch. **`871`** — `actor?.actors_count ?? null` in `deriveActorTotal`, belonging to an earlier spec. **`771`** — `detail?.innovationReadiness?.name ?? null`, i.e. **readiness present with a NULL `name`**: this *is* T-01 code, reachable in principle, and the Reviewer **could not construct a live row** (whether CLARISA emits a NULL `name` is unknown to it). **`776`** — `result.geo_scope.name ?? null`, same family. For both, the code is already what T-01 mandates (*"project every value `?? null`"*), so this is a **missing test, not a missing behaviour** — and it exposes a real asymmetry: T-01's criteria name *"`level` NULL and `name` present"* but have no `name`-NULL-and-`level`-present row. **Reviewer recommendation, which I accept: do NOT reopen T-01** (PASSed at 3 attempts); it is one `it` for whoever next touches that read.
+
+#### Process note from the Reviewer, worth acting on — my briefing error
+
+A 20-LOC diff sits **under** `.agents/reviewer.md` §7's `< 50 LOC` ceiling, where the persona
+prescribes **one checklist pass with `ADVISORY` suppressed**. My brief asked for the full four-lens
+sweep anyway. The Reviewer ran what I asked, kept the advisory block to two lines rather than omitting
+it, and **flagged the tension instead of silently picking one** — which is the right behaviour.
+**The persona's ceiling was the better default here and I should have followed it.** Logged as a
+Leader lesson: match the review depth to the diff, not to the importance of the *task's title* — a
+non-regression guard is load-bearing but its diff is trivially auditable.
+
+**Constitution impact:** none. Test-only change.
+
+---
+
+## 4. Server lane complete — PR 1 boundary
+
+**T-01 … T-05 are done** (T-04 `[~]` on two verification-tier gates; see its entry). This closes the
+work in §6's **PR 1 — server**.
+
+| Metric | Budget (`design.md` §13, re-baselined) | Actual |
+| --- | --- | --- |
+| Tasks | 5 (server lane) | **5** |
+| Review rounds | ~14 for the whole spec | **11 used** (T-01: 3 · T-02: 1 · T-03: 4 · T-04: 2 · T-05: 1) |
+| Server LOC | re-baselined to ~1,100–1,250 for this lane | **T-01 838 · T-02 196 · T-03 393 · T-04 ~400 · T-05 20 ≈ 1,847** |
+
+**Review rounds are the binding constraint, as the re-baseline predicted: 11 of ~14 spent, with the
+four-task client lane still to run.** The LOC re-baseline is now itself under-scoped — but LOC was
+never the gate, and `design.md` §13's escalation rule keys on **task count** (>12 → split the spec),
+which stands at 10.
+
+**Verification state of the whole server lane:** unit `359 suites / 2831 tests`; this spec's
+fixtures-tier spec `11/11` (re-run after T-03 modified T-01's method); `npm run build` exit 0;
+`npx eslint` clean on every touched path; coverage **90.04%** global against a 60% floor.
+`link-results.service.ts` **never modified** — confirmed three times independently.
