@@ -355,3 +355,221 @@ describe('PI Delegates — E2E DB-semantic scenarios (T-09)', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @akili-spec docs/specs/changes/my-pi-delegates — T-14
+//
+// E2E probes for the v3 bulk POST/DELETE endpoints (R-PID-009/010).
+//
+// These tests assert ROUTE REACHABILITY (404 is gone) and DTO validation
+// (ValidationPipe wired → 400 on bad payload) — both are observable without
+// DB seed data. Behavioral assertions (actual sync diff, actual soft-delete)
+// are deferred to a post-migration-apply run (same as T-09 above) — honest
+// per the brief's e2e note.
+//
+// KZ-001: assertions on HTTP status codes and response body shape — not on
+//   call order of internal methods.
+// KZ-004: distinct project ids per test where multiple projects are used.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PI Delegates — Bulk endpoints (T-14, R-PID-009/010)', () => {
+  let bulkApp: INestApplication;
+
+  beforeAll(async () => {
+    // Reuse the same JWT stub + RolesGuard override pattern from T-09 above.
+    jest
+      .spyOn(JwtMiddleware.prototype, 'use')
+      .mockImplementation(async (req: any, _res: any, next: any) => {
+        req.user = {
+          sec_user_id: 800_002,
+          email: 'pi-delegates-bulk-e2e@example.org',
+          first_name: 'Bulk',
+          last_name: 'E2E',
+          roles: [SecRolesEnum.SYSTEM_ADMIN],
+        };
+        return next();
+      });
+
+    const { Test: TestFactory } = await import('@nestjs/testing');
+    const { VersioningType } = await import('@nestjs/common');
+    const { AppModule } = await import('../src/app.module');
+
+    const moduleFixture = await TestFactory.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    bulkApp = moduleFixture.createNestApplication();
+    bulkApp.setGlobalPrefix('api');
+    bulkApp.enableVersioning({ type: VersioningType.URI });
+    await bulkApp.init();
+  }, 120_000);
+
+  afterAll(async () => {
+    await bulkApp?.close();
+  });
+
+  // Helper: checks if the response indicates the pi_delegates table is missing.
+  async function isMissingTable(res: request.Response): Promise<boolean> {
+    if (res.status === 500) {
+      const txt = JSON.stringify(res.body);
+      return (
+        txt.includes('pi_delegates') &&
+        (txt.includes('1146') ||
+          txt.includes("doesn't exist") ||
+          txt.includes('no such table'))
+      );
+    }
+    return false;
+  }
+
+  // ─── E2E-E — POST /api/pi-delegates bulk (R-PID-009) ─────────────────────
+  //
+  // Probe strategy (KZ-017 — declare what we CAN reach):
+  //   1. Valid bulk payload → NOT 404 (route mounted) + NOT 400 (DTO validates).
+  //      Behavioral outcome depends on DB seed data — deferred pending K-015.
+  //   2. Empty project_ids → 400 (ValidationPipe @ArrayNotEmpty).
+  //   3. Empty delegates  → 400 (ValidationPipe @ArrayNotEmpty).
+  //   4. Missing project_ids entirely → 400.
+  //
+  // What we CANNOT reach in this probe:
+  //   - Actual sync-diff rows created/revoked (needs pi_delegates table + seed).
+  //   - The per-project summary body (same prerequisite).
+  // ─────────────────────────────────────────────────────────────────────────
+  describe('E2E-E — POST /api/pi-delegates bulk sync (R-PID-009)', () => {
+    it('valid bulk payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      const payload = {
+        project_ids: ['E2E-BULK-PROBE-POST'],
+        delegates: [{ delegate_user_id: 800_003 }],
+      };
+
+      const res = await request(bulkApp.getHttpServer())
+        .post('/api/pi-delegates')
+        .send(payload);
+
+      // 404 means route not mounted — the failure this test guards against.
+      expect(res.status).not.toBe(404);
+      // 400 means DTO validation rejected a valid payload — also a failure.
+      expect(res.status).not.toBe(400);
+
+      if (await isMissingTable(res)) {
+        console.warn(
+          '[T-14 E2E-E] POST /api/pi-delegates — route mounted, DTO valid, ' +
+            'but pi_delegates table does not exist. ' +
+            'Behavioral assertion deferred (migration unapplied, K-015).',
+        );
+      } else {
+        console.info(
+          `[T-14 E2E-E] POST /api/pi-delegates → ${res.status}. ` +
+            'Route mounted and service reached.',
+        );
+      }
+    });
+
+    it('empty project_ids → 400 (ValidationPipe: @ArrayNotEmpty)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .post('/api/pi-delegates')
+        .send({ project_ids: [], delegates: [{ delegate_user_id: 1 }] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('empty delegates array → 400 (ValidationPipe: @ArrayNotEmpty)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .post('/api/pi-delegates')
+        .send({ project_ids: ['PROJ-X'], delegates: [] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('missing project_ids entirely → 400 (ValidationPipe: @IsArray @ArrayNotEmpty)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .post('/api/pi-delegates')
+        .send({ delegates: [{ delegate_user_id: 1 }] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ─── E2E-F — DELETE /api/pi-delegates bulk (R-PID-010) ───────────────────
+  //
+  // Probe strategy (KZ-017 — declare what we CAN reach):
+  //   1. Valid Shape A payload → NOT 404 (route mounted) + NOT 400 (DTO valid).
+  //   2. Valid Shape B payload → same.
+  //   3. Empty body           → 400 (DTO guards + service ambiguity guard).
+  //   4. Both shapes          → 400 (service ambiguity guard after DTO passes).
+  //   5. Partial Shape B (project_ids only) → 400.
+  //
+  // What we CANNOT reach in this probe:
+  //   - Actual soft-delete of rows (requires pi_delegates table + seed data).
+  //   - revoked_count in the response body (same prerequisite, K-015).
+  // ─────────────────────────────────────────────────────────────────────────
+  describe('E2E-F — DELETE /api/pi-delegates bulk revoke (R-PID-010)', () => {
+    it('Shape A valid payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      // Non-existent id: service finds no active row and returns revoked_count=0.
+      const res = await request(bulkApp.getHttpServer())
+        .delete('/api/pi-delegates')
+        .send({ pi_delegate_ids: [999_999] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(400);
+
+      console.info(
+        `[T-14 E2E-F] DELETE /api/pi-delegates (Shape A) → ${res.status}. ` +
+          'Route mounted. Behavioral assertion deferred pending seed data.',
+      );
+    });
+
+    it('Shape B valid payload → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .delete('/api/pi-delegates')
+        .send({
+          project_ids: ['E2E-BULK-PROBE-DEL'],
+          delegate_user_ids: [800_004],
+        });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(400);
+
+      console.info(
+        `[T-14 E2E-F] DELETE /api/pi-delegates (Shape B) → ${res.status}. ` +
+          'Route mounted. Behavioral assertion deferred pending DB seed.',
+      );
+    });
+
+    it('empty body → 400 (DTO @ValidateIf guards + service ambiguity guard)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .delete('/api/pi-delegates')
+        .send({});
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('both shapes supplied → 400 (service ambiguity guard)', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .delete('/api/pi-delegates')
+        .send({
+          pi_delegate_ids: [7],
+          project_ids: ['PROJ-BOTH'],
+          delegate_user_ids: [1],
+        });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('partial Shape B (project_ids only, no delegate_user_ids) → 400', async () => {
+      const res = await request(bulkApp.getHttpServer())
+        .delete('/api/pi-delegates')
+        .send({ project_ids: ['PROJ-PARTIAL'] });
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+  });
+});

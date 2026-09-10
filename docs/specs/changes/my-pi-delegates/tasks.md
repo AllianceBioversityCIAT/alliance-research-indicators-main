@@ -161,7 +161,7 @@ graph TD
 - **Done:** [ ] endpoints in `/swagger` with bulk payloads; [ ] no `@Roles`.
 - **Dep:** T-12 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
 
-### T-14 — Tests: bulk sync + revoke + PI-exclusion
+### T-14 — Tests: bulk sync + revoke + PI-exclusion  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-008/009/010, NFR-PID-003
 - **Files:** `pi-delegates.service.spec.ts` (extend), `test/pi-delegates.e2e-spec.ts` (extend)
 - **Desc:** sync creates/revokes/keeps; the Mateo-revoke; fail-fast atomicity on auth-denied and on PI-exclusion; provision-once-reuse-across-projects; bulkRevoke by ids and by pairs; cross-project isolation (KZ-004).

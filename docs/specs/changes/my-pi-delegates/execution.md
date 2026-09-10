@@ -336,3 +336,17 @@
 - **Reviewer PASS:** all 8 checks — no `@Roles` (service is the gate), POST/DELETE wired to bulk service, ValidationPipe present on both, list/verify intact, handler signatures match, dead code removed cleanly, Swagger complete, scope clean.
 - **⚠ EXPECTED RED — routed to T-14:** removing `create`/`revoke` makes `pi-delegates.service.spec.ts` stale (calls removed methods + 2-arg constructor vs 3). **`npm test` is RED until T-14 rewrites the service spec.** Not a T-13 defect (T-14 owns the test rewrite). `npm run build` (excludes `*spec.ts`) stayed green — do NOT read that as test-green; the green gate is at T-14 close.
 - **Verification:** `npm run build` clean; `npx eslint <controller+service>` clean.
+
+### T-14 — Tests: bulk sync + revoke + PI-exclusion — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-008/009/010, NFR-PID-003. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `pi-delegates.service.spec.ts` (FULL REWRITE — 27 tests, 3-arg constructor + `dataSource.transaction` mock); `test/pi-delegates.e2e-spec.ts` (extended with bulk probes).
+- **Reviewer PASS:** all 11 scenarios covered + carry-forwards. Tests DISCRIMINATE (KZ-001 — assert on summary `{created,revoked,kept}`/`revoked_count`, thrown exceptions, and specific `insertDelegate`/`softDeleteDelegatePairs`/`softDeleteDelegateIds` args; a wrong diff goes red). Fail-fast asserts the throw AND "nothing applied". KZ-004 distinct `PROJ-*` ids; cross-project isolation proven by per-project revoke discrimination. e2e honestly claims only route-mount + DTO-validation, behavior deferred (KZ-017 comments).
+- **Gate met:** **`npm test -- --silent` → 2728/2728 green** (T-13 had left it red; T-14 restores green). e2e: bulk routes MOUNTED (non-404), empty/partial payloads → 400 via HTTP. `git diff --stat client/` empty. No PRODUCT_BUG.
+- **ADVISORY (non-gating):** Scenario 6 proves isolation on the revoke side but not the cartesian create side (add a `created`-set assertion to make DD-K explicit); Scenario 8's `>=0` line is a near-tautology (real assertion is the `softDeleteDelegateIds([7],...)` call).
+
+---
+
+## v3 Summary (bulk many×many) — COMPLETE (2026-09-10)
+
+All 5 v3 tasks (T-10…T-14) Reviewer-PASS. `POST /pi-delegates` = per-project SYNC (many delegates × many projects; declarative — revokes the missing); `DELETE /pi-delegates` = independent bulk targeted revoke (two shapes); PI-exclusion (a PI can't be a delegate of their own project); all transactional + fail-fast. Full unit suite **2728/2728 green**; no client change. v2 single-item create/revoke removed. Rework rounds: T-10 (1 — missing `@ArrayNotEmpty`). Outstanding: the same human gates as v2 — real Dev/Prod migration apply (K-015; local `alliancereportingdb` already applied) + the behavioral e2e (deferred to a seeded DB the harness points at).
