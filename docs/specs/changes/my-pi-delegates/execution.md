@@ -56,3 +56,29 @@
 - [ ] two revoked rows for same (project,delegate) coexist, second active rejected — **outstanding: verified at human DB-apply** (design guarantees it via the NULL-on-revoke generated key).
 
 **Decisions made:** (1) reverted out-of-scope scanner rather than adopting it; (2) treated DB apply+revert as the spec-designated human step, not a coding gate; (3) recorded the collation advisory for the human apply rather than reworking (advisory, and repo create-table convention omits explicit CHARSET).
+
+---
+
+### T-02 — Entity + module + route registration — **PASS on attempt 2** (2026-09-10)
+
+- **Status:** PASS (Reviewer) after 1 rework round.
+- **Covers:** R-PID-001 AC.1.
+- **Attempts:** 2 Implementer + 2 Reviewer.
+
+**Files changed:**
+- `server/…/domain/entities/pi-delegates/entities/pi-delegate.entity.ts` (new) — `PiDelegate extends AuditableEntity`; PK `pi_delegate_id`; `project_id` varchar(36) + `@ManyToOne` AgressoContract (`project_id → agreement_id`); `pi_user_id`/`delegate_user_id` plain `@Column('bigint')`; `active_delegate_key` intentionally NOT mapped (STORED generated, D-PI-9).
+- `server/…/domain/entities/pi-delegates/pi-delegates.module.ts` (new) — `TypeOrmModule.forFeature([PiDelegate])`, `exports: [TypeOrmModule]` (exemplar pattern).
+- `server/…/domain/routes/main.routes.ts` (edit) — import + `{ path: 'pi-delegates', module: PiDelegatesModule }` in `children`.
+
+**Verification (from `server/researchindicators/`):** `npm run build` clean; `npx eslint <files>` clean (both attempts).
+
+**Attempt 1 — Reviewer FAIL (1 issue):** entity declared `@Index('idx_pi_delegates_delegate_project', ['delegate_user_id','project_id'])` with **no backing migration** → schema-drift vs the source of truth (child guide §7). Confirmed by grep (`idx_pi_delegates` = zero migration matches) and by the exemplar cutting the other way (`ResultPoolFundingAlignment`'s `@Index` IS backed by migration `1779190000006`). Composite index absent from design §4 / requirements §5.
+- **Leader adjudication:** remediation (a) — remove the `@Index` (entity-invented, unspecified; FK on `delegate_user_id` already yields a single-column index for the design §5 fallback filter). Rejected (b) amending the committed T-01 migration — that would be an unspecified performance change / scope creep.
+
+**Attempt 2 — Reviewer PASS:** `@Index` + unused `Index` import removed; entity↔migration column parity intact; `@ManyToOne` + both NOTE comments retained; no regression, no new scope.
+
+**Correct assumption (recorded, not a deviation to flag):** `sec_users` has **no TypeORM `@Entity` class** in this codebase (plain DTO only), so both user FKs are plain `@Column('bigint')` — codebase-consistent; DB-level FK constraints live in the T-01 migration.
+
+**ADVISORY / open item (does NOT gate, NOT a task in this spec):** the design §5/§6 fallback queries filter `(project_id, delegate_user_id, is_active)`. The single-column FK index on `delegate_user_id` serves it; if a composite `(delegate_user_id, project_id)` index proves needed under load, that is a separate design decision + its own migration — not entity-only drift.
+
+**Requirements covered:** R-PID-001 AC.1 (the three associations, module registered at `pi-delegates`).

@@ -46,7 +46,7 @@ graph TD
 - **Done:** [ ] applies forward + reverts clean; [ ] two revoked rows for same (project,delegate) coexist, second active rejected; [ ] no `user_roles`/`SecRolesEnum` touched.
 - **Effort:** M · **Skills:** nestjs-expert
 
-### T-02 — Entity + module + route registration
+### T-02 — Entity + module + route registration  ✅ [x] PASS 2026-09-10 (attempt 2)
 - **Covers:** R-PID-001
 - **Files:** `entities/pi-delegates/{entities/pi-delegate.entity.ts, pi-delegates.module.ts}`, `routes/main.routes.ts`
 - **Done:** [ ] `PiDelegate extends AuditableEntity` with the 3 FKs; [ ] module registered at `pi-delegates`.
