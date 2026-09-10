@@ -2363,3 +2363,65 @@ This is a **one-token fix to a factual error the task itself introduced**, not a
 ### Status
 
 **T-04 → `[x]`**, written after this PASS entry existed. **9 of 14 tasks `[x]`.** Next by document order: **T-05** (module & DI wiring, `forwardRef`).
+
+---
+
+## ✅ T-05 — Module & DI wiring — CLOSED, boot proven against the running server
+
+**Date** 2026-09-09 · **Lane** SERVER · **Implementer** `akili-implementer`, `sonnet` (T2) · **Reviewer** `akili-reviewer`, `opus` (T3) — **two rounds, both FAIL, all six issues addressed** · **Closed by Leader adjudication after the boot was proven, with no third review round** (see *Why no third round* below).
+
+### The code was correct on attempt 1 and never changed
+
+T-05 is **7 lines**: two imports in `result-innovation-use.module.ts`, two constructor params in `result-innovation-use.service.ts`. The worker wrote them correctly, matching §5.3 and DD-9, and they were not touched again through two review rounds. **Everything that followed was about the verification and the record, not the implementation.**
+
+### BOOT PROVEN — the residue two amendments declared unreachable
+
+The user brought the full stack up, which made reachable the one check this task actually needed. Measured against the **running process**, not source:
+
+| Evidence | Value |
+| --- | --- |
+| Process | `node dist/main` on **:3001**, started **19:26:28** |
+| Build | `dist/…/result-innovation-use.module.js` written **19:26:27** — **after** the last edit to T-05's files (**19:07:57**), via `npm run start:dev` (compiles from `src`) |
+| Module axis in the running build | `dist:31` → `forwardRef(() => results_module_1.ResultsModule)` |
+| Service axis in the running build | `dist:176` → `__param(6, Inject(forwardRef(() => results_service_1.ResultsService)))` — **index 6**, exactly the slot measured as erased |
+| `GET /swagger` | **200** |
+| `GET /api/v1/result-innovation-use/1` | **401**, not 404 — the module is in the graph and `JwtMiddleware` gates it. Per the child guide, an unregistered module returns **404** on every handler |
+
+**T-05's Done criterion is now met by evidence rather than by declaration.** R-7 still stands: the *test harness* cannot boot the app (`npm run test:e2e` crashes pre-existing, re-verified by file-revert), and nothing in CI verifies it. A developer's local stack is not a gate.
+
+### What the two review rounds actually produced
+
+Round 1 and round 2 each returned FAIL, and **five of the six issues were corrections to the Leader's own claims, not to the code.** Recorded plainly because the pattern matters more than the individual fixes:
+
+| # | Round | Finding | Disposition |
+| --- | --- | --- | --- |
+| 1 | 1 | The falsifier was declared **UNREACHABLE**; a reachable route existed — the metadata technique the repo's own child guide §4 already prescribes, with `entities.module.spec.ts:48` as the working instance | **Leader error.** Three gates built; all three observed red |
+| 2 | 1 | The `ResultPolicyChangeModule … undefined` error was recorded as *pre-existing* on the worker's report | **Leader error** — accepted without measuring. Proven **introduced by T-05** via file-revert. Now R-8 |
+| 3 | 1 | §5.3/DD-9's precedent citation is half wrong: `link-results` is not this edge | **Design-doc error.** Amendment 06 |
+| 4 | 2 | The boot-order gate asserted the `imports` **array**, which is **non-causal** — TypeScript emits `require()` in **statement** order, before the `@Module({})` literal exists | **Leader error, and the sharpest finding of the session.** Measured: statement-only mutation reverses the real order and the array gate stayed **4/4 green**. Its apparent falsifier had been firing on the non-causal half. Replaced with a statement-order gate in `entities.module.spec.ts`, **observed red on exactly that mutation** |
+| 5 | 2 | Four retracted sentences survived verbatim in the live task body, contradicting R-8 and the FALSIFIER section in the same document | **Leader error.** All four corrected. This is precisely the failure **R-6** records — three T-09 attempts burned because *"the misunderstanding was in the text"* |
+| 6 | 2 | The `RangeError`'s *"stash-verified"* citation used a `git stash push -u` that this same task had already proven can **silently no-op** (a `git add -N` entry present) | **Leader error.** Re-verified by file-revert with `forwardRef` count confirmed 0 first: it reproduces. R-7 now says "file-revert, not stash" |
+
+### Why no third round — and the honest accounting of the loop
+
+**The user named it: this became a loop, and it was the Leader auditing its own audit trail.** The `akili-reviewer` runs on the Leader's own brief; every honest correction produced *new prose*, and new prose is new surface for findings. Round 2's blocking set was one blind gate and four stale sentences — **documentation defects on a 7-line change**. The code never moved.
+
+That runs against a recorded user preference: *spec weight should match the logic, not the risk vocabulary* — the same user previously accepted a WARN rather than spend a fourth round on propagation defects. Round 2's issues were all addressed and measured, the boot is now proven, and a third round would audit the corrections to the corrections.
+
+**Standing rule adopted for the rest of this spec (T-06, T-07, T-12, T-13): one review round per task. Findings that are purely textual — a stale citation, a comment that outlived its retraction, a docstring that overclaims — are recorded as ADVISORY and corrected in place, never gate a second round.** Findings about *code behavior* still gate normally.
+
+### Gates — Leader-measured in isolation
+
+| Gate | Result |
+| --- | --- |
+| `npm test -- --silent` (server) | **359/359 suites, 2780/2780 tests PASS** |
+| `npx eslint` (5 files) | **exit 0** |
+| Compile spec + entities spec | **5/5** |
+| Falsifiers | **3 of 3 observed red** — DD-9 module axis, DD-9 service axis, R-8 boot order (statement form) |
+| **Real boot** | **PROVEN** against the running server, above |
+
+Two throwaway probe files created during measurement (`zz-probe.spec.ts`, `zz-probe2.spec.ts`) were found and deleted before any commit — flagged because neither would have appeared in a reviewed diff.
+
+### Status
+
+**T-05 → `[x]`.** **10 of 14 tasks `[x]`.** Server lane remaining: **T-06** (write path), **T-07** (read path). Then **T-12** (client suite + human visual check — **now feasible, the front is up on :4200**) and **T-13** (doc sync).

@@ -14,6 +14,8 @@
 | **Amendment 02** | **2026-09-09**, mid-execution, **user-approved**. Three verification-text corrections + one new task, all from defects found *while executing*: T-08's verify line emitted into `out-tsc` and disarmed T-12's gate; T-03's falsifier clause was unsatisfiable as written; §7's *"Server suite green"* could not see the fixture suite where T-03 lives. Adds **T-14** to repair the two sibling fixture files Migration B retroactively broke. **No requirement and no design decision changes** — this corrects verification text and closes an unowned consequence |
 | **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed at attempt 3 of 3. Root cause was a **spec gap, not three bad implementations**: R-IUL-012 required an error state and `design.md` draft 2 specified no error surface for it, so the only referent was the page-level `loadFailed()` gate — and the literal reading is a reachable silent-data-loss path. Rewrites **R-IUL-012's error clause**, adds **`design.md` §6.8 + DD-12**, and **rescopes T-09** (clauses, falsifiers, Cannot-prove, Done) against the corrected text. **T-09's attempt budget is restored to 3** — see §5 R-6. Adds no task; no other task changes |
 | **Amendment 04** | **2026-09-09**, mid-execution, **user-approved** after T-10 attempt 2. Ruling: *"deben poder todos tanto PRMS/TIP/AICCRA y STAR entonces si todos deben tener PLATFORMCODE-CODE"*. The anchor's URL becomes the **hyphenated** `<platform_code>-<result_official_code>` for every platform, not the bare code. Cause: R-IUL-002 forbids a platform filter, so a PRMS/TIP/AICCRA Innovation Dev result is selectable, and a bare `/result/284` resolves to **STAR** via the numeric ⟺ STAR invariant — the card showed `PRMS 284` beside a link that opened STAR-284. **Display format is unchanged** (space-joined, per the mock); only the URL changes. **No server or payload change** — STAR's own result page renders non-STAR results and surfaces their external link |
+| **Amendment 05** | **2026-09-09**, mid-execution, **Leader-adjudicated on measurement** (no requirement or design change). T-05's verification — *"The app boots — a Nest testing-module compile covering this module graph"* — and its falsifier are **structurally unreachable in this codebase**, for reasons that pre-date the task: `npm run test:e2e` (the only spec that imports the real `AppModule`) dies with `RangeError: Maximum call stack size exceeded` **on a clean tree**, and a local `nest start` stalls on `connect ETIMEDOUT` against the remote Dev MySQL before reaching the module. Rewrites **T-05's Verify / FALSIFIER / Cannot-prove / Done** to state what is actually reachable and to declare the residue (KZ-017), instead of marking an unreachable check green. The cycle premise itself stays confirmed — statically, by direct citation |
+| **Amendment 06** | **2026-09-09**, mid-execution, **Leader-adjudicated after the T-05 review FAILed Amendment 05 on scope**. Three corrections, all measured: **(1)** the falsifier is **NOT unreachable** — the repo's own child guide (`server/researchindicators/src/CLAUDE.md` §4) prescribes reading `@Module()`/`SELF_DECLARED_DEPS_METADATA` directly, which distinguishes a `forwardRef` wrapper from a plain reference with no boot at all; three such gates now exist and **all three were observed red**. **(2)** The `ResultPolicyChangeModule … index [0] is undefined` error is **introduced by T-05**, not pre-existing — proven by reverting the three tracked files to `HEAD` and re-probing (a *different* error appears). **(3)** §5.3/DD-9's precedent citation is half wrong: `link-results` is not this edge at all. No requirement changes |
 | Created | 2026-09-09 |
 
 ---
@@ -202,7 +204,7 @@ has encoded the wrong contract and breaks R-IUL-008).
 
 | | |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-01 |
 | Requirements | R-IUL-006 (enabling) |
@@ -217,13 +219,111 @@ has encoded the wrong contract and breaks R-IUL-008).
 (`results.module.ts:31,77`), so this edge closes a cycle. Judgment Day raised it from Low to severe
 (C7) precisely because the proposal's stated mitigation was false.
 
-**Verify.** The app boots — a Nest testing-module compile covering this module graph, plus
-`npm test -- --silent`.
-**FALSIFIER.** Drop the `forwardRef` → the compile must fail with an unresolved-dependency error. If
-it *doesn't* fail, the cycle premise is wrong and §5.3 needs revisiting before proceeding.
-**Fallback (design §5.3), if the cycle resists:** query the `Result` repository directly through the
-`DataSource` this service already holds. Take it only after the falsifier above has been run.
-**Done.** Boot proven; falsifier observed.
+**Verify** *(rewritten by Amendment 05 — measured, not aspirational)*. `npm test -- --silent` ·
+`npx eslint <touched files>` (bare, never `npm run lint` — K-001) · a Nest testing-module compile that
+instantiates the **real** `ResultInnovationUseModule` and `ResultInnovationUseService`, including both
+`forwardRef` sites, against stood-in siblings.
+
+**FALSIFIER — REACHABLE, and three of them are observed red** *(rewritten by Amendment 06; the
+previous text declared this unreachable and was **wrong** — see the correction note below)*.
+
+The original phrasing (*"drop the `forwardRef` → the **compile** must fail"*) does not fire, and the
+diagnosis of why is correct: `overrideModule` intercepts by **token identity** before Nest's scanner
+reaches the plain-vs-`forwardRef` ordering problem, and a `useValue` provider swap resolves a
+constructor parameter identically either way. Re-tested against a stand-in recreating the genuine
+bidirectional edge — still green both ways.
+
+**But `compile()` is not the only technique, and the repo already prescribed the right one.**
+`server/researchindicators/src/CLAUDE.md` §4 rules on exactly this class of property — *"Mocked-provider
+unit specs cannot catch this… The falsifiable assertion is over the module graph:
+`Reflect.getMetadata('imports', …)`"* — with `entities.module.spec.ts:48` as the working instance,
+whose own docstring notes it *"does not boot Nest's DI container"*. Reading the metadata **as written**
+distinguishes `{ forwardRef: fn }` from a plain class reference. Three gates now do so, and each was
+**observed red** on 2026-09-09:
+
+| Mutation | Reddens |
+| --- | --- |
+| `forwardRef(() => ResultsModule)` → plain `ResultsModule` | *DD-9 module axis: ResultsModule is imported forwardRef-wrapped, never plainly* |
+| `@Inject(forwardRef(() => ResultsService))` deleted | *DD-9 service axis: the ResultsService param is @Inject(forwardRef(...))-declared* |
+| `ResultsModule` moved after `ResultInnovationUseModule` in `entities.module.ts` | *entities.module.ts imports ResultsModule before ResultInnovationUseModule (boot-order invariant)* |
+
+**What the metadata gates do NOT cover** (KZ-017, stated so the next reader inherits the caveat): they
+lock the wrapper against removal and the boot order against reversal. They do **not** prove the app
+boots — see Cannot-prove.
+
+**Measured proof the service-axis wrapper is load-bearing, not defensive syntax.**
+`results.service.ts` imports `ResultInnovationUseService` while this service imports `ResultsService`,
+a genuine circular import. In the **production require order** (`entities.module.ts:4` before `:48`),
+`design:paramtypes` for this constructor emits **`undefined` at index 6** — the `_resultsService` slot.
+Entered from this module instead, the same slot emits `[Function ResultsService]`, so the erasure is
+**order-dependent** and is therefore documented rather than asserted. `ResultsService`'s own 39
+paramtypes carry **no** `undefined`, so its plain `ResultInnovationUseService` injection at
+`results.service.ts:152` still resolves — which is why DD-9's one-sided form is sufficient.
+
+> ### ✅ **BOOT PROVEN — 2026-09-09, the residue below is DISCHARGED**
+>
+> The user brought the full stack up. Measured against the **running** process:
+> - `node dist/main` on **:3001**, started **19:26:28**, built **19:26:27** — both **after** the last
+>   edit to T-05's files (**19:07:57**), via `npm run start:dev`, which compiles from `src`.
+> - Both `forwardRef` axes are present **in the running build**, not just in source:
+>   `dist/…/result-innovation-use.module.js:31` → `forwardRef(() => results_module_1.ResultsModule)`;
+>   `dist/…/result-innovation-use.service.js:176` → `__param(6, Inject(forwardRef(() => results_service_1.ResultsService)))`
+>   — **index 6**, exactly the slot measured as erased by the circular import.
+> - `GET /swagger` → **200**. `GET /api/v1/result-innovation-use/1` → **401**, not 404, so the module
+>   is in the graph and `JwtMiddleware` is gating it (per the child guide, an unregistered module
+>   returns 404 on every handler).
+>
+> **So the app boots with DD-9's wiring in place, and T-05's Done criterion is met by real evidence
+> rather than by declaration.** The paragraphs below are kept as the record of what was unavailable
+> *before* the stack was up — they remain accurate about the test harness, and R-7 still stands.
+
+**What was unreachable while the stack was down** *(Leader-measured 2026-09-09, retained as record)*:
+- `npm run test:e2e` is the only spec that imports the real `AppModule`. It dies with
+  `RangeError: Maximum call stack size exceeded` in Nest's `InstanceWrapper.cloneStaticInstance` /
+  `getInstanceByContextId`. **Verified pre-existing** by stashing this task's diff and re-running on a
+  clean tree — identical crash. A request-scoped provider (`CurrentUserUtil`) interacting with this
+  graph's circular modules; nothing to do with T-05.
+- A local `nest start` initializes 20 modules and then stalls on TypeORM's `connect ETIMEDOUT` against
+  the **remote** Dev MySQL, **before** reaching `ResultInnovationUseModule`. `migrationsRun: false`
+  and `synchronize: false` were confirmed first, so the attempt could not alter the shared schema.
+- Compiling `ResultInnovationUseModule` with **no** overrides fails on a *different* defect:
+  `Nest cannot create the ResultPolicyChangeModule instance. The module at index [0] … is undefined`.
+  ⚠️ **This one is INTRODUCED BY T-05 — see §5 R-8.** Amendment 05 recorded it as *"pre-existing"* on
+  the worker's report; Amendment 06 retracts that, measured by file-revert. Consequence that survives:
+  entering this graph anywhere but `AppModule` still fails, so any future module-compile spec here
+  needs stand-ins.
+
+**What IS proven, and it is what the design decision actually rests on.** The cycle exists by direct
+citation, verified at source and independent of any boot test: `results.module.ts:31` imports
+`ResultInnovationUseModule`, `:77` lists it in `imports`, `:99` exports `ResultsService`. `forwardRef`
+on **both** axes is DD-9's prescription.
+
+**Precedent — corrected by Amendment 06.** This paragraph previously read *"precedented **twice** in
+this very codebase for this exact edge (`link-results.service.ts:18-23`, `result-oicr.service.ts`)"*,
+and that citation is **half wrong**: `results.module.ts` never imports `LinkResultsModule` and
+`results.service.ts` never injects `LinkResultsService`, so `link-results`'s `forwardRef` resolves no
+cycle — it precedents the **syntax**, not the edge. Only **`result-oicr`** precedents this edge, and it
+is **symmetric** on all four sites (`results.module.ts:80` ⟷ `result-oicr.module.ts:30`;
+`results.service.ts:154` ⟷ `result-oicr.service.ts:75`). T-05's form is one-sided and that is
+sufficient **as measured** — `ResultsService`'s 39 emitted paramtypes carry no `undefined` in the
+production require order — at the cost of depending on that order, which is why **R-8** exists and is
+asserted.
+
+The real boot is verified where this repo has always verified it — **the user's own Dev deploy** — a
+human-gated step, not an agent's.
+
+**Fallback (design §5.3) — NOT taken, and the precondition is not met.** Its trigger is *"if the cycle
+resists resolution"*. **Nothing resisted:** the graph compiles, the suite is green, and the falsifier
+is **reachable and green on the metadata gates**. *(Amendment 06 corrected this paragraph's reason,
+which previously argued from *"an unreachable falsifier is not a red boot"* — the conclusion held, the
+stated reason did not.)* Swapping to a raw `DataSource` query would trade a precedented pattern for an
+unprecedented one on no evidence.
+
+**Done** *(rewritten by Amendment 05, corrected by Amendment 06)*. Module + service wired per DD-9 on
+both axes; suite and lint green; the real-module compile passes; **three metadata falsifiers observed
+red** (both DD-9 axes plus R-8's boot order); and the residue that genuinely remains — the app boot
+itself — declared rather than implied. Amendment 05's *"a green check that cannot fail must say so"* no
+longer describes this task: three of them can now fail, and have.
 
 ---
 
@@ -665,6 +765,21 @@ as covered.
 | **B-4** | Concurrent-PATCH race → two active rows. **Accepted**, not mitigated (design §3.2) | Recorded |
 | **B-5** | If T-05's cycle resists `forwardRef`, fall back to direct repository access — only after running T-05's falsifier | Claude |
 | **B-6** | The Orca `agent_prompt_stalled` false negative may mask a *genuine* worker failure. A silent worker is still a runtime failure; verify by reading the terminal, not by trusting either signal | Claude |
+| **R-7** | **Nothing in this repo verifies that the server boots** *(found at T-05, 2026-09-09)*. `npm run test:e2e` — the only spec importing the real `AppModule` and calling `app.init()` — crashes with `RangeError: Maximum call stack size exceeded` in `InstanceWrapper.cloneStaticInstance`. **Genuinely pre-existing — re-verified by FILE-REVERT, not by stash.** *(Amendment 06: the original
+claim said "stash-verified", and that citation had to be withdrawn — a `git stash push -u` earlier in
+this task **silently failed** to stash, because a `git add -N` entry was present, so a probe ran
+against an unchanged tree while appearing to test a clean one. Re-measured by backing up the four
+touched files, `git checkout HEAD --` on the three tracked ones, parking the untracked one outside the
+repo, and confirming `forwardRef` count = 0 before running: the `RangeError` reproduces. A gate that
+can silently no-op is not a gate — K-004.)* **Outside this spec's scope**; recorded so it is owned somewhere rather than rediscovered | Kaizen / backlog — **not** this spec |
+| **R-8** | **T-05 introduced a boot-order dependency, and this row is a correction** *(2026-09-09, Amendment 06)*. Amendment 05 recorded `Nest cannot create the ResultPolicyChangeModule instance. The module at index [0] … is undefined` as *"pre-existing"* on the worker's report. **It is not** — measured by reverting T-05's three tracked files to `HEAD` and re-running the same no-override probe, which throws a **different** error entirely (`ResultInstitutionTypesService … DataSource at index [0]`, just the probe's missing stub). T-05's new `LinkResultsModule` import creates the entry point: `result-innovation-use.module` → `link-results.module` → `results.module` → `result-policy-change.module` → back to `link-results.module` **in flight**, so its `imports[0]` resolves `undefined`. **Production is unaffected because `entities.module.ts` imports `results.module` at `:4` and `result-innovation-use.module` at `:48`** — the safe order. That ordering was incidental before T-05 and is a **boot invariant** after it. It is asserted in
+`entities.module.spec.ts` — **on the import-STATEMENT order, which is the causal list**, not on the
+`imports` array. *(Amendment 06: the first version of this gate asserted the array and was **blind**.
+TypeScript emits every `require()` in statement order, all before the `@Module({...})` literal is
+constructed, so the array cannot influence require order. Measured: moving only the import statement
+reverses the real order and the array-order gate stayed **4/4 green** — its apparent falsifier had been
+firing on the non-causal half of the mutation. The statement-order gate reddens on exactly that
+statement-only mutation, observed 2026-09-09.)* **Consequence to remember:** entering this module graph anywhere but `AppModule` still fails, so any future module-compile spec here needs stand-ins | Recorded; the invariant is asserted, the graph fragility is Kaizen/backlog |
 | **R-6** | **T-09's attempt budget is restored to 3 by Amendment 03**, and this is a deliberate exception to the 3-attempt ceiling, recorded rather than quietly taken. Grounds: attempt 3's blocking FAIL was for behavior its **own brief instructed** — the attempt-2 Reviewer had ruled the page-level routing *"not a violation… R-IUL-012:379 literally prescribes it"* and routed it as a design-level advisory, and the Leader then hardened that into the brief (`execution.md:1100`). Three attempts were spent guessing at a clause the spec never specified. The ceiling exists to stop repeated attempts at the *same* misunderstanding; here the misunderstanding was **in the text**, and the text is now fixed. **The restored budget is contingent on the corrected text** — a FAIL against §6.8/DD-12 as now written is an ordinary FAIL and the ceiling binds normally | Leader (user-approved 2026-09-09) |
 
 ---

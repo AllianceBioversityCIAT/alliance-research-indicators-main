@@ -21,6 +21,8 @@ import {
 } from './dto/create-result-innovation-use.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
+import { ResultsService } from '../results/results.service';
+import { LinkResultsService } from '../link-results/link-results.service';
 
 describe('ResultInnovationUseService', () => {
   let service: ResultInnovationUseService;
@@ -107,6 +109,13 @@ describe('ResultInnovationUseService', () => {
   const mockUpdateDataUtil = {
     updateLastUpdatedDate: jest.fn().mockResolvedValue(undefined),
   };
+
+  // T-05 (design.md §5.3, DD-9) — DI wiring only. Neither service is called
+  // anywhere in this file's exercised paths yet (T-06/T-07 wire the calls);
+  // these mocks exist solely so `ResultInnovationUseService`'s constructor
+  // resolves in this providers-array TestingModule.
+  const mockResultsService = {};
+  const mockLinkResultsService = {};
 
   // A single, stable manager instance for every transaction run in this
   // file — so an assertion that a child call received *this* object (rather
@@ -198,6 +207,8 @@ describe('ResultInnovationUseService', () => {
           useValue: mockResultQuantifications,
         },
         { provide: UpdateDataUtil, useValue: mockUpdateDataUtil },
+        { provide: ResultsService, useValue: mockResultsService },
+        { provide: LinkResultsService, useValue: mockLinkResultsService },
       ],
     }).compile();
 

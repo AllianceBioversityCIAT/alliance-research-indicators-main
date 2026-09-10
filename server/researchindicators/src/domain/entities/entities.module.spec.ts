@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 
@@ -48,5 +50,57 @@ describe('EntitiesModule — result-innovation-use registration (DD-15)', () => 
     const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
 
     expect(imports).toContain(ResultInnovationUseModule);
+  });
+});
+
+/**
+ * T-05 boot-order invariant — `docs/specs/innovation-use/link-innovation-dev`
+ * §5 **R-8**.
+ *
+ * **Why this asserts the SOURCE TEXT and not the `imports` array.** The
+ * hazard is a require-time one: TypeScript emits every `require()` at the top
+ * of the module in **import-statement** order, and all of them complete
+ * before the `@Module({...})` object literal — and therefore the `imports`
+ * array — is ever constructed. So the array order **cannot** influence the
+ * require order. An earlier version of this gate lived in
+ * `result-innovation-use.module.compile.spec.ts` and asserted
+ * `imports.indexOf(ResultsModule) < imports.indexOf(ResultInnovationUseModule)`.
+ * **Measured 2026-09-09: that gate is blind.** Moving only the *import
+ * statement* (leaving the array untouched) reverses the real require order and
+ * it stayed 4/4 green — so its apparent falsifier had been firing on the
+ * non-causal half of the mutation. Statement order is the causal list, so
+ * statement order is what this reads.
+ *
+ * **The hazard.** `result-innovation-use.module` imports `LinkResultsModule`
+ * (added by T-05), which reaches `results.module` → `result-policy-change.module`
+ * → back to `link-results.module` **while it is still in flight**, leaving
+ * `ResultPolicyChangeModule.imports[0] === undefined`. Production is safe only
+ * because this file requires `results.module` first, which loads that whole
+ * subtree before `result-innovation-use.module` is entered. That ordering was
+ * incidental before T-05 and is load-bearing after it.
+ *
+ * **It also holds up a design decision.** DD-9's one-sided `forwardRef` (this
+ * module wrapped; `results.module.ts:77` / `results.service.ts:152` plain) is
+ * sufficient *because of this order*: measured in it, `ResultsService`'s 39
+ * emitted paramtypes carry no `undefined`. Reverse the order and the erasure
+ * moves to `ResultsService`'s own slot instead.
+ *
+ * FALSIFIER, observed red 2026-09-09: move the `results/results.module` import
+ * statement below the `result-innovation-use/result-innovation-use.module` one,
+ * leaving the `imports` array alone. This spec goes red; the old array-order
+ * gate did not.
+ */
+describe('EntitiesModule — T-05 boot-order invariant (R-8)', () => {
+  it('requires results.module BEFORE result-innovation-use.module (import-statement order)', () => {
+    const source = readFileSync(join(__dirname, 'entities.module.ts'), 'utf8');
+
+    const resultsAt = source.indexOf("from './results/results.module'");
+    const innovUseAt = source.indexOf(
+      "from './result-innovation-use/result-innovation-use.module'",
+    );
+
+    expect(resultsAt).toBeGreaterThanOrEqual(0);
+    expect(innovUseAt).toBeGreaterThanOrEqual(0);
+    expect(resultsAt).toBeLessThan(innovUseAt);
   });
 });

@@ -13,6 +13,7 @@
 | **Amendment 01** | **2026-09-09**, post-Phase-3, from a user-supplied mock ([`mockup/`](mockup/)). Own section card; platform-prefixed label; a labelled "View innovation detail" action instead of a whole-card link; no remove control. **Client-only, plus one added read field.** Revises §4.1, §6.1, §6.3, §6.4, DD-6, DD-7; adds DD-11 |
 | **Amendment 03** | **2026-09-09**, mid-execution, **user-approved Pivot** after T-09 HALTed. Draft 2 specified **no** error surface for the picker at all, while `requirements.md` R-IUL-012 required an error state — the gap that caused three consecutive T-09 failures. **Adds §6.8 and DD-12**; adds one cross-reference to §6.5. No other section changes, and the wire contract (§4.1) is untouched |
 | **Amendment 04** | **2026-09-09**, mid-execution, **user-approved** after T-10 attempt 2 revealed §6.3's Target row misroutes any non-STAR Innovation Dev result. Revises **§6.3's Target row**; adds **DD-13**. Display format untouched; no server or payload change |
+| **Amendment 06** | **2026-09-09** — corrects **§5.3**'s "no cycle" reasoning and **§5.3/DD-9**'s precedent citation, both found wrong by the T-05 review and confirmed at source. No decision is reversed; DD-9's prescription stands and is now measured |
 | Created / revised | 2026-09-09 |
 
 ---
@@ -224,11 +225,32 @@ only transitively through `LinkResultsService`. The real situation:
 
 So importing `ResultsModule` here closes a cycle. **Resolution:**
 
-1. `ResultInnovationUseModule` imports `LinkResultsModule` (no cycle — it exports only `LinkResultsService`)
+1. `ResultInnovationUseModule` imports `LinkResultsModule` — **plainly, no `forwardRef` needed**.
+   *(Corrected by Amendment 06. This bullet previously read "no cycle — it exports only
+   `LinkResultsService`", which is a **non-sequitur**: exports do not determine cycles, imports do,
+   and `LinkResultsModule → ResultsModule → ResultInnovationUseModule` closes one. The plain import is
+   nonetheless correct — a `forwardRef` here would buy nothing, because the module is reached before
+   the cycle closes. What the transitive cycle **does** cause is the boot-order dependency recorded as
+   `tasks.md` §5 **R-8**: entering this graph at `ResultInnovationUseModule` rather than at
+   `AppModule` makes `ResultPolicyChangeModule.imports[0]` resolve `undefined`.)*
 2. `ResultInnovationUseModule` imports `forwardRef(() => ResultsModule)`
 3. `ResultInnovationUseService` injects `@Inject(forwardRef(() => ResultsService))`
 
-Precedent for exactly this edge: `link-results.service.ts` and `result-oicr.service.ts`.
+**Precedent — corrected by Amendment 06.** Only **`result-oicr`** is precedent for *this edge*, and
+it is **symmetric**: `results.module.ts:80` ⟷ `result-oicr.module.ts:30` and
+`results.service.ts:154` ⟷ `result-oicr.service.ts:75` — all four sites `forwardRef`-wrapped.
+`link-results` is **not** this edge and was miscited: `results.module.ts` never imports
+`LinkResultsModule` and `results.service.ts` never injects `LinkResultsService`, so
+`link-results.service.ts:20`'s `forwardRef` resolves no cycle — it is precedent for the **syntax**,
+not for the edge.
+
+**T-05's form is one-sided (this module wrapped; `results.module.ts:77` and `results.service.ts:152`
+left plain), and that is sufficient — measured, not assumed.** `ResultsService`'s 39 emitted
+paramtypes carry **no** `undefined`, so its plain `ResultInnovationUseService` injection still
+resolves; this service's slot 6 *is* erased in the production require order, which is what makes its
+`forwardRef` load-bearing. Symmetrizing would widen the change surface into `results/` for no
+measured gain. The cost of the asymmetry is that correctness now rests on `entities.module.ts`'s
+import order — recorded as **R-8** and asserted by a gate with an observed-red falsifier.
 
 > **Fallback if the cycle still fails to resolve at boot:** query the `Result` repository directly
 > through the `DataSource` this service already holds, filtering `result_id`, `indicator_id = 2`,

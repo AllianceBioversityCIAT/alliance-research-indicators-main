@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,6 +28,8 @@ import {
   InnovationUseOrganizationDto,
 } from './dto/create-result-innovation-use.dto';
 import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
+import { ResultsService } from '../results/results.service';
+import { LinkResultsService } from '../link-results/link-results.service';
 
 /**
  * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
@@ -95,6 +99,9 @@ export class ResultInnovationUseService {
     private readonly _resultInstitutionTypesService: ResultInstitutionTypesService,
     private readonly _resultQuantificationsService: ResultQuantificationsService,
     private readonly _updateDataUtil: UpdateDataUtil,
+    @Inject(forwardRef(() => ResultsService))
+    private readonly _resultsService: ResultsService,
+    private readonly _linkResultsService: LinkResultsService,
   ) {
     this.mainRepo = this.dataSource.getRepository(ResultInnovationUse);
   }
