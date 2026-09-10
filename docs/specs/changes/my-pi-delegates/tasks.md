@@ -146,7 +146,7 @@ graph TD
 - **Done:** [ ] PI→true, non-PI→false; [ ] active ids listed correctly for the diff.
 - **Dep:** T-04 · **Effort:** M · **Skills:** nestjs-expert
 
-### T-12 — Service: bulk assign (sync) + bulk revoke + PI-exclusion
+### T-12 — Service: bulk assign (sync) + bulk revoke + PI-exclusion  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-008, R-PID-009, R-PID-010, NFR-PID-003
 - **Files:** `pi-delegates.service.ts` (replace single create/revoke with `assign`/`bulkRevoke`)
 - **Desc:** `assign(dto)` — one transaction: auth per project (fail-fast) → resolve/provision delegates → PI-exclusion per pair (fail-fast) → per-project reconcile (create desired\current, revoke current\desired, keep ∩) → per-project summary. `bulkRevoke(dto)` — auth per row's project → soft-delete, no sync.

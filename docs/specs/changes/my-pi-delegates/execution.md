@@ -319,3 +319,12 @@
 - **Reviewer PASS:** PI-only check correct (R-PID-008 — a delegate can't read as PI); no self-transaction; `active_delegate_key` not written; soft-deletes guard `is_active=TRUE`, no-op on empty; QB `.update()` correctly bumps `updated_at`.
 - **⚠ CARRY TO T-12 (Reviewer advisory):** `_findOrCreateSecUserInTx`'s existence lookup runs on the pooled connection, NOT the tx `manager`. So **T-12 must resolve/dedupe each unique delegate ONCE up front** (design §10.3 step 2) — provisioning the same new email twice in one transaction would double-insert the sec_user (second lookup misses the first uncommitted insert).
 - **Verification:** `npm run build` clean; `npx eslint <file>` clean.
+
+### T-12 — Service: bulk assign (sync) + bulk revoke + PI-exclusion — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-008/009/010, NFR-PID-003. Effort XHIGH (correctness core). Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `pi-delegates.service.ts` — `assign(dto)` (ONE tx: auth-per-project fail-fast → resolve/dedupe delegates once → PI-exclusion per pair fail-fast → per-project sync diff create/revoke/keep → summary); `bulkRevoke(dto)` (ambiguity guard all 6 cases → per-row/project auth → soft-delete, no sync). v2 `create`/`revoke` kept as stubs for T-13. `DataSource` injected.
+- **Reviewer PASS:** sync diff mathematically correct + **per-project bounded** (no cross-project mass revoke; a project absent from the request is untouched); one transaction, all writes via `manager`, pooled reads are gates only; provision-once dedupe covers both union arms; PI-exclusion fail-fast; ambiguity guard traced for all 6 shape combinations (closes the T-10 partial-shape carry-forward); bulkRevoke Shape A authorizes on `row.project_id`.
+- **⚠ ROUTE TO T-14 (Reviewer advisory — the sharp edge):** `assign` with an empty resolved `desiredSet` → `toRevoke = entire current set` → mass revoke of a project's delegates. This is intended declarative Model-B (DD-G / R-PID-009 AC.2); `@ArrayNotEmpty` on `delegates` backstops the literal empty case. T-14 MUST cover the mass-revoke path deliberately.
+- **ADVISORY (non-gating):** bulkRevoke Shape B interleaves auth with delete (vs assign's pre-loop) — correct transactionally; dedupe-by-input comment nicety.
+- **Verification:** `npm run build` clean; `npx eslint <service>` clean.
