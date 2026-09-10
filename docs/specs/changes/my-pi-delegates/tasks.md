@@ -177,7 +177,7 @@ graph TD
 
 > Product refined bulk after v3: POST becomes per-project (`assignments: [{project_id, delegates}]`, empty delegates = revoke-all), and every assign/revoke is logged in a new append-only `pi_delegate_history` table. `pi_delegates` unchanged. See `requirements.md §12` / `design.md §11`.
 
-### T-15 — Migration: `pi_delegate_history` table
+### T-15 — Migration: `pi_delegate_history` table  ✅ [x] PASS 2026-09-10 (applied local)
 - **Covers:** R-PID-012
 - **Files:** `db/migrations/<ts>-createPiDelegateHistory.ts`
 - **Desc:** append-only `pi_delegate_history` (PK, `pi_delegate_id` bigint no-FK, `project_id` varchar(36), `pi_user_id`, `delegate_user_id`, `action` varchar(10), AuditableEntity). **`DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`** (same as pi_delegates). No unique, no generated column.

@@ -367,3 +367,15 @@ Ran a behavioral smoke test against `alliancereportingdb` (localhost:3307) using
 - Revoke (soft-delete) → `active_delegate_key` NULL → `isPi` false again → re-grant succeeds (revoke→re-grant cycle safe).
 
 **Coverage now:** SQL/data layer proven here (real DB); service orchestration proven by 27 unit tests; HTTP layer (route-mount + DTO-validation) proven by the T-14 e2e. The only untested-in-one-shot path is a full authenticated HTTP round-trip (needs a running server + valid JWT — a manual environment step). The behavioral e2e is no longer "deferred" at the data level.
+
+---
+
+## v4 Task Execution History
+
+### T-15 — Migration: `pi_delegate_history` — **PASS on attempt 1** (2026-09-10)
+
+- **Covers:** R-PID-012. Attempts: 1 Implementer + 1 Reviewer.
+- **Files:** `db/migrations/1787601000000-createPiDelegateHistory.ts` (new) — append-only table: AuditableEntity cols + PK + `pi_delegate_id` (bigint, NO FK — DD-O) + `project_id` varchar(36) + `pi_user_id` + `delegate_user_id` + `action` varchar(10). NO unique/generated/FK. `DEFAULT CHARSET=utf8mb3` (charset lesson from v2 applied up front).
+- **Reviewer PASS (zero findings):** columns match design §11.1 exactly; no FK/unique/generated per DD-O; utf8mb3 charset; placeholder-safe; correct `down()`; timestamp `1787601000000` > max.
+- **Applied to local `alliancereportingdb`** (2026-09-10) + recorded in `migrations`. Verified 12 columns present. (Dev/Prod apply = human step, K-015.)
+- **Verification:** `npm run build` clean; `npx eslint <file>` clean.
