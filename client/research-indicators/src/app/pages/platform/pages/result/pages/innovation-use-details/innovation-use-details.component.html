@@ -255,6 +255,20 @@
                 <span class="text-[var(--ac-primary-blue-300)]">{{ devResult.geo_scope.name }}</span>
               </span>
             }
+            @if (formatInnovationDevReadiness(devResult.innovation_readiness) || devResult.year || devResult.geo_scope) {
+              <span class="text-[var(--ac-grey-400)]">|</span>
+            }
+            <span class="flex items-center">
+              Innovation detail <i class="pi pi-arrow-right !text-[8px] text-[var(--ac-grey-700)] px-1"></i>
+              <a
+                [href]="formatInnovationDevUrl(devResult)"
+                target="_blank"
+                rel="noopener"
+                class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
+                View innovation detail ↗
+                <span class="sr-only">(opens in a new tab)</span>
+              </a>
+            </span>
           </div>
         </div>
       }
