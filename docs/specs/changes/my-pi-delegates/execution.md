@@ -6,7 +6,7 @@
 | --- | --- |
 | Spec path | `docs/specs/changes/my-pi-delegates` |
 | Spec id | 2026-09-my-pi-delegates |
-| Approval mode | **gated** (Leader pauses for user go/no-go after each PASS) |
+| Approval mode | **pre-approved** (user directive 2026-09-10 — auto-continue to next task on PASS; stop only on HALT / Pivot / FATAL_FAIL / budget tripwire). Was `gated` through T-01–T-02. |
 | Package | server (`server/researchindicators`) |
 | Leader model | Opus (T1) · Implementer | akili-implementer wrapper (T2) · Reviewer | akili-reviewer wrapper (T3) — author ≠ auditor upheld |
 | Commit standard | `[SPEC:changes/my-pi-delegates] <message>` |
@@ -82,3 +82,27 @@
 **ADVISORY / open item (does NOT gate, NOT a task in this spec):** the design §5/§6 fallback queries filter `(project_id, delegate_user_id, is_active)`. The single-column FK index on `delegate_user_id` serves it; if a composite `(delegate_user_id, project_id)` index proves needed under load, that is a separate design decision + its own migration — not entity-only drift.
 
 **Requirements covered:** R-PID-001 AC.1 (the three associations, module registered at `pi-delegates`).
+
+---
+
+### T-03 — DTOs — **PASS on attempt 1** (2026-09-10)
+
+- **Status:** PASS (Reviewer). Auto-continue mode (pre-approved).
+- **Covers:** R-PID-004, R-PID-005.
+- **Attempts:** 1 Implementer + 1 Reviewer.
+
+**Files changed (all new, `entities/pi-delegates/dto/`):**
+- `create-pi-delegate.dto.ts` — `DelegateIdentityDto {email @IsEmail, first_name/last_name @IsString @IsNotEmpty}` + `CreatePiDelegateDto {project_id, delegate_user_id?, delegate?}`. Delegate identity is a union enforced DTO-level via reciprocal `@ValidateIf` (each arm required when the other is null → empty body fires both → 400).
+- `verify-pi-delegate.dto.ts` — `{project_id, delegate_user_id}` query pair with `@Type(() => Number)` transform.
+- `revoke-pi-delegate.dto.ts` — `{pi_delegate_id}` (targets the row by PK; soft-delete semantics).
+
+**Verification:** `npm run build` clean; `npx eslint src/domain/entities/pi-delegates/dto/` clean.
+
+**Reviewer verdict:** `STATUS: PASS`. Shape matches design §7 / R-PID-004/005; empty-payload→400 traced and correct; Swagger complete; scope confined to the 3 DTO files.
+
+**ADVISORY (recorded; do NOT gate — but items 1–2 are CARRY-FORWARD requirements for T-06):**
+1. **⚠ CARRY TO T-06 — no global `ValidationPipe` in this repo.** `main.ts` registers none; every validating handler opts in via `@UsePipes(new ValidationPipe(...))` (e.g. `bilateral-project-mapping.controller.ts:65`). The DTOs' "empty→400" only holds if **T-06 attaches the pipe on the controller/handlers**. The DTO TSDoc's "global ValidationPipe" wording overstates this — T-06 must wire it.
+2. **⚠ CARRY TO T-06 — two validation edges to settle at the controller:** (a) when BOTH `delegate_user_id` and `delegate` are present, `delegate_user_id`'s `@IsInt` is skipped (its `@ValidateIf` is false), so a malformed preferred id could reach the service — consider `@IsOptional() @IsInt() @Min(1)` unconditionally + a class-level "at least one" check; (b) `RevokePiDelegateDto.pi_delegate_id` lacks `@Type(() => Number)` — if T-06 binds it to the `:pi_delegate_id` path param, `@IsInt` rejects the string `"7"`; use `ParseIntPipe` on the `@Param` or add the transform. Decide consistently in T-06.
+3. READABILITY: the union rationale comment is clear; keep it in sync if the both-present validation is tightened.
+
+**Requirements covered:** R-PID-004 (CRUD DTO surface), R-PID-005 (provision identity: email+names or existing id).

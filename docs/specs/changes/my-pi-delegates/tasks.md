@@ -52,7 +52,7 @@ graph TD
 - **Done:** [ ] `PiDelegate extends AuditableEntity` with the 3 FKs; [ ] module registered at `pi-delegates`.
 - **Dep:** T-01 · **Effort:** S · **Skills:** nestjs-expert
 
-### T-03 — DTOs
+### T-03 — DTOs  ✅ [x] PASS 2026-09-10
 - **Covers:** R-PID-004, R-PID-005
 - **Files:** `entities/pi-delegates/dto/*`
 - **Desc:** `CreatePiDelegateDto {project_id, delegate: (sec_user_id | {email, first_name, last_name})}`, revoke/verify DTOs; `class-validator` + `@ApiProperty`.
