@@ -1416,3 +1416,84 @@ re-derived later:
 spec (QA screenshots as Visual Reference, description below the metadata row per the user's ruling) →
 **one** human session covering T-10 on the final design **plus** the three batched gates (`/swagger`
 response shape, the `platform_code` `SELECT COUNT`, and naming `RB-2`'s security reviewer).
+
+### T-09 — Selection-time enrichment: the fetch, the id guard, the retry — `PASS` ✅ (2 attempts)
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-10 |
+| Lane | client — Antigravity (`gemini-3.1-pro-high`) → **two parallel lens Reviewers** (Opus), then a closing confirmation |
+| Requirements covered | `R-IUC-007` |
+| Defect classes gated | `DC-10`, `DC-11`, `DC-12`, `DC-15` |
+| Files | `component.ts` **66/15** · `api.service.ts` **5/0** · `component.spec.ts` **261/0** · `api.service.spec.ts` **9/0** |
+
+**All 11 acceptance criteria met.** Gates: **317 suites / 6951 tests** · `npm run build` exit 0 · lint
+clean · `tsc -p tsconfig.spec.json` **934** baseline / **0** in the component spec. **12** new `it`
+blocks, and the suite delta reconciles exactly: 6948 → 6951 = 2 component + 1 `ApiService`.
+
+**`DC-15` reproduced.** With the id guard removed:
+`" … B 20 - Result B  View innovation detail ↗ (opens in a new tab) Desc A from late response "` —
+**A's description under B's title**, the defect both judges found independently. The stub is genuinely
+**deferred and out-of-order**: A suspends on a pending promise while B runs synchronously and rebuilds
+the link *before* A resolves. `tasks.md` is explicit that *"a stub that resolves in order CANNOT
+falsify this"*, which is why `DC-15` exists apart from `DC-12`.
+
+#### Attempt 1 — both lenses FAIL: four issues, **all evidence, no production logic wrong**
+
+`component.ts` is **byte-identical across both attempts (66/15)**.
+
+1. **Falsifier 2's red could not have come from the described mutation.** Reported `Expected 2 / Received 0`. Both lenses traced it **impossible** — `enrichmentSuccessForId` starts at `null` in that fixture, so removing the `else` line changes nothing (the test used `mockRejectedValueOnce`, routing through `catch`) and removing the `catch` line sets `null` over `null`. Either way **the test stays green at 2**. *"A truthful report of that mutation would have had to say 'still green'."*
+2. **🔴 The retry was verified only against a failure mode the client CANNOT generate — the best finding in this spec.** `to-promise.service.ts:21-27` pipes every request through `catchError(error => [{ ...error, successfulRequest: false }])`, so **the promise never rejects on an HTTP error**; a 4xx/5xx **resolves**. Production failures take the **`else`** branch; the `catch` is defensive-only. The test used `mockRejectedValueOnce` — the unreachable branch — and **no test re-selected after `successfulRequest: false`.** The lens then **constructed** the dead end, reachable in four ordinary actions because `enrichmentSuccessForId` is **never cleared on a selection change**: A succeeds (flag = A) → select B (rebuilds to B, **flag stays A**, read left in flight) → re-select A (fails) → re-select A: `sameId && wasSuccessful` **both true**, early return, **card bare for the rest of the session**, suite green. Exactly the dead end `AC.8` and `DD-14` exist to prevent.
+3. **Criterion 2's parity test was tautological** — the section-read stub was `component.body().linked_innovation_dev`, the object `onInnovationDevSelected` had just built and enriched, so it compared the same data through the same template twice. **The trap that cost T-07 a round.**
+4. **🔴 The new `ApiService` method was exercised by nothing in the repository.** `api.service.spec.ts` untouched; a `jest.fn()` in the component spec. **The route string, `useResultInterceptor`, and the deliberate absence of `loadingTrigger` were asserted nowhere** — a typo like `innovation-dev-cards` would leave **all 11 criteria green**, build at exit 0, lint clean, **and the feature dead in production.** Every criterion runs downstream of that one mocked seam.
+
+#### Attempt 2 — all four discharged, with the numbers the lenses had **predicted by trace**
+
+| Fix | Observed |
+| --- | --- |
+| Precise retry mutation (`if (sameId) return;`) | `Expected 2 / Received **1**`; the 0-calls claim withdrawn |
+| Four-selection dead-end test, `else` reset deleted | `Expected 4 / Received **3**` |
+| Parity fixture → independent literal | `grep -c "linked_innovation_dev: component.body()"` = **0** |
+| `ApiService` route + exact options object, segment mutated | `- "…/innovation-dev-card/123"` / `+ "…/innovation-dev-cards/123"` |
+
+**That both predictions returned exact is the strongest evidence in this run** — the lenses traced
+*"this must yield 1, and if it yields anything else the fixture moved, not the guard"*, a falsifiable
+prediction that then held.
+
+**The closing confirmation verified the arrangement, not just the number** — a right number for a
+wrong reason would be the same defect with better aim. It walked all four steps and found the shape
+**load-bearing**: a two-selection sequence never sets the flag before the failure, and the
+**unsettled** B read is what leaves it stale, so no coarser mutation yields `3` by that route. It also
+noted the `else` reset now sits **inside** the supersession guard, so a late failure for a superseded
+id cannot clear the current selection's flag.
+
+#### Leader error, recorded
+
+**I claimed the `MainResponse<unknown>` cast had lost a type gate T-06 relied on. It had not, and my
+proposed fix was impossible.** The quote was from **T-02's** entry (`execution.md:318`, section
+beginning `:282`), about **server** spy fidelity, and `InnovationDevCardFacts` exists **only** in
+`server/` — uncrossable from the client. *"A named client type would gate server drift exactly as much
+as the cast does: not at all."* The gate that **does** hold is one I had not identified: the merge
+writes explicit properties into a fresh object literal contextually typed through `body.update`, so
+excess-property checking catches an interface rename **at the write site**.
+
+**Third error of this species in the run**, after the 400-character grep that could not see a `const`
+and the false universal about dark greys — all three asserting from a partial read instead of checking
+the source.
+
+#### Two worker reasons: false but harmless, corrected in the record only
+
+- **`useResultInterceptor: true` — kept, reasoning rejected.** Justified as *"otherwise the server would **likely** reject the request or fetch the wrong phase's data."* Both halves false: it sets only `X-Use-Year: true`, converted into two query params T-04's handler **ignores** (`ResultsUtil.setup()` never throws; the handler never reads `_currentResult`). Keep the flag — it matches every other `results/*` method — but *"likely"* may not be recorded as fact.
+- **Omitting `loadingTrigger` was right, for a stronger reason than given:** it also calls **`greenChecks.set({})`, wiping the sidebar completion ticks and disabling Submit**, plus an extra green-checks GET per selection. Worse than a loader, and the real reason criteria 3 and 5 require its absence.
+
+#### `ADVISORY` — recorded, non-gating
+
+1. The parity test asserts only **equality**, so it would pass if **both** paths rendered nothing; carried in practice by positive assertions on the same fixture.
+2. A **floating promise** resolved without `await` leaves a continuation running past the test. Inert (the id guard returns early), but this repo has seen cross-suite leakage.
+3. `not.toContain('description')` is **near-vacuous** — that literal never appears in rendered text.
+4. The **`catch` block is unreachable in production**; its test exercises a defensive path only. The reachable branch is now covered.
+5. **`enrichmentSuccessForId` is never cleared on a selection change.** Correct today because the `else` reset covers it, but the dead end is **reset-dependent rather than structurally impossible**. Clearing the flag whenever the id changes would close it by construction — **a design change beyond T-09's criteria, deliberately not made.** Carried as a follow-up, not minted as a task (§2.4).
+6. **T-06's forward pointer is DISCHARGED, not inherited.** Its precondition — *"if T-09's merge hand-builds a partial readiness object"* — does not hold; the server object passes through wholesale and the contract declares `level`/`name` present-but-nullable. The lens tried to construct a reaching payload and could not.
+
+**Constitution impact:** one new `ApiService` method on an existing service.

@@ -352,24 +352,24 @@ worker reports — never while one is active**, and never two full-suite runs at
   - A failure leaves the card at title + anchor, with **no** blocking error, **no** invalid state, and the link fully savable. Enrichment is never a gate on reporting.
   - **Never** resolve the geo scope name client-side. `GetGeoFocusService` is a hardcoded list **missing code 3 (`MULTI_NATIONAL`)** and is a parallel taxonomy the client convention forbids. The name comes from the server.
 - **Acceptance / done check:**
-  - [ ] Selecting an option renders the three fields with no page reload and no save
-  - [ ] The rendered content is identical at selection and after a save + section re-read, for the same result
-  - [ ] While the read is in flight, the card shows title + anchor and no placeholder values
-  - [ ] On failure the card shows title + anchor, no error dialog, no invalid state
-  - [ ] On failure the link is still savable — the save path never reads the three keys
-  - [ ] Re-selecting the same result **after a failure** re-attempts the read
-  - [ ] Re-selecting the same result **after a success** does not refetch
-  - [ ] Selecting A then B clears A's three fields synchronously
-  - [ ] **A's response settling after B is selected does not render A's values under B's title**
-  - [ ] The holds above are order-independent — they hold for B-then-A as well as A-then-B
-  - [ ] The scope name comes from the server response, never from `GetGeoFocusService`
+  - [x] Selecting an option renders the three fields with no page reload and no save
+  - [x] The rendered content is identical at selection and after a save + section re-read, for the same result
+  - [x] While the read is in flight, the card shows title + anchor and no placeholder values
+  - [x] On failure the card shows title + anchor, no error dialog, no invalid state
+  - [x] On failure the link is still savable — the save path never reads the three keys
+  - [x] Re-selecting the same result **after a failure** re-attempts the read
+  - [x] Re-selecting the same result **after a success** does not refetch
+  - [x] Selecting A then B clears A's three fields synchronously
+  - [x] **A's response settling after B is selected does not render A's values under B's title**
+  - [x] The holds above are order-independent — they hold for B-then-A as well as A-then-B
+  - [x] The scope name comes from the server response, never from `GetGeoFocusService`
 - **Verification:** `npm test -- --silent`; **`npm run build`** (see T-06 for why this, not a bare `tsc -p tsconfig.json`).
 - **Falsifying input, named before the test is written (K-012):** a stub whose response for A resolves **after** B has been selected — e.g. A deferred and B immediate. Without the id guard, A's description renders under B's title and the assertion reddens. **A stub that resolves in order cannot falsify this**, which is exactly why `DC-12`'s original falsifier was insufficient and `DC-15` exists. Second input: make the read reject, then re-select the same id → without the retry fix, no second call is made and that criterion reddens.
 - **What disqualifies the evidence:** any fixture that sets `linked_innovation_dev` on the signal directly. The product builds that object **inside `onInnovationDevSelected`** from the picker option, so a directly-seeded 7-key object tests a state the product never reaches and stays green while the real path renders nothing (`KZ-015` — and this is the trap a previous revision of the design walked into). **Drive `onInnovationDevSelected`.**
 - **Skills:** `angular-developer`, `systematic-debugging`
 - **Dependencies:** T-04, T-06, T-02
 - **Estimated effort:** L
-- **Status:** todo
+- **Status:** **done** (Antigravity implemented, two parallel lens Reviewers FAIL → PASS 2026-09-10, 2 attempts — see [`./execution.md`](./execution.md))
 
 ---
 
