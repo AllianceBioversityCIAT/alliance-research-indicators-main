@@ -3,12 +3,14 @@ import {
   BadRequestException,
   ExecutionContext,
   HttpStatus,
+  INestApplication,
   ValidationPipe,
 } from '@nestjs/common';
 import { GUARDS_METADATA, PIPES_METADATA } from '@nestjs/common/constants';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import * as fs from 'fs';
 import * as path from 'path';
+import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { mockPortfolioUtilProvider } from '../../shared/testing/mock-portfolio.util';
 import { ResultInnovationUseController } from './result-innovation-use.controller';
@@ -25,6 +27,7 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResultStatusGuard } from '../../shared/guards/result-status.guard';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { CreateResultInnovationUseDto } from './dto/create-result-innovation-use.dto';
+import { InnovationDevCardFactsDto } from './dto/innovation-dev-card-facts.dto';
 import { ClarisaActorTypesEnum } from '../../tools/clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
 
 jest.mock('../../shared/utils/response.utils');
@@ -34,6 +37,7 @@ describe('ResultInnovationUseController', () => {
   const mockService = {
     update: jest.fn(),
     findOne: jest.fn(),
+    readInnovationDevCardFactsForTarget: jest.fn(),
   };
   const mockFormat = jest.fn();
 
@@ -88,6 +92,63 @@ describe('ResultInnovationUseController', () => {
     expect(ResponseUtils.format).toHaveBeenCalledWith({
       description: 'Result Innovation Use updated successfully',
       data: res,
+      status: HttpStatus.OK,
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-04 — the targeted
+   * endpoint's own handler, called directly (bypassing the HTTP pipe
+   * pipeline). This proves the *envelope construction* — that `result_id`
+   * echoes the numeric argument the caller passed (never a fetched row,
+   * finding #4) and that the three facts are spread verbatim from the
+   * service's return. It does **not** prove `ParseIntPipe` runs on the
+   * real path param — that is the HTTP-level suite below
+   * (`getInnovationDevCardFacts — HTTP route (T-04)`), which is the only
+   * lane that can observe a string arriving at the service.
+   */
+  it('getInnovationDevCardFacts returns the envelope with result_id echoed from the argument, plus the three facts', async () => {
+    const facts = {
+      innovation_readiness: { id: 3, level: 7, name: 'Diffusion and scale' },
+      description: 'A digital advisory service',
+      geo_scope: { code: 2, name: 'Regional' },
+    };
+    mockService.readInnovationDevCardFactsForTarget.mockResolvedValue(facts);
+    mockFormat.mockReturnValue({});
+
+    await controller.getInnovationDevCardFacts(19707);
+
+    expect(
+      mockService.readInnovationDevCardFactsForTarget,
+    ).toHaveBeenCalledWith(19707);
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      description: 'Innovation Development card facts retrieved successfully',
+      data: {
+        result_id: 19707,
+        innovation_readiness: facts.innovation_readiness,
+        description: facts.description,
+        geo_scope: facts.geo_scope,
+      },
+      status: HttpStatus.OK,
+    });
+  });
+
+  it('getInnovationDevCardFacts echoes result_id from the argument even when the target is out of bounds / unknown (empty shape, R-IUC-008 AC.9)', async () => {
+    const emptyFacts = {
+      innovation_readiness: null,
+      description: null,
+      geo_scope: null,
+    };
+    mockService.readInnovationDevCardFactsForTarget.mockResolvedValue(
+      emptyFacts,
+    );
+    mockFormat.mockReturnValue({});
+
+    await controller.getInnovationDevCardFacts(999999);
+
+    expect(ResponseUtils.format).toHaveBeenCalledWith({
+      description: 'Innovation Development card facts retrieved successfully',
+      data: { result_id: 999999, ...emptyFacts },
       status: HttpStatus.OK,
     });
   });
@@ -213,6 +274,17 @@ describe('ResultInnovationUseController', () => {
       const guards = Reflect.getMetadata(
         GUARDS_METADATA,
         ResultInnovationUseController.prototype.findOne,
+      );
+      expect(guards ?? []).not.toContain(ResultStatusGuard);
+    });
+
+    // T-04 (`design.md` §4.2) — the targeted read carries the same
+    // no-guard posture as findOne (R-IUC-008: no @Roles, no
+    // ResultStatusGuard on a read that has no side effect, AC.5).
+    it('metadata on getInnovationDevCardFacts carries no guard', () => {
+      const guards = Reflect.getMetadata(
+        GUARDS_METADATA,
+        ResultInnovationUseController.prototype.getInnovationDevCardFacts,
       );
       expect(guards ?? []).not.toContain(ResultStatusGuard);
     });
@@ -614,6 +686,244 @@ describe('ResultInnovationUseController', () => {
         },
         ['actors.1.women_youth_count', 'sex_age_disaggregation_not_apply'],
       );
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-04 (`design.md` §4.2,
+   * §2.1; `R-IUC-007` server half, `R-IUC-008` AC.1-AC.5, `DC-13`).
+   *
+   * `@ApiOkResponse({ type: InnovationDevCardFactsDto })` — the Swagger
+   * response-shape declaration. `KZ-002` binds what this can prove: this
+   * asserts the DECORATOR is present and points at the right class; it
+   * cannot prove the shape *renders* at `/swagger` — that is a human
+   * observation, owed and not discharged here (see the task report).
+   */
+  describe('@ApiOkResponse on getInnovationDevCardFacts (R-IUC-008 AC.2)', () => {
+    it('declares status 200 with type InnovationDevCardFactsDto', () => {
+      const responses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        ResultInnovationUseController.prototype.getInnovationDevCardFacts,
+      );
+      expect(responses?.[HttpStatus.OK]?.type).toBe(InnovationDevCardFactsDto);
+    });
+  });
+
+  /**
+   * `InnovationDevCardFactsDto` (`dto/innovation-dev-card-facts.dto.ts`) —
+   * exactly four keys. This is the static half of `DC-13`'s falsifier
+   * ("add an `audit` field to the DTO → the exact-key-set assertion
+   * reddens"); the dynamic half (the actual envelope's key set) is proven
+   * on the live response body in the HTTP suite below.
+   */
+  describe('InnovationDevCardFactsDto shape (DC-13)', () => {
+    it('declares exactly four @ApiProperty keys: result_id + the three facts', () => {
+      const properties: string[] = Reflect.getMetadata(
+        DECORATORS.API_MODEL_PROPERTIES_ARRAY,
+        InnovationDevCardFactsDto.prototype,
+      );
+
+      expect(properties.map((key) => key.replace(/^:/, '')).sort()).toEqual(
+        [
+          'description',
+          'geo_scope',
+          'innovation_readiness',
+          'result_id',
+        ].sort(),
+      );
+    });
+  });
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-04 — the HTTP-level
+   * suite. Bootstraps a **real** `INestApplication` carrying only
+   * `ResultInnovationUseController`, real decorators and real Nest
+   * routing (`ParseIntPipe` included) — the same shape as
+   * `automapper.controller.spec.ts`'s "GET coverage registered above
+   * :id (F4)" precedent. This is the only lane in this file that can
+   * observe:
+   *  - **Route resolution** (AC — neither `@Get` shadows the other):
+   *    `controller.getInnovationDevCardFacts(950)` called directly proves
+   *    nothing about *which* handler an actual request reaches.
+   *  - **`ParseIntPipe` coercion** (finding #2): Express always delivers a
+   *    path param as a string. Calling the method directly with a number
+   *    argument cannot exercise the pipe at all; only a real HTTP request
+   *    can prove the mock service was invoked with `950` (number), not
+   *    `'950'` (string).
+   *
+   * `mockFormat` (shared with the rest of this file, `jest.mock(
+   * '../../shared/utils/response.utils')`) is given a real-shaped
+   * implementation for this suite only, so the HTTP response body
+   * actually carries `{ data, status, description }` to assert against —
+   * otherwise it stays the bare `jest.fn()` other tests configure
+   * per-case.
+   */
+  describe('GET .../innovation-dev-card/:resultCode — HTTP route (T-04)', () => {
+    let app: INestApplication;
+    let cardFactsMock: jest.Mock;
+    let findOneMock: jest.Mock;
+
+    const emptyFacts = {
+      innovation_readiness: null,
+      description: null,
+      geo_scope: null,
+    };
+
+    beforeAll(async () => {
+      cardFactsMock = jest.fn();
+      findOneMock = jest.fn();
+
+      mockFormat.mockImplementation(
+        (args: { data: unknown; status: number; description: string }) => ({
+          data: args.data,
+          status: args.status,
+          description: args.description,
+        }),
+      );
+
+      const moduleRef = await Test.createTestingModule({
+        controllers: [ResultInnovationUseController],
+        providers: [
+          {
+            provide: ResultInnovationUseService,
+            useValue: {
+              findOne: findOneMock,
+              update: jest.fn(),
+              readInnovationDevCardFactsForTarget: cardFactsMock,
+            },
+          },
+          SetUpInterceptor,
+          {
+            provide: ResultsUtil,
+            useValue: {
+              resultId: 11,
+              setup: jest.fn().mockResolvedValue(undefined),
+            },
+          },
+          mockPortfolioUtilProvider,
+        ],
+      })
+        .overrideGuard(ResultStatusGuard)
+        .useValue({ canActivate: () => true })
+        .compile();
+
+      app = moduleRef.createNestApplication();
+      await app.init();
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      cardFactsMock.mockReset();
+      findOneMock.mockReset();
+    });
+
+    it('resolves the literal-prefixed route to the new handler, not the bare :resultCode @Get (route resolution)', async () => {
+      cardFactsMock.mockResolvedValue(emptyFacts);
+
+      const res = await request(app.getHttpServer()).get(
+        '/innovation-dev-card/950',
+      );
+
+      expect(res.status).toBe(HttpStatus.OK);
+      expect(cardFactsMock).toHaveBeenCalledWith(950);
+      expect(findOneMock).not.toHaveBeenCalled();
+      expect(res.body.data).toEqual({ result_id: 950, ...emptyFacts });
+    });
+
+    it('the bare :resultCode @Get is unaffected — still resolves to findOne, not the new handler', async () => {
+      findOneMock.mockResolvedValue({ innovation_use_level_id: null });
+
+      const res = await request(app.getHttpServer()).get('/950');
+
+      expect(res.status).toBe(HttpStatus.OK);
+      expect(findOneMock).toHaveBeenCalledWith(11);
+      expect(cardFactsMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Falsifier #1 (`tasks.md` T-04): "declare the new route as a bare
+     * `':id(\d+)'` **after** the existing `@Get` → captured by the
+     * existing handler and the route-resolution assertion goes red."
+     * Manually reproduced against this exact suite during verification
+     * (see the task report's RED/GREEN transcript) rather than left as a
+     * standing mutation in committed code.
+     */
+    it('finding #2 — ParseIntPipe coerces the path param to a number; dropping it silently breaks every valid target', async () => {
+      cardFactsMock.mockResolvedValue(emptyFacts);
+
+      await request(app.getHttpServer()).get('/innovation-dev-card/950');
+
+      expect(cardFactsMock).toHaveBeenCalledWith(950);
+      expect(cardFactsMock).not.toHaveBeenCalledWith('950');
+    });
+
+    /**
+     * `(\d+)` in the route pattern itself (`RESULT_CODE`) rejects a
+     * non-digit segment **before** Nest's router matches any handler at
+     * all — same behavior as the pre-existing bare `:resultCode(\d+)`
+     * route. It never reaches `ParseIntPipe` or the service; the pipe's
+     * own job (proven above) is coercing a digits-only string to a
+     * number, not rejecting non-digit input.
+     */
+    it('a non-numeric path segment does not match the route at all (404), never reaching the service', async () => {
+      const res = await request(app.getHttpServer()).get(
+        '/innovation-dev-card/abc',
+      );
+
+      expect(res.status).toBe(HttpStatus.NOT_FOUND);
+      expect(cardFactsMock).not.toHaveBeenCalled();
+    });
+
+    /**
+     * `DC-13` / `R-IUC-008` AC.3 — the exact key set, on the live
+     * response body (not a mocked call's arguments). Falsifier #2
+     * (`tasks.md` T-04): "add an `audit` field to the DTO → the
+     * exact-key-set assertion reddens" — reproduced manually against
+     * this exact assertion during verification.
+     */
+    it('the response body carries exactly four keys — result_id plus the three facts (DC-13, AC.3)', async () => {
+      cardFactsMock.mockResolvedValue({
+        innovation_readiness: { id: 3, level: 7, name: 'Diffusion and scale' },
+        description: 'A digital advisory service',
+        geo_scope: { code: 2, name: 'Regional' },
+      });
+
+      const res = await request(app.getHttpServer()).get(
+        '/innovation-dev-card/19707',
+      );
+
+      expect(Object.keys(res.body.data).sort()).toEqual(
+        [
+          'description',
+          'geo_scope',
+          'innovation_readiness',
+          'result_id',
+        ].sort(),
+      );
+    });
+
+    it('result_id echoes the path param, never a fetched row (finding #4, R-IUC-008 AC.9)', async () => {
+      cardFactsMock.mockResolvedValue(emptyFacts);
+
+      const res = await request(app.getHttpServer()).get(
+        '/innovation-dev-card/12345',
+      );
+
+      expect(res.body.data.result_id).toBe(12345);
+    });
+
+    it('an out-of-bounds / unknown target (empty shape) is a 200, never a 404 (finding #1, R-IUC-008 AC.9)', async () => {
+      cardFactsMock.mockResolvedValue(emptyFacts);
+
+      const res = await request(app.getHttpServer()).get(
+        '/innovation-dev-card/424242',
+      );
+
+      expect(res.status).toBe(HttpStatus.OK);
+      expect(res.body.data).toEqual({ result_id: 424242, ...emptyFacts });
     });
   });
 });

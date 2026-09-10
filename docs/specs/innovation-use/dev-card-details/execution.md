@@ -606,3 +606,141 @@ admissible anchor, and this one grep-resolves.
 
 **Constitution impact:** none. No new module or moved boundary. `readInnovationDevCardFactsForTarget`
 is a new **public** method on an existing service, and its only intended caller is T-04.
+
+### T-04 — The targeted endpoint: route, response DTO, Swagger — `PASS` (both lenses), **task `[~]`: 2 of 6 criteria owed**
+
+| Field | Value |
+| --- | --- |
+| Reviewer verdict | **PASS** (RISK/SECURITY lens) + **PASS** (API/CONTRACT lens), 1 attempt |
+| Task status | **`[~]`** — the implementation is complete and twice-reviewed, but **2 of 6 acceptance criteria are not discharged at any tier this task runs.** A task with an outstanding gap does not reach `[x]`, *even on a Reviewer PASS* |
+| Date | 2026-09-10 |
+| Review mode | Parallel lens (effort `xhigh` + security surface) |
+| Requirements covered | `R-IUC-007` (server half), `R-IUC-008` AC.1–AC.5 |
+| Defect classes gated | `DC-13` |
+
+**Files:** `result-innovation-use.controller.ts` (+83/2) · `dto/innovation-dev-card-facts.dto.ts`
+(**new**) · `result-innovation-use.controller.spec.ts` (+310/0) · `result-innovation-use.service.ts`
+(+6/1 — **an `export` keyword and its doc comment, no logic**; the security lens reconciled the
+numstat arithmetically: one line deleted, six added, *"no room in a 6/1 diff for a logic change"*).
+
+**The handler, which the Implementer's report did not narrate — so the Leader read it directly:**
+
+```ts
+@Get(`innovation-dev-card/${RESULT_CODE}`)
+async getInnovationDevCardFacts(@Param(RESULT_CODE_PARAM, ParseIntPipe) resultCode: number) {
+  const facts = await this.resultInnovationUseService.readInnovationDevCardFactsForTarget(resultCode);
+  return ResponseUtils.format({ description: '…', status: HttpStatus.OK,
+    data: { result_id: resultCode, innovation_readiness: facts.innovation_readiness,
+            description: facts.description, geo_scope: facts.geo_scope } });
+}
+```
+
+All four of T-03's highest-risk carried items land correctly: `ParseIntPipe` present;
+**`HttpStatus.OK` unconditional with no `NotFoundException` on the path**; `result_id` echoed from the
+**param**, never a fetched row; and the four keys written **key-by-key rather than `...facts`**, which
+the security lens noted *"matters more than it looks"* — it makes `data`'s key order a property of the
+controller's literal rather than of whatever the service returns.
+
+**Verification:** three falsifiers each observed RED then reverted GREEN — bare route (6 red), DTO
+`audit` field (1 red), `ParseIntPipe` removed (**4 red, the service mock receiving the string
+`'950'`** — the constructed defect T-03's review predicted). `npm test -- --silent`:
+`359 suites / 2830 tests passed`. Controller spec 56/56. `npx eslint` clean.
+**`npm run build` re-run by the Leader: exit 0** — this is the *only* gate proving the controller
+cannot reach the unbounded `private` reader, and the read-only Reviewer could not run it.
+
+#### Two Implementer claims the Leader checked rather than propagated
+
+1. **The test count was inflated 2×.** The report said *"24 new test cases"*. The security lens attributed only **12**; the Leader counted the diff: `grep -cE "^\+\s+(it|test)\("` = **12**, across 3 new describes plus 2 cases added to an existing one. **12 is the number of record.** `KZ-008`/`KZ-002`: a coverage figure that reads as settled fact and is never re-checked is exactly the artifact class that propagates.
+2. **The AC numbering in my own brief was wrong, and so is a committed describe title.** Verified against `requirements.md:414-416`: **`R-IUC-008` AC.1** is *"The route sits behind `JwtMiddleware` — it is **not** added to the exclusion list"*; **AC.2** is *"It declares `@ApiTags`, `@ApiBearerAuth` and `@ApiOperation`"*. My brief labelled the middleware criterion AC.2, and the spec file's `describe('@ApiOkResponse … (R-IUC-008 AC.2)')` mislabels an `@ApiOkResponse` assertion — that mandate is `design.md` §4.2's. **My error, corrected here rather than left to propagate into the sign-off.**
+
+#### A divergence between `tasks.md` and `requirements.md`, found by the correction above
+
+`requirements.md` AC.1 claims only a **code-state** fact — *"it is not added to the exclusion list"* —
+which is **fully verifiable statically, and was verified**: `app.module.ts:106-109` binds the
+middleware `.forRoutes({ path: '*', method: RequestMethod.ALL })`, the exclude list holds exactly
+**7** entries (`configuration/:key`, `/`, `/admin(.*)`, `/admin/public(.*)`, `/.well-known(.*)`,
+`/favicon.ico`, `reports/:resultCode/pdf`), **none of which can match this route**, and the diff does
+not touch the file.
+
+`tasks.md` T-04's checkbox instead reads *"An unauthenticated request is **rejected** by
+`JwtMiddleware` before the handler runs"* — a **behavioural** claim, strictly stronger than the
+requirement it implements. **The task criterion is stricter than its requirement.** Recorded as a
+finding rather than silently resolved in either direction: the checkbox stays **unticked** and is
+owed to `npm run test:e2e`. **I deliberately did not amend the criterion's wording to fit the
+available evidence** — §9's wording was already amended once this run (`RB-6`, user-approved), and
+doing it a second time to clear a box would be moving the goalposts rather than reporting the gap.
+
+**Also recorded for whoever runs that e2e:** `jwr.middleware.ts:38` short-circuits entirely when
+`ENV.LOCAL_AUTH_BYPASS` is set (`ARI_LOCAL_AUTH_BYPASS=true` and not production). **An
+unauthenticated-401 e2e is only evidence if that flag is off** — otherwise it measures the bypass.
+
+#### The six criteria, disposed honestly
+
+| # | `tasks.md` T-04 criterion | Disposition |
+| --- | --- | --- |
+| 1 | Route resolves, does not shadow nor get shadowed | **✅ ticked.** Proven **bidirectionally** in a real `INestApplication`: `/innovation-dev-card/950` hits the new handler with `findOne` **not** called; `/950` hits `findOne` with the card read **not** called; `/innovation-dev-card/abc` → 404, neither called |
+| 2 | Unauthenticated request rejected by `JwtMiddleware` | **⬜ NOT ticked — owed to `test:e2e`** (see the divergence above). The *code-state* half (`requirements.md` AC.1) **is** discharged |
+| 3 | Route appears in `/swagger` with a documented response shape | **⬜ NOT ticked — owed to a human.** Only decorator *presence* is asserted, and the spec file says so in its own comment. Per `KZ-002`, presence is not render |
+| 4 | Exactly four keys | **✅ ticked.** Asserted on the **live response body** *and* on the DTO's `@ApiProperty` metadata. The contract lens built the mutation matrix: a key added to the DTO reddens the static test; a key added to the **handler literal** reddens the live test **and** the direct unit test (`toHaveBeenCalledWith` is recursive-equality and rejects extra keys) |
+| 5 | `GET`, no write, no audit row, no status transition | **✅ ticked.** Three reads maximum in the whole chain; **both class-level interceptor `setup()` calls are `findOne`s**; no `.save`/`.insert`/`.update`/`.delete`, no `audit(...)`, no `AuditableEntity` mutation |
+| 6 | Matches T-02's sub-keys field for field | **✅ ticked.** Verified at source: both paths spread the same three names from the same private read, so **nested parity is identity, not resemblance** — the `{id, level, name}` and `{code, name}` objects are built once. Scoped to **in-bounds** targets; the out-of-bounds divergence is designed (§4.2 refused to bound T-02) |
+
+#### Security sign-off record — updated at the HTTP level
+
+`R-IUC-008` **AC.1** dischargeable as a code-state fact (live 401 owed to e2e) · **AC.2**
+dischargeable **by inspection but ungated** — all three decorators are present, yet *deleting
+`@ApiOperation` reddens nothing* · **AC.3, AC.4, AC.5** dischargeable · **AC.9** — see below.
+
+**AC.9 (no existence oracle): holds end to end *by construction*, and is observed only at the service
+level.** The security lens enumerated and closed **every channel** by reading source: a single
+`private static` producer of the empty shape; **no throw path for a bounds miss anywhere in the
+callee**; `status`/`description` literal; `result_id` from the param; key order fixed at *both* the
+handler and envelope layers (`ResponseInterceptor`'s `{...modifiedData, ...res}` cannot reorder
+existing keys); `errors` always `undefined` and dropped by `JSON.stringify`; and **zero occurrences of
+`ClassSerializerInterceptor` in all of `src`** (an unfiltered count, per `K-014`).
+
+**But it is argued, not measured, and two structural reasons why (`KZ-017`):**
+1. **The supertest suite mocks the service, so "unknown" and "out-of-bounds" are the *same input*** — it does not assert one of two cases, it asserts the class they collapse into. The collapse is legitimate (one static factory) but it *is* the argument, not the measurement.
+2. **The observed body is not a `ServerResponseDto`.** `ResponseUtils` is `jest.mock`ed at module scope with a hand-written 3-key implementation, and `ResponseInterceptor` is an `APP_INTERCEPTOR` on `AppModule` that the test module never registers. So `errors`, `timestamp`, `path` and the interceptor's `response.status(...)` **were never observed anywhere in this task.**
+
+> **A wording correction the sign-off must adopt, or a correct implementation will be rejected.**
+> `requirements.md` says the response must be *"**byte-identical** to the response for an id that does
+> not exist at all."* With `timestamp` and `path` in the envelope, **literal byte-identity between two
+> different requests is impossible** — `path` echoes the requested id and the clock moves. The only
+> satisfiable reading is **invariance to DB state for a fixed request**, which is what holds and what
+> T-03 measured. A signatory who reads it literally will reject correct code. **This is a
+> requirements-wording defect, surfaced but deliberately not edited** — it is the RB-2 signatory's
+> call, not a T-04 rework.
+
+**To close the measurement gap:** one HTTP-tier test with the real service, real `ResponseUtils.format`
+and `ResponseInterceptor` registered, reading **the same id** under two DB states (absent, then
+present-but-`is_snapshot = TRUE`), asserting full-body equality modulo `timestamp`.
+
+#### `ADVISORY` — recorded, non-gating, none converted into scope
+
+1. **🔴 `:resultCode` names `result_official_code` platform-wide but means `result_id` here — and one request reads it BOTH ways.** `@UseInterceptors(SetUpInterceptor)` is **class-level**, so it runs on this route; `ResultsUtil.setup()` reads `params.resultCode` and queries on **`result_official_code`** (`results.util.ts:41`), while the handler treats the same segment as a PK. Across the platform `:resultCode` *means* the official code (`ResultsUtil.get resultCode()` returns `result_official_code`); **this endpoint is the exception and nothing in the Swagger says so.** Consequences: **no effect on the response** (nothing reads the getters, `setup()` returns `null` silently) but **1–2 wasted queries per request**. If a caller passes an official code: either an empty card, or — if a row exists whose `result_id` equals that official code and is active/non-snapshot/indicator-2 — **that other result's facts, at 200, indistinguishable from a correct answer.** **Reachability: empty-card branch trivially reachable; wrong-result branch conditionally reachable and the payload was NOT constructed** (needs a real `(result_id, result_official_code)` collision; no DB access, and Dev is shared per §4.3). **Mitigating, verified by the contract lens:** T-09's call site already holds the PK — `innovation-use-details.component.ts:208-219`'s `onInnovationDevSelected(resultId: number)` is fed `option.result_id`, and its literal distinguishes the two fields two lines apart. **Both lenses recommend NOT renaming** — `design.md` §4.2 and `tasks.md` T-04 fix `:resultCode(\d+)` literally and the constants are shared, so a rename is a spec deviation, not a free improvement. **Carried into T-09's brief as a contract warning.**
+2. **`platform_code` is the fourth predicate the spec named and never bounded.** `requirements.md`'s own revision-3 correction says the section read is pinned by `ResultsUtil.setup()`, which hard-filters **`platform_code`**, `is_active` and `is_snapshot` — but `DD-13` bounds only three. So the targeted read is **wider than the section read on the platform dimension.** Mitigating: the picker's list query already selects `r.description` for those rows under the same auth posture, so the only possible *delta* is `innovation_readiness`. **Reachability: could not construct** (no DB access). **Hand-off query that settles it permanently:** `SELECT COUNT(*) FROM results WHERE indicator_id = 2 AND is_active = 1 AND is_snapshot = 0 AND platform_code <> 'STAR';` — zero closes it; non-zero is a question for the **RB-2 signatory**, not a T-04 rework, since AC.6–AC.8 deliberately name three predicates.
+3. **`ParseIntPipe` has one reachable 400, keyed to id *shape*, not existence.** Constructed: a param of **≥ 309 nines** matches `(\d+)`, reaches the pipe, and `isFinite(Number(...))` is false → `BadRequestException`. **Not an oracle** — the class is defined purely by digit count, contains only non-existent ids, and discloses nothing. Leading zeros alias (`/0950` → `950`) consistently for every id; `+`/whitespace forms 404 at the router before the pipe.
+4. **`Number.MAX_SAFE_INTEGER` — verdict given, not deferred: NOT reachable as a bound/read divergence.** `readInnovationDevCardFactsForTarget` threads **one** value into all three consumers and echoes that same coerced value, so there is no path where the bound is evaluated against id X and the read against id Y. The residual is id *aliasing*, which needs a real `result_id > 2^53` (this schema's ids are low autoincrements). The 500 hypothesis was checked and could not be constructed — `1e21` serializes as `1e+21`, a valid MySQL float literal, giving a clean no-match.
+5. **AC.2 is ungated** — no test reddens on deleting `@ApiOperation`, `@ApiTags` or `@ApiBearerAuth`, and one committed describe title mislabels its own AC. Dischargeable by inspection; recorded as a **declared scope limit**, not a defect. *(Left advisory — §2.4 forbids converting an advisory into scope, and this one does not block a criterion.)*
+6. **Two compile-time gaps that are currently test-shaped.** `ResponseUtils.format<T>` **infers** `T` from the literal, so `data` gets no excess-property check — adding `audit: 'x'` type-checks clean (caught by two tests, not by `tsc`); passing the type argument explicitly would move the guarantee to the compiler. And `implements` **does not defend nullability** under `strictNullChecks: false` (`string` and `string | null` are mutually assignable), so the nullability guarantee rests on the hand-written `nullable: true` plus T-01's `?? null` tests — **worth stating so a later task does not over-trust `implements`.** Nested *member* drift **is** caught.
+7. **`@ApiOkResponse` carries no `description`, the one place the diff falls short of the precedent it names.** The wire body is the `ServerResponseDto` envelope; the DTO documents only `data`. The cited precedent annotates exactly this (`bilateral.controller.ts:127-132`: *"…inside the standard ServerResponseDto wrapper"*). **This is what makes criterion 3's human observation ambiguous** — recorded so the human check below compensates.
+8. **The HTTP harness proves route resolution *within the controller*, not at the deployed path** — no `setGlobalPrefix('api')`, no `RouterModule`, so the observed paths lack the `/api/results/innovation-use` prefix. Immaterial for shadowing (a common prefix cannot change two patterns' disjointness) but the prefix composition is proven by nothing automated. **A second reason the human check must read the fully-prefixed path.**
+9. **The HTTP suite's envelope is fabricated and one line elsewhere can void it.** It depends on `mockFormat`'s implementation surviving `jest.clearAllMocks()` — it does (`mockClear` keeps implementations), but a future switch to `resetAllMocks()` would strip it and every `res.body.data` assertion would fail as a confusing `TypeError` rather than a contract failure.
+10. **Coverage unmeasured again** (`npm test` without `--coverage`). Structurally implausible to have regressed — ~310 test lines for ~89 production. **Deferred to the T-05 gate as ruled at T-02.**
+
+#### What a human must observe to discharge criterion 3 (`KZ-002`-compliant wording, from the contract lens)
+
+> At `/swagger`, under tag **Results Innovation Use**,
+> `GET /api/results/innovation-use/innovation-dev-card/{resultCode}` expands to a 200 response whose
+> schema shows exactly four properties — `result_id` (number), `innovation_readiness` (object
+> `{id, level, name}`, nullable, with `level` and `name` each nullable), `description` (string,
+> nullable), `geo_scope` (object `{code, name}`, nullable) — and **no fifth property**. The lock icon
+> is present.
+
+Not *"the Swagger page loaded"* and not *"the endpoint is listed"* — this repo has a precedent where a
+criterion asserting a live `200` was ticked on an observation covering a page merely *rendering*.
+
+**Constitution impact:** a new public HTTP route on an existing controller and a new DTO file in an
+existing `dto/` folder. No new module, no moved boundary. `/akili-archive` should note the route in
+any API inventory.

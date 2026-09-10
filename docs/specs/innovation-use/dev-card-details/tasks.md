@@ -187,19 +187,19 @@ worker reports — never while one is active**, and never two full-suite runs at
   - Do **not** add the route to any `JwtMiddleware.exclude()` entry.
   - Return **only** the three facts plus the id. No audit fields, no user ids, no other section data.
 - **Acceptance / done check:**
-  - [ ] The route resolves and does **not** shadow, nor get shadowed by, the existing bare `:resultCode` `@Get`
-  - [ ] An unauthenticated request is rejected by `JwtMiddleware` before the handler runs
-  - [ ] The route appears in `/swagger` with a documented response shape
-  - [ ] The response contains exactly four keys: the id plus the three facts
-  - [ ] It is a `GET` with no write, no audit row and no status transition
-  - [ ] The response for a valid in-bounds target matches T-02's `linked_innovation_dev` sub-keys **field for field** for the same result
+  - [x] The route resolves and does **not** shadow, nor get shadowed by, the existing bare `:resultCode` `@Get`
+  - [ ] An unauthenticated request is rejected by `JwtMiddleware` before the handler runs — **OWED to `npm run test:e2e`** (with `ARI_LOCAL_AUTH_BYPASS` off, or the test measures the bypass). ⚠️ **This criterion is stricter than the requirement it implements:** `requirements.md` AC.1 claims only *"it is not added to the exclusion list"*, a code-state fact which **is** verified — middleware bound `.forRoutes('*')`, 7 exclude entries, none matching, file untouched. Deliberately **not** reworded to fit the evidence
+  - [ ] The route appears in `/swagger` with a documented response shape — **OWED to a human.** Only decorator *presence* is asserted; presence is not render (`KZ-002`). `execution.md` carries the exact wording the observation must cover
+  - [x] The response contains exactly four keys: the id plus the three facts
+  - [x] It is a `GET` with no write, no audit row and no status transition
+  - [x] The response for a valid in-bounds target matches T-02's `linked_innovation_dev` sub-keys **field for field** for the same result
 - **Verification:** `npm test -- --silent`; plus `/swagger` observed by a human for the documented-shape criterion.
 - **Falsifying input, named before the test is written (K-012):** declare the new route as a bare `':id(\d+)'` **after** the existing `@Get` → a request to it is captured by the existing handler and the route-resolution assertion goes red. And: add an `audit` field to the DTO → the exact-key-set assertion reddens.
 - **What disqualifies the evidence:** the `/swagger` criterion is discharged by a **human observation**, so per KZ-002 it may only be ticked by quoting words that cover *this route's response shape* — an observation that the Swagger page merely *rendered* covers the page, not the shape.
 - **Skills:** `nestjs-expert`, `api-design-principles`
 - **Dependencies:** T-03
 - **Estimated effort:** M
-- **Status:** todo
+- **Status:** **`[~]` implementation complete, both lens Reviewers PASS 2026-09-10 — but 2 of 6 criteria are owed** (live 401 → `test:e2e`; `/swagger` shape → a human). See [`./execution.md`](./execution.md). **Leader ruling: T-09 may proceed** — the endpoint's contract is frozen and twice-reviewed, and both owed items are verification-tier gaps, not contract gaps
 
 ---
 
@@ -485,6 +485,10 @@ mistaken for work items or lost.
 | **Security review — REQUIRED** | `judgment.md` **N-2**: revisions 1–2 waived it on the ground *"no new endpoint"* while §6 of the same file read *"One new endpoint"*. The waiver is revoked. The reviewer signs off specifically on `R-IUC-008` AC.6–AC.9 — the bounded target set and the no-existence-oracle rule | Merge of **PR 1** |
 | ~~**`OQ-3` — does geographic scope ship?**~~ **CLOSED 2026-09-10 — YES, it ships** (user, at the `/akili-execute` gate). Nothing leaves T-01/T-02/T-07/T-08; `DD-10` holds | Was blocking the start of **T-01** | ✅ discharged |
 | ~~**`OQ-1` — readiness format**~~ **CLOSED 2026-09-10 — `Level 7 - <name>`** (user, at the `/akili-execute` gate). `DD-9` is now settled, not provisional; T-06's acceptance table stands unchanged | Was blocking the start of **T-06** | ✅ discharged |
+| **`test:e2e` — live 401 on the new route** | T-04's criterion is worded behaviourally (*"an unauthenticated request is **rejected**"*) and is stricter than `requirements.md` AC.1, which claims only the code-state fact. The code-state half is verified; the live 401 is not, at any tier this spec runs. **Must run with `ARI_LOCAL_AUTH_BYPASS` off** — `jwr.middleware.ts:38` short-circuits the middleware entirely when it is on, so the test would otherwise measure the bypass | Spec `done` |
+| **`/swagger` response shape — human observation** | T-04 criterion 3. Decorator *presence* is asserted; presence is not render (`KZ-002`). `execution.md` carries the exact wording the observation must cover — four properties, their nullability, no fifth property, at the **fully-prefixed** path (the supertest harness registers no global prefix, so composition is proven by nothing automated) | Spec `done` |
+| **`platform_code` — one query settles an open exposure question** | The section read hard-filters **four** predicates; `DD-13` bounds three, so the targeted read is wider on the platform dimension. `SELECT COUNT(*) FROM results WHERE indicator_id = 2 AND is_active = 1 AND is_snapshot = 0 AND platform_code <> 'STAR';` — zero closes it permanently; non-zero is a question for the RB-2 signatory, **not** a rework | Merge of **PR 1** |
+| **`requirements.md`'s "byte-identical" wording** | With `timestamp` and `path` in the envelope, literal byte-identity between two different requests is **unsatisfiable**. The satisfiable reading — and what T-03 measured — is *invariance to DB state for a fixed request*. **A signatory reading it literally will reject correct code.** Surfaced, deliberately not edited: the signatory's call | Merge of **PR 1** |
 | **T-10's visual check** | It is a task above, but it is discharged by a person and gates the spec's completion | Spec `done` |
 
 Not owed: DevOps (no migration, no infra, no environment change).

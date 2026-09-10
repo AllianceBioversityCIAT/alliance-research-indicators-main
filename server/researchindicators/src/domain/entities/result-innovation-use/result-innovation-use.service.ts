@@ -42,8 +42,13 @@ import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles
  * independently nullable** — never collapsed to a bare `null` object when
  * only one part is missing (`design.md` DD-9; the client, not this read,
  * guards the parts for display).
+ *
+ * Exported (`docs/specs/innovation-use/dev-card-details` T-04, carried
+ * advisory from T-01) so the targeted endpoint's response DTO
+ * (`dto/innovation-dev-card-facts.dto.ts`) can `implements` it directly —
+ * the contract cannot silently drift between the two files.
  */
-interface InnovationDevCardFacts {
+export interface InnovationDevCardFacts {
   innovation_readiness: {
     id: number;
     level: number | null;
