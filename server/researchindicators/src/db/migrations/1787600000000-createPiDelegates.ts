@@ -31,7 +31,6 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
         `\`deleted_at\` timestamp NULL, ` +
         `\`pi_delegate_id\` bigint NOT NULL AUTO_INCREMENT, ` +
         `\`project_id\` varchar(36) NOT NULL, ` +
-        `\`pi_user_id\` bigint NOT NULL, ` +
         `\`delegate_user_id\` bigint NOT NULL, ` +
         `\`active_delegate_key\` varchar(80) GENERATED ALWAYS AS (IF(\`is_active\` = 1, CONCAT(\`project_id\`, ':', \`delegate_user_id\`), NULL)) STORED, ` +
         `PRIMARY KEY (\`pi_delegate_id\`)` +
@@ -44,9 +43,6 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
       `ALTER TABLE \`pi_delegates\` ADD CONSTRAINT \`FK_pi_delegates_project_id\` FOREIGN KEY (\`project_id\`) REFERENCES \`agresso_contracts\`(\`agreement_id\`) ON DELETE RESTRICT ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
-      `ALTER TABLE \`pi_delegates\` ADD CONSTRAINT \`FK_pi_delegates_pi_user_id\` FOREIGN KEY (\`pi_user_id\`) REFERENCES \`sec_users\`(\`sec_user_id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`,
-    );
-    await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` ADD CONSTRAINT \`FK_pi_delegates_delegate_user_id\` FOREIGN KEY (\`delegate_user_id\`) REFERENCES \`sec_users\`(\`sec_user_id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
   }
@@ -54,9 +50,6 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` DROP FOREIGN KEY \`FK_pi_delegates_delegate_user_id\``,
-    );
-    await queryRunner.query(
-      `ALTER TABLE \`pi_delegates\` DROP FOREIGN KEY \`FK_pi_delegates_pi_user_id\``,
     );
     await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` DROP FOREIGN KEY \`FK_pi_delegates_project_id\``,

@@ -1,23 +1,29 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-21
 //
-// Unit tests for PiDelegatesService (v4 — per-project assignments + history).
+// Unit tests for PiDelegatesService (v5 — pi_user_id removed from entity + history).
 //
-// This file adapts the T-14 (v3) suite to the v4 shape:
-//   - assign() now takes { assignments: [{ project_id, delegates }] }
-//     (BulkAssignPiDelegatesDto v4 — T-17) instead of { project_ids, delegates }.
-//   - assign() writes recordHistory('assign') after each insertDelegate and
-//     recordHistory('revoke') per fetched row before softDeleteDelegatePairs
-//     (T-19 / R-PID-012).
-//   - bulkRevoke() writes recordHistory('revoke') per revoked row (T-19 / R-PID-013).
-//   - mockManager now provides getRepository().find() so the service can fetch
-//     active rows before recording revoke history.
+// pi_user_id was removed from pi_delegates and pi_delegate_history (Product decision
+// 2026-09-11 — redundant with created_by). This file adapts the v4 (T-21) suite
+// to the v5 shape:
+//   - insertDelegate(project_id, delegate_user_id, createdBy, manager) — 4 args (pi_user_id gone).
+//   - recordHistory(entry, actorId, manager) where entry = { pi_delegate_id, project_id,
+//     delegate_user_id, action } — no pi_user_id in entry.
+//   - Fixture rows for revoke context no longer carry pi_user_id.
 //
-// What is kept from T-14:
-//   - Scenarios 8–11 (bulkRevoke shapes / ambiguity guard / auth) — unchanged logic.
+// History-actor assertion adaptation (requirement 2 per brief):
+//   Previously, revoke tests asserted that the FETCHED ROW's pi_user_id appeared in
+//   recordHistory, proving "who originally assigned" was captured. With pi_user_id gone,
+//   "who did the movement" is expressed via actorId (the 2nd arg to recordHistory),
+//   which equals the revoking caller. Tests now assert:
+//     - entry fields = { pi_delegate_id, project_id, delegate_user_id, action }
+//     - actorId = the revoking caller's user_id.
+//   This keeps the provenance assertion meaningful: a wrong actorId still fails the test.
+//
+// What is kept from v4:
+//   - Scenarios 1–11 coverage (per-project sync, empty=revoke-all, history per movement,
+//     PI-exclusion, auth, provision-once, bulkRevoke shapes A+B, ambiguity guard, auth deny).
 //   - list() / verify() regression tests.
-//
-// What is rewritten:
-//   - Scenarios 1–7 (assign) — payload shape changed; history assertions added.
+//   - KZ-001 (assertions on args, not bare call count), KZ-004 (distinct ids per scenario).
 //
 // Constructor: new PiDelegatesService(repo, currentUserUtil, dataSource)
 //
@@ -29,20 +35,18 @@
 //
 // KZ-001: assertions on returned values / thrown exceptions / recordHistory +
 //   insertDelegate + softDelete* call arguments — NOT bare call order.
-//   A wrong history context (e.g. caller's pi_user_id instead of the row's)
-//   must make a test go red.
 //
 // KZ-004: distinct project ids and delegate user ids per scenario so
 //   per-project scoping is proven, not a batch-wide pass.
 //
-// Scenario → test map (T-21):
+// Scenario → test map (T-21, v5):
 //   1  — per-project sync (distinct lists per project, P1 and P2)
 //   2  — empty delegates = revoke-all (R-PID-011 AC.3)
-//   3  — history per movement (assign: insertDelegate id; revoke: fetched row context)
+//   3  — history per movement (assign: insertDelegate id; revoke: fetched row context + actorId)
 //   4a — rolled-back (PI-exclusion) → recordHistory NOT called
 //   4b — rolled-back (auth-denied)  → insertDelegate + recordHistory NOT called
 //   5  — provision-once across assignments (resolveDelegateUserId called ONCE)
-//   6  — bulkRevoke Shape A → recordHistory('revoke') per row with row's context
+//   6  — bulkRevoke Shape A → recordHistory('revoke') per row with row context
 //   7  — bulkRevoke Shape B → recordHistory('revoke') per fetched row
 //   (8–11 from T-14 — bulkRevoke shapes / ambiguity guard / auth — kept)
 
@@ -67,7 +71,6 @@ function makePiDelegate(overrides: Partial<PiDelegate> = {}): PiDelegate {
   const row = new PiDelegate();
   row.pi_delegate_id = 1;
   row.project_id = 'PROJ-DEFAULT';
-  row.pi_user_id = 10;
   row.delegate_user_id = 20;
   row.is_active = true;
   return Object.assign(row, overrides);
@@ -281,14 +284,12 @@ describe('assign() — T-21 Scenario 1: per-project sync (distinct lists per pro
     const p1RevokedRow = makePiDelegate({
       pi_delegate_id: 55,
       project_id: 'PROJ-P1-SC1',
-      pi_user_id: 99, // ROW's pi_user_id (provenance) — not the caller
       delegate_user_id: 2, // Mateo
       is_active: true,
     });
     const p2RevokedRow = makePiDelegate({
       pi_delegate_id: 66,
       project_id: 'PROJ-P2-SC1',
-      pi_user_id: 88, // ROW's pi_user_id (provenance) — not the caller
       delegate_user_id: 5, // Bob
       is_active: true,
     });
@@ -305,8 +306,8 @@ describe('assign() — T-21 Scenario 1: per-project sync (distinct lists per pro
             'PROJ-P2-SC1': [5], // P2 current: Bob
           },
           rowsToRevokeByProject: {
-            'PROJ-P1-SC1': [p1RevokedRow], // Mateo row (with row's pi_user_id)
-            'PROJ-P2-SC1': [p2RevokedRow], // Bob row (with row's pi_user_id)
+            'PROJ-P1-SC1': [p1RevokedRow], // Mateo row
+            'PROJ-P2-SC1': [p2RevokedRow], // Bob row
           },
           insertDelegateResults: [
             makePiDelegate({
@@ -353,17 +354,15 @@ describe('assign() — T-21 Scenario 1: per-project sync (distinct lists per pro
     expect(p2.revoked).toEqual([5]);
     expect(p2.kept).toHaveLength(0);
 
-    // insertDelegate must be called with the correct per-project args (KZ-001)
+    // insertDelegate must be called with the correct per-project 4-arg form (KZ-001)
     expect(insertDelegate).toHaveBeenCalledWith(
       'PROJ-P1-SC1',
-      50,
       4,
       50,
       expect.anything(),
     );
     expect(insertDelegate).toHaveBeenCalledWith(
       'PROJ-P2-SC1',
-      50,
       7,
       50,
       expect.anything(),
@@ -398,37 +397,34 @@ describe('assign() — T-21 Scenario 1: per-project sync (distinct lists per pro
     ).filter((c) => c[0] === 'PROJ-P2-SC1');
     expect(p2SoftCalls[0][1]).not.toContain(2);
 
-    // History: assign for Carlos (P1) and Ana (P2), revoke for Mateo (P1) and Bob (P2)
-    // Assign history uses insertDelegate's returned pi_delegate_id and caller's pi_user_id
+    // History: assign for Carlos (P1) and Ana (P2)
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 101,
         project_id: 'PROJ-P1-SC1',
-        pi_user_id: 50, // caller
         delegate_user_id: 4, // Carlos
         action: PiDelegateHistoryActionEnum.ASSIGN,
       }),
-      50,
+      50, // actorId = caller
       expect.anything(),
     );
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 102,
         project_id: 'PROJ-P2-SC1',
-        pi_user_id: 50, // caller
         delegate_user_id: 7, // Ana
         action: PiDelegateHistoryActionEnum.ASSIGN,
       }),
-      50,
+      50, // actorId = caller
       expect.anything(),
     );
 
-    // Revoke history uses the FETCHED ROW's pi_delegate_id and pi_user_id (provenance, not caller)
+    // Revoke history uses the FETCHED ROW's pi_delegate_id and delegate_user_id;
+    // actorId = the revoking caller (50).
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 55, // Mateo row's id
         project_id: 'PROJ-P1-SC1',
-        pi_user_id: 99, // Mateo row's pi_user_id (NOT 50 the caller)
         delegate_user_id: 2, // Mateo
         action: PiDelegateHistoryActionEnum.REVOKE,
       }),
@@ -439,11 +435,10 @@ describe('assign() — T-21 Scenario 1: per-project sync (distinct lists per pro
       expect.objectContaining({
         pi_delegate_id: 66, // Bob row's id
         project_id: 'PROJ-P2-SC1',
-        pi_user_id: 88, // Bob row's pi_user_id (NOT 50 the caller)
         delegate_user_id: 5, // Bob
         action: PiDelegateHistoryActionEnum.REVOKE,
       }),
-      50,
+      50, // actorId = caller
       expect.anything(),
     );
   });
@@ -461,14 +456,12 @@ describe('assign() — T-21 Scenario 2: empty delegates = revoke-all (R-PID-011 
     const anaRow = makePiDelegate({
       pi_delegate_id: 201,
       project_id: 'PROJ-SC2-EMPTY',
-      pi_user_id: 77,
       delegate_user_id: 7, // Ana
       is_active: true,
     });
     const bobRow = makePiDelegate({
       pi_delegate_id: 202,
       project_id: 'PROJ-SC2-EMPTY',
-      pi_user_id: 77,
       delegate_user_id: 5, // Bob
       is_active: true,
     });
@@ -511,12 +504,11 @@ describe('assign() — T-21 Scenario 2: empty delegates = revoke-all (R-PID-011 
       expect.anything(),
     );
 
-    // REVOKE history written for Ana
+    // REVOKE history written for Ana — entry has no pi_user_id; actorId = caller (60)
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 201,
         project_id: 'PROJ-SC2-EMPTY',
-        pi_user_id: 77,
         delegate_user_id: 7,
         action: PiDelegateHistoryActionEnum.REVOKE,
       }),
@@ -529,7 +521,6 @@ describe('assign() — T-21 Scenario 2: empty delegates = revoke-all (R-PID-011 
       expect.objectContaining({
         pi_delegate_id: 202,
         project_id: 'PROJ-SC2-EMPTY',
-        pi_user_id: 77,
         delegate_user_id: 5,
         action: PiDelegateHistoryActionEnum.REVOKE,
       }),
@@ -546,17 +537,18 @@ describe('assign() — T-21 Scenario 2: empty delegates = revoke-all (R-PID-011 
 // T-21 Scenario 3 — History per movement (R-PID-012)
 //
 // 3a: assign create → recordHistory called with insertDelegate's returned
-//     pi_delegate_id, caller's pi_user_id (not the row's — this is a new row),
-//     the delegate_user_id, and action='assign'.
+//     pi_delegate_id, the delegate_user_id, and action='assign'.
+//     actorId = caller's user_id.
 // 3b: assign revoke → recordHistory called with the FETCHED ROW's pi_delegate_id
-//     and pi_user_id (provenance), NOT the caller's, and action='revoke'.
+//     and delegate_user_id, and action='revoke'.
+//     actorId = the revoking caller's user_id (the "who" is preserved in actorId,
+//     not in a pi_user_id field that no longer exists).
 // ─────────────────────────────────────────────────────────────────────────────
 describe('assign() — T-21 Scenario 3: history per movement (R-PID-012)', () => {
   it('3a: create → recordHistory(assign) with insertDelegate returned pi_delegate_id', async () => {
     const newRow = makePiDelegate({
       pi_delegate_id: 301,
       project_id: 'PROJ-SC3A',
-      pi_user_id: 70,
       delegate_user_id: 42,
       is_active: true,
     });
@@ -579,33 +571,33 @@ describe('assign() — T-21 Scenario 3: history per movement (R-PID-012)', () =>
 
     await service.assign(dto);
 
-    // recordHistory called with the returned row's pi_delegate_id
+    // recordHistory called with the returned row's pi_delegate_id; actorId = caller (70)
     expect(recordHistory).toHaveBeenCalledTimes(1);
     expect(recordHistory).toHaveBeenCalledWith(
       {
         pi_delegate_id: 301, // insertDelegate's returned id
         project_id: 'PROJ-SC3A',
-        pi_user_id: 70, // caller = pi_user_id for new assignments
         delegate_user_id: 42,
         action: PiDelegateHistoryActionEnum.ASSIGN,
       },
-      70,
+      70, // actorId = caller
       expect.anything(),
     );
   });
 
-  it('3b: revoke → recordHistory(revoke) with fetched ROW pi_user_id, NOT caller', async () => {
-    // The row was originally assigned by PI user_id=88 (the original PI, not the current caller).
+  it('3b: revoke → recordHistory(revoke) with fetched ROW context; actorId = revoking caller', async () => {
+    // The row was originally assigned by some earlier caller (not the current one).
+    // With pi_user_id gone, the "who" is tracked only via actorId in recordHistory.
+    // The assertion: actorId must be the REVOKING caller (71), not some other value.
     const revokedRow = makePiDelegate({
       pi_delegate_id: 302,
       project_id: 'PROJ-SC3B',
-      pi_user_id: 88, // ORIGINAL PI — must appear in history, NOT the caller (71)
       delegate_user_id: 43,
       is_active: true,
     });
 
     const { service, recordHistory } = makeService({
-      userId: 71, // caller is NOT the original PI
+      userId: 71, // revoking caller
       roles: [SecRolesEnum.SYSTEM_ADMIN],
       repo: {
         resolvedUserIds: [],
@@ -627,11 +619,10 @@ describe('assign() — T-21 Scenario 3: history per movement (R-PID-012)', () =>
       {
         pi_delegate_id: 302,
         project_id: 'PROJ-SC3B',
-        pi_user_id: 88, // ROW's original pi_user_id — NOT 71 (caller)
         delegate_user_id: 43,
         action: PiDelegateHistoryActionEnum.REVOKE,
       },
-      71, // actorId = caller
+      71, // actorId = revoking caller (71) — this is the preserved "who"
       expect.anything(),
     );
   });
@@ -825,15 +816,13 @@ describe('assign() — T-21 Scenario 5: provision-once across assignments (R-PID
 // T-21 Scenario 6 — bulkRevoke Shape A + history (R-PID-013)
 //
 // Each row fetched → recordHistory('revoke') with the ROW's pi_delegate_id,
-// pi_user_id (provenance), delegate_user_id, and project_id.
-// The actorId passed to recordHistory is the CALLER's user_id.
+// delegate_user_id, and project_id. actorId = the CALLER's user_id.
 // ─────────────────────────────────────────────────────────────────────────────
 describe('bulkRevoke() — T-21 Scenario 6: Shape A records history per row (R-PID-013)', () => {
   it('Shape A: row found → recordHistory(revoke) with row context, then softDeleteDelegateIds', async () => {
     const existingRow = makePiDelegate({
       pi_delegate_id: 601,
       project_id: 'PROJ-REV-A-SC6',
-      pi_user_id: 33, // ROW's pi_user_id — NOT the caller (120)
       delegate_user_id: 30,
       is_active: true,
     });
@@ -848,13 +837,12 @@ describe('bulkRevoke() — T-21 Scenario 6: Shape A records history per row (R-P
 
     await service.bulkRevoke(dto);
 
-    // recordHistory called with the row's own context (not caller's pi_user_id)
+    // recordHistory called with the row's context; actorId = caller (120)
     expect(recordHistory).toHaveBeenCalledTimes(1);
     expect(recordHistory).toHaveBeenCalledWith(
       {
         pi_delegate_id: 601,
         project_id: 'PROJ-REV-A-SC6',
-        pi_user_id: 33, // ROW's pi_user_id — NOT 120
         delegate_user_id: 30,
         action: PiDelegateHistoryActionEnum.REVOKE,
       },
@@ -889,14 +877,12 @@ describe('bulkRevoke() — T-21 Scenario 6: Shape A records history per row (R-P
       700: makePiDelegate({
         pi_delegate_id: 700,
         project_id: 'PROJ-SC6-MULTI',
-        pi_user_id: 44,
         delegate_user_id: 50,
         is_active: true,
       }),
       701: makePiDelegate({
         pi_delegate_id: 701,
         project_id: 'PROJ-SC6-MULTI',
-        pi_user_id: 44,
         delegate_user_id: 51,
         is_active: true,
       }),
@@ -952,14 +938,12 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
     const rowA = makePiDelegate({
       pi_delegate_id: 801,
       project_id: 'PROJ-REVB-SC7',
-      pi_user_id: 55,
       delegate_user_id: 1,
       is_active: true,
     });
     const rowB = makePiDelegate({
       pi_delegate_id: 802,
       project_id: 'PROJ-REVB-SC7',
-      pi_user_id: 55,
       delegate_user_id: 2,
       is_active: true,
     });
@@ -982,13 +966,12 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
 
     const result = await service.bulkRevoke(dto);
 
-    // recordHistory called for each fetched row
+    // recordHistory called for each fetched row; actorId = caller (130)
     expect(recordHistory).toHaveBeenCalledTimes(2);
     expect(recordHistory).toHaveBeenCalledWith(
       {
         pi_delegate_id: 801,
         project_id: 'PROJ-REVB-SC7',
-        pi_user_id: 55,
         delegate_user_id: 1,
         action: PiDelegateHistoryActionEnum.REVOKE,
       },
@@ -999,7 +982,6 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
       {
         pi_delegate_id: 802,
         project_id: 'PROJ-REVB-SC7',
-        pi_user_id: 55,
         delegate_user_id: 2,
         action: PiDelegateHistoryActionEnum.REVOKE,
       },
@@ -1017,18 +999,16 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
     expect(result.revoked_count).toBe(2);
   });
 
-  it('Shape B: two projects → recordHistory per row per project', async () => {
+  it('Shape B: two projects → recordHistory per row per project (KZ-004)', async () => {
     const rowP1 = makePiDelegate({
       pi_delegate_id: 901,
       project_id: 'PROJ-SC7-P1',
-      pi_user_id: 66,
       delegate_user_id: 40,
       is_active: true,
     });
     const rowP2 = makePiDelegate({
       pi_delegate_id: 902,
       project_id: 'PROJ-SC7-P2',
-      pi_user_id: 77,
       delegate_user_id: 40,
       is_active: true,
     });
@@ -1055,12 +1035,13 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
     expect(softDeleteDelegatePairs).toHaveBeenCalledTimes(2);
     expect(recordHistory).toHaveBeenCalledTimes(2);
 
-    // P1 history has P1's pi_user_id (66), not P2's (77) — KZ-004
+    // KZ-004: P1 and P2 rows have distinct pi_delegate_ids (901 vs 902)
+    // confirming the rows are kept scoped per project
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 901,
-        pi_user_id: 66,
         project_id: 'PROJ-SC7-P1',
+        delegate_user_id: 40,
       }),
       131,
       expect.anything(),
@@ -1068,8 +1049,8 @@ describe('bulkRevoke() — T-21 Scenario 7: Shape B records history per fetched 
     expect(recordHistory).toHaveBeenCalledWith(
       expect.objectContaining({
         pi_delegate_id: 902,
-        pi_user_id: 77,
         project_id: 'PROJ-SC7-P2',
+        delegate_user_id: 40,
       }),
       131,
       expect.anything(),

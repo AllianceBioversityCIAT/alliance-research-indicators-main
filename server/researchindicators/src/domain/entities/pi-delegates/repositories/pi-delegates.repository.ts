@@ -1,7 +1,9 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-04
 //
+// pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
+//
 // Atomicity guarantee (R-PID-005 AC.3 / NFR-PID-003):
-//   createDelegate() routes ALL writes — sec_user insert and pi_delegates insert —
+//   The repository routes ALL writes — sec_user insert and pi_delegates insert —
 //   through the SAME EntityManager obtained from dataSource.transaction().
 //   The original createUserInSecUsers (result.repository.ts:593) issues
 //   this.query() on the pooled connection and is therefore NOT transaction-bound.
@@ -148,50 +150,6 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Transactional create (R-PID-005).
-   *
-   * In a single transaction:
-   *   1. Resolve the delegate's sec_user_id — either from delegate_user_id or by
-   *      looking up / provisioning the user in sec_users.
-   *   2. INSERT the pi_delegates row.
-   *
-   * Both writes share the same EntityManager so a failure at step 2 rolls back
-   * the step-1 INSERT automatically (NFR-PID-003).
-   *
-   * @param project_id   Agresso agreement_id (FK → agresso_contracts)
-   * @param pi_user_id   sec_user_id of the delegating PI (provenance)
-   * @param delegate     Existing sec_user_id OR identity fields to provision
-   * @param createdBy    sec_user_id of the caller (audit)
-   * @returns            The newly-created PiDelegate row
-   */
-  async createDelegate(
-    project_id: string,
-    pi_user_id: number,
-    delegate: DelegateInput,
-    createdBy: number,
-  ): Promise<PiDelegate> {
-    return this.dataSource.transaction(async (manager: EntityManager) => {
-      // Step 1 — resolve or create the delegate sec_user inside the transaction.
-      const delegateUserId = isDelegateByUserId(delegate)
-        ? delegate.delegate_user_id
-        : await this._findOrCreateSecUserInTx(manager, delegate);
-
-      // Step 2 — insert the pi_delegates row via the same transactional manager.
-      const piDelegateRepo = manager.getRepository(PiDelegate);
-      const row = piDelegateRepo.create({
-        project_id,
-        pi_user_id,
-        delegate_user_id: delegateUserId,
-        is_active: true,
-        created_by: createdBy,
-        updated_by: createdBy,
-      });
-
-      return piDelegateRepo.save(row);
-    });
-  }
-
-  /**
    * Soft-delete (revoke) a pi_delegates row (R-PID-004 AC.2 / design §4).
    * Sets is_active = false, deleted_at = now, updated_by = caller.
    */
@@ -311,11 +269,9 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    * Inserts a single pi_delegates row through the caller's transaction manager.
    *
    * Does NOT set active_delegate_key (it is a STORED GENERATED column in MySQL —
-   * the DB computes it; writing it would fail the INSERT). Same pattern as
-   * createDelegate step 2.
+   * the DB computes it; writing it would fail the INSERT).
    *
    * @param project_id         Agresso agreement_id
-   * @param pi_user_id         sec_user_id of the delegating PI (provenance)
    * @param delegate_user_id   sec_user_id of the delegate
    * @param createdBy          sec_user_id of the caller (audit)
    * @param manager            EntityManager from the owning transaction
@@ -323,7 +279,6 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    */
   async insertDelegate(
     project_id: string,
-    pi_user_id: number,
     delegate_user_id: number,
     createdBy: number,
     manager: EntityManager,
@@ -331,7 +286,6 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     const repo = manager.getRepository(PiDelegate);
     const row = repo.create({
       project_id,
-      pi_user_id,
       delegate_user_id,
       is_active: true,
       created_by: createdBy,
@@ -422,7 +376,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    * so this write is atomic with the mutation that triggered it (R-PID-012 AC.3).
    *
    * @param entry    Context captured at the moment of the mutation:
-   *                 pi_delegate_id, project_id, pi_user_id, delegate_user_id, action.
+   *                 pi_delegate_id, project_id, delegate_user_id, action.
    * @param actorId  sec_user_id of the user who executed the assign/revoke (created_by).
    * @param manager  EntityManager from the owning transaction.
    */
@@ -430,7 +384,6 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     entry: {
       pi_delegate_id: number;
       project_id: string;
-      pi_user_id: number;
       delegate_user_id: number;
       action: PiDelegateHistoryActionEnum;
     },

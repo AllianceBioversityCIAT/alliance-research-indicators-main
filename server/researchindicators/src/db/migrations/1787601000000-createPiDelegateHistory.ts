@@ -32,7 +32,6 @@ export class CreatePiDelegateHistory1787601000000
         `\`pi_delegate_history_id\` bigint NOT NULL AUTO_INCREMENT, ` +
         `\`pi_delegate_id\` bigint NOT NULL, ` +
         `\`project_id\` varchar(36) NOT NULL, ` +
-        `\`pi_user_id\` bigint NOT NULL, ` +
         `\`delegate_user_id\` bigint NOT NULL, ` +
         `\`action\` varchar(10) NOT NULL, ` +
         `PRIMARY KEY (\`pi_delegate_history_id\`)` +

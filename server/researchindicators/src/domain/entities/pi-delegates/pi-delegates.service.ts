@@ -40,12 +40,7 @@
 //        (agresso_contracts PI join UNION pi_delegates active row).
 //     3. Neither — ForbiddenException (403).
 //
-// pi_user_id on create (DD-B §4):
-//   When the caller IS the PI (or SYSTEM_ADMIN), pi_user_id = the caller's
-//   own user_id (provenance context).  The delegate check alone does not
-//   determine who the PI is — it only says "this caller may act here."
-//   SYSTEM_ADMIN acting on behalf of a project: pi_user_id is still set to
-//   the caller's user_id as audit provenance.
+// pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
 import {
   BadRequestException,
   ForbiddenException,
@@ -300,16 +295,14 @@ export class PiDelegatesService {
           for (const delegateUserId of toCreate) {
             const row = await this.piDelegatesRepository.insertDelegate(
               a.project_id,
-              callerUserId, // pi_user_id = caller (provenance)
               delegateUserId,
-              callerUserId, // createdBy = caller (audit)
+              callerUserId,
               manager,
             );
             await this.piDelegatesRepository.recordHistory(
               {
                 pi_delegate_id: row.pi_delegate_id,
                 project_id: a.project_id,
-                pi_user_id: callerUserId,
                 delegate_user_id: delegateUserId,
                 action: PiDelegateHistoryActionEnum.ASSIGN,
               },
@@ -321,7 +314,7 @@ export class PiDelegatesService {
           // ── Revokes: fetch row context → recordHistory('revoke') → soft-delete ─
           //
           // softDeleteDelegatePairs only needs delegate_user_ids, but history
-          // requires the full row context (pi_delegate_id, pi_user_id).
+          // requires the full row context (pi_delegate_id, delegate_user_id).
           // Fetch the active rows BEFORE deleting to capture that context.
           if (toRevoke.length > 0) {
             const rowsToRevoke = await manager.getRepository(PiDelegate).find({
@@ -337,7 +330,6 @@ export class PiDelegatesService {
                 {
                   pi_delegate_id: revokedRow.pi_delegate_id,
                   project_id: revokedRow.project_id,
-                  pi_user_id: revokedRow.pi_user_id,
                   delegate_user_id: revokedRow.delegate_user_id,
                   action: PiDelegateHistoryActionEnum.REVOKE,
                 },
@@ -452,7 +444,6 @@ export class PiDelegatesService {
               {
                 pi_delegate_id: row.pi_delegate_id,
                 project_id: row.project_id,
-                pi_user_id: row.pi_user_id,
                 delegate_user_id: row.delegate_user_id,
                 action: PiDelegateHistoryActionEnum.REVOKE,
               },
@@ -475,7 +466,7 @@ export class PiDelegatesService {
           // ── Shape B: revoke by (project × delegate) pairs ──────────────
           //
           // Fetch full row context per project before soft-deleting so history
-          // can be written with pi_delegate_id and pi_user_id (R-PID-013 AC.2).
+          // can be written with pi_delegate_id and delegate_user_id (R-PID-013 AC.2).
           for (const projectId of dto.project_ids!) {
             await this.assertCanManageProject(projectId);
 
@@ -493,7 +484,6 @@ export class PiDelegatesService {
                 {
                   pi_delegate_id: revokedRow.pi_delegate_id,
                   project_id: revokedRow.project_id,
-                  pi_user_id: revokedRow.pi_user_id,
                   delegate_user_id: revokedRow.delegate_user_id,
                   action: PiDelegateHistoryActionEnum.REVOKE,
                 },

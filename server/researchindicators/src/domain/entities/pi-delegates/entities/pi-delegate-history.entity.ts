@@ -1,11 +1,11 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-16
 //
-// NOTE: `pi_delegate_id`, `pi_user_id`, and `delegate_user_id` are plain
-// columns (no FK / @ManyToOne). The history table is append-only and
-// intentionally decoupled from the mutable `pi_delegates` row (DD-O).
-// `sec_users` has no TypeORM @Entity class in this codebase — plain
-// @Column declarations consistent with every other entity that references
-// sec_users FKs.
+// NOTE: `pi_delegate_id` and `delegate_user_id` are plain columns (no FK /
+// @ManyToOne). The history table is append-only and intentionally decoupled
+// from the mutable `pi_delegates` row (DD-O). `sec_users` has no TypeORM
+// @Entity class in this codebase — plain @Column declarations consistent with
+// every other entity that references sec_users FKs.
+// pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
 //
 // NOTE: There is no generated column on this table. Multiple movements per
 // relationship are valid; uniqueness is enforced only on `pi_delegates`
@@ -34,12 +34,6 @@ export class PiDelegateHistory extends AuditableEntity {
     nullable: false,
   })
   project_id!: string;
-
-  @Column('bigint', {
-    name: 'pi_user_id',
-    nullable: false,
-  })
-  pi_user_id!: number;
 
   @Column('bigint', {
     name: 'delegate_user_id',

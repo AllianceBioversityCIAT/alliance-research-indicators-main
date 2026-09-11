@@ -7,11 +7,12 @@
 // constraint is enforced at the DB layer (uq_pi_delegates_active_delegate_key).
 // Same pattern as `result_pool_funding_alignment` (D-PI-9).
 //
-// NOTE: `pi_user_id` and `delegate_user_id` are FK columns pointing to
-// `sec_users.sec_user_id`. `sec_users` has no TypeORM @Entity class in
-// this codebase (it is used only as a plain DTO/query result), so the
-// FK relationship is expressed as plain @Column declarations — consistent
-// with how every other entity in the codebase handles sec_users FKs.
+// NOTE: `delegate_user_id` is a FK column pointing to `sec_users.sec_user_id`.
+// `sec_users` has no TypeORM @Entity class in this codebase (it is used only
+// as a plain DTO/query result), so the FK relationship is expressed as a plain
+// @Column declaration — consistent with how every other entity in the codebase
+// handles sec_users FKs.
+// pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
 import {
   Column,
   Entity,
@@ -36,12 +37,6 @@ export class PiDelegate extends AuditableEntity {
     nullable: false,
   })
   project_id!: string;
-
-  @Column('bigint', {
-    name: 'pi_user_id',
-    nullable: false,
-  })
-  pi_user_id!: number;
 
   @Column('bigint', {
     name: 'delegate_user_id',

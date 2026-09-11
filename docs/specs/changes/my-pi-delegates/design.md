@@ -45,13 +45,12 @@ routes/main.routes.ts                                                       # re
 | --- | --- | --- |
 | `pi_delegate_id` | bigint PK | generated |
 | `project_id` | varchar(36) | FK → `agresso_contracts.agreement_id`, ON DELETE RESTRICT |
-| `pi_user_id` | bigint | FK → `sec_users.sec_user_id` — the delegating PI (provenance) |
 | `delegate_user_id` | bigint | FK → `sec_users.sec_user_id` — the delegate |
 | `active_delegate_key` | varchar(80) STORED GENERATED | `IF(is_active=1, CONCAT(project_id,':',delegate_user_id), NULL)` |
 | *AuditableEntity* | — | `created_by/at`, `updated_by/at`, `is_active`, `deleted_at` |
 
 - **UNIQUE** on `active_delegate_key` → at most one active delegation per `(project, delegate)`, revoke→re-grant safe (repo D-PI-9 pattern; MySQL has no filtered unique index). *(R-PID-001 AC.3 / R-PID-006)*
-- Revoke = soft-delete. `pi_user_id` is provenance/authorization context; the delegate check needs only `(project_id, delegate_user_id)`.
+- Revoke = soft-delete. The delegate check needs only `(project_id, delegate_user_id)`. *(v5: `pi_user_id` removed — see §12.)*
 - Migration append-only; **applied to shared DB as a separate human step** (K-015).
 
 ## 5. `isPi()` extension *(R-PID-002)* — keep existing query, add a conditional fallback
@@ -161,7 +160,6 @@ So the client `is_principal_investigator` flag reflects delegates with **no fron
 | `pi_delegate_history_id` | bigint PK | generated |
 | `pi_delegate_id` | bigint | the affected `pi_delegates` row (plain column, no FK — history is decoupled + immutable) |
 | `project_id` | varchar(36) | context (utf8mb3 to match schema) |
-| `pi_user_id` | bigint | context |
 | `delegate_user_id` | bigint | context |
 | `action` | varchar(10) | `'assign'` \| `'revoke'` (enum `PiDelegateHistoryActionEnum`) |
 | *AuditableEntity* | — | `created_at` = action date, `created_by` = actor; `updated_*`/`deleted_at` unused (append-only) |
@@ -197,3 +195,14 @@ So the client `is_principal_investigator` flag reflects delegates with **no fron
 
 ### 11.7 Budget (v4 delta)
 ~7 tasks (history migration + entity, DTO reshape, repo history method, service loop + history writes, controller, tests) · ~500 LOC · ~2 review rounds.
+
+---
+
+## 12. Amendment v5 — remove redundant `pi_user_id` (2026-09-11, Product-confirmed)
+
+> Product (Option B) determined `pi_user_id` was redundant with `created_by`: the service set both to the caller on create, so they always held the same value. **`pi_user_id` is REMOVED from BOTH `pi_delegates` and `pi_delegate_history`** (column + the `FK_pi_delegates_pi_user_id` FK). The two v4/v2 migrations were AMENDED (unmerged branch). Any earlier prose or table reference to `pi_user_id` in this spec is **superseded** by this note.
+>
+> - `pi_delegates`: columns are now `pi_delegate_id` PK, `project_id` (FK agresso), `delegate_user_id` (FK sec_users), `active_delegate_key` (generated + unique), AuditableEntity. `created_by` records the grantor; `updated_by` records the last mutator (e.g. the revoker).
+> - `pi_delegate_history`: context is now `pi_delegate_id`, `project_id`, `delegate_user_id`, `action`; `created_by` = the actor of the movement, `created_at` = the movement date.
+> - Repo: `insertDelegate(project_id, delegate_user_id, createdBy, manager)`; `recordHistory` entry drops `pi_user_id`; dead `createDelegate` removed.
+> - Unaffected: `isPi`, `queryPrincipalInvestigator`, and the auth queries never referenced `pi_user_id`.

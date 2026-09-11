@@ -428,3 +428,16 @@ Ran a full assign→revoke cycle against `alliancereportingdb` (real data: G232,
 - **assign** history row: `action='assign'`, `pi_user_id=15` (grantor), `created_by=15` (actor), `created_at` set.
 - **revoke** (actor 7, different from the grantor): `action='revoke'`, **`pi_user_id=15` = the ROW's provenance (NOT the revoker 7)**, `created_by=7` = the actor. This is the R-PID-012 crux, proven at the DB level.
 - Append-only trail keeps BOTH movements; `pi_delegates` reflects only the last state (`is_active=0`).
+
+---
+
+## Amendment v5 — remove redundant `pi_user_id` (2026-09-11, Product Option B) — **PASS**
+
+**Trigger:** Product observed `pi_user_id` was redundant with `created_by` (the service set both to the caller on create → identical values). Chose **Option B: remove it** from BOTH `pi_delegates` and `pi_delegate_history`.
+
+- **Production (Reviewer PASS):** amended both migrations (dropped the `pi_user_id` column + `FK_pi_delegates_pi_user_id`; kept project/delegate FKs, generated col, unique index, charset); removed the column from both entities; `insertDelegate(project_id, delegate_user_id, createdBy, manager)` (param dropped); `recordHistory` entry trimmed; dead `createDelegate` removed. `isPi`/`queryPrincipalInvestigator`/auth queries never referenced it — unaffected. `npm run build` green, grep-clean.
+- **Tests (Reviewer PASS):** service spec adapted — all 30 tests preserved (none dropped); the revoke "who did the movement" assertion re-targeted from the removed `pi_user_id` provenance to `recordHistory`'s `actorId` (= the revoking caller). **`npm test` 2731/2731 green.**
+- **Local DB reconciled:** dropped the `pi_user_id` column (+ FK) from both tables in `alliancereportingdb` so they match the amended migrations (also validates the DDL against the real schema, K-006).
+- **Docs:** design §4/§11.1 tables updated + §12 v5 note (supersedes earlier prose mentions).
+- **ADVISORY (non-gating):** a stale TSDoc at `repositories/pi-delegates.repository.ts:34` still names the removed `createDelegate` (harmless).
+- **Net:** `created_by` records the grantor (and, on revoke in the main table, `updated_by` records the revoker); the **history** carries `created_by` = the actor of each movement + `created_at` = the movement date.
