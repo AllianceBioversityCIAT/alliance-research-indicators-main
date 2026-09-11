@@ -7,6 +7,7 @@ import { InnovationUseActor } from '@shared/interfaces/get-innovation-use-detail
 import { GetActorTypesService } from '@shared/services/control-list/get-actor-types.service';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { InputNumber } from 'primeng/inputnumber';
+import { NgModel } from '@angular/forms';
 import { Select } from 'primeng/select';
 import { Checkbox } from 'primeng/checkbox';
 import { ActorType } from '@shared/interfaces/get-actor-types.interface';
@@ -33,7 +34,10 @@ describe('InnovationUseActorItemComponent', () => {
     component = fixture.componentInstance;
   });
 
-  const totalText = (): string => (fixture.debugElement.query(By.css('.actor-total')).nativeElement.textContent || '').trim();
+  // @akili-spec quick/innovation-use-actors-total-field: the total moved from a <span>'s textContent to a
+  // readonly <input>'s value. Reading `.value` is the whole change here — every caller below asserts the
+  // same rendered figure it always did.
+  const totalText = (): string => ((fixture.debugElement.query(By.css('.actor-total')).nativeElement as HTMLInputElement).value || '').trim();
 
   const appInputs = () => fixture.debugElement.queryAll(By.directive(InputComponent));
 
@@ -195,18 +199,31 @@ describe('InnovationUseActorItemComponent', () => {
   });
 
   // c6 — The total control cannot receive a typed value.
-  describe('c6 — total is read-only text, not an input', () => {
-    it('renders the total as a span, with no input or p-inputNumber inside its row', () => {
+  //
+  // @akili-spec quick/innovation-use-actors-total-field — this test was INVERTED, not deleted, and the
+  // distinction matters. Its criterion ("total is read-only text, not an input") was written to forbid the
+  // exact shape QA later asked for, so the SHAPE assertion is reversed by explicit user ruling. Its
+  // GUARANTEE — c6's stated intent, "the total control cannot receive a typed value" — is unchanged and is
+  // now asserted more strictly than before: the field must be `disabled` (so typing is refused AND the
+  // hover/focus borders PrimeNG paints through `:enabled:hover` / `:enabled:focus` never apply, which a
+  // readonly field would still have shown) AND carry no `p-inputNumber` (no spinner offering to change it)
+  // AND have no `ngModel`, so nothing writes back into the row. A span could only ever satisfy the first of
+  // those by accident of being a span.
+  describe('c6 — total cannot receive a typed value', () => {
+    it('renders the total as a disabled input, with no p-inputNumber and no write-back binding', () => {
       component.actor = { ...new InnovationUseActor(), sex_age_disaggregation_not_apply: true, actors_count: 12 };
       fixture.detectChanges();
 
       const totalDe = fixture.debugElement.query(By.css('.actor-total'));
-      expect(totalDe.nativeElement.tagName).toBe('SPAN');
-      expect(totalDe.query(By.css('input'))).toBeNull();
-      expect(totalDe.query(By.directive(InputNumber))).toBeNull();
+      const totalEl = totalDe.nativeElement as HTMLInputElement;
+      expect(totalEl.tagName).toBe('INPUT');
+      expect(totalEl.disabled).toBe(true);
+      expect(totalEl.value).toBe('12');
 
-      const totalRow = fixture.debugElement.query(By.css('.actor-total')).parent!;
+      // No spinner, and no two-way binding that could push a typed value back into the emitted row.
+      const totalRow = totalDe.parent!.parent!;
       expect(totalRow.query(By.directive(InputNumber))).toBeNull();
+      expect(totalDe.injector.get(NgModel, null)).toBeNull();
     });
   });
 
@@ -438,7 +455,14 @@ describe('InnovationUseActorItemComponent', () => {
       // Only `Actor type` and `Total` own a `span.label` in this card's own markup (the four
       // counts' labels are rendered by app-input, a different component, not asserted here) —
       // no third one for `Specify other`.
-      const cardOwnLabelTexts = fixture.debugElement.queryAll(By.css('span.label')).map(de => (de.nativeElement as HTMLElement).textContent?.trim());
+      // @akili-spec quick/innovation-use-actors-total-field: `Total` is now a real <label for> rather than
+      // a <span>, so the selector widened to both. Narrowing it to `span.label` instead would have let the
+      // assertion keep passing while silently no longer covering the Total label at all — the count would
+      // simply have dropped to one, which is exactly the kind of green this test exists to prevent.
+      const cardOwnLabelTexts = fixture.debugElement
+        .queryAll(By.css('span.label, label.label'))
+        .filter(de => !(de.nativeElement as HTMLElement).closest('app-input'))
+        .map(de => (de.nativeElement as HTMLElement).textContent?.trim());
       expect(cardOwnLabelTexts).toEqual(['Actor type*', 'Total']);
     });
   });
