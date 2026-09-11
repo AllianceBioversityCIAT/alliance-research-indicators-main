@@ -1,6 +1,6 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell)
 import { Tooltip } from 'primeng/tooltip';
-import { Component, signal } from '@angular/core';
+import { Component, DebugElement, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -79,6 +79,14 @@ const activatedRouteMock = {
     queryParamMap: { get: (key: string): string | null => (key === 'version' ? 'v1' : null) }
   }
 };
+
+// @akili-spec quick/innovation-measures-unit-first: Unit now renders BEFORE Number on this page, so
+// "the first `app-input` inside the measure card" is no longer the Number field. Every Number lookup
+// below selects by `optionValue` instead of by position — order-independent, and the non-null
+// assertion makes the lookup fail loudly if the field is ever removed rather than silently reading
+// whichever input happens to come first.
+const numberFieldOf = (quantCard: DebugElement): DebugElement =>
+  quantCard.queryAll(By.directive(InputComponent)).find(de => (de.componentInstance as InputComponent).optionValue === 'number')!;
 
 describe('InnovationUseDetailsComponent', () => {
   let component: InnovationUseDetailsComponent;
@@ -463,6 +471,24 @@ describe('InnovationUseDetailsComponent', () => {
       expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
     });
 
+    // @akili-spec quick/innovation-measures-unit-first: Unit renders BEFORE Number on the measure card.
+    // Asserted on DOM ORDER, not on a CSS class or an `order` property — DOM order is what tab order and
+    // screen-reader order follow, and it is the only one of the three jsdom can actually observe.
+    it('renders Unit before Number on the measure card (DOM order, so tab order follows)', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const optionValues = quantCard.queryAll(By.directive(InputComponent)).map(de => (de.componentInstance as InputComponent).optionValue);
+
+      expect(optionValues).toEqual(['unit', 'number']);
+
+      // The labels follow the inputs — a card that swapped only the inputs and left the labels put
+      // would still satisfy the assertion above, and would be wrong on screen.
+      const labels = Array.from((quantCard.nativeElement as HTMLElement).querySelectorAll('h2.label')).map(el => el.textContent?.trim().replace('*', ''));
+      expect(labels).toEqual(['Unit', 'Number']);
+    });
+
     // R-IUR-010 — the Disqualifier (T-12 work order): a green suite after removing
     // `fieldsRequired` is not evidence the five new bindings arrived — a stale binding on the
     // one template that carries it does redden, but the ABSENCE of a new binding is silent for
@@ -501,7 +527,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
       const verdict = numberInput.inputValid();
 
       expect(verdict.valid).toBe(false);
@@ -524,7 +550,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
       const verdict = numberInput.inputValid();
 
       expect(verdict.valid).toBe(true);
@@ -3039,7 +3065,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
 
       // Literal from requirements.md R-MSD-012 AC.2 / design.md §6.2's Leader-verified table — not
       // recomputed here via the same formula under test (that would be tautological).
@@ -3055,7 +3081,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInputDe = quantCard.query(By.directive(InputComponent));
+      const numberInputDe = numberFieldOf(quantCard);
       const nativeInput = numberInputDe.query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.placeholder).not.toContain('positive');
@@ -3179,7 +3205,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+      const nativeInput = numberFieldOf(quantCard).query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.value).toBe('-0.75');
     });
@@ -3194,7 +3220,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+      const nativeInput = numberFieldOf(quantCard).query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.value).toBe('-0.75');
       expect(nativeInput.value).not.toBe('-0.7500');

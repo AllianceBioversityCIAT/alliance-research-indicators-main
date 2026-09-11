@@ -10,7 +10,15 @@
     }
   </div>
 
+  <!-- @akili-spec quick/innovation-measures-unit-first: the two fields are rendered through outlets so the
+       ORDER is a single input, not two copies of the markup. DOM order follows `unitFirst`, so tab order,
+       screen-reader order and visual order stay in agreement (a CSS `order` swap would split them). -->
   <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <ng-container [ngTemplateOutlet]="unitFirst ? unitField : numberField"></ng-container>
+    <ng-container [ngTemplateOutlet]="unitFirst ? numberField : unitField"></ng-container>
+  </div>
+
+  <ng-template #numberField>
     <div>
       <!-- @akili-spec docs/specs/changes/measure-number-signed-decimal (T-10 — DD-4: min/max/placeholder promoted to inputs) -->
       <!-- @akili-spec docs/specs/changes/innovation-use-required-fields (T-03 — DD-4: fieldsRequired split; requiredMode forwarded) -->
@@ -19,12 +27,15 @@
         [type]="'number'" [min]="min" [max]="max" [maxFractionDigits]="maxFractionDigits" [disabled]="disabled"
         [placeholder]="placeholder" (ngModelChange)="onValueChange()"></app-input>
     </div>
+  </ng-template>
+
+  <ng-template #unitField>
     <div>
       <h2 class="label">Unit@if (unitRequired) {<span class="text-[15px] text-[#CF0808]">*</span>}</h2>
       <app-input [signal]="body" [optionValue]="'unit'" [isRequired]="unitRequired" [requiredMode]="unitRequiredMode"
         [disabled]="disabled" placeholder="Write the unit" (ngModelChange)="onValueChange()"></app-input>
     </div>
-  </div>
+  </ng-template>
 
   <!-- @akili-spec quick/innovation-measures-remove-comments -->
   @if (showComments) {
