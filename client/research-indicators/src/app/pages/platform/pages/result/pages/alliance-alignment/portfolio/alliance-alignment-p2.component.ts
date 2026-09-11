@@ -30,7 +30,7 @@ export class AllianceAlignmentP2Component {
 
   shouldShowImpactOutcomes(): boolean {
     const indicatorId = Number(this.cache.currentMetadata()?.indicator_id);
-    return indicatorId === 4 || indicatorId === 5;
+    return [4, 5, 6].includes(indicatorId);
   }
 
   isOicrIndicator(): boolean {

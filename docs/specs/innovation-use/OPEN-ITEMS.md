@@ -8,6 +8,25 @@
 
 ---
 
+> ## ⚠️ Status banner — 2026-09-11
+>
+> **Every child spec of this family is now archived.** `family.md` rows 1–6 all read `done`; the
+> `innovation-use/` folder holds only that manifest and this index. **§3 ("Active specs — unfinished
+> tasks") is therefore superseded** — the specs it lists no longer exist at the paths it cites; their
+> archive paths are in `family.md`.
+>
+> **§4 and §5 are NOT superseded and were never covered by `/akili-resume`.** The item that matters
+> most is still open:
+>
+> **`F1` / `FR-7` / [AC-1718](https://cgiarmel.atlassian.net/browse/AC-1718) — OPEN, High, no owning spec.**
+> `customSaveInnovationDev` still exists (`server/.../result-actors/result-actors.service.ts:91`) and
+> still accepts a caller-supplied primary key with **no ownership check**. Verified live 2026-09-11.
+> The guard is a property of the **endpoint**, not of the data, so platform exposure is asymmetric:
+> chunk 2 built four protections on its own endpoint and the Dev endpoint has none. **Archiving the
+> family's specs did not close this and must not be read as having closed it.**
+
+---
+
 ## 0. Findings from the test-environment session — 2026-08-21, to pick up Monday
 
 Reported by the product owner after checking the work already deployed to **test**. **Neither blocked what was deployed.** Both are now archived (N-1, N-2).

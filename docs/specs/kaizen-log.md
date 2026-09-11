@@ -1183,7 +1183,7 @@ _Root cause:_ verification scope was set by the brief's file list rather than by
 
 #### Standardize
 
-Three minimal edits proposed. **Deferred at the time; all three applied 2026-08-11 during the `results/capdev-bulk-upload-notification` archive.**
+Three minimal edits proposed; **pending user approval** (see the archive report's approval menu). No edit outside this log has been applied.
 
 | Lesson | Proposed edit                                                                                                                                                                                                                                                            | Home                                       |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
