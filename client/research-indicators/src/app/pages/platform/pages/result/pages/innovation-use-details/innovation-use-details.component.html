@@ -215,19 +215,6 @@
             <p class="text-[var(--ac-grey-800)] font-[500] flex leading-4 m-0">{{ formatInnovationDevLabel(devResult) }}</p>
           </div>
           
-          @if (devResult.description) {
-            <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] m-0" [class.line-clamp-3]="!descriptionExpanded()">
-              {{ devResult.description }}
-            </p>
-            <button
-              type="button"
-              data-testid="toggle-description"
-              (click)="descriptionExpanded.set(!descriptionExpanded())"
-              class="self-start border-none bg-transparent cursor-pointer p-0 text-[var(--ac-light-blue-400)] !font-['Space_Grotesk'] font-[500] text-[12px] underline mt-1">
-              {{ descriptionExpanded() ? 'See less' : 'See more' }}
-            </button>
-          }
-
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ac-grey-700)] !font-['Space_Grotesk']">
             @if (devResult.result_status?.result_status_id && devResult.result_status?.name) {
               <app-custom-tag [statusId]="devResult.result_status!.result_status_id ?? ''"
@@ -267,20 +254,30 @@
                 <span class="text-[var(--ac-primary-blue-300)]">{{ devResult.geo_scope.name }}</span>
               </span>
             }
-            @if (formatInnovationDevReadiness(devResult.innovation_readiness) || devResult.year || devResult.geo_scope) {
-              <span class="text-[var(--ac-grey-400)]">|</span>
-            }
-            <span class="flex items-center">
-              Innovation detail <i class="pi pi-arrow-right !text-[8px] text-[var(--ac-grey-700)] px-1"></i>
-              <a
-                [href]="formatInnovationDevUrl(devResult)"
-                target="_blank"
-                rel="noopener"
-                class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
-                View innovation detail ↗
-                <span class="sr-only">(opens in a new tab)</span>
-              </a>
-            </span>
+          </div>
+
+          @if (devResult.description) {
+            <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] m-0" [class.line-clamp-3]="!descriptionExpanded()">
+              {{ devResult.description }}
+            </p>
+            <button
+              type="button"
+              data-testid="toggle-description"
+              (click)="descriptionExpanded.set(!descriptionExpanded())"
+              class="self-start border-none bg-transparent cursor-pointer p-0 text-[var(--ac-light-blue-400)] !font-['Space_Grotesk'] font-[500] text-[12px] underline mt-1">
+              {{ descriptionExpanded() ? 'See less' : 'See more' }}
+            </button>
+          }
+
+          <div class="flex justify-end">
+                <a
+                  [href]="formatInnovationDevUrl(devResult)"
+                  target="_blank"
+                  rel="noopener"
+                  class="innovation-detail-link flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
+                  View innovation detail ↗
+                  <span class="sr-only">(opens in a new tab)</span>
+                </a>
           </div>
         </div>
       }

@@ -3949,19 +3949,24 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         expect(detailsEl.textContent).toContain('Reporting year');
         expect(detailsEl.textContent).toContain('2026');
 
-        // Issue 3: Verify the block order is eyebrow, title, description, metadata row
+        // Block order, reordered by quick/innovation-dev-card-reorder (2026-09-11):
+        // title → metadata row → description → right-aligned anchor.
         const titleEl = detailsEl.querySelector('p.font-\\[500\\]');
         const descEl = detailsEl.querySelector('[data-testid="innovation-dev-description"]');
         const rowEl = detailsEl.querySelector('.flex-wrap');
+        const anchorEl = detailsEl.querySelector('a.innovation-detail-link');
         expect(titleEl).toBeTruthy();
         expect(descEl).toBeTruthy();
         expect(rowEl).toBeTruthy();
-        expect(titleEl!.compareDocumentPosition(descEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-        expect(descEl!.compareDocumentPosition(rowEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(anchorEl).toBeTruthy();
+        expect(titleEl!.compareDocumentPosition(rowEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(rowEl!.compareDocumentPosition(descEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(descEl!.compareDocumentPosition(anchorEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         
         // Count separators
         let separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
-        expect(separators.length).toBe(3);
+        // quick/innovation-dev-card-reorder: 2, not 3 — the anchor's separator left with the anchor.
+        expect(separators.length).toBe(2);
 
         // Now absent geo_scope
         const option2 = { ...option, result_id: 2 };
@@ -3979,7 +3984,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         expect(detailsEl.textContent).not.toContain('Geographic scope');
         
         separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
-        expect(separators.length).toBe(2);
+        expect(separators.length).toBe(1);
 
         // Issue 2: Now absent year as well
         const option3 = { ...option2, result_id: 3 };
@@ -3994,7 +3999,7 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
         expect(detailsEl.textContent).not.toContain('Reporting year');
         
         separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
-        expect(separators.length).toBe(1);
+        expect(separators.length).toBe(0);
       });
 
       it('renders the badge with server-supplied properties, NOT hardcoded Published', async () => {
@@ -4769,8 +4774,10 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(card.textContent).toContain('Geographic scope');
       expect(card.textContent).toContain('Global');
 
-      // "Innovation detail" anchor — the anchor whose label has been deleted twice (tasks.md T-02 Done ✔6).
-      expect(card.textContent).toContain('Innovation detail');
+      // The anchor — deleted twice in this card's history, so it stays pinned. Its `Innovation detail →`
+      // LABEL was removed by design in quick/innovation-dev-card-reorder (2026-09-11), so the pin moved
+      // to the anchor's own visible text, which is what a user actually reads.
+      expect(card.textContent).toContain('View innovation detail ↗');
       const anchor = card.querySelector('a.innovation-detail-link');
       expect(anchor).toBeTruthy();
 
@@ -5235,9 +5242,13 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       
       const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
       const innerRow = anchor.parentElement as HTMLElement;
-      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center');
-      expect(innerRow.parentElement!.className).toContain('flex flex-wrap items-center gap-x-2 gap-y-1');
-      expect(innerRow.parentElement!.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+      // quick/innovation-dev-card-reorder: the anchor now sits in its own right-aligned block,
+      // below the description, instead of inside the metadata row.
+      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex justify-end');
+      // One nesting level SHORTER than before by design: the anchor left the metadata row, so its
+      // parent's parent is now the card's outer wrapper directly. The wrapper's chrome is still
+      // pinned here — that is the half of this assertion that guards against an accidental restyle.
+      expect(innerRow.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
     });
 
     it('The anchor\'s href, text and accessible name are unchanged', () => {
@@ -5285,7 +5296,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(card.textContent).not.toContain('Innovation Dev level');
       
       const separators = Array.from(card.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
-      expect(separators.length).toBe(1);
+      expect(separators.length).toBe(0);
     });
 
     it('With scope null, no `Geographic scope` label element exists', () => {
@@ -5337,7 +5348,7 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
       expect(descElement).toBeNull();
       
       // Check inner structure
-      expect(container.children.length).toBe(3); // header, title, footer (metadata)
+      expect(container.children.length).toBe(4); // eyebrow, title, metadata row, right-aligned anchor
     });
 
     it('The labelled row\'s class list contains `flex-wrap` and no `justify-between`', () => {
