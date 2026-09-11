@@ -471,6 +471,20 @@ describe('InnovationUseDetailsComponent', () => {
       expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
     });
 
+    // @akili-spec quick/innovation-use-bottom-clearance: the last card sat flush against the fixed
+    // Back/Next/Save bar. `.app-page-wrapper`'s own `margin-bottom: 70px` is smaller than that bar's
+    // measured 99px, so the reserve plus the last card's `rs-mb-[25]` all landed underneath it. Nothing in
+    // the suite covered the page wrapper's spacing before this, so the class could have been dropped in
+    // silence by any later edit to this template — which is exactly what happened to a sibling spacing fix
+    // earlier in this log (`rs-mt-[8]`, 2026-09-08).
+    // SCOPE (KZ-017): class presence only. jsdom computes no layout, so this asserts the override is
+    // declared, never that ~26px of gap renders — that is human-verified.
+    it('reserves bottom clearance for the fixed nav bar on the page wrapper', () => {
+      const wrapper = fixture.debugElement.query(By.css('.app-page-wrapper'));
+      expect(wrapper).toBeTruthy();
+      expect((wrapper.nativeElement as HTMLElement).className).toContain('!mb-[100px]');
+    });
+
     // @akili-spec quick/innovation-measures-unit-first: Unit renders BEFORE Number on the measure card.
     // Asserted on DOM ORDER, not on a CSS class or an `order` property — DOM order is what tab order and
     // screen-reader order follow, and it is the only one of the three jsdom can actually observe.
@@ -1852,7 +1866,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect(component.body().quantifications[0].quantification_number).toBe(4);
 
       const totalEl = fixture.debugElement.query(By.css('.actor-total'));
-      expect(totalEl.nativeElement.textContent.trim()).toBe('12');
+      // @akili-spec quick/innovation-use-actors-total-field: the total is a readonly input now, so the
+      // rendered figure lives in `.value`, not in textContent.
+      expect((totalEl.nativeElement as HTMLInputElement).value.trim()).toBe('12');
     });
   });
 
@@ -1888,7 +1904,8 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const totalEl = fixture.debugElement.query(By.css('.actor-total'));
-      expect(totalEl.nativeElement.textContent.trim()).toBe(String(serverEcho.actors[0].total));
+      // @akili-spec quick/innovation-use-actors-total-field: see the note above — `.value`, not textContent.
+      expect((totalEl.nativeElement as HTMLInputElement).value.trim()).toBe(String(serverEcho.actors[0].total));
     });
   });
 
@@ -3662,12 +3679,31 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('actor card "Total" value: text-[var(--ac-grey-800)] on --ac-grey-100 (>= 4.5:1, already conformant before R1)', () => {
-    const total = fixture.debugElement.query(By.css('span.actor-total'));
+  // @akili-spec quick/innovation-use-actors-total-field — the Total value moved from a <span> carrying
+  // `text-[var(--ac-grey-800)]` to a readonly <input>, so the colour is no longer set at the call site: it
+  // comes from `custom-fields.scss`'s `.app-page-wrapper input { color: #4c5158 !important }`. That hex IS
+  // `--ac-grey-800` (colors.scss:35), so the rendered colour is UNCHANGED and the 4.5:1 floor still holds —
+  // and it now sits on the input's lighter fill rather than the card's --ac-grey-100, which can only help.
+  // `disabled` is asserted here, not incidentally: it is what produces the app's standard non-editable
+  // look (the same one `general-information`'s Title field has), and it is also what suppresses PrimeNG's
+  // `:enabled:hover` / `:enabled:focus` borders, so the field stops inviting an edit it cannot accept.
+  // The ground therefore becomes the theme's `formField.disabledBackground` (`{surface.200}` = #e2e8f0),
+  // NOT the card's --ac-grey-100 — asserted below as the pair actually rendered. The theme's
+  // `disabledColor` never applies: `custom-fields.scss`'s `color: #4c5158 !important` outranks it, which
+  // is why the digits keep full strength here rather than dimming.
+  // SCOPE (KZ-017): the class-presence half of this check is GONE and could not be kept — no selector at
+  // the call site carries the colour any more. What survives is the arithmetic plus the readonly guard;
+  // the painted colour was never observed by this test in either form, since jsdom paints nothing.
+  it('actor card "Total" value: #4c5158 (= --ac-grey-800) on the theme disabled fill #e2e8f0 = 6.49:1 (>= 4.5:1)', () => {
+    const total = fixture.debugElement.query(By.css('input.actor-total'));
     expect(total).toBeTruthy();
-    expect((total!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    expect((total!.nativeElement as HTMLInputElement).disabled).toBe(true);
 
-    const ratio = contrastRatio(GREY_800, GREY_100);
+    // roartheme.ts `formField.disabledBackground` -> `{surface.200}`. Spelled here because it is a THEME
+    // token, not one of colors.scss's --ac-* set, so there is no --ac constant to reuse.
+    const DISABLED_FILL: Rgb = [226, 232, 240];
+    const ratio = contrastRatio(GREY_800, DISABLED_FILL);
+    expect(ratio).toBeCloseTo(6.49, 1);
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 

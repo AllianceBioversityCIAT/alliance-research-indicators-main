@@ -1,5 +1,13 @@
 <!-- @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell) -->
-<div class="app-page-wrapper">
+<!-- @akili-spec quick/innovation-use-bottom-clearance: the last card sat flush against the fixed
+     Back/Next/Save bar. Its own `rs-mb-[25]` was never missing — it matches all four sibling cards — but
+     that margin lands UNDER the bar: `.app-page-wrapper` reserves `margin-bottom: 70px` (styles.scss) while
+     `.result-nav-buttons-fixed` measures 99px, so the bar covers the 70px of reserve plus 29px more, eating
+     the card's 25px whole. Raising the reserve to 100px leaves 100 + 25 - 99 = ~26px actually visible,
+     matching the gap between cards. `!` because it overrides `.app-page-wrapper`'s own rule at equal
+     specificity. Scoped to this page's own wrapper — the global rule and the other 12 wizard pages are
+     untouched. -->
+<div class="app-page-wrapper !mb-[100px]">
   <app-form-header />
 
   @if (loadFailed()) {
