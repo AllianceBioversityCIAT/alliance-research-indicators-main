@@ -451,3 +451,13 @@ Ran a full assign→revoke cycle against `alliancereportingdb` (real data: G232,
 **B. New endpoint `GET /pi-delegates/by-delegate?delegate_user_id=<id>` (Reviewer PASS).** The inverse of `list(projectId)` — returns the active delegations for a delegate (which projects they're assigned to). Service `listByDelegate` with **own-or-admin auth** (403 before any DB call for a non-admin querying another user — judgment S4, no cross-user enumeration); `find({where:{delegate_user_id, is_active:true}, order:{project_id}})`. New DTO `ListByDelegateDto`; controller `@Get('by-delegate')` before `@Delete()`, ValidationPipe, no `@Roles`, Swagger. 3 unit tests (own/admin/forbidden) + e2e probe.
 
 **Verification:** `npm run build` clean; **`npm test -- --silent` 2734/2734 green**; eslint clean; `git diff --stat client/` empty. Docs: design §4/§13 + requirements §5 updated (supersede the DB-enforcement wording).
+
+---
+
+## Enrichment — by-project & by-delegate GET responses (2026-09-11, Product) — **PASS**
+
+Both GET endpoints now return joined project + person details (was: raw `pi_delegates` id rows).
+- **`GET /pi-delegates?projectId`** → `{ project_code (agreement_id), project_name (description), is_pool_funding_contributor (bool), status (contract_status), start_date, end_date, delegates: [{delegate_user_id, name, email}] }`.
+- **`GET /pi-delegates/by-delegate?delegate_user_id`** → `{ delegate_user_id, name, email, projects: [{project_code, project_name}] }`.
+- **Repo:** 4 raw-SQL methods (`findProjectSummary`, `findActiveDelegatesWithUser`, `findDelegateProjects`, `findUserSummary`) — parameterized joins to `agresso_contracts` + `sec_users`. **Service:** `list`/`listByDelegate` assemble the DTOs; auth unchanged (list = manage-project; by-delegate = own-or-admin 403-before-DB). **DTOs:** response DTOs with `@ApiProperty` + controller `@ApiOkResponse`.
+- **Reviewer PASS.** `npm run build` clean; **`npm test` 2739/2739 green**; eslint clean; `git diff client/` empty. ADVISORY (non-gating): INNER JOIN drops orphaned-FK rows (FKs enforced at insert, so N/A).

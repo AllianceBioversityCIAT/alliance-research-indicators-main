@@ -14,10 +14,15 @@ import {
 import {
   ApiBearerAuth,
   ApiBody,
+  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ProjectDelegatesResponseDto,
+  DelegateProjectsResponseDto,
+} from './dto/pi-delegate-response.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { PiDelegatesService } from './pi-delegates.service';
@@ -162,10 +167,17 @@ export class PiDelegatesController {
   // ─────────────────────────────────────────────────────────────────────────
   @Get()
   @ApiOperation({
-    summary: 'List active PI delegations for a project',
+    summary: 'List active PI delegations for a project (enriched)',
     description:
-      'Returns all active pi_delegates rows for the given projectId. ' +
+      'Returns a single project object with its active delegates. ' +
+      'Project fields (project_code, project_name, is_pool_funding_contributor, ' +
+      'status, start_date, end_date) come from agresso_contracts. ' +
+      'Delegate identity (delegate_user_id, name, email) comes from sec_users. ' +
       'Caller must be the PI, an active delegate, or SYSTEM_ADMIN (R-PID-007).',
+  })
+  @ApiOkResponse({
+    type: ProjectDelegatesResponseDto,
+    description: 'Project with its active delegate list',
   })
   @ApiQuery({
     name: 'projectId',
@@ -244,13 +256,19 @@ export class PiDelegatesController {
   // ─────────────────────────────────────────────────────────────────────────
   @Get('by-delegate')
   @ApiOperation({
-    summary: 'List active project assignments for a delegate',
+    summary: 'List active project assignments for a delegate (enriched)',
     description:
-      'Returns all active pi_delegates rows where delegate_user_id matches the given value. ' +
+      'Returns a single person object with the active projects they are delegated for. ' +
+      'Person fields (delegate_user_id, name, email) come from sec_users. ' +
+      'Project fields (project_code, project_name) come from agresso_contracts. ' +
       'This is the inverse of GET /pi-delegates?projectId: instead of listing the delegates ' +
       'of a project, it lists the projects a delegate is assigned to. ' +
       'Authorization (own-or-admin): the caller may query their own delegate_user_id; ' +
       'a SYSTEM_ADMIN may query any delegate_user_id. All other combinations return 403.',
+  })
+  @ApiOkResponse({
+    type: DelegateProjectsResponseDto,
+    description: 'Delegate with their active project list',
   })
   @ApiQuery({
     name: 'delegate_user_id',

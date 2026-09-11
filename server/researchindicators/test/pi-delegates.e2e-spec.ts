@@ -1,4 +1,5 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-09
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — enriched GET probes
 //
 // E2E / DB-semantic tests for PI Delegates.
 //
@@ -869,6 +870,18 @@ describe('PI Delegates — GET /api/pi-delegates/by-delegate (by-delegate endpoi
             'Behavioral assertion deferred (migration unapplied, K-015).',
         );
       } else {
+        // When the table exists: assert the enriched response shape (my-pi-delegates-ui).
+        // A 200 response MUST include the top-level person fields; behavioral assertions
+        // on projects[] require seed data and are deferred.
+        if (res.status === 200) {
+          const data = res.body?.data as Record<string, unknown> | undefined;
+          expect(data).toBeDefined();
+          expect(typeof data?.delegate_user_id).toBe('number');
+          // name and email may be null if the user has no sec_users row for the probe id
+          expect('name' in (data ?? {})).toBe(true);
+          expect('email' in (data ?? {})).toBe(true);
+          expect(Array.isArray(data?.projects)).toBe(true);
+        }
         console.info(
           `[by-delegate E2E-H] GET /api/pi-delegates/by-delegate?delegate_user_id=800020 → ${res.status}. ` +
             'Route mounted and service reached.',
@@ -892,6 +905,69 @@ describe('PI Delegates — GET /api/pi-delegates/by-delegate (by-delegate endpoi
 
       expect(res.status).not.toBe(404);
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ─── E2E-I — GET /api/pi-delegates?projectId enriched response shape ─────
+  //
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui
+  //
+  // Probe strategy (KZ-017 — declare what we CAN reach):
+  //   1. Valid projectId → route mounted (NOT 404) + DTO validates (NOT 400).
+  //   2. When table exists and returns 200: response.data has the enriched top-level
+  //      project fields (project_code, project_name, is_pool_funding_contributor,
+  //      status, start_date, end_date, delegates[]).
+  //
+  // What we CANNOT reach in this probe:
+  //   - Non-empty delegates[] (requires pi_delegates table + seed data, K-015).
+  //   - Real project_name values (requires a known agreement_id in agresso_contracts).
+  // ─────────────────────────────────────────────────────────────────────────
+  describe('E2E-I — GET /api/pi-delegates?projectId enriched response shape (my-pi-delegates-ui)', () => {
+    it('valid projectId → route mounted (NOT 404), enriched project object in response when 200', async () => {
+      const res = await request(byDelegateApp.getHttpServer())
+        .get('/api/pi-delegates')
+        .query({ projectId: 'E2E-PROBE-I' });
+
+      // 404 = route not mounted — the failure this test guards against.
+      expect(res.status).not.toBe(404);
+
+      const txt = JSON.stringify(res.body);
+      const tableAbsent =
+        res.status === 500 &&
+        txt.includes('pi_delegates') &&
+        (txt.includes('1146') ||
+          txt.includes("doesn't exist") ||
+          txt.includes('no such table'));
+
+      if (tableAbsent) {
+        console.warn(
+          '[E2E-I] GET /api/pi-delegates?projectId — route mounted, ' +
+            'but pi_delegates table does not exist. ' +
+            'Enriched shape probe deferred (migration unapplied, K-015).',
+        );
+        return;
+      }
+
+      // When the table exists and a 200 comes back: assert the enriched top-level keys.
+      // The probe project (E2E-PROBE-I) likely doesn't exist in agresso_contracts,
+      // so project_name/status/dates may be null — that is the specified fallback.
+      if (res.status === 200) {
+        const data = res.body?.data as Record<string, unknown> | undefined;
+        expect(data).toBeDefined();
+        expect(typeof data?.project_code).toBe('string');
+        expect('project_name' in (data ?? {})).toBe(true);
+        expect(typeof data?.is_pool_funding_contributor).toBe('boolean');
+        expect('status' in (data ?? {})).toBe(true);
+        expect('start_date' in (data ?? {})).toBe(true);
+        expect('end_date' in (data ?? {})).toBe(true);
+        expect(Array.isArray(data?.delegates)).toBe(true);
+      }
+
+      console.info(
+        `[E2E-I] GET /api/pi-delegates?projectId=E2E-PROBE-I → ${res.status}. ` +
+          'Enriched project shape probe complete. ' +
+          'Full behavioral assertion (non-empty delegates[]) deferred pending seed data (K-015).',
+      );
     });
   });
 });

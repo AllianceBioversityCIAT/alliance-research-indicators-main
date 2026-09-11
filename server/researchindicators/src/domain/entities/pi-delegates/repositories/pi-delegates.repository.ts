@@ -361,6 +361,129 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     return result.affected ?? 0;
   }
 
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui
+  // ─────────────────────────────────────────────────────────────────────────
+  // Enriched GET helpers (raw SQL — sec_users has no TypeORM entity)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the agresso_contracts row for a single project code, or null when
+   * no matching row exists.
+   *
+   * Used by list() to populate the project-level fields of
+   * ProjectDelegatesResponseDto.
+   *
+   * @param projectId  agresso_contracts.agreement_id
+   */
+  async findProjectSummary(projectId: string): Promise<{
+    agreement_id: string;
+    description: string | null;
+    is_pool_funding_contributor: number;
+    contract_status: string | null;
+    start_date: Date | null;
+    end_date: Date | null;
+  } | null> {
+    const rows: Array<{
+      agreement_id: string;
+      description: string | null;
+      is_pool_funding_contributor: number;
+      contract_status: string | null;
+      start_date: Date | null;
+      end_date: Date | null;
+    }> = await this.dataSource.query(
+      `SELECT agreement_id, description, is_pool_funding_contributor,
+              contract_status, start_date, end_date
+       FROM agresso_contracts
+       WHERE agreement_id = ?
+       LIMIT 1`,
+      [projectId],
+    );
+    return rows?.length ? rows[0] : null;
+  }
+
+  /**
+   * Returns the active delegates of a project, enriched with sec_users identity.
+   *
+   * Used by list() to populate the delegates[] array of
+   * ProjectDelegatesResponseDto.
+   *
+   * @param projectId  agresso_contracts.agreement_id / pi_delegates.project_id
+   */
+  async findActiveDelegatesWithUser(projectId: string): Promise<
+    Array<{
+      delegate_user_id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+    }>
+  > {
+    return this.dataSource.query(
+      `SELECT pd.delegate_user_id,
+              su.first_name,
+              su.last_name,
+              su.email
+       FROM pi_delegates pd
+         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+       WHERE pd.project_id = ?
+         AND pd.is_active = TRUE
+       ORDER BY su.last_name, su.first_name`,
+      [projectId],
+    );
+  }
+
+  /**
+   * Returns all active projects a delegate is currently assigned to, as
+   * lightweight project summary objects.
+   *
+   * Used by listByDelegate() to populate the projects[] array of
+   * DelegateProjectsResponseDto.
+   *
+   * @param delegateUserId  sec_users.sec_user_id
+   */
+  async findDelegateProjects(
+    delegateUserId: number,
+  ): Promise<Array<{ agreement_id: string; description: string | null }>> {
+    return this.dataSource.query(
+      `SELECT ac.agreement_id, ac.description
+       FROM pi_delegates pd
+         INNER JOIN agresso_contracts ac ON ac.agreement_id = pd.project_id
+       WHERE pd.delegate_user_id = ?
+         AND pd.is_active = TRUE
+       ORDER BY ac.agreement_id`,
+      [delegateUserId],
+    );
+  }
+
+  /**
+   * Returns identity fields for a single sec_user, or null when the user does
+   * not exist.
+   *
+   * Used by listByDelegate() to populate the person-level fields of
+   * DelegateProjectsResponseDto.
+   *
+   * @param userId  sec_users.sec_user_id
+   */
+  async findUserSummary(userId: number): Promise<{
+    sec_user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null> {
+    const rows: Array<{
+      sec_user_id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+    }> = await this.dataSource.query(
+      `SELECT sec_user_id, first_name, last_name, email
+       FROM sec_users
+       WHERE sec_user_id = ?
+       LIMIT 1`,
+      [userId],
+    );
+    return rows?.length ? rows[0] : null;
+  }
+
   // @akili-spec docs/specs/changes/my-pi-delegates — T-18
   // ─────────────────────────────────────────────────────────────────────────
   // History write (R-PID-012)

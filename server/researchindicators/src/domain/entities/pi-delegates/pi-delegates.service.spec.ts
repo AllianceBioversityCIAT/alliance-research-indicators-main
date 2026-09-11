@@ -1,7 +1,7 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-21
-// active_delegate_key removal + by-delegate endpoint (2026-09-11)
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — enriched list() + listByDelegate()
 //
-// Unit tests for PiDelegatesService (v5 — pi_user_id removed from entity + history).
+// Unit tests for PiDelegatesService (v5 — pi_user_id removed + enriched GET responses).
 //
 // pi_user_id was removed from pi_delegates and pi_delegate_history (Product decision
 // 2026-09-11 — redundant with created_by). This file adapts the v4 (T-21) suite
@@ -10,6 +10,14 @@
 //   - recordHistory(entry, actorId, manager) where entry = { pi_delegate_id, project_id,
 //     delegate_user_id, action } — no pi_user_id in entry.
 //   - Fixture rows for revoke context no longer carry pi_user_id.
+//
+// Enriched GET (my-pi-delegates-ui):
+//   - list() now returns ProjectDelegatesResponseDto (project + delegates[]) assembled
+//     from findProjectSummary + findActiveDelegatesWithUser.
+//   - listByDelegate() now returns DelegateProjectsResponseDto (person + projects[])
+//     assembled from findUserSummary + findDelegateProjects.
+//   - The old raw-row assertions are replaced with enriched-shape assertions.
+//   - Auth paths (list → assertCanManageProject; listByDelegate → own-or-admin) are unchanged.
 //
 // History-actor assertion adaptation (requirement 2 per brief):
 //   Previously, revoke tests asserted that the FETCHED ROW's pi_user_id appeared in
@@ -23,16 +31,17 @@
 // What is kept from v4:
 //   - Scenarios 1–11 coverage (per-project sync, empty=revoke-all, history per movement,
 //     PI-exclusion, auth, provision-once, bulkRevoke shapes A+B, ambiguity guard, auth deny).
-//   - list() / verify() regression tests.
+//   - verify() regression tests.
 //   - KZ-001 (assertions on args, not bare call count), KZ-004 (distinct ids per scenario).
 //
 // Constructor: new PiDelegatesService(repo, currentUserUtil, dataSource)
 //
 // Seams (design.md §11.3 / TDD skill):
-//   - assign()     → ProjectSyncSummary[] | ForbiddenException | BadRequestException
-//   - bulkRevoke() → BulkRevokeSummary    | ForbiddenException | BadRequestException
-//   - list()       → PiDelegate[]         | ForbiddenException
-//   - verify()     → { exists: boolean }  | ForbiddenException
+//   - assign()         → ProjectSyncSummary[]         | ForbiddenException | BadRequestException
+//   - bulkRevoke()     → BulkRevokeSummary             | ForbiddenException | BadRequestException
+//   - list()           → ProjectDelegatesResponseDto   | ForbiddenException
+//   - listByDelegate() → DelegateProjectsResponseDto   | ForbiddenException
+//   - verify()         → { exists: boolean }            | ForbiddenException
 //
 // KZ-001: assertions on returned values / thrown exceptions / recordHistory +
 //   insertDelegate + softDelete* call arguments — NOT bare call order.
@@ -40,7 +49,7 @@
 // KZ-004: distinct project ids and delegate user ids per scenario so
 //   per-project scoping is proven, not a batch-wide pass.
 //
-// Scenario → test map (T-21, v5):
+// Scenario → test map (T-21, v5 + enriched):
 //   1  — per-project sync (distinct lists per project, P1 and P2)
 //   2  — empty delegates = revoke-all (R-PID-011 AC.3)
 //   3  — history per movement (assign: insertDelegate id; revoke: fetched row context + actorId)
@@ -50,6 +59,8 @@
 //   6  — bulkRevoke Shape A → recordHistory('revoke') per row with row context
 //   7  — bulkRevoke Shape B → recordHistory('revoke') per fetched row
 //   (8–11 from T-14 — bulkRevoke shapes / ambiguity guard / auth — kept)
+//   12 — list() enriched: assembles ProjectDelegatesResponseDto from project + delegate rows
+//   13 — listByDelegate() enriched: assembles DelegateProjectsResponseDto from user + project rows
 
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
@@ -102,6 +113,35 @@ interface MockRepoOptions {
    * Default: [] (no rows — safe for tests that don't revoke).
    */
   rowsToRevokeByProject?: Record<string, PiDelegate[]>;
+  // ── Enriched GET helpers (my-pi-delegates-ui) ────────────────────────────
+  /** findProjectSummary result (default: null — project not found) */
+  findProjectSummaryResult?: {
+    agreement_id: string;
+    description: string | null;
+    is_pool_funding_contributor: number;
+    contract_status: string | null;
+    start_date: Date | null;
+    end_date: Date | null;
+  } | null;
+  /** findActiveDelegatesWithUser result (default: []) */
+  findActiveDelegatesWithUserResult?: Array<{
+    delegate_user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  }>;
+  /** findUserSummary result (default: null — user not found) */
+  findUserSummaryResult?: {
+    sec_user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  /** findDelegateProjects result (default: []) */
+  findDelegateProjectsResult?: Array<{
+    agreement_id: string;
+    description: string | null;
+  }>;
 }
 
 function makeService(opts: {
@@ -212,6 +252,24 @@ function makeService(opts: {
 
   const recordHistory = jest.fn().mockResolvedValue(undefined);
 
+  // ── Enriched GET helpers (my-pi-delegates-ui) ──────────────────────────────
+
+  const findProjectSummary = jest
+    .fn()
+    .mockResolvedValue(repoOpts.findProjectSummaryResult ?? null);
+
+  const findActiveDelegatesWithUser = jest
+    .fn()
+    .mockResolvedValue(repoOpts.findActiveDelegatesWithUserResult ?? []);
+
+  const findUserSummary = jest
+    .fn()
+    .mockResolvedValue(repoOpts.findUserSummaryResult ?? null);
+
+  const findDelegateProjects = jest
+    .fn()
+    .mockResolvedValue(repoOpts.findDelegateProjectsResult ?? []);
+
   const mockRepo = {
     isPiOrActiveDelegateOfProject,
     isPiOfProject,
@@ -223,6 +281,10 @@ function makeService(opts: {
     findOne,
     find,
     recordHistory,
+    findProjectSummary,
+    findActiveDelegatesWithUser,
+    findUserSummary,
+    findDelegateProjects,
   } as unknown as PiDelegatesRepository;
 
   // ── Mock currentUserUtil ───────────────────────────────────────────────────
@@ -263,6 +325,11 @@ function makeService(opts: {
     findOne,
     recordHistory,
     managerFind,
+    // Enriched GET mocks (my-pi-delegates-ui)
+    findProjectSummary,
+    findActiveDelegatesWithUser,
+    findUserSummary,
+    findDelegateProjects,
   };
 }
 
@@ -1296,36 +1363,142 @@ describe('bulkRevoke() — Scenario 11: Shape A auth denied on row project', () 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// list() and verify() — unchanged from v2, kept for regression
+// T-21 (enriched) Scenario 12 — list() assembles ProjectDelegatesResponseDto
+//
+// list() now returns one project object with its active delegates, assembled from
+// findProjectSummary + findActiveDelegatesWithUser.
+//
+// KZ-001: assert on the RETURNED object fields (project_code, delegates[].name, etc.)
+//   and the repo method call arguments — NOT on bare call count.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('list() and verify() — unchanged from v2', () => {
-  it('list() returns active delegations for the given projectId', async () => {
-    const rows = [
-      makePiDelegate({ project_id: 'PROJ-LIST', delegate_user_id: 61 }),
-      makePiDelegate({
-        project_id: 'PROJ-LIST',
-        delegate_user_id: 62,
-        pi_delegate_id: 2,
-      }),
-    ];
+describe('list() — Scenario 12: enriched ProjectDelegatesResponseDto (my-pi-delegates-ui)', () => {
+  it('returns project fields + delegates array with name assembled from first+last', async () => {
+    const { service, findProjectSummary, findActiveDelegatesWithUser } =
+      makeService({
+        userId: 10,
+        roles: [SecRolesEnum.SYSTEM_ADMIN],
+        repo: {
+          findProjectSummaryResult: {
+            agreement_id: 'G232',
+            description: 'CGIAR Fund - PRMS Year 2025',
+            is_pool_funding_contributor: 0,
+            contract_status: 'COMPLETED',
+            start_date: new Date('2025-01-01T04:00:00.000Z'),
+            end_date: new Date('2025-12-31T04:00:00.000Z'),
+          },
+          findActiveDelegatesWithUserResult: [
+            {
+              delegate_user_id: 1,
+              first_name: 'Juan Carlos',
+              last_name: 'Cadavid',
+              email: 'j.cadavid@cgiar.org',
+            },
+          ],
+        },
+      });
 
-    const { service, mockRepo } = makeService({
-      userId: 10,
-      roles: [SecRolesEnum.SYSTEM_ADMIN],
-    });
-    // Override find on the mock repo
-    (mockRepo.find as jest.Mock).mockResolvedValue(rows);
+    const result = await service.list('G232');
 
-    const result = await service.list('PROJ-LIST');
+    // Project-level fields (KZ-001)
+    expect(result.project_code).toBe('G232');
+    expect(result.project_name).toBe('CGIAR Fund - PRMS Year 2025');
+    expect(result.is_pool_funding_contributor).toBe(false); // tinyint 0 → boolean false
+    expect(result.status).toBe('COMPLETED');
+    expect(result.start_date).toEqual(new Date('2025-01-01T04:00:00.000Z'));
+    expect(result.end_date).toEqual(new Date('2025-12-31T04:00:00.000Z'));
 
-    expect(result).toBe(rows);
-    expect(mockRepo.find).toHaveBeenCalledWith({
-      where: { project_id: 'PROJ-LIST', is_active: true },
-      order: { pi_delegate_id: 'ASC' },
-    });
+    // Delegates array
+    expect(result.delegates).toHaveLength(1);
+    expect(result.delegates[0].delegate_user_id).toBe(1);
+    expect(result.delegates[0].name).toBe('Juan Carlos Cadavid');
+    expect(result.delegates[0].email).toBe('j.cadavid@cgiar.org');
+
+    // Repo methods called with the correct projectId (KZ-001)
+    expect(findProjectSummary).toHaveBeenCalledWith('G232');
+    expect(findActiveDelegatesWithUser).toHaveBeenCalledWith('G232');
   });
 
-  it('list() for unauthorized caller → ForbiddenException', async () => {
+  it('is_pool_funding_contributor: tinyint 1 → boolean true', async () => {
+    const { service } = makeService({
+      userId: 10,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G233',
+          description: 'Pool Funding Project',
+          is_pool_funding_contributor: 1,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [],
+      },
+    });
+
+    const result = await service.list('G233');
+
+    expect(result.is_pool_funding_contributor).toBe(true);
+  });
+
+  it('project not found → project_code falls back to the queried projectId, nulls for other fields', async () => {
+    const { service } = makeService({
+      userId: 10,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: null, // project not in agresso_contracts
+        findActiveDelegatesWithUserResult: [],
+      },
+    });
+
+    const result = await service.list('PHANTOM-PROJ');
+
+    expect(result.project_code).toBe('PHANTOM-PROJ');
+    expect(result.project_name).toBeNull();
+    expect(result.is_pool_funding_contributor).toBe(false); // Boolean(undefined) = false
+    expect(result.status).toBeNull();
+    expect(result.delegates).toHaveLength(0);
+  });
+
+  it('multiple delegates → delegates[] has all entries with correct names', async () => {
+    const { service } = makeService({
+      userId: 10,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G234',
+          description: 'Multi-delegate Project',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 10,
+            first_name: 'Ana',
+            last_name: 'García',
+            email: 'a.garcia@cgiar.org',
+          },
+          {
+            delegate_user_id: 11,
+            first_name: 'Bob',
+            last_name: 'Smith',
+            email: 'b.smith@cgiar.org',
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G234');
+
+    expect(result.delegates).toHaveLength(2);
+    expect(result.delegates[0].name).toBe('Ana García');
+    expect(result.delegates[1].name).toBe('Bob Smith');
+    // delegate_user_id must be a Number (cast from DB bigint/string)
+    expect(typeof result.delegates[0].delegate_user_id).toBe('number');
+  });
+
+  it('list() for unauthorized caller → ForbiddenException (auth unchanged)', async () => {
     const { service } = makeService({
       userId: 88,
       roles: [],
@@ -1336,7 +1509,12 @@ describe('list() and verify() — unchanged from v2', () => {
       ForbiddenException,
     );
   });
+});
 
+// ─────────────────────────────────────────────────────────────────────────────
+// verify() — unchanged logic, kept for regression
+// ─────────────────────────────────────────────────────────────────────────────
+describe('verify() — unchanged from v2', () => {
   it('verify() returns { exists: true } when delegation row found', async () => {
     const row = makePiDelegate({
       project_id: 'PROJ-VER',
@@ -1376,87 +1554,137 @@ describe('list() and verify() — unchanged from v2', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// listByDelegate() — by-delegate endpoint
-// @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+// T-21 (enriched) Scenario 13 — listByDelegate() assembles DelegateProjectsResponseDto
+// @akili-spec docs/specs/changes/my-pi-delegates-ui
 //
-// Auth contract (own-or-admin):
+// listByDelegate() now returns one person object with their active projects,
+// assembled from findUserSummary + findDelegateProjects.
+//
+// Auth contract (own-or-admin — unchanged):
 //   - Own delegate (delegateUserId === caller's user_id) → allowed for any role.
-//   - SYSTEM_ADMIN querying another delegate_user_id          → allowed.
-//   - Non-admin querying another delegate_user_id             → ForbiddenException.
+//   - SYSTEM_ADMIN querying another delegate_user_id     → allowed.
+//   - Non-admin querying another delegate_user_id        → ForbiddenException (403)
+//     thrown BEFORE any DB method is called.
 //
-// Seam: piDelegatesRepository.find({ where: { delegate_user_id, is_active: true }, order: { project_id: 'ASC' } })
-//
-// KZ-001: assert on the returned rows and the find() call args (where-clause),
-//   plus the thrown exception — not on bare call order.
+// KZ-001: assert on the RETURNED object fields (name, email, projects[].project_code, etc.)
+//   and the repo method call arguments — NOT on bare call order.
+// KZ-004: distinct delegate_user_ids across scenarios.
 // ─────────────────────────────────────────────────────────────────────────────
-describe('listByDelegate() — own delegate, SYSTEM_ADMIN, and forbidden path', () => {
-  it('own delegate → returns the active rows (asserts find where-clause args)', async () => {
+describe('listByDelegate() — Scenario 13: enriched DelegateProjectsResponseDto (my-pi-delegates-ui)', () => {
+  it('own delegate → returns person fields + projects[] with project_code and project_name', async () => {
     const ownUserId = 200;
-    const expectedRows = [
-      makePiDelegate({
-        pi_delegate_id: 1001,
-        project_id: 'PROJ-BD-A',
-        delegate_user_id: ownUserId,
-        is_active: true,
-      }),
-      makePiDelegate({
-        pi_delegate_id: 1002,
-        project_id: 'PROJ-BD-B',
-        delegate_user_id: ownUserId,
-        is_active: true,
-      }),
-    ];
 
-    const { service, mockRepo } = makeService({
+    const { service, findUserSummary, findDelegateProjects } = makeService({
       userId: ownUserId,
       roles: [], // not SYSTEM_ADMIN — allowed because it is own id
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: ownUserId,
+          first_name: 'Juan Carlos',
+          last_name: 'Cadavid',
+          email: 'j.cadavid@cgiar.org',
+        },
+        findDelegateProjectsResult: [
+          { agreement_id: 'G232', description: 'CGIAR Fund - PRMS Year 2025' },
+          { agreement_id: 'G233', description: 'Pool Funding Project' },
+        ],
+      },
     });
-    (mockRepo.find as jest.Mock).mockResolvedValue(expectedRows);
 
     const result = await service.listByDelegate(ownUserId);
 
-    // Returned rows match what the repo yielded
-    expect(result).toBe(expectedRows);
+    // Person-level fields (KZ-001)
+    expect(result.delegate_user_id).toBe(ownUserId);
+    expect(result.name).toBe('Juan Carlos Cadavid');
+    expect(result.email).toBe('j.cadavid@cgiar.org');
 
-    // find() called with the correct where-clause (KZ-001)
-    expect(mockRepo.find).toHaveBeenCalledWith({
-      where: { delegate_user_id: ownUserId, is_active: true },
-      order: { project_id: 'ASC' },
-    });
+    // Projects array
+    expect(result.projects).toHaveLength(2);
+    expect(result.projects[0].project_code).toBe('G232');
+    expect(result.projects[0].project_name).toBe('CGIAR Fund - PRMS Year 2025');
+    expect(result.projects[1].project_code).toBe('G233');
+
+    // Repo methods called with the correct userId (KZ-001)
+    expect(findUserSummary).toHaveBeenCalledWith(ownUserId);
+    expect(findDelegateProjects).toHaveBeenCalledWith(ownUserId);
   });
 
-  it('SYSTEM_ADMIN querying another delegate → allowed, returns rows', async () => {
+  it('SYSTEM_ADMIN querying another delegate → allowed, returns enriched response', async () => {
     const adminUserId = 201;
     const targetDelegateId = 999; // different from caller
-    const expectedRows = [
-      makePiDelegate({
-        pi_delegate_id: 1003,
-        project_id: 'PROJ-BD-C',
-        delegate_user_id: targetDelegateId,
-        is_active: true,
-      }),
-    ];
 
-    const { service, mockRepo } = makeService({
+    const { service } = makeService({
       userId: adminUserId,
       roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: targetDelegateId,
+          first_name: 'Target',
+          last_name: 'User',
+          email: 'target@cgiar.org',
+        },
+        findDelegateProjectsResult: [
+          { agreement_id: 'G300', description: 'Project 300' },
+        ],
+      },
     });
-    (mockRepo.find as jest.Mock).mockResolvedValue(expectedRows);
 
     const result = await service.listByDelegate(targetDelegateId);
 
-    expect(result).toBe(expectedRows);
-    expect(mockRepo.find).toHaveBeenCalledWith({
-      where: { delegate_user_id: targetDelegateId, is_active: true },
-      order: { project_id: 'ASC' },
-    });
+    expect(result.delegate_user_id).toBe(targetDelegateId);
+    expect(result.name).toBe('Target User');
+    expect(result.projects).toHaveLength(1);
+    expect(result.projects[0].project_code).toBe('G300');
   });
 
-  it('non-admin querying ANOTHER delegate_user_id → ForbiddenException (K-012 red input)', async () => {
-    const callerUserId = 202;
+  it('user not found → name and email are null, projects array from repo', async () => {
+    const delegateId = 202;
+
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: null, // user absent in sec_users
+        findDelegateProjectsResult: [],
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+
+    expect(result.delegate_user_id).toBe(delegateId);
+    expect(result.name).toBeNull();
+    expect(result.email).toBeNull();
+    expect(result.projects).toHaveLength(0);
+  });
+
+  it('no active project assignments → projects is an empty array', async () => {
+    const delegateId = 203;
+
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: delegateId,
+          first_name: 'Empty',
+          last_name: 'Delegate',
+          email: 'empty@cgiar.org',
+        },
+        findDelegateProjectsResult: [], // no active delegations
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+
+    expect(result.name).toBe('Empty Delegate');
+    expect(result.projects).toHaveLength(0);
+  });
+
+  it('non-admin querying ANOTHER delegate_user_id → ForbiddenException BEFORE any DB call', async () => {
+    const callerUserId = 204;
     const otherDelegateId = 888; // not the caller's own id
 
-    const { service, mockRepo } = makeService({
+    const { service, findUserSummary, findDelegateProjects } = makeService({
       userId: callerUserId,
       roles: [SecRolesEnum.CONTRIBUTOR], // non-admin
     });
@@ -1465,7 +1693,8 @@ describe('listByDelegate() — own delegate, SYSTEM_ADMIN, and forbidden path', 
       ForbiddenException,
     );
 
-    // find() must NOT be called — the 403 is thrown before any DB access (KZ-001)
-    expect(mockRepo.find).not.toHaveBeenCalled();
+    // DB methods must NOT be called — the 403 is thrown before any DB access (KZ-001)
+    expect(findUserSummary).not.toHaveBeenCalled();
+    expect(findDelegateProjects).not.toHaveBeenCalled();
   });
 });

@@ -59,6 +59,10 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { PiDelegate } from './entities/pi-delegate.entity';
 import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
+import {
+  ProjectDelegatesResponseDto,
+  DelegateProjectsResponseDto,
+} from './dto/pi-delegate-response.dto';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Response shapes
@@ -513,16 +517,42 @@ export class PiDelegatesService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * List all active delegations for a project (R-PID-004 AC.1).
-   * Auth is enforced: only PI, active delegate, or SYSTEM_ADMIN may list.
+   * List active delegations for a project, enriched with project + person details
+   * (GET /pi-delegates?projectId — my-pi-delegates-ui spec).
+   *
+   * Auth is enforced: only PI, active delegate, or SYSTEM_ADMIN may list
+   * (R-PID-007 / R-PID-004 AC.1).
+   *
+   * Returns a single ProjectDelegatesResponseDto that embeds:
+   *   - Project fields from agresso_contracts (project_code, project_name,
+   *     is_pool_funding_contributor, status, start_date, end_date).
+   *   - delegates[] from pi_delegates JOIN sec_users (id, name, email).
+   *
+   * @param projectId  agresso_contracts.agreement_id
    */
-  async list(projectId: string): Promise<PiDelegate[]> {
+  async list(projectId: string): Promise<ProjectDelegatesResponseDto> {
     await this.assertCanManageProject(projectId);
 
-    return this.piDelegatesRepository.find({
-      where: { project_id: projectId, is_active: true },
-      order: { pi_delegate_id: 'ASC' },
-    });
+    const [project, delegates] = await Promise.all([
+      this.piDelegatesRepository.findProjectSummary(projectId),
+      this.piDelegatesRepository.findActiveDelegatesWithUser(projectId),
+    ]);
+
+    return {
+      project_code: project?.agreement_id ?? projectId,
+      project_name: project?.description ?? null,
+      is_pool_funding_contributor: Boolean(
+        project?.is_pool_funding_contributor,
+      ),
+      status: project?.contract_status ?? null,
+      start_date: project?.start_date ?? null,
+      end_date: project?.end_date ?? null,
+      delegates: delegates.map((d) => ({
+        delegate_user_id: Number(d.delegate_user_id),
+        name: `${d.first_name} ${d.last_name}`.trim(),
+        email: d.email,
+      })),
+    };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -531,13 +561,10 @@ export class PiDelegatesService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * List all active projects a delegate is currently assigned to.
+   * List active project assignments for a delegate, enriched with person + project
+   * details (GET /pi-delegates/by-delegate — my-pi-delegates-ui spec).
    *
-   * This is the inverse of list() which returns delegates of a project.
-   * listByDelegate() returns all pi_delegates rows where delegate_user_id
-   * matches the given value and is_active = true.
-   *
-   * Authorization (own-or-admin):
+   * Authorization (own-or-admin — unchanged from v2):
    *   - The caller may query their own delegate_user_id unconditionally.
    *   - A SYSTEM_ADMIN may query any delegate_user_id.
    *   - Any other combination → ForbiddenException (403).
@@ -545,9 +572,16 @@ export class PiDelegatesService {
    * assertCanManageProject is deliberately NOT used here — this query is
    * cross-project; there is no single project_id to gate on.
    *
-   * @param delegateUserId  sec_user_id of the delegate to query
+   * Returns a single DelegateProjectsResponseDto that embeds:
+   *   - Person fields from sec_users (delegate_user_id, name, email).
+   *   - projects[] from pi_delegates JOIN agresso_contracts
+   *     (project_code, project_name).
+   *
+   * @param delegateUserId  sec_users.sec_user_id of the delegate to query
    */
-  async listByDelegate(delegateUserId: number): Promise<PiDelegate[]> {
+  async listByDelegate(
+    delegateUserId: number,
+  ): Promise<DelegateProjectsResponseDto> {
     const callerUserId = this.currentUserUtil.user_id;
     const roles = this.currentUserUtil.roles ?? [];
 
@@ -560,10 +594,20 @@ export class PiDelegatesService {
       );
     }
 
-    return this.piDelegatesRepository.find({
-      where: { delegate_user_id: delegateUserId, is_active: true },
-      order: { project_id: 'ASC' },
-    });
+    const [user, projects] = await Promise.all([
+      this.piDelegatesRepository.findUserSummary(delegateUserId),
+      this.piDelegatesRepository.findDelegateProjects(delegateUserId),
+    ]);
+
+    return {
+      delegate_user_id: delegateUserId,
+      name: user ? `${user.first_name} ${user.last_name}`.trim() : null,
+      email: user?.email ?? null,
+      projects: projects.map((p) => ({
+        project_code: p.agreement_id,
+        project_name: p.description,
+      })),
+    };
   }
 
   /**
