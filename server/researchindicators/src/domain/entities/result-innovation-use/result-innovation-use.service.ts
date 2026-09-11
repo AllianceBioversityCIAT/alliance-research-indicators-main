@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ResultInnovationUse } from './entities/result-innovation-use.entity';
+import { Result } from '../results/entities/result.entity';
 import {
   CurrentUserUtil,
   SetAuditEnum,
@@ -32,6 +33,30 @@ import { ResultsService } from '../results/results.service';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
+
+/**
+ * `docs/specs/innovation-use/dev-card-details` T-01 — the three Innovation
+ * Dev card facts, shared by both entry points (T-02's section read, T-04's
+ * targeted endpoint). See `readInnovationDevCardFacts` below for the
+ * mechanism. `innovation_readiness` carries `level` and `name` **each
+ * independently nullable** — never collapsed to a bare `null` object when
+ * only one part is missing (`design.md` DD-9; the client, not this read,
+ * guards the parts for display).
+ *
+ * Exported (`docs/specs/innovation-use/dev-card-details` T-04, carried
+ * advisory from T-01) so the targeted endpoint's response DTO
+ * (`dto/innovation-dev-card-facts.dto.ts`) can `implements` it directly —
+ * the contract cannot silently drift between the two files.
+ */
+export interface InnovationDevCardFacts {
+  innovation_readiness: {
+    id: number;
+    level: number | null;
+    name: string | null;
+  } | null;
+  description: string | null;
+  geo_scope: { code: number; name: string | null } | null;
+}
 
 /**
  * T-05 (R-IUA-002, R-IUA-004 AC.5, R-IUA-001, R-IUA-008 AC.1/AC.3/AC.4) +
@@ -598,6 +623,23 @@ export class ResultInnovationUseService {
      */
     const innovationDevLink = innovationDevLinks?.[0] ?? null;
 
+    /**
+     * `docs/specs/innovation-use/dev-card-details` T-02 (`design.md` §4.1,
+     * §5.2; `R-IUC-001`, `R-IUC-002`, `R-IUC-006`; `DC-1`, `DC-3`).
+     *
+     * Keyed off **`innovationDevLink.other_result_id`** — the LINKED
+     * Innovation Dev result — never off this method's own `resultId`. That
+     * is the whole point of the task: the three facts describe the linked
+     * result, not the Innovation Use result being viewed. Called **only**
+     * when a link exists, and **at most once** per read: when
+     * `innovationDevLink` is `null` there is no target to read and
+     * `readInnovationDevCardFacts` is not invoked at all — zero extra
+     * queries, matching §5.2's "when it is null, §5.1 is not called".
+     */
+    const innovationDevCardFacts = innovationDevLink
+      ? await this.readInnovationDevCardFacts(innovationDevLink.other_result_id)
+      : null;
+
     return {
       innovation_use_level_id: detail?.innovation_use_level_id ?? null,
       innovation_use_level: detail?.innovation_use_level?.level ?? null,
@@ -612,14 +654,203 @@ export class ResultInnovationUseService {
       innovation_dev_result_id: innovationDevLink?.other_result_id ?? null,
       linked_innovation_dev: innovationDevLink
         ? {
+            // The four pre-existing sub-keys — byte-identical to before this
+            // task (`R-IUC-006`): same names, same types, same `?? null`
+            // coercion on `title` and `platform_code`. Not touched.
             result_id: innovationDevLink.other_result.result_id,
             result_official_code:
               innovationDevLink.other_result.result_official_code,
             title: innovationDevLink.other_result.title ?? null,
             platform_code: innovationDevLink.other_result.platform_code ?? null,
+            // The three new facts, from the linked result via T-01's shared
+            // read (`innovationDevCardFacts` is non-null here, because
+            // `innovationDevLink` is non-null in this branch).
+            innovation_readiness: innovationDevCardFacts.innovation_readiness,
+            description: innovationDevCardFacts.description,
+            geo_scope: innovationDevCardFacts.geo_scope,
           }
         : null,
     };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-01 — `design.md` §3.1,
+   * §3.2, §5.1, `DD-3`, `DD-4` (`R-IUC-001`, `R-IUC-002`, `NFR-IUC-001`).
+   *
+   * The single source of truth for the Innovation Dev card's three facts —
+   * readiness, description, geographic scope — for a given result id. Both
+   * entry points call it: T-02's section read (keyed off the LINK's
+   * `other_result_id`, never the viewed result's own id) and T-04's
+   * targeted endpoint (keyed off its path param, already bounded by T-03).
+   * Sharing one method is what makes the two structurally incapable of
+   * disagreeing (`R-IUC-007` AC.2, `DC-10`) — this task adds the method
+   * only; wiring it into `findOne` is T-02's scope, not this one's.
+   *
+   * **Why a `QueryBuilder`, not `relations` (§3.2, DD-3) — round 1's
+   * sharpest finding.** Expressing the `result_innovation_dev.is_active`
+   * filter the way `relations` allows —
+   * `where: { result_id, result_innovation_dev: { is_active: true } }` —
+   * puts the predicate in the **`WHERE`** clause against a `LEFT JOIN`. A
+   * target with no detail row, or an inactive one, then yields
+   * `detail.is_active IS NULL` and the **parent `Result` row is excluded
+   * entirely** — losing `description` and `geo_scope`, neither of which
+   * depends on that row at all. The fix: attach the predicate to the join's
+   * **`ON`** clause instead (the third argument to `leftJoinAndSelect`), so
+   * the parent always comes back when it exists and the detail is simply
+   * absent when missing or inactive. `geo_scope` is joined
+   * **unconditionally**; `where` constrains only the parent's own id — this
+   * is the shape `DC-14`'s `test:fixtures` assertion checks against the
+   * real emitted SQL (`NFR-IUC-001`'s disqualifier: a mocked-repository
+   * call-count assertion proves the call, never the SQL, whatever query API
+   * is used — §11 limit 3).
+   *
+   * **`[0] ?? null` on the relation array (§3.1).** `result.result_innovation_dev`
+   * is typed `@OneToMany`, but `ResultInnovationDev.result_id` is the
+   * child's `@PrimaryColumn` — the join can return at most one row per
+   * result, never a scalar fan-out.
+   *
+   * **Every value projected `?? null` — never `?? ''`, never `?? 0`
+   * (§5.1).** `innovation_readiness` is built only when the detail row
+   * carries a non-null `innovation_readiness_id` (checked with
+   * `!== undefined && !== null`, never `??` — the id itself may legitimately
+   * be a falsy-looking value under other coercions, and this mirrors the
+   * `!== undefined` discipline `update()` already uses elsewhere in this
+   * file for the same reason: distinguishing "absent" from "a value that
+   * happens to coerce falsy"). When it is built, `level` and `name` are
+   * each `?? null` **independently** and never collapsed to a bare `null`
+   * object when only one part is missing — the client guards the parts for
+   * display (DD-9, T-06). No `is_active` filter is applied to the
+   * `innovationReadiness` join itself: a stored FK's readiness is a fact
+   * about the detail row, not about catalog currency (mirrors this file's
+   * own `innovation_use_level` relation join in `findOne`, which applies no
+   * such filter for the identical reason).
+   *
+   * A missing target `Result` row returns all three facts `null` and never
+   * throws (§5.1's closing row) — unreachable from the section read as the
+   * code stands today (§5.2's note). **Also unreachable from the targeted
+   * path (T-04/T-03) for an unknown id**, post-T-03: `!result` here would
+   * require `readInnovationDevCardFacts` to run at all, but
+   * `readInnovationDevCardFactsForTarget` below short-circuits an unknown
+   * id at the bound (`inBounds` false) and never calls this method in the
+   * first place — see that method's own `inBounds` ternary, just below,
+   * for that structure. The one way `!result`
+   * still fires from the targeted path is a TOCTOU race between the
+   * bounding queries above and this read: the row is deleted in between,
+   * so the bound saw it and this method does not.
+   */
+  private async readInnovationDevCardFacts(
+    resultId: number,
+  ): Promise<InnovationDevCardFacts> {
+    const result = await this.dataSource
+      .getRepository(Result)
+      .createQueryBuilder('result')
+      .leftJoinAndSelect(
+        'result.result_innovation_dev',
+        'detail',
+        'detail.is_active = :isActive',
+        { isActive: true },
+      )
+      .leftJoinAndSelect('detail.innovationReadiness', 'readiness')
+      .leftJoinAndSelect('result.geo_scope', 'geoScope')
+      .where('result.result_id = :resultId', { resultId })
+      .getOne();
+
+    if (!result) {
+      return ResultInnovationUseService.emptyInnovationDevCardFacts();
+    }
+
+    const detail = result.result_innovation_dev?.[0] ?? null;
+    const readinessId = detail?.innovation_readiness_id;
+    const hasReadiness = readinessId !== undefined && readinessId !== null;
+
+    return {
+      innovation_readiness: hasReadiness
+        ? {
+            id: readinessId,
+            level: detail?.innovationReadiness?.level ?? null,
+            name: detail?.innovationReadiness?.name ?? null,
+          }
+        : null,
+      description: result.description ?? null,
+      geo_scope: result.geo_scope
+        ? { code: result.geo_scope.code, name: result.geo_scope.name ?? null }
+        : null,
+    };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-03 (`design.md` DD-13;
+   * `R-IUC-008` AC.6–AC.9). The literal `{ innovation_readiness: null,
+   * description: null, geo_scope: null }` shape shared by two callers: the
+   * "target row does not exist" branch above, and the out-of-bounds branch
+   * of `readInnovationDevCardFactsForTarget` below. Factored into one
+   * method so the two cases are **structurally**, not just coincidentally,
+   * identical (`AC.9`) — a future edit to one cannot silently drift from
+   * the other the way two independent object literals could.
+   */
+  private static emptyInnovationDevCardFacts(): InnovationDevCardFacts {
+    return { innovation_readiness: null, description: null, geo_scope: null };
+  }
+
+  /**
+   * `docs/specs/innovation-use/dev-card-details` T-03 (`design.md` DD-13;
+   * `R-IUC-008` AC.6–AC.9). This is the **only** entry point T-04's targeted
+   * endpoint may call — never `readInnovationDevCardFacts` directly — and
+   * it exists to bound that read's target set to exactly the three
+   * predicates the section read already gets for free from
+   * `SetUpInterceptor` → `ResultsUtil.setup()`: `indicator_id = 2`
+   * (Innovation Development), `is_active = TRUE`, `is_snapshot = FALSE`.
+   *
+   * **Do NOT wire this into T-02's section read.** `findOne`'s call to
+   * `readInnovationDevCardFacts` above stays exactly as T-02 left it: the
+   * section read's target arrives through an existing link row already
+   * pinned by `SetUpInterceptor`, and adding these predicates there would
+   * silently start hiding links to results that are legitimately reachable
+   * today (`design.md` §4.2's note on `judgment.md` N-1).
+   *
+   * **`indicator_id = 2` and `is_active = TRUE` are bounded by
+   * `ResultsService.filterResultByIndicators`** — the same method
+   * `validateInnovationDevLinkTarget` above already calls for the identical
+   * purpose, and the one `LinkResultsService.saveLinkResults` uses to bound
+   * the linkable set. **Never hand-rolled** — `R-IUC-008` AC.6 names this
+   * explicitly, and design.md DD-13 records revision 2's failure mode: an
+   * ungated target set with every *other* acceptance criterion green.
+   *
+   * **`is_snapshot = FALSE` has no existing service method to reuse** —
+   * `filterResultByIndicators` does not filter it, and neither
+   * `ResultsUtil.setup()` nor the `GET /api/results` list query expose it
+   * as a callable predicate; both just hard-filter the column inline. So it
+   * is checked directly, alongside, against the same `resultId` — never
+   * folded into a hand-rolled `where` that duplicates the indicator/active
+   * bound `filterResultByIndicators` already owns.
+   *
+   * **Out-of-bounds and unknown resolve to the exact same object**
+   * (`emptyInnovationDevCardFacts()` above) — not two call sites that
+   * happen to build equal-looking literals. No status code, message, field
+   * presence or field ordering can differ between them, because there is
+   * only one code path producing that shape (`AC.9` — no existence oracle).
+   */
+  async readInnovationDevCardFactsForTarget(
+    resultId: number,
+  ): Promise<InnovationDevCardFacts> {
+    const [matches, target] = await Promise.all([
+      this._resultsService.filterResultByIndicators(
+        [resultId],
+        [IndicatorsEnum.INNOVATION_DEV],
+        false,
+      ),
+      this.dataSource.getRepository(Result).findOne({
+        select: { result_id: true, is_snapshot: true },
+        where: { result_id: resultId },
+      }),
+    ]);
+
+    const inBounds =
+      matches.includes(resultId) && target?.is_snapshot === false;
+
+    return inBounds
+      ? this.readInnovationDevCardFacts(resultId)
+      : ResultInnovationUseService.emptyInnovationDevCardFacts();
   }
 
   /**

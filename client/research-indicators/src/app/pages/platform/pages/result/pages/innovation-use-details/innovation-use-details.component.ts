@@ -23,6 +23,7 @@ import { InnovationUseLevelStepperComponent } from './components/innovation-use-
 import { InnovationUseActorItemComponent } from './components/innovation-use-actor-item/innovation-use-actor-item.component';
 import { InnovationUseOrganizationItemComponent } from './components/innovation-use-organization-item/innovation-use-organization-item.component';
 import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
 import {
@@ -135,6 +136,16 @@ export function formatInnovationDevLabel(
   return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
 }
 
+export function formatInnovationDevReadiness(
+  readiness: { id?: number; level: number | null; name: string | null } | null | undefined
+): string {
+  if (!readiness) return '';
+  if (readiness.level !== null && readiness.name !== null) return `Level ${readiness.level} - ${readiness.name}`;
+  if (readiness.level !== null) return `Level ${readiness.level}`;
+  if (readiness.name !== null) return readiness.name;
+  return '';
+}
+
 export function formatInnovationDevUrl(
   result: { platform_code?: string | null; result_official_code?: number | string | null } | null | undefined
 ): string {
@@ -167,7 +178,8 @@ export function formatInnovationDevUrl(
     InnovationUseActorItemComponent,
     InnovationUseOrganizationItemComponent,
     SelectComponent,
-    TooltipModule
+    TooltipModule,
+    CustomTagComponent
   ],
   templateUrl: './innovation-use-details.component.html'
 })
@@ -202,29 +214,94 @@ export default class InnovationUseDetailsComponent {
   readonly formatInnovationDevLabel = formatInnovationDevLabel;
   readonly formatInnovationDevCode = formatInnovationDevCode;
   readonly formatInnovationDevUrl = formatInnovationDevUrl;
+  readonly formatInnovationDevReadiness = formatInnovationDevReadiness;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+  
+  descriptionExpanded = signal(false);
 
-  onInnovationDevSelected(resultId: number): void {
+  enrichmentSuccessForId = signal<number | null>(null);
+
+  async onInnovationDevSelected(resultId: number): Promise<void> {
+    const currentLinked = this.body().linked_innovation_dev;
+    const sameId = currentLinked?.result_id === resultId;
+    const wasSuccessful = this.enrichmentSuccessForId() === resultId;
+
+    if (sameId && wasSuccessful) {
+      return; // R-IUC-007 AC.7: no refetch after success
+    }
+
     // R-IUL-004: must NOT leave the previous result in the payload after the selection changes.
     // AND the card re-renders for the new result.
     this.body.update(current => {
-      if (current.linked_innovation_dev?.result_id !== resultId) {
-        const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
-        return {
-          ...current,
-          linked_innovation_dev: option
-            ? {
-                result_id: option.result_id,
-                result_official_code: Number(option.result_official_code),
-                title: option.title ?? '',
-                platform_code: option.platform_code ?? null
-              }
-            : null
-        };
-      }
-      return current;
+      const option = this.innoDevOutputService.list().find(o => o.result_id === resultId);
+      return {
+        ...current,
+        linked_innovation_dev: option
+          ? {
+              result_id: option.result_id,
+              result_official_code: Number(option.result_official_code),
+              title: option.title ?? '',
+              platform_code: option.platform_code ?? null,
+              result_status: option.result_status,
+              year: option.year
+            }
+          : null
+      };
     });
+
+    if (!resultId) {
+      this.enrichmentSuccessForId.set(null);
+      return;
+    }
+
+    try {
+      const response = await this.api.GET_InnovationDevCard(resultId);
+
+      // DC-12 / DC-15: discarded if superseded (the selected ID changed while we were waiting)
+      if (this.body().linked_innovation_dev?.result_id !== resultId) {
+        return;
+      }
+
+      if (response.successfulRequest) {
+        this.enrichmentSuccessForId.set(resultId);
+        const data = (response.data || {}) as {
+          innovation_readiness?: { id: number; level: number | null; name: string | null } | null;
+          description?: string | null;
+          geo_scope?: { code: number; name: string | null } | null;
+        };
+        const { innovation_readiness, description, geo_scope } = data;
+        this.body.update(current => {
+          if (current.linked_innovation_dev?.result_id !== resultId) return current;
+          return {
+            ...current,
+            linked_innovation_dev: {
+              ...current.linked_innovation_dev!,
+              innovation_readiness: innovation_readiness ?? null,
+              description: description ?? null,
+              geo_scope: geo_scope ?? null
+            }
+          };
+        });
+      } else {
+        // DD-14 / DD-12: Failure is never a gate. Retryable.
+        this.enrichmentSuccessForId.set(null);
+      }
+    } catch {
+      if (this.body().linked_innovation_dev?.result_id !== resultId) {
+        return;
+      }
+      this.enrichmentSuccessForId.set(null);
+    }
+  }
+
+  clearInnovationDev(): void {
+    this.body.update(current => ({
+      ...current,
+      innovation_dev_result_id: null,
+      linked_innovation_dev: null
+    }));
+    this.enrichmentSuccessForId.set(null);
   }
 
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */

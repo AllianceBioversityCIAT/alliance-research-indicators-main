@@ -1,3 +1,5 @@
+import { ResultStatus } from './result-config.interface';
+
 // @akili-spec docs/specs/innovation-use/details-page (T-01 — contract layer)
 export class GetInnovationUseDetails {
   // @akili-spec docs/specs/innovation-use/link-innovation-dev (T-08 — §4.1 wire contract)
@@ -12,8 +14,17 @@ export class GetInnovationUseDetails {
   // `platform_code` is a NULLABLE `varchar(50)` on the server (`results.platform_code`). It is a
   // SEPARATE column from `result_official_code` (a `bigint`). They are two columns, never one string.
   // A NULL `platform_code` is real and must be representable — hence `string | null`.
-  linked_innovation_dev: { result_id: number; result_official_code: number; title: string; platform_code: string | null } | null | undefined =
-    undefined;
+  linked_innovation_dev: {
+    result_id: number;
+    result_official_code: number;
+    title: string;
+    platform_code: string | null;
+    innovation_readiness?: { id: number; level: number | null; name: string | null } | null;
+    description?: string | null;
+    geo_scope?: { code: number; name: string | null } | null;
+    result_status?: ResultStatus;
+    year?: string;
+  } | null | undefined = undefined;
 
   innovation_use_level_id: number | undefined = undefined;
   /** The resolved scale point, server-derived. Read-only; never sent. */

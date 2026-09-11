@@ -598,6 +598,11 @@ export class ApiService {
     return this.TP.get(url(), { loadingTrigger: true, useResultInterceptor: true });
   };
 
+  GET_InnovationDevCard = (resultCode: number): Promise<MainResponse<unknown>> => {
+    const url = () => `results/innovation-use/innovation-dev-card/${resultCode}`;
+    return this.TP.get(url(), { useResultInterceptor: true });
+  };
+
   PATCH_InnovationUseDetails = <T>(resultCode: number, body: T): Promise<MainResponse<GetInnovationUseDetails>> => {
     const url = () => `results/innovation-use/${resultCode}`;
     return this.TP.patch(url(), body, { useResultInterceptor: true });

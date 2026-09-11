@@ -3427,6 +3427,29 @@ describe('ResultsService', () => {
 
       expect(result).toEqual([1, 3]);
     });
+
+    // AKILI rework attempt 2 (docs/specs/innovation-use/dev-card-details
+    // T-03) — the two tests above assert only the `.map()` on the return
+    // value; neither ever inspects the `where` object passed to
+    // `mainRepo.find`, so `indicator_id` and `is_active` (the two clauses
+    // T-03's bound actually delegates to this method) were asserted by
+    // nothing in this file. This test discriminates both: deleting
+    // `is_active: true` from the where clause, or inverting the `not`
+    // ternary, each leaves this assertion — and only this assertion — red.
+    it('calls mainRepo.find with indicator_id, is_active and result_id as the declarative where predicate', async () => {
+      mockMainRepo.find.mockResolvedValue([]);
+
+      await service.filterResultByIndicators([1, 2, 3], [1 as any]);
+
+      expect(mockMainRepo.find).toHaveBeenCalledWith({
+        select: { result_id: true },
+        where: {
+          result_id: In([1, 2, 3]),
+          indicator_id: In([1]),
+          is_active: true,
+        },
+      });
+    });
   });
 
   // [CLAUDE/DONE] 142
