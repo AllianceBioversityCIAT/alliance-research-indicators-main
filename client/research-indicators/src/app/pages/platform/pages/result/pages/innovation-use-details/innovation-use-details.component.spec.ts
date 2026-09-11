@@ -36,6 +36,7 @@ const LEVELS_FIXTURE: InnovationUseLevel[] = Array.from({ length: 10 }, (_, leve
 const idForLevel = (level: number) => level + 1;
 
 const apiService = {
+  GET_InnovationDevCard: jest.fn().mockResolvedValue({ data: null, successfulRequest: true }),
   GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
   PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
   GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: LEVELS_FIXTURE, successfulRequest: true }),
@@ -3878,6 +3879,176 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(formatInnovationDevLabel(undefined)).toBe('');
     });
 
+    describe('T-01 — Carry result_status and year into the card\'s object', () => {
+      it('populates result_status and year from the picker option', async () => {
+        // Falsifier: this literal must compile exactly as is.
+        const option = {
+          result_id: 1,
+          result_official_code: 1,
+          title: 'Title',
+          platform_code: 'P-1',
+          result_status: {
+            result_status_id: 1,
+            name: 'Draft',
+            description: 'desc',
+            is_active: 1,
+            config: {
+              color: { text: '#FFF', background: '#000', border: '#111' },
+              icon: { name: 'draft', color: '#FFF' }
+            }
+          },
+          year: '2026'
+        };
+        
+        // We spy on list() to return our option
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any]);
+
+        await component.onInnovationDevSelected(1);
+
+        const linked = component.body().linked_innovation_dev;
+        expect(linked?.result_status?.name).toBe('Draft');
+        expect(linked?.year).toBe('2026');
+      });
+    });
+
+    describe('T-02 — OICR style layout', () => {
+      it('renders Geographic scope when present and avoids stranded separators when absent', async () => {
+        const option = {
+          result_id: 1,
+          result_official_code: 1,
+          title: 'Title',
+          platform_code: 'P-1',
+          description: 'A test description',
+          result_status: {
+            result_status_id: 1,
+            name: 'Draft',
+            description: 'desc',
+            is_active: 1,
+            config: {
+              color: { text: '#FFF', background: '#000', border: '#111' },
+              icon: { name: 'draft', color: '#FFF' }
+            }
+          },
+          year: '2026'
+        };
+        const fetchedData = {
+          innovation_readiness: { id: 1, level: 7, name: 'Validation' },
+          geo_scope: { id: 1, name: 'Global' },
+          description: 'A test description from api'
+        };
+        apiService.GET_InnovationDevCard.mockResolvedValueOnce({ data: fetchedData, successfulRequest: true });
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any]);
+        await component.onInnovationDevSelected(1);
+        fixture.detectChanges();
+
+        const cards = fixture.debugElement.queryAll(By.css('.section-title')).map(t => t.parent?.nativeElement as HTMLElement);
+        let detailsEl = cards.find(c => c.querySelector('.section-title')?.textContent?.includes('RELATED INNOVATION DEVELOPMENT'))!;
+        expect(detailsEl.textContent).toContain('Geographic scope');
+        
+        // Issue 2: Verify Reporting year rendering
+        expect(detailsEl.textContent).toContain('Reporting year');
+        expect(detailsEl.textContent).toContain('2026');
+
+        // Issue 3: Verify the block order is eyebrow, title, description, metadata row
+        const titleEl = detailsEl.querySelector('p.font-\\[500\\]');
+        const descEl = detailsEl.querySelector('[data-testid="innovation-dev-description"]');
+        const rowEl = detailsEl.querySelector('.flex-wrap');
+        expect(titleEl).toBeTruthy();
+        expect(descEl).toBeTruthy();
+        expect(rowEl).toBeTruthy();
+        expect(titleEl!.compareDocumentPosition(descEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(descEl!.compareDocumentPosition(rowEl!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        
+        // Count separators
+        let separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+        expect(separators.length).toBe(3);
+
+        // Now absent geo_scope
+        const option2 = { ...option, result_id: 2 };
+        const fetchedDataAbsent = {
+          innovation_readiness: { id: 1, level: 7, name: 'Validation' },
+          geo_scope: null
+        };
+        apiService.GET_InnovationDevCard.mockResolvedValueOnce({ data: fetchedDataAbsent, successfulRequest: true });
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any, option2 as any]);
+        await component.onInnovationDevSelected(2);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        
+        expect(detailsEl.textContent).not.toContain('Geographic scope');
+        
+        separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+        expect(separators.length).toBe(2);
+
+        // Issue 2: Now absent year as well
+        const option3 = { ...option2, result_id: 3 };
+        delete (option3 as any).year;
+        apiService.GET_InnovationDevCard.mockResolvedValueOnce({ data: fetchedDataAbsent, successfulRequest: true });
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any, option2 as any, option3 as any]);
+        await component.onInnovationDevSelected(3);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        
+        expect(detailsEl.textContent).not.toContain('Reporting year');
+        
+        separators = Array.from(detailsEl.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+        expect(separators.length).toBe(1);
+      });
+
+      it('renders the badge with server-supplied properties, NOT hardcoded Published', async () => {
+        const option = {
+          result_id: 1,
+          result_official_code: 1,
+          title: 'Title',
+          platform_code: 'P-1',
+          result_status: {
+            result_status_id: 2,
+            name: 'Draft',
+            description: 'desc',
+            is_active: 1,
+            config: {
+              color: { text: '#FFF', background: '#000', border: '#111' },
+              icon: { name: 'draft', color: '#FFF' }
+            }
+          },
+          year: '2026'
+        };
+        jest.spyOn(innoDevService, 'list').mockReturnValue([option as any]);
+        await component.onInnovationDevSelected(1);
+        fixture.detectChanges();
+
+        const badgeEl = fixture.debugElement.query(By.css('app-custom-tag')).nativeElement;
+        // Should NOT contain the text Published because our status is Draft
+        expect(badgeEl.textContent).not.toContain('Published');
+        expect(badgeEl.textContent).toContain('Draft');
+      });
+    });
+
+    describe('formatInnovationDevReadiness', () => {
+      it('formats correctly when both level and name are present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 1, level: 3, name: 'Validation' })).toBe('Level 3 - Validation');
+      });
+
+      it('returns name alone when only name is present (falsifier)', () => {
+        expect(component.formatInnovationDevReadiness({ id: 7, level: null, name: 'X' })).toBe('X');
+      });
+
+      it('returns level alone when only level is present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 2, level: 5, name: null })).toBe('Level 5');
+      });
+
+      it('returns empty string when neither level nor name are present', () => {
+        expect(component.formatInnovationDevReadiness({ id: 4, level: null, name: null })).toBe('');
+      });
+
+      it('returns empty string when input is null or undefined', () => {
+        expect(component.formatInnovationDevReadiness(null)).toBe('');
+        expect(component.formatInnovationDevReadiness(undefined)).toBe('');
+      });
+    });
+
     it('asserts the ERROR state uses the card-scoped error surface (2a) and keeps the control mounted', async () => {
       // Set the options request failure via the API mock
       apiService.GET_Results.mockResolvedValueOnce({ successfulRequest: false, errorDetail: { errors: 'Mock failure' } });
@@ -3986,6 +4157,265 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       const tooltipDirective = selectDebug.injector.get(Tooltip);
       expect(tooltipDirective).toBeTruthy();
       expect((tooltipDirective as any).content).not.toBe('There are no reported Innovation Development outputs to link.');
+    });
+  });
+
+  describe('T-09 — Enrichment rules (fetch, id guard, retry)', () => {
+    let innoDevService: GetInnoDevOutputService;
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([
+        { result_id: 1, platform_code: 'A', result_official_code: 10, title: 'Result A' } as any,
+        { result_id: 2, platform_code: 'B', result_official_code: 20, title: 'Result B' } as any
+      ]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockClear();
+      apiService.PATCH_InnovationUseDetails.mockClear();
+      (actions.showToast as jest.Mock).mockClear();
+      fixture.detectChanges();
+    });
+
+    it('While the read is in flight, the card shows title + anchor and no placeholder values', async () => {
+      let resolveA!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+
+      component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result A');
+      expect(card.textContent).not.toContain('Innovation Dev level');
+      expect(card.textContent).not.toContain('Geographic scope');
+      expect(card.textContent).not.toContain('description');
+
+      resolveA({ successfulRequest: true, data: { innovation_readiness: { id: 1, level: 1, name: 'Idea' }, description: 'Desc A', geo_scope: { code: 1, name: 'Global' } } });
+      await fixture.whenStable();
+    });
+
+    it('Selecting an option renders the three fields with no page reload and no save', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          description: 'Desc A',
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Innovation Dev level');
+      expect(card.textContent).toContain('Level 1 - Idea');
+      expect(card.textContent).toContain('Desc A');
+      expect(card.textContent).toContain('Geographic scope');
+      expect(card.textContent).toContain('Global');
+    });
+
+    it('On failure the card shows title + anchor, no error dialog, no invalid state, and link is savable', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: false,
+        errorDetail: { errors: 'Failed' }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result A');
+      expect(card.textContent).not.toContain('Innovation Dev level');
+      expect(component.loadFailed()).toBe(false);
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+
+      component.body.update(current => ({ ...current, innovation_dev_result_id: 1 }));
+      await component.saveData();
+      expect(apiService.PATCH_InnovationUseDetails).toHaveBeenCalledTimes(1);
+      const [, payload] = apiService.PATCH_InnovationUseDetails.mock.calls[0];
+      expect(payload.innovation_dev_result_id).toBe(1);
+    });
+
+    it('Re-selecting the same result after a failure re-attempts the read', async () => {
+      apiService.GET_InnovationDevCard.mockRejectedValueOnce(new Error('fail'));
+      await component.onInnovationDevSelected(1);
+      
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+    });
+
+    it('Re-selecting the same result after a reachable failure (successfulRequest: false) re-attempts the read', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: false });
+      await component.onInnovationDevSelected(1);
+      
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+    });
+
+    it('Selection changes before a failure clear the success flag so the new result can be re-attempted (DD-14 reachable failure)', async () => {
+      // 1. select A -> succeeds
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      // 2. select B -> rebuild to B's four keys, B's read in flight (deferred)
+      let bResolve: any;
+      apiService.GET_InnovationDevCard.mockImplementationOnce(() => new Promise(r => { bResolve = r; }));
+      const bPromise = component.onInnovationDevSelected(2);
+      
+      // 3. re-select A -> linked is B, so sameId is false. Fetch A, A fails at envelope level
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: false });
+      await component.onInnovationDevSelected(1);
+      
+      // 4. re-select A -> if the failure didn't clear the success flag, A would early return
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(4);
+      bResolve({ successfulRequest: true, data: {} }); // cleanup
+    });
+
+    it('Re-selecting the same result after a success does not refetch', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: {} });
+      await component.onInnovationDevSelected(1);
+      
+      await component.onInnovationDevSelected(1);
+      
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(1);
+    });
+
+    it('Selecting A then B clears A\'s three fields synchronously', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: { description: 'Desc A' }
+      });
+      await component.onInnovationDevSelected(1);
+      
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+      
+      component.onInnovationDevSelected(2);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('Result B');
+      expect(card.textContent).not.toContain('Desc A');
+
+      resolveB({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('A\'s response settling after B is selected does not render A\'s values under B\'s title', async () => {
+      let resolveA!: (value: any) => void;
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+
+      component.onInnovationDevSelected(1);
+      component.onInnovationDevSelected(2);
+
+      resolveA({
+        successfulRequest: true,
+        data: { description: 'Desc A from late response' }
+      });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Desc A from late response');
+
+      resolveB({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('The holds above are order-independent — they hold for B-then-A as well as A-then-B', async () => {
+      let resolveA!: (value: any) => void;
+      let resolveB!: (value: any) => void;
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveB = resolve; }));
+      apiService.GET_InnovationDevCard.mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }));
+
+      component.onInnovationDevSelected(2);
+      component.onInnovationDevSelected(1);
+
+      resolveB({
+        successfulRequest: true,
+        data: { description: 'Desc B from late response' }
+      });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Desc B from late response');
+
+      resolveA({ successfulRequest: true, data: {} });
+      await fixture.whenStable();
+    });
+
+    it('The scope name comes from the server response, never from GetGeoFocusService', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          geo_scope: { code: 3, name: 'MULTI_NATIONAL' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).toContain('MULTI_NATIONAL');
+    });
+
+    it('The rendered content is identical at selection and after a save + section re-read, for the same result', async () => {
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          description: 'Desc A',
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      await component.onInnovationDevSelected(1);
+      fixture.detectChanges();
+
+      const cardBefore = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      const contentBefore = cardBefore.textContent;
+
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: {
+          ...new GetInnovationUseDetails(),
+          linked_innovation_dev: {
+            result_id: 1, result_official_code: 10, title: 'Result A', platform_code: 'A',
+            innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+            description: 'Desc A',
+            geo_scope: { code: 1, name: 'Global' }
+          }
+        } as any
+      });
+      await component.getData();
+      fixture.detectChanges();
+
+      const cardAfter = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(cardAfter.textContent).toBe(contentBefore);
     });
   });
 
@@ -4177,6 +4607,364 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(cardText).toContain('STAR 284 - Deleted result');
     });
   });
+
+  // ===============================================================================================
+  // T-03 — ⊗ clears the selection and resets T-09's enrichment flag (R-OICR-003 / DC-3)
+  //
+  // Falsifier (CORRECTED 2026-09-10 — original was structurally false, see DD-3): delete
+  // `this.enrichmentSuccessForId.set(null)` from clearInnovationDev() (component.ts:302). Then
+  // criterion 2's FOUR-STEP sequence exposes the defect:
+  //   1. select 42 → enrichmentSuccessForId = 42
+  //   2. ⊗ clear → linked_innovation_dev = null, flag STAYS (reset missing)
+  //   3. getData() rehydrates linked_innovation_dev BARE (result_id=42, no enrichment keys)
+  //   4. re-select 42 → sameId IS true (rehydrated), wasSuccessful IS true (flag still 42)
+  //      → early return fires → card shows title + anchor only, NO level/description/scope
+  // Expected RED: `expect(card.textContent).toContain('Level 4 - Testing')` fails.
+  //
+  // The original 3-step (clear + repick without getData()) was false: after clear,
+  // linked_innovation_dev is null → sameId = (undefined === 42) = false, ALWAYS. The early
+  // return could never fire on that path regardless of the flag. Verified by measurement.
+  // ===============================================================================================
+  describe('T-03 — ⊗ clears the selection and resets the enrichment flag (R-OICR-003)', () => {
+    let innoDevService: GetInnoDevOutputService;
+
+    // A fully populated option that the picker can return via innoDevService.list().
+    // Shape mirrors what onInnovationDevSelected() reads from the option.
+    const OPTION = {
+      result_id: 42,
+      result_official_code: '42',
+      title: 'Crop yield study',
+      platform_code: 'STAR',
+      result_status: {
+        result_status_id: 3,
+        name: 'Draft',
+        description: 'A draft result',
+        is_active: 1,
+        config: {
+          color: { text: '#fff', background: '#333', border: '#444' },
+          icon: { name: 'draft', color: '#fff' }
+        }
+      },
+      year: '2025'
+    };
+
+    // Enrichment data returned by GET_InnovationDevCard for result_id 42.
+    const ENRICHMENT = {
+      innovation_readiness: { id: 2, level: 4, name: 'Testing' },
+      description: 'A detailed description about the result',
+      geo_scope: { code: 1, name: 'Global' }
+    };
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      // Populate the picker list with our option so onInnovationDevSelected() can find it.
+      innoDevService.list.set([OPTION as any]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockClear();
+      fixture.detectChanges();
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 1 — ⊗ clears the card; the section returns to its no-link state
+    // ---------------------------------------------------------------------------
+    it('c1 — the ⊗ button is present, clicking it clears linked_innovation_dev and removes the card from the DOM', async () => {
+      // Arrange: select a result to show the card.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      component.body.update(b => ({ ...b, innovation_dev_result_id: OPTION.result_id }));
+      fixture.detectChanges();
+
+      // Positive control: the card IS present before clearing.
+      const relatedCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(relatedCard.textContent).toContain('Crop yield study');
+
+      // Positive control: the ⊗ button is present — deleting it from the template reddens this.
+      const clearBtn = fixture.debugElement.query(By.css('[data-testid="clear-innovation-dev"]'));
+      expect(clearBtn).toBeTruthy();
+
+      // Act: dispatch click through Angular's event binding (triggerEventHandler is more reliable
+      // than nativeElement.click() for (click) bindings inside @if control-flow blocks in jsdom).
+      clearBtn.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      // Assert state.
+      expect(component.body().linked_innovation_dev).toBeNull();
+      expect(component.body().innovation_dev_result_id).toBeNull();
+
+      // Assert DOM: the inner card div (eyebrow + title) must be gone.
+      const cardAfter = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(cardAfter.textContent).not.toContain('Crop yield study');
+      // The inner result card (flex-col gap-2 container with eyebrow + title) must be gone.
+      // The outer section heading still contains "RELATED INNOVATION DEVELOPMENT" — we assert
+      // absence of the result title, not the section title string.
+      const innerResultCard = cardAfter.querySelector('.bg-\\[var\\(--ac-grey-100\\)\\]');
+      expect(innerResultCard).toBeNull();
+    });
+
+    it('c2 (FALSIFIER — four-step rehydration) — re-selecting the SAME result after clear + getData() rehydration renders a full card: level, description and scope are in the DOM', async () => {
+      // DD-3 (corrected 2026-09-10): the falsifier is NOT clear-then-repick. After clearInnovationDev(),
+      // `linked_innovation_dev` is null, so sameId = (undefined === 42) = false — the early return
+      // never fires regardless of the flag. The trigger is a REHYDRATION between the clear and the
+      // re-selection. This four-step sequence is the minimal proof that the reset is load-bearing.
+      //
+      // MUTATION to restore before trusting: delete `this.enrichmentSuccessForId.set(null)` from
+      // clearInnovationDev() (component.ts:302). With the reset absent, step 4's
+      // `sameId && wasSuccessful` is true (linked rehydrated with same id, flag never cleared),
+      // so the early return fires and the card shows title + anchor only.
+      // Expected RED: `expect(card.textContent).toContain('Level 4 - Testing')` fails.
+
+      // Step 1: select 42 → enrichment succeeds → enrichmentSuccessForId = 42, card full.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Step 2: ⊗ clear → linked_innovation_dev = null; the flag survives if the reset is missing.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Step 3: getData() rehydrates linked_innovation_dev with a BARE object — only the four keys
+      // the server's GET_InnovationUseDetails returns. The three enrichment keys (innovation_readiness,
+      // description, geo_scope) are optional and only GET_InnovationDevCard ever writes them.
+      // This is the step that makes sameId TRUE again on step 4, which is what the original
+      // clear-then-repick sequence could never achieve.
+      const BARE_LINKED = {
+        result_id: OPTION.result_id,
+        result_official_code: Number(OPTION.result_official_code),
+        title: OPTION.title,
+        platform_code: OPTION.platform_code
+        // innovation_readiness, description, geo_scope — intentionally absent (bare)
+      };
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: { ...new GetInnovationUseDetails(), linked_innovation_dev: BARE_LINKED }
+      });
+      await component.getData();
+      fixture.detectChanges();
+
+      // Step 4: user picks 42 again. If the reset was omitted in step 2, enrichmentSuccessForId
+      // is still 42, sameId is now true (getData() restored result_id=42), wasSuccessful is true
+      // → early return fires → GET_InnovationDevCard is NOT called → card renders bare.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Assert the card renders FULLY — these DOM assertions are where the red must land.
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+
+      // Level must be present — this is the assertion that reddens when the reset is deleted.
+      expect(card.textContent).toContain('Innovation Dev level');
+      expect(card.textContent).toContain('Level 4 - Testing');
+
+      // Description must be present.
+      expect(card.textContent).toContain('A detailed description about the result');
+
+      // Scope must be present.
+      expect(card.textContent).toContain('Geographic scope');
+      expect(card.textContent).toContain('Global');
+
+      // "Innovation detail" anchor — the anchor whose label has been deleted twice (tasks.md T-02 Done ✔6).
+      expect(card.textContent).toContain('Innovation detail');
+      const anchor = card.querySelector('a.innovation-detail-link');
+      expect(anchor).toBeTruthy();
+
+      // The enrichment fetch must have been called a second time (once before clearing, once after).
+      // Call count: 1 before step 2 + 0 during getData() + 1 during step 4 = 2.
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+
+      // Flag check (after DOM — the red must land on a DOM assertion, not here).
+      expect(component.enrichmentSuccessForId()).toBe(OPTION.result_id);
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 3 — the picker still accepts any new selection after clearing
+    // ---------------------------------------------------------------------------
+    it('c3 — after clearing, selecting a DIFFERENT result populates the card with that result', async () => {
+      const OTHER_OPTION = {
+        result_id: 99,
+        result_official_code: '99',
+        title: 'Different crop study',
+        platform_code: 'PRMS',
+        result_status: OPTION.result_status,
+        year: '2024'
+      };
+      innoDevService.list.set([OPTION as any, OTHER_OPTION as any]);
+
+      // Arrange: select OPTION first.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Clear.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Act: select a different result.
+      const OTHER_ENRICHMENT = { innovation_readiness: { id: 5, level: 2, name: 'Proof of concept' }, description: 'Other desc', geo_scope: null };
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: OTHER_ENRICHMENT });
+      await component.onInnovationDevSelected(OTHER_OPTION.result_id);
+      fixture.detectChanges();
+
+      // Assert the card shows the OTHER result, not the old one.
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+
+      expect(card.textContent).toContain('Different crop study');
+      expect(card.textContent).not.toContain('Crop yield study');
+      expect(card.textContent).toContain('Proof of concept');
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 4 — still single-select; no confirmation step
+    // ---------------------------------------------------------------------------
+    it('c4 — clearInnovationDev() is synchronous and requires no confirmation dialog', () => {
+      // Arrange: seed a linked result in body directly to isolate clear() from the fetch path.
+      component.body.update(b => ({
+        ...b,
+        innovation_dev_result_id: OPTION.result_id,
+        linked_innovation_dev: {
+          result_id: OPTION.result_id,
+          result_official_code: Number(OPTION.result_official_code),
+          title: OPTION.title,
+          platform_code: OPTION.platform_code
+        }
+      }));
+      fixture.detectChanges();
+
+      // Positive control: the card is present before clearing.
+      const relatedCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(relatedCard.textContent).toContain('Crop yield study');
+
+      // Act: clear — must be a plain synchronous call, no await, no confirm() dialog.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Assert: state is cleared immediately, no toast was shown.
+      expect(component.body().linked_innovation_dev).toBeNull();
+      expect(actions.showToast).not.toHaveBeenCalled();
+
+      // Assert: only one result can be linked at a time — body carries null, not an array.
+      expect(Array.isArray(component.body().linked_innovation_dev)).toBe(false);
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 5 — the save payload no longer carries the cleared link
+    // ---------------------------------------------------------------------------
+    it('c5 — after clearInnovationDev(), buildPayload() carries innovation_dev_result_id: null', async () => {
+      // Arrange: select a result so the payload would carry the id if clear() did not work.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      component.body.update(b => ({ ...b, innovation_dev_result_id: OPTION.result_id }));
+
+      // Positive control: before clearing, the payload carries the id.
+      expect(component.buildPayload().innovation_dev_result_id).toBe(OPTION.result_id);
+
+      // Act: clear.
+      component.clearInnovationDev();
+
+      // Assert: after clearing, the payload carries null — not the old id, not undefined.
+      const payload = component.buildPayload();
+      expect(payload.innovation_dev_result_id).toBeNull();
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 6 — the ⊗ is absent in read-only mode; the card title still renders
+    //
+    // Rationale: `@if (submission.isEditableStatus())` guards the button. Deleting
+    // the button or that guard makes c1 and c6 both fail; removing only the guard
+    // (exposing the button unconditionally) makes only c6 fail. The card title is
+    // the positive control — the section is not absent, only the control.
+    // ---------------------------------------------------------------------------
+    it('c6 — when isEditableStatus() is false, the ⊗ button is absent while the card title still renders', async () => {
+      // Arrange: select a result so the card is visible.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Switch to read-only.
+      submission.isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+
+      // Positive control: the card IS still in the DOM (title renders).
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(card.textContent).toContain('Crop yield study');
+
+      // Assert: the ⊗ button is absent — its @if guard must remove it in read-only mode.
+      const clearBtn = fixture.debugElement.query(By.css('[data-testid="clear-innovation-dev"]'));
+      expect(clearBtn).toBeNull();
+    });
+  });
+
+  describe('T-04 — See more / See less (R-OICR-004)', () => {
+    let innoDevService: GetInnoDevOutputService;
+    const OPTION = {
+      result_id: 42,
+      result_official_code: '42',
+      title: 'Title',
+      platform_code: 'STAR',
+      result_status: { result_status_id: 3, name: 'Draft', config: {} }
+    };
+    const LONG_DESCRIPTION = 'A'.repeat(400);
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([OPTION as any]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockResolvedValue({ successfulRequest: true, data: { description: LONG_DESCRIPTION } });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+    });
+
+    it('c1/c4 — A 400-char description renders clamped with See more affordance, and the full string is in the DOM', () => {
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(true);
+      expect(descEl.textContent).toContain(LONG_DESCRIPTION);
+      
+      const button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]')).nativeElement as HTMLButtonElement;
+      expect(button.textContent?.trim()).toBe('See more');
+    });
+
+    it('c2/c4 — Activating See more expands the text (line-clamp-3 absent) and shows See less, full text still in DOM', () => {
+      let button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(false);
+      expect(descEl.textContent).toContain(LONG_DESCRIPTION);
+
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      expect(button.nativeElement.textContent?.trim()).toBe('See less');
+    });
+
+    it('c3 — Activating See less re-collapses the text', () => {
+      let button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+      
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(true);
+      
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      expect(button.nativeElement.textContent?.trim()).toBe('See more');
+    });
+  });
 });
 
 // ===================================================================================================
@@ -4274,6 +5062,7 @@ class ResultRouteStubComponent {}
 
 describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful result/:id -> innovation-use-details route tree)', () => {
   const routeTreeApiService = {
+    GET_InnovationDevCard: jest.fn().mockResolvedValue({ data: null, successfulRequest: true }),
     GET_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
     PATCH_InnovationUseDetails: jest.fn().mockResolvedValue({ data: new GetInnovationUseDetails(), successfulRequest: true }),
     GET_InnovationUseLevels: jest.fn().mockResolvedValue({ data: [], successfulRequest: true }),
@@ -4353,5 +5142,327 @@ describe('InnovationUseDetailsComponent — goToEvidence() id source (faithful r
     component.goToEvidence();
 
     expect(navigateSpy).toHaveBeenCalledWith(['/result', 1, 'evidence'], { queryParams: { version: 'v1' } });
+  });
+
+  // ===============================================================================================
+  // T-07 — Restructure the card: prose, not a property list
+  // ===============================================================================================
+  describe('T-07 — Restructure the card: prose, not a property list', () => {
+    let component: InnovationUseDetailsComponent;
+    let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+        providers: [
+          { provide: ApiService, useValue: apiService },
+          { provide: CacheService, useClass: CacheServiceMock },
+          { provide: ActionsService, useValue: actions },
+          { provide: Router, useValue: router },
+          { provide: SubmissionService, useValue: submission },
+          { provide: VersionWatcherService, useValue: versionWatcher },
+          { provide: ActivatedRoute, useValue: activatedRouteMock }
+        ]
+      }).compileComponents();
+      fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+      component = fixture.componentInstance;
+    });
+
+    it('No element in the card names the description — no `Description:` label, no `aria-label` naming it', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'A non-empty description',
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Description:');
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement?.getAttribute('aria-label')).toBeNull();
+    });
+
+    it('The full, unclamped description text is present in the DOM', () => {
+      const longDesc = 'A'.repeat(400);
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: longDesc,
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]') as HTMLElement;
+      expect(descElement.textContent).toContain(longDesc);
+      expect(descElement.className).toContain('line-clamp-3');
+    });
+
+    it('The anchor row preserves the class list across the inner wrappers and parent container', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          innovation_readiness: { id: 1, name: 'Level', level: 1 },
+          geo_scope: { code: 1, name: 'Global' },
+          description: 'A desc'
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
+      const innerRow = anchor.parentElement as HTMLElement;
+      expect(innerRow.className.replace(' ng-star-inserted', '')).toBe('flex items-center');
+      expect(innerRow.parentElement!.className).toContain('flex flex-wrap items-center gap-x-2 gap-y-1');
+      expect(innerRow.parentElement!.parentElement!.className).toContain('rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+    });
+
+    it('The anchor\'s href, text and accessible name are unchanged', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const anchor = card.querySelector('a.innovation-detail-link') as HTMLAnchorElement;
+      expect(anchor.getAttribute('href')).toContain('P-1-1');
+      expect(anchor.textContent).toContain('View innovation detail ↗');
+      expect(anchor.querySelector('.sr-only')?.textContent).toBe('(opens in a new tab)');
+    });
+
+    it('With readiness null, no `Innovation Dev level` label element exists', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: null,
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Innovation Dev level');
+      
+      const separators = Array.from(card.querySelectorAll('span')).filter((s: any) => s.textContent.trim() === '|');
+      expect(separators.length).toBe(1);
+    });
+
+    it('With scope null, no `Geographic scope` label element exists', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      expect(card.textContent).not.toContain('Geographic scope');
+    });
+
+    it('With all three null, the card still renders the column layout but without the description element', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: null,
+          innovation_readiness: null,
+          geo_scope: null
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const contentNodes = Array.from(card.children).filter(el => el.tagName !== 'H2' && el.tagName !== 'APP-SELECT');
+      expect(contentNodes.length).toBe(1); // The main outer container
+      const container = contentNodes[0] as HTMLElement;
+      expect(container.className.replace(' ng-star-inserted', '')).toBe('flex flex-col gap-2 rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]');
+      
+      // Ensure description is absent
+      const descElement = container.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement).toBeNull();
+      
+      // Check inner structure
+      expect(container.children.length).toBe(3); // header, title, footer (metadata)
+    });
+
+    it('The labelled row\'s class list contains `flex-wrap` and no `justify-between`', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const labelledRow = card.querySelector('.flex-wrap') as HTMLElement;
+      expect(labelledRow).not.toBeNull();
+      expect(labelledRow.className).toContain('flex-wrap');
+      expect(labelledRow.className).not.toContain('justify-between');
+    });
+  });
+
+  // ===============================================================================================
+  // T-08 — WCAG AA on all three new text elements, in both themes
+  // ===============================================================================================
+  describe('T-08 — WCAG AA on all three new text elements', () => {
+    let component: InnovationUseDetailsComponent;
+    let fixture: ComponentFixture<InnovationUseDetailsComponent>;
+
+    type Rgb = [number, number, number];
+    const relativeLuminance = ([r8, g8, b8]: Rgb): number => {
+      const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+      const [r, g, b] = [r8, g8, b8].map(v => channel(v / 255));
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrastRatio = (fg: Rgb, bg: Rgb): number => {
+      const l1 = relativeLuminance(fg);
+      const l2 = relativeLuminance(bg);
+      const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+      return (lighter + 0.05) / (darker + 0.05);
+    };
+
+    // The background is the card's own fill: --ac-grey-100 (asserted by T-07 in 'The title + anchor row preserves the class list across the outer and inner wrappers' and 'With all three null, the card\'s DOM equals today\'s card plus no extra containers').
+    // The ratio is computed from hex read out of colors.scss, not from computed style.
+    const GREY_100_LIGHT: Rgb = [244, 247, 249];
+    const GREY_800_LIGHT: Rgb = [76, 81, 88];
+    const GREY_100_DARK: Rgb = [43, 43, 43];
+    const GREY_800_DARK: Rgb = [194, 194, 194];
+
+    beforeEach(async () => {
+      await TestBed.configureTestingModule({
+        imports: [InnovationUseDetailsComponent, HttpClientTestingModule],
+        providers: [
+          { provide: ApiService, useValue: apiService },
+          { provide: CacheService, useClass: CacheServiceMock },
+          { provide: ActionsService, useValue: actions },
+          { provide: Router, useValue: router },
+          { provide: SubmissionService, useValue: submission },
+          { provide: VersionWatcherService, useValue: versionWatcher },
+          { provide: ActivatedRoute, useValue: activatedRouteMock }
+        ]
+      }).compileComponents();
+      fixture = TestBed.createComponent(InnovationUseDetailsComponent);
+      component = fixture.componentInstance;
+    });
+
+
+    it('renders the text-[var(--ac-grey-800)] class on the title and description elements (T-05 to restate fully)', () => {
+      component.body.set({
+        ...component.body(),
+        linked_innovation_dev: {
+          result_id: 1,
+          title: 'A title',
+          result_official_code: 1,
+          platform_code: 'P-1',
+          description: 'A description',
+          innovation_readiness: { id: 1, level: 1, name: 'Idea' },
+          geo_scope: { code: 1, name: 'Global' }
+        }
+      });
+      fixture.detectChanges();
+
+      const card = fixture.debugElement.queryAll(By.css('.section-title'))
+        .find(c => c.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      
+      const descElement = card.querySelector('[data-testid="innovation-dev-description"]');
+      expect(descElement).toBeTruthy();
+      expect((descElement as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+
+      // The title carries this as well now
+      const titleP = Array.from(card.querySelectorAll('p')).find(p => p.textContent?.includes('A title'));
+      expect(titleP).toBeTruthy();
+      expect((titleP as HTMLElement).className).toContain('text-[var(--ac-grey-800)]');
+    });
+
+    it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in light mode', () => {
+      const lightRatio = contrastRatio(GREY_800_LIGHT, GREY_100_LIGHT);
+      expect(lightRatio).toBeCloseTo(7.44, 1);
+      expect(lightRatio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Dark theme gate (test 1 ∧ test 3): the falsifier for the dark half is REMOVAL of the colour
+    // class, not substitution of --ac-grey-600. Of the three tokens design.md §8.3 evaluated, all
+    // three clear 4.5 on dark --ac-grey-100 (#2b2b2b): 600 -> 4.67, 700 -> 6.24, 800 -> 7.95 — so the
+    // light-half substitution falsifier has no analogue AMONG THE CANDIDATES. Lower greys in the same
+    // [data-theme='dark'] block do fail (grey-500 #7d7d7d is ~3.44:1), but none was ever a candidate
+    // for this text. Removal is what test 1 catches — it was observed RED under a real template
+    // mutation of the Readiness level outer span, and removal fails toContain exactly as substitution
+    // does. Test 4 pins the value the element would inherit if the token were removed.
+    it('computes ≥ 4.5:1 (AA) for --ac-grey-800 against --ac-grey-100 in dark mode', () => {
+      const darkRatio = contrastRatio(GREY_800_DARK, GREY_100_DARK);
+      expect(darkRatio).toBeCloseTo(7.95, 1);
+      expect(darkRatio).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Falsifying inputs (KZ-014) — each superseded token must still measurably fail 4.5:1, proving
+    // they are discriminating rather than vacuously true. K-004/KZ-014: this is the "red"
+    // this block must be able to show — see the reverted-swap check run separately during verification.
+    it('falsifying input: inherited UA black on --ac-grey-100 (dark theme removal falsifier) reports less than 4.5:1 and fails AA', () => {
+      expect(contrastRatio([0, 0, 0], GREY_100_DARK)).toBeLessThan(4.5);
+    });
   });
 });
