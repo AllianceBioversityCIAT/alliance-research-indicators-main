@@ -1,6 +1,6 @@
 // @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell)
 import { Tooltip } from 'primeng/tooltip';
-import { Component, signal } from '@angular/core';
+import { Component, DebugElement, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -79,6 +79,14 @@ const activatedRouteMock = {
     queryParamMap: { get: (key: string): string | null => (key === 'version' ? 'v1' : null) }
   }
 };
+
+// @akili-spec quick/innovation-measures-unit-first: Unit now renders BEFORE Number on this page, so
+// "the first `app-input` inside the measure card" is no longer the Number field. Every Number lookup
+// below selects by `optionValue` instead of by position — order-independent, and the non-null
+// assertion makes the lookup fail loudly if the field is ever removed rather than silently reading
+// whichever input happens to come first.
+const numberFieldOf = (quantCard: DebugElement): DebugElement =>
+  quantCard.queryAll(By.directive(InputComponent)).find(de => (de.componentInstance as InputComponent).optionValue === 'number')!;
 
 describe('InnovationUseDetailsComponent', () => {
   let component: InnovationUseDetailsComponent;
@@ -447,7 +455,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect(organizationCountLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
 
       // R-IUR-010 AC.1, asserted per field rather than per card: Number and Unit each carry the
-      // red `*` beside their label; Comments does not.
+      // red `*` beside their label. @akili-spec quick/innovation-measures-remove-comments: the
+      // Comments field is no longer rendered on this card at all (`[showComments]="false"`), so
+      // its absence — not an asterisk-free label — is what is asserted now.
       const quantLabels = Array.from(quantificationsCard.querySelectorAll('h2.label'));
       const numberLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Number'));
       const unitLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Unit'));
@@ -455,10 +465,28 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(numberLabel).toBeTruthy();
       expect(unitLabel).toBeTruthy();
-      expect(commentsLabel).toBeTruthy();
+      expect(commentsLabel).toBeUndefined();
+      expect(quantificationsCard.querySelector('app-textarea')).toBeNull();
       expect(numberLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
       expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
-      expect(commentsLabel!.querySelector('span')).toBeNull();
+    });
+
+    // @akili-spec quick/innovation-measures-unit-first: Unit renders BEFORE Number on the measure card.
+    // Asserted on DOM ORDER, not on a CSS class or an `order` property — DOM order is what tab order and
+    // screen-reader order follow, and it is the only one of the three jsdom can actually observe.
+    it('renders Unit before Number on the measure card (DOM order, so tab order follows)', () => {
+      component.addQuantification();
+      fixture.detectChanges();
+
+      const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
+      const optionValues = quantCard.queryAll(By.directive(InputComponent)).map(de => (de.componentInstance as InputComponent).optionValue);
+
+      expect(optionValues).toEqual(['unit', 'number']);
+
+      // The labels follow the inputs — a card that swapped only the inputs and left the labels put
+      // would still satisfy the assertion above, and would be wrong on screen.
+      const labels = Array.from((quantCard.nativeElement as HTMLElement).querySelectorAll('h2.label')).map(el => el.textContent?.trim().replace('*', ''));
+      expect(labels).toEqual(['Unit', 'Number']);
     });
 
     // R-IUR-010 — the Disqualifier (T-12 work order): a green suite after removing
@@ -499,7 +527,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
       const verdict = numberInput.inputValid();
 
       expect(verdict.valid).toBe(false);
@@ -522,7 +550,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
       const verdict = numberInput.inputValid();
 
       expect(verdict.valid).toBe(true);
@@ -989,7 +1017,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect(payload.quantifications[0].quantification_number).toBe(0);
     });
 
-    it('keeps a row identified only by unit or only by description', () => {
+    // @akili-spec quick/innovation-measures-remove-comments: `description` was dropped from both the
+    // card and the payload, so it no longer identifies a row — a description-only row is absent now.
+    it('keeps a row identified only by unit, and drops one identified only by description', () => {
       component.body.set({
         ...component.body(),
         quantifications: [
@@ -998,7 +1028,22 @@ describe('InnovationUseDetailsComponent', () => {
         ]
       });
 
-      expect(component.buildPayload().quantifications.length).toBe(2);
+      const payload = component.buildPayload();
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.quantifications[0].unit).toBe('hectares');
+    });
+
+    // @akili-spec quick/innovation-measures-remove-comments: `description` is never sent from this page.
+    it('never sends description, even when the row carries one from the server', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 7, quantification_number: 12, unit: 'hectares', description: 'a legacy note' }]
+      });
+
+      const payload = component.buildPayload();
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.quantifications[0].description).toBeUndefined();
+      expect('description' in payload.quantifications[0]).toBe(false);
     });
   });
 
@@ -3020,7 +3065,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInput = quantCard.query(By.directive(InputComponent)).componentInstance as InputComponent;
+      const numberInput = numberFieldOf(quantCard).componentInstance as InputComponent;
 
       // Literal from requirements.md R-MSD-012 AC.2 / design.md §6.2's Leader-verified table — not
       // recomputed here via the same formula under test (that would be tautological).
@@ -3036,7 +3081,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const numberInputDe = quantCard.query(By.directive(InputComponent));
+      const numberInputDe = numberFieldOf(quantCard);
       const nativeInput = numberInputDe.query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.placeholder).not.toContain('positive');
@@ -3160,7 +3205,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+      const nativeInput = numberFieldOf(quantCard).query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.value).toBe('-0.75');
     });
@@ -3175,7 +3220,7 @@ describe('InnovationUseDetailsComponent', () => {
       fixture.detectChanges();
 
       const quantCard = fixture.debugElement.query(By.directive(QuantificationItemComponent));
-      const nativeInput = quantCard.query(By.directive(InputComponent)).query(By.css('input')).nativeElement as HTMLInputElement;
+      const nativeInput = numberFieldOf(quantCard).query(By.css('input')).nativeElement as HTMLInputElement;
 
       expect(nativeInput.value).toBe('-0.75');
       expect(nativeInput.value).not.toBe('-0.7500');
@@ -4444,6 +4489,15 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(card.nativeElement.getAttribute('target')).toBe('_blank');
       expect(card.nativeElement.getAttribute('rel')).toBe('noopener');
       expect(card.nativeElement.textContent).toContain('(opens in a new tab)');
+
+      // @akili-spec quick/innovation-use-sr-only-containing-block: the `sr-only` span above is
+      // `position: absolute`. Without `relative` on THIS anchor its containing block resolves to
+      // `.grid-container`, which is outside `#content`'s `overflow-y: auto` — the span then escapes the
+      // app's scrollport and stretches <html>, producing the reported double scroll. jsdom resolves no
+      // containing block, so the class is the only part of that chain a unit test can hold on to; the
+      // measurement that proved it lives in the quick-log row.
+      expect(card.nativeElement.classList).toContain('relative');
+      expect(card.nativeElement.querySelector('span.sr-only')).toBeTruthy();
     });
 
     it('FALSIFIER (href form): assert a STAR result yields /result/STAR-284/general-information EXACTLY, and a PRMS result yields /result/PRMS-284/general-information EXACTLY', () => {
