@@ -4,6 +4,7 @@
 - **Budget (`design.md` §7):** **5 tasks · ~260 LOC · ~7 review rounds**
 - **Lane:** client only. All five delegable to Antigravity.
 - **Last updated:** 2026-09-10
+- **Status:** **T-01…T-04 done and deployed-ready.** **T-05 deferred by user decision at the deployment cut** — it is test-only and changes nothing a user sees; deferring it means no test pins the metadata row's colour tokens. `dev-card-details` T-10 (human visual check, both themes) is still owed and now unblocked.
 
 ---
 
@@ -66,11 +67,11 @@ graph TD
 - **Files:** `innovation-use-details.component.{html,ts}` · its `.spec.ts`
 - **Scope:** an ⊗ control that sets `linked_innovation_dev = null` **and** `enrichmentSuccessForId = null`.
 - **Done:**
-  - [ ] ⊗ clears the card; the section returns to its no-link state
-  - [ ] 🔴 **Re-selecting the SAME result after clearing renders a full card** — not a bare one
-  - [ ] The picker still accepts any new selection
-  - [ ] Still single-select; no confirmation step
-  - [ ] The save payload no longer carries the cleared link
+  - [x] ⊗ clears the card; the section returns to its no-link state
+  - [x] 🔴 **Re-selecting the SAME result after clearing renders a full card** — not a bare one
+  - [x] The picker still accepts any new selection
+  - [x] Still single-select; no confirmation step
+  - [x] The save payload no longer carries the cleared link
 - **Verification:** `npm test -- --silent` · `npm run build`
 - **Falsifying input — ⚠️ CORRECTED 2026-09-10, the original was wrong and is recorded as such:** omit the `enrichmentSuccessForId` reset, then run the **four-step** sequence — select 42 (enrichment succeeds) → ⊗ clear → **`getData()` rehydrates `linked_innovation_dev` BARE** (only `result_id`/`code`/`title`/`platform_code`; the three enrichment keys are optional and only `GET_InnovationDevCard` writes them) → re-select 42. **Only now** are `sameId` and `wasSuccessful` both true, the early return fires, and the card renders **title + anchor only**. The **DOM** assertions must redden.
   - **What the original said, and why it was false:** it claimed clear-then-repick alone suffices. It does not — after a clear `linked_innovation_dev` is `null`, so `sameId` is `undefined === 42`, **structurally false whatever the flag holds**. **Measured:** with the reset deleted and the white-box flag assertion removed, the test **passes**. The rehydration in step 3 is what makes `sameId` true again.
@@ -86,10 +87,10 @@ graph TD
 - **Files:** `innovation-use-details.component.{html,ts}` · its `.spec.ts`
 - **Scope:** one `descriptionExpanded` signal toggling `line-clamp-3`; the affordance shows **See more** when clamped, **See less** when expanded.
 - **Done:**
-  - [ ] A 400-character description renders clamped with **See more**
-  - [ ] Activating it expands and offers **See less**; activating that re-collapses
-  - [ ] 🔴 **The complete text is in the DOM in BOTH states**
-  - [ ] The affordance is absent when the description is short enough not to clamp *(or always present — state which and why)*
+  - [x] A 400-character description renders clamped with **See more**
+  - [x] Activating it expands and offers **See less**; activating that re-collapses
+  - [x] 🔴 **The complete text is in the DOM in BOTH states**
+  - [x] The affordance is absent when the description is short enough not to clamp *(or always present — state which and why)*
 - **Verification:** `npm test -- --silent` · `npm run build`
 - **Falsifying input:** replace the clamp with `description.slice(0, 200)` → the full-text assertion reddens in the collapsed state. **A short fixture cannot catch this** — use 400 characters, as `R-IUC-004`'s scenario does.
 - **Disqualifier:** asserting only the class toggle. Class presence proves the string is in the attribute; it proves **nothing about whether the text clamps or is readable**. The visible effect is `DC-6` → T-10.
