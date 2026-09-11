@@ -447,7 +447,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect(organizationCountLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
 
       // R-IUR-010 AC.1, asserted per field rather than per card: Number and Unit each carry the
-      // red `*` beside their label; Comments does not.
+      // red `*` beside their label. @akili-spec quick/innovation-measures-remove-comments: the
+      // Comments field is no longer rendered on this card at all (`[showComments]="false"`), so
+      // its absence — not an asterisk-free label — is what is asserted now.
       const quantLabels = Array.from(quantificationsCard.querySelectorAll('h2.label'));
       const numberLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Number'));
       const unitLabel = quantLabels.find(label => label.textContent?.trim().startsWith('Unit'));
@@ -455,10 +457,10 @@ describe('InnovationUseDetailsComponent', () => {
 
       expect(numberLabel).toBeTruthy();
       expect(unitLabel).toBeTruthy();
-      expect(commentsLabel).toBeTruthy();
+      expect(commentsLabel).toBeUndefined();
+      expect(quantificationsCard.querySelector('app-textarea')).toBeNull();
       expect(numberLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
       expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
-      expect(commentsLabel!.querySelector('span')).toBeNull();
     });
 
     // R-IUR-010 — the Disqualifier (T-12 work order): a green suite after removing
@@ -989,7 +991,9 @@ describe('InnovationUseDetailsComponent', () => {
       expect(payload.quantifications[0].quantification_number).toBe(0);
     });
 
-    it('keeps a row identified only by unit or only by description', () => {
+    // @akili-spec quick/innovation-measures-remove-comments: `description` was dropped from both the
+    // card and the payload, so it no longer identifies a row — a description-only row is absent now.
+    it('keeps a row identified only by unit, and drops one identified only by description', () => {
       component.body.set({
         ...component.body(),
         quantifications: [
@@ -998,7 +1002,22 @@ describe('InnovationUseDetailsComponent', () => {
         ]
       });
 
-      expect(component.buildPayload().quantifications.length).toBe(2);
+      const payload = component.buildPayload();
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.quantifications[0].unit).toBe('hectares');
+    });
+
+    // @akili-spec quick/innovation-measures-remove-comments: `description` is never sent from this page.
+    it('never sends description, even when the row carries one from the server', () => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 7, quantification_number: 12, unit: 'hectares', description: 'a legacy note' }]
+      });
+
+      const payload = component.buildPayload();
+      expect(payload.quantifications.length).toBe(1);
+      expect(payload.quantifications[0].description).toBeUndefined();
+      expect('description' in payload.quantifications[0]).toBe(false);
     });
   });
 

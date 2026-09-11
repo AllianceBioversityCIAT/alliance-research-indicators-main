@@ -662,8 +662,10 @@ export default class InnovationUseDetailsComponent {
           // the `typeof` check compare against a type with no `string` member, which does not compile
           // (`J-17`) — that is the intended coupling between the two declarations, not an oversight.
           quantification_number: typeof row.quantification_number === 'string' ? Number(row.quantification_number) : row.quantification_number,
-          unit: row.unit,
-          description: row.description
+          unit: row.unit
+          // @akili-spec quick/innovation-measures-remove-comments: `description` is no longer editable on this
+          // page (the Comments field was dropped from the measure card), so it is not sent. The field is
+          // optional on the payload, so omitting it is the "send nothing" option the change asked for.
         }))
     };
   }
@@ -715,11 +717,17 @@ export default class InnovationUseDetailsComponent {
     };
   }
 
-  /** Hazard (b): "absent" for text fields is empty-string-or-nullish, not `== null`; `0` is a present number. */
+  /**
+   * Hazard (b): "absent" for text fields is empty-string-or-nullish, not `== null`; `0` is a present number.
+   *
+   * @akili-spec quick/innovation-measures-remove-comments: `description` no longer participates. It is not
+   * editable on this page any more and is not sent, so a legacy row carrying only a description would
+   * otherwise survive this filter and be POSTed as a blank `{id, unit: ''}` row.
+   */
   private quantificationRowAbsent(row: InnovationUseQuantification): boolean {
     const numberAbsent = row.quantification_number === undefined || row.quantification_number === null;
     const textAbsent = (value: string | undefined): boolean => !value || value.trim().length === 0;
-    return numberAbsent && textAbsent(row.unit) && textAbsent(row.description);
+    return numberAbsent && textAbsent(row.unit);
   }
 
   private extractErrorMessages(errorDetail: ErrorResponse | undefined): string[] {
