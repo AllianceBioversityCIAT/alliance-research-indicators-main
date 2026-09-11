@@ -1,4 +1,5 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-21
+// active_delegate_key removal + by-delegate endpoint (2026-09-11)
 //
 // Unit tests for PiDelegatesService (v5 — pi_user_id removed from entity + history).
 //
@@ -1371,5 +1372,100 @@ describe('list() and verify() — unchanged from v2', () => {
     const result = await service.verify(dto);
 
     expect(result).toEqual({ exists: false });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// listByDelegate() — by-delegate endpoint
+// @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+//
+// Auth contract (own-or-admin):
+//   - Own delegate (delegateUserId === caller's user_id) → allowed for any role.
+//   - SYSTEM_ADMIN querying another delegate_user_id          → allowed.
+//   - Non-admin querying another delegate_user_id             → ForbiddenException.
+//
+// Seam: piDelegatesRepository.find({ where: { delegate_user_id, is_active: true }, order: { project_id: 'ASC' } })
+//
+// KZ-001: assert on the returned rows and the find() call args (where-clause),
+//   plus the thrown exception — not on bare call order.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listByDelegate() — own delegate, SYSTEM_ADMIN, and forbidden path', () => {
+  it('own delegate → returns the active rows (asserts find where-clause args)', async () => {
+    const ownUserId = 200;
+    const expectedRows = [
+      makePiDelegate({
+        pi_delegate_id: 1001,
+        project_id: 'PROJ-BD-A',
+        delegate_user_id: ownUserId,
+        is_active: true,
+      }),
+      makePiDelegate({
+        pi_delegate_id: 1002,
+        project_id: 'PROJ-BD-B',
+        delegate_user_id: ownUserId,
+        is_active: true,
+      }),
+    ];
+
+    const { service, mockRepo } = makeService({
+      userId: ownUserId,
+      roles: [], // not SYSTEM_ADMIN — allowed because it is own id
+    });
+    (mockRepo.find as jest.Mock).mockResolvedValue(expectedRows);
+
+    const result = await service.listByDelegate(ownUserId);
+
+    // Returned rows match what the repo yielded
+    expect(result).toBe(expectedRows);
+
+    // find() called with the correct where-clause (KZ-001)
+    expect(mockRepo.find).toHaveBeenCalledWith({
+      where: { delegate_user_id: ownUserId, is_active: true },
+      order: { project_id: 'ASC' },
+    });
+  });
+
+  it('SYSTEM_ADMIN querying another delegate → allowed, returns rows', async () => {
+    const adminUserId = 201;
+    const targetDelegateId = 999; // different from caller
+    const expectedRows = [
+      makePiDelegate({
+        pi_delegate_id: 1003,
+        project_id: 'PROJ-BD-C',
+        delegate_user_id: targetDelegateId,
+        is_active: true,
+      }),
+    ];
+
+    const { service, mockRepo } = makeService({
+      userId: adminUserId,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+    });
+    (mockRepo.find as jest.Mock).mockResolvedValue(expectedRows);
+
+    const result = await service.listByDelegate(targetDelegateId);
+
+    expect(result).toBe(expectedRows);
+    expect(mockRepo.find).toHaveBeenCalledWith({
+      where: { delegate_user_id: targetDelegateId, is_active: true },
+      order: { project_id: 'ASC' },
+    });
+  });
+
+  it('non-admin querying ANOTHER delegate_user_id → ForbiddenException (K-012 red input)', async () => {
+    const callerUserId = 202;
+    const otherDelegateId = 888; // not the caller's own id
+
+    const { service, mockRepo } = makeService({
+      userId: callerUserId,
+      roles: [SecRolesEnum.CONTRIBUTOR], // non-admin
+    });
+
+    await expect(service.listByDelegate(otherDelegateId)).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    // find() must NOT be called — the 403 is thrown before any DB access (KZ-001)
+    expect(mockRepo.find).not.toHaveBeenCalled();
   });
 });

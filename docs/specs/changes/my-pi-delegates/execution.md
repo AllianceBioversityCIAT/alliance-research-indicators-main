@@ -441,3 +441,13 @@ Ran a full assign→revoke cycle against `alliancereportingdb` (real data: G232,
 - **Docs:** design §4/§11.1 tables updated + §12 v5 note (supersedes earlier prose mentions).
 - **ADVISORY (non-gating):** a stale TSDoc at `repositories/pi-delegates.repository.ts:34` still names the removed `createDelegate` (harmless).
 - **Net:** `created_by` records the grantor (and, on revoke in the main table, `updated_by` records the revoker); the **history** carries `created_by` = the actor of each movement + `created_at` = the movement date.
+
+---
+
+## Amendment v6 — remove `active_delegate_key` + add by-delegate endpoint (2026-09-11, Product) — **PASS**
+
+**A. `active_delegate_key` removed (Reviewer PASS).** Product did not want the generated column. Dropped from `pi_delegates` (column + `uq_pi_delegates_active_delegate_key` unique index; migration amended, unmerged branch; entity/comments updated). **Consequence:** the DB-level "one active per (project, delegate)" guarantee (R-PID-001 AC.3 / R-PID-006 / DD-F) is gone — uniqueness is now **app-enforced** by the `assign` sync (creates only `desired \ current`). No query referenced the column; `isPi`/metadata/auth unaffected. Local `alliancereportingdb` reconciled (index + column dropped). Accepted tradeoff (a manual/racy insert could create a duplicate active row).
+
+**B. New endpoint `GET /pi-delegates/by-delegate?delegate_user_id=<id>` (Reviewer PASS).** The inverse of `list(projectId)` — returns the active delegations for a delegate (which projects they're assigned to). Service `listByDelegate` with **own-or-admin auth** (403 before any DB call for a non-admin querying another user — judgment S4, no cross-user enumeration); `find({where:{delegate_user_id, is_active:true}, order:{project_id}})`. New DTO `ListByDelegateDto`; controller `@Get('by-delegate')` before `@Delete()`, ValidationPipe, no `@Roles`, Swagger. 3 unit tests (own/admin/forbidden) + e2e probe.
+
+**Verification:** `npm run build` clean; **`npm test -- --silent` 2734/2734 green**; eslint clean; `git diff --stat client/` empty. Docs: design §4/§13 + requirements §5 updated (supersede the DB-enforcement wording).

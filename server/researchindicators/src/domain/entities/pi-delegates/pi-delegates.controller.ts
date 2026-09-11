@@ -24,6 +24,7 @@ import { PiDelegatesService } from './pi-delegates.service';
 import { BulkAssignPiDelegatesDto } from './dto/bulk-assign-pi-delegates.dto';
 import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
+import { ListByDelegateDto } from './dto/list-by-delegate.query.dto';
 
 // ⚠ No @Roles(...) is applied here (R-PID-007 / DD-B).
 // RolesGuard.canActivate() returns true when no @Roles metadata is present,
@@ -227,6 +228,52 @@ export class PiDelegatesController {
         status: HttpStatus.OK,
       }),
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-delegate — list active projects for a delegate
+  //
+  // Inverse of GET /pi-delegates?projectId (which lists delegates of a project).
+  // Returns all active pi_delegates rows for the given delegate_user_id.
+  //
+  // Declared BEFORE @Delete() so Nest matches the static path segment
+  // 'by-delegate' before the parameterless DELETE on the root path.
+  //
+  // Auth (own-or-admin): enforced in the service — no @Roles here.
+  // @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+  // ─────────────────────────────────────────────────────────────────────────
+  @Get('by-delegate')
+  @ApiOperation({
+    summary: 'List active project assignments for a delegate',
+    description:
+      'Returns all active pi_delegates rows where delegate_user_id matches the given value. ' +
+      'This is the inverse of GET /pi-delegates?projectId: instead of listing the delegates ' +
+      'of a project, it lists the projects a delegate is assigned to. ' +
+      'Authorization (own-or-admin): the caller may query their own delegate_user_id; ' +
+      'a SYSTEM_ADMIN may query any delegate_user_id. All other combinations return 403.',
+  })
+  @ApiQuery({
+    name: 'delegate_user_id',
+    required: true,
+    type: Number,
+    description: 'sec_users.sec_user_id of the delegate to query',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  async listByDelegate(@Query() dto: ListByDelegateDto) {
+    return this.piDelegatesService
+      .listByDelegate(dto.delegate_user_id)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: 'Projects for the delegate',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   // ─────────────────────────────────────────────────────────────────────────

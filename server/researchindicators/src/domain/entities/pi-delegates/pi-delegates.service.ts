@@ -525,6 +525,47 @@ export class PiDelegatesService {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-delegate — inverse list (projects for a delegate)
+  // @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * List all active projects a delegate is currently assigned to.
+   *
+   * This is the inverse of list() which returns delegates of a project.
+   * listByDelegate() returns all pi_delegates rows where delegate_user_id
+   * matches the given value and is_active = true.
+   *
+   * Authorization (own-or-admin):
+   *   - The caller may query their own delegate_user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any delegate_user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * assertCanManageProject is deliberately NOT used here — this query is
+   * cross-project; there is no single project_id to gate on.
+   *
+   * @param delegateUserId  sec_user_id of the delegate to query
+   */
+  async listByDelegate(delegateUserId: number): Promise<PiDelegate[]> {
+    const callerUserId = this.currentUserUtil.user_id;
+    const roles = this.currentUserUtil.roles ?? [];
+
+    const isSelf = delegateUserId === callerUserId;
+    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
+
+    if (!isSelf && !isAdmin) {
+      throw new ForbiddenException(
+        'Access denied: you may only query your own delegate assignments, or you must be a SYSTEM_ADMIN.',
+      );
+    }
+
+    return this.piDelegatesRepository.find({
+      where: { delegate_user_id: delegateUserId, is_active: true },
+      order: { project_id: 'ASC' },
+    });
+  }
+
   /**
    * Verify whether an active delegation exists for the given
    * (project_id, delegate_user_id) pair (R-PID-004 AC.1).

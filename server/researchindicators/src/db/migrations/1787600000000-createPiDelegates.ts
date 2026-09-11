@@ -1,14 +1,15 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-01
+// active_delegate_key removed (Product decision 2026-09-11)
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Creates the `pi_delegates` table as the relational source of truth for
- * PI delegation (R-PID-001, R-PID-006). A STORED GENERATED column
- * `active_delegate_key` carries the unique-active constraint that prevents
- * duplicate active delegations per (project, delegate) while allowing
- * revoked rows to coexist (design decision DD-F — MySQL has no filtered
- * unique index). Inactive rows carry NULL in `active_delegate_key`, and
- * MySQL's unique-index semantics do not consider NULLs as duplicates.
+ * PI delegation (R-PID-001, R-PID-006).
+ *
+ * The assign() sync in PiDelegatesService prevents duplicate active delegations
+ * per (project, delegate) by construction — no DB-level generated column is
+ * needed. Active rows are uniquely identified by (project_id, delegate_user_id,
+ * is_active = 1); revoked rows coexist without constraint.
  *
  * Charset: the table is pinned to utf8mb3 / utf8mb3_general_ci so that
  * `project_id` matches `agresso_contracts.agreement_id` (that legacy column is
@@ -32,12 +33,8 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
         `\`pi_delegate_id\` bigint NOT NULL AUTO_INCREMENT, ` +
         `\`project_id\` varchar(36) NOT NULL, ` +
         `\`delegate_user_id\` bigint NOT NULL, ` +
-        `\`active_delegate_key\` varchar(80) GENERATED ALWAYS AS (IF(\`is_active\` = 1, CONCAT(\`project_id\`, ':', \`delegate_user_id\`), NULL)) STORED, ` +
         `PRIMARY KEY (\`pi_delegate_id\`)` +
         `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE \`pi_delegates\` ADD UNIQUE INDEX \`uq_pi_delegates_active_delegate_key\` (\`active_delegate_key\`)`,
     );
     await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` ADD CONSTRAINT \`FK_pi_delegates_project_id\` FOREIGN KEY (\`project_id\`) REFERENCES \`agresso_contracts\`(\`agreement_id\`) ON DELETE RESTRICT ON UPDATE NO ACTION`,

@@ -1,6 +1,7 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-04
 //
 // pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
+// active_delegate_key removed (Product decision 2026-09-11)
 //
 // Atomicity guarantee (R-PID-005 AC.3 / NFR-PID-003):
 //   The repository routes ALL writes — sec_user insert and pi_delegates insert —
@@ -9,9 +10,9 @@
 //   this.query() on the pooled connection and is therefore NOT transaction-bound.
 //   This repository reuses the insert logic (column set, AllianceUserStaff carnet
 //   resolution) but executes it via manager.query() so both writes share the same
-//   transactional connection. A failure after the sec_user insert (e.g. duplicate
-//   active_delegate_key on the pi_delegates row) will roll back the sec_user insert
-//   as well — satisfying the T-09 rollback test (R-PID-005 AC.3).
+//   transactional connection. A failure after the sec_user insert (e.g. a FK
+//   constraint violation on the pi_delegates row) will roll back the sec_user
+//   insert as well — satisfying the T-09 rollback test (R-PID-005 AC.3).
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { PiDelegate } from '../entities/pi-delegate.entity';
@@ -267,9 +268,6 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
 
   /**
    * Inserts a single pi_delegates row through the caller's transaction manager.
-   *
-   * Does NOT set active_delegate_key (it is a STORED GENERATED column in MySQL —
-   * the DB computes it; writing it would fail the INSERT).
    *
    * @param project_id         Agresso agreement_id
    * @param delegate_user_id   sec_user_id of the delegate

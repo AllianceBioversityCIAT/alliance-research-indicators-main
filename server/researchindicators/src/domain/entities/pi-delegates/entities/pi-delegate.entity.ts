@@ -1,11 +1,5 @@
 // @akili-spec docs/specs/changes/my-pi-delegates — T-02
-//
-// NOTE: `active_delegate_key` is a STORED GENERATED column in MySQL
-// (IF(is_active=1, CONCAT(project_id,':',delegate_user_id), NULL)).
-// It is intentionally NOT mapped here — TypeORM would attempt to write
-// to it on INSERT/UPDATE and break every mutation. The unique-active
-// constraint is enforced at the DB layer (uq_pi_delegates_active_delegate_key).
-// Same pattern as `result_pool_funding_alignment` (D-PI-9).
+// active_delegate_key removed (Product decision 2026-09-11)
 //
 // NOTE: `delegate_user_id` is a FK column pointing to `sec_users.sec_user_id`.
 // `sec_users` has no TypeORM @Entity class in this codebase (it is used only

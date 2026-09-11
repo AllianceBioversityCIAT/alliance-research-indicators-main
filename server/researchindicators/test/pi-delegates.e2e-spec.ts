@@ -115,17 +115,18 @@ describe('PI Delegates — E2E DB-semantic scenarios (T-09)', () => {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // E2E-A — DB unique-active constraint rejects a duplicate active delegation
+  // E2E-A — assign() sync prevents a duplicate active delegation
   //
-  // Real MySQL scenario: the STORED GENERATED active_delegate_key column has
-  // a UNIQUE index. Two INSERT requests for the same (project_id,
-  // delegate_user_id) while both are is_active=1 must result in a 409 from
-  // the server (service catches errno 1062 → ConflictException).
+  // The active_delegate_key generated column and its unique index were removed
+  // (Product decision 2026-09-11). Duplicate-active prevention is now enforced
+  // entirely by the assign() sync logic in PiDelegatesService: the diff computes
+  // (desired \ current) so the same (project, delegate) pair is never re-inserted
+  // while already active.
   //
-  // This cannot be proven with a unit mock: the mock returns whatever we tell
-  // it to — the DB constraint is the actual gate (R-PID-001 AC.3 / R-PID-006).
+  // This scenario is retained as a documentation-only probe for the real DB
+  // path; behavioral assertion requires seed data and a post-migration run.
   // ─────────────────────────────────────────────────────────────────────────
-  describe('E2E-A — DB unique-active constraint rejects duplicate active delegation', () => {
+  describe('E2E-A — assign() sync prevents duplicate active delegation (no DB unique-active index)', () => {
     const projectId = 'E2E-PROBE-A-UNIQ';
     const delegateUserId = 999_001;
 
@@ -781,6 +782,115 @@ describe('PI Delegates — v4 assignments payload (T-21, R-PID-011)', () => {
 
       expect(res.status).not.toBe(404);
       // Old shape has no `assignments` field — DTO @ArrayNotEmpty on assignments fires → 400
+      expect(res.status).toBe(400);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+//
+// E2E probes for GET /api/pi-delegates/by-delegate.
+//
+// Probe strategy (KZ-017 — declare what we CAN reach):
+//   1. Valid delegate_user_id → route mounted (NOT 404) + DTO validates (NOT 400).
+//      Behavioral outcome depends on DB seed data — deferred pending K-015.
+//   2. Missing delegate_user_id → 400 (ValidationPipe @IsNotEmpty).
+//   3. Non-numeric delegate_user_id → 400 (ValidationPipe @IsInt after @Type transform).
+//
+// What we CANNOT reach in this probe:
+//   - Actual row results (requires pi_delegates table + seed data).
+//   - The 403 path for a non-admin querying another user (service auth guard —
+//     the e2e harness stubs SYSTEM_ADMIN, so all valid requests are authorized).
+//
+// KZ-001: assertions on HTTP status codes.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PI Delegates — GET /api/pi-delegates/by-delegate (by-delegate endpoint)', () => {
+  let byDelegateApp: INestApplication;
+
+  beforeAll(async () => {
+    jest
+      .spyOn(JwtMiddleware.prototype, 'use')
+      .mockImplementation(async (req: any, _res: any, next: any) => {
+        req.user = {
+          sec_user_id: 800_020,
+          email: 'pi-delegates-by-delegate-e2e@example.org',
+          first_name: 'ByDelegate',
+          last_name: 'E2E',
+          roles: [SecRolesEnum.SYSTEM_ADMIN],
+        };
+        return next();
+      });
+
+    const { Test: TestFactory } = await import('@nestjs/testing');
+    const { VersioningType } = await import('@nestjs/common');
+    const { AppModule } = await import('../src/app.module');
+
+    const moduleFixture = await TestFactory.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    byDelegateApp = moduleFixture.createNestApplication();
+    byDelegateApp.setGlobalPrefix('api');
+    byDelegateApp.enableVersioning({ type: VersioningType.URI });
+    await byDelegateApp.init();
+  }, 120_000);
+
+  afterAll(async () => {
+    await byDelegateApp?.close();
+  });
+
+  describe('E2E-H — GET /api/pi-delegates/by-delegate (route mount + validation)', () => {
+    it('valid delegate_user_id → route mounted (NOT 404), DTO validates (NOT 400)', async () => {
+      const res = await request(byDelegateApp.getHttpServer())
+        .get('/api/pi-delegates/by-delegate')
+        .query({ delegate_user_id: 800_020 });
+
+      // 404 = route not mounted — the failure this test guards against.
+      expect(res.status).not.toBe(404);
+      // 400 = DTO validation rejected a structurally valid param — also a failure.
+      expect(res.status).not.toBe(400);
+
+      const txt = JSON.stringify(res.body);
+      const tableAbsent =
+        res.status === 500 &&
+        txt.includes('pi_delegates') &&
+        (txt.includes('1146') ||
+          txt.includes("doesn't exist") ||
+          txt.includes('no such table'));
+
+      if (tableAbsent) {
+        console.warn(
+          '[by-delegate E2E-H] GET /api/pi-delegates/by-delegate — route mounted, DTO valid, ' +
+            'but pi_delegates table does not exist. ' +
+            'Behavioral assertion deferred (migration unapplied, K-015).',
+        );
+      } else {
+        console.info(
+          `[by-delegate E2E-H] GET /api/pi-delegates/by-delegate?delegate_user_id=800020 → ${res.status}. ` +
+            'Route mounted and service reached.',
+        );
+      }
+    });
+
+    it('missing delegate_user_id → 400 (ValidationPipe @IsNotEmpty)', async () => {
+      const res = await request(byDelegateApp.getHttpServer()).get(
+        '/api/pi-delegates/by-delegate',
+      );
+
+      expect(res.status).not.toBe(404);
+      expect(res.status).toBe(400);
+    });
+
+    it('non-numeric delegate_user_id → 400 (ValidationPipe @IsInt after @Type transform)', async () => {
+      const res = await request(byDelegateApp.getHttpServer())
+        .get('/api/pi-delegates/by-delegate')
+        .query({ delegate_user_id: 'not-a-number' });
+
+      expect(res.status).not.toBe(404);
       expect(res.status).toBe(400);
     });
   });

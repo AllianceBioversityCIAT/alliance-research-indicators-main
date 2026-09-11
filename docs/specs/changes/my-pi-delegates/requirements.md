@@ -81,7 +81,7 @@ Give a project's work PI-level review by a **PI Delegate**, modeled **only** as 
 | Migration not applied to shared DB | Human apply step named (K-015) |
 
 ## 5. Data requirements
-- New `pi_delegates`: `pi_delegate_id` PK; `project_id` varchar(36) FK `agresso_contracts.agreement_id`; `pi_user_id` bigint FK `sec_users`; `delegate_user_id` bigint FK `sec_users`; `AuditableEntity`; generated `active_delegate_key` + unique. Migration append-only; applied separately (K-015).
+- New `pi_delegates`: `pi_delegate_id` PK; `project_id` varchar(36) FK `agresso_contracts.agreement_id`; `pi_user_id` bigint FK `sec_users`; `delegate_user_id` bigint FK `sec_users`; `AuditableEntity`; (v6: `active_delegate_key` removed — uniqueness now app-enforced). Migration append-only; applied separately (K-015).
 
 ## 6. API surface delta (finalized in design)
 - `POST /pi-delegates` (create, provisions sec_user), `GET /pi-delegates?projectId` (list), `GET /pi-delegates/verify` (exists?), `PATCH`/`DELETE` (update/revoke). Authorization per R-PID-007. Swagger required. `ServerResponseDto` envelope.

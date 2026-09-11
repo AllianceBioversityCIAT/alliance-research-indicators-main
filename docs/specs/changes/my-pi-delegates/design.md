@@ -46,10 +46,9 @@ routes/main.routes.ts                                                       # re
 | `pi_delegate_id` | bigint PK | generated |
 | `project_id` | varchar(36) | FK → `agresso_contracts.agreement_id`, ON DELETE RESTRICT |
 | `delegate_user_id` | bigint | FK → `sec_users.sec_user_id` — the delegate |
-| `active_delegate_key` | varchar(80) STORED GENERATED | `IF(is_active=1, CONCAT(project_id,':',delegate_user_id), NULL)` |
 | *AuditableEntity* | — | `created_by/at`, `updated_by/at`, `is_active`, `deleted_at` |
 
-- **UNIQUE** on `active_delegate_key` → at most one active delegation per `(project, delegate)`, revoke→re-grant safe (repo D-PI-9 pattern; MySQL has no filtered unique index). *(R-PID-001 AC.3 / R-PID-006)*
+- **At most one active delegation per `(project, delegate)`** is now **app-enforced** by the `assign` sync (which only creates `desired \ current`), not DB-enforced. *(v6: `active_delegate_key` + its unique index removed — see §13. Supersedes the DB-level R-PID-001 AC.3 / R-PID-006 / DD-F.)*
 - Revoke = soft-delete. The delegate check needs only `(project_id, delegate_user_id)`. *(v5: `pi_user_id` removed — see §12.)*
 - Migration append-only; **applied to shared DB as a separate human step** (K-015).
 
@@ -202,7 +201,15 @@ So the client `is_principal_investigator` flag reflects delegates with **no fron
 
 > Product (Option B) determined `pi_user_id` was redundant with `created_by`: the service set both to the caller on create, so they always held the same value. **`pi_user_id` is REMOVED from BOTH `pi_delegates` and `pi_delegate_history`** (column + the `FK_pi_delegates_pi_user_id` FK). The two v4/v2 migrations were AMENDED (unmerged branch). Any earlier prose or table reference to `pi_user_id` in this spec is **superseded** by this note.
 >
-> - `pi_delegates`: columns are now `pi_delegate_id` PK, `project_id` (FK agresso), `delegate_user_id` (FK sec_users), `active_delegate_key` (generated + unique), AuditableEntity. `created_by` records the grantor; `updated_by` records the last mutator (e.g. the revoker).
+> - `pi_delegates`: columns are `pi_delegate_id` PK, `project_id` (FK agresso), `delegate_user_id` (FK sec_users), AuditableEntity. `created_by` records the grantor; `updated_by` records the last mutator (e.g. the revoker). *(v6 removed `active_delegate_key` + its unique index.)*
 > - `pi_delegate_history`: context is now `pi_delegate_id`, `project_id`, `delegate_user_id`, `action`; `created_by` = the actor of the movement, `created_at` = the movement date.
 > - Repo: `insertDelegate(project_id, delegate_user_id, createdBy, manager)`; `recordHistory` entry drops `pi_user_id`; dead `createDelegate` removed.
 > - Unaffected: `isPi`, `queryPrincipalInvestigator`, and the auth queries never referenced `pi_user_id`.
+
+---
+
+## 13. Amendment v6 — remove `active_delegate_key` + add by-delegate endpoint (2026-09-11, Product)
+
+> **A. `active_delegate_key` removed.** Product did not want the generated column. It was dropped from `pi_delegates` (column + `uq_pi_delegates_active_delegate_key` unique index; migration amended, unmerged branch). **Consequence:** the "one active delegation per (project, delegate)" rule (R-PID-001 AC.3 / R-PID-006 / DD-F) is **no longer DB-enforced** — it is now guaranteed only by the `assign` sync logic (creates `desired \ current`, never a duplicate active pair). No query referenced the column. Uniqueness is app-level defense; a direct/manual insert could create a duplicate active row (accepted tradeoff).
+>
+> **B. New endpoint `GET /pi-delegates/by-delegate?delegate_user_id=<id>`** — the inverse of `GET /pi-delegates?projectId` (list a project's delegates). Returns the **active delegations for a delegate** (which projects they are assigned to). **Auth (own-or-admin):** allowed if `delegate_user_id === caller` OR caller is `SYSTEM_ADMIN`; else 403 (no cross-user enumeration — judgment S4). Service `listByDelegate` → `find({where:{delegate_user_id, is_active:true}, order:{project_id}})`. No `@Roles`; ValidationPipe + Swagger.
