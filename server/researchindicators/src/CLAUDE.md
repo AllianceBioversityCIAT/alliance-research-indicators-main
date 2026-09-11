@@ -101,7 +101,7 @@ Naming:
    - Use `@Roles(...)` + ensure `RolesGuard` is on the controller (or the handler).
    - For result mutations, add `@UseGuards(ResultStatusGuard)` and use the `RESULT_CODE` path token + `@GetResultVersion()`.
    - Return the service promise wrapped in `ResponseUtils.format({ description, status, data })`.
-4. **Route registration** — if it is a new sub-resource path, add a node under `domain/routes/main.routes.ts`. If it is a new endpoint on an existing controller, no route change needed.
+4. **Route registration** — if it is a new sub-resource path, add a node under `domain/routes/main.routes.ts`. If it is a new endpoint on an existing controller, no route change needed. **⚠ A route in `main.routes.ts` is NOT reachable unless its module is ALSO imported into `domain/entities/entities.module.ts` (Kaizen KZ-017).** `RouterModule.register` only maps paths; NestJS instantiates a module — and mounts its controller — only when the module is in the app graph. A module present in `main.routes.ts` but absent from `entities.module.ts` returns **404 in production** and still passes `build` + unit + `lint`. **Verify HTTP reachability by booting the app / an e2e request, never by grepping the route table.**
 5. **Tests** — extend `<module>.controller.spec.ts` + `<module>.service.spec.ts`. Add an e2e case under `test/` if it is a new public route.
 6. **OpenSearch** — if a new field is searchable, decorate the entity column with `@OpenSearchProperty({...})` and follow the reindex path in `tools/open-search/`.
 7. **Swagger sanity check** — confirm the endpoint shows up at `/swagger` with the right tag, params, and bearer-auth lock.
