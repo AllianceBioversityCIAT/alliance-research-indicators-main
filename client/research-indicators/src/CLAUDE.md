@@ -135,6 +135,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - **Forms**: reactive forms; wrapped PrimeNG inputs from `styles/custom-fields.scss` & `styles/custom-prime-force-styles.scss` — not raw PrimeNG controls.
 - **Colors & spacing**: token utility classes (`.abc-*`, `.atc-*`, `.rs-*`, `.fs-*`) or CSS variables (`var(--ac-*)`). **No hex literals in component code.**
 - **Dark mode**: rely on tokens — never branch on `isDarkMode()` for color decisions.
+- **URL-addressable filter state**: where a screen's filters are shareable via the query string, the `URL ⇄ state` mapping lives in a **pure codec module** beside the feature — `pages/platform/pages/results-center/url/` is the reference implementation (frozen slug vocabulary + `parse`/`serialize`; no DI, no router, no signals). The **component** owns reading and writing it, never a `providedIn: 'root'` service, which would rewrite the address bar of every other route that injects the same singleton. Vocabularies are frozen constants, never derived from display names. *(Spec: `docs/specs/archive/2026-08-13-results-center--url-filters`; the durable contract is in [`../../../docs/ux-ui/design.md`](../../../docs/ux-ui/design.md) §12.2.)*
 - **i18n**: not yet wired. Don't add a parallel i18n mechanism — file an open question instead.
 - **Strict TS**: `strict`, `noImplicitOverride`, `noPropertyAccessFromIndexSignature`, `noImplicitReturns`, `noFallthroughCasesInSwitch`, `strictTemplates`. Don't loosen these in `tsconfig.json`.
 
@@ -151,6 +152,8 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
 - ⚠️ **A component fixture must arrange the TRANSITION the product performs, not the end state (Kaizen KZ-015).** Setting an input before the first `detectChanges()` tests a state the product may never reach. A 2026-08-20 dialog shipped never loading its data on open — the parent renders it always with `visible=false` and only flips the signal later — while every test set `visible=true` *before* the first `detectChanges()`, so the construct-false-then-open sequence, the only one production uses, was never exercised. The suite was green and the feature was broken. Construct in the initial state, assert the negative, **then** change it.
 - ⚠️ **A targeted single-file run trips those project-wide floors and exits `1` with every test passing** (measured: `npx jest <file> --silent` → exit 1 on 63/63 green; `--coverage=false` → exit 0). An exit code from a targeted run without `--coverage=false` is not a signal — and under a red-before/green-after protocol it makes "green after" unreachable (K-020).
 - Excluded from coverage by design: `app.config.ts`, `app.routes.ts`, `shared/sockets/websocket.service.ts`, `shared/components/alert/alert.component.ts`.
+- **When a spec stubs a child component, assert the stub renders/evaluates what the real one does** (projected content, host bindings) — or use the real component. A stub with `template: ''` cannot prove anything about projected controls. *(Kaizen KZ-001)*
+- **If a change touches a component rendered by many screens, run the full suite before reporting** — targeted suites confirm the brief was followed, not that the blast radius is clean. *(Kaizen KZ-003)*
 
 ---
 

@@ -89,6 +89,12 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             link: '/administration/configuration/variables',
             icon: 'pi-database',
             iconSize: '13px'
+          },
+          {
+            label: 'Prompt Manager',
+            link: '/administration/configuration/prompt-manager',
+            icon: 'pi-sparkles',
+            iconSize: '13px'
           }
         ]
       });

@@ -16,7 +16,7 @@
 NestJS 10 HTTP service + RabbitMQ microservice + Socket.IO gateway + Vite/React 19 SSR admin panel.
 
 Two Nest applications bootstrap from `main.ts`:
-- **HTTP** (`AppModule`) — REST API under `/api/v{n}` + Swagger at `/swagger` + admin SSR under `/admin`.
+- **HTTP** (`AppModule`) — REST API under `/api` + Swagger at `/swagger` + admin SSR under `/admin`. URI versioning is enabled with **no `defaultVersion`** (`main.ts:53-56`), so a route is `/api/v{n}/...` **only** when its handler declares `@Version('{n}')`; everything else is `/api/...` unversioned. Don't assume a `/v1` segment — check the decorator.
 - **Microservice** (`AppMicroserviceModule`) — RabbitMQ consumer on queue `ARI_QUEUE`.
 
 ---

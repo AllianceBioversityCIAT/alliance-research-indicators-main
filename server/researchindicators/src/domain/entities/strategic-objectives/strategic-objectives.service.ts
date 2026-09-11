@@ -12,7 +12,7 @@ import {
   CurrentUserUtil,
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
-import { FindOptionsWhere } from 'typeorm';
+import { FindOptionsWhere, In } from 'typeorm';
 
 @Injectable()
 export class StrategicObjectivesService {
@@ -52,6 +52,31 @@ export class StrategicObjectivesService {
       order: { name: 'ASC' },
     });
     return strategicObjectives;
+  }
+
+  /**
+   * Narrow finder for portfolio-scoped id validation (AI-formalize alignment
+   * path, design.md §3 / DD-1). Returns only the rows matching every one of:
+   * `id IN (ids)`, `portfolio_id = portfolioId`, `is_active = true` — a
+   * single predicate that covers "unknown", "inactive" and "foreign
+   * portfolio" discard causes at once. Guarded against `IN ()`: an empty
+   * `ids` array short-circuits to `[]` without querying.
+   */
+  async findActiveByIdsForPortfolio(
+    ids: number[],
+    portfolioId: number,
+  ): Promise<StrategicObjective[]> {
+    if (!ids?.length) {
+      return [];
+    }
+
+    return this.mainRepo.find({
+      where: {
+        id: In(ids),
+        portfolio_id: portfolioId,
+        is_active: true,
+      },
+    });
   }
 
   async findOne(id: number) {

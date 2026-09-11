@@ -26,6 +26,7 @@ describe('BilateralService', () => {
     PATCH_PoolFundingAlignment: jest.Mock;
     GET_PoolFundingSciencePrograms: jest.Mock;
     GET_PoolFundingHlosIndicators: jest.Mock;
+    TP: { updateGreenChecks: jest.Mock };
   };
   let canAccessCenterAdminSignal: ReturnType<typeof signal<boolean>>;
   let isCurrentUserOwnerSignal: ReturnType<typeof signal<boolean>>;
@@ -38,7 +39,8 @@ describe('BilateralService', () => {
       GET_PoolFundingAlignment: jest.fn(),
       PATCH_PoolFundingAlignment: jest.fn(),
       GET_PoolFundingSciencePrograms: jest.fn(),
-      GET_PoolFundingHlosIndicators: jest.fn()
+      GET_PoolFundingHlosIndicators: jest.fn(),
+      TP: { updateGreenChecks: jest.fn().mockResolvedValue(undefined) }
     };
     canAccessCenterAdminSignal = signal<boolean>(false);
     isCurrentUserOwnerSignal = signal<boolean>(false);
@@ -606,6 +608,38 @@ describe('BilateralService', () => {
 
       await expect(service.patchAlignment('RES-001', { has_contribution: false })).rejects.toThrow('network down');
 
+      expect(service.savingAlignment()).toBe(false);
+    });
+
+    // Regression: the sidebar green check and the PRMS SYNC gate read
+    // `cache.greenChecks()`, refreshed only by ToPromiseService's
+    // `loadingTrigger` finalize hook — which no PATCH goes through. Before this
+    // fix the check stayed stale until a full result reload.
+    it('200 — refreshes the green checks so the sidebar check and PRMS SYNC gate update', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(successAlignment));
+
+      await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(mockApi.TP.updateGreenChecks).toHaveBeenCalledTimes(1);
+    });
+
+    it('non-200 — does NOT refresh the green checks (nothing changed server-side)', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(
+        err<AlignmentResponse>(500, 'Internal Server Error', undefined as unknown as AlignmentResponse)
+      );
+
+      await service.patchAlignment('RES-001', { has_contribution: false });
+
+      expect(mockApi.TP.updateGreenChecks).not.toHaveBeenCalled();
+    });
+
+    it('200 — a green-check refresh failure never turns a successful save into an error', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(successAlignment));
+      mockApi.TP.updateGreenChecks.mockRejectedValue(new Error('green checks down'));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({ ok: true, data: successAlignment });
       expect(service.savingAlignment()).toBe(false);
     });
   });

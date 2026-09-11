@@ -42,7 +42,7 @@ Your sole responsibility is to implement the technical scope of the active task 
 
 3. **Server Conventions (`server/researchindicators` — non-negotiable):**
    * **HTTP envelope:** every response is `ServerResponseDto` (`{ data, status, description, errors, timestamp, path }`), wrapped by `ResponseInterceptor`; errors flow through `GlobalExceptions` with the same shape. Never return raw payloads.
-   * **Routing:** global `/api` prefix with URI versioning (`/api/v1`, `/api/v2`).
+   * **Routing:** global `/api` prefix. URI versioning is enabled but **no `defaultVersion` is set** (`main.ts:53-56`), so a handler mounts under a version segment **only if it declares `@Version(...)`** — everything else is `/api/<resource>/...`, and `/api/v1/...` returns `404`. Never assume `/v1`: check the decorator, or boot the app and dump the route table, before writing a client, test, or doc against a path.
    * **Auth/RBAC:** wire `@Roles(...)` + `RolesGuard`; `SYSTEM_ADMIN` bypasses; Results mutations also pass `ResultStatusGuard`. Never bypass `JwtMiddleware`; never log tokens.
    * **Persistence:** TypeORM + MySQL (utf8mb4). Migrations are **append-only** — never edit a merged migration; generate via `npm run migration:generate -- ./src/db/migrations/<name>`. Domain entities extend `AuditableEntity`.
    * **A migration is not verified until it has been executed** (Kaizen K-006). It can be valid TypeScript, lint-clean, type-clean and reviewed while still being unrunnable — that shipped once in this repo. Run it against a disposable local MySQL of the same engine version as Dev before reporting the task complete, and never against the shared Dev database by hand.

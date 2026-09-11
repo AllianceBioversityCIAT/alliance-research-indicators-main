@@ -97,6 +97,82 @@ describe('ClarisaLeversService', () => {
     });
   });
 
+  describe('findActiveByIdsForPortfolio', () => {
+    // A genuine predicate evaluator over the fixture list — not a canned
+    // return value — so the portfolio-scoping and is_active exclusion cases
+    // can actually fail against an implementation that never applies them
+    // (KZ-001), matching the standard set in
+    // strategic-objectives.service.spec.ts.
+    const evaluateWhere = (
+      lever: Record<string, any>,
+      where: Record<string, any>,
+    ): boolean =>
+      Object.entries(where).every(([key, condition]) => {
+        const actual = lever[key];
+        if (condition && typeof condition === 'object' && 'type' in condition) {
+          if (condition.type === 'in') {
+            return (condition.value as unknown[]).includes(actual);
+          }
+          throw new Error(
+            `Unsupported FindOperator type in test double: ${condition.type}`,
+          );
+        }
+        return actual === condition;
+      });
+
+    const fakeFind = (fixtures: Record<string, any>[]) =>
+      jest.fn(async ({ where }: any) =>
+        fixtures.filter((lever) => evaluateWhere(lever, where)),
+      );
+
+    it('returns [] without querying when ids is empty', async () => {
+      const result = await service.findActiveByIdsForPortfolio([], 2);
+
+      expect(result).toEqual([]);
+      expect(mockMainRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('returns only ids that are active and owned by the given portfolio, discarding a foreign-portfolio id', async () => {
+      const fixtures = [
+        { id: 11, portfolio_id: 2, is_active: true },
+        { id: 12, portfolio_id: 2, is_active: true },
+        { id: 4, portfolio_id: 1, is_active: true }, // active, but portfolio-1
+      ];
+      mockMainRepo.find.mockImplementation(fakeFind(fixtures));
+
+      const result = await service.findActiveByIdsForPortfolio([11, 12, 4], 2);
+
+      expect(mockMainRepo.find).toHaveBeenCalledWith({
+        where: {
+          id: expect.objectContaining({ type: 'in', value: [11, 12, 4] }),
+          portfolio_id: 2,
+          is_active: true,
+        },
+      });
+      expect(result).toEqual([
+        { id: 11, portfolio_id: 2, is_active: true },
+        { id: 12, portfolio_id: 2, is_active: true },
+      ]);
+    });
+
+    it('discards an id in the right portfolio that is inactive', async () => {
+      const fixtures = [{ id: 20, portfolio_id: 2, is_active: false }];
+      mockMainRepo.find.mockImplementation(fakeFind(fixtures));
+
+      const result = await service.findActiveByIdsForPortfolio([20], 2);
+
+      expect(result).toEqual([]);
+    });
+
+    it('discards an unknown id without throwing', async () => {
+      mockMainRepo.find.mockImplementation(fakeFind([]));
+
+      const result = await service.findActiveByIdsForPortfolio([999], 2);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('resolveIconUrl', () => {
     it('should resolve icon URL for a known short_name', () => {
       expect(service.resolveIconUrl('Lever 3')).toBe(

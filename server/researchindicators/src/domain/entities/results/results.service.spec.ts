@@ -58,6 +58,14 @@ import { GreenChecksService } from '../green-checks/green-checks.service';
 import { GreenCheckRepository } from '../green-checks/repository/green-checks.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { AiReportsService } from '../ai-reports/ai-reports.service';
+import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
+import { CgiarLogger } from '../../shared/utils/cgiar-logs/logs.util';
+import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
+import { PortfolioIdEnum } from './portfolio-handlers/enum/portfolio-id.enum';
+// T-06 (R-RES-007 AC.1): read directly to assert the code path — not
+// inferred from behaviour — see the dedicated describe below.
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 describe('ResultsService', () => {
   let service: ResultsService;
@@ -100,8 +108,17 @@ describe('ResultsService', () => {
   let mockResultAlignmentOperationsService: jest.Mocked<
     Pick<ResultAlignmentOperationsService, 'save' | 'find'>
   >;
-  let mockPortfoliosService: jest.Mocked<Pick<PortfoliosService, 'findOne'>>;
+  let mockPortfoliosService: jest.Mocked<
+    Pick<PortfoliosService, 'findOne' | 'findByYear'>
+  >;
   let mockAiReportsService: { create: jest.Mock };
+  let mockCapdevBulkNotificationService: { dispatch: jest.Mock };
+  let mockResultSectionOrchestrator: jest.Mocked<
+    Pick<
+      ResultSectionOrchestratorService,
+      'saveStrategicObjectivesForPortfolio' | 'saveLeversForPortfolio'
+    >
+  >;
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   let mockEntityManager: jest.Mocked<EntityManager>;
 
@@ -293,9 +310,17 @@ describe('ResultsService', () => {
 
     mockPortfoliosService = {
       findOne: jest.fn(),
+      findByYear: jest.fn(),
     };
     mockAiReportsService = {
       create: jest.fn().mockResolvedValue({ id: 1 }),
+    };
+    mockCapdevBulkNotificationService = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
+    mockResultSectionOrchestrator = {
+      saveStrategicObjectivesForPortfolio: jest.fn(),
+      saveLeversForPortfolio: jest.fn(),
     };
 
     mockEntityManager = {
@@ -424,6 +449,14 @@ describe('ResultsService', () => {
         {
           provide: AiReportsService,
           useValue: mockAiReportsService,
+        },
+        {
+          provide: CapdevBulkNotificationService,
+          useValue: mockCapdevBulkNotificationService,
+        },
+        {
+          provide: ResultSectionOrchestratorService,
+          useValue: mockResultSectionOrchestrator,
         },
       ],
     }).compile();
@@ -3483,6 +3516,1470 @@ describe('ResultsService', () => {
         'AI error',
       );
     });
+
+    // T-05 — the strategic-objectives alignment step (design.md §5.1).
+    describe('strategic objectives alignment', () => {
+      const baseProcessedResult = (overrides: any = {}) => ({
+        result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2026 },
+        generalInformation: {},
+        sdgs: [],
+        ipRights: {},
+        geoScope: {},
+        partners: [],
+        evidences: [],
+        policyChange: {},
+        ...overrides,
+      });
+
+      const mockSuccessfulWriteChain = () => {
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultPolicyChangeService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+      };
+
+      it('resolves 2026 to portfolio 2 and saves the ids through the orchestrator, reporting no discrepancy (R-RES-003)', async () => {
+        const rawResult = {
+          title: 'SO 2026',
+          year: 2026,
+          strategic_objectives: [1, 3, 5],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ strategic_objectives: [1, 3, 5] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 100,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockResolvedValue(
+          { supported: true, saved: [1, 3, 5], discarded: [] },
+        );
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenCalledWith(2026);
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).toHaveBeenCalledWith(100, PortfolioIdEnum.PORTFOLIO_2, [1, 3, 5]);
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([]);
+      });
+
+      it('degrades to missing_fields, in addition to what the AI reported, when the resolved portfolio does not support strategic objectives, without failing the item (R-RES-004)', async () => {
+        const rawResult = {
+          title: 'SO 2025',
+          year: 2025,
+          strategic_objectives: [1, 3, 5],
+          metadata: { missing_fields: ['sdg_targets'] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2025 },
+            strategic_objectives: [1, 3, 5],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 101,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_1,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockResolvedValue(
+          { supported: false, saved: [], discarded: [] },
+        );
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([
+          'sdg_targets',
+          'strategic_objectives',
+        ]);
+      });
+
+      it('reports no strategic_objectives entry for a 2025 item that never carried the field (R-RES-004 AC.4)', async () => {
+        const rawResult = {
+          title: 'No SO',
+          year: 2025,
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2025 },
+            strategic_objectives: undefined,
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 102,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([]);
+        expect(mockPortfoliosService.findByYear).not.toHaveBeenCalled();
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).not.toHaveBeenCalled();
+      });
+
+      it('creates the item and records the field with no fallback portfolio when no active portfolio covers the year (R-RES-006, falsifier: year 2035)', async () => {
+        const rawResult = {
+          title: 'SO 2035',
+          year: 2035,
+          strategic_objectives: [1],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2035 },
+            strategic_objectives: [1],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 103,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue(null);
+        const warnSpy = jest
+          .spyOn(CgiarLogger.prototype, 'warn')
+          .mockImplementation(() => undefined);
+
+        try {
+          const result = await service.formalizeResult(
+            rawResult,
+            true,
+            resultMetadata,
+          );
+
+          expect((result as any).error).toBe(false);
+          expect(resultMetadata[0].missing_fields).toEqual([
+            'strategic_objectives',
+          ]);
+          expect(
+            mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+          ).not.toHaveBeenCalled();
+          expect(
+            warnSpy.mock.calls.some((call) => String(call[0]).includes('2035')),
+          ).toBe(true);
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('records each discarded id as strategic_objectives:<id>, distinguishable from the field-level entry (R-RES-005)', async () => {
+        const rawResult = {
+          title: 'SO discard',
+          year: 2026,
+          strategic_objectives: [1, 999, 3],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            strategic_objectives: [1, 999, 3],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 104,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockResolvedValue(
+          { supported: true, saved: [1, 3], discarded: [999] },
+        );
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([
+          'strategic_objectives:999',
+        ]);
+        expect(resultMetadata[0].missing_fields).not.toContain(
+          'strategic_objectives',
+        );
+      });
+
+      // T-03 forward pointer (execution.md): a red-capable test against the
+      // unconditional-loop bug. Content equality, not toContain — toContain
+      // would still pass with the spurious per-id entries present.
+      it('ignores report.discarded entirely when supported is false, asserted by content equality (T-03 forward pointer, R-RES-005 AC.2)', async () => {
+        const rawResult = {
+          title: 'SO unsupported carrying ids',
+          year: 2025,
+          strategic_objectives: [1, 999],
+          metadata: { missing_fields: ['sdg_targets'] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2025 },
+            strategic_objectives: [1, 999],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 105,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_1,
+        } as any);
+        // Portfolio 1 reports unsupported even though ids were sent —
+        // `discarded` here is exactly what an unconditional-loop bug would
+        // iterate over and turn into spurious per-id entries.
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockResolvedValue(
+          { supported: false, saved: [], discarded: [1, 999] },
+        );
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([
+          'sdg_targets',
+          'strategic_objectives',
+        ]);
+      });
+
+      it.each([
+        ['absent', undefined],
+        ['an empty array', []],
+        ['null', null],
+      ])(
+        'never calls the resolver or the orchestrator when strategic_objectives is %s (R-RES-007 step 1 guard)',
+        async (_label, value) => {
+          const rawResult = {
+            title: 'No SO variant',
+            year: 2026,
+            strategic_objectives: value,
+            metadata: { missing_fields: [] },
+          } as any;
+          const resultMetadata: any[] = [];
+
+          jest
+            .spyOn(service, 'createResultFromAiRoar')
+            .mockResolvedValue(
+              baseProcessedResult({ strategic_objectives: value }) as any,
+            );
+          jest.spyOn(service, 'createResult').mockResolvedValue({
+            result_id: 200,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any);
+          mockSuccessfulWriteChain();
+
+          const result = await service.formalizeResult(
+            rawResult,
+            true,
+            resultMetadata,
+          );
+
+          expect((result as any).error).toBe(false);
+          expect(mockPortfoliosService.findByYear).not.toHaveBeenCalled();
+          expect(
+            mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+          ).not.toHaveBeenCalled();
+          expect(resultMetadata[0].missing_fields).toEqual([]);
+        },
+      );
+
+      it('succeeds without a metadata collector when called from the single endpoint (DD-7, R-RES-009)', async () => {
+        const rawResult = { title: 'Single endpoint', year: 2026 } as any;
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(baseProcessedResult() as any);
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 300,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+
+        const result = await service.formalizeResult(rawResult);
+
+        expect((result as any).error).toBe(false);
+        expect((result as any).result_id).toBe(300);
+      });
+
+      it('rolls back via deleteFullResultById and rethrows when the alignment step itself throws (single endpoint, DD-6/DD-8)', async () => {
+        const rawResult = {
+          title: 'Alignment throws',
+          year: 2026,
+          strategic_objectives: [1],
+        } as any;
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ strategic_objectives: [1] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 301,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockDataSource.getRepository.mockReturnValue({
+          findOne: jest.fn().mockResolvedValue(null),
+        } as any);
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockRejectedValue(
+          new Error('orchestrator failure'),
+        );
+
+        await expect(service.formalizeResult(rawResult)).rejects.toThrow(
+          'orchestrator failure',
+        );
+        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(301);
+      });
+
+      it('resolves an item with no year using the current calendar year, routing per-item to the portfolio that covers it (R-RES-002 AC.4, KZ-004)', async () => {
+        const currentYear = new Date().getFullYear();
+        const noYearResult = {
+          title: 'No year field',
+          strategic_objectives: [7],
+          metadata: { missing_fields: [] },
+        } as any;
+        const olderYearResult = {
+          title: 'Old year item',
+          year: 2010,
+          strategic_objectives: [9],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: currentYear,
+              },
+              strategic_objectives: [7],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: 2010,
+              },
+              strategic_objectives: [9],
+            }) as any,
+          );
+        jest
+          .spyOn(service, 'createResult')
+          .mockResolvedValueOnce({
+            result_id: 400,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any)
+          .mockResolvedValueOnce({
+            result_id: 401,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any);
+        mockSuccessfulWriteChain();
+
+        // KZ-001: the double routes by year (a map), not a constant return —
+        // otherwise it cannot distinguish per-item scoping from a hardcoded
+        // default.
+        mockPortfoliosService.findByYear.mockImplementation(
+          async (year: number) =>
+            ({
+              id:
+                year === currentYear
+                  ? PortfolioIdEnum.PORTFOLIO_2
+                  : PortfolioIdEnum.PORTFOLIO_1,
+            }) as any,
+        );
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockResolvedValue(
+          { supported: true, saved: [], discarded: [] },
+        );
+
+        await service.formalizeResult(noYearResult, true, resultMetadata);
+        await service.formalizeResult(olderYearResult, true, resultMetadata);
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          1,
+          currentYear,
+        );
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          2,
+          2010,
+        );
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).toHaveBeenNthCalledWith(1, 400, PortfolioIdEnum.PORTFOLIO_2, [7]);
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).toHaveBeenNthCalledWith(2, 401, PortfolioIdEnum.PORTFOLIO_1, [9]);
+      });
+
+      // T-06 (R-RES-007 AC.3, DC-2) — Disqualifies: "an inertness case
+      // that omits the sibling-row is_active assertions." Absence of the
+      // new row is not evidence the pre-existing rows survived, so every
+      // row here is tracked by table + result id in a shared fake store,
+      // and the section-wide save double (mockResultAlignmentOperationsService)
+      // genuinely performs the destructive reconciliation it stands in
+      // for (BaseServiceSimple.create, DD-1) — if the formalizer ever
+      // reached it, the sibling rows below would flip inactive and this
+      // test would go red (KZ-001 double fidelity).
+      it('leaves every result_sdgs row and every ALIGNMENT result_contracts row active, alongside the new strategic-objectives row (R-RES-007 AC.3)', async () => {
+        type FakeRow = {
+          table:
+            | 'result_sdgs'
+            | 'result_contracts'
+            | 'result_strategic_objectives';
+          result_id: number;
+          is_active: boolean;
+        };
+        const rows: FakeRow[] = [];
+
+        const rawResult = {
+          title: 'SO + SDG inertness',
+          year: 2026,
+          sdg_targets: [1, 2],
+          strategic_objectives: [51],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            sdgs: [{ clarisa_sdg_id: 10 }, { clarisa_sdg_id: 20 }],
+            strategic_objectives: [51],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockImplementation(async () => {
+          // Mirrors createResult's real write of the primary ALIGNMENT
+          // result_contracts row (results.service.ts ~L459-466).
+          rows.push({
+            table: 'result_contracts',
+            result_id: 700,
+            is_active: true,
+          });
+          return {
+            result_id: 700,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any;
+        });
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockImplementation(async (resultId: number, sdgs: any[]) => {
+            rows.push(
+              ...sdgs.map(() => ({
+                table: 'result_sdgs' as const,
+                result_id: resultId,
+                is_active: true,
+              })),
+            );
+          });
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultAlignmentOperationsService.save.mockImplementation(
+          async (resultId: number) => {
+            rows.forEach((row) => {
+              if (row.result_id === resultId) row.is_active = false;
+            });
+            return {} as any;
+          },
+        );
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockImplementation(
+          async (
+            resultId: number,
+            _portfolioId: PortfolioIdEnum,
+            ids: number[],
+          ) => {
+            rows.push(
+              ...ids.map((_id) => ({
+                table: 'result_strategic_objectives' as const,
+                result_id: resultId,
+                is_active: true,
+              })),
+            );
+            return { supported: true, saved: ids, discarded: [] };
+          },
+        );
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(
+          mockResultAlignmentOperationsService.save,
+        ).not.toHaveBeenCalled();
+        expect(rows.filter((r) => r.table === 'result_sdgs')).toHaveLength(2);
+        expect(
+          rows
+            .filter((r) => r.table === 'result_sdgs')
+            .every((r) => r.is_active),
+        ).toBe(true);
+        expect(
+          rows
+            .filter((r) => r.table === 'result_contracts')
+            .every((r) => r.is_active),
+        ).toBe(true);
+        expect(
+          rows.some(
+            (r) =>
+              r.table === 'result_strategic_objectives' &&
+              r.result_id === 700 &&
+              r.is_active,
+          ),
+        ).toBe(true);
+      });
+    });
+
+    // T-05 — the primary-levers alignment step (design.md §5.1). Mirrors
+    // the strategic-objectives describe above with one structural
+    // difference: `LeversSaveReport` carries no `supported` flag (DD-8),
+    // so there is no "portfolio does not support the field" branch here —
+    // only the field-level (unresolvable year) and per-id (discarded)
+    // cases.
+    describe('primary levers alignment', () => {
+      const baseProcessedResult = (overrides: any = {}) => ({
+        result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2026 },
+        generalInformation: {},
+        sdgs: [],
+        ipRights: {},
+        geoScope: {},
+        partners: [],
+        evidences: [],
+        policyChange: {},
+        ...overrides,
+      });
+
+      const mockSuccessfulWriteChain = () => {
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultPolicyChangeService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+      };
+
+      it('resolves a 2024 item to portfolio 1, saves the ids through the orchestrator, and the item carries the unchanged bulk-metadata fields (R-RES-002, R-RES-003 analog)', async () => {
+        const rawResult = {
+          title: 'Levers 2024',
+          year: 2024,
+          status: ResultStatusEnum.SUBMITTED,
+          primary_levers: [4, 5],
+          metadata: { missing_fields: [], manually_edited: true },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: {
+              indicator_id: IndicatorsEnum.POLICY_CHANGE,
+              year: 2024,
+            },
+            primary_levers: [4, 5],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 500,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_1,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [4, 5],
+          discarded: [],
+        });
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenCalledWith(2024);
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenCalledWith(500, PortfolioIdEnum.PORTFOLIO_1, [4, 5]);
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata).toHaveLength(1);
+        expect(resultMetadata[0]).toEqual(
+          expect.objectContaining({
+            missing_fields: [],
+            manual_intervention_occurred: true,
+            suggested_status: ResultStatusEnum.SUBMITTED,
+            title: 'Levers 2024',
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_id: 500,
+          }),
+        );
+      });
+
+      it('resolves a 2026 item to portfolio 2 and saves the ids through the orchestrator (R-RES-004 analog)', async () => {
+        const rawResult = {
+          title: 'Levers 2026',
+          year: 2026,
+          primary_levers: [11, 12],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ primary_levers: [11, 12] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 501,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [11, 12],
+          discarded: [],
+        });
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenCalledWith(501, PortfolioIdEnum.PORTFOLIO_2, [11, 12]);
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([]);
+      });
+
+      it('creates the item and records the field with no fallback portfolio when no active portfolio covers the year, without raising (R-RES-006, falsifier: year 2035)', async () => {
+        const rawResult = {
+          title: 'Levers 2035',
+          year: 2035,
+          primary_levers: [11],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            result: {
+              indicator_id: IndicatorsEnum.POLICY_CHANGE,
+              year: 2035,
+            },
+            primary_levers: [11],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 502,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue(null);
+        const warnSpy = jest
+          .spyOn(CgiarLogger.prototype, 'warn')
+          .mockImplementation(() => undefined);
+
+        try {
+          const result = await service.formalizeResult(
+            rawResult,
+            true,
+            resultMetadata,
+          );
+
+          expect((result as any).error).toBe(false);
+          expect(resultMetadata[0].missing_fields).toEqual(['primary_levers']);
+          expect(
+            mockResultSectionOrchestrator.saveLeversForPortfolio,
+          ).not.toHaveBeenCalled();
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+          expect(String(warnSpy.mock.calls[0][0])).toContain('2035');
+          expect(String(warnSpy.mock.calls[0][0])).toContain('502');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it("records each discarded id as primary_levers:<id>, appended to the AI's own entries and distinguishable from the field-level entry, asserted by content equality (R-RES-005)", async () => {
+        const rawResult = {
+          title: 'Levers discard',
+          year: 2026,
+          primary_levers: [11, 999, 4],
+          metadata: { missing_fields: ['sdg_targets'] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue(
+          baseProcessedResult({
+            primary_levers: [11, 999, 4],
+          }) as any,
+        );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 503,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [11],
+          discarded: [999, 4],
+        });
+
+        const result = await service.formalizeResult(
+          rawResult,
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(resultMetadata[0].missing_fields).toEqual([
+          'sdg_targets',
+          'primary_levers:999',
+          'primary_levers:4',
+        ]);
+        expect(resultMetadata[0].missing_fields).not.toContain(
+          'primary_levers',
+        );
+      });
+
+      it.each([
+        ['absent', undefined],
+        ['an empty array', []],
+        ['null', null],
+      ])(
+        'never calls the resolver or the orchestrator when primary_levers is %s (R-RES-008 step 1 guard)',
+        async (_label, value) => {
+          const rawResult = {
+            title: 'No levers variant',
+            year: 2026,
+            primary_levers: value,
+            metadata: { missing_fields: [] },
+          } as any;
+          const resultMetadata: any[] = [];
+
+          jest
+            .spyOn(service, 'createResultFromAiRoar')
+            .mockResolvedValue(
+              baseProcessedResult({ primary_levers: value }) as any,
+            );
+          jest.spyOn(service, 'createResult').mockResolvedValue({
+            result_id: 504,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any);
+          mockSuccessfulWriteChain();
+
+          const result = await service.formalizeResult(
+            rawResult,
+            true,
+            resultMetadata,
+          );
+
+          expect((result as any).error).toBe(false);
+          expect(mockPortfoliosService.findByYear).not.toHaveBeenCalled();
+          expect(
+            mockResultSectionOrchestrator.saveLeversForPortfolio,
+          ).not.toHaveBeenCalled();
+          expect(resultMetadata[0].missing_fields).toEqual([]);
+        },
+      );
+
+      it('resolves an item with no year using the current calendar year, routing per-item to the portfolio that covers it — its sibling covers a different portfolio (R-RES-002 AND IT MUST, KZ-004)', async () => {
+        const currentYear = new Date().getFullYear();
+        const noYearResult = {
+          title: 'No year levers',
+          primary_levers: [7],
+          metadata: { missing_fields: [] },
+        } as any;
+        const olderYearResult = {
+          title: 'Old year levers',
+          year: 2010,
+          primary_levers: [9],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: currentYear,
+              },
+              primary_levers: [7],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: 2010,
+              },
+              primary_levers: [9],
+            }) as any,
+          );
+        jest
+          .spyOn(service, 'createResult')
+          .mockResolvedValueOnce({
+            result_id: 700,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any)
+          .mockResolvedValueOnce({
+            result_id: 701,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any);
+        mockSuccessfulWriteChain();
+
+        // KZ-001: the double routes by year (a map), not a constant return —
+        // otherwise it cannot distinguish per-item scoping from a hardcoded
+        // default.
+        mockPortfoliosService.findByYear.mockImplementation(
+          async (year: number) =>
+            ({
+              id:
+                year === currentYear
+                  ? PortfolioIdEnum.PORTFOLIO_2
+                  : PortfolioIdEnum.PORTFOLIO_1,
+            }) as any,
+        );
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [],
+          discarded: [],
+        });
+
+        await service.formalizeResult(noYearResult, true, resultMetadata);
+        await service.formalizeResult(olderYearResult, true, resultMetadata);
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          1,
+          currentYear,
+        );
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          2,
+          2010,
+        );
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenNthCalledWith(1, 700, PortfolioIdEnum.PORTFOLIO_2, [7]);
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenNthCalledWith(2, 701, PortfolioIdEnum.PORTFOLIO_1, [9]);
+      });
+
+      it('issues at most one findByYear lookup per distinct effective year across a 3-item, 2-distinct-year batch, via the shared memoized lookup (NFR-RES-001)', async () => {
+        const underlyingLookup = jest.fn((year: number) => ({
+          id:
+            year === 2026
+              ? PortfolioIdEnum.PORTFOLIO_2
+              : PortfolioIdEnum.PORTFOLIO_1,
+        }));
+        const cache = new Map<number, { id: PortfolioIdEnum }>();
+        mockPortfoliosService.findByYear.mockImplementation(
+          async (year: number) => {
+            if (!cache.has(year)) {
+              cache.set(year, underlyingLookup(year));
+            }
+            return cache.get(year) as any;
+          },
+        );
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [],
+          discarded: [],
+        });
+        mockSuccessfulWriteChain();
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: 2026,
+              },
+              primary_levers: [11],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: 2026,
+              },
+              primary_levers: [12],
+            }) as any,
+          )
+          .mockResolvedValueOnce(
+            baseProcessedResult({
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: 2010,
+              },
+              primary_levers: [4],
+            }) as any,
+          );
+        jest
+          .spyOn(service, 'createResult')
+          .mockResolvedValueOnce({
+            result_id: 600,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any)
+          .mockResolvedValueOnce({
+            result_id: 601,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any)
+          .mockResolvedValueOnce({
+            result_id: 602,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any);
+
+        const resultMetadata: any[] = [];
+        await service.formalizeResult(
+          {
+            title: 'A',
+            year: 2026,
+            primary_levers: [11],
+            metadata: { missing_fields: [] },
+          } as any,
+          true,
+          resultMetadata,
+        );
+        await service.formalizeResult(
+          {
+            title: 'B',
+            year: 2026,
+            primary_levers: [12],
+            metadata: { missing_fields: [] },
+          } as any,
+          true,
+          resultMetadata,
+        );
+        await service.formalizeResult(
+          {
+            title: 'C',
+            year: 2010,
+            primary_levers: [4],
+            metadata: { missing_fields: [] },
+          } as any,
+          true,
+          resultMetadata,
+        );
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenCalledTimes(3);
+        expect(underlyingLookup).toHaveBeenCalledTimes(2);
+      });
+
+      it('logs exactly one warn line for the discarded-ids case, never one per id (NFR-RES-002)', async () => {
+        const rawResult = {
+          title: 'Levers warn count',
+          year: 2026,
+          primary_levers: [1, 2, 3],
+          metadata: { missing_fields: [] },
+        } as any;
+        const resultMetadata: any[] = [];
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ primary_levers: [1, 2, 3] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 505,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [],
+          discarded: [1, 2, 3],
+        });
+        const warnSpy = jest
+          .spyOn(CgiarLogger.prototype, 'warn')
+          .mockImplementation(() => undefined);
+
+        try {
+          await service.formalizeResult(rawResult, true, resultMetadata);
+
+          expect(warnSpy).toHaveBeenCalledTimes(1);
+          expect(String(warnSpy.mock.calls[0][0])).toContain('1, 2, 3');
+          expect(String(warnSpy.mock.calls[0][0])).toContain('505');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('succeeds without a metadata collector when called from the single endpoint, with levers written (DD-7 analog)', async () => {
+        const rawResult = {
+          title: 'Single endpoint levers',
+          year: 2026,
+          primary_levers: [11],
+        } as any;
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ primary_levers: [11] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 506,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockResolvedValue({
+          saved: [11],
+          discarded: [],
+        });
+
+        const result = await service.formalizeResult(rawResult);
+
+        expect((result as any).error).toBe(false);
+        expect((result as any).result_id).toBe(506);
+      });
+
+      it('rolls back via deleteFullResultById and rethrows when the levers step itself throws (single endpoint, DD-8 analog)', async () => {
+        const rawResult = {
+          title: 'Levers throws',
+          year: 2026,
+          primary_levers: [11],
+        } as any;
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockResolvedValue(
+            baseProcessedResult({ primary_levers: [11] }) as any,
+          );
+        jest.spyOn(service, 'createResult').mockResolvedValue({
+          result_id: 507,
+          indicator_id: IndicatorsEnum.POLICY_CHANGE,
+          result_status_id: 1,
+        } as any);
+        mockSuccessfulWriteChain();
+        mockDataSource.getRepository.mockReturnValue({
+          findOne: jest.fn().mockResolvedValue(null),
+        } as any);
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockRejectedValue(
+          new Error('levers orchestrator failure'),
+        );
+
+        await expect(service.formalizeResult(rawResult)).rejects.toThrow(
+          'levers orchestrator failure',
+        );
+        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(507);
+      });
+    });
+
+    // T-06 — proves R-RES-008 (inertness) and R-RES-010 (composition) for
+    // a single item carrying all three AI alignment fields at once. T-05's
+    // inertness test (:3846) already proves the two-field case
+    // (sdg_targets + strategic_objectives) does not disturb result_sdgs or
+    // the ALIGNMENT result_contracts row — cited, not re-derived, for
+    // those two tables; this extends the same technique to the third
+    // field (primary_levers) and to R-RES-010's cross-field guarantee.
+    describe('inertness and composition — all three AI alignment fields on one item (R-RES-008, R-RES-010, T-06)', () => {
+      type FakeRow = {
+        table:
+          | 'result_sdgs'
+          | 'result_contracts'
+          | 'result_strategic_objectives'
+          | 'result_levers';
+        result_id: number;
+        key: number;
+        is_active: boolean;
+      };
+
+      const threeFieldRawResult = () =>
+        ({
+          title: 'Three-field composition',
+          year: 2026,
+          sdg_targets: [1, 2],
+          strategic_objectives: [3],
+          primary_levers: [11, 12],
+          metadata: { missing_fields: [] },
+        }) as any;
+
+      // Wires every collaborator so the shared `rows` sink ends up holding
+      // exactly what production would write, keyed by result id and
+      // table. KZ-001: `saveStrategicObjectivesForPortfolio` and
+      // `saveLeversForPortfolio` push using their OWN call-time `rid`
+      // argument (not a closed-over constant), so the same wiring can be
+      // invoked again for a second, unrelated result id.
+      const wireThreeFieldMocks = (rows: FakeRow[], resultId: number) => {
+        jest.spyOn(service, 'createResultFromAiRoar').mockResolvedValue({
+          result: { indicator_id: IndicatorsEnum.POLICY_CHANGE, year: 2026 },
+          generalInformation: {},
+          sdgs: [{ clarisa_sdg_id: 10 }, { clarisa_sdg_id: 20 }],
+          ipRights: {},
+          geoScope: {},
+          partners: [],
+          evidences: [],
+          policyChange: {},
+          strategic_objectives: [3],
+          primary_levers: [11, 12],
+        } as any);
+        jest.spyOn(service, 'createResult').mockImplementation(async () => {
+          // Mirrors createResult's real write of the primary ALIGNMENT
+          // result_contracts row (results.service.ts ~L459-466) — cited
+          // from T-05's inertness test (:3872-3879) rather than
+          // re-derived.
+          rows.push({
+            table: 'result_contracts',
+            result_id: resultId,
+            key: resultId,
+            is_active: true,
+          });
+          return {
+            result_id: resultId,
+            indicator_id: IndicatorsEnum.POLICY_CHANGE,
+            result_status_id: 1,
+          } as any;
+        });
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockImplementation(async (rid: number, sdgs: any[]) => {
+            rows.push(
+              ...sdgs.map((s: any) => ({
+                table: 'result_sdgs' as const,
+                result_id: rid,
+                key: s.clarisa_sdg_id,
+                is_active: true,
+              })),
+            );
+          });
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultAlignmentOperationsService.save.mockImplementation(
+          async (rid: number) => {
+            // Faithful to the real hazard (DD-1): the section-wide save
+            // reconciles by deactivating every row for the result it is
+            // called with. Asserted never called below (R-RES-008 AC.4) —
+            // this implementation exists so that a wrong production path
+            // which DOES reach it would be caught here, not hidden by an
+            // inert double (KZ-001).
+            rows.forEach((row) => {
+              if (row.result_id === rid) row.is_active = false;
+            });
+            return {} as any;
+          },
+        );
+        mockPortfoliosService.findByYear.mockResolvedValue({
+          id: PortfolioIdEnum.PORTFOLIO_2,
+        } as any);
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockImplementation(
+          async (rid: number, _portfolioId: PortfolioIdEnum, ids: number[]) => {
+            rows.push(
+              ...ids.map((id) => ({
+                table: 'result_strategic_objectives' as const,
+                result_id: rid,
+                key: id,
+                is_active: true,
+              })),
+            );
+            return { supported: true, saved: ids, discarded: [] };
+          },
+        );
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockImplementation(
+          async (rid: number, _portfolioId: PortfolioIdEnum, ids: number[]) => {
+            rows.push(
+              ...ids.map((id) => ({
+                table: 'result_levers' as const,
+                result_id: rid,
+                key: id,
+                is_active: true,
+              })),
+            );
+            return { saved: ids, discarded: [] };
+          },
+        );
+      };
+
+      it('ends with every result_sdgs, ALIGNMENT result_contracts, result_strategic_objectives and new result_levers row active, never reaching the section-wide save (R-RES-008 AC.1/AC.4, R-RES-010 AC.1/AC.2)', async () => {
+        const rows: FakeRow[] = [];
+        const resultMetadata: any[] = [];
+        wireThreeFieldMocks(rows, 750);
+
+        const result = await service.formalizeResult(
+          threeFieldRawResult(),
+          true,
+          resultMetadata,
+        );
+
+        expect((result as any).error).toBe(false);
+        expect(
+          mockResultAlignmentOperationsService.save,
+        ).not.toHaveBeenCalled();
+
+        // Sibling-row survival asserted individually — absence of the new
+        // lever row is not evidence the old rows survived (DC-4,
+        // Disqualifies).
+        const of = (table: FakeRow['table']) =>
+          rows.filter((r) => r.result_id === 750 && r.table === table);
+        expect(of('result_sdgs')).toHaveLength(2);
+        expect(of('result_sdgs').every((r) => r.is_active)).toBe(true);
+        expect(of('result_contracts').every((r) => r.is_active)).toBe(true);
+        expect(of('result_strategic_objectives')).toHaveLength(1);
+        expect(
+          of('result_strategic_objectives').every((r) => r.is_active),
+        ).toBe(true);
+        expect(
+          of('result_levers')
+            .map((r) => r.key)
+            .sort(),
+        ).toEqual([11, 12]);
+        expect(of('result_levers').every((r) => r.is_active)).toBe(true);
+        expect(resultMetadata[0].missing_fields).toEqual([]);
+      });
+
+      // formalizeResult's own two alignment blocks execute in one fixed
+      // textual order (strategic objectives, then levers — design.md
+      // §5.4); reversing that order would mean editing results.service.ts,
+      // which T-06 may not do. What the fixed order can never exercise on
+      // its own is the OTHER direction of the hazard: levers already
+      // written, then the strategic-objectives write landing on top of
+      // them. This test supplies that missing direction by invoking the
+      // identical narrow-save implementations directly, levers first, for
+      // a second, disjoint result id — proving the composition holds
+      // regardless of which step is considered to run first (R-RES-010
+      // AC.3), because DD-1/DD-9 scope each save to its own table and
+      // neither reads the other's rows.
+      it('holds for both possible step orders: the natural order (SO before levers) via formalizeResult, and the reverse (levers before SO) via the identical narrow-save calls (R-RES-010 AC.3)', async () => {
+        const rows: FakeRow[] = [];
+        const resultMetadata: any[] = [];
+        wireThreeFieldMocks(rows, 751);
+
+        // Forward: the real, fixed order.
+        await service.formalizeResult(
+          threeFieldRawResult(),
+          true,
+          resultMetadata,
+        );
+        expect(
+          rows
+            .filter((r) => r.result_id === 751 && r.table === 'result_levers')
+            .every((r) => r.is_active),
+        ).toBe(true);
+        expect(
+          rows
+            .filter(
+              (r) =>
+                r.result_id === 751 &&
+                r.table === 'result_strategic_objectives',
+            )
+            .every((r) => r.is_active),
+        ).toBe(true);
+
+        // Reversed: the same two jest.fn() implementations — the exact
+        // functions formalizeResult itself calls — invoked directly,
+        // levers first, for a fresh result id.
+        await mockResultSectionOrchestrator.saveLeversForPortfolio(
+          752,
+          PortfolioIdEnum.PORTFOLIO_2,
+          [21, 22],
+        );
+        await mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio(
+          752,
+          PortfolioIdEnum.PORTFOLIO_2,
+          [6],
+        );
+
+        const of752 = (table: FakeRow['table']) =>
+          rows.filter((r) => r.result_id === 752 && r.table === table);
+        expect(of752('result_levers').every((r) => r.is_active)).toBe(true);
+        expect(
+          of752('result_strategic_objectives').every((r) => r.is_active),
+        ).toBe(true);
+
+        // No leakage between the two result ids exercised in this test.
+        expect(rows.filter((r) => r.result_id === 751)).toHaveLength(6);
+        expect(rows.filter((r) => r.result_id === 752)).toHaveLength(3);
+      });
+    });
+
+    // T-06 (R-RES-007 AC.1) — "the alignment step is reached only for a
+    // result created in the same formalizeResult call" is a property of
+    // the CODE PATH, not of any one test's behaviour, and T-03's tests
+    // cannot assert it (they never touch results.service.ts). Asserted
+    // here directly against the source, not inferred from a mock's
+    // outputs (tasks.md §4: "explicitly NOT closed by T-03").
+    describe('R-RES-007 AC.1 — the alignment step is reached only for a result created in the same call', () => {
+      it('is true by construction: the method assigns its rollback handle exactly once, from createResult, and both alignment steps address that same local — asserted against the source text', () => {
+        const source = readFileSync(
+          join(__dirname, 'results.service.ts'),
+          'utf8',
+        );
+        const methodStart = source.indexOf('async formalizeResult(');
+        expect(methodStart).toBeGreaterThan(-1);
+        const nextMethodStart = source.indexOf(
+          'async createResultFromAiBulk(',
+          methodStart,
+        );
+        expect(nextMethodStart).toBeGreaterThan(methodStart);
+        const body = source.slice(methodStart, nextMethodStart);
+
+        // (a) Exactly one result is created in this method, and the
+        // rollback handle is assigned from ITS return value — never from
+        // a lookup of a pre-existing row (design.md §2.3 fact 1).
+        const createCalls = (
+          body.match(/const newResult = await this\.createResult\(/g) ?? []
+        ).length;
+        expect(createCalls).toBe(1);
+        const rollbackAssignments = (
+          body.match(/resultExists = newResult;/g) ?? []
+        ).length;
+        expect(rollbackAssignments).toBe(1);
+
+        // (b) The levers step's call into the orchestrator textually
+        // follows that creation, and is addressed with that same local —
+        // never a separately-fetched id.
+        const createIndex = body.indexOf(
+          'const newResult = await this.createResult(',
+        );
+        const leversCallIndex = body.indexOf(
+          'this._resultSectionOrchestrator.saveLeversForPortfolio(',
+        );
+        expect(leversCallIndex).toBeGreaterThan(createIndex);
+        expect(body.slice(leversCallIndex, leversCallIndex + 200)).toContain(
+          'newResult.result_id',
+        );
+
+        // (c) There is no other call site feeding a different id into it.
+        const leversCallFirstArgs = [
+          ...body.matchAll(/saveLeversForPortfolio\(\s*([^,]+),/g),
+        ].map((m) => m[1].trim());
+        expect(leversCallFirstArgs).toEqual(['newResult.result_id']);
+      });
+    });
   });
 
   // [CLAUDE/DONE] 143
@@ -3540,6 +5037,768 @@ describe('ResultsService', () => {
           ]),
         }),
       );
+    });
+
+    // T-10 (R-CBU-001, R-CBU-010) — the CapDev notification stage is a
+    // sibling call, wrapped so nothing it does can affect the response.
+    it('should dispatch the CapDev bulk notification with the created process id and the metadata file contacts', async () => {
+      const contacts = [{ email: 'lead@example.org' }];
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-789',
+          file_name: 'contacts.csv',
+          contacts,
+        },
+      };
+      mockAiReportsService.create.mockResolvedValueOnce({ id: 42 });
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+
+      await service.createResultFromAiBulk(payload as any);
+
+      expect(mockCapdevBulkNotificationService.dispatch).toHaveBeenCalledWith(
+        42,
+        contacts,
+      );
+    });
+
+    it('should still answer with the unchanged data payload when MessageMicroservice.sendEmail throws inside dispatch', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-1',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('sendEmail failed: broker unreachable'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(output).toEqual({
+        results_errors: [],
+        results_created: [{ result_id: 1, error: false }],
+      });
+    });
+
+    it('should still answer with the unchanged data payload when the notification repository throws', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-2',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('repository query failed'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(output).toEqual({
+        results_errors: [],
+        results_created: [{ result_id: 1, error: false }],
+      });
+    });
+
+    it('should keep results created before a notification failure persisted and readable', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any, { title: 'R2' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-3',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any)
+        .mockResolvedValueOnce({ result_id: 2, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('sendEmail failed'),
+      );
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      // The bulk upload persistence call already happened before dispatch()
+      // ever runs — a failure there cannot un-persist it.
+      expect(mockAiReportsService.create).toHaveBeenCalledTimes(1);
+      expect(output.results_created).toEqual([
+        { result_id: 1, error: false },
+        { result_id: 2, error: false },
+      ]);
+      expect(output.results_errors).toHaveLength(0);
+    });
+
+    it('should not let dispatch() throw propagate out of createResultFromAiBulk', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-throw-4',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+      mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+        new Error('unexpected failure'),
+      );
+
+      // If the outer try/catch did not contain the rejection, this await
+      // itself would throw and fail the test.
+      const output = await service.createResultFromAiBulk(payload as any);
+      expect(output.results_created).toHaveLength(1);
+    });
+
+    // T-12 — R-CBU-010 AC.5: the outer containment boundary (design.md §6.6
+    // "Outer") is its own logger, not merely a swallowed rejection. Binds to
+    // the specific method (`CgiarLogger.prototype.error`), not "some log
+    // fired" (Disqualifies) — a spy on `.log`/`.warn` would not catch a
+    // regression that demoted this to a lower level.
+    it('logs exactly one ERROR-level line carrying the bulk process id when dispatch() throws (R-CBU-010 AC.5, outer boundary)', async () => {
+      const errorSpy = jest
+        .spyOn(CgiarLogger.prototype, 'error')
+        .mockImplementation(() => undefined);
+      // Leader fold 4 (test hygiene): `jest.clearAllMocks()` in the
+      // top-level `afterEach` (:434-435) clears call records but does NOT
+      // undo a `spyOn` — restoring the prototype method must survive an
+      // assertion throwing mid-test, or every later test in this file would
+      // silently run against a mocked `CgiarLogger.prototype.error`.
+      try {
+        const payload = {
+          results: [{ title: 'R1' } as any],
+          metadata: {
+            ai_interaction_id: 'ai-throw-5',
+            file_name: 'upload.xlsx',
+          },
+        };
+        jest
+          .spyOn(service, 'formalizeResult')
+          .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+        mockAiReportsService.create.mockResolvedValueOnce({ id: 777 });
+        mockCapdevBulkNotificationService.dispatch.mockRejectedValueOnce(
+          new Error('ECONNREFUSED: RabbitMQ unreachable'),
+        );
+
+        await service.createResultFromAiBulk(payload as any);
+
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(errorSpy.mock.calls[0][0]).toContain('777');
+        expect(errorSpy.mock.calls[0][0]).toContain(
+          'ECONNREFUSED: RabbitMQ unreachable',
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('should produce a data payload with exactly the pre-change shape (results_errors, results_created only)', async () => {
+      const payload = {
+        results: [{ title: 'R1' } as any],
+        metadata: {
+          ai_interaction_id: 'ai-shape',
+          file_name: 'upload.xlsx',
+        },
+      };
+      jest
+        .spyOn(service, 'formalizeResult')
+        .mockResolvedValueOnce({ result_id: 1, error: false } as any);
+
+      const output = await service.createResultFromAiBulk(payload as any);
+
+      expect(Object.keys(output).sort()).toEqual([
+        'results_created',
+        'results_errors',
+      ]);
+    });
+
+    // T-06 — R-RES-008: each bulk item routes on its own year, with no
+    // leakage between items. Unlike every test above, formalizeResult is
+    // NOT spied here: the real per-item loop in createResultFromAiBulk
+    // must run so the routing this suite proves is batch-scoped, not
+    // per-call (execution.md's T-05 Lens B advisory: "the AC.4 test's
+    // name says routing per-item but it is two sequential formalizeResult
+    // calls").
+    describe('per-item routing and no leakage (R-RES-008, T-06)', () => {
+      type Fixture = {
+        title: string;
+        year: number;
+        objectives: number[];
+        resultId: number;
+      };
+      type SoRow = { result_id: number; strategic_objective_id: number };
+
+      // KZ-004: year, strategic_objectives and title all differ per item.
+      const mixedYearFixtures = (): Fixture[] => [
+        { title: 'Mixed 2025', year: 2025, objectives: [11], resultId: 501 },
+        {
+          title: 'Mixed 2026',
+          year: 2026,
+          objectives: [21, 22],
+          resultId: 502,
+        },
+        {
+          title: 'Mixed 2027',
+          year: 2027,
+          objectives: [31, 32, 33],
+          resultId: 503,
+        },
+      ];
+
+      // KZ-001: every double below genuinely keys off its arguments
+      // (title, year, result id) rather than returning a batch-wide
+      // constant — matched by argument, not by call order, so the fixture
+      // is provably order-independent (needed for AC.2's reversed run).
+      const wireRoutingMocks = (items: Fixture[], soRows: SoRow[]) => {
+        const byTitle = new Map(items.map((f) => [f.title, f]));
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockImplementation(async (raw: any) => {
+            const f = byTitle.get(raw.title);
+            return {
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: f.year,
+                title: f.title,
+              },
+              generalInformation: {},
+              sdgs: [],
+              ipRights: {},
+              geoScope: {},
+              partners: [],
+              evidences: [],
+              strategic_objectives: f.objectives,
+            } as any;
+          });
+        jest
+          .spyOn(service, 'createResult')
+          .mockImplementation(async (arg: any) => {
+            const f = byTitle.get(arg.title);
+            return {
+              result_id: f.resultId,
+              indicator_id: IndicatorsEnum.POLICY_CHANGE,
+              result_status_id: 1,
+            } as any;
+          });
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+
+        // Genuine per-year routing: 2025 is portfolio 1 (no seeded
+        // strategic objectives, D-2); 2026/2027 are portfolio 2.
+        mockPortfoliosService.findByYear.mockImplementation(
+          async (year: number) =>
+            ({
+              id:
+                year === 2025
+                  ? PortfolioIdEnum.PORTFOLIO_1
+                  : PortfolioIdEnum.PORTFOLIO_2,
+            }) as any,
+        );
+        mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio.mockImplementation(
+          async (
+            resultId: number,
+            portfolioId: PortfolioIdEnum,
+            ids: number[],
+          ) => {
+            if (portfolioId === PortfolioIdEnum.PORTFOLIO_1) {
+              return { supported: false, saved: [], discarded: [] };
+            }
+            soRows.push(
+              ...ids.map((id) => ({
+                result_id: resultId,
+                strategic_objective_id: id,
+              })),
+            );
+            return { supported: true, saved: ids, discarded: [] };
+          },
+        );
+      };
+
+      const runBatch = async (items: Fixture[]) => {
+        const payload = {
+          results: items.map((f) => ({
+            title: f.title,
+            year: f.year,
+            strategic_objectives: f.objectives,
+            metadata: { missing_fields: [] },
+          })),
+          metadata: { ai_interaction_id: 'so-routing', file_name: 'so.csv' },
+        };
+        const output = await service.createResultFromAiBulk(payload as any);
+        const bulkResults = mockAiReportsService.create.mock.calls[0][0]
+          .bulkUploadResults as any[];
+        return { output, bulkResults };
+      };
+
+      // Assert per item, keyed by that item's own result id — not
+      // aggregate row counts (Disqualifies: "aggregate row-count
+      // assertions" — an aggregate count of 5 rows passes while every row
+      // hangs off the wrong result).
+      const assertMixedYearOutcome = (items: Fixture[], soRows: SoRow[]) => {
+        for (const f of items) {
+          // Year 2025 resolves to portfolio 1, which supports no
+          // strategic objectives (D-2) — it must hold none of its own.
+          const expectedOwn = f.year === 2025 ? [] : [...f.objectives];
+          const own = soRows
+            .filter((r) => r.result_id === f.resultId)
+            .map((r) => r.strategic_objective_id)
+            .sort((a, b) => a - b);
+          expect(own).toEqual(expectedOwn.sort((a, b) => a - b));
+
+          // No item's objectives are attached to another item's result id.
+          const others = soRows.filter((r) => r.result_id !== f.resultId);
+          expect(
+            others.some((r) => f.objectives.includes(r.strategic_objective_id)),
+          ).toBe(false);
+        }
+      };
+
+      it('routes each item on its own year: 2026/2027 hold exactly their own ids, 2025 holds none and reports the field (AC.1, AC.3)', async () => {
+        const soRows: SoRow[] = [];
+        const items = mixedYearFixtures();
+        wireRoutingMocks(items, soRows);
+
+        const { bulkResults } = await runBatch(items);
+
+        expect(soRows.filter((r) => r.result_id === 501)).toHaveLength(0);
+        assertMixedYearOutcome(items, soRows);
+
+        const item2025 = bulkResults.find((r) => r.result_id === 501);
+        expect(item2025.missing_fields).toEqual(['strategic_objectives']);
+        expect(
+          bulkResults.find((r) => r.result_id === 502).missing_fields,
+        ).toEqual([]);
+        expect(
+          bulkResults.find((r) => r.result_id === 503).missing_fields,
+        ).toEqual([]);
+      });
+
+      it('produces the identical per-item outcome when item order is reversed (AC.2)', async () => {
+        const soRows: SoRow[] = [];
+        const items = mixedYearFixtures();
+        wireRoutingMocks(items, soRows);
+
+        const { bulkResults } = await runBatch([...items].reverse());
+
+        expect(soRows.filter((r) => r.result_id === 501)).toHaveLength(0);
+        assertMixedYearOutcome(items, soRows);
+        expect(
+          bulkResults.find((r) => r.result_id === 501).missing_fields,
+        ).toEqual(['strategic_objectives']);
+      });
+
+      it("continues the batch after the 2026 item fails mid-way: no result_strategic_objectives row survives for it, and the 2025 item still resolves on its own year, not the failed item's (R-RES-008 scenario 2, R-RES-003 AC.3)", async () => {
+        const soRows: SoRow[] = [];
+        const failingItem: Fixture = {
+          title: 'Fails after alignment',
+          year: 2026,
+          objectives: [41, 42],
+          resultId: 601,
+        };
+        const survivorItem: Fixture = {
+          title: 'Survivor 2025',
+          year: 2025,
+          objectives: [43],
+          resultId: 602,
+        };
+        const items = [failingItem, survivorItem];
+        wireRoutingMocks(items, soRows);
+
+        mockDataSource.getRepository.mockReturnValue({
+          findOne: jest.fn().mockResolvedValue(null),
+        } as any);
+        // KZ-001: deleteFullResultById's double actually purges the rows
+        // it stands in for deleting (DD-6), not a bare call-count no-op —
+        // otherwise "no row survives" could not be asserted at all.
+        mockQueryService.deleteFullResultById.mockImplementation(
+          async (resultId: number) => {
+            const remaining = soRows.filter((r) => r.result_id !== resultId);
+            soRows.length = 0;
+            soRows.push(...remaining);
+          },
+        );
+        // Force the first item to fail after its alignment write, in the
+        // very next step of the try block (customStatus).
+        jest
+          .spyOn(service, 'customStatus')
+          .mockImplementation(async (_status: any, resultId: number) => {
+            if (resultId === failingItem.resultId) {
+              throw new Error('forced failure after alignment write');
+            }
+            return undefined;
+          });
+
+        const { output } = await runBatch(items);
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          1,
+          2026,
+        );
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          2,
+          2025,
+        );
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).toHaveBeenNthCalledWith(
+          1,
+          601,
+          PortfolioIdEnum.PORTFOLIO_2,
+          [41, 42],
+        );
+        // The survivor resolves to the portfolio covering its OWN year
+        // (2025 → portfolio 1) — not portfolio 2, which the failed item
+        // used. This is the assertion R-RES-008 scenario 2 exists for.
+        expect(
+          mockResultSectionOrchestrator.saveStrategicObjectivesForPortfolio,
+        ).toHaveBeenNthCalledWith(2, 602, PortfolioIdEnum.PORTFOLIO_1, [43]);
+
+        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(601);
+        expect(soRows.filter((r) => r.result_id === 601)).toHaveLength(0);
+
+        expect(output.results_errors).toHaveLength(1);
+        expect((output.results_errors[0] as any).error).toBe(true);
+        expect(output.results_created).toHaveLength(1);
+        expect((output.results_created[0] as any).result_id).toBe(602);
+      });
+    });
+
+    // T-06 — mirrors the strategic-objectives "per-item routing and no
+    // leakage" describe above (:4789), adapted for primary_levers. One
+    // structural difference: both portfolios WRITE levers (DD-8, no
+    // `supported` concept), so every item in the mixed-year fixture is
+    // expected to succeed rather than one degrading.
+    describe('per-item routing and no leakage — primary levers (R-RES-002 BUT, R-RES-009, T-06)', () => {
+      type Fixture = {
+        title: string;
+        year: number;
+        leverIds: number[];
+        resultId: number;
+        portfolio: PortfolioIdEnum;
+      };
+      type LeverRow = {
+        result_id: number;
+        lever_id: number;
+        is_active: boolean;
+      };
+
+      // KZ-004: year, primary_levers and title all differ per item, with
+      // DISJOINT id sets, spanning BOTH portfolios (2024/2010 -> portfolio
+      // 1, 2026 -> portfolio 2). A fixture built from shared defaults
+      // could not distinguish per-item routing from a batch-wide constant
+      // (DC-5) — the exact bug R-RES-009 exists to prevent.
+      const mixedYearFixtures = (): Fixture[] => [
+        {
+          title: 'Levers Mixed 2024',
+          year: 2024,
+          leverIds: [4, 5],
+          resultId: 801,
+          portfolio: PortfolioIdEnum.PORTFOLIO_1,
+        },
+        {
+          title: 'Levers Mixed 2026',
+          year: 2026,
+          leverIds: [11, 12],
+          resultId: 802,
+          portfolio: PortfolioIdEnum.PORTFOLIO_2,
+        },
+        {
+          title: 'Levers Mixed 2010',
+          year: 2010,
+          leverIds: [6, 7, 8],
+          resultId: 803,
+          portfolio: PortfolioIdEnum.PORTFOLIO_1,
+        },
+      ];
+
+      // KZ-001: every double below genuinely keys off its arguments
+      // (title, year, result id) rather than a batch-wide constant, so
+      // the fixture is provably order-independent (needed for AC.2's
+      // reversed run) and provably per-item (needed for the falsifier).
+      const wireLeversRoutingMocks = (
+        items: Fixture[],
+        leverRows: LeverRow[],
+      ) => {
+        const byTitle = new Map(items.map((f) => [f.title, f]));
+        const portfolioByYear = new Map(
+          items.map((f) => [f.year, f.portfolio]),
+        );
+
+        jest
+          .spyOn(service, 'createResultFromAiRoar')
+          .mockImplementation(async (raw: any) => {
+            const f = byTitle.get(raw.title);
+            return {
+              result: {
+                indicator_id: IndicatorsEnum.POLICY_CHANGE,
+                year: f.year,
+                title: f.title,
+              },
+              generalInformation: {},
+              sdgs: [],
+              ipRights: {},
+              geoScope: {},
+              partners: [],
+              evidences: [],
+              primary_levers: f.leverIds,
+            } as any;
+          });
+        jest
+          .spyOn(service, 'createResult')
+          .mockImplementation(async (arg: any) => {
+            const f = byTitle.get(arg.title);
+            return {
+              result_id: f.resultId,
+              indicator_id: IndicatorsEnum.POLICY_CHANGE,
+              result_status_id: 1,
+            } as any;
+          });
+        jest.spyOn(service, 'updateGeneralInfo').mockResolvedValue(undefined);
+        jest.spyOn(service, 'saveGeoLocation').mockResolvedValue(undefined);
+        jest.spyOn(service, 'customStatus').mockResolvedValue(undefined);
+        mockResultSdgsService.saveSdgAi = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultIpRightsService.update = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultInstitutionsService.updatePartners = jest
+          .fn()
+          .mockResolvedValue(undefined);
+        mockResultEvidencesService.updateResultEvidences = jest
+          .fn()
+          .mockResolvedValue(undefined);
+
+        // Routes by year via a map built from the fixture's OWN declared
+        // portfolio — never a constant return (NFR-RES-001 / DC-5).
+        mockPortfoliosService.findByYear.mockImplementation(
+          async (year: number) => ({ id: portfolioByYear.get(year) }) as any,
+        );
+        mockResultSectionOrchestrator.saveLeversForPortfolio.mockImplementation(
+          async (
+            resultId: number,
+            _portfolioId: PortfolioIdEnum,
+            ids: number[],
+          ) => {
+            leverRows.push(
+              ...ids.map((id) => ({
+                result_id: resultId,
+                lever_id: id,
+                is_active: true,
+              })),
+            );
+            return { saved: ids, discarded: [] };
+          },
+        );
+      };
+
+      const runBatch = async (items: Fixture[]) => {
+        const payload = {
+          results: items.map((f) => ({
+            title: f.title,
+            year: f.year,
+            primary_levers: f.leverIds,
+            metadata: { missing_fields: [] },
+          })),
+          metadata: {
+            ai_interaction_id: 'levers-routing',
+            file_name: 'levers.csv',
+          },
+        };
+        const output = await service.createResultFromAiBulk(payload as any);
+        const bulkResults = mockAiReportsService.create.mock.calls[0][0]
+          .bulkUploadResults as any[];
+        return { output, bulkResults };
+      };
+
+      // Assert per item, keyed by that item's own result id — never
+      // aggregate row counts (Disqualifies: an aggregate count of 7 rows
+      // passes while every row hangs off the wrong result).
+      const assertMixedYearOutcome = (
+        items: Fixture[],
+        leverRows: LeverRow[],
+      ) => {
+        for (const f of items) {
+          const own = leverRows
+            .filter((r) => r.result_id === f.resultId)
+            .map((r) => r.lever_id)
+            .sort((a, b) => a - b);
+          expect(own).toEqual([...f.leverIds].sort((a, b) => a - b));
+
+          // No item's levers are attached to another item's result id
+          // (R-RES-009 AC.4).
+          const others = leverRows.filter((r) => r.result_id !== f.resultId);
+          expect(others.some((r) => f.leverIds.includes(r.lever_id))).toBe(
+            false,
+          );
+
+          // Pinned at the PORTFOLIO argument, not just the written rows:
+          // the row-content check above is blind to which portfolio was
+          // actually resolved for this item, since the double writes rows
+          // by result id regardless of the portfolio argument it
+          // received. Without this line, a batch-wide resolution defect
+          // (DC-5 — every item silently routed on the first item's
+          // portfolio) still passes, because for this fixture every
+          // item's OWN id list happens to differ, but the ids themselves
+          // are not portfolio-specific in the double. This is the
+          // assertion the DC-5 falsifier actually reddens.
+          expect(
+            mockResultSectionOrchestrator.saveLeversForPortfolio,
+          ).toHaveBeenCalledWith(f.resultId, f.portfolio, f.leverIds);
+        }
+      };
+
+      it('routes each item on its own year: each item holds exactly its own ids at the role its own portfolio dictates (AC.1, AC.3)', async () => {
+        const leverRows: LeverRow[] = [];
+        const items = mixedYearFixtures();
+        wireLeversRoutingMocks(items, leverRows);
+
+        const { bulkResults } = await runBatch(items);
+
+        assertMixedYearOutcome(items, leverRows);
+        for (const f of items) {
+          expect(
+            bulkResults.find((r) => r.result_id === f.resultId).missing_fields,
+          ).toEqual([]);
+        }
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenCalledTimes(3);
+      });
+
+      it('produces the identical per-item outcome when item order is reversed, over a fresh fixture (AC.2)', async () => {
+        const leverRows: LeverRow[] = [];
+        const items: Fixture[] = [
+          {
+            title: 'Levers Reversed 2025',
+            year: 2025,
+            leverIds: [21, 22],
+            resultId: 901,
+            portfolio: PortfolioIdEnum.PORTFOLIO_1,
+          },
+          {
+            title: 'Levers Reversed 2027',
+            year: 2027,
+            leverIds: [31],
+            resultId: 902,
+            portfolio: PortfolioIdEnum.PORTFOLIO_1,
+          },
+          {
+            title: 'Levers Reversed 2026',
+            year: 2026,
+            leverIds: [13, 14],
+            resultId: 903,
+            portfolio: PortfolioIdEnum.PORTFOLIO_2,
+          },
+        ];
+        wireLeversRoutingMocks(items, leverRows);
+
+        await runBatch([...items].reverse());
+
+        assertMixedYearOutcome(items, leverRows);
+      });
+
+      it("continues the batch after the 2026 item fails mid-way: no result_levers row survives for it, and the 2025 item still resolves on its own year, not the failed item's (R-RES-009 AC.3, AC.4)", async () => {
+        const leverRows: LeverRow[] = [];
+        const failingItem: Fixture = {
+          title: 'Levers Fails After Write',
+          year: 2026,
+          leverIds: [41, 42],
+          resultId: 1001,
+          portfolio: PortfolioIdEnum.PORTFOLIO_2,
+        };
+        const survivorItem: Fixture = {
+          title: 'Levers Survivor 2025',
+          year: 2025,
+          leverIds: [43],
+          resultId: 1002,
+          portfolio: PortfolioIdEnum.PORTFOLIO_1,
+        };
+        const items = [failingItem, survivorItem];
+        wireLeversRoutingMocks(items, leverRows);
+
+        mockDataSource.getRepository.mockReturnValue({
+          findOne: jest.fn().mockResolvedValue(null),
+        } as any);
+        // KZ-001: deleteFullResultById's double actually purges the rows
+        // it stands in for deleting, not a bare call-count no-op —
+        // otherwise "no row survives" could not be asserted at all.
+        mockQueryService.deleteFullResultById.mockImplementation(
+          async (resultId: number) => {
+            const remaining = leverRows.filter((r) => r.result_id !== resultId);
+            leverRows.length = 0;
+            leverRows.push(...remaining);
+          },
+        );
+        // Force the first item to fail after its lever write, in the very
+        // next step of the try block (customStatus).
+        jest
+          .spyOn(service, 'customStatus')
+          .mockImplementation(async (_status: any, resultId: number) => {
+            if (resultId === failingItem.resultId) {
+              throw new Error('forced failure after lever write');
+            }
+            return undefined;
+          });
+
+        const { output } = await runBatch(items);
+
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          1,
+          2026,
+        );
+        expect(mockPortfoliosService.findByYear).toHaveBeenNthCalledWith(
+          2,
+          2025,
+        );
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenNthCalledWith(
+          1,
+          1001,
+          PortfolioIdEnum.PORTFOLIO_2,
+          [41, 42],
+        );
+        // The survivor resolves to the portfolio covering its OWN year
+        // (2025 -> portfolio 1) — not portfolio 2, which the failed item
+        // used. This is the assertion R-RES-009's scenario exists for.
+        expect(
+          mockResultSectionOrchestrator.saveLeversForPortfolio,
+        ).toHaveBeenNthCalledWith(2, 1002, PortfolioIdEnum.PORTFOLIO_1, [43]);
+
+        expect(mockQueryService.deleteFullResultById).toHaveBeenCalledWith(
+          1001,
+        );
+        expect(leverRows.filter((r) => r.result_id === 1001)).toHaveLength(0);
+
+        expect(output.results_errors).toHaveLength(1);
+        expect((output.results_errors[0] as any).error).toBe(true);
+        expect(output.results_created).toHaveLength(1);
+        expect((output.results_created[0] as any).result_id).toBe(1002);
+      });
     });
   });
 
@@ -3653,6 +5912,145 @@ describe('ResultsService', () => {
 
       expect(result.result).toBeDefined();
       expect(result.result.title).toBe('Test');
+    });
+
+    // T-05 — carries the field so formalizeResult's alignment step can
+    // populate it (design.md §5.1; T-01 added the carrier on ResultAiDto).
+    it('carries strategic_objectives through onto the processed ResultAiDto', async () => {
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === TempResultAi) {
+          return { save: jest.fn().mockResolvedValue({}) } as any;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue({ agreement_id: 'AGR-001' }),
+          find: jest.fn().mockResolvedValue([]),
+        } as any;
+      });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
+      mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
+
+      const result = await service.createResultFromAiRoar({
+        contract_code: 'AGR-001',
+        title: 'Test',
+        description: 'Desc',
+        indicator: 'Policy Change',
+        strategic_objectives: [1, 3, 5],
+      } as any);
+
+      expect(result.strategic_objectives).toEqual([1, 3, 5]);
+    });
+
+    it('carries an absent strategic_objectives through as undefined', async () => {
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === TempResultAi) {
+          return { save: jest.fn().mockResolvedValue({}) } as any;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue({ agreement_id: 'AGR-001' }),
+          find: jest.fn().mockResolvedValue([]),
+        } as any;
+      });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
+      mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
+
+      const result = await service.createResultFromAiRoar({
+        contract_code: 'AGR-001',
+        title: 'Test',
+        description: 'Desc',
+        indicator: 'Policy Change',
+      } as any);
+
+      expect(result.strategic_objectives).toBeUndefined();
+    });
+
+    // T-05 — carries the field so formalizeResult's levers step can
+    // populate it (design.md §5.1; T-01 added the carrier on ResultRawAi).
+    // Proves the end-to-end carrier from this method, not by inspecting
+    // ResultAiDto's declaration alone: a T-01-only change (ResultRawAi
+    // gains the field but ResultAiDto/createResultFromAiRoar never carry
+    // it) would leave `result.primary_levers` undefined here and this
+    // assertion would redden.
+    it('carries primary_levers through onto the processed ResultAiDto', async () => {
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === TempResultAi) {
+          return { save: jest.fn().mockResolvedValue({}) } as any;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue({ agreement_id: 'AGR-001' }),
+          find: jest.fn().mockResolvedValue([]),
+        } as any;
+      });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
+      mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
+
+      const result = await service.createResultFromAiRoar({
+        contract_code: 'AGR-001',
+        title: 'Test',
+        description: 'Desc',
+        indicator: 'Policy Change',
+        primary_levers: [11, 12],
+      } as any);
+
+      expect(result.primary_levers).toEqual([11, 12]);
+    });
+
+    it('carries an absent primary_levers through as undefined', async () => {
+      mockDataSource.getRepository.mockImplementation((entity: unknown) => {
+        if (entity === TempResultAi) {
+          return { save: jest.fn().mockResolvedValue({}) } as any;
+        }
+        return {
+          findOne: jest.fn().mockResolvedValue({ agreement_id: 'AGR-001' }),
+          find: jest.fn().mockResolvedValue([]),
+        } as any;
+      });
+      mockIndicatorsService.findByName.mockResolvedValue({
+        indicator_id: 1,
+      } as any);
+      mockResultUsersService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockResultInstitutionsService.filterInstitutionsAi = jest
+        .fn()
+        .mockReturnValue({ acept: [], pending: [] });
+      mockClarisaGeoScopeService.findByName.mockResolvedValue(null);
+      mockClarisaCountriesService.findByIso2 = jest.fn().mockResolvedValue([]);
+
+      const result = await service.createResultFromAiRoar({
+        contract_code: 'AGR-001',
+        title: 'Test',
+        description: 'Desc',
+        indicator: 'Policy Change',
+      } as any);
+
+      expect(result.primary_levers).toBeUndefined();
     });
   });
 
