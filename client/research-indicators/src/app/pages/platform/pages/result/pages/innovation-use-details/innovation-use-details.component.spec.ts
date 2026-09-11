@@ -4607,6 +4607,304 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(cardText).toContain('STAR 284 - Deleted result');
     });
   });
+
+  // ===============================================================================================
+  // T-03 — ⊗ clears the selection and resets T-09's enrichment flag (R-OICR-003 / DC-3)
+  //
+  // Falsifier (CORRECTED 2026-09-10 — original was structurally false, see DD-3): delete
+  // `this.enrichmentSuccessForId.set(null)` from clearInnovationDev() (component.ts:302). Then
+  // criterion 2's FOUR-STEP sequence exposes the defect:
+  //   1. select 42 → enrichmentSuccessForId = 42
+  //   2. ⊗ clear → linked_innovation_dev = null, flag STAYS (reset missing)
+  //   3. getData() rehydrates linked_innovation_dev BARE (result_id=42, no enrichment keys)
+  //   4. re-select 42 → sameId IS true (rehydrated), wasSuccessful IS true (flag still 42)
+  //      → early return fires → card shows title + anchor only, NO level/description/scope
+  // Expected RED: `expect(card.textContent).toContain('Level 4 - Testing')` fails.
+  //
+  // The original 3-step (clear + repick without getData()) was false: after clear,
+  // linked_innovation_dev is null → sameId = (undefined === 42) = false, ALWAYS. The early
+  // return could never fire on that path regardless of the flag. Verified by measurement.
+  // ===============================================================================================
+  describe('T-03 — ⊗ clears the selection and resets the enrichment flag (R-OICR-003)', () => {
+    let innoDevService: GetInnoDevOutputService;
+
+    // A fully populated option that the picker can return via innoDevService.list().
+    // Shape mirrors what onInnovationDevSelected() reads from the option.
+    const OPTION = {
+      result_id: 42,
+      result_official_code: '42',
+      title: 'Crop yield study',
+      platform_code: 'STAR',
+      result_status: {
+        result_status_id: 3,
+        name: 'Draft',
+        description: 'A draft result',
+        is_active: 1,
+        config: {
+          color: { text: '#fff', background: '#333', border: '#444' },
+          icon: { name: 'draft', color: '#fff' }
+        }
+      },
+      year: '2025'
+    };
+
+    // Enrichment data returned by GET_InnovationDevCard for result_id 42.
+    const ENRICHMENT = {
+      innovation_readiness: { id: 2, level: 4, name: 'Testing' },
+      description: 'A detailed description about the result',
+      geo_scope: { code: 1, name: 'Global' }
+    };
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      // Populate the picker list with our option so onInnovationDevSelected() can find it.
+      innoDevService.list.set([OPTION as any]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockClear();
+      fixture.detectChanges();
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 1 — ⊗ clears the card; the section returns to its no-link state
+    // ---------------------------------------------------------------------------
+    it('c1 — the ⊗ button is present, clicking it clears linked_innovation_dev and removes the card from the DOM', async () => {
+      // Arrange: select a result to show the card.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      component.body.update(b => ({ ...b, innovation_dev_result_id: OPTION.result_id }));
+      fixture.detectChanges();
+
+      // Positive control: the card IS present before clearing.
+      const relatedCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(relatedCard.textContent).toContain('Crop yield study');
+
+      // Positive control: the ⊗ button is present — deleting it from the template reddens this.
+      const clearBtn = fixture.debugElement.query(By.css('[data-testid="clear-innovation-dev"]'));
+      expect(clearBtn).toBeTruthy();
+
+      // Act: dispatch click through Angular's event binding (triggerEventHandler is more reliable
+      // than nativeElement.click() for (click) bindings inside @if control-flow blocks in jsdom).
+      clearBtn.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      // Assert state.
+      expect(component.body().linked_innovation_dev).toBeNull();
+      expect(component.body().innovation_dev_result_id).toBeNull();
+
+      // Assert DOM: the inner card div (eyebrow + title) must be gone.
+      const cardAfter = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(cardAfter.textContent).not.toContain('Crop yield study');
+      // The inner result card (flex-col gap-2 container with eyebrow + title) must be gone.
+      // The outer section heading still contains "RELATED INNOVATION DEVELOPMENT" — we assert
+      // absence of the result title, not the section title string.
+      const innerResultCard = cardAfter.querySelector('.bg-\\[var\\(--ac-grey-100\\)\\]');
+      expect(innerResultCard).toBeNull();
+    });
+
+    it('c2 (FALSIFIER — four-step rehydration) — re-selecting the SAME result after clear + getData() rehydration renders a full card: level, description and scope are in the DOM', async () => {
+      // DD-3 (corrected 2026-09-10): the falsifier is NOT clear-then-repick. After clearInnovationDev(),
+      // `linked_innovation_dev` is null, so sameId = (undefined === 42) = false — the early return
+      // never fires regardless of the flag. The trigger is a REHYDRATION between the clear and the
+      // re-selection. This four-step sequence is the minimal proof that the reset is load-bearing.
+      //
+      // MUTATION to restore before trusting: delete `this.enrichmentSuccessForId.set(null)` from
+      // clearInnovationDev() (component.ts:302). With the reset absent, step 4's
+      // `sameId && wasSuccessful` is true (linked rehydrated with same id, flag never cleared),
+      // so the early return fires and the card shows title + anchor only.
+      // Expected RED: `expect(card.textContent).toContain('Level 4 - Testing')` fails.
+
+      // Step 1: select 42 → enrichment succeeds → enrichmentSuccessForId = 42, card full.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Step 2: ⊗ clear → linked_innovation_dev = null; the flag survives if the reset is missing.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Step 3: getData() rehydrates linked_innovation_dev with a BARE object — only the four keys
+      // the server's GET_InnovationUseDetails returns. The three enrichment keys (innovation_readiness,
+      // description, geo_scope) are optional and only GET_InnovationDevCard ever writes them.
+      // This is the step that makes sameId TRUE again on step 4, which is what the original
+      // clear-then-repick sequence could never achieve.
+      const BARE_LINKED = {
+        result_id: OPTION.result_id,
+        result_official_code: Number(OPTION.result_official_code),
+        title: OPTION.title,
+        platform_code: OPTION.platform_code
+        // innovation_readiness, description, geo_scope — intentionally absent (bare)
+      };
+      apiService.GET_InnovationUseDetails.mockResolvedValueOnce({
+        successfulRequest: true,
+        data: { ...new GetInnovationUseDetails(), linked_innovation_dev: BARE_LINKED }
+      });
+      await component.getData();
+      fixture.detectChanges();
+
+      // Step 4: user picks 42 again. If the reset was omitted in step 2, enrichmentSuccessForId
+      // is still 42, sameId is now true (getData() restored result_id=42), wasSuccessful is true
+      // → early return fires → GET_InnovationDevCard is NOT called → card renders bare.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Assert the card renders FULLY — these DOM assertions are where the red must land.
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+
+      // Level must be present — this is the assertion that reddens when the reset is deleted.
+      expect(card.textContent).toContain('Innovation Dev level');
+      expect(card.textContent).toContain('Level 4 - Testing');
+
+      // Description must be present.
+      expect(card.textContent).toContain('A detailed description about the result');
+
+      // Scope must be present.
+      expect(card.textContent).toContain('Geographic scope');
+      expect(card.textContent).toContain('Global');
+
+      // "Innovation detail" anchor — the anchor whose label has been deleted twice (tasks.md T-02 Done ✔6).
+      expect(card.textContent).toContain('Innovation detail');
+      const anchor = card.querySelector('a.innovation-detail-link');
+      expect(anchor).toBeTruthy();
+
+      // The enrichment fetch must have been called a second time (once before clearing, once after).
+      // Call count: 1 before step 2 + 0 during getData() + 1 during step 4 = 2.
+      expect(apiService.GET_InnovationDevCard).toHaveBeenCalledTimes(2);
+
+      // Flag check (after DOM — the red must land on a DOM assertion, not here).
+      expect(component.enrichmentSuccessForId()).toBe(OPTION.result_id);
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 3 — the picker still accepts any new selection after clearing
+    // ---------------------------------------------------------------------------
+    it('c3 — after clearing, selecting a DIFFERENT result populates the card with that result', async () => {
+      const OTHER_OPTION = {
+        result_id: 99,
+        result_official_code: '99',
+        title: 'Different crop study',
+        platform_code: 'PRMS',
+        result_status: OPTION.result_status,
+        year: '2024'
+      };
+      innoDevService.list.set([OPTION as any, OTHER_OPTION as any]);
+
+      // Arrange: select OPTION first.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Clear.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Act: select a different result.
+      const OTHER_ENRICHMENT = { innovation_readiness: { id: 5, level: 2, name: 'Proof of concept' }, description: 'Other desc', geo_scope: null };
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: OTHER_ENRICHMENT });
+      await component.onInnovationDevSelected(OTHER_OPTION.result_id);
+      fixture.detectChanges();
+
+      // Assert the card shows the OTHER result, not the old one.
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+
+      expect(card.textContent).toContain('Different crop study');
+      expect(card.textContent).not.toContain('Crop yield study');
+      expect(card.textContent).toContain('Proof of concept');
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 4 — still single-select; no confirmation step
+    // ---------------------------------------------------------------------------
+    it('c4 — clearInnovationDev() is synchronous and requires no confirmation dialog', () => {
+      // Arrange: seed a linked result in body directly to isolate clear() from the fetch path.
+      component.body.update(b => ({
+        ...b,
+        innovation_dev_result_id: OPTION.result_id,
+        linked_innovation_dev: {
+          result_id: OPTION.result_id,
+          result_official_code: Number(OPTION.result_official_code),
+          title: OPTION.title,
+          platform_code: OPTION.platform_code
+        }
+      }));
+      fixture.detectChanges();
+
+      // Positive control: the card is present before clearing.
+      const relatedCard = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(relatedCard.textContent).toContain('Crop yield study');
+
+      // Act: clear — must be a plain synchronous call, no await, no confirm() dialog.
+      component.clearInnovationDev();
+      fixture.detectChanges();
+
+      // Assert: state is cleared immediately, no toast was shown.
+      expect(component.body().linked_innovation_dev).toBeNull();
+      expect(actions.showToast).not.toHaveBeenCalled();
+
+      // Assert: only one result can be linked at a time — body carries null, not an array.
+      expect(Array.isArray(component.body().linked_innovation_dev)).toBe(false);
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 5 — the save payload no longer carries the cleared link
+    // ---------------------------------------------------------------------------
+    it('c5 — after clearInnovationDev(), buildPayload() carries innovation_dev_result_id: null', async () => {
+      // Arrange: select a result so the payload would carry the id if clear() did not work.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      component.body.update(b => ({ ...b, innovation_dev_result_id: OPTION.result_id }));
+
+      // Positive control: before clearing, the payload carries the id.
+      expect(component.buildPayload().innovation_dev_result_id).toBe(OPTION.result_id);
+
+      // Act: clear.
+      component.clearInnovationDev();
+
+      // Assert: after clearing, the payload carries null — not the old id, not undefined.
+      const payload = component.buildPayload();
+      expect(payload.innovation_dev_result_id).toBeNull();
+    });
+
+    // ---------------------------------------------------------------------------
+    // Criterion 6 — the ⊗ is absent in read-only mode; the card title still renders
+    //
+    // Rationale: `@if (submission.isEditableStatus())` guards the button. Deleting
+    // the button or that guard makes c1 and c6 both fail; removing only the guard
+    // (exposing the button unconditionally) makes only c6 fail. The card title is
+    // the positive control — the section is not absent, only the control.
+    // ---------------------------------------------------------------------------
+    it('c6 — when isEditableStatus() is false, the ⊗ button is absent while the card title still renders', async () => {
+      // Arrange: select a result so the card is visible.
+      apiService.GET_InnovationDevCard.mockResolvedValueOnce({ successfulRequest: true, data: ENRICHMENT });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+
+      // Switch to read-only.
+      submission.isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+
+      // Positive control: the card IS still in the DOM (title renders).
+      const card = fixture.debugElement
+        .queryAll(By.css('.section-title'))
+        .find(t => t.nativeElement.textContent.includes('RELATED INNOVATION DEVELOPMENT'))?.parent?.nativeElement as HTMLElement;
+      expect(card.textContent).toContain('Crop yield study');
+
+      // Assert: the ⊗ button is absent — its @if guard must remove it in read-only mode.
+      const clearBtn = fixture.debugElement.query(By.css('[data-testid="clear-innovation-dev"]'));
+      expect(clearBtn).toBeNull();
+    });
+  });
 });
 
 // ===================================================================================================

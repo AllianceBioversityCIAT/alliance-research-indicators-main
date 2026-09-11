@@ -203,6 +203,11 @@
               <span class="text-[11px] text-[var(--ac-grey-600)] font-[400] !font-[Space_Grotesk]">INNOVATION DEVELOPMENT</span>
             </div>
             <div class="flex w-[28px] justify-end items-center">
+              @if (submission.isEditableStatus()) {
+                <button type="button" data-testid="clear-innovation-dev" aria-label="Clear the linked innovation development" class="cursor-pointer flex items-center justify-center border-none bg-transparent" (click)="clearInnovationDev()">
+                  <span class="text-[14px] text-[var(--ac-red-1)] font-medium">⊗</span>
+                </button>
+              }
             </div>
           </div>
           

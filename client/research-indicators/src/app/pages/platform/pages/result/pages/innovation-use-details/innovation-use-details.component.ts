@@ -293,6 +293,15 @@ export default class InnovationUseDetailsComponent {
     }
   }
 
+  clearInnovationDev(): void {
+    this.body.update(current => ({
+      ...current,
+      innovation_dev_result_id: null,
+      linked_innovation_dev: null
+    }));
+    this.enrichmentSuccessForId.set(null);
+  }
+
   /** R-IUP-020 (Amendment 01 / T-14): template-bindable mirrors of the module-level consts above. */
   readonly calculatorUrl = INNOVATION_USE_CALCULATOR_URL;
   readonly definitionsUrl = INNOVATION_USE_DEFINITIONS_URL;
