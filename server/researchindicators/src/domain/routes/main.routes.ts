@@ -33,6 +33,7 @@ import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/resu
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
+import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
 import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 import { ResultActorsModule } from '../entities/result-actors/result-actors.module';
 import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
@@ -113,6 +114,10 @@ const ResultsChildren: Routes = [
         module: InnovationDevAnticipatedUsersModule,
       },
     ],
+  },
+  {
+    path: 'innovation-use',
+    module: ResultInnovationUseModule,
   },
   {
     path: 'evidences',

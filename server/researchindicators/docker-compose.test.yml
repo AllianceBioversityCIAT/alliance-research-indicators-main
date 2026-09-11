@@ -1,0 +1,31 @@
+# Disposable scratch MySQL for the TEST datasource target (T-01).
+# NEVER used by other developers' app containers — see docker-compose.yml for
+# that. This file exists purely so the regression fixtures and the migration
+# suite have a schema that can be freely created, dropped, and rebuilt.
+#
+# Bring up:   npm run compose:test:up
+# Tear down:  npm run compose:test:down
+services:
+  test-mysql:
+    container_name: research_indicators_server_test_mysql
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: scratch_root_pw
+      MYSQL_DATABASE: ari_scratch_test
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_520_ci
+      # T-01b (snapshot model): mysql:8.0 ships with log_bin ON and
+      # log_bin_trust_function_creators OFF, which rejects CREATE
+      # FUNCTION/PROCEDURE bodies (like SP_versioning) that aren't marked
+      # DETERMINISTIC/NO SQL/READS SQL DATA (MySQL error 1418). This scratch
+      # container's own binlog is irrelevant (it is disposable, dropped and
+      # recreated freely) — never set this on anything pointed at ARI_MYSQL_*.
+      - --log-bin-trust-function-creators=1
+    ports:
+      # Bound to loopback deliberately. A bare '3307:3306' binds 0.0.0.0, which
+      # would expose this container — root password in plaintext above — on every
+      # interface of the developer's machine, including a corporate VPN segment.
+      # The harness only ever connects from localhost.
+      - '127.0.0.1:3307:3306'
+    restart: 'no'

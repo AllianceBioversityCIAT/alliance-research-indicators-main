@@ -1,0 +1,194 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-05 — innovation use actor card) -->
+<ng-template #requiredMessage>
+  <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+    <i class="material-symbols-rounded !text-[14px]">warning</i>
+    <span class="fs-[14]">This field is required</span>
+  </div>
+</ng-template>
+
+<div class="relative flex flex-col rs-gap-[16] bg-[var(--ac-grey-100)] border border-[var(--ac-grey-200)] rs-p-[20]">
+  <div class="flex justify-between items-center rs-gap-[4]">
+    <span class="fs-[13] text-[var(--ac-grey-600)] font-['Space_Grotesk'] tracking-widest">ACTOR # {{ actorNumber }}</span>
+
+    @if (!disabled) {
+      <button
+        type="button"
+        class="cursor-pointer text-[var(--ac-red-1)] bg-transparent border-0 p-0"
+        [attr.aria-label]="'Remove actor ' + actorNumber"
+        (click)="onRemove()">
+        <i class="pi pi-times-circle !text-[16px]"></i>
+      </button>
+    }
+  </div>
+
+  <div class="flex flex-col rs-gap-[4]">
+    <span class="label">Actor type<span class="text-red-500">*</span></span>
+
+    <p-select
+      [disabled]="disabled"
+      [scrollHeight]="'218px'"
+      [optionLabel]="'name'"
+      [optionValue]="'code'"
+      [optionDisabled]="'optionDisabled'"
+      placeholder="Select the actor type"
+      [ariaLabel]="'Select the actor type'"
+      class="fs-[14] w-full"
+      [style]="actorTypeMissing || duplicateType ? { border: '2px solid var(--ac-warning-1)' } : {}"
+      [ngModel]="body().actor_type_id"
+      (onChange)="onActorTypeChange($event.value)"
+      [options]="typeOptions">
+    </p-select>
+
+    @if (duplicateType) {
+      <div class="flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+        <i class="material-symbols-rounded !text-[14px]">warning</i>
+        <span class="fs-[14]">This actor type has already been reported on another row</span>
+      </div>
+    } @else if (actorTypeMissing) {
+      <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+    }
+
+    @if (body().actor_type_id === otherActorTypeId) {
+      <input
+        pInputText
+        class="rs-mt-[12] w-full"
+        [style]="otherNameMissing ? { border: '2px solid var(--ac-warning-1)' } : {}"
+        placeholder="Specify other"
+        aria-label="Specify other actor type"
+        [ngModel]="body().actor_type_custom_name"
+        (ngModelChange)="onCustomNameChange($event)"
+        [disabled]="disabled"
+        type="text" />
+      @if (otherNameMissing) {
+        <ng-container *ngTemplateOutlet="requiredMessage"></ng-container>
+      }
+    }
+
+    <div class="flex items-center rs-gap-[8] option-label rs-pt-[12]">
+      <p-checkbox
+        [inputId]="'sex_age_disaggregation_not_apply_' + actorNumber"
+        [disabled]="disabled"
+        [ngModel]="body().sex_age_disaggregation_not_apply"
+        (onChange)="onModeChange($event.checked)"
+        binary="true"
+        styleClass="rs-w-[16] rs-h-[16]" />
+      <label [attr.for]="'sex_age_disaggregation_not_apply_' + actorNumber">Sex and age disaggregation does not apply</label>
+    </div>
+
+    @if (!body().sex_age_disaggregation_not_apply) {
+      <!-- T-13 c8 fix: two-column split waits for `lg:` (1024px), not `md:` (768px). At `md:` the
+           card's actual content width is squeezed well below its viewport width by TWO fixed-position
+           left rails outside this component (the platform sidebar's reserved padding plus
+           result.component.scss's own 322px `.container` column for `app-result-sidebar`) — neither
+           is visible from this template, but the squeeze is real: at 768px viewport the card interior
+           can be ~120-300px, not enough for two count fields side by side without the longer labels
+           ("Women non-youth", "Men non-youth") wrapping. `lg:` gives every viewport this card can
+           realistically appear at at least ~450px of interior width before it goes two-up. Single
+           column at `md:` was already the layout for the aggregate "How many" field below (no
+           breakpoint at all) and for every field in the sibling Organization card, so this doesn't
+           introduce a new pattern. `min-w-0` on each cell is defense in depth: without it, a grid
+           item's default automatic minimum size is its content's min-content width, so it can refuse
+           to shrink to its track and overflow the card (V-1) even if a future change narrows the
+           two-column range again; with it, the item shrinks with its track and `app-input`'s own
+           `width: 100% !important` rule (input.component.scss) governs instead. -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 rs-gap-[16] rs-pt-[12]">
+        <app-input
+          class="min-w-0"
+          [signal]="body"
+          [optionValue]="'women_youth_count'"
+          [label]="'Women youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+        <app-input
+          class="min-w-0"
+          [signal]="body"
+          [optionValue]="'women_not_youth_count'"
+          [label]="'Women non-youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+        <app-input
+          class="min-w-0"
+          [signal]="body"
+          [optionValue]="'men_youth_count'"
+          [label]="'Men youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+        <app-input
+          class="min-w-0"
+          [signal]="body"
+          [optionValue]="'men_not_youth_count'"
+          [label]="'Men non-youth'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [requiredMode]="'filled'"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+      </div>
+
+      @if (showTotalNotPositive) {
+        <div class="actor-total-required-message flex items-center gap-1 rs-mt-[4] text-[var(--ac-warning-1)]">
+          <i class="material-symbols-rounded !text-[14px]">warning</i>
+          <span class="fs-[14]">The total must be greater than 0</span>
+        </div>
+      }
+    } @else {
+      <div class="rs-pt-[12]">
+        <!-- @akili-spec docs/specs/changes/innovation-use-required-fields (T-05 — R-IUR-005, DD-1 'positive') -->
+        <app-input
+          [signal]="body"
+          [optionValue]="'actors_count'"
+          [label]="'How many'"
+          [type]="'number'"
+          [min]="0"
+          [maxFractionDigits]="0"
+          [requiredMode]="'positive'"
+          [disabled]="disabled"
+          placeholder="How many?"></app-input>
+      </div>
+    }
+
+    <!-- @akili-spec quick/innovation-use-actors-total-field (QA: "leave it in a non-editable text field,
+         right-aligned, to keep the look of the section"). Same grid as the four count fields above, so the
+         Total lands in the right column under `Women non-youth` / `Men non-youth`. A native `pInputText` is
+         used rather than `app-input`, which hardcodes `[showButtons]="true"` on its number branch and would
+         render editing arrows on a field that cannot be edited.
+
+         `disabled`, matching how this app already renders a non-editable field — `general-information`'s
+         `Title` passes plain `[disabled]` and gets the bluish fill the QA screenshot shows. That fill is the
+         theme's `formField.disabledBackground` (`{surface.200}` = `#e2e8f0`), so it is the theme's own token,
+         not a hex invented here.
+
+         The text does NOT dim with it: `custom-fields.scss` forces `color: #4c5158 !important` on every input
+         in the page wrapper, which outranks the theme's `disabledColor`. MEASURED: `#4c5158` on `#e2e8f0` =
+         **6.49:1**, above the 4.5:1 floor (it was 7.44:1 as a span on the card fill).
+
+         `disabled` also removes the editing affordances `readonly` could not: PrimeNG paints its hover and
+         focus borders through `.p-inputtext:enabled:hover` / `:enabled:focus`, and a disabled input matches
+         neither — so the blue border no longer invites editing a field that cannot be edited. -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 rs-gap-[16] rs-pt-[12] border-t border-[var(--ac-grey-200)]">
+      <div class="hidden lg:block"></div>
+      <div class="min-w-0">
+        <label class="label" [attr.for]="'actor-total-' + actorNumber">Total</label>
+        <input
+          pInputText
+          [id]="'actor-total-' + actorNumber"
+          class="actor-total w-full text-right text-[14px]"
+          [value]="total() ?? ''"
+          disabled />
+      </div>
+    </div>
+  </div>
+</div>

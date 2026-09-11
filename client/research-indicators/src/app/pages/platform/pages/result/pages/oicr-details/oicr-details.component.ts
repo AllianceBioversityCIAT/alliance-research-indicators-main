@@ -10,7 +10,7 @@ import { FormHeaderComponent } from '@shared/components/form-header/form-header.
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { OicrFormFieldsComponent } from '@shared/components/custom-fields/oicr-form-fields/oicr-form-fields.component';
 import { PatchOicr, QuantificationPayload } from '@shared/interfaces/oicr-creation.interface';
-import { QuantificationItemComponent, QuantificationItemData } from './components/quantification-item/quantification-item.component';
+import { QuantificationItemComponent, QuantificationItemData } from '@components/quantification-item/quantification-item.component';
 import { CheckboxModule } from 'primeng/checkbox';
 import { AccordionModule } from 'primeng/accordion';
 import { AuthorsContactPersonsTableComponent } from './components/authors-contact-persons-table/authors-contact-persons-table.component';

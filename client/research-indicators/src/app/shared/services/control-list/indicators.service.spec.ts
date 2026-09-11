@@ -67,6 +67,16 @@ describe('IndicatorsService', () => {
           indicator_type_id: 2,
           icon_src: '',
           severity: ''
+        },
+        {
+          indicator_id: 6,
+          name: 'Indicator 6',
+          is_active: true,
+          description: '',
+          long_description: '',
+          indicator_type_id: 2,
+          icon_src: '',
+          severity: ''
         }
       ]
     }
@@ -118,10 +128,23 @@ describe('IndicatorsService', () => {
         value: 2,
         items: [
           { label: 'Indicator 4', value: 4 },
-          { label: 'Indicator 5', value: 5 }
+          { label: 'Indicator 5', value: 5 },
+          { label: 'Indicator 6', value: 6 }
         ]
       }
     ]);
+  });
+
+  // @akili-spec docs/specs/innovation-use/details-page (T-13 Pivot — PV-T13-1)
+  it('generateGroupedIndicators should admit indicator 6 (Innovation Use) while keeping indicator 3 excluded', () => {
+    const result = service.generateGroupedIndicators(mockIndicatorTypes, 'name', 'indicator_type_id', 'name', 'indicator_id');
+    const allItems = result.flatMap((group: any) => group.items);
+
+    // Indicator 6 (Innovation Use) must be admitted to the create-result dropdown allowlist
+    expect(allItems).toEqual(expect.arrayContaining([{ label: 'Indicator 6', value: 6 }]));
+
+    // Indicator 3 must remain excluded — the allowlist widened by exactly one member, not disabled
+    expect(allItems).not.toEqual(expect.arrayContaining([{ label: 'Indicator 3', value: 3 }]));
   });
 
   it('generateGroupedIndicators should return empty array if no data', () => {

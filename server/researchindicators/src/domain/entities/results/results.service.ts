@@ -77,6 +77,7 @@ import { ResultLever } from '../result-levers/entities/result-lever.entity';
 import { ClarisaLeversService } from '../../tools/clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { AgressoContractService } from '../agresso-contract/agresso-contract.service';
 import { ResultInnovationDevService } from '../result-innovation-dev/result-innovation-dev.service';
+import { ResultInnovationUseService } from '../result-innovation-use/result-innovation-use.service';
 import { ResultSdgsService } from '../result-sdgs/result-sdgs.service';
 import { ResultSdg } from '../result-sdgs/entities/result-sdg.entity';
 import { ResultIpRightsService } from '../result-ip-rights/result-ip-rights.service';
@@ -119,7 +120,10 @@ import {
   CreateBulkUploadProcessesDto,
   CreateBulkUploadResultsDto,
 } from '../ai-reports/dto/create-ai-report.dto';
+import { CapdevBulkNotificationService } from '../ai-reports/notifications/capdev-bulk-notification.service';
 import { DeleteResultsByParametersDto } from './dto/delete-results-params.dto';
+import { ResultSectionOrchestratorService } from './portfolio-handlers/application/result-section-orchestrator.service';
+import { PortfolioIdEnum } from './portfolio-handlers/enum/portfolio-id.enum';
 
 @Injectable()
 export class ResultsService {
@@ -148,6 +152,7 @@ export class ResultsService {
     private readonly _clarisaLeversService: ClarisaLeversService,
     private readonly _agressoContractService: AgressoContractService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
+    private readonly _resultInnovationUseService: ResultInnovationUseService,
     private readonly _resultSdgsService: ResultSdgsService,
     @Inject(forwardRef(() => ResultOicrService))
     private readonly _resultOicrService: ResultOicrService,
@@ -164,6 +169,8 @@ export class ResultsService {
     private readonly _alignmentOperations: ResultAlignmentOperationsService,
     private readonly _portfolioService: PortfoliosService,
     private readonly _aiReportsService: AiReportsService,
+    private readonly _capdevBulkNotificationService: CapdevBulkNotificationService,
+    private readonly _resultSectionOrchestrator: ResultSectionOrchestratorService,
   ) {}
 
   async findResults(filters: Partial<ResultFiltersInterface>) {
@@ -395,10 +402,9 @@ export class ResultsService {
 
     const { description, indicator_id, title, contract_id, year } =
       createResult;
-
     await this.mainRepo
       .findOne({
-        where: { title, is_active: true },
+        where: { title: title?.trim(), is_active: true },
         relations: { indicator: true },
       })
       .then((result) => {
@@ -541,6 +547,9 @@ export class ResultsService {
       case IndicatorsEnum.OICR:
         await this._resultOicrService.create(resultId, manager);
         break;
+      case IndicatorsEnum.INNOVATION_USE:
+        await this._resultInnovationUseService.create(resultId, manager);
+        break;
       case IndicatorsEnum.KNOWLEDGE_PRODUCT:
         await this._resultKnowledgeProductService.create(resultId, manager);
         break;
@@ -551,6 +560,7 @@ export class ResultsService {
     const ipAvailables = [
       IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
       IndicatorsEnum.INNOVATION_DEV,
+      IndicatorsEnum.INNOVATION_USE,
     ];
 
     if (ipAvailables?.includes(indicator)) {
@@ -941,6 +951,101 @@ export class ResultsService {
           break;
       }
 
+      // Strategic objectives alignment (design.md §5.1). Step 1 is the
+      // load-bearing guard: an absent, null or empty list must return
+      // before the resolver or the orchestrator are ever called, which
+      // makes the destructive section-wide alignment save unreachable by
+      // construction rather than by care (R-RES-007, R-RES-004 AC.4).
+      if (!isEmpty(processedResult?.strategic_objectives)) {
+        // Same expression createResultFromAiRoar already persists onto the
+        // result row (R-RES-002 AC.4) — computed here too so the portfolio
+        // this step routes to always matches the result's own effective
+        // year, independent of how the caller populated `result.year`.
+        const effectiveYear = result.year ?? new Date().getFullYear();
+        const portfolio =
+          await this._portfolioService.findByYear(effectiveYear);
+
+        if (!portfolio) {
+          // No active portfolio covers the year → degrade the field, never
+          // fall back to a default portfolio (R-RES-006).
+          elementResultMetadata.missing_fields.push('strategic_objectives');
+          this.logger.warn(
+            `No active portfolio covers year ${effectiveYear}; strategic objectives were not saved for result ${newResult.result_id}.`,
+          );
+        } else {
+          const alignmentReport =
+            await this._resultSectionOrchestrator.saveStrategicObjectivesForPortfolio(
+              newResult.result_id,
+              portfolio.id as PortfolioIdEnum,
+              processedResult.strategic_objectives,
+            );
+
+          if (!alignmentReport.supported) {
+            // Terminating branch (R-RES-004): report.discarded is ignored
+            // entirely on this path — an unsupported portfolio never
+            // carries per-id entries alongside the field-level one.
+            elementResultMetadata.missing_fields.push('strategic_objectives');
+            this.logger.warn(
+              `Portfolio ${portfolio.id} does not support strategic objectives; not saved for result ${newResult.result_id}.`,
+            );
+          } else if (!isEmpty(alignmentReport.discarded)) {
+            elementResultMetadata.missing_fields.push(
+              ...alignmentReport.discarded.map(
+                (id) => `strategic_objectives:${id}`,
+              ),
+            );
+            this.logger.warn(
+              `Discarded strategic objective ids [${alignmentReport.discarded.join(', ')}] for result ${newResult.result_id} (portfolio ${portfolio.id}).`,
+            );
+          }
+        }
+      }
+
+      // Primary levers alignment (design.md §5.1). Same load-bearing guard
+      // as strategic objectives: an absent, null or empty list must return
+      // before the resolver or the orchestrator are ever called, which
+      // makes the destructive section-wide alignment save unreachable by
+      // construction rather than by care (R-RES-008). Placed above
+      // `customStatus` — an `APPROVED` item's snapshot copies
+      // `result_levers`, so below this point would silently omit levers
+      // from it (design.md §5.4).
+      if (!isEmpty(processedResult?.primary_levers)) {
+        // Same expression createResultFromAiRoar already persists onto the
+        // result row — computed here too so the portfolio this step routes
+        // to always matches the result's own effective year, independent
+        // of how the caller populated `result.year` (R-RES-002).
+        const effectiveYear = result.year ?? new Date().getFullYear();
+        const portfolio =
+          await this._portfolioService.findByYear(effectiveYear);
+
+        if (!portfolio) {
+          // No active portfolio covers the year → degrade the field, never
+          // fall back to a default portfolio (R-RES-006). No `if` on a
+          // portfolio id here or below — each portfolio's own handler
+          // decides what a primary lever means (DD-2).
+          elementResultMetadata.missing_fields.push('primary_levers');
+          this.logger.warn(
+            `No active portfolio covers year ${effectiveYear}; primary levers were not saved for result ${newResult.result_id}.`,
+          );
+        } else {
+          const leversReport =
+            await this._resultSectionOrchestrator.saveLeversForPortfolio(
+              newResult.result_id,
+              portfolio.id as PortfolioIdEnum,
+              processedResult.primary_levers,
+            );
+
+          if (!isEmpty(leversReport.discarded)) {
+            elementResultMetadata.missing_fields.push(
+              ...leversReport.discarded.map((id) => `primary_levers:${id}`),
+            );
+            this.logger.warn(
+              `Discarded primary lever ids [${leversReport.discarded.join(', ')}] for result ${newResult.result_id} (portfolio ${portfolio.id}).`,
+            );
+          }
+        }
+      }
+
       const finalStatus = await this.customStatus(
         result.status,
         newResult.result_id,
@@ -950,7 +1055,7 @@ export class ResultsService {
       elementResultMetadata.final_status =
         finalStatus ?? newResult?.result_status_id;
       elementResultMetadata.result_id = newResult.result_id;
-      resultMetadata.push(elementResultMetadata);
+      resultMetadata?.push(elementResultMetadata);
       return { ...newResult, error: false };
     } catch (error) {
       if (resultExists) {
@@ -975,7 +1080,7 @@ export class ResultsService {
         throw error;
       }
 
-      resultMetadata.push(elementResultMetadata);
+      resultMetadata?.push(elementResultMetadata);
 
       return {
         ...result,
@@ -1055,7 +1160,24 @@ export class ResultsService {
       resultsCreated.push(newResult);
     }
     iaMetadataReport.bulkUploadResults = iaMetadataReportResults;
-    await this._aiReportsService.create(iaMetadataReport);
+    const process = await this._aiReportsService.create(iaMetadataReport);
+
+    // R-CBU-010 / design.md §6.6 — outer containment boundary: nothing
+    // thrown, rejected or timed out from the CapDev notification stage may
+    // reach this method's return path. The bulk upload has already
+    // persisted by this point, so a notification failure here must never
+    // roll back or fail the response.
+    try {
+      await this._capdevBulkNotificationService.dispatch(
+        process.id,
+        metadata?.contacts,
+      );
+    } catch (error) {
+      this.logger.error(
+        `CapDev bulk upload notification failed for process ${process?.id}: ${error?.message ?? error}`,
+      );
+    }
+
     return {
       results_errors: resultsCreated.filter((el) => (el as any).error),
       results_created: resultsCreated.filter((el) => !(el as any).error),
@@ -1155,6 +1277,9 @@ export class ResultsService {
 
       tmpNewData.result = newResult;
     }
+
+    tmpNewData.strategic_objectives = result?.strategic_objectives;
+    tmpNewData.primary_levers = result?.primary_levers;
 
     if (!isEmpty(result?.sdg_targets)) {
       const existingSdgs = await this.dataSource

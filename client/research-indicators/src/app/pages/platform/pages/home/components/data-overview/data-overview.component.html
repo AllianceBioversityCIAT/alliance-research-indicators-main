@@ -39,7 +39,7 @@
       @if (showIndicatorList()) {
       <div class="indicators">
         @for (indicator of indicatorList(); track indicator.indicator_id) {
-        <a class="indicator" [routerLink]="['/results-center']" [queryParams]="{ indicatorTab: indicator.indicator_id }"
+        <a class="indicator" [routerLink]="['/results-center']" [queryParams]="indicatorRowQueryParams(indicator)"
           [attr.data-index]="$index">
           <div class="indicator-head">
             <i class="indicator-icon icon-color-{{ indicator.icon_src }} pi {{ indicator.icon_src }}"></i>
