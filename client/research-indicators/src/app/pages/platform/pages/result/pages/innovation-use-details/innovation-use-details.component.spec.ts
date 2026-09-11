@@ -471,6 +471,20 @@ describe('InnovationUseDetailsComponent', () => {
       expect(unitLabel!.querySelector('span')?.textContent?.trim()).toBe('*');
     });
 
+    // @akili-spec quick/innovation-use-bottom-clearance: the last card sat flush against the fixed
+    // Back/Next/Save bar. `.app-page-wrapper`'s own `margin-bottom: 70px` is smaller than that bar's
+    // measured 99px, so the reserve plus the last card's `rs-mb-[25]` all landed underneath it. Nothing in
+    // the suite covered the page wrapper's spacing before this, so the class could have been dropped in
+    // silence by any later edit to this template — which is exactly what happened to a sibling spacing fix
+    // earlier in this log (`rs-mt-[8]`, 2026-09-08).
+    // SCOPE (KZ-017): class presence only. jsdom computes no layout, so this asserts the override is
+    // declared, never that ~26px of gap renders — that is human-verified.
+    it('reserves bottom clearance for the fixed nav bar on the page wrapper', () => {
+      const wrapper = fixture.debugElement.query(By.css('.app-page-wrapper'));
+      expect(wrapper).toBeTruthy();
+      expect((wrapper.nativeElement as HTMLElement).className).toContain('!mb-[100px]');
+    });
+
     // @akili-spec quick/innovation-measures-unit-first: Unit renders BEFORE Number on the measure card.
     // Asserted on DOM ORDER, not on a CSS class or an `order` property — DOM order is what tab order and
     // screen-reader order follow, and it is the only one of the three jsdom can actually observe.
