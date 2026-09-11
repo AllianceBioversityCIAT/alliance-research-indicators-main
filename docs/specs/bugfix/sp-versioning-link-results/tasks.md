@@ -52,7 +52,7 @@ npm run test:fixtures
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` — PASS, one Implementer attempt, zero rework; two parallel lens Reviewers both PASS |
 | Size | S (logic) / L (bytes — DD-4) |
 | Depends on | T-01 |
 | Requirements | R-SPL-001, R-SPL-002, NFR-SPL-001, NFR-SPL-002 |
