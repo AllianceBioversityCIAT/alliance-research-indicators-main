@@ -85,11 +85,36 @@ Recorded as **OQ-UI-1** so the backend spec can absorb them when the UI is sched
 - Edit pre-fills; revoke with confirmation; history read-only, newest first.
 - Built entirely with STAR design tokens/components; no hex; responsive; loading/empty/error states present.
 
+## Alignment update — backend shipped, decisions locked (2026-09-11)
+
+> The backend spec is **DONE and archived** (`archive/2026-09-11-changes--my-pi-delegates`). This supersedes the outdated "Backend Dependencies" / additive-assign framing above.
+
+**Backend endpoints — status (what the UI consumes):**
+| Need | Endpoint | Status |
+| --- | --- | --- |
+| By-project list (project details + its delegates w/ name+email) | `GET /api/pi-delegates?projectId` | ✅ **exists (enriched)** — returns `{project_code, project_name, is_pool_funding_contributor, status, start_date, end_date, delegates:[{delegate_user_id, name, email}]}` |
+| By-person list (person + their projects) | `GET /api/pi-delegates/by-delegate?delegate_user_id` | ✅ **exists (enriched)** — `{delegate_user_id, name, email, projects:[{project_code, project_name}]}` |
+| Assign / edit (create + sync) | `POST /api/pi-delegates` | ✅ **exists** — `{assignments:[{project_id, delegates:[{delegate_user_id} | {email,first_name,last_name}]}]}` |
+| Revoke (the row "X") | `DELETE /api/pi-delegates` | ✅ **exists** — `{project_ids, delegate_user_ids}` OR `{pi_delegate_ids}` |
+| **People picker source** (center users, ex-self) | — | ❌ **user provides later** → stub/placeholder in the UI for now |
+| **Projects picker source** (my manageable projects) | — | ❌ **user provides later** → stub/placeholder for now |
+
+**Assign = SYNC per project (confirmed, DD-M in backend):** the `POST` sends the **full desired delegate list per project**; anyone active but NOT in the list is **revoked** (`delegates:[]` = revoke all). Same in the by-person direction (a person's projects sync). **UX consequence:** the assign modal MUST pre-load the project's (or person's) current items so "save" does not accidentally revoke — and the confirmation dialog must name who/what will be **added AND removed**.
+
+**Locked UI decisions (Product, 2026-09-11):**
+- **Nav:** add a **"Principal Investigator"** section to the left sidebar → sub-item **"My PI Delegates"** (icon). Mimic the existing `results`/"resource" sidebar+page pattern; do NOT rename existing items.
+- **Modal:** reuse the existing **`modals.component`** — do NOT build a modal from scratch; only author the **inner content** (two `app-multiselect`s: **people** × **projects**, both with search/filter).
+- **Selectors:** use the existing **`app-multiselect`** (already styled) for both people and projects; **search must filter by person or project**.
+- **Table row action:** an **"X"** per row removes that delegate/project directly → `DELETE` endpoint.
+- **Design fidelity:** the mockup (`mockup/My-PI-Delegates.html` + the Claude-design link) is a **base**, NOT fully STAR-aligned — adapt to STAR tokens/typography/components (`.abc-*`/`.atc-*`/`.rs-*`/`.fs-*`, `var(--ac-*)`, PrimeNG Aura); no hex.
+
+**Scope NOW:** create the full **design + tasks** for the **Assign PI Delegates UI** — the two tabs (By-project default, By-person), the enriched tables with per-row "X" delete + search, and the assign/edit modal (reusing `modals.component`, inner content = the two multiselects, sync-aware confirm). The two picker-fill endpoints stay stubbed until the user wires them.
+
 ## Next Step
 ```text
 /akili-specify docs/specs/changes/my-pi-delegates-ui
 ```
-(after the backend spec ships and OQ-UI-1 endpoints are agreed). Requirements for this screen are captured in `requirements.md`; design/tasks follow when scheduled.
+Backend is shipped; OQ-UI-1 is resolved above (2 GETs + POST + DELETE exist; the 2 picker endpoints are user-provided-later stubs). Proceeding to design + tasks.
 
 ---
 AKILI-SPECS methodology by **Juan Carlos Cadavid** — [jcadavid.com](https://jcadavid.com). MIT License.

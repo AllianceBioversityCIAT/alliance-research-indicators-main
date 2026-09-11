@@ -81,8 +81,18 @@ The **My PI Delegates** screen inside STAR's **PI** area lets a PI (or a delegat
 | Duplicate / self / cross-project selection | Component specs on panel logic (R-UI-005) — but server is the source of truth |
 | State drift across views | Single-cache derivation test (R-UI-010) |
 
-## 5. Backend dependencies (OQ-UI-1)
-The screen requires backend read endpoints not in the backend spec's core: **list my PI projects + delegates**, **eligible-users**, **history list**. These must be added to the backend spec before this UI is built.
+## 5. Backend dependencies — RESOLVED (2026-09-11; backend shipped)
+
+The backend is done + archived. Endpoints the UI consumes:
+- ✅ `GET /api/pi-delegates?projectId` (enriched: project code/name/pool-funding/status/dates + `delegates:[{delegate_user_id,name,email}]`) — the By-project tab source.
+- ✅ `GET /api/pi-delegates/by-delegate?delegate_user_id` (enriched: person + `projects:[{project_code,project_name}]`) — the By-person tab source.
+- ✅ `POST /api/pi-delegates` `{assignments:[{project_id, delegates}]}` — assign/edit (**SYNC per project**).
+- ✅ `DELETE /api/pi-delegates` (`{project_ids,delegate_user_ids}` or `{pi_delegate_ids}`) — the row "X".
+- ❌ **People picker** + ❌ **Projects picker** endpoints — **user provides later**; UI stubs them for now.
+
+> **⚠ R-UI-005 AC.2 SUPERSEDED — assign is SYNC, not additive.** `POST` sends the **full desired delegate list per project**; anyone active but not in the sent list is **REVOKED** (`delegates:[]` = revoke all), and symmetrically in the by-person direction. The assign modal MUST pre-load current items so "save" never revokes by accident, and the confirmation must name both **added** and **removed**. (History-list requirement R-UI-009 has **no read endpoint yet** → defer the history panel to a later increment; not in the current scope.)
+
+**Scope now:** the two tabs (By-project default + By-person) with enriched tables + per-row "X" delete + search-by-person-or-project, and the assign/edit modal reusing `modals.component` with two `app-multiselect`s (people × projects, sync-aware confirm). Nav: a "Principal Investigator" section → "My PI Delegates" sub-item (icon), mimicking the `results`/"resource" pattern.
 
 ## 6. Open questions
 | # | Question | Status |
