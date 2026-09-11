@@ -4905,6 +4905,66 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(clearBtn).toBeNull();
     });
   });
+
+  describe('T-04 — See more / See less (R-OICR-004)', () => {
+    let innoDevService: GetInnoDevOutputService;
+    const OPTION = {
+      result_id: 42,
+      result_official_code: '42',
+      title: 'Title',
+      platform_code: 'STAR',
+      result_status: { result_status_id: 3, name: 'Draft', config: {} }
+    };
+    const LONG_DESCRIPTION = 'A'.repeat(400);
+
+    beforeEach(async () => {
+      innoDevService = TestBed.inject(GetInnoDevOutputService);
+      innoDevService.loading.set(false);
+      innoDevService.list.set([OPTION as any]);
+      await component.getData();
+      apiService.GET_InnovationDevCard.mockResolvedValue({ successfulRequest: true, data: { description: LONG_DESCRIPTION } });
+      await component.onInnovationDevSelected(OPTION.result_id);
+      fixture.detectChanges();
+    });
+
+    it('c1/c4 — A 400-char description renders clamped with See more affordance, and the full string is in the DOM', () => {
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(true);
+      expect(descEl.textContent).toContain(LONG_DESCRIPTION);
+      
+      const button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]')).nativeElement as HTMLButtonElement;
+      expect(button.textContent?.trim()).toBe('See more');
+    });
+
+    it('c2/c4 — Activating See more expands the text (line-clamp-3 absent) and shows See less, full text still in DOM', () => {
+      let button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(false);
+      expect(descEl.textContent).toContain(LONG_DESCRIPTION);
+
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      expect(button.nativeElement.textContent?.trim()).toBe('See less');
+    });
+
+    it('c3 — Activating See less re-collapses the text', () => {
+      let button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+      
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      button.triggerEventHandler('click', null);
+      fixture.detectChanges();
+
+      const descEl = fixture.debugElement.query(By.css('[data-testid="innovation-dev-description"]')).nativeElement as HTMLElement;
+      expect(descEl.classList.contains('line-clamp-3')).toBe(true);
+      
+      button = fixture.debugElement.query(By.css('[data-testid="toggle-description"]'));
+      expect(button.nativeElement.textContent?.trim()).toBe('See more');
+    });
+  });
 });
 
 // ===================================================================================================

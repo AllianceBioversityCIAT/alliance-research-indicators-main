@@ -216,9 +216,16 @@
           </div>
           
           @if (devResult.description) {
-            <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] line-clamp-3 m-0">
+            <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] m-0" [class.line-clamp-3]="!descriptionExpanded()">
               {{ devResult.description }}
             </p>
+            <button
+              type="button"
+              data-testid="toggle-description"
+              (click)="descriptionExpanded.set(!descriptionExpanded())"
+              class="self-start border-none bg-transparent cursor-pointer p-0 text-[var(--ac-light-blue-400)] !font-['Space_Grotesk'] font-[500] text-[12px] underline mt-1">
+              {{ descriptionExpanded() ? 'See less' : 'See more' }}
+            </button>
           }
 
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ac-grey-700)] !font-['Space_Grotesk']">

@@ -217,6 +217,8 @@ export default class InnovationUseDetailsComponent {
   readonly formatInnovationDevReadiness = formatInnovationDevReadiness;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
+  
+  descriptionExpanded = signal(false);
 
   enrichmentSuccessForId = signal<number | null>(null);
 
