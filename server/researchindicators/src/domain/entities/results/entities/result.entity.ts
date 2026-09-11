@@ -29,6 +29,7 @@ import { ResultEvidence } from '../../result-evidences/entities/result-evidence.
 import { TempResultAi } from './temp-result-ai.entity';
 import { ResultCapacitySharing } from '../../result-capacity-sharing/entities/result-capacity-sharing.entity';
 import { ResultInnovationDev } from '../../result-innovation-dev/entities/result-innovation-dev.entity';
+import { ResultInnovationUse } from '../../result-innovation-use/entities/result-innovation-use.entity';
 import { ResultActor } from '../../result-actors/entities/result-actor.entity';
 import { ResultInstitutionType } from '../../result-institution-types/entities/result-institution-type.entity';
 import { ResultSdg } from '../../result-sdgs/entities/result-sdg.entity';
@@ -318,6 +319,12 @@ export class Result extends AuditableEntity {
     (resultInnovationDev) => resultInnovationDev.result,
   )
   result_innovation_dev!: ResultInnovationDev[];
+
+  @OneToMany(
+    () => ResultInnovationUse,
+    (resultInnovationUse) => resultInnovationUse.result,
+  )
+  result_innovation_use!: ResultInnovationUse[];
 
   @OneToMany(() => ResultActor, (resultActor) => resultActor.result)
   result_actors!: ResultActor[];

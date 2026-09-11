@@ -57,6 +57,9 @@ describe('GreenCheckRepository', () => {
     expect(repository.innovationDevValidation('r.x')).toContain(
       'innovation_dev_validation',
     );
+    expect(repository.innovationUseValidation('r.x')).toContain(
+      'innovation_use_validation',
+    );
     expect(repository.oicrValidation('r.x')).toContain('oicr_validation');
     expect(repository.link_resultValidation('r.x')).toContain(
       'link_result_validation',
@@ -118,6 +121,72 @@ describe('GreenCheckRepository', () => {
     const sql = queryMock.mock.calls[0][0] as string;
     expect(sql).toContain('innovation_dev_validation');
     expect(sql).toContain('intellectual_property_validation');
+  });
+
+  it('calculateGreenChecks adds innovation_use and IP for INNOVATION_USE', async () => {
+    findOneMock.mockResolvedValue({
+      indicator_id: IndicatorsEnum.INNOVATION_USE,
+    });
+    queryMock.mockResolvedValueOnce([{}]);
+    await repository.calculateGreenChecks(3);
+    const sql = queryMock.mock.calls[0][0] as string;
+    expect(sql).toContain('innovation_use_validation');
+    expect(sql).toContain('intellectual_property_validation');
+  });
+
+  describe('calculateGreenChecks key-set assembly per indicator (T-11)', () => {
+    // Asserts the ASSEMBLED SQL key set only (which "as <alias>" fragments
+    // get concatenated into the query for each indicator). This does NOT and
+    // cannot assert what innovation_use_validation(...) actually returns as
+    // a boolean — that behavioral claim belongs to T-12's fixture harness
+    // against a real database, per this task's disqualifier clause.
+    const commonKeys = [
+      'general_information',
+      'alignment',
+      'geo_location',
+      'partners',
+      'evidences',
+      'pool_funding_alignment',
+    ];
+
+    function extractAliasKeys(sql: string): string[] {
+      return Array.from(sql.matchAll(/\bas\s+(\w+)/gi)).map((m) => m[1]);
+    }
+
+    const cases: Array<[string, IndicatorsEnum, string[]]> = [
+      [
+        'CAPACITY_SHARING_FOR_DEVELOPMENT',
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        [...commonKeys, 'cap_sharing', 'ip_rights'],
+      ],
+      [
+        'INNOVATION_DEV',
+        IndicatorsEnum.INNOVATION_DEV,
+        [...commonKeys, 'innovation_dev', 'ip_rights'],
+      ],
+      [
+        'POLICY_CHANGE',
+        IndicatorsEnum.POLICY_CHANGE,
+        [...commonKeys, 'policy_change'],
+      ],
+      ['OICR', IndicatorsEnum.OICR, [...commonKeys, 'oicr', 'link_result']],
+      [
+        'INNOVATION_USE',
+        IndicatorsEnum.INNOVATION_USE,
+        [...commonKeys, 'innovation_use', 'ip_rights'],
+      ],
+    ];
+
+    it.each(cases)(
+      'assembles the exact key set for %s',
+      async (_label, indicator, expectedKeys) => {
+        findOneMock.mockResolvedValue({ indicator_id: indicator });
+        queryMock.mockResolvedValueOnce([{}]);
+        await repository.calculateGreenChecks(1);
+        const sql = queryMock.mock.calls[0][0] as string;
+        expect(extractAliasKeys(sql).sort()).toEqual([...expectedKeys].sort());
+      },
+    );
   });
 
   it('calculateGreenChecks returns null when query empty', async () => {

@@ -1,0 +1,433 @@
+<!-- @akili-spec docs/specs/innovation-use/details-page (T-07 — innovation use details page shell) -->
+<!-- @akili-spec quick/innovation-use-bottom-clearance: the last card sat flush against the fixed
+     Back/Next/Save bar. Its own `rs-mb-[25]` was never missing — it matches all four sibling cards — but
+     that margin lands UNDER the bar: `.app-page-wrapper` reserves `margin-bottom: 70px` (styles.scss) while
+     `.result-nav-buttons-fixed` measures 99px, so the bar covers the 70px of reserve plus 29px more, eating
+     the card's 25px whole. Raising the reserve to 100px leaves 100 + 25 - 99 = ~26px actually visible,
+     matching the gap between cards. `!` because it overrides `.app-page-wrapper`'s own rule at equal
+     specificity. Scoped to this page's own wrapper — the global rule and the other 12 wizard pages are
+     untouched. -->
+<div class="app-page-wrapper !mb-[100px]">
+  <app-form-header />
+
+  @if (loadFailed()) {
+    <div class="flex items-center rs-gap-[8] rs-p-[20] rs-mb-[25] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+      <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
+      <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Use section could not be loaded. Please try again.</span>
+    </div>
+  } @else {
+    <!-- INNOVATION USE DETAILS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <h2 class="section-title">INNOVATION USE DETAILS</h2>
+
+      <span class="label">How would you assess the current use level of the innovation?<span class="text-red-500">*</span></span>
+
+      <!-- GUIDANCE CALLOUT (R-IUP-020, Amendment 01 / T-14). Renders unconditionally — not gated on
+           showJustification() or isEditableStatus() (AC.5). Mirrors the ACTORS callout's bg-/border-l-/
+           rs-p-* shape (design.md §5.8).
+
+           SHAPE — quick/innovation-use-banner-leading-and-border (2026-09-08) aligns all four of
+           this feature's banners to the innovation-details readiness banner that reviewers cited:
+           `border-l-[5px]` (was 4px) and `leading-[17px]` on the body text. That reference banner
+           spells raw hex for background, border and text because it predates the token rule; the
+           equivalent TOKENS are used here instead, and they already matched — only the border width
+           and the line-height differed. `font-['Barlow']` there is a no-op for us: styles.scss sets
+           Barlow globally. `my-[15px]` on the reference's text was NOT copied — reviewers named
+           only leading and border, and our banners space themselves with rs-p-* padding.
+
+           BODY COLOUR — quick/innovation-use-banner-body-grey-700 (2026-09-08), user-requested for
+           EVERY information banner in this feature: non-link banner text is --ac-grey-700, links
+           keep --ac-light-blue-400. This SUPERSEDES DD-17's --ac-grey-800 body choice and is a
+           DELIBERATE, MEASURED WCAG exception — --ac-grey-700 is 3.91:1 on --ac-grey-100 (3.51:1 on
+           the organization card's --ac-grey-200), under the 4.5:1 that R-IUP-020 AC.6 / R-IUW-002 /
+           NFR-IUP-001 require; --ac-grey-800 measured 7.44:1 and 6.68:1. Ratios are asserted as
+           numbers in the spec so the deviation stays recorded, not silent. Two surfaces on this
+           page are NOT banners and deliberately keep --ac-grey-800 at AA: the `loadFailed` ERROR
+           banner and the definitions-link paragraph (which sits on the white card).
+
+           rs-mt-[16]: `span.label` above is inline and carries no margin of its own (custom-fields
+           .scss sets only font + color on `.label`), so the callout sat flush against the question.
+           The gap is opened here, at the call site, rather than on the shared `.label` rule. It
+           was first opened at 8px and raised to 16px so the callout's top and bottom margins MATCH
+           (`rs-mt-[16] rs-mb-[16]`) — the asymmetry was visible in the box model. -->
+
+      <div
+        data-testid="use-level-guidance"
+        class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mt-[16] rs-mb-[16]">
+        <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
+        <ul class="list-disc rs-pl-[20] flex flex-col rs-gap-[4]">
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
+            In case the innovation use level differs across countries or regions, we advise to assign the highest current innovation use level that
+            can be supported by the evidence provided.
+          </li>
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
+            Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be supported by evidence
+            documentation.
+          </li>
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">The innovation use level will be quality assessed.</li>
+          <!-- The link keeps --ac-light-blue-400 (6.35:1, AA). Only the NON-link banner text moved
+               to --ac-grey-700 — see the callout header comment. -->
+          <li class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
+            <span class="font-semibold">YOUR USE LEVEL IN JUST 3 CLICKS:</span>{{ ' '
+            }}<a [href]="calculatorUrl" target="_blank" rel="noopener noreferrer" class="text-[var(--ac-light-blue-400)] underline"
+              >TRY THE NEW INNOVATION USE CALCULATOR</a
+            >
+          </li>
+        </ul>
+      </div>
+
+      <app-innovation-use-level-stepper
+        [levels]="levelsService.list()"
+        [selectedLevelId]="body().innovation_use_level_id"
+        [disabled]="!submission.isEditableStatus()"
+        (levelSelected)="onLevelSelected($event)" />
+
+      <!-- DEFINITIONS LINK (R-IUP-020, Amendment 01 / T-14) — beneath the stepper's own definition
+           callout (`.description`, T-04). Renders unconditionally, same as the guidance callout above. -->
+      <p data-testid="use-level-definitions-link" class="fs-[14] text-[var(--ac-grey-800)] rs-mt-[12] rs-mb-[16]">
+        <a [href]="definitionsUrl" target="_blank" rel="noopener noreferrer" class="text-[var(--ac-light-blue-400)] underline">Click here</a> to see
+        the definition of all use levels
+      </p>
+
+      <!-- EVIDENCE CALLOUT (R-IUP-021, Amendment 01 / T-14) — gated on showJustification() since
+           quick/innovation-use-evidence-callout-gating (2026-09-08), which REVERSES R-IUP-021 AC.5
+           and its "not gated on the justification's condition" scenario by user ruling. Rationale
+           for the reversal: P1 asks the reporter to "provide a brief explanation justifying the
+           selected Innovation Use Level", and below level 6 no such field exists on the page
+           (R-IUP-006), so the callout was asking for something the form does not offer. It is a
+           SEPARATE @if from the textarea's block below, not a merge of the two — the callout must
+           stay above the textarea in DOM order, and showJustification() itself is untouched.
+           "Click here to go there" is a <button>, never a document href (R-IUP-021 scenario) — it
+           calls goToEvidence(), which issues a Router.navigate carrying `version`/`from` (DD-16). -->
+      @if (showJustification()) {
+        <div
+          data-testid="evidence-callout"
+          class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[16] rs-mb-[16]">
+          <i class="shrink-0 text-[var(--ac-light-blue-500)] !text-[18px] pi pi-exclamation-circle"></i>
+          <div class="flex flex-col">
+            <p class="fs-[14] leading-[17px] text-[var(--ac-grey-700)] rs-mb-[12]">
+              Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the necessary
+              evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo; section of the form (<button
+                type="button"
+                class="text-[var(--ac-light-blue-400)] underline cursor-pointer"
+                (click)="goToEvidence()">
+                Click here to go there</button
+              >)
+            </p>
+            <p class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">
+              Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data paper, newsletter, etc.
+              It may be project reports, scientific publications, book chapters, communication materials that provide evidence of the current
+              development/ maturity stage of the innovation.
+            </p>
+          </div>
+        </div>
+      }
+
+      @if (showJustification()) {
+        <div class="rs-mt-[20]">
+          <app-textarea
+            [signal]="body"
+            [optionValue]="'innovation_use_level_explanation'"
+            [label]="'Justification'"
+            [isRequired]="true"
+            [disabled]="!submission.isEditableStatus()"
+            [rows]="4"
+            placeholder="Explain the use of this innovation at this level"></app-textarea>
+
+          @if (justificationWhitespaceOnly()) {
+            <!-- T-02 (bugfix/innovation-use-draft-save) / R-IUD-003: `app-textarea` itself is
+                 untouched (DD-2) and its own required message keeps rendering, unsuppressed, for
+                 a truly empty value — `isInvalid()` there checks untrimmed `length === 0`, so it
+                 already fires for blank/`''` and stays silent for whitespace. This block covers
+                 exactly the gap that leaves open: whitespace-only, where the raw value is
+                 non-empty but trims to nothing. Gating on that disjoint subset (rather than on
+                 `justificationMissing()` directly) keeps the two messages mutually exclusive by
+                 construction — never both, never neither — so R-IUD-003's count stays 1/1/0
+                 without editing or suppressing the shared component from the call site. -->
+            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-warning-1)]">
+              <i class="material-symbols-rounded !text-[14px]">warning</i>
+              <span class="fs-[14]">This field is required</span>
+            </div>
+          }
+
+          @if (justificationError()) {
+            <div class="flex items-center rs-gap-[4] rs-mt-[4] text-[var(--ac-red-1)]">
+              <i class="material-symbols-rounded !text-[14px]">warning</i>
+              <span class="fs-[14]">{{ justificationError() }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- RELATED INNOVATION DEVELOPMENT -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <h2 class="section-title">
+        RELATED INNOVATION DEVELOPMENT
+        @if (innoDevSelect.isRequired) {
+          <span class="text-red-500">*</span>
+        }
+      </h2>
+
+      @if (innoDevOutputService.error()) {
+        <div class="flex items-center rs-gap-[8] rs-p-[12] rs-mb-[16] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+          <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
+          <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Development outputs could not be loaded. Please try again.</span>
+        </div>
+      }
+
+      <app-select
+        #innoDevSelect
+        serviceName="innoDevOutput"
+        [optionValue]="{ body: 'innovation_dev_result_id', option: 'result_id' }"
+        optionLabel="title"
+        [customFilterBy]="'result_official_code,title,platform_code'"
+        placeholder="Select the innovation development"
+        [isRequired]="true"
+        [hideSelected]="true"
+        [disabled]="isInnovationDevDisabled()"
+        [signal]="body"
+        [pTooltip]="innoDevTooltip()"
+        tooltipPosition="top"
+        (selectEvent)="onInnovationDevSelected($event)">
+        <ng-template #selectedItemTemplate let-result>
+          <span class="text-[var(--ac-grey-800)]">
+            {{ formatInnovationDevLabel(result) }}
+          </span>
+        </ng-template>
+
+        <ng-template #item let-result>
+          <span class="text-[var(--ac-grey-800)]">
+            {{ formatInnovationDevLabel(result) }}
+          </span>
+        </ng-template>
+      </app-select>
+
+      @if (body().linked_innovation_dev; as devResult) {
+        <div class="flex flex-col gap-2 rs-mt-[16] rs-p-[16] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] rounded-[13px]">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-chart-pie !text-[12px] text-[var(--ac-orange-1)]"></i>
+              <span class="text-[11px] text-[var(--ac-grey-600)] font-[400] !font-[Space_Grotesk]">INNOVATION DEVELOPMENT</span>
+            </div>
+            <div class="flex w-[28px] justify-end items-center">
+              @if (submission.isEditableStatus()) {
+                <button type="button" data-testid="clear-innovation-dev" aria-label="Clear the linked innovation development" class="cursor-pointer flex items-center justify-center border-none bg-transparent" (click)="clearInnovationDev()">
+                  <i class="pi pi-times-circle !text-[18px] text-[var(--ac-red-1)]"></i>
+                </button>
+              }
+            </div>
+          </div>
+          
+          <div class="flex">
+            <p class="text-[var(--ac-grey-800)] font-[500] flex leading-4 m-0">{{ formatInnovationDevLabel(devResult) }}</p>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ac-grey-700)] !font-['Space_Grotesk']">
+            @if (devResult.result_status?.result_status_id && devResult.result_status?.name) {
+              <app-custom-tag [statusId]="devResult.result_status!.result_status_id ?? ''"
+                [statusName]="devResult.result_status!.name ?? ''"
+                [statusColor]="devResult.result_status?.config?.color?.text ?? ''"
+                [statusBackground]="devResult.result_status?.config?.color?.background ?? ''"
+                [statusBorder]="devResult.result_status?.config?.color?.border ?? ''" [icon]="true"
+                [iconName]="devResult.result_status?.config?.icon?.name ?? ''"
+                [iconColor]="devResult.result_status?.config?.icon?.color ?? ''"
+                [tooltip]="devResult.result_status?.description ?? ''" class="pr-1.5"
+                [maxWidth]="'150px'"></app-custom-tag>
+            }
+            
+            @if (formatInnovationDevReadiness(devResult.innovation_readiness)) {
+              <span class="flex items-center">
+                Innovation Dev level <i class="pi pi-arrow-right !text-[8px] text-[var(--ac-grey-700)] px-1"></i>
+                <span class="text-[var(--ac-primary-blue-300)]">{{ formatInnovationDevReadiness(devResult.innovation_readiness) }}</span>
+              </span>
+            }
+
+            @if (devResult.year) {
+              @if (formatInnovationDevReadiness(devResult.innovation_readiness)) {
+                <span class="text-[var(--ac-grey-400)]">|</span>
+              }
+              <span class="flex items-center">
+                Reporting year <i class="pi pi-arrow-right !text-[8px] text-[var(--ac-grey-700)] px-1"></i>
+                <span class="text-[var(--ac-primary-blue-300)]">{{ devResult.year }}</span>
+              </span>
+            }
+
+            @if (devResult.geo_scope) {
+              @if (formatInnovationDevReadiness(devResult.innovation_readiness) || devResult.year) {
+                <span class="text-[var(--ac-grey-400)]">|</span>
+              }
+              <span class="flex items-center">
+                Geographic scope <i class="pi pi-arrow-right !text-[8px] text-[var(--ac-grey-700)] px-1"></i>
+                <span class="text-[var(--ac-primary-blue-300)]">{{ devResult.geo_scope.name }}</span>
+              </span>
+            }
+          </div>
+
+          @if (devResult.description) {
+            <p data-testid="innovation-dev-description" class="text-[var(--ac-grey-800)] m-0" [class.line-clamp-3]="!descriptionExpanded()">
+              {{ devResult.description }}
+            </p>
+            <button
+              type="button"
+              data-testid="toggle-description"
+              (click)="descriptionExpanded.set(!descriptionExpanded())"
+              class="self-start border-none bg-transparent cursor-pointer p-0 text-[var(--ac-light-blue-400)] !font-['Space_Grotesk'] font-[500] text-[12px] underline mt-1">
+              {{ descriptionExpanded() ? 'See less' : 'See more' }}
+            </button>
+          }
+
+          <div class="flex justify-end">
+                <a
+                  [href]="formatInnovationDevUrl(devResult)"
+                  target="_blank"
+                  rel="noopener"
+                  class="innovation-detail-link relative flex shrink-0 cursor-pointer items-center justify-center rounded-[13px] border-2 border-[var(--ac-light-blue-400)] bg-[var(--ac-white-1)] font-medium text-[var(--ac-light-blue-400)] no-underline transition-colors duration-200 fs-[15] hover:bg-[var(--ac-light-blue-400)] hover:text-[var(--ac-white-1)] rs-px-[16] rs-py-[8]">
+                  View innovation detail ↗
+                  <!-- @akili-spec quick/innovation-use-sr-only-containing-block: `relative` on this anchor is
+                       LOAD-BEARING, not decorative. `.sr-only` is `position: absolute`; with no positioned
+                       ancestor its containing block resolved to `.grid-container` (`position: relative`), which
+                       let it escape `#content`'s `overflow-y: auto` and stretch <html> — the double scroll. -->
+                  <span class="sr-only">(opens in a new tab)</span>
+                </a>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ACTORS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <h2 class="section-title">ACTORS</h2>
+
+      <div class="flex items-center rs-gap-[8] bg-[var(--ac-grey-100)] border-l-[5px] border-l-[var(--ac-light-blue-500)] rs-p-[12] rs-mb-[16]">
+        <i class="shrink-0 material-symbols-rounded !text-[18px] text-[var(--ac-light-blue-500)]">info</i>
+        <div class="flex flex-col rs-gap-[4]">
+          <span class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]">List every actor group using this innovation.</span>
+          <!-- Youth guidance: the sex/age disaggregation fields below split each actor group into
+               youth / non-youth, so the callout states the age boundary the counts assume and links
+               to the UN source that defines it. -->
+          <span class="fs-[14] leading-[17px] text-[var(--ac-grey-700)]"
+            >For the youth counts, the United Nations defines youth as people between 15 and 24 years old.{{ ' '
+            }}<a [href]="youthDefinitionUrl" target="_blank" rel="noopener noreferrer" class="text-[var(--ac-light-blue-400)] underline"
+              >See the UN definition of youth</a
+            >.</span
+          >
+        </div>
+      </div>
+
+      <!-- DD-7 (reversion) / R-IUR-011 AC.1: the actors-required message is removed entirely — it
+           must render in no state, per R-IUR-001 S1's BUT clause (no amber message on an
+           untouched empty section) and R-IUR-011 (actors are no longer required). -->
+      <div class="flex flex-col rs-gap-[16]">
+        @for (actor of body().actors; track $index) {
+          <app-innovation-use-actor-item
+            [actor]="actor"
+            [actorNumber]="$index + 1"
+            [disabled]="!submission.isEditableStatus()"
+            [duplicateType]="duplicateActorTypeIndexes().has($index)"
+            [usedActorTypeIds]="usedActorTypeIdsExcluding($index)"
+            (update)="onActorUpdate($index, $event)"
+            (remove)="removeActor($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addActor()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15] rounded-[7px]">
+            Add other actor
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- ORGANIZATIONS -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <h2 class="section-title">ORGANIZATIONS</h2>
+
+      <div class="flex flex-col rs-gap-[16]">
+        @for (organization of body().organizations; track $index) {
+          <app-innovation-use-organization-item
+            [organization]="organization"
+            [organizationNumber]="$index + 1"
+            [disabled]="!submission.isEditableStatus()"
+            (update)="onOrganizationUpdate($index, $event)"
+            (remove)="removeOrganization($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addOrganization()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15] rounded-[7px]">
+            Add other organization
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- OTHER QUANTITATIVE MEASURES -->
+    <div class="rounded-[13px] rs-p-[30] rs-mb-[25] border border-[var(--ac-grey-200)] bg-[var(--ac-white-1)]">
+      <h2 class="section-title">OTHER QUANTITATIVE MEASURES</h2>
+
+      <div class="flex flex-col rs-gap-[16]">
+        @for (quantification of quantificationsView(); track $index) {
+          <!-- @akili-spec docs/specs/changes/measure-number-signed-decimal (T-11 — DD-5: scale 4, the
+               derived symmetric bound, and copy without "positive". No [step] binding — DD-6. -->
+          <app-quantification-item
+            [quantification]="quantification"
+            [quantNumber]="$index + 1"
+            [headerLabel]="'MEASURE'"
+            [disabled]="!submission.isEditableStatus()"
+            [numberRequired]="true"
+            [unitRequired]="true"
+            [commentsRequired]="false"
+            [showComments]="false"
+            [unitFirst]="true"
+            [numberRequiredMode]="'nonzero'"
+            [unitRequiredMode]="'filled'"
+            [min]="quantificationNumberMin"
+            [max]="quantificationNumberMax"
+            [maxFractionDigits]="quantificationNumberScale"
+            [placeholder]="quantificationNumberPlaceholder"
+            (update)="onQuantificationUpdate($index, $event)"
+            (delete)="removeQuantification($index)" />
+        }
+      </div>
+
+      @if (submission.isEditableStatus()) {
+        <div class="rs-mt-[16]">
+          <button
+            type="button"
+            (click)="addQuantification()"
+            class="flex cursor-pointer w-full items-center justify-center rs-gap-[8] border-2 font-medium border-[var(--ac-light-blue-300)] text-[var(--ac-light-blue-300)] rs-p-[12] fs-[15] rounded-[7px]">
+            Add other measure
+            <i class="pi pi-plus !text-[12px]"></i>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  @if (unaddressedSaveErrors().length > 0) {
+    <!-- REWORK (Issue 2): array-row save errors (actor/organization/quantification) carry no
+         server-assigned index this page can bind an inline message to, so they render here
+         rather than being dropped. The justification textarea handles its own field above. -->
+    <div class="flex flex-col rs-gap-[4] rs-mb-[16] rs-p-[12] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+      @for (message of unaddressedSaveErrors(); track message) {
+        <div class="flex items-center rs-gap-[4] text-[var(--ac-red-1)]">
+          <i class="material-symbols-rounded !text-[14px]">warning</i>
+          <span class="fs-[14]">{{ message }}</span>
+        </div>
+      }
+    </div>
+  }
+
+  <app-navigation-buttons [showSave]="true" (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
+</div>

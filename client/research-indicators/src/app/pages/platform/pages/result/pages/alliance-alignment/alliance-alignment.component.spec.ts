@@ -585,6 +585,27 @@ describe('AllianceAlignmentComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'next-section'], { queryParams: { version: 'v1' }, replaceUrl: true });
   });
 
+  // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+  // R-IUP-003 AC.3 / c6's call-site half: delegates to the REAL CacheService's
+  // `currentResultIndicatorSectionPath` (not a hand-rolled stub) so that deleting
+  // `case 6` from cache.service.ts makes THIS assertion fail, not only the
+  // cache.service.spec.ts presence assertion.
+  it('Next navigates to innovation-use-details for an indicator-6 result, never to the empty path', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    api.GET_Alignments.mockResolvedValue({ data: { contracts: [], result_sdgs: [] } });
+    const realCache = new CacheService();
+    realCache.currentMetadata.set({ indicator_id: 6 });
+    cache.currentResultIndicatorSectionPath.mockImplementation(() => realCache.currentResultIndicatorSectionPath());
+
+    await component.saveData('next');
+
+    expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'innovation-use-details'], {
+      queryParams: { version: 'v1' },
+      replaceUrl: true
+    });
+    expect(router.navigate).not.toHaveBeenCalledWith(['result', 1, ''], { queryParams: { version: 'v1' }, replaceUrl: true });
+  });
+
   it('should use version in queryParams if present', async () => {
     api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
     api.GET_Alignments.mockResolvedValue({ data: { contracts: [], result_sdgs: [] } });

@@ -198,7 +198,28 @@ A spec once shipped **6,239 passing tests over a tree that failed `npm run build
 **Two gates, and you need both:**
 
 - **`npm run build`** — the gate for **app** code. `ng build` uses `tsconfig.app.json` (`files: [src/main.ts]`), and with `strictTemplates` on it type-checks templates too. It does **not** see `*.spec.ts`.
-- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. **Gate against the 945 baseline — it will not be "clean", and expecting clean makes it useless again.**
+- **`npx tsc -p tsconfig.spec.json --noEmit`** — the gate for **spec** code. **Repaired 2026-08-13 (K-004).** Until then two pre-existing `TS1005` *syntax* errors aborted the parse and suppressed semantic diagnostics across the whole spec project: it reported **3** errors where **945** existed. ⚠️ **Do NOT gate on a total.** The old instruction here said *"gate against the 945 baseline"*; measured **938** on 2026-08-27, and the total moves whenever anyone fixes or adds a spec error — so a stale figure reads as either a regression or a free win, and both readings are wrong.
+  **Gate on your own files instead, which is drift-proof:**
+  ```bash
+  npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E '<path/of/each/file/you/touched>'
+  ```
+  ⚠️ **Refined 2026-08-27, same day, because a worker hit this rule's edge immediately.** *"The grep must be empty"* is **wrong for any file that already carries pre-existing errors** — `quantification-item.component.spec.ts` has **5** `TS2552` (`Cannot find name 'SimpleChanges'`; the file imports only the singular `SimpleChange`), so an empty grep is unachievable without fixing unrelated code.
+  **The correct bar is NO NEW errors in the files you touched**, and the only sound way to establish that is to compare against the pre-edit state:
+  ```bash
+  npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E '<your/file>' | wc -l   # after
+  git stash -q && npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E '<your/file>' | wc -l && git stash pop -q   # before
+  ```
+  ⚠️ **Compare the normalized error SET, not a count** (refined 2026-08-27 by the `T-10` review). Two counts matching cannot distinguish *"unchanged"* from *"one pre-existing error fixed **and** one new error introduced"*. Strip the position and compare `code + message`, sorted:
+  ```bash
+  # run before and after; the two outputs must be identical
+  npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E '<your/file>' \
+    | sed -E 's/\([0-9]+,[0-9]+\)//' | sort
+  ```
+  **Line numbers legitimately shift when you insert code above an existing error — a shifted line is not a new error**, which is exactly why the position must be stripped before comparing. If the grep is empty for your file, that is simply the easy case.
+  ⚠️ **`git stash` mutates the WHOLE tree, not just your files.** Never run it while another agent is editing (root guide's concurrency rule), always verify the `pop`, and prefer a narrower form: `git stash push -- <your files>`, or read the original with `git show HEAD:<file>` into a scratch path and check that instead.
+  **Also compare the TOTALS in the same window — but as a tripwire, not a gate.** It is what catches (a) `K-004`'s parse-abort mode, where a syntax error in *your* file collapses the whole project's diagnostics into a handful, and (b) a new error your change caused in a file you did **not** touch. Same-window before/after only; **never** against a dated figure. The `938` above is illustrative of the order of magnitude and nothing more.
+  The total will not be clean and does not need to be.
+  **This gate is not optional and nothing else substitutes for it** — `eslint` ignores `*.spec.ts`, `ts-jest` runs `isolatedModules: true`, and `tsconfig.app.json` has `files: [src/main.ts]`, so **`npm test`, `npm run lint` and `npm run build` type-check no spec code at all.** *Measured 2026-08-27 (`changes/measure-number-signed-decimal` T-09): a spec file passed all three of those gates while carrying **four** `TS7031` errors — `fakeAsync(({ a, b }) => …)` erases `it.each`'s parameter inference, because `fakeAsync(fn: Function)` supplies no parameter types, so the destructured bindings fall to `noImplicitAny`. A sibling `it.each` without `fakeAsync` type-checked fine.*
 
 ## ⚠ Gates must be proven able to fail (Kaizen K-004)
 

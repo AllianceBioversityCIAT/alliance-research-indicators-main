@@ -3,4 +3,5 @@ export enum LinkResultRolesEnum {
   INNOVATION_DEV = 2,
   OICR_STEP_ONE = 3,
   LINK_RESULT_SECTION = 4,
+  INNOVATION_USE_LINKED_DEV = 5,
 }
