@@ -4489,6 +4489,15 @@ describe('InnovationUseDetailsComponent — R3: contrast, measured, extended to 
       expect(card.nativeElement.getAttribute('target')).toBe('_blank');
       expect(card.nativeElement.getAttribute('rel')).toBe('noopener');
       expect(card.nativeElement.textContent).toContain('(opens in a new tab)');
+
+      // @akili-spec quick/innovation-use-sr-only-containing-block: the `sr-only` span above is
+      // `position: absolute`. Without `relative` on THIS anchor its containing block resolves to
+      // `.grid-container`, which is outside `#content`'s `overflow-y: auto` — the span then escapes the
+      // app's scrollport and stretches <html>, producing the reported double scroll. jsdom resolves no
+      // containing block, so the class is the only part of that chain a unit test can hold on to; the
+      // measurement that proved it lives in the quick-log row.
+      expect(card.nativeElement.classList).toContain('relative');
+      expect(card.nativeElement.querySelector('span.sr-only')).toBeTruthy();
     });
 
     it('FALSIFIER (href form): assert a STAR result yields /result/STAR-284/general-information EXACTLY, and a PRMS result yields /result/PRMS-284/general-information EXACTLY', () => {
