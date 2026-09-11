@@ -11,10 +11,9 @@ import { dataSource } from '../../src/db/config/mysql/orm.test.config';
  *
  * `result_official_code` band (FP-45): `904_000` — the highest band
  * claimed by any sibling `*.fixture-spec.ts` header at the time of writing
- * was `903_0xx` (`innovation-dev-card-facts` /
- * `innovation-use-linked-dev-validation`), so `904_000` is unused. Report
- * year `2116` — every sibling file's own claimed year runs from `2094`
- * through `2115`; `2116` is unused.
+ * was `903_0xx` (`innovation-dev-card-facts`), so `904_000` is unused.
+ * Report year `2116` — every sibling file's own claimed year runs from
+ * `2094` through `2115`; `2116` is unused.
  *
  * This file seeds its own `link_result_roles` row rather than reusing
  * `LinkResultRolesEnum.INNOVATION_USE_LINKED_DEV` (id 5, seeded by
@@ -44,19 +43,29 @@ import { dataSource } from '../../src/db/config/mysql/orm.test.config';
  * block's `WHERE lr.is_active = TRUE AND lr.result_id = temp_result_id`
  * still excludes them. They exist to prove the fix does NOT overcopy,
  * once T-02 lands — the `sp-versioning-objective-blocks` file makes the
- * same choice for its own negative coverage.
+ * same choice for its own negative coverage. Amendment A1 (tasks.md,
+ * 2026-09-11) added case 3's second query (`other_result_id = <snapshot>`)
+ * so it covers both of DD-2's violation shapes — a block that remapped
+ * the target side instead of the owner side would otherwise evade it.
  *
  * ## Case 4 — delete round-trip (`it('re-versions a result...')`)
  *
  * The `sp-versioning-roles-id` T-02b sequence: version → delete-version →
- * version again. Also passes both before and after T-02 today — nothing is
- * ever copied onto the snapshot yet, so there is nothing for
+ * version again. Amendment A2 (tasks.md, 2026-09-11, user-approved after
+ * the first Reviewer PASS) added an assertion that a copied row actually
+ * exists on `snapshot1Id` before the delete — without it, this case would
+ * pass identically whether the copy landed or silently did not.
+ *
+ * RED (current `main`, same root cause as case 1): nothing is ever copied
+ * onto the snapshot, so the premise assertion (`snapshot1Links.length`)
+ * fails before `CALL SP_delete_result_version` is even reached.
+ *
+ * GREEN (after T-02): the premise holds, and the case then proves
  * `SP_delete_result_version`'s existing `link_results` cleanup
  * (`WHERE result_id = temp_result_id OR other_result_id = temp_result_id`,
- * `1787083305648-AmendLifecycleRoutinesForInnovationUse.ts:1137-1139`) to
- * trip over. It is a forward-looking regression guard: once T-02 starts
- * copying rows onto the snapshot, this proves they do not block the
- * physical delete with a foreign-key failure (MySQL 1451).
+ * `1787083305648-AmendLifecycleRoutinesForInnovationUse.ts:1137-1139`)
+ * does not block the physical delete with a foreign-key failure
+ * (MySQL 1451), and that re-versioning afterward still succeeds.
  */
 describe('SP_versioning link_results regression fixture (T-01)', () => {
   const uniqueSuffix = Date.now();
@@ -287,6 +296,17 @@ describe('SP_versioning link_results regression fixture (T-01)', () => {
       [snapshot.result_id],
     );
     expect(copiedRows).toHaveLength(0);
+
+    // A1 (amendment): the row this case seeds is also NOT owned in the
+    // other DD-2 direction — a T-02 block that remapped the target side
+    // instead of the owner side (`new_result_id AS other_result_id …
+    // WHERE lr.other_result_id = temp_result_id`) would evade the query
+    // above but would write here. Close that second violation shape.
+    const targetSideRows = await dataSource.query(
+      `SELECT link_result_id FROM link_results WHERE other_result_id = ?`,
+      [snapshot.result_id],
+    );
+    expect(targetSideRows).toHaveLength(0);
   }, 30000);
 
   it('re-versions a result whose existing snapshot carries a link_results row, without losing the new snapshot to a foreign-key failure (T-02b sequence)', async () => {
@@ -299,6 +319,17 @@ describe('SP_versioning link_results regression fixture (T-01)', () => {
     expect(snapshot1).toBeDefined();
     const snapshot1Id = snapshot1.result_id;
     expect(snapshot1Id).not.toBe(cycleSourceResultId);
+
+    // A2 (amendment): assert this case's own premise — a copied row must
+    // actually be present on the snapshot before the delete — otherwise
+    // the delete round-trip below would pass identically whether the copy
+    // landed or silently did not (same missing-copy defect as case 1,
+    // observed at a second point; RED on current `main`).
+    const snapshot1Links = await dataSource.query(
+      `SELECT link_result_id FROM link_results WHERE result_id = ?`,
+      [snapshot1Id],
+    );
+    expect(snapshot1Links.length).toBeGreaterThan(0);
 
     // The application's re-version sequence: delete the existing
     // snapshot, then version again (green-checks.repository.ts:294→307).

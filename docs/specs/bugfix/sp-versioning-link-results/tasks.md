@@ -10,7 +10,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | `[x]` |
+| Status | `[x]` — PASSed, reopened for the approved A1/A2/A3 amendment, PASSed again (2nd Reviewer verdict, no advisories) |
 | Size | S |
 | Depends on | — |
 | Requirements | R-SPL-001 (all clauses), R-SPL-002 |
@@ -26,6 +26,13 @@ Cases:
 1. **Copy** — seed an active non-snapshot STAR result + one active `link_results` row it owns; `CALL SP_versioning`; assert a row exists on the new snapshot's `result_id` with `other_result_id` and `link_result_role_id` preserved and a **fresh** `link_result_id`.
 2. **Negative clauses of R-SPL-001** — an `is_active = FALSE` row is not copied; a row where the versioned result is only `other_result_id` is not copied; the source row is unchanged.
 3. **Delete round-trip** — version → `CALL SP_delete_result_version` → version again, the `sp-versioning-roles-id` T-02b sequence, proving the copied rows do not block the physical delete (MySQL 1451).
+
+**Amendment (2026-09-11, user-approved after the first Reviewer PASS).** Two assertions are added because, as first written, two cases could not fail for the reason they exist:
+
+- **A1 — case 3 gains a target-side query.** It asserted only `WHERE result_id = <snapshot>`, so a T-02 block that remapped the **target** (`new_result_id AS other_result_id … WHERE lr.other_result_id = temp_result_id`) writes a row that query cannot see, and the case stays green. Add a companion `SELECT … WHERE other_result_id = <snapshot>` expecting zero rows. This closes the second of DD-2's two violation shapes.
+- **A2 — case 4 must assert its own premise.** Its purpose is *"copied rows do not block the physical delete"*, yet it never checks a copied row is present before `CALL SP_delete_result_version`. Post-T-02 it would pass identically whether the copy landed or silently did not. Assert `link_results WHERE result_id = snapshot1Id` is non-empty **before** the delete — the exemplar does exactly this (`sp-versioning-objective-blocks.fixture-spec.ts:279-288`).
+
+**A2 adds a second red on current `main`, and that is correct** — it is the same missing copy, observed at a second point. Expected after the amendment: still **6** failing suites, now **2** failing tests inside this one.
 
 ### Verification
 
@@ -98,8 +105,8 @@ diff <(old body) <(new body)        # R-SPL-002
 | --- | --- |
 | R-SPL-001 main scenario | T-01 case 1, T-02 |
 | R-SPL-001 `BUT not is_active = FALSE` | T-01 case 2 |
-| R-SPL-001 `BUT not target-side rows` | T-01 case 2 |
-| R-SPL-001 `AND IT MUST leave the source untouched` | T-01 case 2 |
+| R-SPL-001 `BUT not target-side rows` | T-01 case 3, **both** query shapes (amendment A1) |
+| R-SPL-001 `AND IT MUST leave the source untouched` | T-01 case 1 (corrected 2026-09-11 — this table said case 2; the assertions live in case 1) |
 | R-SPL-001 fresh `link_result_id` | T-01 case 1 |
 | R-SPL-002 | T-02 body diff |
 | NFR-SPL-001 | T-02 `down()` |

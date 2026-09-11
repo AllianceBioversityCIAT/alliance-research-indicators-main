@@ -80,3 +80,58 @@ T-02 must probe them at red before citing them:
 | 4 | **Cannot be probed as written** — see advisory 1. It can only go red on the FK path (if `SP_delete_result_version`'s clear were removed), never on "a copied row was present" |
 
 A green run of cases 2–4 after T-02 is **not** evidence until each has been observed failing.
+
+### T-01 — REOPENED (amendment A1/A2)
+
+| Field | Value |
+| --- | --- |
+| Status | `[~]` — reopened after PASS |
+| Date | 2026-09-11 |
+| Trigger | Reviewer ADVISORY 1 and 2, **escalated to the user and approved by them** |
+
+The first PASS was correct on its own terms and is committed (`97cdb383`). It is reopened because the Reviewer showed two of the four cases could not fail for the reason they exist — not a defect in the delivered work, a gap in what it could prove.
+
+Per this command's rule, an advisory may not silently become a task or widen one. It was therefore **escalated as a spec gap**, the user chose to reopen, and `tasks.md` T-01 now carries the amendment explicitly. The scope change is approved and recorded, not absorbed.
+
+**Why it was worth reopening:** this fixture is the *only* gate the bug has. Case 4 protects against the FK failure (MySQL 1451) that motivated auditing every delete routine in the first place — and as written it would have passed whether or not the copy landed.
+
+#### T-01 amendment — result
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** (2nd Reviewer verdict, no advisories) |
+| Implementer attempts | 1 (amendment) |
+| Total T-01 attempts | 2 — one original + one approved amendment, **zero rework-for-defect** |
+
+**Changes:** A1 (case 3 target-side query), A2 (case 4 premise assertion), A3 (band-ledger correction). One file, +42/-11.
+
+**Verification** — `npm run test:fixtures`:
+
+| | Before amendment | After | Reading |
+| --- | --- | --- | --- |
+| Suites | 6 failed / 21 | **6 failed / 21** | no new suite broken |
+| Tests failed | 46 | **47** | +1, the new A2 red |
+| Tests total | 145 | **145** | unchanged → assertions added, not `it` blocks |
+
+Case 4's new red: `expect(snapshot1Links.length).toBeGreaterThan(0)` → `Received: 0`, at **L332**, with `CALL SP_delete_result_version` at **L336**.
+
+**Reviewer verdict: `STATUS: PASS`.** The two findings that make this verdict worth more than a green run:
+
+1. **The failure modes are distinguishable.** An FK 1451 would be a thrown driver error out of `dataSource.query` at L336; what is observed is an assertion failure over a `SELECT` result at L332. So case 4's red is the missing copy, not the delete routine.
+2. **The hazard the Leader raised was real and is closed by construction.** A1 could have been permanently red if it bound the seed's own id: case 3 seeds a row whose `other_result_id` IS the versioned result. It binds `snapshot.result_id` instead, and the snapshot is selected under `is_snapshot = TRUE` while `insertResult` always writes `is_snapshot = 0` — so the seeded row is **structurally unable** to match. The Reviewer also noted the corroboration: had the wrong value been bound, case 3 would be red; it is green.
+
+A3 was re-verified rather than accepted on faith: an unfiltered grep for `903_0xx`/`903_000` across `test/` returns the new header and `innovation-dev-card-facts.fixture-spec.ts:56` only — the false attribution is gone and the surviving one is true.
+
+Advisory 4 (teardown step-isolation) remains **deliberately out of scope** by user ruling; the Reviewer confirmed no `tryStep` helper was added.
+
+#### ⚠️ Forward pointer to T-02 — updated, supersedes the one above
+
+Cases 2 and 3 remain green-before-and-after and must still be probed at red once T-02 exists:
+
+| Case | Input that must make it go red |
+| --- | --- |
+| 2 | Omit `AND lr.is_active = TRUE`, or drop `AND lr.result_id = temp_result_id` |
+| 3 | Widen to `… OR lr.other_result_id = temp_result_id` (owner shape), **or** remap the target (`new_result_id AS other_result_id`) — A1 now catches the second shape too |
+| 4 | **Now probeable.** It reddens today on the missing copy (A2) |
+
+**New, and easy to miss:** because case 4 now aborts at L332 on current `main`, the delete round-trip **executes zero times** until T-02 lands. T-02 is therefore the first run in which `CALL SP_delete_result_version` is exercised against a snapshot that actually carries `link_results` rows — the FK path this whole spec was audited for. A green case 4 after T-02 is the first real evidence for it.
