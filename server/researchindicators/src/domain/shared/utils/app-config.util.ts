@@ -61,11 +61,20 @@ export class AppConfig {
   }
 
   // CLARISA API key — sent as the `x-api-key` header.
+  //
   // Distinct from ARI_CLARISA_USER/PASS above: those authenticate STAR against
-  // CLARISA's own API, while this key is the platform identity CLARISA issues
-  // per tool and per environment. The PRMS Normalizer ingest API validates it
-  // against CLARISA on every call and resolves the calling platform from it,
-  // which is why one key must never be shared across tools or environments.
+  // CLARISA's own API, while this is a CLARISA-issued key identifying the
+  // calling platform.
+  //
+  // This getter formalizes a variable that was ALREADY being read raw:
+  // `report-ms.app.ts` does `env.ARI_CLARISA_API_KEY` via `import { env } from
+  // 'process'`. Prefer this getter over a direct process.env read.
+  //
+  // NOT to be confused with the `app_config` row of the SAME NAME
+  // (`AppConfigKey.ARI_CLARISA_API_KEY`, seeded by migration 1781879906673,
+  // read by `PdfViewerService` through `AppConfigService.getEnv`). That row is
+  // documented as the key for "the IBD unit's microservices". Two stores, one
+  // name — check which one a consumer means before wiring a third.
   get ARI_CLARISA_API_KEY(): string {
     return process.env.ARI_CLARISA_API_KEY;
   }
