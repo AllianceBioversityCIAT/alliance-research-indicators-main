@@ -32,7 +32,7 @@ Split rationale: (1) the server integration is the contract everything else cons
 
 | # | Spec Path | Title / Scope | Depends on | Parallel-safe | Status | Owner |
 |---|---|---|---|---|---|---|
-| 1 | `prms-sync/sync-engine` | Server: PRMS Normalizer integration tool, payload builders (5 types), sync endpoint, state persistence, env routing TEST/PROD | `none` | `yes` | `pending` | TBD |
+| 1 | `prms-sync/sync-engine` | Server: PRMS Normalizer integration tool, payload builders (4 types — KP dropped by D-4), sync endpoint, state persistence, env routing TEST/PROD | `none` | `yes` | `pending` | TBD |
 | 2 | `prms-sync/sync-button-ux` | Client: wire the existing PRMS SYNC button — confirm modal, loading, success/failure UX, synced badge, alignment lock refresh | `sync-engine` | `no` | `pending` | TBD |
 | 3 | `prms-sync/center-admin-resync` | Center Admin: sync status visibility + manual re-sync from the bilateral module for failed/pending results | `sync-engine` | `no` | `pending` | TBD |
 | 4 | `prms-sync/pi-sync-panel` | PI project-level control panel: per-result sync pipeline (pending alignment / ready / synced / failed / future PRMS verdict) | `sync-engine` | `no` | `pending` | TBD |
