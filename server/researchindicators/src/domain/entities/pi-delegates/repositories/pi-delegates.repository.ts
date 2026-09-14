@@ -415,13 +415,19 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       first_name: string;
       last_name: string;
       email: string;
+      carnet: string | null;
+      status_id: number | null;
+      is_active: number;
     }>
   > {
     return this.dataSource.query(
       `SELECT pd.delegate_user_id,
               su.first_name,
               su.last_name,
-              su.email
+              su.email,
+              su.carnet,
+              su.status_id,
+              su.is_active
        FROM pi_delegates pd
          INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
        WHERE pd.project_id = ?
@@ -468,14 +474,20 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     first_name: string;
     last_name: string;
     email: string;
+    carnet: string | null;
+    status_id: number | null;
+    is_active: number;
   } | null> {
     const rows: Array<{
       sec_user_id: number;
       first_name: string;
       last_name: string;
       email: string;
+      carnet: string | null;
+      status_id: number | null;
+      is_active: number;
     }> = await this.dataSource.query(
-      `SELECT sec_user_id, first_name, last_name, email
+      `SELECT sec_user_id, first_name, last_name, email, carnet, status_id, is_active
        FROM sec_users
        WHERE sec_user_id = ?
        LIMIT 1`,
@@ -568,6 +580,9 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       first_name: string;
       last_name: string;
       email: string;
+      carnet: string | null;
+      status_id: number | null;
+      is_active: number;
     }>
   > {
     if (!projectIds.length) return [];
@@ -577,7 +592,10 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
               pd.delegate_user_id,
               su.first_name,
               su.last_name,
-              su.email
+              su.email,
+              su.carnet,
+              su.status_id,
+              su.is_active
        FROM pi_delegates pd
          INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
        WHERE pd.project_id IN (?)
@@ -605,6 +623,9 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       first_name: string;
       last_name: string;
       email: string;
+      carnet: string | null;
+      status_id: number | null;
+      is_active: number;
       agreement_id: string;
       description: string | null;
     }>
@@ -616,6 +637,9 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
               su.first_name,
               su.last_name,
               su.email,
+              su.carnet,
+              su.status_id,
+              su.is_active,
               ac.agreement_id,
               ac.description
        FROM pi_delegates pd

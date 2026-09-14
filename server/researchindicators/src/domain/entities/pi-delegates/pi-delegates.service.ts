@@ -551,6 +551,11 @@ export class PiDelegatesService {
         delegate_user_id: Number(d.delegate_user_id),
         name: `${d.first_name} ${d.last_name}`.trim(),
         email: d.email,
+        first_name: d.first_name ?? null,
+        last_name: d.last_name ?? null,
+        carnet: d.carnet ?? null,
+        status_id: d.status_id != null ? Number(d.status_id) : null,
+        is_active: Boolean(d.is_active),
       })),
     };
   }
@@ -603,6 +608,11 @@ export class PiDelegatesService {
       delegate_user_id: delegateUserId,
       name: user ? `${user.first_name} ${user.last_name}`.trim() : null,
       email: user?.email ?? null,
+      first_name: user?.first_name ?? null,
+      last_name: user?.last_name ?? null,
+      carnet: user?.carnet ?? null,
+      status_id: user?.status_id != null ? Number(user.status_id) : null,
+      is_active: Boolean(user?.is_active),
       projects: projects.map((p) => ({
         project_code: p.agreement_id,
         project_name: p.description,
@@ -663,6 +673,9 @@ export class PiDelegatesService {
         first_name: string;
         last_name: string;
         email: string;
+        carnet: string | null;
+        status_id: number | null;
+        is_active: number;
       }>
     >();
     for (const d of delegates) {
@@ -684,6 +697,11 @@ export class PiDelegatesService {
         delegate_user_id: Number(d.delegate_user_id),
         name: `${d.first_name} ${d.last_name}`.trim(),
         email: d.email,
+        first_name: d.first_name ?? null,
+        last_name: d.last_name ?? null,
+        carnet: d.carnet ?? null,
+        status_id: d.status_id != null ? Number(d.status_id) : null,
+        is_active: Boolean(d.is_active),
       })),
     }));
   }
@@ -741,6 +759,9 @@ export class PiDelegatesService {
         first_name: string;
         last_name: string;
         email: string;
+        carnet: string | null;
+        status_id: number | null;
+        is_active: number;
         projects: Array<{ agreement_id: string; description: string | null }>;
       }
     >();
@@ -752,6 +773,9 @@ export class PiDelegatesService {
           first_name: row.first_name,
           last_name: row.last_name,
           email: row.email,
+          carnet: row.carnet ?? null,
+          status_id: row.status_id != null ? Number(row.status_id) : null,
+          is_active: row.is_active,
           projects: [],
         });
       }
@@ -765,6 +789,11 @@ export class PiDelegatesService {
       delegate_user_id: delegateId,
       name: `${info.first_name} ${info.last_name}`.trim(),
       email: info.email,
+      first_name: info.first_name ?? null,
+      last_name: info.last_name ?? null,
+      carnet: info.carnet ?? null,
+      status_id: info.status_id,
+      is_active: Boolean(info.is_active),
       projects: info.projects.map((p) => ({
         project_code: p.agreement_id,
         project_name: p.description ?? null,

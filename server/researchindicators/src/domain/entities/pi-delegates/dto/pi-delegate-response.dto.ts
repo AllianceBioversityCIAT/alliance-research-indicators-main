@@ -36,6 +36,47 @@ export class DelegateSummaryDto {
     example: 'j.cadavid@cgiar.org',
   })
   email!: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.first_name of the delegate',
+    example: 'Juan Carlos',
+  })
+  first_name!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.last_name of the delegate',
+    example: 'Cadavid',
+  })
+  last_name!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.carnet (Alliance staff carnet) of the delegate',
+    example: 'C12345',
+  })
+  carnet!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'sec_users.status_id of the delegate account (1=Accepted, 2=Pending, 3=Rejected)',
+    example: 1,
+  })
+  status_id!: number | null;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'sec_users.is_active of the delegate account (cast from tinyint)',
+    example: true,
+  })
+  is_active!: boolean;
 }
 
 /**
@@ -152,6 +193,47 @@ export class DelegateProjectsResponseDto {
     example: 'j.cadavid@cgiar.org',
   })
   email!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.first_name of the delegate',
+    example: 'Juan Carlos',
+  })
+  first_name!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.last_name of the delegate',
+    example: 'Cadavid',
+  })
+  last_name!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'sec_users.carnet (Alliance staff carnet) of the delegate',
+    example: 'C12345',
+  })
+  carnet!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'sec_users.status_id of the delegate account (1=Accepted, 2=Pending, 3=Rejected)',
+    example: 1,
+  })
+  status_id!: number | null;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'sec_users.is_active of the delegate account (cast from tinyint)',
+    example: true,
+  })
+  is_active!: boolean;
 
   @ApiProperty({
     type: [ProjectSummaryDto],

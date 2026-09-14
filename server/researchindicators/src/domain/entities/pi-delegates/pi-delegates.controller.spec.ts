@@ -37,7 +37,16 @@ const PROJECT_DELEGATES_FIXTURE: ProjectDelegatesResponseDto = {
   start_date: null,
   end_date: null,
   delegates: [
-    { delegate_user_id: 1, name: 'Alice Smith', email: 'a.smith@cgiar.org' },
+    {
+      delegate_user_id: 1,
+      name: 'Alice Smith',
+      email: 'a.smith@cgiar.org',
+      first_name: 'Alice',
+      last_name: 'Smith',
+      carnet: null,
+      status_id: 1,
+      is_active: true,
+    },
   ],
 };
 
@@ -45,6 +54,11 @@ const DELEGATE_PROJECTS_FIXTURE: DelegateProjectsResponseDto = {
   delegate_user_id: 42,
   name: 'Bob Doe',
   email: 'b.doe@cgiar.org',
+  first_name: 'Bob',
+  last_name: 'Doe',
+  carnet: null,
+  status_id: 1,
+  is_active: true,
   projects: [{ project_code: 'PROJ-01', project_name: 'Test Project' }],
 };
 

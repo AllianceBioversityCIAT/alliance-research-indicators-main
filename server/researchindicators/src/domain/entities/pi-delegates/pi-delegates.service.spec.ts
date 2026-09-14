@@ -129,6 +129,9 @@ interface MockRepoOptions {
     first_name: string;
     last_name: string;
     email: string;
+    carnet?: string | null;
+    status_id?: number | null;
+    is_active?: number;
   }>;
   /** findUserSummary result (default: null — user not found) */
   findUserSummaryResult?: {
@@ -136,6 +139,9 @@ interface MockRepoOptions {
     first_name: string;
     last_name: string;
     email: string;
+    carnet?: string | null;
+    status_id?: number | null;
+    is_active?: number;
   } | null;
   /** findDelegateProjects result (default: []) */
   findDelegateProjectsResult?: Array<{
@@ -1392,6 +1398,9 @@ describe('list() — Scenario 12: enriched ProjectDelegatesResponseDto (my-pi-de
               first_name: 'Juan Carlos',
               last_name: 'Cadavid',
               email: 'j.cadavid@cgiar.org',
+              carnet: 'C00042',
+              status_id: 1,
+              is_active: 1,
             },
           ],
         },
@@ -1407,11 +1416,16 @@ describe('list() — Scenario 12: enriched ProjectDelegatesResponseDto (my-pi-de
     expect(result.start_date).toEqual(new Date('2025-01-01T04:00:00.000Z'));
     expect(result.end_date).toEqual(new Date('2025-12-31T04:00:00.000Z'));
 
-    // Delegates array
+    // Delegates array — enriched fields (KZ-001)
     expect(result.delegates).toHaveLength(1);
     expect(result.delegates[0].delegate_user_id).toBe(1);
     expect(result.delegates[0].name).toBe('Juan Carlos Cadavid');
     expect(result.delegates[0].email).toBe('j.cadavid@cgiar.org');
+    expect(result.delegates[0].first_name).toBe('Juan Carlos');
+    expect(result.delegates[0].last_name).toBe('Cadavid');
+    expect(result.delegates[0].carnet).toBe('C00042');
+    expect(result.delegates[0].status_id).toBe(1);
+    expect(result.delegates[0].is_active).toBe(true);
 
     // Repo methods called with the correct projectId (KZ-001)
     expect(findProjectSummary).toHaveBeenCalledWith('G232');
@@ -1583,6 +1597,9 @@ describe('listByDelegate() — Scenario 13: enriched DelegateProjectsResponseDto
           first_name: 'Juan Carlos',
           last_name: 'Cadavid',
           email: 'j.cadavid@cgiar.org',
+          carnet: 'C00099',
+          status_id: 1,
+          is_active: 1,
         },
         findDelegateProjectsResult: [
           { agreement_id: 'G232', description: 'CGIAR Fund - PRMS Year 2025' },
@@ -1593,10 +1610,15 @@ describe('listByDelegate() — Scenario 13: enriched DelegateProjectsResponseDto
 
     const result = await service.listByDelegate(ownUserId);
 
-    // Person-level fields (KZ-001)
+    // Person-level fields — enriched (KZ-001)
     expect(result.delegate_user_id).toBe(ownUserId);
     expect(result.name).toBe('Juan Carlos Cadavid');
     expect(result.email).toBe('j.cadavid@cgiar.org');
+    expect(result.first_name).toBe('Juan Carlos');
+    expect(result.last_name).toBe('Cadavid');
+    expect(result.carnet).toBe('C00099');
+    expect(result.status_id).toBe(1);
+    expect(result.is_active).toBe(true);
 
     // Projects array
     expect(result.projects).toHaveLength(2);
@@ -1735,6 +1757,9 @@ interface ManagedMockOpts {
     first_name: string;
     last_name: string;
     email: string;
+    carnet?: string | null;
+    status_id?: number | null;
+    is_active?: number;
   }>;
   /** findDelegatesForProjects result (default: []) */
   delegatesForProjects?: Array<{
@@ -1742,6 +1767,9 @@ interface ManagedMockOpts {
     first_name: string;
     last_name: string;
     email: string;
+    carnet?: string | null;
+    status_id?: number | null;
+    is_active?: number;
     agreement_id: string;
     description: string | null;
   }>;
@@ -1862,6 +1890,9 @@ describe('listManagedProjects() — Scenario 14: own caller gets enriched Projec
           first_name: 'Alice',
           last_name: 'Smith',
           email: 'a.smith@cgiar.org',
+          carnet: 'C00010',
+          status_id: 1,
+          is_active: 1,
         },
         {
           project_id: 'G501',
@@ -1869,6 +1900,9 @@ describe('listManagedProjects() — Scenario 14: own caller gets enriched Projec
           first_name: 'Bob',
           last_name: 'Jones',
           email: 'b.jones@cgiar.org',
+          carnet: null,
+          status_id: 2,
+          is_active: 1,
         },
       ],
     });
@@ -1885,10 +1919,17 @@ describe('listManagedProjects() — Scenario 14: own caller gets enriched Projec
     expect(g500.delegates[0].delegate_user_id).toBe(10);
     expect(g500.delegates[0].name).toBe('Alice Smith');
     expect(g500.delegates[0].email).toBe('a.smith@cgiar.org');
+    expect(g500.delegates[0].first_name).toBe('Alice');
+    expect(g500.delegates[0].last_name).toBe('Smith');
+    expect(g500.delegates[0].carnet).toBe('C00010');
+    expect(g500.delegates[0].status_id).toBe(1);
+    expect(g500.delegates[0].is_active).toBe(true);
 
     const g501 = result.find((r) => r.project_code === 'G501')!;
     expect(g501.is_pool_funding_contributor).toBe(true); // tinyint 1 → true
     expect(g501.delegates[0].name).toBe('Bob Jones');
+    expect(g501.delegates[0].carnet).toBeNull();
+    expect(g501.delegates[0].status_id).toBe(2);
 
     // KZ-001: repo called with the correct userId / projectIds
     expect(findManagedProjectIds).toHaveBeenCalledWith(ownUserId);
@@ -2075,6 +2116,9 @@ describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjec
             first_name: 'Carlos',
             last_name: 'Ramirez',
             email: 'c.ramirez@cgiar.org',
+            carnet: 'C00030',
+            status_id: 1,
+            is_active: 1,
             agreement_id: 'G800',
             description: 'Project Eight Hundred',
           },
@@ -2083,6 +2127,9 @@ describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjec
             first_name: 'Carlos',
             last_name: 'Ramirez',
             email: 'c.ramirez@cgiar.org',
+            carnet: 'C00030',
+            status_id: 1,
+            is_active: 1,
             agreement_id: 'G801',
             description: 'Project Eight Zero One',
           },
@@ -2092,6 +2139,9 @@ describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjec
             first_name: 'Diana',
             last_name: 'Torres',
             email: 'd.torres@cgiar.org',
+            carnet: null,
+            status_id: 2,
+            is_active: 1,
             agreement_id: 'G800',
             description: 'Project Eight Hundred',
           },
@@ -2106,6 +2156,11 @@ describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjec
     const carlos = result.find((r) => r.delegate_user_id === 30)!;
     expect(carlos.name).toBe('Carlos Ramirez');
     expect(carlos.email).toBe('c.ramirez@cgiar.org');
+    expect(carlos.first_name).toBe('Carlos');
+    expect(carlos.last_name).toBe('Ramirez');
+    expect(carlos.carnet).toBe('C00030');
+    expect(carlos.status_id).toBe(1);
+    expect(carlos.is_active).toBe(true);
     // Carlos appears once, with both managed projects
     expect(carlos.projects).toHaveLength(2);
     const carlosProjectCodes = carlos.projects.map((p) => p.project_code);
@@ -2115,6 +2170,8 @@ describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjec
     const diana = result.find((r) => r.delegate_user_id === 31)!;
     expect(diana.projects).toHaveLength(1);
     expect(diana.projects[0].project_code).toBe('G800');
+    expect(diana.carnet).toBeNull();
+    expect(diana.status_id).toBe(2);
 
     // KZ-001: repo called with correct args
     expect(findManagedProjectIds).toHaveBeenCalledWith(ownUserId);
@@ -2190,5 +2247,157 @@ describe('listManagedDelegates() — Scenario 19: own-or-admin auth', () => {
 
     await expect(service.listManagedDelegates(ownId)).resolves.toEqual([]);
     expect(findManagedProjectIds).toHaveBeenCalledWith(ownId);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 20 — Rejected/inactive delegate account still flows through (Part-B rule)
+//
+// The table GET must NOT filter on su.status_id or su.is_active — a delegate whose
+// account is Rejected (status_id=3) or inactive (is_active=0) is still returned
+// in the list/by-delegate/by-user responses.  The new fields must be populated
+// exactly as they come from the mock (no suppression of "bad" values).
+//
+// This discriminates: a mapping that silently dropped status_id=3 or coerced
+// is_active=0 to true would fail at least one assertion here.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_active=0) account still returned', () => {
+  it('list(): delegate with status_id=3 and is_active=0 is returned with those exact values', async () => {
+    const { service } = makeService({
+      userId: 500,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G900',
+          description: 'Part B Test Project',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 77,
+            first_name: 'Rejected',
+            last_name: 'User',
+            email: 'rejected@cgiar.org',
+            carnet: null,
+            status_id: 3, // Rejected
+            is_active: 0, // account inactive
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G900');
+
+    expect(result.delegates).toHaveLength(1);
+    const d = result.delegates[0];
+    expect(d.delegate_user_id).toBe(77);
+    // status_id=3 must flow through — NOT filtered or suppressed
+    expect(d.status_id).toBe(3);
+    // is_active=0 must be false, NOT coerced to true
+    expect(d.is_active).toBe(false);
+    expect(d.carnet).toBeNull();
+  });
+
+  it('listByDelegate(): delegate with status_id=3 and is_active=0 returns those exact person-level values', async () => {
+    const delegateId = 78;
+
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: delegateId,
+          first_name: 'Rejected',
+          last_name: 'Person',
+          email: 'rejected2@cgiar.org',
+          carnet: null,
+          status_id: 3, // Rejected
+          is_active: 0, // account inactive
+        },
+        findDelegateProjectsResult: [],
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+
+    expect(result.delegate_user_id).toBe(delegateId);
+    expect(result.status_id).toBe(3);
+    expect(result.is_active).toBe(false);
+    expect(result.carnet).toBeNull();
+  });
+
+  it('listManagedProjects(): delegate with status_id=3 / is_active=0 appears in delegates[] with correct values', async () => {
+    const ownUserId = 501;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G901'],
+      projectSummaries: [
+        {
+          agreement_id: 'G901',
+          description: 'Part B Managed',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G901',
+          delegate_user_id: 79,
+          first_name: 'Inactive',
+          last_name: 'Delegate',
+          email: 'inactive@cgiar.org',
+          carnet: 'C99999',
+          status_id: 3, // Rejected
+          is_active: 0, // account inactive
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result).toHaveLength(1);
+    const d = result[0].delegates[0];
+    expect(d.delegate_user_id).toBe(79);
+    expect(d.status_id).toBe(3);
+    expect(d.is_active).toBe(false);
+    expect(d.carnet).toBe('C99999');
+  });
+
+  it('listManagedDelegates(): delegate with status_id=3 / is_active=0 is grouped with correct values', async () => {
+    const ownUserId = 502;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G902'],
+      delegatesForProjects: [
+        {
+          delegate_user_id: 80,
+          first_name: 'Rejected',
+          last_name: 'Grouped',
+          email: 'grouped@cgiar.org',
+          carnet: null,
+          status_id: 3, // Rejected
+          is_active: 0, // account inactive
+          agreement_id: 'G902',
+          description: 'Grouped Part B',
+        },
+      ],
+    });
+
+    const result = await service.listManagedDelegates(ownUserId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].delegate_user_id).toBe(80);
+    expect(result[0].status_id).toBe(3);
+    expect(result[0].is_active).toBe(false);
+    expect(result[0].carnet).toBeNull();
   });
 });
