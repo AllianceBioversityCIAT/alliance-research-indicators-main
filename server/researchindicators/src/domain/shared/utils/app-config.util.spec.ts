@@ -38,7 +38,6 @@ describe('AppConfig', () => {
     process.env.ARI_CLARISA_HOST = 'clarisa';
     process.env.ARI_CLARISA_USER = 'cu';
     process.env.ARI_CLARISA_PASS = 'cp';
-    process.env.ARI_CLARISA_API_KEY = 'ck';
     process.env.ARI_MYSQL_HOST = 'mh';
     process.env.ARI_MYSQL_USER_NAME = 'mu';
     process.env.ARI_MYSQL_USER_PASS = 'mp';
@@ -92,7 +91,6 @@ describe('AppConfig', () => {
     expect(cfg.ARI_CLARISA_HOST).toBe('clarisa');
     expect(cfg.ARI_CLARISA_USER).toBe('cu');
     expect(cfg.ARI_CLARISA_PASS).toBe('cp');
-    expect(cfg.ARI_CLARISA_API_KEY).toBe('ck');
     expect(cfg.ARI_MYSQL_HOST).toBe('mh');
     expect(cfg.ARI_MYSQL_USER_NAME).toBe('mu');
     expect(cfg.ARI_MYSQL_USER_PASS).toBe('mp');

@@ -49,9 +49,12 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
 ## 4. Proposed Outcome
 
 1. **New tool module** `domain/tools/prms-normalizer/` (TRD §9.1): one Nest service, transport
-   encapsulated, `BaseApi` reuse where it fits. The API key is **`AppConfig.ARI_CLARISA_API_KEY`**
-   (added 2026-09-14, sent as `x-api-key`); the per-environment Normalizer host still needs its
-   own `ARI_*` var at implementation time (K-005 — TEST and PROD are branch selectors).
+   encapsulated, `BaseApi` reuse where it fits — **no implementation of this exists today**
+   (verified 2026-09-14: no `prms-normalizer` module, no POST to `/ingest`, no Normalizer host
+   anywhere in the tree). The API key comes from the **`app_config` row**, via
+   `AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY).simple_value`, read **per request**
+   (not in the constructor — see homologation §10.1). The per-environment Normalizer **host**
+   still needs its own `ARI_*` var (K-005 — TEST and PROD are branch selectors).
 2. **Payload builders for the four supported types** — `capacity_sharing`,
    `innovation_development`, `policy_change`, `innovation_use` — implementing
    [`homologation.md`](./homologation.md) verbatim, including the 2026-08/09 breaking rules that
@@ -230,7 +233,5 @@ The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the cl
 1. **OQ-H1' / OQ-H2'** — how v1 presents Innovation Use and PRMS policy type `1`. Recommended:
    gate both out with a stated reason. Option (c) in §12 (`is_determined` only, no monetary
    figure) is worth a look first — it is small and it recovers a whole indicator type.
-2. **OQ-H8** — request STAR's **TEST** API key *value* from PRMS Tech Support. The config slot
-   exists (`ARI_CLARISA_API_KEY`); the key itself does not. The spike that closes OQ-H5, OQ-H6,
-   OQ-H9 and OQ-F7 cannot run without it, and every field claim in the homologation stays
-   unproven until it does.
+2. ~~OQ-H8~~ **— closed 2026-09-14.** The API key is already in `app_config` in both TEST and
+   PROD, so the spike is **unblocked**: nothing has to be requested from PRMS Tech Support.

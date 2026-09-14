@@ -383,12 +383,28 @@ thing to settle.
 | `requestId` | AWS trace id, present in every body. | Persist on every attempt — it is what PRMS support asks for. |
 | `prms_result_code` | — | ⚠️ **Still not located in the contract.** The success example shows only `results: [{...Metadata}]`. Family OQ-F7 remains **open**: confirm whether the PRMS-assigned code returns synchronously, on the decision webhook, or not at all. `results.prms_result_code` exists and is unwritten. |
 
+### 10.1 Reading the API key — two behaviours to design around
+
+`AppConfigService.getEnv` is a direct `findOne` on `app_config` filtered by
+`key = … AND is_active = true`, returning `{ json_value, simple_value }`.
+
+| Behaviour | Consequence for `sync-engine` |
+|---|---|
+| **Throws `NotFoundException`** when the row is missing **or `is_active = false`** | ✅ Good: a deactivated key fails loudly instead of sending an empty header and collecting a PRMS `401`. Let it propagate as a clear STAR-side error; do not swallow it into a generic sync failure. |
+| **No caching** — one query per call | ✅ A rotated key takes effect immediately. The cost is one indexed read per sync, negligible for a user-triggered action. **Not** subject to the 5-minute TTL trap of K-016 — that applies to `MappingPhaseResolver` / `ClarisaProjectsService`, not here. |
+| ⚠️ **`PdfViewerService`'s pattern is the one to avoid** | It calls `setApiKey()` **in its constructor**, so it reads once at boot and a rotated key needs a process restart. `sync-engine` must read **per request**, not at construction — otherwise key rotation silently keeps working with the old value until the next deploy. |
+
+> **Environment split comes free here.** Because the value lives in each environment's own
+> database, TEST and PROD are separated by the database itself — no `ARI_*` variable is needed for
+> the key. **The Normalizer HOST still needs one var per environment** (K-005 / R-F2); only the
+> credential is DB-resident.
+
 ### Authentication & webhooks (closes family OQ-F1)
 
 | Item | Answer (2026-09 contract) |
 |---|---|
 | Transport | **Still REST `POST /ingest`.** The anticipated "hook-based model" did **not** replace ingest; hooks appear instead as **outbound decision webhooks** *from* PRMS. The family's hold reason is resolved. |
-| Auth | **`x-api-key` header, a CLARISA API key.** No `Authorization: Bearer` alternative, no anonymous access. Access path: **`AppConfig.ARI_CLARISA_API_KEY`** (`domain/shared/utils/app-config.util.ts`, getter added 2026-09-14 over a variable `report-ms.app.ts` was already reading raw). ⚠️ **Which key VALUE is an open question — see OQ-H8.** The name is already taken twice in this repo (an env var and an `app_config` row), and the row is documented as the key for *the IBD unit's microservices*. PRMS issues keys **per tool and per environment** and forbids reuse across tools, so ingest most likely needs its own value. |
+| Auth | **`x-api-key` header, a CLARISA API key — CLOSED 2026-09-14.** No `Authorization: Bearer` alternative, no anonymous access. **Source: the `app_config` DB row `ARI_CLARISA_API_KEY`** (`AppConfigKey`, seeded by migration `1781879906673`), read through **`AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY)` → `.simple_value`** — the same manager and the same key `PdfViewerService` already uses. The value was **verified present in both TEST and PROD** by the product owner on 2026-09-14. See §10.1 for the two behaviours this manager imposes. |
 | Key scope | **One key per tool per environment.** The key *is* the platform identity — it is what makes `external_reference` round-trip to us and only us. Must be requested from PRMS Tech Support for STAR, TEST **and** PRODUCTION. **Not yet obtained — this is now the critical-path blocker.** |
 | Environments | TEST `https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com` · PROD `https://v6a9z2e4y5.execute-api.us-east-1.amazonaws.com`. One `ARI_*` var per environment (K-005: hosts are branch selectors, never collapsed). |
 | Decision webhooks | Self-service `POST /webhook` with the same key. Registration carries **no platform field** — the key identifies us. **Decisions taken with no destination registered are not replayed**, so registration must precede the first result going under review. Out of scope for `sync-engine` v1; it is the natural fifth family member. |
@@ -407,7 +423,7 @@ survives:
 | **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? STAR has `agresso_contract.agreement_id` + `projectDescription`; the composition is **unproven**. | Every type | Spike |
 | **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the field table, or `level` per `inno_dev.json`? | Innovation Development | Spike |
 | **OQ-H7** | `innov_use_to_be_determined` — derive it from "no actors and no quantifications", or store it explicitly? *(Moot while OQ-H1' keeps the type out.)* | Innovation Use | HITL |
-| **OQ-H8** | **API key — which value, and from where?** Two sub-questions. **(a)** The *access path* exists (`AppConfig.ARI_CLARISA_API_KEY`, 2026-09-14) — but the repo already carries **two stores under that one name**: the env var (`report-ms.app.ts`) and an `app_config` row (`PdfViewerService`, migration `1781879906673`, described as *the IBD unit's microservices* key). `sync-engine` must state which it reads, and not silently inherit a key meant for another consumer. **(b)** PRMS issues keys **per tool and per environment** and states a key must not be reused across tools — so STAR ingest most likely needs **its own TEST and PRODUCTION values**, requested from PRMS Tech Support. Critical path: the spike cannot run without the TEST value. | Everything | External + design |
+| ~~OQ-H8~~ | **CLOSED 2026-09-14.** The key is the **`app_config` row**, read via `AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY)`; the value is present in **TEST and PROD**, verified by the product owner. No key has to be requested and no env var is involved — see §10 and §10.1. *(The env-var getter briefly added the same day was reverted: with the value DB-resident it was a third access path to one credential name and had no callers.)* | — | Closed |
 | **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted by PRMS, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
 
 **Closed:** OQ-H1 → D-1 · OQ-H2 → D-2 · OQ-H3 → D-3 · OQ-H4 → D-4 (type dropped) · plus D-5, D-6, D-7.
