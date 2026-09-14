@@ -7,6 +7,14 @@
 > **gated out with a stated reason**, not attempted; no field is filled by inference. Centres
 > resolve from the primary contract (`ExCIAT` → `46`, `ExBIO` → `49`).
 >
+> **Revision 4 — 2026-09-14.** Two corrections. **(a) Build ≠ send:** payload builders are written
+> for **every** indicator STAR can represent, including the ones PRMS rejects today — the gate
+> withholds the *send*, not the development, so lifting an exclusion is a gate change, not new
+> work. **(b)** Added [`homologation.md`](./homologation.md) §12 — a review of all ten inbound
+> homologations for reuse in reverse. **Six are reusable, four are not**, and one
+> (`sex_and_age_disaggregation`) would silently invert every actor row if the inbound code were
+> copied as precedent.
+>
 > **Revision 2 — 2026-09-14.** Rewritten against the **2026-09** PRMS Normalizer contract.
 > The family's hold (OQ-F1, "the service is becoming a hook") is **resolved**: ingest is still
 > `POST /ingest` with an `x-api-key`; the hooks are *outbound decision webhooks*. Revision 1
@@ -57,19 +65,27 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
    `AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY).simple_value`, read **per request**
    (not in the constructor — see homologation §10.1). The per-environment Normalizer **host**
    still needs its own `ARI_*` var (K-005 — TEST and PROD are branch selectors).
-2. **Payload builders for the four supported types** — `capacity_sharing`,
-   `innovation_development`, `policy_change`, `innovation_use` — implementing
+2. **Payload builders for every indicator STAR can represent** — `capacity_sharing`,
+   `innovation_development`, `policy_change` (all three subtypes) and `innovation_use` —
+   implementing
    [`homologation.md`](./homologation.md) verbatim, including the 2026-08/09 breaking rules that
    STAR *can* satisfy: mandatory `lead_contact_person` (always present, D-3); `measures` always
    required for Innovation Use; `women_youth ≤ women`; centres from
    `agresso_contract.ubwClientDescription` — `ExCIAT` → **`46`**, `ExBIO` → **`49`** (D-7).
-3. **An eligibility gate, in place of pre-flight validation.** D-5 removes link validation and
-   D-6 removes length guards, so nothing is validated on our side *except* what STAR structurally
-   cannot satisfy. The endpoint refuses **up front**, with a reason the user can read:
-   `indicator_id = 3` (KP, D-4), `indicator_id = 5` (OICR), `indicator_id = 6` (Innovation Use —
-   D-1 + P-1), and PRMS policy type `1` (D-2). Nothing is attempted-and-failed. **P-1 makes this
-   the gate's purpose, not a limitation of it:** where a mandatory field has no user-supplied
-   source, the correct outcome is a visible refusal, never a payload we completed ourselves.
+3. **A send gate, separate from the builders.** D-5 removes link validation and D-6 removes
+   length guards, so nothing is validated on our side *except* what STAR structurally cannot
+   satisfy. The endpoint refuses **up front**, with a reason the user can read: `indicator_id = 3`
+   (KP, D-4), `indicator_id = 5` (OICR), `indicator_id = 6` (Innovation Use — D-1 + P-1), and PRMS
+   policy type `1` (D-2). Nothing is attempted-and-failed. **P-1 makes this the gate's purpose,
+   not a limitation of it:** where a mandatory field has no user-supplied source, the correct
+   outcome is a visible refusal, never a payload we completed ourselves.
+
+   **Build ≠ send.** The gate is a *thin, data-driven list*, never a missing branch: the
+   Innovation Use and policy-type-`1` builders are written, unit-tested and exercised in CI
+   against fixtures. When the PRMS PO meeting unblocks a type, the change is removing its entry
+   from that list — **not** writing a builder under time pressure months after the contract was
+   last read. The gate therefore has to be one enumerated place, not a condition scattered through
+   the builders.
 4. **Sync endpoint** guarded by: result Approved, alignment complete, primary contract is a
    pool-funding contributor, `@Roles`, and idempotency (already-synced → 409).
 5. **State persistence** — append-only `result_prms_sync_log` (attempt, environment, request
@@ -97,7 +113,8 @@ the STAR API key for TEST.
 - No client changes (child 2), no re-sync UI (child 3), no PI panel (child 4).
 - **No `usd_budget` / `is_determined` capture, and no substitute value** (D-1 + P-1) — Innovation
   Use is **gated out of v1**. It has **two** missing declarations, not one:
-  `innov_use_to_be_determined` is equally sourceless (homologation §1.4). See §12.
+  `innov_use_to_be_determined` is equally sourceless (homologation §1.4). See §12. *(The builder
+  itself IS written — what is withheld is the send, and the two sourceless fields.)*
 - **No `status_amount` / `amount` capture** (D-2) — PRMS policy type `1` stays unsyncable.
 - **No Knowledge Product sync** (D-4) — STAR cannot author KPs.
 - **No pre-flight validation of evidence links or title/description length** (D-5, D-6).
@@ -207,6 +224,16 @@ fields* but *who is supposed to*.
   alignment, non-pool-funding contract, already synced, `indicator_id = 3` (KP), `indicator_id = 5`
   (OICR), `indicator_id = 6` (Innovation Use), and PRMS policy type `1`. Each refusal carries a
   distinct, user-readable reason — one shared generic message would fail this criterion.
+- **Every builder covered, including gated types.** The `innovation_use` and policy-type-`1`
+  builders produce a correct payload for everything STAR *does* hold, proven against fixtures —
+  the only absences are the fields with no source. Lifting a gate must require no builder change;
+  prove it by flipping the gate in a test and asserting the payload builds.
+- **The `sex_and_age_disaggregation` orientation asserted in both modes** against the serialized
+  JSON (homologation §12.4). A test that exercises one mode proves nothing here: both values are
+  valid booleans, so an inverted flag is accepted by PRMS and silently recorded wrong.
+- **Role filters proven** — an Innovation Use payload built for a result that also carries
+  Innovation *Development* actors, institution types and quantifications contains **none** of the
+  Development rows (§12.5).
 - **P-1 asserted at the payload level:** no emitted field holds a value no user supplied.
   Concretely — `number_people_trained.unknown`, `innovation_developers` and
   `innov_use_to_be_determined` appear in **no** built payload. Assert on the serialized JSON, not

@@ -300,13 +300,15 @@ thing to settle.
 | `number_people_trained.men` | | `session_participants_male` | ✅ **EXACT.** |
 | `number_people_trained.non_binary` | | `session_participants_non_binary` | ✅ **EXACT.** |
 | `number_people_trained.unknown` | | — | ⚫ **Omitted (P-1, §1.4).** No column, and the `session_participants_total` remainder is an arithmetic artefact rather than a reported figure. Optional → send nothing. |
-| `length_training` | ✅ enum | `session_length_id` **and** `degree_id` | 🟢 **DERIVED — two STAR fields collapse into one PRMS enum.** PRMS accepts `"PhD" \| "Master" \| "Short-term" \| "Long-term"`. Proposed rule: `degree_id = PHD (1)` → `"PhD"`; `MSC (2)` → `"Master"`; otherwise invert `SessionLengthHomologation` (`SHORT_TERM` → `"Short-term"`, `LONG_TERM` → `"Long-term"`). ⚠️ `BSC (3)` has **no** PRMS slot — it must fall through to the session length, which means a BSc long-course and a non-degree long-course become indistinguishable in PRMS. Accept and record, or escalate to PRMS. |
+| `length_training` | ✅ enum | `session_length_id` **and** `degree_id` | 🟢 **DERIVED — two STAR fields collapse into one PRMS enum; full analysis in §12.2.** PRMS accepts `"PhD" \| "Master" \| "Short-term" \| "Long-term"`. Proposed rule: `degree_id = PHD (1)` → `"PhD"`; `MSC (2)` → `"Master"`; otherwise invert `SessionLengthHomologation` (`SHORT_TERM` → `"Short-term"`, `LONG_TERM` → `"Long-term"`). ⚠️ `BSC (3)` has **no** PRMS slot — it must fall through to the session length, which means a BSc long-course and a non-degree long-course become indistinguishable in PRMS. Accept and record, or escalate to PRMS. |
 | `delivery_method` | ✅ enum | `delivery_modality_id` | ✅ **EXACT — map already written.** Invert `DeliveryModalityHomologation`: `VIRTUAL` → `"Virtual / Online"`, `HYBRID` → `"Blended (in-person and virtual)"`, `IN_PERSON` → `"In person"`. |
 
-> Both homologation tables already exist in the repo for the **inbound** direction
-> (`domain/tools/open-search/prms/homologation/`). They are reusable by inversion — but an
-> inverted map is only total if the forward map was injective. `SessionLengthHomologation`
-> has 2 keys for 4 PRMS values, which is exactly why `degree_id` has to join the rule above.
+> Both tables exist in the repo for the **inbound** direction
+> (`domain/tools/open-search/prms/homologation/`), but neither inverts cleanly on its own:
+> `SessionLengthHomologation` covers 2 of the 4 PRMS values, and `DegreeHomologation` is **not
+> injective** (`Master` and `MSc` both → `MSC`). `DeliveryModalityHomologation` is the one
+> genuinely bijective map in the whole set. See **§12** for the full review of all ten inbound
+> artefacts and which are safe to invert.
 
 ---
 
@@ -330,7 +332,7 @@ thing to settle.
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
 | `innov_use_to_be_determined` | ✅ | — | 🔴 **No source, and not inferable (P-1, §1.4).** No boolean column on `result_innovation_use`. Deriving it from "no actors and no quantifications" is the same move P-1 was established to reject. A second reason Innovation Use is gated out of v1 — even with D-1 resolved, **this field would still have no honest source.** Raise it at the PRMS PO meeting alongside `usd_budget`. |
-| `actors[]` | ✅ unless TBD | `result_actors` | ✅ see §8.3. Empty array counts as missing. |
+| `actors[]` | ✅ unless TBD | `result_actors` **where `actor_role_id = ActorRolesEnum.INNOVATION_USE (2)`** | ✅ see §8.3. ⚠️ The role filter is mandatory — the table also holds Innovation *Development* actors (§12.5). Empty array counts as missing. |
 | `organization[]` | ⚙️ opt | `result_institution_types` where `institution_type_role_id = INNOVATION_USE (2)` | ✅ see §8.4. |
 | `measures[]` | ✅ **always** | `result_quantifications` where `quantification_role_id = INNOVATION_USE (3)` | ✅ see §8.5. |
 
@@ -347,7 +349,7 @@ thing to settle.
 | `actor_type_id` | ⚙️ ≥1 | `result_actors.actor_type_id` → `clarisa_actor_types.code` | ✅ **EXACT.** ⚠️ PRMS documents exactly **5** actor types (1–5). Confirm STAR's seeded `clarisa_actor_types` holds the same 5 and no more — an id outside PRMS's table is **rejected** since 2026-08. |
 | `actor_type_name` | ⚙️ ≥1 | `clarisa_actor_types.name` | ✅ **EXACT.** Prefer the id: since 2026-08 an unresolvable *name* is rejected, and **before** 2026-08 a name-only actor was **silently dropped while the request still returned 200**. |
 | `other_actor_type` | cond (`actor_type_id = 5`) | `result_actors.actor_type_custom_name` | ✅ **EXACT.** |
-| `sex_and_age_disaggregation` | ❌ opt | `result_actors.sex_age_disaggregation_not_apply` | ✅ **EXACT — despite the names reading opposite.** Verified against the entity's own documented mode table: STAR `TRUE` = aggregate mode (`actors_count` populated, the four `*_count` NULL); PRMS `true` = *"disaggregation not available, report `how_many` only"*. **Same semantics, direct pass-through.** The inverted-sounding names make this the highest-risk row in the document — assert it explicitly in a test, both modes. |
+| `sex_and_age_disaggregation` | ❌ opt | `result_actors.sex_age_disaggregation_not_apply` | ⚠️ **Pass-through by both contracts — but NOT yet proven, see §12.4.** STAR `TRUE` = aggregate mode (`actors_count` populated, the four `*_count` NULL); Normalizer `true` = *"disaggregation not available, report `how_many` only"*. Same meaning → send unchanged. **However** the existing inbound code negates the same-named field (`prms.opensearch.service.ts:564`) for a *different* PRMS surface. **Highest-risk row in this document.** Prove both modes in the spike, assert on the serialized JSON, and never copy `:564` as precedent. |
 | `how_many` | cond (required when the flag is `true`) | `result_actors.actors_count` | ✅ **EXACT.** In disaggregated mode `actors_count` is NULL **by design** (it is not a stored total — DD-7) and PRMS does not require it. Omit; never compute a substitute. |
 | `women` | ❌ opt | — | 🟢 **DERIVED:** `women_youth_count + women_not_youth_count`. |
 | `women_youth` | ❌ opt | `result_actors.women_youth_count` | ✅ **EXACT.** Must be ≤ `women` — guaranteed by the derivation above. |
@@ -479,6 +481,135 @@ side. They are what stands between v1 and full type coverage.
 | **4** | **`keep_editing`** — should STAR results land in PRMS as *Editing* (the reporting user completes them there) or *Pending review*? | Changes who finishes the result and which queue it enters. A workflow decision, theirs to make with us. |
 | **5** | **Doc contradictions** — `innovation_readiness_level` `id`/`name` vs `{"level": 0}`; `scope_code = 50` absent from the validation table; CGIAR System Organization listed as `11605 / SO` in `lead_center` but `221 / SMO` in `contributing_center`. | The written contract disagrees with its own examples; a spike can reveal current behaviour but not intent. |
 | **6** | **Title / description length** — the contract says 30 / 150 words; a PRMS developer confirmed verbally that longer values pass (D-6). | A verbal exception to a written contract needs an owner and a date, or it silently expires (K-013). |
+
+---
+
+## 12. Inverting the inbound homologations
+
+STAR already homologates PRMS values when **importing** (`domain/tools/open-search/prms/`). The
+obvious move is to invert them for sending. **Six of the ten are reusable; four are not**, and one
+of the four is a trap that would silently corrupt every actor row.
+
+| Artefact | Inbound mapping | Invertible? | Outbound verdict |
+|---|---|---|---|
+| `delivery-modality.homologation.ts` | 3 PRMS labels ↔ 3 STAR values | ✅ **Bijective** | **Reuse by inversion.** The only clean one. |
+| `AcronymExContractEnum` *(inline)* | `'ABC RH' → EXCIAT`, `'ABC' → EXBIO` | ✅ Bijective | **Reuse** — already the basis of D-7 (§1.3). Keep its `.toUpperCase().trim()`. |
+| `policy-type.homologation.ts` | PRMS ids `1,2,3` ↔ STAR enum | ✅ Bijective | **Reuse, with a caveat** — see §12.1. |
+| `policy-stage.homologation.ts` | PRMS ids `6,7,8` ↔ STAR `1,2,3` | ✅ Bijective | **Reuse, same caveat** — §12.1. |
+| `session-length.homologation.ts` | 2 PRMS terms ↔ 2 STAR values | ⚠️ **Partial** | PRMS's outbound enum has **4** values, this map covers 2. Must combine with degree — §12.2. |
+| `degree.homologation.ts` | 5 keys → 4 STAR values | ❌ **Not injective** | `Master` *and* `MSc` both → `MSC`, so the inverse is ambiguous — §12.2. |
+| `indicator.homologation.ts` | PRMS `ResultTypeEnum` (numeric `1–11`) → STAR `IndicatorsEnum` | ❌ **Wrong vocabulary** | Not an inversion at all — §12.3. |
+| `ip-rights-application.homologation.ts` | `Yes` / `No` / `Not sure` ↔ STAR IP option | — | ⚫ **No outbound counterpart.** The Normalizer's `innovation_development` block has only `innovation_typology`, `innovation_developers`, `innovation_readiness_level` — **no IP rights field.** Not needed. |
+| `prms-innovation-question.homologation.ts` | question ids `101` / `102` | — | ⚫ **No outbound counterpart.** Same reason. |
+| `ResultPrmsStatusMapper` *(inline)* | PRMS status → STAR `*_IN_PRMS` statuses | ❌ | ⚫ **Not sent.** PRMS decides the status; STAR does not propose one. Becomes relevant only for the future **decision webhook**, which is the inbound direction again. |
+
+> The catalogue lookups (`innovation_typology`, `innovation_readiness_level`, `actor_type`,
+> `institution_type`, countries, regions, sub-nationals) are **not** homologations — inbound they
+> resolve CLARISA by name or code through `Clarisa*Service`. Outbound they are direct reads of the
+> same CLARISA ids STAR already stores. Nothing to invert.
+
+### 12.1 Policy ids — the provenance is not the same
+
+`PolicyTypeHomologation` and `PolicyStageHomologation` document their PRMS side as coming from
+**`policy_change_summary`** — PRMS's *internal* ids, reached through OpenSearch. The Normalizer,
+by contrast, points at **CLARISA** (`/api/policy-types`, `/api/policy-stages`) and its example
+sends `policy_stage: { "name": "Stage 1" }`.
+
+**PRMS-internal ids and CLARISA ids are not established to be the same numbers.** Inverting the map
+and sending the id is therefore a guess wearing the costume of an existing, tested mapping — the
+most convincing kind of wrong.
+
+> **Rule for v1:** send the **`name`**, which both catalogues agree on, or prove the id in the
+> spike. The contract accepts either (`id` *or* `name`). ⚠️ Note the labels are not verbatim
+> identical: the inbound file documents PRMS type `1` as *"Program, budget or investment"*, while
+> the Normalizer's field table calls it *"Budget or investment"* and `policy.json` sends
+> *"Program, budget or investment"*. Send the form the examples use, and confirm at the PO meeting
+> (agenda item 5).
+
+### 12.2 `length_training` — two STAR fields, one PRMS enum, and a lossy inverse
+
+The Normalizer accepts exactly `"PhD" | "Master" | "Short-term" | "Long-term"`. STAR splits that
+across `session_length_id` and `degree_id`, and the inbound pair reflects it: `SessionLength`
+carries the *term*, `Degree` carries the *name*, and the inbound comment notes degree **only
+applies when the term is Long-term**.
+
+Inverting hits two problems:
+
+| Problem | Detail |
+|---|---|
+| **`degree` is not injective** | `Master` **and** `MSc` both map to `DegreesEnum.MSC`. Inverting `MSC` is ambiguous — resolve it by the *target* vocabulary: the Normalizer's enum contains `"Master"`, not `"MSc"`, so `MSC → "Master"`. The ambiguity disappears only because the destination is narrower than the source. |
+| **Two STAR degrees have no PRMS slot** | `BSc` and `Other` do not exist in `length_training`. They must fall through to the session term, which means **a BSc long course and a non-degree long course become indistinguishable in PRMS.** Record it; do not invent a value (P-1). |
+
+**Proposed outbound rule:** `degree_id = PHD → "PhD"` · `MSC → "Master"` · otherwise invert
+`SessionLengthHomologation` (`SHORT_TERM → "Short-term"`, `LONG_TERM → "Long-term"`).
+
+### 12.3 `indicator.homologation.ts` is not invertible — different vocabularies
+
+This is the one most likely to be reached for and the one that fits worst.
+
+| | Inbound | Outbound (Normalizer) |
+|---|---|---|
+| PRMS side | `ResultTypeEnum` — **numbers** `1–11` (`POLICY_CHANGE = 1`, `KNOWLEDGE_PRODUCT = 6`, …) | `type` — **strings** (`"policy_change"`, `"knowledge_product"`, …) |
+| Source | PRMS OpenSearch `indicator_category.code` | The ingest contract |
+
+They are two different vocabularies for the same concept, and the numbers do **not** correspond to
+anything in the Normalizer. The outbound map in §3 is a **new artefact**, not an inversion — write
+it fresh and keep it beside the inbound one so the difference stays visible.
+
+> It also carries six `null` entries (`CAPACITY_CHANGE`, `OTHER_OUTCOME`, `OTHER_OUTPUT`,
+> `IMPACT_CONTRIBUTION`, `INNOVATION_USE_IPSR`, `COMPLIMENTARY_INNOVATION`) — PRMS types STAR
+> cannot represent. Inverting a partial function yields a partial function; §3's map is total over
+> STAR's six indicators instead, which is the property the outbound side actually needs.
+
+### 12.4 ⚠️ `sex_and_age_disaggregation` — the inbound code and the Normalizer doc disagree
+
+**This is the finding that justifies the whole review.**
+
+`prms.opensearch.service.ts:564` **negates** the field:
+
+```ts
+dto.sex_age_disaggregation_not_apply = !actor.sex_and_age_disaggregation;
+```
+
+But reading the two contracts side by side, the outbound direction is a **pass-through**:
+
+| | `true` means |
+|---|---|
+| **Normalizer doc** (`innovation_use.actors[]`) | *"⚠️ Reads as 'does not apply'"* — disaggregation **not** available, report `how_many` only |
+| **STAR entity** (`result_actor.entity.ts` mode table) | Aggregate mode — `actors_count` populated, the four `*_count` NULL |
+
+Same meaning. So `sex_age_disaggregation_not_apply` → `sex_and_age_disaggregation` **unchanged**,
+and the inbound line would be its opposite.
+
+**Both can still be correct**, and that is the point: they are *different PRMS surfaces*. The
+inbound line reads `innovation_development_summary…demand.actors[]` from PRMS **OpenSearch** and
+writes STAR actors with `ActorRolesEnum.INNOVATION_DEV`; the outbound writes the **Normalizer's**
+`innovation_use.actors[]` from actors with `ActorRolesEnum.INNOVATION_USE`. Two APIs, two actor
+roles, one field name — and the Normalizer doc flags its own semantics with a ⚠️, which is what a
+contract does when a name reads backwards.
+
+> **Rules, non-negotiable:**
+> 1. **Do not cite `:564` as precedent.** It governs a different surface. Copying it inverts every
+>    actor row in the outbound payload — and because both values are valid booleans, PRMS accepts
+>    the payload and silently records the wrong disaggregation mode.
+> 2. **Prove the outbound direction in the spike**, with one actor in each mode, read back.
+> 3. Assert it on the **serialized JSON**, never on the DTO (KZ-001, KZ-017).
+> 4. The mode also selects which numbers are populated at all (§8.3) — a flipped flag sends
+>    `how_many` where PRMS expects `women`/`men`, or the reverse.
+
+### 12.5 Selecting the right rows — the Innovation Use role filter
+
+Three STAR tables serve both Innovation Development and Innovation Use, discriminated by a role
+column. The outbound builders must filter, or they mix the two indicators' data:
+
+| Table | Filter for Innovation Use |
+|---|---|
+| `result_actors` | `actor_role_id = ActorRolesEnum.INNOVATION_USE (2)` |
+| `result_institution_types` | `institution_type_role_id = InstitutionTypeRoleEnum.INNOVATION_USE (2)` |
+| `result_quantifications` | `quantification_role_id = QuantificationRolesEnum.INNOVATION_USE (3)` |
+
+> ⚠️ The three enums use **different numbers for the same concept** (`2`, `2`, `3`). A copy-pasted
+> literal is wrong in exactly one of the three. Use the enum, never the number.
 
 ---
 
