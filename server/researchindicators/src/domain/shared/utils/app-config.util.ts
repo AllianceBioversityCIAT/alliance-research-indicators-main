@@ -60,6 +60,16 @@ export class AppConfig {
     return process.env.ARI_CLARISA_PASS;
   }
 
+  // CLARISA API key — sent as the `x-api-key` header.
+  // Distinct from ARI_CLARISA_USER/PASS above: those authenticate STAR against
+  // CLARISA's own API, while this key is the platform identity CLARISA issues
+  // per tool and per environment. The PRMS Normalizer ingest API validates it
+  // against CLARISA on every call and resolves the calling platform from it,
+  // which is why one key must never be shared across tools or environments.
+  get ARI_CLARISA_API_KEY(): string {
+    return process.env.ARI_CLARISA_API_KEY;
+  }
+
   //Mysql host
   get ARI_MYSQL_HOST(): string {
     return process.env.ARI_MYSQL_HOST;

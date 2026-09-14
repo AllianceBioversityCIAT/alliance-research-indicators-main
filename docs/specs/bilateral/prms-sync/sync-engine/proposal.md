@@ -49,7 +49,9 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
 ## 4. Proposed Outcome
 
 1. **New tool module** `domain/tools/prms-normalizer/` (TRD §9.1): one Nest service, transport
-   encapsulated, host + API key via `ARI_*` env vars, `BaseApi` reuse where it fits.
+   encapsulated, `BaseApi` reuse where it fits. The API key is **`AppConfig.ARI_CLARISA_API_KEY`**
+   (added 2026-09-14, sent as `x-api-key`); the per-environment Normalizer host still needs its
+   own `ARI_*` var at implementation time (K-005 — TEST and PROD are branch selectors).
 2. **Payload builders for the four supported types** — `capacity_sharing`,
    `innovation_development`, `policy_change`, `innovation_use` — implementing
    [`homologation.md`](./homologation.md) verbatim, including the 2026-08/09 breaking rules that
@@ -228,6 +230,7 @@ The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the cl
 1. **OQ-H1' / OQ-H2'** — how v1 presents Innovation Use and PRMS policy type `1`. Recommended:
    gate both out with a stated reason. Option (c) in §12 (`is_determined` only, no monetary
    figure) is worth a look first — it is small and it recovers a whole indicator type.
-2. **OQ-H8** — request STAR's **TEST** API key from PRMS Tech Support. The spike that closes
-   OQ-H5, OQ-H6, OQ-H9 and OQ-F7 cannot run without it, and every field claim in the
-   homologation stays unproven until it does.
+2. **OQ-H8** — request STAR's **TEST** API key *value* from PRMS Tech Support. The config slot
+   exists (`ARI_CLARISA_API_KEY`); the key itself does not. The spike that closes OQ-H5, OQ-H6,
+   OQ-H9 and OQ-F7 cannot run without it, and every field claim in the homologation stays
+   unproven until it does.

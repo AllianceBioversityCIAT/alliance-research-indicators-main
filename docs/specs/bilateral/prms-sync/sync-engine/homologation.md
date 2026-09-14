@@ -388,7 +388,7 @@ thing to settle.
 | Item | Answer (2026-09 contract) |
 |---|---|
 | Transport | **Still REST `POST /ingest`.** The anticipated "hook-based model" did **not** replace ingest; hooks appear instead as **outbound decision webhooks** *from* PRMS. The family's hold reason is resolved. |
-| Auth | **`x-api-key` header, a CLARISA API key.** No `Authorization: Bearer` alternative, no anonymous access. |
+| Auth | **`x-api-key` header, a CLARISA API key.** No `Authorization: Bearer` alternative, no anonymous access. Read from **`AppConfig.ARI_CLARISA_API_KEY`** (`domain/shared/utils/app-config.util.ts`) — added 2026-09-14. ⚠️ Distinct from `ARI_CLARISA_USER`/`ARI_CLARISA_PASS`, which authenticate STAR against CLARISA's *own* API; this key is STAR's **platform identity**. |
 | Key scope | **One key per tool per environment.** The key *is* the platform identity — it is what makes `external_reference` round-trip to us and only us. Must be requested from PRMS Tech Support for STAR, TEST **and** PRODUCTION. **Not yet obtained — this is now the critical-path blocker.** |
 | Environments | TEST `https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com` · PROD `https://v6a9z2e4y5.execute-api.us-east-1.amazonaws.com`. One `ARI_*` var per environment (K-005: hosts are branch selectors, never collapsed). |
 | Decision webhooks | Self-service `POST /webhook` with the same key. Registration carries **no platform field** — the key identifies us. **Decisions taken with no destination registered are not replayed**, so registration must precede the first result going under review. Out of scope for `sync-engine` v1; it is the natural fifth family member. |
@@ -407,7 +407,7 @@ survives:
 | **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? STAR has `agresso_contract.agreement_id` + `projectDescription`; the composition is **unproven**. | Every type | Spike |
 | **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the field table, or `level` per `inno_dev.json`? | Innovation Development | Spike |
 | **OQ-H7** | `innov_use_to_be_determined` — derive it from "no actors and no quantifications", or store it explicitly? *(Moot while OQ-H1' keeps the type out.)* | Innovation Use | HITL |
-| **OQ-H8** | **STAR API keys for TEST and PRODUCTION — requested from PRMS Tech Support?** Critical path: the spike cannot run without the TEST key. | Everything | External |
+| **OQ-H8** | **STAR API key values for TEST and PRODUCTION — requested from PRMS Tech Support?** The *plumbing* is done (`ARI_CLARISA_API_KEY`, 2026-09-14); what is missing is the **values**, one per environment. Critical path: the spike cannot run without the TEST key. | Everything | External |
 | **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted by PRMS, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
 
 **Closed:** OQ-H1 → D-1 · OQ-H2 → D-2 · OQ-H3 → D-3 · OQ-H4 → D-4 (type dropped) · plus D-5, D-6, D-7.
