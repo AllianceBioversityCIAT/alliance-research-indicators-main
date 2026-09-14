@@ -43,7 +43,8 @@
 Of the **58 contract fields** reconciled below, **51 are satisfiable today** from the STAR model.
 The other **7 (G-1…G-7) were put to the product owner on 2026-09-14 and all 7 are now decided** —
 §1.1 records each decision and what it costs. Nothing in this homologation blocks
-`/akili-specify` any more; what remains open is the TEST-env spike (§11).
+`/akili-specify` any more; the TEST-env spike ran 2026-09-14 and §11 now shows two items closed
+(OQ-F7, OQ-H9) and two open at the persistence/composition layer (OQ-H5, OQ-H6).
 
 ### 1.0 Governing principle — **P-1: what we do not have, we do not send**
 
@@ -116,7 +117,7 @@ this?"*, not *"is a computation involved?"*.
 | PRMS type | STAR indicator | v1 outcome |
 |---|---|---|
 | `capacity_sharing` | 1 | ✅ **Syncs clean.** No open gap. |
-| `innovation_development` | 2 | ✅ **Syncs clean.** Only OQ-H6 (`readiness_level` shape) pending, and the spike settles it. |
+| `innovation_development` | 2 | ✅ **Syncs clean.** OQ-H6 (`readiness_level` shape) — the TEST spike settled the **schema** layer only (`id`+`name`+`level` together pass; no shape is rejected). **Which key persists is still open** — no `innovation_development` call reached persistence, each blocked earlier by an unrelated `innovation_typology` catalogue rejection. See §6. |
 | `policy_change` | 4 | ⚠️ **Two of three subtypes.** *Legal instrument* and *Policy or strategy* sync; *Program, Budget, or Investment* is **gated out** (D-2). |
 | `innovation_use` | 6 | ⛔ **Not synced in v1** — gated out with a stated reason (D-1 + P-1). |
 | `knowledge_product` | 3 | ⚫ **Out of scope** (D-4). |
@@ -184,8 +185,13 @@ this?"*, not *"is a computation involved?"*.
 | `result_indicator_description` | ❌ opt | `result_pool_funding_toc_alignment.indicator_description` | ✅ **EXACT.** |
 | `result_indicator_type_name` | ❌ opt | — | 🟡 **HOMOLOGABLE.** No column. Candidates: `result_pool_funding_indicator_mapping.indicator_type`, or the STAR indicator display name (`INDICATORS_ENUM_DISPLAY_NAME`). PRMS's own examples use labels like *"Number of knowledge products"*, which match **neither** verbatim. Optional → safest v1 is to omit rather than send a value PRMS cannot resolve. |
 
-> A "No" row (`aligns_with_toc: false`) carries `null` in every ToC column. `toc_mapping` must
-> then be built from `science_program_id` alone, or omitted in favour of `contributing_programs`.
+> A "No" row (`aligns_with_toc: false`) carries `null` in every ToC column. **`toc_mapping` cannot
+> be omitted — CONTRADICTED by the TEST spike, 2026-09-14 (T-01).** The object is unconditionally
+> required at the root of `data`: a first call that left it out was rejected with `"(root) must
+> have required property 'toc_mapping'"` (`spike/discovery-log.md` finding D-A, `requestId
+> Root=1-6aa851eb-4ec93ae925475b33182f3ccf`). For a "No" row, `toc_mapping` must still be built
+> from `science_program_id` alone; `contributing_programs` is a separate, additional field, never
+> a substitute for `toc_mapping` itself.
 
 ### 4.2 `contributing_programs[]` (the **Contributing** Science Programs)
 
@@ -213,8 +219,17 @@ this?"*, not *"is a computation involved?"*.
 
 **Conditional rules STAR must pre-validate (PRMS rejects otherwise):** scope 1 → *no* regions/countries/sub-nationals; 2 → ≥1 region; 3 → **≥2 countries**; 4 → ≥1 country; 5 → ≥1 country **and** ≥1 sub-national. STAR does not enforce the ≥2-country rule for Multi-national — confirm before relying on it.
 
-> ⚠️ **Scope `50` (to be determined)** exists in STAR and is listed in PRMS's `scope_code`
-> description, but appears in **no** conditional-validation row. Behaviour unknown — spike it.
+> ✅ **Scope `50` (to be determined) — CONFIRMED by the TEST spike, 2026-09-14 (T-01).** Accepted
+> end-to-end with **no** companion regions/countries/sub-nationals, and with one specific,
+> non-obvious required label: `scope_label` must be the literal string
+> **`"This is yet to be determined"`** (not `"To be determined"` — a first attempt with that
+> guess was schema-rejected: `"/geo_focus/scope_label must be equal to one of the allowed
+> values. Allowed values: [\"Global\",\"Regional\",\"Multi-national\",\"National\",\"Sub-national\",
+> \"This is yet to be determined\"]"`). With the corrected label, the row was fully `ACCEPTED`
+> (`200`) and persisted as `"geographic_scope_id":50,"obj_geographic_scope":{"id":50,"name":
+> "This is yet to be determined","description":""}`. See
+> `spike/README.md` § OQ-5 and `spike/responses/01-capacity-sharing-scope50.json`
+> (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`).
 
 ### 4.4 Institutions
 
@@ -248,7 +263,7 @@ this?"*, not *"is a computation involved?"*.
 
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
-| `grant_title` | ✅ | `result_contracts.contract_id` → `agresso_contract` | 🟡 **HOMOLOGABLE — composition unproven.** `projectDescription` is STAR's "Project Name" (`OrderFieldsEnum.PROJECT_NAME → ac.projectDescription`); `agreement_id` is the code. PRMS's example — `"D-200358-Enhancing Food Security…"` — reads as `<agreement_id>-<description>`, and PRMS matches against **CLARISA `/api/projects`**, not against AGRESSO. **Do not assert a composition; prove it in the spike.** A title PRMS cannot resolve fails the row. |
+| `grant_title` | ✅ | `result_contracts.contract_id` → `agresso_contract` | ⚠️ **PREMISE FALSIFIED by the TEST spike, 2026-09-14 (T-01).** The assumption that "a title PRMS cannot resolve fails the row" is **wrong**. Two ACCEPTED (`200`) calls used a plausible-format guess (`"D-000000-ARI SPIKE Contract Title Test"`) and one used a deliberately-garbage string with no code prefix at all (`"THIS IS A DELIBERATELY INVALID ARI SPIKE GRANT TITLE THAT MATCHES NO CLARISA PROJECT"`) — **both succeeded identically**, and in every case the persisted result's `bilateral_projects` array came back **empty** (`"bilateral_projects":[]`), with no error, no `207` partial failure, nothing. See `spike/README.md` § OQ-1, `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`) and `spike/responses/05-capacity-sharing-failing-grant-title.json` (`requestId Root=1-6aa852e8-42962254355b61c50e0b74df`). **Consequence: `sync-engine` cannot detect a silently-dropped bilateral-project link from the ingest response alone** — a row that reads as fully synced may have lost its project association. The composition itself (`<agreement_id>-<description>`) remains **unproven** — the spike had no reachable CLARISA-verified project to test with a genuinely real title; see `spike/README.md` § OQ-1 for what would settle that half. |
 | `is_lead` | ⚙️ opt | `result_contracts.is_primary` | ✅ **EXACT.** |
 | **`usd_budget`** | ✅ **cond — Innovation Use only** | — | 🔴 **NOT BUILT — D-1.** No per-result, per-contract USD amount exists in the model, and none is being added this cycle. `agresso_contract.grant_amount_usd` / `center_amount_usd` are **project totals**, not this result's contribution — sending either would be a fabricated figure and is explicitly ruled out. Must be **> 0** when sent; `0` is rejected. |
 | **`is_determined`** | ✅ **cond — Innovation Use only** | — | 🔴 **NOT BUILT — D-1.** ⚠️ Worth noting for the revisit: `is_determined: true` alone *does* satisfy PRMS, and it needs **no monetary figure** — only a per-project boolean meaning "amount not yet determined". That is a materially smaller change than capturing USD amounts, and it would make Innovation Use syncable. Raised as **OQ-H1'**. |
@@ -284,11 +299,20 @@ thing to settle.
 | `innovation_readiness_level.id` | ⚙️ ≥1 | `result_innovation_dev.innovation_readiness_id` → `clarisa_innovation_readiness_levels.id` | ✅ **EXACT.** |
 | `innovation_readiness_level.name` | ⚙️ ≥1 | `clarisa_innovation_readiness_levels.name` | ✅ **EXACT.** |
 
-> ⚠️ **Contradiction inside the supplied documentation.** The field table for
+> ⚠️ **Contradiction inside the supplied documentation — SCHEMA layer settled by the TEST spike,
+> 2026-09-14 (T-01); PERSISTENCE layer still open.** The field table for
 > `innovation_readiness_level` declares `id` and `name` only — but `inno_dev.json` sends
 > `{"level": 0}`. STAR's `clarisa_innovation_readiness_levels` carries **both** `id` and
-> `level`, so either shape is producible; what is not knowable from the docs is which one the
-> schema accepts. **Spike it** (this is the successor to family OQ-F5).
+> `level`, so either shape is producible. The spike sent `id`+`name` alone, `level` alone
+> (`spike/responses/03-innovation-development-level-only.json`, `requestId
+> Root=1-6aa852b9-3fe9d93047debe46758a3a33`), and all three keys together
+> (`spike/responses/02-innovation-development-combined-readiness.json`, `requestId
+> Root=1-6aa8532c-5bc036d21bb27f3109931c8a`) — in every case `innovation_readiness_level` was
+> never named in the validation error; the schema **rejects none of the three shapes**. What
+> remains open is which key the downstream system actually reads and stores: every one of the
+> three calls was blocked earlier by an unrelated `innovation_typology` catalog rejection
+> (`"Unsupported innovation typology name \"Technology\""`), so none reached persistence. See
+> `spike/README.md` § OQ-2 for the full account and what would settle the remaining question.
 
 ---
 
@@ -421,7 +445,7 @@ thing to settle.
 | `401` | No key, or CLARISA says the key is invalid. | **Do not retry** — fix the key. |
 | `503` | CLARISA unreachable to validate the key. | **Retryable**; the key may be fine. |
 | `requestId` | AWS trace id, present in every body. | Persist on every attempt — it is what PRMS support asks for. |
-| `prms_result_code` | — | ⚠️ **Still not located in the contract.** The success example shows only `results: [{...Metadata}]`. Family OQ-F7 remains **open**: confirm whether the PRMS-assigned code returns synchronously, on the decision webhook, or not at all. `results.prms_result_code` exists and is unwritten. |
+| `prms_result_code` | — | ✅ **LOCATED by the TEST spike, 2026-09-14 (T-01).** Returns **synchronously**, in the same ingest response, at `results[].result.result_code` (echoed again at `results[].externalApiResponse.response.result_code`) — not only via the decision webhook. Confirmed on 3 separate ACCEPTED calls with distinct, incrementing values (`9197`, `9198`, `9199`); see `spike/README.md` § OQ-6 and `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`): `"result":{...,"result_id":11665,"result_code":9197}`. Family OQ-F7 is **closed**. ⚠️ Do not confuse this with the Normalizer's own `resultId` field (`prms.result-management.api:<type>:dataset.ingest.requested:auto-<hash>`), which is a deterministic idempotency key present even on failed calls and is **not** the PRMS-assigned code. |
 
 ### 10.1 Reading the API key — two behaviours to design around
 
@@ -445,7 +469,7 @@ thing to settle.
 |---|---|
 | Transport | **Still REST `POST /ingest`.** The anticipated "hook-based model" did **not** replace ingest; hooks appear instead as **outbound decision webhooks** *from* PRMS. The family's hold reason is resolved. |
 | Auth | **`x-api-key` header, a CLARISA API key — CLOSED 2026-09-14.** No `Authorization: Bearer` alternative, no anonymous access. **Source: the `app_config` DB row `ARI_CLARISA_API_KEY`** (`AppConfigKey`, seeded by migration `1781879906673`), read through **`AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY)` → `.simple_value`** — the same manager and the same key `PdfViewerService` already uses. The value was **verified present in both TEST and PROD** by the product owner on 2026-09-14. See §10.1 for the two behaviours this manager imposes. |
-| Key scope | **One key per tool per environment.** The key *is* the platform identity — it is what makes `external_reference` round-trip to us and only us. Must be requested from PRMS Tech Support for STAR, TEST **and** PRODUCTION. **Not yet obtained — this is now the critical-path blocker.** |
+| Key scope | **One key per tool per environment — CONFIRMED for TEST by the TEST spike, 2026-09-14 (T-01).** The key *is* the platform identity: all 3 ACCEPTED calls resolved to `"external_platform_id": 34, "external_platform_code": "STAR"` (e.g. `spike/responses/04-policy-change.json`, `requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`), and none of the 12 calls this session drew a `401`. **This confirms the `.env` TEST value works and identifies STAR** (A-1 limit per `spike/README.md:4-17`: the spike shows the `.env` value is valid for the Normalizer, not that it equals the `app_config` row — re-confirm once DB access is restored). **PRODUCTION remains unobtained and is the residual critical-path item** — a TEST key does not substitute for it; must still be requested from PRMS Tech Support. |
 | Environments | TEST `https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com` · PROD `https://v6a9z2e4y5.execute-api.us-east-1.amazonaws.com`. One `ARI_*` var per environment (K-005: hosts are branch selectors, never collapsed). |
 | Decision webhooks | Self-service `POST /webhook` with the same key. Registration carries **no platform field** — the key identifies us. **Decisions taken with no destination registered are not replayed**, so registration must precede the first result going under review. Out of scope for `sync-engine` v1; it is the natural fifth family member. |
 
@@ -454,19 +478,23 @@ thing to settle.
 ## 11. Open questions after the 2026-09-14 decisions
 
 Under **P-1**, the questions that were *"how do we fill this?"* collapse into *"we do not, and the
-type waits."* What survives is three spike items and one meeting.
+type waits."* What survives is four spike-derived items — two closed by the TEST spike (T-01,
+2026-09-14), two still open — and one meeting.
 
 | ID | Question | Blocks | Closed by |
 |---|---|---|---|
 | ~~OQ-H1'~~ | **CLOSED — option (a).** Innovation Use is **gated out of v1** with a stated reason. Substituting `is_determined: true` was rejected under P-1. | — | Decided |
 | ~~OQ-H2'~~ | **CLOSED — option (a).** PRMS policy type `1` (*Program, Budget, or Investment*) is **gated out** the same way; the other two subtypes sync. | — | Decided |
 | ~~OQ-H7~~ | **CLOSED — no honest source.** `innov_use_to_be_determined` cannot be inferred (P-1, §1.4). Folded into the PRMS PO agenda below. | — | Decided |
-| **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? STAR has `agresso_contract.agreement_id` + `projectDescription`; the composition is **unproven**. | Every type | Spike |
-| **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the field table, or `level` per `inno_dev.json`? | Innovation Development | Spike |
-| **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
-| **OQ-F7** | Where (or whether) the PRMS-assigned result code returns. `results.prms_result_code` exists and is unwritten. | Code round-trip | Spike |
+| ~~OQ-H9~~ | **CLOSED — TEST spike, 2026-09-14 (T-01).** `geo_focus.scope_code = 50` is accepted end-to-end with the exact required label `"This is yet to be determined"`, with no companion regions/countries/sub-nationals required or rejected. See §4.3, `spike/README.md` § OQ-5, `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`). | — | Closed |
+| ~~OQ-F7~~ | **CLOSED — TEST spike, 2026-09-14 (T-01).** The PRMS-assigned result code returns synchronously in the same ingest response, at `results[].result.result_code`. See §10, `spike/README.md` § OQ-6, `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`). | — | Closed |
+| **OQ-H5** | `grant_title` composition — **premise falsified by the TEST spike, 2026-09-14 (T-01):** an unresolvable title does **not** fail the row — both a plausible-format guess and a deliberately-garbage title returned `200`/`success: true` with `bilateral_projects: []`. What remains open is the composition itself: what exactly CLARISA `/api/projects` expects, and whether a genuinely CLARISA-verified title populates `bilateral_projects`. See §4.6, `spike/README.md` § OQ-1, `spike/responses/04-policy-change.json` / `05-capacity-sharing-failing-grant-title.json`. | Every type | Spike (partial) |
+| **OQ-H6** | `innovation_readiness_level` — **partially answered by the TEST spike, 2026-09-14 (T-01): schema layer only, persistence layer still open.** The schema tolerates `id`/`name`, `level`, or all three together — none rejected. No call reached persistence (each was blocked earlier by an unrelated `innovation_typology` catalog rejection), so which key is actually read/stored is still unknown. See §6, `spike/README.md` § OQ-2. | Innovation Development | Spike (partial) |
 
-> The spike is **unblocked** — the API key is already in `app_config` in TEST and PROD (§10.1).
+> The spike ran on 2026-09-14 (T-01) — the API key was already in `app_config` in TEST and PROD
+> (§10.1). Two items closed outright (OQ-H9, OQ-F7); two remain open at the persistence/composition
+> layer (OQ-H5, OQ-H6) after the schema/premise layer was settled — see `spike/README.md` for what
+> would close each.
 
 ### 11.1 Agenda for the PRMS PO meeting
 

@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `not-started`
+- **Status:** `in-progress` — T-01 done (2026-09-14); T-02 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -90,7 +90,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ## 3. Tasks
 
-### T-01 — SPIKE: validate the contract against the TEST Normalizer
+### T-01 — SPIKE: validate the contract against the TEST Normalizer  ✅ `[x]` DONE
 
 - **Requirements covered:** closes OQ-1, OQ-2, OQ-5, OQ-6 — gates every field claim downstream
 - **Files touched:** none in `src/`. Evidence committed under `docs/specs/bilateral/prms-sync/sync-engine/spike/`
@@ -100,9 +100,9 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Record the **verbatim** response body for every call, `requestId` included.
   - Probe specifically: `grant_title` composition (OQ-1), `innovation_readiness_level` as `id`/`name` vs `level` (OQ-2), `geo_focus.scope_code = 50` (OQ-5), where a PRMS result code appears (OQ-6).
 - **Done check:**
-  - [ ] One verbatim response per type, committed, each showing its `requestId`
-  - [ ] Each of OQ-1, OQ-2, OQ-5, OQ-6 answered **with the response text that answers it quoted**, or explicitly recorded as still open
-  - [ ] `homologation.md` updated where the spike contradicts it
+  - [x] One verbatim response per type, committed, each showing its `requestId`
+  - [x] Each of OQ-1, OQ-2, OQ-5, OQ-6 answered **with the response text that answers it quoted**, or explicitly recorded as still open
+  - [x] `homologation.md` updated where the spike contradicts it
 - **Failing input:** a payload with a deliberately wrong `grant_title` — if PRMS accepts it, OQ-1's premise (that PRMS resolves the title) is false and the finding is that, not a green.
 - **Disqualifies the evidence:** a paraphrased response. A summary cannot show whether the code arrived. **If the TEST host is unreachable, the task is BLOCKED — not passed with mocks.**
 - **Effort:** M · **Depends on:** — · **Skills:** `api-design-principles`
