@@ -99,18 +99,34 @@ describe('UsersService', () => {
     });
   });
 
-  // ── 2. Status filter uses enum, not literal ───────────────────────────────
+  // ── 2. Status filter uses IN-list with ACCEPTED + EXTERNAL_ACCEPTED ────────
 
-  it('passes UserStatusEnum.ACCEPTED as the statusId param (not a hardcoded 1)', async () => {
+  it('passes statusIds [ACCEPTED, EXTERNAL_ACCEPTED] to the IN predicate (not a single = :statusId)', async () => {
     await service.findActiveUsers();
 
     const qb = repoMock._qb;
-    // where() is called with the status predicate
-    expect(qb.where).toHaveBeenCalledWith('su.status_id = :statusId', {
-      statusId: UserStatusEnum.ACCEPTED,
+    // where() is called with the IN-list status predicate
+    expect(qb.where).toHaveBeenCalledWith('su.status_id IN (:...statusIds)', {
+      statusIds: [UserStatusEnum.ACCEPTED, UserStatusEnum.EXTERNAL_ACCEPTED],
     });
     // andWhere() is called with is_active = TRUE
     expect(qb.andWhere).toHaveBeenCalledWith('su.is_active = TRUE');
+  });
+
+  // ── 2b. Regression: Pending(2) and Rejected(3) must not be in the list ────
+
+  it('excludes Pending(2) and Rejected(3) from the statusIds IN-list', async () => {
+    await service.findActiveUsers();
+
+    const qb = repoMock._qb;
+    // Retrieve the statusIds array that was passed to where()
+    const whereCall = qb.where.mock.calls[0];
+    const statusIds: number[] = whereCall[1].statusIds;
+
+    expect(statusIds).toContain(UserStatusEnum.ACCEPTED);
+    expect(statusIds).toContain(UserStatusEnum.EXTERNAL_ACCEPTED);
+    expect(statusIds).not.toContain(UserStatusEnum.PENDING);
+    expect(statusIds).not.toContain(UserStatusEnum.REJECTED);
   });
 
   // ── 3. Search term appended when provided ────────────────────────────────

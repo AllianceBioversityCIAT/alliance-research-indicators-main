@@ -16,12 +16,13 @@ export class UsersService {
   ) {}
 
   /**
-   * Returns active users (status_id = ACCEPTED AND is_active = TRUE) with an
-   * optional name/email filter.
+   * Returns active users (status_id ∈ {Accepted, External Accepted} AND is_active = TRUE)
+   * with an optional name/email filter.
    *
-   * "ACTIVE user" = sec_users.status_id = UserStatusEnum.ACCEPTED (1)
+   * "ACTIVE user" = sec_users.status_id ∈ {UserStatusEnum.ACCEPTED (1),
+   *                                         UserStatusEnum.EXTERNAL_ACCEPTED (4)}
    *                 AND sec_users.is_active = TRUE.
-   * Pending (2) and Rejected (3) users are excluded by the status_id predicate.
+   * Pending (2) and Rejected (3) users are excluded by the IN-list predicate.
    *
    * When `search` is provided, rows are further narrowed to those where
    * first_name, last_name, or email contains the search term (LIKE %term%).
@@ -36,8 +37,8 @@ export class UsersService {
     const qb = this.secUserRepository
       .createQueryBuilder('su')
       .select(['su.sec_user_id', 'su.first_name', 'su.last_name', 'su.email'])
-      .where('su.status_id = :statusId', {
-        statusId: UserStatusEnum.ACCEPTED,
+      .where('su.status_id IN (:...statusIds)', {
+        statusIds: [UserStatusEnum.ACCEPTED, UserStatusEnum.EXTERNAL_ACCEPTED],
       })
       .andWhere('su.is_active = TRUE')
       .orderBy('su.last_name', 'ASC')

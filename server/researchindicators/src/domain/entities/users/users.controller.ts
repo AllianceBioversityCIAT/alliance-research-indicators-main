@@ -37,9 +37,10 @@ export class UsersController {
   // ─────────────────────────────────────────────────────────────────────────
   @Get('active')
   @ApiOperation({
-    summary: 'List active users (Accepted + is_active) for pickers',
+    summary:
+      'List active users (Accepted or External Accepted + is_active) for pickers',
     description:
-      'Returns users whose status_id = 1 (Accepted) AND is_active = TRUE. ' +
+      'Returns users whose status_id ∈ {1 (Accepted), 4 (External Accepted)} AND is_active = TRUE. ' +
       'Pending (status_id = 2) and Rejected (status_id = 3) users are excluded. ' +
       'An optional `search` query parameter filters by first_name, last_name, or email ' +
       '(case-insensitive LIKE match). Results are ordered by last_name, first_name. ' +
