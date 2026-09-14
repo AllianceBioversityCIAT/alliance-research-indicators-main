@@ -39,6 +39,16 @@
       min-width: 200px;
     }
 
+    &--email {
+      min-width: 180px;
+      white-space: nowrap;
+    }
+
+    &--status {
+      min-width: 110px;
+      white-space: nowrap;
+    }
+
     &--projects {
       min-width: 280px;
     }
@@ -47,6 +57,11 @@
       min-width: 80px;
       text-align: center;
     }
+  }
+
+  // ── Email cell ───────────────────────────────────────────────────────
+  &__email {
+    font-size: 12px;
   }
 
   // ── Person cell (name + email) ───────────────────────────────────────
@@ -86,8 +101,50 @@
       flex-shrink: 0;
     }
 
-    &__email {
-      font-size: 11px;
+  }
+
+  // ── Status pill (Active / Inactive) — dot + text (NFR-UI-002) ───────
+  &__status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--ac-grey-300);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-grey-700);
+
+    &__dot {
+      font-size: 8px;
+      flex-shrink: 0;
+    }
+
+    &__text {
+      white-space: nowrap;
+    }
+
+    // Active: green tokens
+    &--active {
+      background-color: var(--ac-green-100);
+      border-color: var(--ac-green-300);
+      color: var(--ac-green-600);
+
+      .by-person__status-pill__dot {
+        color: var(--ac-green-400);
+      }
+    }
+
+    // Inactive: red tokens (NFR-UI-002 — text is the non-colour cue)
+    &--inactive {
+      background-color: color-mix(in srgb, var(--ac-red-1) 8%, var(--ac-grey-100));
+      border-color: var(--ac-red-1);
+      color: var(--ac-red-1);
+
+      .by-person__status-pill__dot {
+        color: var(--ac-red-1);
+      }
     }
   }
 

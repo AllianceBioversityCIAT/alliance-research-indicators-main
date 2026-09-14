@@ -2251,18 +2251,130 @@ describe('listManagedDelegates() — Scenario 19: own-or-admin auth', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scenario 20 — Rejected/inactive delegate account still flows through (Part-B rule)
+// Scenario 20 — is_active is DERIVED from status_id (not the raw column)
 //
-// The table GET must NOT filter on su.status_id or su.is_active — a delegate whose
-// account is Rejected (status_id=3) or inactive (is_active=0) is still returned
-// in the list/by-delegate/by-user responses.  The new fields must be populated
-// exactly as they come from the mock (no suppression of "bad" values).
+// New rule: is_active ⟺ status_id ∈ {1 (Accepted), 4 (External Accepted)}.
+// Pending (2) and Rejected (3) → false.
 //
-// This discriminates: a mapping that silently dropped status_id=3 or coerced
-// is_active=0 to true would fail at least one assertion here.
+// Part-B rule is STILL enforced: the GET endpoints return the delegate row
+// regardless of status — a Rejected delegate appears with is_active: false,
+// NOT suppressed from the list.
+//
+// Load-bearing discriminator (★): status_id=3 with raw is_active=1.
+//   A regression back to Boolean(d.is_active) would return true.
+//   The correct derivation returns false.
+//
+// All four producers are exercised:
+//   list(), listByDelegate(), listManagedProjects(), listManagedDelegates().
+//
+// Status coverage per producer:
+//   status_id=1 (Accepted)          → is_active: true
+//   status_id=4 (External Accepted) → is_active: true
+//   status_id=2 (Pending)           → is_active: false
+//   status_id=3 (Rejected) + raw 1  → is_active: false  ★ discriminator
 // ─────────────────────────────────────────────────────────────────────────────
-describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_active=0) account still returned', () => {
-  it('list(): delegate with status_id=3 and is_active=0 is returned with those exact values', async () => {
+describe('Scenario 20 — is_active derived from status_id (not raw column)', () => {
+  // ── list() ────────────────────────────────────────────────────────────────
+
+  it('list(): status_id=1 → is_active: true', async () => {
+    const { service } = makeService({
+      userId: 500,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G900',
+          description: 'Sc20 list accepted',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 77,
+            first_name: 'Accepted',
+            last_name: 'User',
+            email: 'accepted@cgiar.org',
+            carnet: null,
+            status_id: 1, // Accepted
+            is_active: 1, // raw column — irrelevant after fix
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G900');
+    expect(result.delegates[0].is_active).toBe(true);
+    expect(result.delegates[0].status_id).toBe(1);
+  });
+
+  it('list(): status_id=4 (External Accepted) → is_active: true', async () => {
+    const { service } = makeService({
+      userId: 500,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G900B',
+          description: 'Sc20 list ext-accepted',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 77,
+            first_name: 'External',
+            last_name: 'Accepted',
+            email: 'ext@cgiar.org',
+            carnet: null,
+            status_id: 4, // External Accepted
+            is_active: 1,
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G900B');
+    expect(result.delegates[0].is_active).toBe(true);
+    expect(result.delegates[0].status_id).toBe(4);
+  });
+
+  it('list(): status_id=2 (Pending) → is_active: false', async () => {
+    const { service } = makeService({
+      userId: 500,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G900C',
+          description: 'Sc20 list pending',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 77,
+            first_name: 'Pending',
+            last_name: 'User',
+            email: 'pending@cgiar.org',
+            carnet: null,
+            status_id: 2, // Pending
+            is_active: 1,
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G900C');
+    expect(result.delegates[0].is_active).toBe(false);
+    expect(result.delegates[0].status_id).toBe(2);
+  });
+
+  it('list(): ★ status_id=3 (Rejected) with raw is_active=1 → is_active: false (discriminator)', async () => {
+    // ★ If the mapping regressed to Boolean(d.is_active), raw is_active=1 → true.
+    // The correct derivation reads status_id=3 (Rejected) → false.
     const { service } = makeService({
       userId: 500,
       roles: [SecRolesEnum.SYSTEM_ADMIN],
@@ -2283,7 +2395,7 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
             email: 'rejected@cgiar.org',
             carnet: null,
             status_id: 3, // Rejected
-            is_active: 0, // account inactive
+            is_active: 1, // ★ raw=1 — regression would yield true
           },
         ],
       },
@@ -2294,14 +2406,87 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
     expect(result.delegates).toHaveLength(1);
     const d = result.delegates[0];
     expect(d.delegate_user_id).toBe(77);
-    // status_id=3 must flow through — NOT filtered or suppressed
     expect(d.status_id).toBe(3);
-    // is_active=0 must be false, NOT coerced to true
+    // ★ must be false (derived from status_id=3), NOT true (raw is_active=1)
     expect(d.is_active).toBe(false);
     expect(d.carnet).toBeNull();
   });
 
-  it('listByDelegate(): delegate with status_id=3 and is_active=0 returns those exact person-level values', async () => {
+  // ── listByDelegate() ──────────────────────────────────────────────────────
+
+  it('listByDelegate(): status_id=1 → is_active: true', async () => {
+    const delegateId = 78;
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: delegateId,
+          first_name: 'Accepted',
+          last_name: 'Person',
+          email: 'a@cgiar.org',
+          carnet: null,
+          status_id: 1,
+          is_active: 1,
+        },
+        findDelegateProjectsResult: [],
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+    expect(result.is_active).toBe(true);
+    expect(result.status_id).toBe(1);
+  });
+
+  it('listByDelegate(): status_id=4 (External Accepted) → is_active: true', async () => {
+    const delegateId = 78;
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: delegateId,
+          first_name: 'Ext',
+          last_name: 'Accepted',
+          email: 'ext@cgiar.org',
+          carnet: null,
+          status_id: 4,
+          is_active: 1,
+        },
+        findDelegateProjectsResult: [],
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+    expect(result.is_active).toBe(true);
+    expect(result.status_id).toBe(4);
+  });
+
+  it('listByDelegate(): status_id=2 (Pending) → is_active: false', async () => {
+    const delegateId = 78;
+    const { service } = makeService({
+      userId: delegateId,
+      roles: [],
+      repo: {
+        findUserSummaryResult: {
+          sec_user_id: delegateId,
+          first_name: 'Pending',
+          last_name: 'Person',
+          email: 'pending@cgiar.org',
+          carnet: null,
+          status_id: 2,
+          is_active: 1,
+        },
+        findDelegateProjectsResult: [],
+      },
+    });
+
+    const result = await service.listByDelegate(delegateId);
+    expect(result.is_active).toBe(false);
+    expect(result.status_id).toBe(2);
+  });
+
+  it('listByDelegate(): ★ status_id=3 (Rejected) with raw is_active=1 → is_active: false (discriminator)', async () => {
     const delegateId = 78;
 
     const { service } = makeService({
@@ -2315,7 +2500,7 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
           email: 'rejected2@cgiar.org',
           carnet: null,
           status_id: 3, // Rejected
-          is_active: 0, // account inactive
+          is_active: 1, // ★ raw=1 — regression would yield true
         },
         findDelegateProjectsResult: [],
       },
@@ -2325,11 +2510,119 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
 
     expect(result.delegate_user_id).toBe(delegateId);
     expect(result.status_id).toBe(3);
+    // ★ must be false (derived), NOT true (raw=1)
     expect(result.is_active).toBe(false);
     expect(result.carnet).toBeNull();
   });
 
-  it('listManagedProjects(): delegate with status_id=3 / is_active=0 appears in delegates[] with correct values', async () => {
+  // ── listManagedProjects() ─────────────────────────────────────────────────
+
+  it('listManagedProjects(): status_id=1 → is_active: true', async () => {
+    const ownUserId = 501;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G901'],
+      projectSummaries: [
+        {
+          agreement_id: 'G901',
+          description: 'Sc20 mproj accepted',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G901',
+          delegate_user_id: 79,
+          first_name: 'Accepted',
+          last_name: 'Delegate',
+          email: 'acc@cgiar.org',
+          carnet: null,
+          status_id: 1,
+          is_active: 1,
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+    expect(result[0].delegates[0].is_active).toBe(true);
+    expect(result[0].delegates[0].status_id).toBe(1);
+  });
+
+  it('listManagedProjects(): status_id=4 (External Accepted) → is_active: true', async () => {
+    const ownUserId = 501;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G901B'],
+      projectSummaries: [
+        {
+          agreement_id: 'G901B',
+          description: 'Sc20 mproj ext-accepted',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G901B',
+          delegate_user_id: 79,
+          first_name: 'Ext',
+          last_name: 'Accepted',
+          email: 'ext@cgiar.org',
+          carnet: null,
+          status_id: 4,
+          is_active: 1,
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+    expect(result[0].delegates[0].is_active).toBe(true);
+    expect(result[0].delegates[0].status_id).toBe(4);
+  });
+
+  it('listManagedProjects(): status_id=2 (Pending) → is_active: false', async () => {
+    const ownUserId = 501;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G901C'],
+      projectSummaries: [
+        {
+          agreement_id: 'G901C',
+          description: 'Sc20 mproj pending',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G901C',
+          delegate_user_id: 79,
+          first_name: 'Pending',
+          last_name: 'Delegate',
+          email: 'pending@cgiar.org',
+          carnet: null,
+          status_id: 2,
+          is_active: 1,
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+    expect(result[0].delegates[0].is_active).toBe(false);
+    expect(result[0].delegates[0].status_id).toBe(2);
+  });
+
+  it('listManagedProjects(): ★ status_id=3 (Rejected) with raw is_active=1 → is_active: false (discriminator)', async () => {
     const ownUserId = 501;
 
     const { service } = makeServiceWithManagedMethods({
@@ -2355,7 +2648,7 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
           email: 'inactive@cgiar.org',
           carnet: 'C99999',
           status_id: 3, // Rejected
-          is_active: 0, // account inactive
+          is_active: 1, // ★ raw=1 — regression would yield true
         },
       ],
     });
@@ -2366,11 +2659,92 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
     const d = result[0].delegates[0];
     expect(d.delegate_user_id).toBe(79);
     expect(d.status_id).toBe(3);
+    // ★ must be false (derived), NOT true (raw=1)
     expect(d.is_active).toBe(false);
     expect(d.carnet).toBe('C99999');
   });
 
-  it('listManagedDelegates(): delegate with status_id=3 / is_active=0 is grouped with correct values', async () => {
+  // ── listManagedDelegates() ────────────────────────────────────────────────
+
+  it('listManagedDelegates(): status_id=1 → is_active: true', async () => {
+    const ownUserId = 502;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G902'],
+      delegatesForProjects: [
+        {
+          delegate_user_id: 80,
+          first_name: 'Accepted',
+          last_name: 'Grouped',
+          email: 'acc@cgiar.org',
+          carnet: null,
+          status_id: 1,
+          is_active: 1,
+          agreement_id: 'G902',
+          description: 'Accepted Grouped',
+        },
+      ],
+    });
+
+    const result = await service.listManagedDelegates(ownUserId);
+    expect(result[0].is_active).toBe(true);
+    expect(result[0].status_id).toBe(1);
+  });
+
+  it('listManagedDelegates(): status_id=4 (External Accepted) → is_active: true', async () => {
+    const ownUserId = 502;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G902B'],
+      delegatesForProjects: [
+        {
+          delegate_user_id: 80,
+          first_name: 'Ext',
+          last_name: 'Accepted',
+          email: 'ext@cgiar.org',
+          carnet: null,
+          status_id: 4,
+          is_active: 1,
+          agreement_id: 'G902B',
+          description: 'Ext Accepted Grouped',
+        },
+      ],
+    });
+
+    const result = await service.listManagedDelegates(ownUserId);
+    expect(result[0].is_active).toBe(true);
+    expect(result[0].status_id).toBe(4);
+  });
+
+  it('listManagedDelegates(): status_id=2 (Pending) → is_active: false', async () => {
+    const ownUserId = 502;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G902C'],
+      delegatesForProjects: [
+        {
+          delegate_user_id: 80,
+          first_name: 'Pending',
+          last_name: 'Grouped',
+          email: 'pending@cgiar.org',
+          carnet: null,
+          status_id: 2,
+          is_active: 1,
+          agreement_id: 'G902C',
+          description: 'Pending Grouped',
+        },
+      ],
+    });
+
+    const result = await service.listManagedDelegates(ownUserId);
+    expect(result[0].is_active).toBe(false);
+    expect(result[0].status_id).toBe(2);
+  });
+
+  it('listManagedDelegates(): ★ status_id=3 (Rejected) with raw is_active=1 → is_active: false (discriminator)', async () => {
     const ownUserId = 502;
 
     const { service } = makeServiceWithManagedMethods({
@@ -2385,7 +2759,7 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
           email: 'grouped@cgiar.org',
           carnet: null,
           status_id: 3, // Rejected
-          is_active: 0, // account inactive
+          is_active: 1, // ★ raw=1 — regression would yield true
           agreement_id: 'G902',
           description: 'Grouped Part B',
         },
@@ -2397,6 +2771,7 @@ describe('Scenario 20 — Part-B rule: Rejected (status_id=3) / inactive (is_act
     expect(result).toHaveLength(1);
     expect(result[0].delegate_user_id).toBe(80);
     expect(result[0].status_id).toBe(3);
+    // ★ must be false (derived from status_id=3), NOT true (raw is_active=1)
     expect(result[0].is_active).toBe(false);
     expect(result[0].carnet).toBeNull();
   });

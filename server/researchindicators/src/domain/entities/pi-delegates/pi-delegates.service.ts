@@ -63,6 +63,7 @@ import {
   ProjectDelegatesResponseDto,
   DelegateProjectsResponseDto,
 } from './dto/pi-delegate-response.dto';
+import { UserStatusEnum } from '../users/enum/user-status.enum';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Response shapes
@@ -555,7 +556,10 @@ export class PiDelegatesService {
         last_name: d.last_name ?? null,
         carnet: d.carnet ?? null,
         status_id: d.status_id != null ? Number(d.status_id) : null,
-        is_active: Boolean(d.is_active),
+        is_active: [
+          UserStatusEnum.ACCEPTED,
+          UserStatusEnum.EXTERNAL_ACCEPTED,
+        ].includes(Number(d.status_id)),
       })),
     };
   }
@@ -612,7 +616,10 @@ export class PiDelegatesService {
       last_name: user?.last_name ?? null,
       carnet: user?.carnet ?? null,
       status_id: user?.status_id != null ? Number(user.status_id) : null,
-      is_active: Boolean(user?.is_active),
+      is_active: [
+        UserStatusEnum.ACCEPTED,
+        UserStatusEnum.EXTERNAL_ACCEPTED,
+      ].includes(Number(user?.status_id)),
       projects: projects.map((p) => ({
         project_code: p.agreement_id,
         project_name: p.description,
@@ -701,7 +708,10 @@ export class PiDelegatesService {
         last_name: d.last_name ?? null,
         carnet: d.carnet ?? null,
         status_id: d.status_id != null ? Number(d.status_id) : null,
-        is_active: Boolean(d.is_active),
+        is_active: [
+          UserStatusEnum.ACCEPTED,
+          UserStatusEnum.EXTERNAL_ACCEPTED,
+        ].includes(Number(d.status_id)),
       })),
     }));
   }
@@ -793,7 +803,10 @@ export class PiDelegatesService {
       last_name: info.last_name ?? null,
       carnet: info.carnet ?? null,
       status_id: info.status_id,
-      is_active: Boolean(info.is_active),
+      is_active: [
+        UserStatusEnum.ACCEPTED,
+        UserStatusEnum.EXTERNAL_ACCEPTED,
+      ].includes(Number(info.status_id)),
       projects: info.projects.map((p) => ({
         project_code: p.agreement_id,
         project_name: p.description ?? null,

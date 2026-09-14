@@ -73,7 +73,7 @@ export class DelegateSummaryDto {
   @ApiProperty({
     type: Boolean,
     description:
-      'sec_users.is_active of the delegate account (cast from tinyint)',
+      'True when the user is active in STAR (status Accepted or External Accepted); false for Pending/Rejected.',
     example: true,
   })
   is_active!: boolean;
@@ -230,7 +230,7 @@ export class DelegateProjectsResponseDto {
   @ApiProperty({
     type: Boolean,
     description:
-      'sec_users.is_active of the delegate account (cast from tinyint)',
+      'True when the user is active in STAR (status Accepted or External Accepted); false for Pending/Rejected.',
     example: true,
   })
   is_active!: boolean;

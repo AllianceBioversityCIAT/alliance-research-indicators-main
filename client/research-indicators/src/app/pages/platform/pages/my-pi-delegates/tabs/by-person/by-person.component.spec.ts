@@ -438,16 +438,85 @@ describe('ByPersonComponent', () => {
       await createComponent([ALICE]);
     });
 
-    it('renders the p-table header columns', () => {
+    it('renders the p-table header columns (Person, Email, Status, Managed projects, Actions)', () => {
       const headers = fixture.debugElement.queryAll(By.css('th'));
       const headerTexts = headers.map(h => (h.nativeElement as HTMLElement).textContent?.trim());
       expect(headerTexts).toContain('Person');
+      expect(headerTexts).toContain('Email');
+      expect(headerTexts).toContain('Status');
       expect(headerTexts).toContain('Managed projects');
     });
 
     it('renders body rows', () => {
       const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
       expect(rows.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // ── 9. Email column ───────────────────────────────────────────────────
+
+  describe('Email column', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('renders row.email in the Email td cell', () => {
+      const emailCells = fixture.debugElement.queryAll(By.css('.by-person__td--email'));
+      expect(emailCells.length).toBeGreaterThanOrEqual(1);
+      const cellText = (emailCells[0].nativeElement as HTMLElement).textContent?.trim() ?? '';
+      expect(cellText).toContain('alice@test.org');
+    });
+
+    it('renders the .by-person__email span with the email value', () => {
+      const emailSpan = fixture.debugElement.query(By.css('.by-person__email'));
+      expect(emailSpan).toBeTruthy();
+      expect((emailSpan.nativeElement as HTMLElement).textContent?.trim()).toBe('alice@test.org');
+    });
+  });
+
+  // ── 10. Status pill (Active / Inactive) — KZ-015 discriminating ───────
+
+  describe('Status pill', () => {
+    it('ACTIVE: shows "Active" pill for is_active:true (KZ-015: start active, assert Active pill)', async () => {
+      await createComponent([ALICE]); // ALICE has is_active: true
+      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
+      expect(pill).toBeTruthy();
+      expect((pill.nativeElement as HTMLElement).textContent?.trim()).toContain('Active');
+      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--active')).toBe(true);
+      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(false);
+    });
+
+    it('INACTIVE: shows "Inactive" pill for is_active:false (KZ-015 transition: set inactive, assert Inactive pill)', async () => {
+      // Arrange: start with active person — pill says "Active"
+      await createComponent([ALICE]);
+      const pillBefore = fixture.debugElement.query(By.css('.by-person__status-pill'));
+      expect((pillBefore.nativeElement as HTMLElement).textContent?.trim()).toContain('Active');
+      expect((pillBefore.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(false);
+
+      // Act: switch to inactive person (KZ-015 transition)
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Assert: pill now shows "Inactive"
+      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
+      expect(pill).toBeTruthy();
+      expect((pill.nativeElement as HTMLElement).textContent?.trim()).toContain('Inactive');
+      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(true);
+      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--active')).toBe(false);
+    });
+
+    it('ACTIVE: pill does NOT show "Inactive" text for is_active:true (negative discriminator)', async () => {
+      await createComponent([ALICE]);
+      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
+      expect((pill.nativeElement as HTMLElement).textContent?.trim()).not.toContain('Inactive');
+    });
+
+    it('INACTIVE: pill does NOT show "Active" text for is_active:false (negative discriminator)', async () => {
+      await createComponent([CAROL_INACTIVE]);
+      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
+      expect((pill.nativeElement as HTMLElement).textContent?.trim()).not.toContain('Active');
     });
   });
 });
