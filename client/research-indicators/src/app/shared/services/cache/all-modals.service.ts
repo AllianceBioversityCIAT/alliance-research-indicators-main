@@ -70,6 +70,18 @@ export class AllModalsService {
     | { source: 'byPerson'; delegateUserId: number }
     | null
   >(null);
+
+  // ─── PI Delegate History modal context ───────────────────────────────────────
+  /**
+   * The open-context for the Delegation History (read-only) modal.
+   * 'byProject' → opened from the By-project tab; projectCode + projectName are set.
+   * 'byPerson'  → opened from the By-person tab; delegateUserId + name are set.
+   */
+  piDelegateHistoryContext = signal<
+    | { source: 'byProject'; projectCode: string; projectName: string | null }
+    | { source: 'byPerson'; delegateUserId: number; name: string | null }
+    | null
+  >(null);
   setResultInformationEntryContext(context: 'results-center' | null): void {
     this.resultInformationEntryContext.set(context);
     this.modalConfig.update(modals => ({
@@ -171,6 +183,10 @@ export class AllModalsService {
     assignPiDelegate: {
       isOpen: false,
       title: 'Assign / Edit PI Delegate'
+    },
+    piDelegateHistory: {
+      isOpen: false,
+      title: 'Delegation History'
     }
   });
 
@@ -291,7 +307,8 @@ export class AllModalsService {
       editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
-      assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false }
+      assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false },
+      piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);

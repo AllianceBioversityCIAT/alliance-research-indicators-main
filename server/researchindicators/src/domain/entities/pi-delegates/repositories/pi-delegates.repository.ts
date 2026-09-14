@@ -652,6 +652,113 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     );
   }
 
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+  // ─────────────────────────────────────────────────────────────────────────
+  // History READ helpers (GET /pi-delegates/history)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns every history row for a project, newest-first, LEFT JOINed with
+   * sec_users for both the actor (created_by) and the target delegate, and
+   * with agresso_contracts for the project name.
+   *
+   * LEFT JOINs are intentional: a user could be deleted from sec_users after
+   * the event was recorded; the history row must still be visible.
+   *
+   * No is_active filter — history is an append-only log; every event counts.
+   *
+   * @param projectId  pi_delegate_history.project_id (agresso agreement_id)
+   */
+  async findProjectHistory(projectId: string): Promise<
+    Array<{
+      pi_delegate_history_id: number;
+      action: string;
+      created_at: Date;
+      actor_user_id: number | null;
+      actor_first: string | null;
+      actor_last: string | null;
+      delegate_user_id: number;
+      target_first: string | null;
+      target_last: string | null;
+      project_id: string;
+      project_name: string | null;
+    }>
+  > {
+    return this.dataSource.query(
+      `SELECT h.pi_delegate_history_id,
+              h.action,
+              h.created_at,
+              h.created_by    AS actor_user_id,
+              actor.first_name AS actor_first,
+              actor.last_name  AS actor_last,
+              h.delegate_user_id,
+              tgt.first_name   AS target_first,
+              tgt.last_name    AS target_last,
+              h.project_id,
+              ac.description   AS project_name
+       FROM pi_delegate_history h
+         LEFT JOIN sec_users actor ON actor.sec_user_id = h.created_by
+         LEFT JOIN sec_users tgt   ON tgt.sec_user_id   = h.delegate_user_id
+         LEFT JOIN agresso_contracts ac ON ac.agreement_id = h.project_id
+       WHERE h.project_id = ?
+       ORDER BY h.created_at DESC`,
+      [projectId],
+    );
+  }
+
+  /**
+   * Returns every history row for a specific delegate scoped to the given
+   * project ids, newest-first. LEFT JOINs as per findProjectHistory.
+   *
+   * Callers MUST guard against an empty projectIds array — this method
+   * returns [] immediately when the list is empty to avoid an invalid
+   * `IN ()` clause.
+   *
+   * @param delegateUserId  pi_delegate_history.delegate_user_id to filter on
+   * @param projectIds      Allowlist of project_ids (caller's managed set)
+   */
+  async findDelegateHistory(
+    delegateUserId: number,
+    projectIds: string[],
+  ): Promise<
+    Array<{
+      pi_delegate_history_id: number;
+      action: string;
+      created_at: Date;
+      actor_user_id: number | null;
+      actor_first: string | null;
+      actor_last: string | null;
+      delegate_user_id: number;
+      target_first: string | null;
+      target_last: string | null;
+      project_id: string;
+      project_name: string | null;
+    }>
+  > {
+    if (!projectIds.length) return [];
+    return this.dataSource.query(
+      `SELECT h.pi_delegate_history_id,
+              h.action,
+              h.created_at,
+              h.created_by    AS actor_user_id,
+              actor.first_name AS actor_first,
+              actor.last_name  AS actor_last,
+              h.delegate_user_id,
+              tgt.first_name   AS target_first,
+              tgt.last_name    AS target_last,
+              h.project_id,
+              ac.description   AS project_name
+       FROM pi_delegate_history h
+         LEFT JOIN sec_users actor ON actor.sec_user_id = h.created_by
+         LEFT JOIN sec_users tgt   ON tgt.sec_user_id   = h.delegate_user_id
+         LEFT JOIN agresso_contracts ac ON ac.agreement_id = h.project_id
+       WHERE h.delegate_user_id = ?
+         AND h.project_id IN (?)
+       ORDER BY h.created_at DESC`,
+      [delegateUserId, projectIds],
+    );
+  }
+
   // @akili-spec docs/specs/changes/my-pi-delegates — T-18
   // ─────────────────────────────────────────────────────────────────────────
   // History write (R-PID-012)

@@ -99,6 +99,7 @@
           [searchQuery]="searchQuery()"
           [statusFilter]="statusFilter()"
           (assignRequested)="onAssignFromProject($event)"
+          (historyRequested)="onHistoryFromProject($event)"
         ></app-by-project>
       </p-tabPanel>
 
@@ -107,6 +108,7 @@
         <app-by-person
           [searchQuery]="searchQuery()"
           (assignRequested)="onAssignFromPerson($event)"
+          (historyRequested)="onHistoryFromPerson($event)"
         ></app-by-person>
       </p-tabPanel>
     </p-tabView>

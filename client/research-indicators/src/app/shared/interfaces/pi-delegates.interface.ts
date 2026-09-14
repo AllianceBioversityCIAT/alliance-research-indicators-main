@@ -99,3 +99,33 @@ export interface DelegateProjects {
   /** Active project assignments for this delegate (may be an empty array). */
   projects: ProjectSummary[];
 }
+
+/**
+ * One entry in the delegation history log.
+ * Returned by GET /api/pi-delegates/history?project_id=<code>
+ *           or GET /api/pi-delegates/history?delegate_user_id=<id>
+ * Entries are returned NEWEST-FIRST by the backend.
+ */
+export interface PiDelegateHistoryEntry {
+  /** Primary key of the history row. */
+  pi_delegate_history_id: number;
+  /** 'assign' = role was granted; 'revoke' = role was revoked. */
+  action: 'assign' | 'revoke';
+  /** The person who performed the action. */
+  actor: {
+    user_id: number | null;
+    name: string | null;
+  };
+  /** The person whose delegate role changed. */
+  delegate: {
+    user_id: number;
+    name: string | null;
+  };
+  /** The project this delegation event relates to. */
+  project: {
+    project_code: string;
+    project_name: string | null;
+  };
+  /** ISO 8601 timestamp of when the action occurred. */
+  created_at: string;
+}

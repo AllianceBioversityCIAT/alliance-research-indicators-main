@@ -51,6 +51,13 @@ export class ByProjectComponent {
   // Assign button emits the project code; the parent/page shell opens the modal.
   @Output() readonly assignRequested = new EventEmitter<{ projectCode: string }>();
 
+  // ─── History output ───────────────────────────────────────────────────────────
+  // History button emits project code + name; the shell opens the history modal.
+  @Output() readonly historyRequested = new EventEmitter<{
+    projectCode: string;
+    projectName: string | null;
+  }>();
+
   // ─── Input signals from shell filter bar ─────────────────────────────────────
   readonly searchQuery = input<string>('');
   readonly statusFilter = input<string>('All');
@@ -98,6 +105,15 @@ export class ByProjectComponent {
 
   onAssign(project: ProjectDelegates): void {
     this.assignRequested.emit({ projectCode: project.project_code });
+  }
+
+  // ─── History affordance ───────────────────────────────────────────────────────
+
+  onHistory(project: ProjectDelegates): void {
+    this.historyRequested.emit({
+      projectCode: project.project_code,
+      projectName: project.project_name
+    });
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

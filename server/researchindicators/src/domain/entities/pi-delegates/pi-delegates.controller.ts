@@ -31,6 +31,8 @@ import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
 import { ListByDelegateDto } from './dto/list-by-delegate.query.dto';
 import { ListManagedDto } from './dto/list-managed.query.dto';
+import { HistoryQueryDto } from './dto/history.query.dto';
+import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
 
 // ⚠ No @Roles(...) is applied here (R-PID-007 / DD-B).
 // RolesGuard.canActivate() returns true when no @Roles metadata is present,
@@ -412,6 +414,79 @@ export class PiDelegatesController {
           status: HttpStatus.OK,
         }),
       );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/history — delegation history for a project OR a delegate
+  //
+  // Exactly ONE query param required: project_id OR delegate_user_id.
+  // The service enforces the mutual-exclusion rule (BadRequestException when
+  // both or neither are provided).
+  //
+  // Auth:
+  //   project_id branch     → assertCanManageProject (PI / active delegate /
+  //                           SYSTEM_ADMIN of that project).
+  //   delegate_user_id branch → scoped to the CALLER's managed projects;
+  //                             empty managed set returns [] without a DB query.
+  //
+  // MUST be declared BEFORE @Delete() so Nest matches the static path segment
+  // 'history' before the parameterless DELETE on the root path.
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+  // ─────────────────────────────────────────────────────────────────────────
+  @Get('history')
+  @ApiOperation({
+    summary: 'Delegation history for a project OR a delegate',
+    description:
+      'Returns delegation history rows (assign / revoke events) newest-first. ' +
+      'Supply EXACTLY ONE of the two query params — providing both or neither ' +
+      'returns 400.\n\n' +
+      '**project_id branch** — Returns the full history for that project. ' +
+      'Caller must be the PI, an active delegate, or SYSTEM_ADMIN of the project (403 otherwise).\n\n' +
+      '**delegate_user_id branch** — Returns history for the given delegate, ' +
+      'scoped to projects the CALLER manages (PI or active delegate). ' +
+      'If the caller manages no projects, an empty array is returned without querying the history table.\n\n' +
+      "Each entry includes: the action ('assign' | 'revoke'), the actor (who performed it), " +
+      'the delegate (who was affected), the project, and the timestamp. ' +
+      'Actor and delegate names use LEFT JOINs so a deleted account does not suppress the row — ' +
+      'the name fields will be null in that case.',
+  })
+  @ApiOkResponse({
+    type: PiDelegateHistoryEntryDto,
+    isArray: true,
+    description: 'History entries, newest-first',
+  })
+  @ApiQuery({
+    name: 'project_id',
+    required: false,
+    type: String,
+    description:
+      'Agresso agreement_id of the project whose full delegation history to return. ' +
+      'Mutually exclusive with delegate_user_id.',
+    example: 'INIT-268',
+  })
+  @ApiQuery({
+    name: 'delegate_user_id',
+    required: false,
+    type: Number,
+    description:
+      'sec_users.sec_user_id of the delegate whose history to return, scoped to ' +
+      "the caller's managed projects. Mutually exclusive with project_id.",
+    example: 42,
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  async getHistory(@Query() dto: HistoryQueryDto) {
+    return this.piDelegatesService.getHistory(dto).then((data) =>
+      ResponseUtils.format({
+        data,
+        description: 'PI delegation history',
+        status: HttpStatus.OK,
+      }),
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -26,6 +26,9 @@ import { ListByDelegateDto } from './dto/list-by-delegate.query.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
 import { BulkAssignPiDelegatesDto } from './dto/bulk-assign-pi-delegates.dto';
 import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
+import { HistoryQueryDto } from './dto/history.query.dto';
+import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
+import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -64,6 +67,15 @@ const DELEGATE_PROJECTS_FIXTURE: DelegateProjectsResponseDto = {
 
 // ─── Mock service factory ─────────────────────────────────────────────────────
 
+const HISTORY_ENTRY_FIXTURE: PiDelegateHistoryEntryDto = {
+  pi_delegate_history_id: 1,
+  action: PiDelegateHistoryActionEnum.ASSIGN,
+  actor: { user_id: 50, name: 'Jane Smith' },
+  delegate: { user_id: 42, name: 'Juan Carlos Cadavid' },
+  project: { project_code: 'INIT-268', project_name: 'Initiative 268' },
+  created_at: new Date('2026-09-14T12:00:00.000Z'),
+};
+
 function makeMockService() {
   return {
     assign: jest.fn().mockResolvedValue([]),
@@ -77,6 +89,7 @@ function makeMockService() {
     listManagedDelegates: jest
       .fn()
       .mockResolvedValue([DELEGATE_PROJECTS_FIXTURE]),
+    getHistory: jest.fn().mockResolvedValue([HISTORY_ENTRY_FIXTURE]),
   };
 }
 
@@ -330,6 +343,75 @@ describe('ResponseUtils.format envelope — listManagedProjects and listManagedD
 
     await expect(
       controller.listManagedDelegates({ user_id: 99 }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getHistory() handler — GET /pi-delegates/history
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PiDelegatesController.getHistory() — GET /pi-delegates/history', () => {
+  it('project_id branch: calls service.getHistory({ project_id }) and wraps in ResponseUtils.format', async () => {
+    const { controller, mockService } = await makeController();
+    const dto: HistoryQueryDto = { project_id: 'INIT-268' };
+
+    const result = await controller.getHistory(dto);
+
+    // KZ-001: service receives the exact DTO object
+    expect(mockService.getHistory).toHaveBeenCalledWith(dto);
+    expect(result).toMatchObject({
+      status: HttpStatus.OK,
+      description: 'PI delegation history',
+    });
+    expect(Array.isArray(result.data)).toBe(true);
+  });
+
+  it('delegate_user_id branch: calls service.getHistory({ delegate_user_id }) and wraps in ResponseUtils.format', async () => {
+    const { controller, mockService } = await makeController();
+    const dto: HistoryQueryDto = { delegate_user_id: 42 };
+
+    const result = await controller.getHistory(dto);
+
+    // KZ-001: service receives the exact DTO including the numeric delegate_user_id
+    expect(mockService.getHistory).toHaveBeenCalledWith(dto);
+    expect(result).toMatchObject({
+      status: HttpStatus.OK,
+      description: 'PI delegation history',
+    });
+  });
+
+  it('data field contains the array returned by the service', async () => {
+    const { controller, mockService } = await makeController();
+    mockService.getHistory.mockResolvedValue([HISTORY_ENTRY_FIXTURE]);
+    const dto: HistoryQueryDto = { project_id: 'INIT-268' };
+
+    const result = await controller.getHistory(dto);
+
+    expect(result.data).toEqual([HISTORY_ENTRY_FIXTURE]);
+  });
+
+  it('empty result from service → data is an empty array', async () => {
+    const { controller, mockService } = await makeController();
+    mockService.getHistory.mockResolvedValue([]);
+    const dto: HistoryQueryDto = { delegate_user_id: 99 };
+
+    const result = await controller.getHistory(dto);
+
+    expect(result.data).toEqual([]);
+  });
+
+  it('project branch: ForbiddenException from assertCanManageProject propagates (non-manager is denied)', async () => {
+    const { controller, mockService } = await makeController();
+    const { ForbiddenException } = await import('@nestjs/common');
+    mockService.getHistory.mockRejectedValue(
+      new ForbiddenException(
+        'Access denied: caller is not the PI, an active delegate, or a SYSTEM_ADMIN for this project.',
+      ),
+    );
+
+    await expect(
+      controller.getHistory({ project_id: 'PROJ-DENIED' }),
     ).rejects.toThrow(ForbiddenException);
   });
 });

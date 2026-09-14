@@ -25,6 +25,7 @@ import MyPiDelegatesComponent from './my-pi-delegates.component';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '@services/cache/cache.service';
+import { AllModalsService } from '@services/cache/all-modals.service';
 import type { ProjectDelegates } from '@interfaces/pi-delegates.interface';
 
 // ─── Factory ─────────────────────────────────────────────────────────────────
@@ -402,6 +403,47 @@ describe('MyPiDelegatesComponent', () => {
   it('statusFilter signal starts as All', () => {
     fixture.detectChanges();
     expect(component.statusFilter()).toBe('All');
+  });
+
+  // ── 10. Delegation History wiring ───────────────────────────────────────────
+
+  describe('onHistoryFromProject handler (10)', () => {
+    it('sets piDelegateHistoryContext to byProject and opens piDelegateHistory modal', () => {
+      fixture.detectChanges();
+
+      // AllModalsService is provided in root — get the real instance injected
+      const allModals = TestBed.inject(AllModalsService);
+
+      component.onHistoryFromProject({ projectCode: 'PRJ-999', projectName: 'Test Project' });
+
+      const ctx = allModals.piDelegateHistoryContext();
+      expect(ctx).not.toBeNull();
+      expect(ctx!.source).toBe('byProject');
+      if (ctx!.source === 'byProject') {
+        expect(ctx!.projectCode).toBe('PRJ-999');
+        expect(ctx!.projectName).toBe('Test Project');
+      }
+      expect(allModals.isModalOpen('piDelegateHistory').isOpen).toBe(true);
+    });
+  });
+
+  describe('onHistoryFromPerson handler (10)', () => {
+    it('sets piDelegateHistoryContext to byPerson and opens piDelegateHistory modal', () => {
+      fixture.detectChanges();
+
+      const allModals = TestBed.inject(AllModalsService);
+
+      component.onHistoryFromPerson({ delegateUserId: 77, name: 'Bob Delegate' });
+
+      const ctx = allModals.piDelegateHistoryContext();
+      expect(ctx).not.toBeNull();
+      expect(ctx!.source).toBe('byPerson');
+      if (ctx!.source === 'byPerson') {
+        expect(ctx!.delegateUserId).toBe(77);
+        expect(ctx!.name).toBe('Bob Delegate');
+      }
+      expect(allModals.isModalOpen('piDelegateHistory').isOpen).toBe(true);
+    });
   });
 });
 

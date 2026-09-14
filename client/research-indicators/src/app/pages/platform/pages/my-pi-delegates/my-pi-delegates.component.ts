@@ -117,4 +117,30 @@ export default class MyPiDelegatesComponent implements OnInit {
     });
     this.allModalsService.openModal('assignPiDelegate');
   }
+
+  // ─── Delegation History modal wiring ─────────────────────────────────────────
+
+  /**
+   * Opened from By-project tab history button: show history for this project.
+   */
+  onHistoryFromProject(event: { projectCode: string; projectName: string | null }): void {
+    this.allModalsService.piDelegateHistoryContext.set({
+      source: 'byProject',
+      projectCode: event.projectCode,
+      projectName: event.projectName
+    });
+    this.allModalsService.openModal('piDelegateHistory');
+  }
+
+  /**
+   * Opened from By-person tab history button: show history for this person.
+   */
+  onHistoryFromPerson(event: { delegateUserId: number; name: string | null }): void {
+    this.allModalsService.piDelegateHistoryContext.set({
+      source: 'byPerson',
+      delegateUserId: event.delegateUserId,
+      name: event.name
+    });
+    this.allModalsService.openModal('piDelegateHistory');
+  }
 }

@@ -2776,3 +2776,360 @@ describe('Scenario 20 — is_active derived from status_id (not raw column)', ()
     expect(result[0].carnet).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 21 — getHistory(): project_id branch
+//
+// project_id present, delegate_user_id absent:
+//   - assertCanManageProject called with project_id (403 if not PI/delegate/admin)
+//   - findProjectHistory called with project_id
+//   - rows mapped → PiDelegateHistoryEntryDto[]
+//
+// Discriminating assertions:
+//   - actor name assembled from actor_first + actor_last (null when both absent)
+//   - delegate name assembled from target_first + target_last (null when both absent)
+//   - action mapped as-is (ASSIGN and REVOKE both tested)
+//   - pi_delegate_history_id and delegate.user_id cast to Number
+//   - actor.user_id null when actor_user_id is null (LEFT JOIN — actor deleted)
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extended mock factory for getHistory — adds findProjectHistory + findDelegateHistory */
+function makeServiceForHistory(opts: {
+  userId?: number;
+  roles?: number[];
+  isAuthorized?: boolean;
+  projectHistoryRows?: Array<{
+    pi_delegate_history_id: number;
+    action: string;
+    created_at: Date;
+    actor_user_id: number | null;
+    actor_first: string | null;
+    actor_last: string | null;
+    delegate_user_id: number;
+    target_first: string | null;
+    target_last: string | null;
+    project_id: string;
+    project_name: string | null;
+  }>;
+  delegateHistoryRows?: Array<{
+    pi_delegate_history_id: number;
+    action: string;
+    created_at: Date;
+    actor_user_id: number | null;
+    actor_first: string | null;
+    actor_last: string | null;
+    delegate_user_id: number;
+    target_first: string | null;
+    target_last: string | null;
+    project_id: string;
+    project_name: string | null;
+  }>;
+  managedProjectIds?: string[];
+}) {
+  const findProjectHistory = jest
+    .fn()
+    .mockResolvedValue(opts.projectHistoryRows ?? []);
+
+  const findDelegateHistory = jest
+    .fn()
+    .mockResolvedValue(opts.delegateHistoryRows ?? []);
+
+  const findManagedProjectIds = jest
+    .fn()
+    .mockResolvedValue(opts.managedProjectIds ?? []);
+
+  const isPiOrActiveDelegateOfProject = jest
+    .fn()
+    .mockResolvedValue(opts.isAuthorized ?? true);
+
+  const mockRepo = {
+    isPiOrActiveDelegateOfProject,
+    isPiOfProject: jest.fn().mockResolvedValue(false),
+    listActiveDelegateUserIds: jest.fn().mockResolvedValue([]),
+    resolveDelegateUserId: jest.fn().mockResolvedValue(0),
+    insertDelegate: jest.fn().mockResolvedValue(new PiDelegate()),
+    softDeleteDelegatePairs: jest.fn().mockResolvedValue(0),
+    softDeleteDelegateIds: jest.fn().mockResolvedValue(0),
+    findOne: jest.fn().mockResolvedValue(null),
+    find: jest.fn().mockResolvedValue([]),
+    recordHistory: jest.fn().mockResolvedValue(undefined),
+    findProjectSummary: jest.fn().mockResolvedValue(null),
+    findActiveDelegatesWithUser: jest.fn().mockResolvedValue([]),
+    findUserSummary: jest.fn().mockResolvedValue(null),
+    findDelegateProjects: jest.fn().mockResolvedValue([]),
+    findManagedProjectIds,
+    findProjectSummariesByIds: jest.fn().mockResolvedValue([]),
+    findActiveDelegatesForProjects: jest.fn().mockResolvedValue([]),
+    findDelegatesForProjects: jest.fn().mockResolvedValue([]),
+    findProjectHistory,
+    findDelegateHistory,
+  } as unknown as import('./repositories/pi-delegates.repository').PiDelegatesRepository;
+
+  const mockCurrentUser = {
+    user_id: opts.userId ?? 50,
+    roles: opts.roles ?? [],
+  } as unknown as CurrentUserUtil;
+
+  const mockDataSource = {
+    transaction: jest
+      .fn()
+      .mockImplementation(
+        (cb: (manager: import('typeorm').EntityManager) => Promise<unknown>) =>
+          cb({
+            getRepository: jest
+              .fn()
+              .mockReturnValue({ find: jest.fn().mockResolvedValue([]) }),
+          } as unknown as import('typeorm').EntityManager),
+      ),
+  } as unknown as DataSource;
+
+  const service = new PiDelegatesService(
+    mockRepo,
+    mockCurrentUser,
+    mockDataSource,
+  );
+
+  return {
+    service,
+    mockRepo,
+    findProjectHistory,
+    findDelegateHistory,
+    findManagedProjectIds,
+    isPiOrActiveDelegateOfProject,
+  };
+}
+
+describe('getHistory() — Scenario 21: project_id branch', () => {
+  it('calls assertCanManageProject then findProjectHistory; maps rows → PiDelegateHistoryEntryDto[]', async () => {
+    const ts = new Date('2026-09-14T12:00:00.000Z');
+
+    const { service, findProjectHistory } = makeServiceForHistory({
+      userId: 50,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      projectHistoryRows: [
+        {
+          pi_delegate_history_id: 1,
+          action: 'assign',
+          created_at: ts,
+          actor_user_id: 50,
+          actor_first: 'Jane',
+          actor_last: 'Smith',
+          delegate_user_id: 42,
+          target_first: 'Juan',
+          target_last: 'Cadavid',
+          project_id: 'INIT-268',
+          project_name: 'Initiative 268',
+        },
+        {
+          pi_delegate_history_id: 2,
+          action: 'revoke',
+          created_at: ts,
+          actor_user_id: 55,
+          actor_first: 'Bob',
+          actor_last: 'Doe',
+          delegate_user_id: 42,
+          target_first: 'Juan',
+          target_last: 'Cadavid',
+          project_id: 'INIT-268',
+          project_name: 'Initiative 268',
+        },
+      ],
+    });
+
+    const result = await service.getHistory({ project_id: 'INIT-268' });
+
+    // KZ-001: repo called with the correct project_id
+    expect(findProjectHistory).toHaveBeenCalledWith('INIT-268');
+    expect(result).toHaveLength(2);
+
+    // First entry — ASSIGN
+    expect(result[0].pi_delegate_history_id).toBe(1);
+    expect(result[0].action).toBe('assign');
+    expect(result[0].actor.user_id).toBe(50);
+    expect(result[0].actor.name).toBe('Jane Smith');
+    expect(result[0].delegate.user_id).toBe(42);
+    expect(result[0].delegate.name).toBe('Juan Cadavid');
+    expect(result[0].project.project_code).toBe('INIT-268');
+    expect(result[0].project.project_name).toBe('Initiative 268');
+    expect(result[0].created_at).toEqual(ts);
+
+    // Second entry — REVOKE (discriminates both action values map through)
+    expect(result[1].action).toBe('revoke');
+    expect(result[1].actor.user_id).toBe(55);
+    expect(result[1].actor.name).toBe('Bob Doe');
+  });
+
+  it('actor deleted (actor_user_id null, actor_first/last null) → actor.user_id null, actor.name null', async () => {
+    const { service } = makeServiceForHistory({
+      userId: 50,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      projectHistoryRows: [
+        {
+          pi_delegate_history_id: 3,
+          action: 'assign',
+          created_at: new Date(),
+          actor_user_id: null, // deleted account — LEFT JOIN produced null
+          actor_first: null,
+          actor_last: null,
+          delegate_user_id: 42,
+          target_first: 'Alive',
+          target_last: 'Person',
+          project_id: 'INIT-268',
+          project_name: 'Initiative 268',
+        },
+      ],
+    });
+
+    const result = await service.getHistory({ project_id: 'INIT-268' });
+
+    expect(result[0].actor.user_id).toBeNull();
+    expect(result[0].actor.name).toBeNull();
+    expect(result[0].delegate.name).toBe('Alive Person'); // delegate still visible
+  });
+
+  it('delegate deleted (target_first/last null) → delegate.name null', async () => {
+    const { service } = makeServiceForHistory({
+      userId: 50,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      projectHistoryRows: [
+        {
+          pi_delegate_history_id: 4,
+          action: 'revoke',
+          created_at: new Date(),
+          actor_user_id: 50,
+          actor_first: 'Present',
+          actor_last: 'Actor',
+          delegate_user_id: 99,
+          target_first: null, // deleted delegate account
+          target_last: null,
+          project_id: 'PROJ-X',
+          project_name: null,
+        },
+      ],
+    });
+
+    const result = await service.getHistory({ project_id: 'PROJ-X' });
+
+    expect(result[0].delegate.user_id).toBe(99);
+    expect(result[0].delegate.name).toBeNull();
+    expect(result[0].project.project_name).toBeNull();
+  });
+
+  it('non-manager caller → ForbiddenException from assertCanManageProject (project branch auth)', async () => {
+    const { service } = makeServiceForHistory({
+      userId: 77,
+      roles: [], // not SYSTEM_ADMIN
+      isAuthorized: false, // isPiOrActiveDelegateOfProject = false
+    });
+
+    await expect(
+      service.getHistory({ project_id: 'PROJ-DENIED' }),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('no history rows → returns empty array', async () => {
+    const { service, findProjectHistory } = makeServiceForHistory({
+      userId: 50,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      projectHistoryRows: [],
+    });
+
+    const result = await service.getHistory({ project_id: 'PROJ-EMPTY' });
+
+    expect(findProjectHistory).toHaveBeenCalledWith('PROJ-EMPTY');
+    expect(result).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 22 — getHistory(): delegate_user_id branch
+//
+// delegate_user_id present, project_id absent:
+//   - findManagedProjectIds called with CALLER's user_id (not the queried delegate)
+//   - empty managed set → [] without calling findDelegateHistory (KZ-001: discriminator)
+//   - non-empty managed set → findDelegateHistory(delegate_user_id, managedIds)
+//   - rows mapped → PiDelegateHistoryEntryDto[]
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getHistory() — Scenario 22: delegate_user_id branch', () => {
+  it('caller with managed projects → findDelegateHistory called with (delegate_user_id, managedIds)', async () => {
+    const callerUserId = 60;
+    const ts = new Date('2026-09-14T09:00:00.000Z');
+
+    const { service, findDelegateHistory, findManagedProjectIds } =
+      makeServiceForHistory({
+        userId: callerUserId,
+        roles: [],
+        managedProjectIds: ['INIT-268', 'INIT-269'],
+        delegateHistoryRows: [
+          {
+            pi_delegate_history_id: 10,
+            action: 'assign',
+            created_at: ts,
+            actor_user_id: callerUserId,
+            actor_first: 'Caller',
+            actor_last: 'User',
+            delegate_user_id: 42,
+            target_first: 'Delegate',
+            target_last: 'Target',
+            project_id: 'INIT-268',
+            project_name: 'Initiative 268',
+          },
+        ],
+      });
+
+    const result = await service.getHistory({ delegate_user_id: 42 });
+
+    // KZ-001: managed ids comes from the CALLER (60), not the queried delegate (42)
+    expect(findManagedProjectIds).toHaveBeenCalledWith(callerUserId);
+    // KZ-001: repo receives the correct delegate_user_id and the managed id list
+    expect(findDelegateHistory).toHaveBeenCalledWith(42, [
+      'INIT-268',
+      'INIT-269',
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].pi_delegate_history_id).toBe(10);
+    expect(result[0].action).toBe('assign');
+    expect(result[0].delegate.user_id).toBe(42);
+    expect(result[0].delegate.name).toBe('Delegate Target');
+    expect(result[0].actor.name).toBe('Caller User');
+    expect(result[0].project.project_code).toBe('INIT-268');
+  });
+
+  it('empty managed set → returns [] WITHOUT calling findDelegateHistory (discriminator)', async () => {
+    const { service, findDelegateHistory, findManagedProjectIds } =
+      makeServiceForHistory({
+        userId: 61,
+        roles: [],
+        managedProjectIds: [], // caller manages nothing
+      });
+
+    const result = await service.getHistory({ delegate_user_id: 99 });
+
+    expect(findManagedProjectIds).toHaveBeenCalledWith(61);
+    // ★ discriminating: a regression that skips the empty-guard would still call findDelegateHistory
+    expect(findDelegateHistory).not.toHaveBeenCalled();
+    expect(result).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 23 — getHistory(): exactly-one validation (BadRequest)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getHistory() — Scenario 23: exactly-one validation', () => {
+  it('both params present → BadRequestException', async () => {
+    const { service } = makeServiceForHistory({ userId: 50 });
+
+    await expect(
+      service.getHistory({ project_id: 'INIT-268', delegate_user_id: 42 }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('neither param present → BadRequestException', async () => {
+    const { service } = makeServiceForHistory({ userId: 50 });
+
+    await expect(service.getHistory({})).rejects.toThrow(BadRequestException);
+  });
+});

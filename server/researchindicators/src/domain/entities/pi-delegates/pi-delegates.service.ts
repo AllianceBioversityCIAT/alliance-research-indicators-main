@@ -63,6 +63,8 @@ import {
   ProjectDelegatesResponseDto,
   DelegateProjectsResponseDto,
 } from './dto/pi-delegate-response.dto';
+import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
+import { HistoryQueryDto } from './dto/history.query.dto';
 import { UserStatusEnum } from '../users/enum/user-status.enum';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -812,6 +814,117 @@ export class PiDelegatesService {
         project_name: p.description ?? null,
       })),
     }));
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/history — delegation history (project OR delegate)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns delegation history rows, newest-first, for either a project OR a
+   * delegate (mutually exclusive, exactly one required).
+   *
+   * project_id branch:
+   *   - assertCanManageProject(project_id) → 403 if caller is not PI / active
+   *     delegate / SYSTEM_ADMIN of that project.
+   *   - Returns ALL history rows for the project (no scope restriction on whose
+   *     actions appear; the PI sees the full audit trail).
+   *
+   * delegate_user_id branch:
+   *   - No single project to gate on → scope to the CALLER's managed projects.
+   *   - findManagedProjectIds(caller.user_id): if empty → return [] immediately
+   *     without a history query (consistent with R-UI-003 AC.2).
+   *   - Returns history WHERE delegate_user_id = ? AND project_id IN (managed ids),
+   *     so a PI only sees history on projects they manage.
+   *
+   * @param query  HistoryQueryDto — exactly one of project_id / delegate_user_id
+   */
+  async getHistory(
+    query: HistoryQueryDto,
+  ): Promise<PiDelegateHistoryEntryDto[]> {
+    const hasProject = query.project_id != null && query.project_id !== '';
+    const hasDelegate = query.delegate_user_id != null;
+
+    if (hasProject && hasDelegate) {
+      throw new BadRequestException(
+        'Provide exactly one of project_id or delegate_user_id, not both.',
+      );
+    }
+
+    if (!hasProject && !hasDelegate) {
+      throw new BadRequestException(
+        'Provide exactly one of project_id or delegate_user_id.',
+      );
+    }
+
+    // ── Helper: map raw rows → PiDelegateHistoryEntryDto[] ──────────────────
+    type RawHistoryRow = {
+      pi_delegate_history_id: number;
+      action: string;
+      created_at: Date;
+      actor_user_id: number | null;
+      actor_first: string | null;
+      actor_last: string | null;
+      delegate_user_id: number;
+      target_first: string | null;
+      target_last: string | null;
+      project_id: string;
+      project_name: string | null;
+    };
+
+    const mapRow = (r: RawHistoryRow): PiDelegateHistoryEntryDto => {
+      const actorName =
+        r.actor_first || r.actor_last
+          ? `${r.actor_first ?? ''} ${r.actor_last ?? ''}`.trim() || null
+          : null;
+      const delegateName =
+        r.target_first || r.target_last
+          ? `${r.target_first ?? ''} ${r.target_last ?? ''}`.trim() || null
+          : null;
+
+      return {
+        pi_delegate_history_id: Number(r.pi_delegate_history_id),
+        action: r.action as PiDelegateHistoryEntryDto['action'],
+        actor: {
+          user_id: r.actor_user_id != null ? Number(r.actor_user_id) : null,
+          name: actorName,
+        },
+        delegate: {
+          user_id: Number(r.delegate_user_id),
+          name: delegateName,
+        },
+        project: {
+          project_code: r.project_id,
+          project_name: r.project_name ?? null,
+        },
+        created_at: r.created_at,
+      };
+    };
+
+    // ── project_id branch ────────────────────────────────────────────────────
+    if (hasProject) {
+      await this.assertCanManageProject(query.project_id!);
+      const rows = await this.piDelegatesRepository.findProjectHistory(
+        query.project_id!,
+      );
+      return rows.map(mapRow);
+    }
+
+    // ── delegate_user_id branch ──────────────────────────────────────────────
+    const callerUserId = this.currentUserUtil.user_id;
+    const managedIds =
+      await this.piDelegatesRepository.findManagedProjectIds(callerUserId);
+
+    if (!managedIds.length) {
+      return [];
+    }
+
+    const rows = await this.piDelegatesRepository.findDelegateHistory(
+      query.delegate_user_id!,
+      managedIds,
+    );
+    return rows.map(mapRow);
   }
 
   /**

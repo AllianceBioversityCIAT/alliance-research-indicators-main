@@ -11,4 +11,5 @@ export type ModalName =
   | 'editPrompt'
   | 'projectGroundingSetup'
   | 'portfolioManagement'
-  | 'assignPiDelegate';
+  | 'assignPiDelegate'
+  | 'piDelegateHistory';

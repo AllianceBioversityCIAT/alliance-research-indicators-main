@@ -519,4 +519,45 @@ describe('ByPersonComponent', () => {
       expect((pill.nativeElement as HTMLElement).textContent?.trim()).not.toContain('Active');
     });
   });
+
+  // ── 11. History button — emits historyRequested ──────────────────────
+
+  describe('history button', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('renders a history icon button in the Actions cell', () => {
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      expect(btn).toBeTruthy();
+    });
+
+    it('emits historyRequested with delegateUserId + name when history button is clicked', () => {
+      const emitted: { delegateUserId: number; name: string | null }[] = [];
+      component.historyRequested.subscribe((v: { delegateUserId: number; name: string | null }) =>
+        emitted.push(v)
+      );
+
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      // KZ-014: must carry the delegate's id and name
+      expect(emitted.length).toBe(1);
+      expect(emitted[0].delegateUserId).toBe(1);
+      expect(emitted[0].name).toBe('Alice Example');
+    });
+
+    it('history button does NOT emit assignRequested (discriminator)', () => {
+      const assignEmitted: unknown[] = [];
+      component.assignRequested.subscribe((v: unknown) => assignEmitted.push(v));
+
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      // KZ-014: clicking history must NOT trigger assignRequested
+      expect(assignEmitted.length).toBe(0);
+    });
+  });
 });

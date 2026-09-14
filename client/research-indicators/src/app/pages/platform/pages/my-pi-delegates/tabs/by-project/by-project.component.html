@@ -128,17 +128,17 @@
             }
           </td>
 
-          <!-- Actions — disabled history + "Assign people" text button -->
+          <!-- Actions — history + "Assign people" text button -->
           <td class="by-project__td by-project__td--actions">
             <div class="by-project__actions">
               <button
                 type="button"
                 class="by-project__history-btn"
-                [disabled]="true"
-                aria-disabled="true"
-                pTooltip="Delegation history — coming soon"
+                pTooltip="Delegation history"
                 tooltipPosition="top"
-                [attr.aria-label]="'Delegation history for ' + project.project_code + ' (coming soon)'"
+                [attr.aria-label]="'Delegation history for ' + project.project_code"
+                (click)="onHistory(project)"
+                (keydown.enter)="onHistory(project)"
               >
                 <i class="pi pi-history" aria-hidden="true"></i>
               </button>

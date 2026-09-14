@@ -218,6 +218,38 @@
     }
   }
 
+  // ── Actions wrapper (history + assign) ──────────────────────────────────
+  &__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  // ── History button ───────────────────────────────────────────────────
+  &__history-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 27px;
+    height: 27px;
+    border-radius: 8px;
+    border: none;
+    background-color: var(--ac-grey-200);
+    color: var(--ac-primary-blue-400);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--ac-grey-300);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ac-light-blue-400);
+      outline-offset: 2px;
+    }
+  }
+
   // ── Assign button ────────────────────────────────────────────────────
   &__assign-btn {
     display: inline-flex;

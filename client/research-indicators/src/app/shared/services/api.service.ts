@@ -2,7 +2,7 @@ import { Injectable, WritableSignal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
-import { ActiveUser, DelegateProjects, ProjectDelegates } from '../interfaces/pi-delegates.interface';
+import { ActiveUser, DelegateProjects, PiDelegateHistoryEntry, ProjectDelegates } from '../interfaces/pi-delegates.interface';
 import { GetViewComponents, Indicator, IndicatorTypes } from '../interfaces/api.interface';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 import {
@@ -1283,6 +1283,24 @@ export class ApiService {
     return firstValueFrom(
       this.TP.http.delete<MainResponse<unknown>>(url, { body })
     );
+  };
+
+  /**
+   * GET /api/pi-delegates/history?project_id=<code>  OR  ?delegate_user_id=<id>
+   * Exactly one parameter must be provided.
+   * Returns delegation history entries NEWEST-FIRST.
+   */
+  GET_PIDelegatesHistory = (
+    params: { project_id?: string; delegate_user_id?: number }
+  ): Promise<MainResponse<PiDelegateHistoryEntry[]>> => {
+    let qs: string;
+    if (params.project_id !== undefined) {
+      qs = `project_id=${encodeURIComponent(params.project_id)}`;
+    } else {
+      qs = `delegate_user_id=${encodeURIComponent(params.delegate_user_id!)}`;
+    }
+    const url = () => `pi-delegates/history?${qs}`;
+    return this.TP.get(url(), {});
   };
 
   // ─── Users — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-08) ────────

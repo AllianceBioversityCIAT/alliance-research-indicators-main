@@ -349,11 +349,29 @@ describe('ByProjectComponent', () => {
       expect((btn.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign people');
     });
 
-    it('renders the history icon button in disabled state', () => {
+    it('renders the history icon button in an ENABLED state (disabled removed)', () => {
       const historyBtn = fixture.debugElement.query(By.css('.by-project__history-btn'));
       expect(historyBtn).toBeTruthy();
       const el = historyBtn.nativeElement as HTMLButtonElement;
-      expect(el.disabled || el.getAttribute('aria-disabled') === 'true').toBe(true);
+      // KZ-014: must NOT be disabled — if still disabled, the feature was not wired
+      expect(el.disabled).toBe(false);
+      expect(el.getAttribute('aria-disabled')).not.toBe('true');
+    });
+
+    it('emits historyRequested with projectCode+projectName when history button is clicked', () => {
+      const emitted: { projectCode: string; projectName: string | null }[] = [];
+      component.historyRequested.subscribe((v: { projectCode: string; projectName: string | null }) =>
+        emitted.push(v)
+      );
+
+      const historyBtn = fixture.debugElement.query(By.css('.by-project__history-btn'));
+      (historyBtn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(emitted.length).toBe(1);
+      // KZ-014: must carry the project code from the row data
+      expect(emitted[0].projectCode).toBe('PRJ-001');
+      expect(emitted[0].projectName).toBe('Alpha Research');
     });
 
     it('emits assignRequested with the project code when "Assign people" is clicked', () => {

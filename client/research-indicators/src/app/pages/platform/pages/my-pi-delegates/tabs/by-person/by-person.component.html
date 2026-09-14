@@ -104,19 +104,32 @@
             </div>
           </td>
 
-          <!-- Actions — Assign affordance (T-UI-07 wires the modal) -->
+          <!-- Actions — History + Assign affordances -->
           <td class="by-person__td by-person__td--actions">
-            <button
-              type="button"
-              class="by-person__assign-btn"
-              [attr.aria-label]="'Assign projects to ' + row.name"
-              pTooltip="Assign projects to this person"
-              tooltipPosition="top"
-              (click)="onAssign(row)"
-              (keydown.enter)="onAssign(row)"
-            >
-              <i class="pi pi-user-plus" aria-hidden="true"></i>
-            </button>
+            <div class="by-person__actions">
+              <button
+                type="button"
+                class="by-person__history-btn"
+                [attr.aria-label]="'Delegation history for ' + row.name"
+                pTooltip="Delegation history"
+                tooltipPosition="top"
+                (click)="onHistory(row)"
+                (keydown.enter)="onHistory(row)"
+              >
+                <i class="pi pi-history" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="by-person__assign-btn"
+                [attr.aria-label]="'Assign projects to ' + row.name"
+                pTooltip="Assign projects to this person"
+                tooltipPosition="top"
+                (click)="onAssign(row)"
+                (keydown.enter)="onAssign(row)"
+              >
+                <i class="pi pi-user-plus" aria-hidden="true"></i>
+              </button>
+            </div>
           </td>
 
         </tr>

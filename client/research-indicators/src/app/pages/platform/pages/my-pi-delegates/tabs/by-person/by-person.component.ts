@@ -60,6 +60,13 @@ export class ByPersonComponent {
   // Assign button emits the delegate_user_id; the parent/page shell opens the modal.
   @Output() readonly assignRequested = new EventEmitter<{ delegateUserId: number }>();
 
+  // ─── History output ───────────────────────────────────────────────────────────
+  // History button emits delegate_user_id + name; the shell opens the history modal.
+  @Output() readonly historyRequested = new EventEmitter<{
+    delegateUserId: number;
+    name: string | null;
+  }>();
+
   // ─── Input signal from shell filter bar ───────────────────────────────────────
   readonly searchQuery = input<string>('');
 
@@ -118,6 +125,14 @@ export class ByPersonComponent {
   // ─── Assign affordance ────────────────────────────────────────────────────────
   onAssign(row: PersonRow): void {
     this.assignRequested.emit({ delegateUserId: row.delegate_user_id });
+  }
+
+  // ─── History affordance ───────────────────────────────────────────────────────
+  onHistory(row: PersonRow): void {
+    this.historyRequested.emit({
+      delegateUserId: row.delegate_user_id,
+      name: row.name || null
+    });
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────
