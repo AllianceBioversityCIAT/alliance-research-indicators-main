@@ -1,0 +1,65 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-07) -->
+<!-- R-UI-005: Two searchable app-multiselects (People × Projects). -->
+<!-- R-UI-005 AC.3: People multiselect excludes the current user via [optionFilter]. -->
+<!-- R-UI-005 AC.4: Accept gating handled by disabledConfirmIf (wired in all-modals.html). -->
+<!-- R-UI-006: Pre-load from context seeds both pickers (SYNC guard). -->
+<!-- R-UI-007: Delta confirm + success toast / error state handled in .ts. -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+
+<div class="assign-pi-delegate">
+
+  <!-- ── People picker ─────────────────────────────────────────────────── -->
+  <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
+  <!-- optionFilter excludes the current user (R-UI-005 AC.3). -->
+  <div class="assign-pi-delegate__field">
+    <app-multiselect
+      [signal]="peopleSignal"
+      signalOptionValue="selected_people"
+      serviceName="piDelegatePeople"
+      optionValue="delegate_user_id"
+      optionLabel="name"
+      filterBy="name,email"
+      label="People"
+      placeholder="Select people to assign as delegates"
+      [optionFilter]="selfExclusionFilter()"
+      [isRequired]="true"
+    ></app-multiselect>
+    <p class="assign-pi-delegate__hint atc-grey-600">
+      Select the people who will act as PI Delegates.
+      You cannot assign yourself.
+    </p>
+  </div>
+
+  <!-- ── Projects picker ─────────────────────────────────────────────────── -->
+  <!-- serviceName='piDelegateProjects' → projects from byProjectCache (the page table) (T-UI-08). -->
+  <div class="assign-pi-delegate__field">
+    <app-multiselect
+      [signal]="projectsSignal"
+      signalOptionValue="selected_projects"
+      serviceName="piDelegateProjects"
+      optionValue="project_code"
+      optionLabel="project_name"
+      filterBy="project_code,project_name"
+      label="Projects"
+      placeholder="Select projects to assign delegates to"
+      [isRequired]="true"
+    ></app-multiselect>
+    <p class="assign-pi-delegate__hint atc-grey-600">
+      Select the projects for this delegation.
+      Only your manageable projects will appear.
+    </p>
+  </div>
+
+  <!-- ── Pre-load note ──────────────────────────────────────────────────── -->
+  <!-- Informs the user that the selections shown on open reflect the project's
+       current delegate assignments (pre-loaded from the cache). -->
+  @if (getSelectedPeopleList().length > 0 || getSelectedProjectsList().length > 0) {
+    <div class="assign-pi-delegate__preload-notice" role="status" aria-live="polite">
+      <i class="pi pi-info-circle atc-primary-blue-400" aria-hidden="true"></i>
+      <span class="atc-grey-700 fs-14">
+        Pre-loaded selections reflect the current delegate assignments.
+      </span>
+    </div>
+  }
+
+</div>

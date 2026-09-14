@@ -610,6 +610,168 @@ export class PiDelegatesService {
     };
   }
 
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/projects — projects the user manages (PI or delegate)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns all projects the given user manages — either as PI or as an active
+   * delegate — each enriched with its active delegates list.
+   *
+   * Fills the "By project" tab of the My PI Delegates UI for a whole user.
+   *
+   * Authorization (own-or-admin):
+   *   - The caller may query their own user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * @param userId  sec_users.sec_user_id of the user whose managed projects to list
+   */
+  async listManagedProjects(
+    userId: number,
+  ): Promise<ProjectDelegatesResponseDto[]> {
+    const callerUserId = this.currentUserUtil.user_id;
+    const roles = this.currentUserUtil.roles ?? [];
+
+    const isSelf = userId === callerUserId;
+    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
+
+    if (!isSelf && !isAdmin) {
+      throw new ForbiddenException(
+        'Access denied: you may only query your own managed projects, or you must be a SYSTEM_ADMIN.',
+      );
+    }
+
+    const projectIds =
+      await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+    if (!projectIds.length) {
+      return [];
+    }
+
+    const [projects, delegates] = await Promise.all([
+      this.piDelegatesRepository.findProjectSummariesByIds(projectIds),
+      this.piDelegatesRepository.findActiveDelegatesForProjects(projectIds),
+    ]);
+
+    // Index delegates by project_id for O(1) lookup during assembly.
+    const delegatesByProject = new Map<
+      string,
+      Array<{
+        delegate_user_id: number;
+        first_name: string;
+        last_name: string;
+        email: string;
+      }>
+    >();
+    for (const d of delegates) {
+      const projectId = d.project_id;
+      if (!delegatesByProject.has(projectId)) {
+        delegatesByProject.set(projectId, []);
+      }
+      delegatesByProject.get(projectId)!.push(d);
+    }
+
+    return projects.map((p) => ({
+      project_code: p.agreement_id,
+      project_name: p.description ?? null,
+      is_pool_funding_contributor: Boolean(p.is_pool_funding_contributor),
+      status: p.contract_status ?? null,
+      start_date: p.start_date ?? null,
+      end_date: p.end_date ?? null,
+      delegates: (delegatesByProject.get(p.agreement_id) ?? []).map((d) => ({
+        delegate_user_id: Number(d.delegate_user_id),
+        name: `${d.first_name} ${d.last_name}`.trim(),
+        email: d.email,
+      })),
+    }));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/people — distinct delegates across the user's managed projects
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the distinct delegates across all projects the given user manages,
+   * each with the subset of managed projects they are assigned to.
+   *
+   * Fills the "By person" tab of the My PI Delegates UI for a whole user.
+   *
+   * Projects the user does NOT manage are excluded: even if a delegate is
+   * assigned to other projects, only assignments in the caller's managed set
+   * are returned.
+   *
+   * Authorization (own-or-admin — same as listManagedProjects):
+   *   - The caller may query their own user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * @param userId  sec_users.sec_user_id of the user whose managed delegates to list
+   */
+  async listManagedDelegates(
+    userId: number,
+  ): Promise<DelegateProjectsResponseDto[]> {
+    const callerUserId = this.currentUserUtil.user_id;
+    const roles = this.currentUserUtil.roles ?? [];
+
+    const isSelf = userId === callerUserId;
+    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
+
+    if (!isSelf && !isAdmin) {
+      throw new ForbiddenException(
+        'Access denied: you may only query your own managed delegates, or you must be a SYSTEM_ADMIN.',
+      );
+    }
+
+    const projectIds =
+      await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+    if (!projectIds.length) {
+      return [];
+    }
+
+    const rows =
+      await this.piDelegatesRepository.findDelegatesForProjects(projectIds);
+
+    // Group rows by delegate_user_id, collecting the distinct projects per delegate.
+    const byDelegate = new Map<
+      number,
+      {
+        first_name: string;
+        last_name: string;
+        email: string;
+        projects: Array<{ agreement_id: string; description: string | null }>;
+      }
+    >();
+
+    for (const row of rows) {
+      const delegateId = Number(row.delegate_user_id);
+      if (!byDelegate.has(delegateId)) {
+        byDelegate.set(delegateId, {
+          first_name: row.first_name,
+          last_name: row.last_name,
+          email: row.email,
+          projects: [],
+        });
+      }
+      byDelegate.get(delegateId)!.projects.push({
+        agreement_id: row.agreement_id,
+        description: row.description,
+      });
+    }
+
+    return Array.from(byDelegate.entries()).map(([delegateId, info]) => ({
+      delegate_user_id: delegateId,
+      name: `${info.first_name} ${info.last_name}`.trim(),
+      email: info.email,
+      projects: info.projects.map((p) => ({
+        project_code: p.agreement_id,
+        project_name: p.description ?? null,
+      })),
+    }));
+  }
+
   /**
    * Verify whether an active delegation exists for the given
    * (project_id, delegate_user_id) pair (R-PID-004 AC.1).

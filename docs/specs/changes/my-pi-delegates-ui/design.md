@@ -72,7 +72,9 @@ The People and Projects endpoints **do not exist yet** (user will wire them). `a
 
 ## 9. Nav entry (R-UI-001)
 
-Add a **Principal Investigator** group to the sidebar (`{ id:'pi', label:'Principal Investigator', icon:'pi-users', children:[{ label:'My PI Delegates', link:'/platform/my-pi-delegates' }] }`) — mimic the existing group/resource pattern; do NOT rename existing items. **Visibility:** shown when the user has ≥1 managed project (eligibility-driven, not a new role) — derive from the loaded By-project data (or a lightweight eligibility check); if that signal is not cheaply available, show it for authenticated users and let the page handle the empty state. Route: lazy `loadComponent` in `app.routes.ts` under the platform shell + existing auth guard.
+Add a **Principal Investigator** group to the sidebar (`{ id:'pi', label:'Principal Investigator', icon:'pi-users', children:[{ label:'My PI Delegates', link:'/my-pi-delegates' }] }`) — mimic the existing group/resource pattern; do NOT rename existing items. **Visibility:** shown when the user has ≥1 managed project (eligibility-driven, not a new role) — derive from the loaded By-project data (or a lightweight eligibility check); if that signal is not cheaply available, show it for authenticated users and let the page handle the empty state. Route: lazy `loadComponent` in `app.routes.ts` under the platform shell + existing auth guard.
+
+> **⚠ CORRECTION (2026-09-14, runtime NG04002):** the link is `/my-pi-delegates`, **NOT** `/platform/my-pi-delegates`. This app's platform shell is `path: ''`, so its children resolve at `/<child>` with **no `/platform/` prefix** (siblings: `/home`, `/projects`, `/about-indicators`). There is no `platform` path segment anywhere in `app.routes.ts`. The original `/platform/…` in this spec was an incorrect assumption that compiled but 404'd at runtime (`tsc` proves compile, not route resolution — KZ-017). The route registration (`{ path: 'my-pi-delegates' }` child of the `''` shell) was already correct; only the nav link string was wrong.
 
 ## 10. Design fidelity + a11y
 

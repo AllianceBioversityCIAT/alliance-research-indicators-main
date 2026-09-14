@@ -58,6 +58,18 @@ export class AllModalsService {
   refreshLinkedResults?: () => Promise<void> | void;
   setRefreshLinkedResults = (fn: (() => Promise<void> | void) | undefined) => (this.refreshLinkedResults = fn);
   syncSelectedResults = signal<Result[]>([]);
+
+  // ─── Assign PI Delegate modal context (T-UI-07) ─────────────────────────────
+  /**
+   * The open-context for the Assign/Edit modal.
+   * 'byProject' → the modal was opened from the By-project tab; projectCode is set.
+   * 'byPerson'  → the modal was opened from the By-person tab; delegateUserId is set.
+   */
+  assignPiDelegateContext = signal<
+    | { source: 'byProject'; projectCode: string }
+    | { source: 'byPerson'; delegateUserId: number }
+    | null
+  >(null);
   setResultInformationEntryContext(context: 'results-center' | null): void {
     this.resultInformationEntryContext.set(context);
     this.modalConfig.update(modals => ({
@@ -155,6 +167,10 @@ export class AllModalsService {
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
+    },
+    assignPiDelegate: {
+      isOpen: false,
+      title: 'Assign / Edit PI Delegate'
     }
   });
 
@@ -274,7 +290,8 @@ export class AllModalsService {
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
       editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
-      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false }
+      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
+      assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);

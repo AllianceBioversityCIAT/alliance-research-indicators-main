@@ -30,6 +30,7 @@ import { BulkAssignPiDelegatesDto } from './dto/bulk-assign-pi-delegates.dto';
 import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
 import { ListByDelegateDto } from './dto/list-by-delegate.query.dto';
+import { ListManagedDto } from './dto/list-managed.query.dto';
 
 // ⚠ No @Roles(...) is applied here (R-PID-007 / DD-B).
 // RolesGuard.canActivate() returns true when no @Roles metadata is present,
@@ -289,6 +290,125 @@ export class PiDelegatesController {
         ResponseUtils.format({
           data,
           description: 'Projects for the delegate',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/projects — projects a user manages (PI or delegate)
+  //
+  // Returns the full enriched ProjectDelegatesResponseDto[] for every project
+  // the specified user manages (as PI OR as an active delegate).
+  // This is the "By project" tab data for the My PI Delegates UI when viewing
+  // a whole user rather than a single project.
+  //
+  // Auth (own-or-admin): enforced in the service — no @Roles here.
+  // Declared BEFORE @Delete() so Nest matches the static path segments
+  // 'by-user/projects' before the parameterless DELETE on the root path.
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+  @Get('by-user/projects')
+  @ApiOperation({
+    summary:
+      'List managed projects for a user (PI or active delegate), each enriched with delegates',
+    description:
+      'Returns an array of project objects — one per project the specified user manages ' +
+      'either as PI or as an active delegate. ' +
+      'Each project is enriched with its full active delegate list (same shape as ' +
+      'GET /pi-delegates?projectId). ' +
+      'Project fields (project_code, project_name, is_pool_funding_contributor, ' +
+      'status, start_date, end_date) come from agresso_contracts. ' +
+      'Delegate identity (delegate_user_id, name, email) comes from sec_users. ' +
+      'Authorization (own-or-admin): the caller may query their own user_id; ' +
+      'a SYSTEM_ADMIN may query any user_id. All other combinations return 403.',
+  })
+  @ApiOkResponse({
+    type: ProjectDelegatesResponseDto,
+    isArray: true,
+    description:
+      'Array of projects the user manages, each with its active delegate list',
+  })
+  @ApiQuery({
+    name: 'user_id',
+    required: true,
+    type: Number,
+    description:
+      'sec_users.sec_user_id whose managed projects (PI or active delegate) to list',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  async listManagedProjects(@Query() dto: ListManagedDto) {
+    return this.piDelegatesService
+      .listManagedProjects(dto.user_id)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: 'Managed projects for the user',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/people — distinct delegates across a user's managed projects
+  //
+  // Returns DelegateProjectsResponseDto[] — one entry per distinct delegate
+  // across all projects the specified user manages. Each entry lists only the
+  // managed-project assignments (projects the user does NOT manage are excluded).
+  //
+  // This is the "By person" tab data for the My PI Delegates UI when viewing
+  // a whole user.
+  //
+  // Auth (own-or-admin): enforced in the service — no @Roles here.
+  // Declared BEFORE @Delete() so Nest matches the static path segments
+  // 'by-user/people' before the parameterless DELETE on the root path.
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+  @Get('by-user/people')
+  @ApiOperation({
+    summary:
+      "List distinct delegates across a user's managed projects, each with their managed project assignments",
+    description:
+      'Returns an array of person objects — one per distinct delegate across all ' +
+      'projects the specified user manages (as PI or as an active delegate). ' +
+      "Each person object embeds only the projects within the user's managed set: " +
+      'projects the user does NOT manage are excluded, even if the delegate is ' +
+      'assigned to them. ' +
+      'Person fields (delegate_user_id, name, email) come from sec_users. ' +
+      'Project fields (project_code, project_name) come from agresso_contracts. ' +
+      'Authorization (own-or-admin): the caller may query their own user_id; ' +
+      'a SYSTEM_ADMIN may query any user_id. All other combinations return 403.',
+  })
+  @ApiOkResponse({
+    type: DelegateProjectsResponseDto,
+    isArray: true,
+    description:
+      'Array of distinct delegates, each with the managed projects they are assigned to',
+  })
+  @ApiQuery({
+    name: 'user_id',
+    required: true,
+    type: Number,
+    description: 'sec_users.sec_user_id whose managed delegates to list',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  async listManagedDelegates(@Query() dto: ListManagedDto) {
+    return this.piDelegatesService
+      .listManagedDelegates(dto.user_id)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: "Distinct delegates across the user's managed projects",
           status: HttpStatus.OK,
         }),
       );

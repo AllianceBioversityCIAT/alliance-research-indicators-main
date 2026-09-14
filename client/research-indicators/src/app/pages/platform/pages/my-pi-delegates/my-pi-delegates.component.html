@@ -1,0 +1,94 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04) -->
+<!-- R-UI-002 AC.1: By-project is the FIRST tab (default active). -->
+<!-- R-UI-004: Summary counters come from service computed signals — no second copy. -->
+<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues for every status (icon + text). -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+
+<div class="pi-delegates-page">
+
+  <!-- ── Page header ─────────────────────────────────────────────────── -->
+  <header class="pi-delegates-header">
+    <h1 class="pi-delegates-title atc-primary-blue-600">My PI Delegates</h1>
+    <p class="pi-delegates-subtitle atc-grey-800">
+      Manage the people who act as Principal Investigator delegates across your projects.
+    </p>
+  </header>
+
+  <!-- ── Summary header (R-UI-004) ──────────────────────────────────── -->
+  <!-- Counters are computed() off the service cache — reactive after any write. -->
+  <section
+    class="pi-delegates-summary"
+    aria-label="PI Delegates summary"
+  >
+    <div class="pi-delegates-summary__card" aria-live="polite">
+      <span
+        class="pi-delegates-summary__value atc-primary-blue-500"
+        [attr.aria-label]="'Total PI projects: ' + totalProjects()"
+      >
+        {{ loading() ? '—' : totalProjects() }}
+      </span>
+      <span class="pi-delegates-summary__label atc-grey-800">Total PI projects</span>
+    </div>
+
+    <div class="pi-delegates-summary__card" aria-live="polite">
+      <span
+        class="pi-delegates-summary__value atc-primary-blue-500"
+        [attr.aria-label]="'People in the review team: ' + totalDistinctDelegates()"
+      >
+        {{ loading() ? '—' : totalDistinctDelegates() }}
+      </span>
+      <span class="pi-delegates-summary__label atc-grey-800">People in review team</span>
+    </div>
+
+    <div class="pi-delegates-summary__card" aria-live="polite">
+      <span
+        class="pi-delegates-summary__value atc-primary-blue-500"
+        [attr.aria-label]="'Projects without a PI Delegate: ' + projectsWithoutDelegateCount()"
+      >
+        {{ loading() ? '—' : projectsWithoutDelegateCount() }}
+      </span>
+      <span class="pi-delegates-summary__label atc-grey-800">Projects without a PI Delegate</span>
+    </div>
+  </section>
+
+  <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────── -->
+  @if (loading()) {
+    <div class="pi-delegates-state pi-delegates-state--loading" role="status" aria-live="polite">
+      <i class="pi pi-spin pi-spinner pi-delegates-state__icon atc-primary-blue-400" aria-hidden="true"></i>
+      <span class="atc-grey-800">Loading PI delegates data…</span>
+    </div>
+  }
+
+  <!-- ── Error state (NFR-UI-003) ───────────────────────────────────── -->
+  @else if (error()) {
+    <div class="pi-delegates-state pi-delegates-state--error" role="alert">
+      <i class="pi pi-exclamation-circle pi-delegates-state__icon atc-red-1" aria-hidden="true"></i>
+      <span class="atc-red-1">
+        Could not load PI delegates data. Please refresh the page and try again.
+      </span>
+    </div>
+  }
+
+  <!-- ── Tabs + content ─────────────────────────────────────────────── -->
+  @else {
+    <p-tabView
+      [activeIndex]="activeTabIndex()"
+      (activeIndexChange)="onTabChange({ index: $event })"
+      styleClass="pi-delegates-tabview"
+    >
+      <!-- ── Tab 0: By project (DEFAULT — R-UI-002 AC.1) ─────────── -->
+      <!-- (assignRequested) → onAssignFromProject → opens assignPiDelegate modal (T-UI-07) -->
+      <p-tabPanel header="By project">
+        <app-by-project (assignRequested)="onAssignFromProject($event)"></app-by-project>
+      </p-tabPanel>
+
+      <!-- ── Tab 1: By person (T-UI-06) ──────────────────────────────── -->
+      <!-- (assignRequested) → onAssignFromPerson → opens assignPiDelegate modal (T-UI-07) -->
+      <p-tabPanel header="By person">
+        <app-by-person (assignRequested)="onAssignFromPerson($event)"></app-by-person>
+      </p-tabPanel>
+    </p-tabView>
+  }
+
+</div>

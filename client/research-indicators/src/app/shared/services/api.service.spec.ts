@@ -368,6 +368,30 @@ describe('ApiService', () => {
 
       expect(mockToPromiseService.get).toHaveBeenCalledWith('tools/clarisa/science-programs', {});
     });
+
+    it('should call GET_ActiveUsers without ?search when no argument is supplied', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_ActiveUsers();
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('users/active', {});
+    });
+
+    it('should call GET_ActiveUsers without ?search when an empty string is supplied', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_ActiveUsers('');
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('users/active', {});
+    });
+
+    it('should append ?search=<encoded> when a non-empty search string is supplied', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_ActiveUsers('Alice Smith');
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('users/active?search=Alice%20Smith', {});
+    });
   });
 
   describe('POST methods', () => {

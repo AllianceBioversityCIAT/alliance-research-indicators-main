@@ -99,6 +99,7 @@ import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impa
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
 import { AiReportsModule } from './ai-reports/ai-reports.module';
 import { PiDelegatesModule } from './pi-delegates/pi-delegates.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -196,6 +197,7 @@ import { PiDelegatesModule } from './pi-delegates/pi-delegates.module';
     BilateralModule,
     BilateralProjectMappingModule,
     PiDelegatesModule,
+    UsersModule,
     PortfoliosModule,
     StrategicObjectivesModule,
     ImpactOutcomesModule,

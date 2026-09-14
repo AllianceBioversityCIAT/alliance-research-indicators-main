@@ -1,0 +1,201 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05) -->
+<!-- R-UI-002: By-project enriched table (code/name/pool-funding/status/dates/delegates) -->
+<!-- R-UI-008: Per-delegate "X" → confirm → revokePair (named pair only, no other project affected) -->
+<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text) for pool-funding + no-delegate rows. -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+
+<div class="by-project">
+
+  <!-- ── Search bar ─────────────────────────────────────────────────── -->
+  <div class="by-project__toolbar">
+    <div class="by-project__search-wrapper">
+      <span class="by-project__search-icon">
+        <i class="pi pi-search" aria-hidden="true"></i>
+      </span>
+      <input
+        pInputText
+        type="text"
+        id="by-project-search"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Search by person (name / email) or project (code / name)"
+        aria-label="Search by person or project"
+        class="by-project__search-input"
+      />
+    </div>
+
+    @if (hasSearch()) {
+      <button
+        type="button"
+        class="by-project__clear-btn atc-grey-700"
+        (click)="clearSearch()"
+        (keydown.enter)="clearSearch()"
+        aria-label="Clear search"
+      >
+        Clear
+      </button>
+    }
+  </div>
+
+  <!-- ── Table ──────────────────────────────────────────────────────── -->
+  <div class="by-project__table-wrapper">
+    <p-table
+      [value]="filteredRows()"
+      [loading]="service.loading()"
+      [scrollable]="true"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
+      aria-label="PI Delegates by project"
+    >
+      <!-- Header -->
+      <ng-template pTemplate="header">
+        <tr>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Code</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Project name</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Pool funding</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Status</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Start date</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">End date</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Delegates</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Actions</th>
+        </tr>
+      </ng-template>
+
+      <!-- Body -->
+      <ng-template pTemplate="body" let-project>
+        <tr class="by-project__row">
+
+          <!-- Code -->
+          <td class="by-project__td by-project__td--code">
+            <span class="atc-grey-800 by-project__cell-text">{{ project.project_code }}</span>
+          </td>
+
+          <!-- Project name -->
+          <td class="by-project__td by-project__td--name">
+            <span class="atc-grey-800 by-project__cell-text">{{ project.project_name || '—' }}</span>
+          </td>
+
+          <!-- Pool funding — icon + text, NOT colour-only (NFR-UI-002) -->
+          <td class="by-project__td by-project__td--pool">
+            @if (project.is_pool_funding_contributor) {
+              <span class="by-project__pool-badge" aria-label="Pool funding contributor: Yes">
+                <i class="pi pi-check-circle by-project__pool-badge__icon" aria-hidden="true"></i>
+                <span class="by-project__pool-badge__text">Yes</span>
+              </span>
+            } @else {
+              <span class="by-project__pool-badge by-project__pool-badge--no" aria-label="Pool funding contributor: No">
+                <i class="pi pi-minus-circle by-project__pool-badge__icon" aria-hidden="true"></i>
+                <span class="by-project__pool-badge__text atc-grey-600">No</span>
+              </span>
+            }
+          </td>
+
+          <!-- Status — icon + text (NFR-UI-002) -->
+          <td class="by-project__td by-project__td--status">
+            <span class="by-project__status atc-grey-800">
+              {{ project.status || '—' }}
+            </span>
+          </td>
+
+          <!-- Start date -->
+          <td class="by-project__td by-project__td--date">
+            <span class="atc-grey-800">{{ formatDate(project.start_date) }}</span>
+          </td>
+
+          <!-- End date -->
+          <td class="by-project__td by-project__td--date">
+            <span class="atc-grey-800">{{ formatDate(project.end_date) }}</span>
+          </td>
+
+          <!-- Delegates cell — chips or no-delegate cue (R-UI-002 AC.2/AC.3) -->
+          <td class="by-project__td by-project__td--delegates">
+            @if (project.delegates.length === 0) {
+              <!-- No-delegate: non-colour cue (icon + text) — R-UI-002 AC.3 / NFR-UI-002 -->
+              <span
+                class="by-project__no-delegate"
+                aria-label="No PI Delegate assigned"
+                data-testid="no-delegate-cue"
+              >
+                <i
+                  class="pi pi-exclamation-triangle by-project__no-delegate__icon atc-orange-1"
+                  aria-hidden="true"
+                ></i>
+                <span class="by-project__no-delegate__text atc-grey-700">No PI Delegate assigned</span>
+              </span>
+            } @else {
+              <div class="by-project__chips" role="list" [attr.aria-label]="'Delegates for ' + project.project_code">
+                @for (delegate of project.delegates; track delegate.delegate_user_id) {
+                  <span
+                    class="by-project__chip"
+                    role="listitem"
+                    [attr.aria-label]="delegate.name + ' (' + delegate.email + ')'"
+                  >
+                    <span class="by-project__chip__info">
+                      <span class="by-project__chip__name atc-primary-blue-600">{{ delegate.name }}</span>
+                      <span class="by-project__chip__email atc-grey-700">{{ delegate.email }}</span>
+                    </span>
+                    <!-- Per-delegate "X" revoke (R-UI-008) -->
+                    <button
+                      type="button"
+                      class="by-project__chip__remove"
+                      [attr.aria-label]="'Revoke ' + delegate.name + ' from ' + project.project_code"
+                      pTooltip="Revoke delegate"
+                      tooltipPosition="top"
+                      (click)="onRevokeDelegate(project, delegate)"
+                      (keydown.enter)="onRevokeDelegate(project, delegate)"
+                    >
+                      <i class="pi pi-times" aria-hidden="true"></i>
+                    </button>
+                  </span>
+                }
+              </div>
+            }
+          </td>
+
+          <!-- Actions — Assign affordance (T-UI-07 wires the modal) -->
+          <td class="by-project__td by-project__td--actions">
+            <button
+              type="button"
+              class="by-project__assign-btn"
+              [attr.aria-label]="'Assign delegate to ' + project.project_code"
+              pTooltip="Assign PI Delegate"
+              tooltipPosition="top"
+              (click)="onAssign(project)"
+              (keydown.enter)="onAssign(project)"
+            >
+              <i class="pi pi-user-plus" aria-hidden="true"></i>
+            </button>
+          </td>
+
+        </tr>
+      </ng-template>
+
+      <!-- Empty state -->
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="8" class="by-project__empty" role="status">
+            <div class="by-project__empty-inner">
+              <i class="pi pi-inbox by-project__empty__icon atc-grey-500" aria-hidden="true"></i>
+              <p class="by-project__empty__text atc-grey-700">
+                @if (hasSearch()) {
+                  No projects match your search.
+                } @else {
+                  No PI projects found.
+                }
+              </p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->
+  @if (service.error()) {
+    <div class="by-project__error" role="alert">
+      <i class="pi pi-exclamation-circle by-project__error__icon atc-red-1" aria-hidden="true"></i>
+      <span class="atc-red-1">{{ service.error() }}</span>
+    </div>
+  }
+
+</div>

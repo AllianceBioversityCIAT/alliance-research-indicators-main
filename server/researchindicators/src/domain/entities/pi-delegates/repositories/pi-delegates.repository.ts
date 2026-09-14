@@ -484,6 +484,150 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     return rows?.length ? rows[0] : null;
   }
 
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+  // User-scoped managed-project helpers (raw SQL — sec_users has no entity)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the agreement_ids of all projects that userId manages as PI or as
+   * an active delegate.
+   *
+   * PI half:      agresso_contracts → alliance_user_staff → sec_users (same
+   *               chain as isPiOfProject / isPiOrActiveDelegateOfProject).
+   * Delegate half: pi_delegates where delegate_user_id = userId AND is_active.
+   *
+   * Both halves are combined with UNION so each managed agreement_id appears
+   * exactly once even when the user is both PI and a delegate (unusual in
+   * practice but safe to handle).
+   *
+   * @param userId  sec_users.sec_user_id
+   */
+  async findManagedProjectIds(userId: number): Promise<string[]> {
+    const query = `
+      SELECT ac.agreement_id
+      FROM agresso_contracts ac
+        INNER JOIN alliance_user_staff aus ON aus.carnet = ac.projectLeadId
+        INNER JOIN sec_users su ON su.email = aus.email
+      WHERE su.sec_user_id = ?
+      UNION
+      SELECT DISTINCT pd.project_id AS agreement_id
+      FROM pi_delegates pd
+      WHERE pd.delegate_user_id = ?
+        AND pd.is_active = TRUE
+    `;
+    const rows: Array<{ agreement_id: string }> = await this.dataSource.query(
+      query,
+      [userId, userId],
+    );
+    return rows.map((r) => r.agreement_id);
+  }
+
+  /**
+   * Returns agresso_contracts rows for the given project ids.
+   *
+   * Callers MUST guard against an empty projectIds array — an empty IN clause
+   * is not valid SQL and this method does not issue any query when the list is
+   * empty (it returns [] immediately).
+   *
+   * @param projectIds  agresso_contracts.agreement_id values to look up
+   */
+  async findProjectSummariesByIds(projectIds: string[]): Promise<
+    Array<{
+      agreement_id: string;
+      description: string | null;
+      is_pool_funding_contributor: number;
+      contract_status: string | null;
+      start_date: Date | null;
+      end_date: Date | null;
+    }>
+  > {
+    if (!projectIds.length) return [];
+    return this.dataSource.query(
+      `SELECT agreement_id, description, is_pool_funding_contributor,
+              contract_status, start_date, end_date
+       FROM agresso_contracts
+       WHERE agreement_id IN (?)`,
+      [projectIds],
+    );
+  }
+
+  /**
+   * Returns active delegate rows (enriched with sec_users identity) for the
+   * given project ids.
+   *
+   * Guards against an empty list: returns [] without querying when projectIds
+   * is empty.
+   *
+   * @param projectIds  project_id values to look up
+   */
+  async findActiveDelegatesForProjects(projectIds: string[]): Promise<
+    Array<{
+      project_id: string;
+      delegate_user_id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+    }>
+  > {
+    if (!projectIds.length) return [];
+    // No sec_users status/is_active filter — inactive/pending/rejected delegate ACCOUNTS are intentionally included in the table (only pd.is_active gates the delegation). Product decision 2026-09-14.
+    return this.dataSource.query(
+      `SELECT pd.project_id,
+              pd.delegate_user_id,
+              su.first_name,
+              su.last_name,
+              su.email
+       FROM pi_delegates pd
+         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+       WHERE pd.project_id IN (?)
+         AND pd.is_active = TRUE
+       ORDER BY su.last_name, su.first_name`,
+      [projectIds],
+    );
+  }
+
+  /**
+   * Returns active pi_delegates rows for the given projects, joined with both
+   * sec_users (delegate identity) and agresso_contracts (project description).
+   *
+   * Used by listManagedDelegates() (GET /pi-delegates/by-user/people) to build
+   * the DelegateProjectsResponseDto[] response.
+   *
+   * Guards against an empty list: returns [] without querying when projectIds
+   * is empty.
+   *
+   * @param projectIds  project_id values to look up
+   */
+  async findDelegatesForProjects(projectIds: string[]): Promise<
+    Array<{
+      delegate_user_id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+      agreement_id: string;
+      description: string | null;
+    }>
+  > {
+    if (!projectIds.length) return [];
+    // No sec_users status/is_active filter — inactive/pending/rejected delegate ACCOUNTS are intentionally included in the table (only pd.is_active gates the delegation). Product decision 2026-09-14.
+    return this.dataSource.query(
+      `SELECT pd.delegate_user_id,
+              su.first_name,
+              su.last_name,
+              su.email,
+              ac.agreement_id,
+              ac.description
+       FROM pi_delegates pd
+         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+         INNER JOIN agresso_contracts ac ON ac.agreement_id = pd.project_id
+       WHERE pd.project_id IN (?)
+         AND pd.is_active = TRUE
+       ORDER BY su.last_name, su.first_name, ac.agreement_id`,
+      [projectIds],
+    );
+  }
+
   // @akili-spec docs/specs/changes/my-pi-delegates — T-18
   // ─────────────────────────────────────────────────────────────────────────
   // History write (R-PID-012)

@@ -1,0 +1,131 @@
+// @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04)
+// NFR-UI-001: STAR design tokens only — no hex literals in this file.
+// All colours via var(--ac-*); spacing uses plain CSS; no Tailwind in .scss files.
+
+.pi-delegates-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 2rem 1.5rem;
+  max-width: 100%;
+}
+
+// ─── Page header ──────────────────────────────────────────────────────────────
+
+.pi-delegates-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pi-delegates-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.pi-delegates-subtitle {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+// ─── Summary header (R-UI-004) ────────────────────────────────────────────────
+
+.pi-delegates-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pi-delegates-summary__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--ac-grey-100);
+  border: 1px solid var(--ac-grey-200);
+  min-width: 10rem;
+  flex: 1 1 10rem;
+}
+
+.pi-delegates-summary__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pi-delegates-summary__label {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+// ─── Loading / error states (NFR-UI-003) ──────────────────────────────────────
+
+.pi-delegates-state {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.pi-delegates-state__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.pi-delegates-state--loading {
+  background-color: var(--ac-grey-100);
+  border: 1px solid var(--ac-grey-200);
+}
+
+.pi-delegates-state--error {
+  background-color: var(--ac-grey-100);
+  border: 1px solid var(--ac-grey-200);
+}
+
+// ─── Tab view ─────────────────────────────────────────────────────────────────
+
+.pi-delegates-tabview {
+  width: 100%;
+}
+
+// ─── Empty state (NFR-UI-003) ─────────────────────────────────────────────────
+
+.pi-delegates-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.pi-delegates-empty__icon {
+  font-size: 2.5rem;
+}
+
+.pi-delegates-empty__text {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.pi-delegates-empty__hint {
+  font-size: 0.875rem;
+  max-width: 28rem;
+  margin: 0;
+}
+
+// ─── Placeholder (removed when T-UI-05/06 replace with real components) ───────
+
+.pi-delegates-tab-placeholder {
+  padding: 1.5rem;
+  font-size: 0.875rem;
+}

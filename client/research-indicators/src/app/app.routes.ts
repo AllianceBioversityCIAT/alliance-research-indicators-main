@@ -210,6 +210,16 @@ export const routes: Routes = [
         ]
       },
       {
+        path: 'my-pi-delegates',
+        loadComponent: () =>
+          import('@pages/platform/pages/my-pi-delegates/my-pi-delegates.component').then(m => m.default),
+        canMatch: [rolesGuard],
+        data: {
+          title: 'My PI Delegates',
+          isLoggedIn: true
+        }
+      },
+      {
         path: 'about',
         loadComponent: () => import('@platform/pages/about/about.component'),
         data: {

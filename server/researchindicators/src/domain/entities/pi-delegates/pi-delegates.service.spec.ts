@@ -1698,3 +1698,497 @@ describe('listByDelegate() — Scenario 13: enriched DelegateProjectsResponseDto
     expect(findDelegateProjects).not.toHaveBeenCalled();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenarios 14–19 — listManagedProjects() and listManagedDelegates()
+// @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+//
+// Factory (makeServiceWithManagedMethods) extends makeService with the four new
+// repo methods needed for the by-user endpoints:
+//   - findManagedProjectIds(userId)
+//   - findProjectSummariesByIds(projectIds)
+//   - findActiveDelegatesForProjects(projectIds)
+//   - findDelegatesForProjects(projectIds)
+//
+// KZ-001: assertions on returned shapes and repo call args, not bare call count.
+// KZ-004: distinct user_ids and project ids per scenario.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ManagedMockOpts {
+  userId?: number;
+  roles?: number[];
+  /** findManagedProjectIds result (default: []) */
+  managedProjectIds?: string[];
+  /** findProjectSummariesByIds result (default: []) */
+  projectSummaries?: Array<{
+    agreement_id: string;
+    description: string | null;
+    is_pool_funding_contributor: number;
+    contract_status: string | null;
+    start_date: Date | null;
+    end_date: Date | null;
+  }>;
+  /** findActiveDelegatesForProjects result (default: []) */
+  activeDelegatesForProjects?: Array<{
+    project_id: string;
+    delegate_user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+  }>;
+  /** findDelegatesForProjects result (default: []) */
+  delegatesForProjects?: Array<{
+    delegate_user_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    agreement_id: string;
+    description: string | null;
+  }>;
+}
+
+function makeServiceWithManagedMethods(opts: ManagedMockOpts) {
+  const findManagedProjectIds = jest
+    .fn()
+    .mockResolvedValue(opts.managedProjectIds ?? []);
+
+  const findProjectSummariesByIds = jest
+    .fn()
+    .mockResolvedValue(opts.projectSummaries ?? []);
+
+  const findActiveDelegatesForProjects = jest
+    .fn()
+    .mockResolvedValue(opts.activeDelegatesForProjects ?? []);
+
+  const findDelegatesForProjects = jest
+    .fn()
+    .mockResolvedValue(opts.delegatesForProjects ?? []);
+
+  const mockRepo = {
+    // pre-existing methods — not exercised in by-user tests but must exist
+    isPiOrActiveDelegateOfProject: jest.fn().mockResolvedValue(true),
+    isPiOfProject: jest.fn().mockResolvedValue(false),
+    listActiveDelegateUserIds: jest.fn().mockResolvedValue([]),
+    resolveDelegateUserId: jest.fn().mockResolvedValue(0),
+    insertDelegate: jest.fn().mockResolvedValue(new PiDelegate()),
+    softDeleteDelegatePairs: jest.fn().mockResolvedValue(0),
+    softDeleteDelegateIds: jest.fn().mockResolvedValue(0),
+    findOne: jest.fn().mockResolvedValue(null),
+    find: jest.fn().mockResolvedValue([]),
+    recordHistory: jest.fn().mockResolvedValue(undefined),
+    findProjectSummary: jest.fn().mockResolvedValue(null),
+    findActiveDelegatesWithUser: jest.fn().mockResolvedValue([]),
+    findUserSummary: jest.fn().mockResolvedValue(null),
+    findDelegateProjects: jest.fn().mockResolvedValue([]),
+    // new by-user methods
+    findManagedProjectIds,
+    findProjectSummariesByIds,
+    findActiveDelegatesForProjects,
+    findDelegatesForProjects,
+  } as unknown as import('./repositories/pi-delegates.repository').PiDelegatesRepository;
+
+  const mockCurrentUser = {
+    user_id: opts.userId ?? 50,
+    roles: opts.roles ?? [],
+  } as unknown as CurrentUserUtil;
+
+  const mockDataSource = {
+    transaction: jest
+      .fn()
+      .mockImplementation(
+        (cb: (manager: import('typeorm').EntityManager) => Promise<unknown>) =>
+          cb({
+            getRepository: jest
+              .fn()
+              .mockReturnValue({ find: jest.fn().mockResolvedValue([]) }),
+          } as unknown as import('typeorm').EntityManager),
+      ),
+  } as unknown as DataSource;
+
+  const service = new PiDelegatesService(
+    mockRepo,
+    mockCurrentUser,
+    mockDataSource,
+  );
+
+  return {
+    service,
+    mockRepo,
+    findManagedProjectIds,
+    findProjectSummariesByIds,
+    findActiveDelegatesForProjects,
+    findDelegatesForProjects,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 14 — listManagedProjects(): own caller returns enriched array
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedProjects() — Scenario 14: own caller gets enriched ProjectDelegatesResponseDto[]', () => {
+  it('assembles enriched array: project fields + delegates indexed by project_id', async () => {
+    const ownUserId = 300;
+
+    const {
+      service,
+      findManagedProjectIds,
+      findProjectSummariesByIds,
+      findActiveDelegatesForProjects,
+    } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G500', 'G501'],
+      projectSummaries: [
+        {
+          agreement_id: 'G500',
+          description: 'Project Alpha',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        {
+          agreement_id: 'G501',
+          description: 'Project Beta',
+          is_pool_funding_contributor: 1,
+          contract_status: 'COMPLETED',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G500',
+          delegate_user_id: 10,
+          first_name: 'Alice',
+          last_name: 'Smith',
+          email: 'a.smith@cgiar.org',
+        },
+        {
+          project_id: 'G501',
+          delegate_user_id: 20,
+          first_name: 'Bob',
+          last_name: 'Jones',
+          email: 'b.jones@cgiar.org',
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result).toHaveLength(2);
+
+    const g500 = result.find((r) => r.project_code === 'G500')!;
+    expect(g500.project_name).toBe('Project Alpha');
+    expect(g500.is_pool_funding_contributor).toBe(false);
+    expect(g500.status).toBe('ACTIVE');
+    expect(g500.delegates).toHaveLength(1);
+    expect(g500.delegates[0].delegate_user_id).toBe(10);
+    expect(g500.delegates[0].name).toBe('Alice Smith');
+    expect(g500.delegates[0].email).toBe('a.smith@cgiar.org');
+
+    const g501 = result.find((r) => r.project_code === 'G501')!;
+    expect(g501.is_pool_funding_contributor).toBe(true); // tinyint 1 → true
+    expect(g501.delegates[0].name).toBe('Bob Jones');
+
+    // KZ-001: repo called with the correct userId / projectIds
+    expect(findManagedProjectIds).toHaveBeenCalledWith(ownUserId);
+    expect(findProjectSummariesByIds).toHaveBeenCalledWith(['G500', 'G501']);
+    expect(findActiveDelegatesForProjects).toHaveBeenCalledWith([
+      'G500',
+      'G501',
+    ]);
+  });
+
+  it('delegate on two managed projects — appears in both projects delegates[] (no grouping at this level)', async () => {
+    const ownUserId = 301;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G600', 'G601'],
+      projectSummaries: [
+        {
+          agreement_id: 'G600',
+          description: 'P600',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+        {
+          agreement_id: 'G601',
+          description: 'P601',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        // Same delegate (id=55) in both projects
+        {
+          project_id: 'G600',
+          delegate_user_id: 55,
+          first_name: 'Shared',
+          last_name: 'Delegate',
+          email: 'shared@cgiar.org',
+        },
+        {
+          project_id: 'G601',
+          delegate_user_id: 55,
+          first_name: 'Shared',
+          last_name: 'Delegate',
+          email: 'shared@cgiar.org',
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    // Each project has the delegate in its own delegates[]
+    const g600 = result.find((r) => r.project_code === 'G600')!;
+    const g601 = result.find((r) => r.project_code === 'G601')!;
+    expect(g600.delegates).toHaveLength(1);
+    expect(g601.delegates).toHaveLength(1);
+    expect(g600.delegates[0].delegate_user_id).toBe(55);
+    expect(g601.delegates[0].delegate_user_id).toBe(55);
+  });
+
+  it('project with no delegates → delegates[] is empty', async () => {
+    const ownUserId = 302;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G700'],
+      projectSummaries: [
+        {
+          agreement_id: 'G700',
+          description: 'Solo Project',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+        },
+      ],
+      activeDelegatesForProjects: [], // no active delegates
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].delegates).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 15 — listManagedProjects(): empty managed set → []
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedProjects() — Scenario 15: empty managed project set → [] (no enrichment called)', () => {
+  it('returns empty array and does NOT call findProjectSummariesByIds or findActiveDelegatesForProjects', async () => {
+    const ownUserId = 310;
+
+    const {
+      service,
+      findProjectSummariesByIds,
+      findActiveDelegatesForProjects,
+    } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: [],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result).toEqual([]);
+    // Enrichment queries must NOT be issued when the managed set is empty
+    expect(findProjectSummariesByIds).not.toHaveBeenCalled();
+    expect(findActiveDelegatesForProjects).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 16 — listManagedProjects(): auth (own-or-admin)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedProjects() — Scenario 16: own-or-admin auth', () => {
+  it('non-admin querying ANOTHER user_id → ForbiddenException BEFORE findManagedProjectIds', async () => {
+    const callerUserId = 320;
+    const otherUserId = 999;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: callerUserId,
+      roles: [SecRolesEnum.CONTRIBUTOR],
+    });
+
+    await expect(service.listManagedProjects(otherUserId)).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    // The 403 fires before any DB call — KZ-001 discriminates: removing the guard would allow this
+    expect(findManagedProjectIds).not.toHaveBeenCalled();
+  });
+
+  it('SYSTEM_ADMIN querying another user_id → allowed, findManagedProjectIds called', async () => {
+    const adminId = 321;
+    const targetId = 777;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: adminId,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      managedProjectIds: [],
+    });
+
+    await expect(service.listManagedProjects(targetId)).resolves.toEqual([]);
+    expect(findManagedProjectIds).toHaveBeenCalledWith(targetId);
+  });
+
+  it('own caller (non-admin) → allowed, findManagedProjectIds called with own id', async () => {
+    const ownId = 322;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: ownId,
+      roles: [],
+      managedProjectIds: [],
+    });
+
+    await expect(service.listManagedProjects(ownId)).resolves.toEqual([]);
+    expect(findManagedProjectIds).toHaveBeenCalledWith(ownId);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 17 — listManagedDelegates(): own caller gets correct grouped response
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedDelegates() — Scenario 17: own caller gets DelegateProjectsResponseDto[]', () => {
+  it('groups rows by delegate_user_id; delegate on 2 managed projects appears ONCE with both projects', async () => {
+    const ownUserId = 400;
+
+    const { service, findManagedProjectIds, findDelegatesForProjects } =
+      makeServiceWithManagedMethods({
+        userId: ownUserId,
+        roles: [],
+        managedProjectIds: ['G800', 'G801'],
+        delegatesForProjects: [
+          // delegate 30 is on both G800 and G801
+          {
+            delegate_user_id: 30,
+            first_name: 'Carlos',
+            last_name: 'Ramirez',
+            email: 'c.ramirez@cgiar.org',
+            agreement_id: 'G800',
+            description: 'Project Eight Hundred',
+          },
+          {
+            delegate_user_id: 30,
+            first_name: 'Carlos',
+            last_name: 'Ramirez',
+            email: 'c.ramirez@cgiar.org',
+            agreement_id: 'G801',
+            description: 'Project Eight Zero One',
+          },
+          // delegate 31 is only on G800
+          {
+            delegate_user_id: 31,
+            first_name: 'Diana',
+            last_name: 'Torres',
+            email: 'd.torres@cgiar.org',
+            agreement_id: 'G800',
+            description: 'Project Eight Hundred',
+          },
+        ],
+      });
+
+    const result = await service.listManagedDelegates(ownUserId);
+
+    // Two distinct delegates in the result
+    expect(result).toHaveLength(2);
+
+    const carlos = result.find((r) => r.delegate_user_id === 30)!;
+    expect(carlos.name).toBe('Carlos Ramirez');
+    expect(carlos.email).toBe('c.ramirez@cgiar.org');
+    // Carlos appears once, with both managed projects
+    expect(carlos.projects).toHaveLength(2);
+    const carlosProjectCodes = carlos.projects.map((p) => p.project_code);
+    expect(carlosProjectCodes).toContain('G800');
+    expect(carlosProjectCodes).toContain('G801');
+
+    const diana = result.find((r) => r.delegate_user_id === 31)!;
+    expect(diana.projects).toHaveLength(1);
+    expect(diana.projects[0].project_code).toBe('G800');
+
+    // KZ-001: repo called with correct args
+    expect(findManagedProjectIds).toHaveBeenCalledWith(ownUserId);
+    expect(findDelegatesForProjects).toHaveBeenCalledWith(['G800', 'G801']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 18 — listManagedDelegates(): empty managed set → []
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedDelegates() — Scenario 18: empty managed project set → [] (no enrichment called)', () => {
+  it('returns empty array and does NOT call findDelegatesForProjects', async () => {
+    const ownUserId = 410;
+
+    const { service, findDelegatesForProjects } = makeServiceWithManagedMethods(
+      {
+        userId: ownUserId,
+        roles: [],
+        managedProjectIds: [],
+      },
+    );
+
+    const result = await service.listManagedDelegates(ownUserId);
+
+    expect(result).toEqual([]);
+    expect(findDelegatesForProjects).not.toHaveBeenCalled();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 19 — listManagedDelegates(): auth (own-or-admin)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('listManagedDelegates() — Scenario 19: own-or-admin auth', () => {
+  it('non-admin querying ANOTHER user_id → ForbiddenException BEFORE findManagedProjectIds', async () => {
+    const callerUserId = 420;
+    const otherUserId = 888;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: callerUserId,
+      roles: [SecRolesEnum.CONTRIBUTOR],
+    });
+
+    await expect(service.listManagedDelegates(otherUserId)).rejects.toThrow(
+      ForbiddenException,
+    );
+
+    // The guard fires before any DB call — removing it would let this pass (KZ-001/KZ-014)
+    expect(findManagedProjectIds).not.toHaveBeenCalled();
+  });
+
+  it('SYSTEM_ADMIN querying another user_id → allowed', async () => {
+    const adminId = 421;
+    const targetId = 666;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: adminId,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      managedProjectIds: [],
+    });
+
+    await expect(service.listManagedDelegates(targetId)).resolves.toEqual([]);
+    expect(findManagedProjectIds).toHaveBeenCalledWith(targetId);
+  });
+
+  it('own caller (non-admin) → allowed', async () => {
+    const ownId = 422;
+
+    const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+      userId: ownId,
+      roles: [],
+      managedProjectIds: [],
+    });
+
+    await expect(service.listManagedDelegates(ownId)).resolves.toEqual([]);
+    expect(findManagedProjectIds).toHaveBeenCalledWith(ownId);
+  });
+});

@@ -1,0 +1,154 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-06) -->
+<!-- R-UI-003: By-person table (person name+email → project chips). -->
+<!-- R-UI-003 AC.2: ONLY managed projects surface (guaranteed by byProjectCache inversion). -->
+<!-- R-UI-008: Per-project "X" revokes that pair only. -->
+<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text) for empty overall state. -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+
+<div class="by-person">
+
+  <!-- ── Search bar ─────────────────────────────────────────────────── -->
+  <div class="by-person__toolbar">
+    <div class="by-person__search-wrapper">
+      <span class="by-person__search-icon">
+        <i class="pi pi-search" aria-hidden="true"></i>
+      </span>
+      <input
+        pInputText
+        type="text"
+        id="by-person-search"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Search by person (name / email) or project (code / name)"
+        aria-label="Search by person or project"
+        class="by-person__search-input"
+      />
+    </div>
+
+    @if (hasSearch()) {
+      <button
+        type="button"
+        class="by-person__clear-btn atc-grey-700"
+        (click)="clearSearch()"
+        (keydown.enter)="clearSearch()"
+        aria-label="Clear search"
+      >
+        Clear
+      </button>
+    }
+  </div>
+
+  <!-- ── Table ──────────────────────────────────────────────────────── -->
+  <div class="by-person__table-wrapper">
+    <p-table
+      [value]="filteredRows()"
+      [loading]="service.loading()"
+      [scrollable]="true"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
+      aria-label="PI Delegates by person"
+    >
+      <!-- Header -->
+      <ng-template pTemplate="header">
+        <tr>
+          <th scope="col" class="by-person__th atc-primary-blue-600">Person</th>
+          <th scope="col" class="by-person__th atc-primary-blue-600">Managed projects</th>
+          <th scope="col" class="by-person__th atc-primary-blue-600">Actions</th>
+        </tr>
+      </ng-template>
+
+      <!-- Body -->
+      <ng-template pTemplate="body" let-row>
+        <tr class="by-person__row">
+
+          <!-- Person cell: name + email -->
+          <td class="by-person__td by-person__td--person">
+            <div class="by-person__person">
+              <span class="by-person__person__name atc-primary-blue-600">{{ row.name }}</span>
+              <span class="by-person__person__email atc-grey-700">{{ row.email }}</span>
+            </div>
+          </td>
+
+          <!-- Projects cell: chips with per-chip X (R-UI-008) -->
+          <td class="by-person__td by-person__td--projects">
+            <div
+              class="by-person__chips"
+              role="list"
+              [attr.aria-label]="'Projects managed by ' + row.name"
+            >
+              @for (project of row.projects; track project.project_code) {
+                <span
+                  class="by-person__chip"
+                  role="listitem"
+                  [attr.aria-label]="project.project_code + (project.project_name ? ' — ' + project.project_name : '')"
+                >
+                  <span class="by-person__chip__info">
+                    <span class="by-person__chip__code atc-primary-blue-600">{{ project.project_code }}</span>
+                    @if (project.project_name) {
+                      <span class="by-person__chip__name atc-grey-700">{{ project.project_name }}</span>
+                    }
+                  </span>
+                  <!-- Per-project "X" revoke (R-UI-008: named pair only, not the whole person) -->
+                  <button
+                    type="button"
+                    class="by-person__chip__remove"
+                    [attr.aria-label]="'Revoke ' + row.name + ' from ' + project.project_code"
+                    pTooltip="Revoke from this project"
+                    tooltipPosition="top"
+                    (click)="onRevokeProject(row, project)"
+                    (keydown.enter)="onRevokeProject(row, project)"
+                  >
+                    <i class="pi pi-times" aria-hidden="true"></i>
+                  </button>
+                </span>
+              }
+            </div>
+          </td>
+
+          <!-- Actions — Assign affordance (T-UI-07 wires the modal) -->
+          <td class="by-person__td by-person__td--actions">
+            <button
+              type="button"
+              class="by-person__assign-btn"
+              [attr.aria-label]="'Assign projects to ' + row.name"
+              pTooltip="Assign projects to this person"
+              tooltipPosition="top"
+              (click)="onAssign(row)"
+              (keydown.enter)="onAssign(row)"
+            >
+              <i class="pi pi-user-plus" aria-hidden="true"></i>
+            </button>
+          </td>
+
+        </tr>
+      </ng-template>
+
+      <!-- Empty state: no people (non-colour cue — NFR-UI-002/003) -->
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="3" class="by-person__empty" role="status">
+            <div class="by-person__empty-inner">
+              <i class="pi pi-users by-person__empty__icon atc-grey-500" aria-hidden="true"></i>
+              <p class="by-person__empty__text atc-grey-700">
+                @if (hasSearch()) {
+                  No people match your search.
+                } @else {
+                  No PI delegates found.
+                }
+              </p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </div>
+
+  <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->
+  @if (service.error()) {
+    <div class="by-person__error" role="alert">
+      <i class="pi pi-exclamation-circle by-person__error__icon atc-red-1" aria-hidden="true"></i>
+      <span class="atc-red-1">{{ service.error() }}</span>
+    </div>
+  }
+
+</div>

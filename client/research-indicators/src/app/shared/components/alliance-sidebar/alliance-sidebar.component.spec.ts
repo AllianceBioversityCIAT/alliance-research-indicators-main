@@ -166,6 +166,42 @@ describe('AllianceSidebarComponent', () => {
     expect(visible[0].label).toBe('Visible');
   });
 
+  // ─── T-UI-03: Principal Investigator group + My PI Delegates child (R-UI-001) ──
+  it('should always expose a "pi" group in piGroups()', () => {
+    const groups = component.piGroups();
+    expect(groups).toHaveLength(1);
+    const piGroup = groups[0];
+    expect(piGroup.id).toBe('pi');
+    expect(piGroup.label).toBe('Principal Investigator');
+    expect(piGroup.icon).toBe('pi-users');
+  });
+
+  it('should include a My PI Delegates child linking to /my-pi-delegates', () => {
+    const piGroup = component.piGroups()[0];
+    const child = piGroup.children.find(c => c.link === '/my-pi-delegates');
+    expect(child).toBeDefined();
+    expect(child?.label).toBe('My PI Delegates');
+  });
+
+  it('should still expose the center-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
+    expect(centerAdmin).toBeTruthy();
+    expect(centerAdmin?.children.length).toBeGreaterThan(0);
+  });
+
+  it('should still expose the system-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+    };
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+    const sysAdmin = component.administrationGroups().find(g => g.id === 'system-admin');
+    expect(sysAdmin).toBeTruthy();
+    expect(sysAdmin?.label).toBe('System admin');
+  });
+
   it('should include portfolio management in center admin navigation', () => {
     const roles = TestBed.inject(RolesService) as { canAccessCenterAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
@@ -247,7 +283,7 @@ describe('AllianceSidebarComponent', () => {
     expect(group?.s3Image).toBe('icons/graph.svg');
 
     const button = fixture.nativeElement.querySelector(
-      'button.admin-parent--collapsed'
+      'button.admin-parent--collapsed[aria-label="System admin"]'
     ) as HTMLButtonElement | null;
     const img = button?.querySelector('img') as HTMLImageElement | null;
     expect(img).toBeTruthy();
