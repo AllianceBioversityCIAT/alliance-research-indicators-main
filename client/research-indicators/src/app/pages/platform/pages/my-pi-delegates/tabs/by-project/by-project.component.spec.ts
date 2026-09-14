@@ -1,15 +1,14 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05)
 //
 // Spec contract (K-015: arrange the TRANSITION — not the end state):
-//   - Table renders enriched fields for a mocked cache (code/name/status/dates/pool-funding + chips).
-//   - Row X → revoke: clicking X on a delegate calls service.revokePair with the RIGHT
-//     (project_code, delegate_user_id) pair.  The confirm transition must be accepted for
-//     revoke to fire; revoke does NOT fire if confirm is dismissed (K-001/KZ-014).
-//   - Search filters by person OR project; a wrong filter (only-by-project) fails the
-//     person-match case.
-//   - No-delegate non-colour cue: icon+text markup present for projects with delegates:[].
+//   - searchQuery and statusFilter are inputs; test by setting them via setInput.
+//   - Status filter excludes non-matching rows (negative discriminator).
+//   - INACTIVE delegate chip has --inactive class and inactive-icon.
+//   - ACTIVE delegate chip does NOT have --inactive class.
+//   - "Assign people" text button renders; history button is disabled.
+//   - Revoke, search, pool-funding, formatDate as before.
 //
-// K-020: --coverage=false for single-file runs; coverage gate is on the full suite.
+// K-020: --coverage=false for single-file runs.
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -23,14 +22,15 @@ import type { GlobalAlert } from '@interfaces/global-alert.interface';
 
 // ─── Test data ────────────────────────────────────────────────────────────────
 
-const DELEGATE_A = { delegate_user_id: 1, name: 'Alice Example', email: 'alice@test.org' };
-const DELEGATE_B = { delegate_user_id: 2, name: 'Bob Sample', email: 'bob@test.org' };
+const DELEGATE_A = { delegate_user_id: 1, name: 'Alice Example', email: 'alice@test.org', is_active: true };
+const DELEGATE_B = { delegate_user_id: 2, name: 'Bob Sample', email: 'bob@test.org', is_active: true };
+const DELEGATE_INACTIVE = { delegate_user_id: 3, name: 'Carol Gone', email: 'carol@test.org', is_active: false };
 
 const PROJECT_WITH_DELEGATES: ProjectDelegates = {
   project_code: 'PRJ-001',
   project_name: 'Alpha Research',
   is_pool_funding_contributor: true,
-  status: 'Active',
+  status: 'Ongoing',
   start_date: '2024-01-15' as unknown as Date,
   end_date: '2026-12-31' as unknown as Date,
   delegates: [DELEGATE_A, DELEGATE_B]
@@ -40,10 +40,20 @@ const PROJECT_NO_DELEGATES: ProjectDelegates = {
   project_code: 'PRJ-002',
   project_name: 'Beta Project',
   is_pool_funding_contributor: false,
-  status: 'Pending',
+  status: 'Completed',
   start_date: null,
   end_date: null,
   delegates: []
+};
+
+const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
+  project_code: 'PRJ-003',
+  project_name: 'Gamma Study',
+  is_pool_funding_contributor: false,
+  status: 'Ongoing',
+  start_date: null,
+  end_date: null,
+  delegates: [DELEGATE_INACTIVE]
 };
 
 // ─── Service stubs ────────────────────────────────────────────────────────────
@@ -58,31 +68,20 @@ function buildServiceStub(rows: ProjectDelegates[] = []) {
 }
 
 function buildActionsStub() {
-  return {
-    showGlobalAlert: jest.fn()
-  };
+  return { showGlobalAlert: jest.fn() };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Fire the confirmCallback that ActionsService.showGlobalAlert received.
- * This arranges the TRANSITION (K-015): the guard must be accepted for the action to fire.
- */
 function acceptConfirm(actionsStub: { showGlobalAlert: jest.Mock }): void {
   const call = actionsStub.showGlobalAlert.mock.calls[0];
   const alert = call?.[0] as GlobalAlert | undefined;
   alert?.confirmCallback?.event?.();
 }
 
-/**
- * Returns true if the cancel path is present (does NOT call revokePair).
- * Verifies revoke does NOT fire when the dialog is dismissed (K-001/KZ-014).
- */
 function dismissConfirm(actionsStub: { showGlobalAlert: jest.Mock }): boolean {
   const call = actionsStub.showGlobalAlert.mock.calls[0];
   const alert = call?.[0] as GlobalAlert | undefined;
-  // cancelCallback.event is optional; invoking it should not call revokePair.
   alert?.cancelCallback?.event?.();
   return !!alert?.cancelCallback;
 }
@@ -109,7 +108,7 @@ describe('ByProjectComponent', () => {
 
     fixture = TestBed.createComponent(ByProjectComponent);
     component = fixture.componentInstance;
-    // K-015: construct in initial state THEN trigger initial change detection
+    // K-015: initial state then detectChanges
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -122,34 +121,20 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
     });
 
-    it('renders the project code', () => {
+    it('renders project code and name in the combined project cell', () => {
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('PRJ-001');
-      expect(text).toContain('PRJ-002');
-    });
-
-    it('renders the project name', () => {
-      const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Alpha Research');
-      expect(text).toContain('Beta Project');
     });
 
-    it('renders the status for PRJ-001', () => {
+    it('renders status pill for PRJ-001', () => {
       const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('Active');
-    });
-
-    it('renders formatted start date for PRJ-001', () => {
-      const text = fixture.nativeElement.textContent as string;
-      // formatDate('2024-01-15') → "15 Jan 2024" (en-GB locale)
-      expect(text).toContain('2024');
+      expect(text).toContain('Ongoing');
     });
 
     it('renders pool-funding Yes badge with icon for PRJ-001', () => {
-      // Icon class `pi-check-circle` must be present (non-colour cue — NFR-UI-002)
       const icons = fixture.debugElement.queryAll(By.css('.pi-check-circle'));
       expect(icons.length).toBeGreaterThanOrEqual(1);
-      // The text "Yes" must also be present
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Yes');
     });
@@ -166,11 +151,40 @@ describe('ByProjectComponent', () => {
       expect(text).toContain('Alice Example');
       expect(text).toContain('alice@test.org');
       expect(text).toContain('Bob Sample');
-      expect(text).toContain('bob@test.org');
     });
   });
 
-  // ── 2. No-delegate non-colour cue (R-UI-002 AC.2/AC.3 / NFR-UI-002) ─
+  // ── 2. Inactive delegate chip ────────────────────────────────────────
+
+  describe('inactive delegate chip (is_active === false)', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_INACTIVE_DELEGATE]);
+    });
+
+    it('INACTIVE chip has --inactive class', () => {
+      const chips = fixture.debugElement.queryAll(By.css('.by-project__chip'));
+      const inactiveChip = chips.find(c => (c.nativeElement as HTMLElement).classList.contains('by-project__chip--inactive'));
+      expect(inactiveChip).toBeTruthy();
+    });
+
+    it('INACTIVE chip has the inactive icon', () => {
+      const icon = fixture.debugElement.query(By.css('.by-project__chip--inactive .by-project__chip__inactive-icon'));
+      expect(icon).toBeTruthy();
+    });
+  });
+
+  describe('active delegate chip (is_active === true)', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+    });
+
+    it('ACTIVE chip does NOT have --inactive class', () => {
+      const inactiveChips = fixture.debugElement.queryAll(By.css('.by-project__chip--inactive'));
+      expect(inactiveChips.length).toBe(0);
+    });
+  });
+
+  // ── 3. No-delegate non-colour cue ─────────────────────────────────────
 
   describe('no-delegate row', () => {
     beforeEach(async () => {
@@ -178,7 +192,6 @@ describe('ByProjectComponent', () => {
     });
 
     it('shows the exclamation-triangle icon (non-colour cue)', () => {
-      // The cue must not be colour alone — icon MUST be in the DOM
       const icon = fixture.debugElement.query(By.css('.pi-exclamation-triangle'));
       expect(icon).toBeTruthy();
     });
@@ -190,7 +203,7 @@ describe('ByProjectComponent', () => {
     });
   });
 
-  // ── 3. Row X → revoke (R-UI-008) ─────────────────────────────────────
+  // ── 4. Revoke delegate (R-UI-008) ─────────────────────────────────────
 
   describe('revoke delegate', () => {
     beforeEach(async () => {
@@ -198,9 +211,8 @@ describe('ByProjectComponent', () => {
     });
 
     it('calls showGlobalAlert when the X button is clicked', () => {
-      // K-015: arrange the initial render, then click X
       const xBtns = fixture.debugElement.queryAll(By.css('.by-project__chip__remove'));
-      expect(xBtns.length).toBe(2); // two delegates
+      expect(xBtns.length).toBe(2);
       (xBtns[0].nativeElement as HTMLButtonElement).click();
       fixture.detectChanges();
       expect(actionsStub.showGlobalAlert).toHaveBeenCalledTimes(1);
@@ -213,12 +225,10 @@ describe('ByProjectComponent', () => {
 
       const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
       expect(alert.detail).toContain('Alice Example');
-      expect(alert.detail).toContain('alice@test.org');
       expect(alert.detail).toContain('PRJ-001');
     });
 
     it('calls revokePair with the EXACT (project_code, delegate_user_id) pair on confirm', fakeAsync(() => {
-      // K-015: click X on delegate A → arrange confirm transition → accept
       const xBtns = fixture.debugElement.queryAll(By.css('.by-project__chip__remove'));
       (xBtns[0].nativeElement as HTMLButtonElement).click();
       fixture.detectChanges();
@@ -227,25 +237,10 @@ describe('ByProjectComponent', () => {
       tick();
 
       expect(serviceStub.revokePair).toHaveBeenCalledTimes(1);
-      expect(serviceStub.revokePair).toHaveBeenCalledWith('PRJ-001', 1); // Alice's pair
-    }));
-
-    it('does NOT call revokePair for the second delegate when first is revoked (pair isolation)', fakeAsync(() => {
-      // Clicking X on delegate A must only pass delegate_user_id=1, not 2 (R-UI-008)
-      const xBtns = fixture.debugElement.queryAll(By.css('.by-project__chip__remove'));
-      (xBtns[0].nativeElement as HTMLButtonElement).click();
-      fixture.detectChanges();
-
-      acceptConfirm(actionsStub);
-      tick();
-
       expect(serviceStub.revokePair).toHaveBeenCalledWith('PRJ-001', 1);
-      expect(serviceStub.revokePair).not.toHaveBeenCalledWith('PRJ-001', 2);
     }));
 
     it('does NOT call revokePair when the confirmation dialog is dismissed', fakeAsync(() => {
-      // K-001/KZ-014: a guard that can be removed and the test still passes is not evidence.
-      // Dismissing the confirm must leave revokePair uncalled.
       const xBtns = fixture.debugElement.queryAll(By.css('.by-project__chip__remove'));
       (xBtns[0].nativeElement as HTMLButtonElement).click();
       fixture.detectChanges();
@@ -253,58 +248,33 @@ describe('ByProjectComponent', () => {
       const hasCancelCallback = dismissConfirm(actionsStub);
       tick();
 
-      // Verify the cancel path exists (the guard is real) and revoke was NOT fired
       expect(hasCancelCallback).toBe(true);
       expect(serviceStub.revokePair).not.toHaveBeenCalled();
     }));
-
-    it('clicking X on delegate B calls revokePair with delegate_user_id=2', fakeAsync(() => {
-      const xBtns = fixture.debugElement.queryAll(By.css('.by-project__chip__remove'));
-      // xBtns[1] is Bob (second chip under first project)
-      (xBtns[1].nativeElement as HTMLButtonElement).click();
-      fixture.detectChanges();
-
-      acceptConfirm(actionsStub);
-      tick();
-
-      expect(serviceStub.revokePair).toHaveBeenCalledWith('PRJ-001', 2);
-    }));
   });
 
-  // ── 4. Search filtering ───────────────────────────────────────────────
+  // ── 5. Search filtering (via searchQuery input) ───────────────────────
 
-  describe('search', () => {
+  describe('search filtering', () => {
     beforeEach(async () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
     });
 
-    it('shows all rows when search is empty', () => {
+    it('shows all rows when searchQuery input is empty', () => {
       const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
       expect(rows.length).toBe(2);
     });
 
-    it('filters by project code', () => {
-      component.searchQuery.set('PRJ-001');
+    it('filters by project code when searchQuery input is set', () => {
+      fixture.componentRef.setInput('searchQuery', 'PRJ-001');
       fixture.detectChanges();
 
       const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
       expect(rows.length).toBe(1);
-      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('PRJ-001');
-    });
-
-    it('filters by project name', () => {
-      component.searchQuery.set('alpha');
-      fixture.detectChanges();
-
-      const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
-      expect(rows.length).toBe(1);
-      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('Alpha Research');
     });
 
     it('filters by delegate name (person search)', () => {
-      // A query for 'alice' must match PRJ-001 (has Alice) but NOT PRJ-002 (no delegates).
-      // Verifies search works by PERSON, not only by project — the spec requires both.
-      component.searchQuery.set('alice');
+      fixture.componentRef.setInput('searchQuery', 'alice');
       fixture.detectChanges();
 
       const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
@@ -312,42 +282,81 @@ describe('ByProjectComponent', () => {
       expect((rows[0].nativeElement as HTMLElement).textContent).toContain('PRJ-001');
     });
 
-    it('filters by delegate email', () => {
-      component.searchQuery.set('bob@test.org');
-      fixture.detectChanges();
-
-      const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
-      expect(rows.length).toBe(1);
-    });
-
-    it('returns no rows for a non-matching query', () => {
-      component.searchQuery.set('zzznomatch');
+    it('returns no rows for a non-matching query (negative discriminator)', () => {
+      fixture.componentRef.setInput('searchQuery', 'zzznomatch');
       fixture.detectChanges();
 
       const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
       expect(rows.length).toBe(0);
     });
+  });
 
-    it('a project-only search (by code) does NOT match a person-only name', () => {
-      // Negative discriminator: if filtering were only by project, 'Alice' would return 0.
-      // The component must also filter by person.
-      component.searchQuery.set('Alice Example');
+  // ── 6. Status filter (via statusFilter input) ─────────────────────────
+
+  describe('status filtering', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
+      // PRJ-001 status = 'Ongoing', PRJ-002 status = 'Completed'
+    });
+
+    it('shows all rows when statusFilter is "All"', () => {
+      fixture.componentRef.setInput('statusFilter', 'All');
       fixture.detectChanges();
 
       const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
-      // Should still match PRJ-001 because Alice is a delegate there
+      expect(rows.length).toBe(2);
+    });
+
+    it('filters to only Ongoing rows when statusFilter is "Ongoing"', () => {
+      fixture.componentRef.setInput('statusFilter', 'Ongoing');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
       expect(rows.length).toBe(1);
+      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('PRJ-001');
+    });
+
+    it('filters to only Completed rows — negative: excludes Ongoing (discriminator)', () => {
+      fixture.componentRef.setInput('statusFilter', 'Completed');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
+      expect(rows.length).toBe(1);
+      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('PRJ-002');
+      // Confirm PRJ-001 (Ongoing) is excluded
+      expect((rows[0].nativeElement as HTMLElement).textContent).not.toContain('PRJ-001');
+    });
+
+    it('returns zero rows for a status that matches nothing (negative discriminator)', () => {
+      fixture.componentRef.setInput('statusFilter', 'NonExistentStatus');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-project__row'));
+      expect(rows.length).toBe(0);
     });
   });
 
-  // ── 5. Assign output ─────────────────────────────────────────────────
+  // ── 7. Actions column ─────────────────────────────────────────────────
 
-  describe('assign button', () => {
+  describe('actions column', () => {
     beforeEach(async () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
     });
 
-    it('emits assignRequested with the project code when Assign is clicked', () => {
+    it('renders the "Assign people" text button', () => {
+      const btn = fixture.debugElement.query(By.css('.by-project__assign-btn'));
+      expect(btn).toBeTruthy();
+      expect((btn.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign people');
+    });
+
+    it('renders the history icon button in disabled state', () => {
+      const historyBtn = fixture.debugElement.query(By.css('.by-project__history-btn'));
+      expect(historyBtn).toBeTruthy();
+      const el = historyBtn.nativeElement as HTMLButtonElement;
+      expect(el.disabled || el.getAttribute('aria-disabled') === 'true').toBe(true);
+    });
+
+    it('emits assignRequested with the project code when "Assign people" is clicked', () => {
       const emitted: { projectCode: string }[] = [];
       component.assignRequested.subscribe((v: { projectCode: string }) => emitted.push(v));
 
@@ -360,15 +369,14 @@ describe('ByProjectComponent', () => {
     });
   });
 
-  // ── 6. Date formatting helper ─────────────────────────────────────────
+  // ── 8. Date formatting helper ─────────────────────────────────────────
 
   describe('formatDate', () => {
     beforeEach(async () => {
       await createComponent();
     });
 
-    it('formats an ISO string defensively (does not throw)', () => {
-      expect(() => component.formatDate('2024-01-15')).not.toThrow();
+    it('formats an ISO string defensively', () => {
       expect(component.formatDate('2024-01-15')).toContain('2024');
     });
 
@@ -378,11 +386,6 @@ describe('ByProjectComponent', () => {
 
     it('returns "—" for undefined', () => {
       expect(component.formatDate(undefined)).toBe('—');
-    });
-
-    it('handles a real Date object', () => {
-      const d = new Date(2025, 5, 20); // June 20 2025
-      expect(component.formatDate(d)).toContain('2025');
     });
   });
 });

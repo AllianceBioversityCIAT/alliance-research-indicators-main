@@ -1,42 +1,11 @@
 <!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05) -->
-<!-- R-UI-002: By-project enriched table (code/name/pool-funding/status/dates/delegates) -->
-<!-- R-UI-008: Per-delegate "X" → confirm → revokePair (named pair only, no other project affected) -->
-<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
-<!-- NFR-UI-002: Non-colour cues (icon+text) for pool-funding + no-delegate rows. -->
+<!-- R-UI-002: By-project enriched table -->
+<!-- R-UI-008: Per-delegate "X" revoke -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text). -->
 <!-- NFR-UI-003: Loading / error / empty states. -->
 
 <div class="by-project">
-
-  <!-- ── Search bar ─────────────────────────────────────────────────── -->
-  <div class="by-project__toolbar">
-    <div class="by-project__search-wrapper">
-      <span class="by-project__search-icon">
-        <i class="pi pi-search" aria-hidden="true"></i>
-      </span>
-      <input
-        pInputText
-        type="text"
-        id="by-project-search"
-        [ngModel]="searchQuery()"
-        (ngModelChange)="searchQuery.set($event)"
-        placeholder="Search by person (name / email) or project (code / name)"
-        aria-label="Search by person or project"
-        class="by-project__search-input"
-      />
-    </div>
-
-    @if (hasSearch()) {
-      <button
-        type="button"
-        class="by-project__clear-btn atc-grey-700"
-        (click)="clearSearch()"
-        (keydown.enter)="clearSearch()"
-        aria-label="Clear search"
-      >
-        Clear
-      </button>
-    }
-  </div>
 
   <!-- ── Table ──────────────────────────────────────────────────────── -->
   <div class="by-project__table-wrapper">
@@ -50,13 +19,10 @@
       <!-- Header -->
       <ng-template pTemplate="header">
         <tr>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Code</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Project name</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Pool funding</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Project</th>
           <th scope="col" class="by-project__th atc-primary-blue-600">Status</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Start date</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">End date</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Delegates</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">Pool funding</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">PI Delegates</th>
           <th scope="col" class="by-project__th atc-primary-blue-600">Actions</th>
         </tr>
       </ng-template>
@@ -65,14 +31,37 @@
       <ng-template pTemplate="body" let-project>
         <tr class="by-project__row">
 
-          <!-- Code -->
-          <td class="by-project__td by-project__td--code">
-            <span class="atc-grey-800 by-project__cell-text">{{ project.project_code }}</span>
+          <!-- Project (code · dates / name) -->
+          <td class="by-project__td by-project__td--project">
+            <div class="by-project__project">
+              <span class="by-project__project__meta atc-grey-600">
+                {{ project.project_code }}
+                @if (project.start_date || project.end_date) {
+                  &nbsp;·&nbsp;{{ formatDate(project.start_date) }} – {{ formatDate(project.end_date) }}
+                }
+              </span>
+              <span class="by-project__project__name atc-grey-900">{{ project.project_name || '—' }}</span>
+            </div>
           </td>
 
-          <!-- Project name -->
-          <td class="by-project__td by-project__td--name">
-            <span class="atc-grey-800 by-project__cell-text">{{ project.project_name || '—' }}</span>
+          <!-- Status — pill with leading dot + text (NFR-UI-002) -->
+          <td class="by-project__td by-project__td--status">
+            @if (project.status) {
+              <span
+                class="by-project__status-pill"
+                [class.by-project__status-pill--ongoing]="project.status === 'Ongoing'"
+                [class.by-project__status-pill--completed]="project.status === 'Completed'"
+                [class.by-project__status-pill--closed]="project.status === 'Closed'"
+                [class.by-project__status-pill--pending]="project.status === 'Pending'"
+                [class.by-project__status-pill--active]="project.status === 'Active'"
+                [attr.aria-label]="'Status: ' + project.status"
+              >
+                <span class="by-project__status-pill__dot" aria-hidden="true">&#x25CF;</span>
+                <span class="by-project__status-pill__text">{{ project.status }}</span>
+              </span>
+            } @else {
+              <span class="atc-grey-500">—</span>
+            }
           </td>
 
           <!-- Pool funding — icon + text, NOT colour-only (NFR-UI-002) -->
@@ -88,23 +77,6 @@
                 <span class="by-project__pool-badge__text atc-grey-600">No</span>
               </span>
             }
-          </td>
-
-          <!-- Status — icon + text (NFR-UI-002) -->
-          <td class="by-project__td by-project__td--status">
-            <span class="by-project__status atc-grey-800">
-              {{ project.status || '—' }}
-            </span>
-          </td>
-
-          <!-- Start date -->
-          <td class="by-project__td by-project__td--date">
-            <span class="atc-grey-800">{{ formatDate(project.start_date) }}</span>
-          </td>
-
-          <!-- End date -->
-          <td class="by-project__td by-project__td--date">
-            <span class="atc-grey-800">{{ formatDate(project.end_date) }}</span>
           </td>
 
           <!-- Delegates cell — chips or no-delegate cue (R-UI-002 AC.2/AC.3) -->
@@ -127,12 +99,16 @@
                 @for (delegate of project.delegates; track delegate.delegate_user_id) {
                   <span
                     class="by-project__chip"
+                    [class.by-project__chip--inactive]="delegate.is_active === false"
                     role="listitem"
-                    [attr.aria-label]="delegate.name + ' (' + delegate.email + ')'"
+                    [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
                   >
+                    @if (delegate.is_active === false) {
+                      <i class="pi pi-exclamation-circle by-project__chip__inactive-icon" aria-hidden="true"></i>
+                    }
                     <span class="by-project__chip__info">
-                      <span class="by-project__chip__name atc-primary-blue-600">{{ delegate.name }}</span>
-                      <span class="by-project__chip__email atc-grey-700">{{ delegate.email }}</span>
+                      <span class="by-project__chip__name">{{ delegate.name }}</span>
+                      <span class="by-project__chip__email">{{ delegate.email }}</span>
                     </span>
                     <!-- Per-delegate "X" revoke (R-UI-008) -->
                     <button
@@ -152,19 +128,30 @@
             }
           </td>
 
-          <!-- Actions — Assign affordance (T-UI-07 wires the modal) -->
+          <!-- Actions — disabled history + "Assign people" text button -->
           <td class="by-project__td by-project__td--actions">
-            <button
-              type="button"
-              class="by-project__assign-btn"
-              [attr.aria-label]="'Assign delegate to ' + project.project_code"
-              pTooltip="Assign PI Delegate"
-              tooltipPosition="top"
-              (click)="onAssign(project)"
-              (keydown.enter)="onAssign(project)"
-            >
-              <i class="pi pi-user-plus" aria-hidden="true"></i>
-            </button>
+            <div class="by-project__actions">
+              <button
+                type="button"
+                class="by-project__history-btn"
+                [disabled]="true"
+                aria-disabled="true"
+                pTooltip="Delegation history — coming soon"
+                tooltipPosition="top"
+                [attr.aria-label]="'Delegation history for ' + project.project_code + ' (coming soon)'"
+              >
+                <i class="pi pi-history" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="by-project__assign-btn"
+                [attr.aria-label]="'Assign delegate to ' + project.project_code"
+                (click)="onAssign(project)"
+                (keydown.enter)="onAssign(project)"
+              >
+                Assign people
+              </button>
+            </div>
           </td>
 
         </tr>
@@ -173,16 +160,10 @@
       <!-- Empty state -->
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="8" class="by-project__empty" role="status">
+          <td colspan="5" class="by-project__empty" role="status">
             <div class="by-project__empty-inner">
               <i class="pi pi-inbox by-project__empty__icon atc-grey-500" aria-hidden="true"></i>
-              <p class="by-project__empty__text atc-grey-700">
-                @if (hasSearch()) {
-                  No projects match your search.
-                } @else {
-                  No PI projects found.
-                }
-              </p>
+              <p class="by-project__empty__text atc-grey-700">No projects match your search.</p>
             </div>
           </td>
         </tr>

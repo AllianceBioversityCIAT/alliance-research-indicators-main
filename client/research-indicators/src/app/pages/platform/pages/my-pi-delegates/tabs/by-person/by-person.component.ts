@@ -2,14 +2,9 @@
 //
 // By-person tab: reads service.byPersonCache() directly (populated by the
 // GET /api/pi-delegates/by-user/people endpoint via loadByUser).
+// searchQuery is now an input() signal driven by the shell filter bar.
 // Covers: R-UI-003 (By-person view), R-UI-008 (revoke named pair only),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
-//
-// Source change: personRows is now a `computed` of service.byPersonCache() rather than a
-// byProjectCache inversion.  After every write, _reloadForUser() refreshes BOTH caches,
-// so byPersonCache stays authoritative and the inversion Map is no longer needed.
-// R-UI-003 AC.2 (never show an unmanaged project) is guaranteed by the endpoint: the
-// backend only returns projects the queried user manages.
 //
 // Assign affordance: @Output() assignRequested — modal pre-fill is T-UI-07.
 
@@ -20,7 +15,7 @@ import {
   Output,
   computed,
   inject,
-  signal
+  input
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -36,6 +31,7 @@ export interface PersonRow {
   delegate_user_id: number;
   name: string;
   email: string;
+  is_active: boolean;
   projects: { project_code: string; project_name: string | null }[];
 }
 
@@ -64,8 +60,8 @@ export class ByPersonComponent {
   // Assign button emits the delegate_user_id; the parent/page shell opens the modal.
   @Output() readonly assignRequested = new EventEmitter<{ delegateUserId: number }>();
 
-  // ─── Search ───────────────────────────────────────────────────────────────────
-  readonly searchQuery = signal('');
+  // ─── Input signal from shell filter bar ───────────────────────────────────────
+  readonly searchQuery = input<string>('');
 
   // ─── byPersonCache read (R-UI-003 / R-UI-010 / by-user/people endpoint) ──────
   /**
@@ -80,6 +76,7 @@ export class ByPersonComponent {
       delegate_user_id: d.delegate_user_id,
       name: d.name ?? '',
       email: d.email ?? '',
+      is_active: d.is_active,
       projects: d.projects
     }))
   );
@@ -90,8 +87,6 @@ export class ByPersonComponent {
     if (!query) return this.personRows();
     return this.personRows().filter(row => this.matchesQuery(row, query));
   });
-
-  readonly hasSearch = computed(() => this.searchQuery().trim().length > 0);
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
   /**
@@ -123,11 +118,6 @@ export class ByPersonComponent {
   // ─── Assign affordance ────────────────────────────────────────────────────────
   onAssign(row: PersonRow): void {
     this.assignRequested.emit({ delegateUserId: row.delegate_user_id });
-  }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
-  clearSearch(): void {
-    this.searchQuery.set('');
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────

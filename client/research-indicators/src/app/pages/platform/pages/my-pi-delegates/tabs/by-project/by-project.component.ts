@@ -1,6 +1,7 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05)
 //
-// By-project tab: enriched p-table with per-delegate "X" revoke + client-side search.
+// By-project tab: enriched p-table with per-delegate "X" revoke.
+// searchQuery and statusFilter are now input() signals, driven by the shell filter bar.
 // Covers: R-UI-002 (by-project view), R-UI-008 (revoke named pair only),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
 //
@@ -13,7 +14,7 @@ import {
   Output,
   computed,
   inject,
-  signal
+  input
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -50,17 +51,20 @@ export class ByProjectComponent {
   // Assign button emits the project code; the parent/page shell opens the modal.
   @Output() readonly assignRequested = new EventEmitter<{ projectCode: string }>();
 
-  // ─── Search (R-UI-010: filter over the cache, never mutate it) ───────────────
-  readonly searchQuery = signal('');
+  // ─── Input signals from shell filter bar ─────────────────────────────────────
+  readonly searchQuery = input<string>('');
+  readonly statusFilter = input<string>('All');
 
-  /** Derived filtered view: matches by person (name/email) OR project (code/name). */
+  /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {
     const query = this.searchQuery().trim().toLowerCase();
-    if (!query) return this.service.byProjectCache();
-    return this.service.byProjectCache().filter(row => this.matchesQuery(row, query));
+    const status = this.statusFilter();
+    return this.service.byProjectCache().filter(row => {
+      const matchesStatus = status === 'All' || row.status === status;
+      const matchesQuery = !query || this.matchesQuery(row, query);
+      return matchesStatus && matchesQuery;
+    });
   });
-
-  readonly hasSearch = computed(() => this.searchQuery().trim().length > 0);
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
 
@@ -109,13 +113,9 @@ export class ByProjectComponent {
     return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
   }
 
-  clearSearch(): void {
-    this.searchQuery.set('');
-  }
-
   // ─── Private ──────────────────────────────────────────────────────────────────
 
-  private matchesQuery(row: ProjectDelegates, query: string): boolean {
+  matchesQuery(row: ProjectDelegates, query: string): boolean {
     // Match by project code or name
     if (row.project_code.toLowerCase().includes(query)) return true;
     if (row.project_name?.toLowerCase().includes(query)) return true;

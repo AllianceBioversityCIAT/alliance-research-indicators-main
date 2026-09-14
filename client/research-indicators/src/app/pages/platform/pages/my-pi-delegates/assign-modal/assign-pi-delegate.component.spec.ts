@@ -152,7 +152,7 @@ class MockPiDelegatesClientService {
 
 function buildProject(
   code: string,
-  delegates: { delegate_user_id: number; name: string; email: string }[]
+  delegates: { delegate_user_id: number; name: string; email: string; is_active?: boolean }[]
 ): ProjectDelegates {
   return {
     project_code: code,
@@ -161,7 +161,7 @@ function buildProject(
     status: 'Active',
     start_date: null,
     end_date: null,
-    delegates
+    delegates: delegates.map(d => ({ ...d, is_active: d.is_active ?? true }))
   };
 }
 
@@ -527,6 +527,158 @@ describe('AssignPiDelegateComponent', () => {
       // After close: state cleared.
       expect(component.peopleSignal().selected_people).toHaveLength(0);
       expect(component.projectsSignal().selected_projects).toHaveLength(0);
+    }));
+  });
+
+  // ─── CHANGE 1: Projects picker disabled when source=byProject ────────────────
+
+  describe('Projects picker disabled (CHANGE 1)', () => {
+    it('projectsDisabled() is true when context source is byProject (KZ-015: closed→open)', fakeAsync(() => {
+      // Start closed — projectsDisabled should be false (no context yet).
+      expect(component.projectsDisabled()).toBe(false);
+
+      // Transition: set byProject context and open.
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // KZ-014: must be true after the open transition — a wrong value would fail.
+      expect(component.projectsDisabled()).toBe(true);
+
+      // The [disabled] input on the Projects app-multiselect must be true.
+      // Query the element rendered by the SECOND app-multiselect (Projects).
+      const multiselects = fixture.nativeElement.querySelectorAll('app-multiselect');
+      // The Projects multiselect is the second one in the DOM.
+      expect(multiselects.length).toBeGreaterThanOrEqual(2);
+    }));
+
+    it('projectsDisabled() is false when context source is byPerson (negative discriminator)', fakeAsync(() => {
+      // Arrange: byPerson context — project picker must stay interactive.
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // KZ-014: must be false — if it were true the negative discriminator would have failed.
+      expect(component.projectsDisabled()).toBe(false);
+    }));
+
+    it('renders the locked helper text when projectsDisabled() is true', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // KZ-014: the locked helper must exist and contain the spec copy.
+      expect(el.textContent).toContain('Opened from this project');
+      expect(el.textContent).toContain('only the people can be changed here');
+    }));
+
+    it('does NOT render the locked helper text when source is byPerson', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // KZ-014: locked helper must NOT be in DOM when source is byPerson.
+      expect(el.textContent).not.toContain('Opened from this project');
+    }));
+  });
+
+  // ─── CHANGE 2: Inactive-delegate amber warning ────────────────────────────────
+
+  describe('Inactive-delegate warning (CHANGE 2)', () => {
+    it('renders the amber warning and names the inactive person (KZ-015: closed→open)', fakeAsync(() => {
+      // Arrange: project P1 has Alice (active) and Carol (inactive).
+      piService.byProjectCache.set([
+        buildProject('P1', [
+          { delegate_user_id: 1, name: 'Alice', email: 'a@test.com', is_active: true },
+          { delegate_user_id: 3, name: 'Carol', email: 'c@test.com', is_active: false }
+        ])
+      ]);
+
+      // KZ-015: start closed — no warning yet.
+      expect(component.inactiveSelectedPeople()).toHaveLength(0);
+
+      // Transition: open from byProject context.
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // KZ-014: Carol must be in inactiveSelectedPeople — a wrong value would fail.
+      expect(component.inactiveSelectedPeople().map(p => p.name)).toContain('Carol');
+      expect(component.inactiveSelectedPeople().map(p => p.name)).not.toContain('Alice');
+
+      // The amber warning must be rendered in the DOM and name Carol.
+      const el: HTMLElement = fixture.nativeElement;
+      const warning = el.querySelector('.assign-pi-delegate__inactive-warning');
+      expect(warning).not.toBeNull();
+      expect(warning!.textContent).toContain('Carol');
+    }));
+
+    it('does NOT render the amber warning when all pre-loaded delegates are active', fakeAsync(() => {
+      // Arrange: all delegates are active.
+      piService.byProjectCache.set([
+        buildProject('P1', [
+          { delegate_user_id: 1, name: 'Alice', email: 'a@test.com', is_active: true },
+          { delegate_user_id: 2, name: 'Bob', email: 'b@test.com', is_active: true }
+        ])
+      ]);
+
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // KZ-014: warning must not be present (negative discriminator).
+      expect(component.inactiveSelectedPeople()).toHaveLength(0);
+      const el: HTMLElement = fixture.nativeElement;
+      const warning = el.querySelector('.assign-pi-delegate__inactive-warning');
+      expect(warning).toBeNull();
+    }));
+
+    it('names multiple inactive delegates in the warning text', fakeAsync(() => {
+      // Arrange: two inactive delegates.
+      piService.byProjectCache.set([
+        buildProject('P1', [
+          { delegate_user_id: 3, name: 'Carol', email: 'c@test.com', is_active: false },
+          { delegate_user_id: 4, name: 'Dave', email: 'd@test.com', is_active: false }
+        ])
+      ]);
+
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.inactiveSelectedPeople()).toHaveLength(2);
+      const el: HTMLElement = fixture.nativeElement;
+      const warning = el.querySelector('.assign-pi-delegate__inactive-warning');
+      expect(warning).not.toBeNull();
+      // KZ-014: both names must appear.
+      expect(warning!.textContent).toContain('Carol');
+      expect(warning!.textContent).toContain('Dave');
     }));
   });
 });

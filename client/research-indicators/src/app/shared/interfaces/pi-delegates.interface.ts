@@ -34,6 +34,16 @@ export interface DelegateSummary {
   name: string;
   /** sec_users.email of the delegate. */
   email: string;
+  /** Whether the delegate's account is active in sec_users. */
+  is_active: boolean;
+  /** sec_users.first_name — may be null. */
+  first_name?: string | null;
+  /** sec_users.last_name — may be null. */
+  last_name?: string | null;
+  /** sec_users.carnet — may be null. */
+  carnet?: string | null;
+  /** sec_users.status_id — may be null. */
+  status_id?: number | null;
 }
 
 /**
@@ -80,6 +90,12 @@ export interface DelegateProjects {
   name: string | null;
   /** sec_users.email of the delegate. */
   email: string | null;
+  /** Whether the delegate's account is active in sec_users. */
+  is_active: boolean;
+  /** sec_users.first_name — may be null. */
+  first_name?: string | null;
+  /** sec_users.last_name — may be null. */
+  last_name?: string | null;
   /** Active project assignments for this delegate (may be an empty array). */
   projects: ProjectSummary[];
 }

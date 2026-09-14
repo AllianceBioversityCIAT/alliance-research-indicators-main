@@ -68,7 +68,9 @@ export class PiDelegatePeoplePickerStubService {
           (res.data ?? []).map(u => ({
             delegate_user_id: u.sec_user_id,
             name: (`${u.first_name ?? ''} ${u.last_name ?? ''}`).trim() || u.email,
-            email: u.email
+            email: u.email,
+            // Active-users endpoint only returns is_active=true users.
+            is_active: true
           }))
         );
       }

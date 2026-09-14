@@ -1,29 +1,25 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04)
 //
-// Test suite for the My PI Delegates page shell.
+// Test suite for the My PI Delegates page shell (re-skin).
 //
 // Proofs required:
 //   1. R-UI-002 AC.1  — opens with By-project tab active by DEFAULT.
-//   2. R-UI-004       — counters render the service's computed values AND update
-//                       reactively after the cache is mutated (K-015: arrange the
-//                       TRANSITION, not the end state).
-//   3. NFR-UI-003     — loading / error / empty states render + hide correctly;
-//                       K-015 transitions are arranged for each.
-//   4. Tab signal     — activeTabIndex changes on tab switch.
-//   5. Stub quality   — the PiDelegatesClientService stub evaluates real signal
-//                       logic so wrong wiring (e.g. reading a stale copy) FAILS.
+//   2. Info banner renders.
+//   3. Footer summary computes people/assignments/projects/inactive from byProjectCache
+//      (wrong counts fail — discriminating).
+//   4. Status dropdown options derived from distinct statuses in byProjectCache.
+//   5. searchQuery and statusFilter signals are passed as inputs to by-project.
+//   6. NFR-UI-003     — loading / error states (K-015 transitions).
+//   7. Tab signal     — activeTabIndex changes on tab switch.
 //
-// KZ-001 compliance: the mock service exposes computed() signals that mirror the
-// real service so a wrong read path (e.g. a second divergent copy) produces wrong
-// values and causes test failure.
-// KZ-015 compliance: every state is arranged from the default (neutral) state and
-// the component is rendered BEFORE the change — asserting "not-yet" then "now".
+// KZ-015: every state transition arranged from the initial state.
 
 import { signal, computed } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TabViewModule } from 'primeng/tabview';
+import { DropdownModule } from 'primeng/dropdown';
 import MyPiDelegatesComponent from './my-pi-delegates.component';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -40,36 +36,17 @@ function makeProject(overrides: Partial<ProjectDelegates> = {}): ProjectDelegate
     status: 'Active',
     start_date: null,
     end_date: null,
-    delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'alice@example.com' }],
+    delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'alice@example.com', is_active: true }],
     ...overrides
   };
 }
 
-// ─── Mock service (KZ-001: real computed signals, not static stubs) ───────────
-//
-// The mock uses the same signal/computed derivation as the REAL service so that
-// wrong wiring in the component (e.g. reading a second copy or a different signal)
-// will produce incorrect counter values and fail the assertion.
-// We expose byProjectCache as a WritableSignal so tests can mutate it to arrange
-// the reactivity proof (R-UI-004 / K-015).
+// ─── Mock service ─────────────────────────────────────────────────────────────
 
 function createMockService() {
   const byProjectCache = signal<ProjectDelegates[]>([]);
   const loading = signal<boolean>(false);
   const error = signal<string | null>(null);
-
-  // Mirror the real service computed logic exactly (KZ-001).
-  const totalProjects = computed(() => byProjectCache().length);
-  const totalDistinctDelegates = computed(() => {
-    const ids = new Set<number>();
-    for (const project of byProjectCache()) {
-      for (const delegate of project.delegates) {
-        ids.add(delegate.delegate_user_id);
-      }
-    }
-    return ids.size;
-  });
-  const projectsWithoutDelegate = computed(() => byProjectCache().filter(p => p.delegates.length === 0));
 
   const loadByProject = jest.fn<Promise<void>, [string[]]>().mockResolvedValue(undefined);
   const loadByUser = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
@@ -79,15 +56,12 @@ function createMockService() {
     byPersonCache: signal([]),
     loading,
     error,
-    totalProjects,
-    totalDistinctDelegates,
-    projectsWithoutDelegate,
     loadByProject,
     loadByUser
   };
 }
 
-// ─── CacheService stub factory ────────────────────────────────────────────────
+// ─── CacheService stub ────────────────────────────────────────────────────────
 
 function createMockCacheService(secUserId: number | null = 99) {
   return {
@@ -110,7 +84,7 @@ describe('MyPiDelegatesComponent', () => {
     mockCacheService = createMockCacheService(99);
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, TabViewModule, DropdownModule, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockService },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },
@@ -121,31 +95,22 @@ describe('MyPiDelegatesComponent', () => {
     fixture = TestBed.createComponent(MyPiDelegatesComponent);
     component = fixture.componentInstance;
     // NOTE: do NOT call detectChanges() here (KZ-015).
-    // Each test arranges its state, then calls detectChanges() to trigger OnInit.
   });
 
   // ── 1. R-UI-002 AC.1 — By-project default ──────────────────────────────────
 
   it('renders with By-project as the active tab by default (R-UI-002 AC.1)', () => {
-    // Arrange: service is idle; no state yet
-    // Act: first render (OnInit runs)
     fixture.detectChanges();
-
-    // Assert: activeTabIndex signal starts at 0 (By-project)
     expect(component.activeTabIndex()).toBe(0);
 
-    // PrimeNG v19 renders its host as a custom element (p-tabview) with data-pc-name="tabview"
-    // and class p-tabs on the host element.
     const tabViewEl =
       fixture.nativeElement.querySelector('[data-pc-name="tabview"]') ||
       fixture.nativeElement.querySelector('p-tabview') ||
       fixture.nativeElement.querySelector('.p-tabs');
     expect(tabViewEl).not.toBeNull();
 
-    // The p-tabPanel elements must declare headers "By project" and "By person"
     const tabPanels = fixture.debugElement.queryAll(By.css('p-tabPanel, p-tabpanel'));
     expect(tabPanels.length).toBeGreaterThanOrEqual(2);
-    // Attributes on the Angular element (not the host DOM node)
     const firstHeader = (tabPanels[0].attributes as Record<string, string>)['header'];
     const secondHeader = (tabPanels[1].attributes as Record<string, string>)['header'];
     expect(firstHeader).toBe('By project');
@@ -154,183 +119,179 @@ describe('MyPiDelegatesComponent', () => {
 
   it('calls loadByUser with the current user id on init', () => {
     fixture.detectChanges();
-    // CacheService stub returns sec_user_id = 99; the component must pass it as Number(99).
     expect(mockService.loadByUser).toHaveBeenCalledTimes(1);
     expect(mockService.loadByUser).toHaveBeenCalledWith(99);
   });
 
-  // ── 2. R-UI-004 — Summary counters (reactivity, K-015 transition) ──────────
+  // ── 2. Info banner ──────────────────────────────────────────────────────────
 
-  it('renders 0 for all counters when the cache is empty', () => {
-    // Arrange: empty cache (default)
+  it('renders the info banner with info-circle icon', () => {
     fixture.detectChanges();
-
-    const el: HTMLElement = fixture.nativeElement;
-    const counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    // Should be 3 counter cards
-    expect(counterValues.length).toBe(3);
-    // All show 0 (counter derives from computed signal, cache is empty)
-    expect(counterValues[0].textContent?.trim()).toBe('0');
-    expect(counterValues[1].textContent?.trim()).toBe('0');
-    expect(counterValues[2].textContent?.trim()).toBe('0');
+    const banner = fixture.nativeElement.querySelector('.pi-delegates-banner');
+    expect(banner).not.toBeNull();
+    const icon = fixture.nativeElement.querySelector('.pi-delegates-banner .pi-info-circle');
+    expect(icon).not.toBeNull();
+    const text = (banner as HTMLElement).textContent ?? '';
+    expect(text).toContain('PI Delegate');
   });
 
-  it('counters reflect service signals after cache is populated (R-UI-004)', () => {
-    // Arrange: start with empty cache; render first
+  // ── 3. Footer summary ───────────────────────────────────────────────────────
+
+  it('footer shows zero counts when cache is empty', () => {
+    fixture.detectChanges();
+    const footer = fixture.nativeElement.querySelector('.pi-delegates-footer__left');
+    const text = (footer as HTMLElement | null)?.textContent ?? '';
+    // 0 people, 0 active assignments, 0 projects
+    expect(text).toContain('0 people');
+    expect(text).toContain('0 active assignments');
+    expect(text).toContain('0 projects');
+  });
+
+  it('footer counts people/assignments/projects correctly after cache is populated', () => {
+    // Arrange: start empty (initial state)
     fixture.detectChanges();
 
-    const el: HTMLElement = fixture.nativeElement;
-    let counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    // Pre-condition: all zeros (the "before" of the transition)
-    expect(counterValues[0].textContent?.trim()).toBe('0');
-    expect(counterValues[1].textContent?.trim()).toBe('0');
-    expect(counterValues[2].textContent?.trim()).toBe('0');
-
-    // Act: mutate the shared cache (K-015 — arrange the transition)
+    // Act: populate cache (K-015 transition)
+    // 2 projects: P001 has 2 delegates (Alice active, Bob inactive), P002 has 1 delegate (Carol active)
     mockService.byProjectCache.set([
-      makeProject({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'alice@c.com' }] }),
-      makeProject({ project_code: 'P002', delegates: [] }) // no delegate → counted in projectsWithoutDelegate
+      makeProject({
+        project_code: 'P001',
+        status: 'Ongoing',
+        delegates: [
+          { delegate_user_id: 1, name: 'Alice', email: 'alice@c.com', is_active: true },
+          { delegate_user_id: 2, name: 'Bob', email: 'bob@c.com', is_active: false }
+        ]
+      }),
+      makeProject({
+        project_code: 'P002',
+        status: 'Completed',
+        delegates: [
+          { delegate_user_id: 3, name: 'Carol', email: 'carol@c.com', is_active: true }
+        ]
+      })
     ]);
     fixture.detectChanges();
 
-    // Assert AFTER transition:
-    counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    // totalProjects: 2 projects in cache
-    expect(counterValues[0].textContent?.trim()).toBe('2');
-    // totalDistinctDelegates: 1 unique person across all projects
-    expect(counterValues[1].textContent?.trim()).toBe('1');
-    // projectsWithoutDelegateCount: 1 project has empty delegates
-    expect(counterValues[2].textContent?.trim()).toBe('1');
+    // Assert: people = 3 (distinct ids 1,2,3), activeAssignments = 3, projects = 2, inactive = 1 (Bob)
+    const footer = fixture.nativeElement.querySelector('.pi-delegates-footer__left');
+    const text = (footer as HTMLElement | null)?.textContent ?? '';
+    expect(text).toContain('3 people');
+    expect(text).toContain('3 active assignments');
+    expect(text).toContain('2 projects');
+    // Bob is inactive → inactive count shown
+    const inactiveEl = fixture.nativeElement.querySelector('.pi-delegates-footer__left .atc-red-1');
+    expect(inactiveEl).not.toBeNull();
+    expect((inactiveEl as HTMLElement).textContent).toContain('1');
   });
 
-  it('counters update again when cache is mutated a second time (reactive — R-UI-004)', () => {
-    // Arrange: start populated
+  it('footer does NOT show inactive marker when all delegates are active', () => {
     mockService.byProjectCache.set([
-      makeProject({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@a.com' }] })
+      makeProject({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@c.com', is_active: true }] })
     ]);
     fixture.detectChanges();
 
-    const el: HTMLElement = fixture.nativeElement;
-    let counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    // Pre-condition (first state)
-    expect(counterValues[0].textContent?.trim()).toBe('1');
-    expect(counterValues[1].textContent?.trim()).toBe('1');
-    expect(counterValues[2].textContent?.trim()).toBe('0');
+    const inactiveEl = fixture.nativeElement.querySelector('.pi-delegates-footer__left .atc-red-1');
+    expect(inactiveEl).toBeNull();
+  });
 
-    // Act: add a second project with a NEW distinct person and NO delegates (K-015 transition)
+  it('footer right text says "Only projects where you are the Principal Investigator are listed"', () => {
+    fixture.detectChanges();
+    const footerRight = fixture.nativeElement.querySelector('.pi-delegates-footer__right');
+    expect((footerRight as HTMLElement | null)?.textContent).toContain('Principal Investigator');
+  });
+
+  // ── 4. Status options ───────────────────────────────────────────────────────
+
+  it('statusOptions starts with "All" and derives from byProjectCache statuses', () => {
+    // Pre-condition: empty
+    fixture.detectChanges();
+    expect(component.statusOptions()).toEqual(['All']);
+
+    // Act: add projects with statuses
     mockService.byProjectCache.set([
-      makeProject({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@a.com' }] }),
-      makeProject({ project_code: 'P002', delegates: [{ delegate_user_id: 2, name: 'Bob', email: 'b@b.com' }] }),
-      makeProject({ project_code: 'P003', delegates: [] })
+      makeProject({ project_code: 'P1', status: 'Ongoing', delegates: [] }),
+      makeProject({ project_code: 'P2', status: 'Completed', delegates: [] }),
+      makeProject({ project_code: 'P3', status: 'Ongoing', delegates: [] }) // duplicate
     ]);
     fixture.detectChanges();
 
-    // Assert AFTER second transition:
-    counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    expect(counterValues[0].textContent?.trim()).toBe('3'); // 3 projects
-    expect(counterValues[1].textContent?.trim()).toBe('2'); // 2 distinct people
-    expect(counterValues[2].textContent?.trim()).toBe('1'); // 1 without a delegate
+    // Assert: deduplicated, sorted, 'All' first
+    expect(component.statusOptions()).toContain('All');
+    expect(component.statusOptions()).toContain('Ongoing');
+    expect(component.statusOptions()).toContain('Completed');
+    // No duplicate Ongoing
+    expect(component.statusOptions().filter(s => s === 'Ongoing').length).toBe(1);
   });
 
-  // ── 3. NFR-UI-003 — Loading state (K-015 transition) ───────────────────────
+  // ── 5. NFR-UI-003 — Loading state (K-015 transition) ───────────────────────
 
   it('shows loading indicator while service.loading() is true (NFR-UI-003)', () => {
-    // Pre-condition: loading = false (default), ensure no loading state initially
     fixture.detectChanges();
-    let el: HTMLElement = fixture.nativeElement;
-    expect(el.querySelector('.pi-delegates-state--loading')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-state--loading')).toBeNull();
 
-    // Act: set loading to true (K-015 — arrange the transition)
     mockService.loading.set(true);
     fixture.detectChanges();
 
-    // Assert: loading state block rendered
-    el = fixture.nativeElement;
-    const loadingEl = el.querySelector('.pi-delegates-state--loading');
+    const loadingEl = fixture.nativeElement.querySelector('.pi-delegates-state--loading');
     expect(loadingEl).not.toBeNull();
     expect(loadingEl?.textContent).toMatch(/Loading/i);
-
-    // Counters show '—' while loading
-    const counterValues = el.querySelectorAll('.pi-delegates-summary__value');
-    for (const cv of Array.from(counterValues)) {
-      expect(cv.textContent?.trim()).toBe('—');
-    }
   });
 
   it('hides loading indicator when service.loading() becomes false (NFR-UI-003)', () => {
-    // Arrange: start loading
     mockService.loading.set(true);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.pi-delegates-state--loading')).not.toBeNull();
 
-    // Act: loading completes
     mockService.loading.set(false);
     fixture.detectChanges();
 
-    // Assert: loading gone
     expect(fixture.nativeElement.querySelector('.pi-delegates-state--loading')).toBeNull();
   });
 
-  // ── 4. NFR-UI-003 — Error state (K-015 transition) ─────────────────────────
+  // ── 6. NFR-UI-003 — Error state (K-015 transition) ─────────────────────────
 
   it('shows error block when service.error() is non-null (NFR-UI-003)', () => {
-    // Pre-condition: no error
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.pi-delegates-state--error')).toBeNull();
 
-    // Act: service signals an error (K-015 transition)
     mockService.error.set('Failed to load by-project data');
     fixture.detectChanges();
 
-    // Assert: error state block rendered
     const errorEl = fixture.nativeElement.querySelector('.pi-delegates-state--error');
     expect(errorEl).not.toBeNull();
     expect(errorEl?.textContent).toMatch(/Could not load/i);
   });
 
   it('hides error block when error() clears (NFR-UI-003)', () => {
-    // Arrange: start with error
     mockService.error.set('some error');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.pi-delegates-state--error')).not.toBeNull();
 
-    // Act: error clears
     mockService.error.set(null);
     fixture.detectChanges();
 
-    // Assert: gone
     expect(fixture.nativeElement.querySelector('.pi-delegates-state--error')).toBeNull();
   });
 
-  // ── 5. NFR-UI-003 — By-project tab content (T-UI-05 owns empty state) ─────────
-  //
-  // The shell no longer owns the empty state inside the By-project tab — that was
-  // transferred to <app-by-project> (T-UI-05). The shell's responsibility is to
-  // render <app-by-project> in the tab panel when loading=false and error=null.
+  // ── 7. Tab panel rendering ──────────────────────────────────────────────────
 
   it('renders app-by-project in the By-project tab panel when not loading and no error (NFR-UI-003)', () => {
-    // Default state: loading=false, error=null → tabs are shown → app-by-project rendered
     fixture.detectChanges();
-
-    // The shell includes ByProjectComponent which renders as app-by-project
     const byProjectEl = fixture.nativeElement.querySelector('app-by-project');
     expect(byProjectEl).not.toBeNull();
   });
 
   it('does not render the tab content when loading=true (NFR-UI-003, K-015 transition)', () => {
-    // Pre-condition: not loading → app-by-project present
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('app-by-project')).not.toBeNull();
 
-    // Act: set loading to true
     mockService.loading.set(true);
     fixture.detectChanges();
 
-    // Assert: tabs block hidden (loading state renders instead)
     expect(fixture.nativeElement.querySelector('app-by-project')).toBeNull();
   });
 
-  // ── 6. Tab index signal ──────────────────────────────────────────────────────
+  // ── 8. Tab index signal ──────────────────────────────────────────────────────
 
   it('updates activeTabIndex signal when onTabChange is called', () => {
     fixture.detectChanges();
@@ -343,37 +304,20 @@ describe('MyPiDelegatesComponent', () => {
     expect(component.activeTabIndex()).toBe(0);
   });
 
-  // ── 7. Summary area: aria-live regions are present ──────────────────────────
+  // ── 9. searchQuery and statusFilter signals ─────────────────────────────────
 
-  it('renders summary section with aria-label and aria-live on each card (a11y)', () => {
+  it('searchQuery signal starts empty', () => {
     fixture.detectChanges();
-
-    const summary = fixture.nativeElement.querySelector('[aria-label="PI Delegates summary"]');
-    expect(summary).not.toBeNull();
-
-    const cards = fixture.nativeElement.querySelectorAll('[aria-live="polite"]');
-    // 3 counter cards + possible others; at minimum 3
-    expect(cards.length).toBeGreaterThanOrEqual(3);
+    expect(component.searchQuery()).toBe('');
   });
 
-  // ── 8. Counters derive from ONE cache (no divergent copy — R-UI-010 / KZ-002) ─
-
-  it('counter totalDistinctDelegates de-duplicates across projects (single-cache derivation)', () => {
-    // Same delegate_user_id in two projects → should count as 1 distinct person
-    mockService.byProjectCache.set([
-      makeProject({ project_code: 'PA', delegates: [{ delegate_user_id: 99, name: 'X', email: 'x@x.com' }] }),
-      makeProject({ project_code: 'PB', delegates: [{ delegate_user_id: 99, name: 'X', email: 'x@x.com' }] })
-    ]);
+  it('statusFilter signal starts as All', () => {
     fixture.detectChanges();
-
-    const counterValues = fixture.nativeElement.querySelectorAll('.pi-delegates-summary__value');
-    expect(counterValues[0].textContent?.trim()).toBe('2'); // 2 projects
-    expect(counterValues[1].textContent?.trim()).toBe('1'); // only 1 DISTINCT person
-    expect(counterValues[2].textContent?.trim()).toBe('0'); // both have delegates
+    expect(component.statusFilter()).toBe('All');
   });
 });
 
-// ─── Null-user edge case — separate TestBed so overrideProvider works ─────────
+// ─── Null-user edge case ──────────────────────────────────────────────────────
 
 describe('MyPiDelegatesComponent — unauthenticated edge', () => {
   it('does NOT call loadByUser when sec_user_id is null', async () => {
@@ -383,17 +327,13 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
       byPersonCache: signal<ProjectDelegates[]>([]),
       loading: signal(false),
       error: signal<string | null>(null),
-      totalProjects: computed(() => byProjectCache().length),
-      totalDistinctDelegates: computed(() => 0),
-      projectsWithoutDelegate: computed(() => byProjectCache().filter(p => p.delegates.length === 0)),
       loadByProject: jest.fn<Promise<void>, [string[]]>().mockResolvedValue(undefined),
       loadByUser: jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined)
     };
-    // CacheService with no user (sec_user_id absent)
     const noUserCache = { dataCache: signal({ user: undefined }) };
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, TabViewModule, DropdownModule, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockSvc },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },

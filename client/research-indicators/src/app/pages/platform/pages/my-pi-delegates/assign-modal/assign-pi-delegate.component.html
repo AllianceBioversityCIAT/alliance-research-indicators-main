@@ -5,6 +5,8 @@
 <!-- R-UI-006: Pre-load from context seeds both pickers (SYNC guard). -->
 <!-- R-UI-007: Delta confirm + success toast / error state handled in .ts. -->
 <!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- CHANGE 1: Projects picker disabled when source=byProject (project is pre-fixed). -->
+<!-- CHANGE 2: Inactive-delegate amber warning when pre-loaded chips are inactive. -->
 
 <div class="assign-pi-delegate">
 
@@ -30,8 +32,28 @@
     </p>
   </div>
 
+  <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->
+  <!-- Amber box naming any pre-loaded delegates whose is_active === false. -->
+  @if (inactiveSelectedPeople().length > 0) {
+    <div class="assign-pi-delegate__inactive-warning" role="alert" aria-live="assertive">
+      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon" aria-hidden="true"></i>
+      <span class="assign-pi-delegate__inactive-warning-text fs-14">
+        @if (inactiveSelectedPeople().length === 1) {
+          <strong>{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
+          They will not be able to review results until their account is reactivated.
+          The role can still be granted and will take effect once they are active again.
+        } @else {
+          <strong>{{ inactiveNames() }}</strong> are inactive in STAR.
+          They will not be able to review results until their accounts are reactivated.
+          The role can still be granted and will take effect once they are active again.
+        }
+      </span>
+    </div>
+  }
+
   <!-- ── Projects picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegateProjects' → projects from byProjectCache (the page table) (T-UI-08). -->
+  <!-- CHANGE 1: When source=byProject the picker is disabled — the project is pre-fixed. -->
   <div class="assign-pi-delegate__field">
     <app-multiselect
       [signal]="projectsSignal"
@@ -43,11 +65,20 @@
       label="Projects"
       placeholder="Select projects to assign delegates to"
       [isRequired]="true"
+      [disabled]="projectsDisabled()"
     ></app-multiselect>
-    <p class="assign-pi-delegate__hint atc-grey-600">
-      Select the projects for this delegation.
-      Only your manageable projects will appear.
-    </p>
+    <!-- CHANGE 1: helper text when project is fixed -->
+    @if (projectsDisabled()) {
+      <p class="assign-pi-delegate__hint assign-pi-delegate__hint--locked atc-grey-600">
+        <i class="pi pi-lock" aria-hidden="true"></i>
+        Opened from this project — only the people can be changed here.
+      </p>
+    } @else {
+      <p class="assign-pi-delegate__hint atc-grey-600">
+        Select the projects for this delegation.
+        Only your manageable projects will appear.
+      </p>
+    }
   </div>
 
   <!-- ── Pre-load note ──────────────────────────────────────────────────── -->

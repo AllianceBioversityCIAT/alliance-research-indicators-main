@@ -17,6 +17,18 @@
     font-size: 0.8125rem; // ~13px — sits below the field
     line-height: 1.5;
     margin: 0;
+
+    // CHANGE 1: locked variant — lock icon + text in-line
+    &--locked {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+
+      .pi-lock {
+        font-size: 0.75rem;
+        flex-shrink: 0;
+      }
+    }
   }
 
   &__preload-notice {
@@ -34,6 +46,32 @@
 
     span {
       line-height: 1.5;
+    }
+  }
+
+  // CHANGE 2: amber warning for inactive pre-loaded delegates
+  &__inactive-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--ac-orange-1);
+    background: var(--ac-grey-100);
+  }
+
+  &__inactive-warning-icon {
+    color: var(--ac-orange-1);
+    margin-top: 0.125rem;
+    flex-shrink: 0;
+  }
+
+  &__inactive-warning-text {
+    line-height: 1.5;
+    color: var(--ac-grey-800);
+
+    strong {
+      font-weight: 600;
     }
   }
 }

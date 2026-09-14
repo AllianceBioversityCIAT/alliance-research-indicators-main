@@ -36,6 +36,9 @@ interface PersonOption {
   delegate_user_id: number;
   name: string;
   email: string;
+  /** Carried from DelegateSummary.is_active when seeded from byProjectCache.
+   *  undefined for newly-picked options (active-users endpoint — always active). */
+  is_active?: boolean;
 }
 
 interface ProjectOption {
@@ -86,8 +89,34 @@ export class AssignPiDelegateComponent implements OnInit {
 
   // ─── Derived helpers for delta computation ────────────────────────────────────
 
-  private readonly selectedPeople = computed(() => this.peopleSignal().selected_people ?? []);
+  readonly selectedPeople = computed(() => this.peopleSignal().selected_people ?? []);
   private readonly selectedProjects = computed(() => this.projectsSignal().selected_projects ?? []);
+
+  // ─── Projects picker disabled (CHANGE 1) ─────────────────────────────────────
+  /**
+   * When the modal is opened from a project row, the project is pre-fixed and
+   * cannot be changed — only the People picker remains interactive.
+   */
+  readonly projectsDisabled = computed(
+    () => this.allModalsService.assignPiDelegateContext()?.source === 'byProject'
+  );
+
+  // ─── Inactive delegate warning (CHANGE 2) ────────────────────────────────────
+  /**
+   * Pre-loaded delegates that have is_active === false.
+   * Only appears for chips seeded from byProjectCache; newly-picked options are
+   * always active (active-users endpoint).
+   */
+  readonly inactiveSelectedPeople = computed(() =>
+    this.selectedPeople().filter(p => p.is_active === false)
+  );
+
+  /** Comma-separated names of inactive pre-loaded delegates — used directly in the template. */
+  readonly inactiveNames = computed(() =>
+    this.inactiveSelectedPeople()
+      .map(p => p.name)
+      .join(', ')
+  );
 
   // ─── Accept gating (R-UI-005 AC.4) ────────────────────────────────────────────
   /**
@@ -173,11 +202,13 @@ export class AssignPiDelegateComponent implements OnInit {
         });
         // Seed current delegates — this is the anti-revoke guard: if user saves without
         // changing the people selection, the POST will include exactly the current delegates.
+        // is_active is carried so the inactive-delegate warning can surface them.
         this.peopleSignal.set({
           selected_people: projectEntry.delegates.map(d => ({
             delegate_user_id: d.delegate_user_id,
             name: d.name,
-            email: d.email
+            email: d.email,
+            is_active: d.is_active
           }))
         });
       } else {
@@ -207,7 +238,8 @@ export class AssignPiDelegateComponent implements OnInit {
               {
                 delegate_user_id: delegateEntry.delegate_user_id,
                 name: delegateEntry.name,
-                email: delegateEntry.email
+                email: delegateEntry.email,
+                is_active: delegateEntry.is_active
               }
             ]
           : []

@@ -24,7 +24,7 @@ function makeProjectDelegates(overrides: Partial<ProjectDelegates> = {}): Projec
     status: 'Active',
     start_date: null,
     end_date: null,
-    delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'alice@example.com' }],
+    delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'alice@example.com', is_active: true }],
     ...overrides
   };
 }
@@ -42,6 +42,7 @@ function makeDelegateProjects(overrides: Partial<DelegateProjects> = {}): Delega
     delegate_user_id: 42,
     name: 'Alice',
     email: 'alice@example.com',
+    is_active: true,
     projects: [{ project_code: 'P001', project_name: 'Alpha Project' }],
     ...overrides
   };
@@ -91,7 +92,7 @@ describe('PiDelegatesClientService', () => {
 
   describe('single-cache derivation (R-UI-010)', () => {
     it('loads byProjectCache from the mocked API payload', async () => {
-      const project = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 7, name: 'Bob', email: 'b@c.com' }] });
+      const project = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 7, name: 'Bob', email: 'b@c.com', is_active: true }] });
       mockApi.GET_PIDelegatesByProject.mockResolvedValue(makeOkResponse(project));
 
       await service.loadByProject(['P001']);
@@ -102,7 +103,7 @@ describe('PiDelegatesClientService', () => {
     it('computed totalProjects reflects byProjectCache length, not a second field', async () => {
       // Arrange: two projects — a divergent copy would disagree with this count.
       const p1 = makeProjectDelegates({ project_code: 'P001', delegates: [] });
-      const p2 = makeProjectDelegates({ project_code: 'P002', delegates: [{ delegate_user_id: 5, name: 'C', email: 'c@d.com' }] });
+      const p2 = makeProjectDelegates({ project_code: 'P002', delegates: [{ delegate_user_id: 5, name: 'C', email: 'c@d.com', is_active: true }] });
       mockApi.GET_PIDelegatesByProject
         .mockResolvedValueOnce(makeOkResponse(p1))
         .mockResolvedValueOnce(makeOkResponse(p2));
@@ -116,8 +117,8 @@ describe('PiDelegatesClientService', () => {
     });
 
     it('computed totalDistinctDelegates counts unique delegate_user_ids across all projects', async () => {
-      const sharedDelegate = { delegate_user_id: 99, name: 'Shared', email: 's@s.com' };
-      const p1 = makeProjectDelegates({ project_code: 'P001', delegates: [sharedDelegate, { delegate_user_id: 10, name: 'X', email: 'x@x.com' }] });
+      const sharedDelegate = { delegate_user_id: 99, name: 'Shared', email: 's@s.com', is_active: true };
+      const p1 = makeProjectDelegates({ project_code: 'P001', delegates: [sharedDelegate, { delegate_user_id: 10, name: 'X', email: 'x@x.com', is_active: true }] });
       const p2 = makeProjectDelegates({ project_code: 'P002', delegates: [sharedDelegate] });
       mockApi.GET_PIDelegatesByProject
         .mockResolvedValueOnce(makeOkResponse(p1))
@@ -130,7 +131,7 @@ describe('PiDelegatesClientService', () => {
     });
 
     it('projectsWithoutDelegate only includes projects with empty delegates array', async () => {
-      const withDel = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'A', email: 'a@a.com' }] });
+      const withDel = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'A', email: 'a@a.com', is_active: true }] });
       const withoutDel = makeProjectDelegates({ project_code: 'P002', delegates: [] });
       mockApi.GET_PIDelegatesByProject
         .mockResolvedValueOnce(makeOkResponse(withDel))
@@ -152,7 +153,7 @@ describe('PiDelegatesClientService', () => {
       // After the POST the server returns a delegate assigned.
       const afterWrite = makeProjectDelegates({
         project_code: 'P001',
-        delegates: [{ delegate_user_id: 55, name: 'New', email: 'new@test.com' }]
+        delegates: [{ delegate_user_id: 55, name: 'New', email: 'new@test.com', is_active: true }]
       });
 
       // Initial load uses the first mockResolvedValueOnce (beforeWrite).
@@ -203,7 +204,7 @@ describe('PiDelegatesClientService', () => {
       // Initial: project has a delegate.
       const withDelegate = makeProjectDelegates({
         project_code: 'P001',
-        delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'alice@example.com' }]
+        delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'alice@example.com', is_active: true }]
       });
       // After revoke: project has no delegates.
       const afterRevoke = makeProjectDelegates({ project_code: 'P001', delegates: [] });
@@ -232,7 +233,7 @@ describe('PiDelegatesClientService', () => {
     it('calls DELETE before GET and cache equals refetched value', async () => {
       const withDelegate = makeProjectDelegates({
         project_code: 'P001',
-        delegates: [{ delegate_user_id: 9, name: 'Z', email: 'z@z.com' }]
+        delegates: [{ delegate_user_id: 9, name: 'Z', email: 'z@z.com', is_active: true }]
       });
       const afterRevoke = makeProjectDelegates({ project_code: 'P001', delegates: [] });
 
@@ -330,6 +331,7 @@ describe('PiDelegatesClientService', () => {
         delegate_user_id: 1,
         name: 'Alice',
         email: 'a@a.com',
+        is_active: true,
         projects: [{ project_code: 'P001', project_name: 'Alpha' }]
       };
       mockApi.GET_PIDelegatesByDelegate.mockResolvedValue(makeOkResponse(delegateProjects));
@@ -409,7 +411,7 @@ describe('PiDelegatesClientService', () => {
   describe('revokePair → _reloadForUser reloads both caches', () => {
     it('after revokePair, GET_PIDelegatesByUserProjects AND GET_PIDelegatesByUserPeople are called', async () => {
       // Arrange: loadByUser first so _userId is set.
-      const project = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'a@a.com' }] });
+      const project = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 42, name: 'Alice', email: 'a@a.com', is_active: true }] });
       mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([project]));
       mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
       await service.loadByUser(7);

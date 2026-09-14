@@ -7,64 +7,6 @@
   flex-direction: column;
   gap: 12px;
 
-  // ── Toolbar (search row) ────────────────────────────────────────────
-  &__toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background-color: var(--ac-white-1);
-    border: 1px solid var(--ac-grey-200);
-    border-bottom: none;
-  }
-
-  &__search-wrapper {
-    position: relative;
-    flex: 1;
-    max-width: 28rem;
-  }
-
-  &__search-icon {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    padding-left: 10px;
-    pointer-events: none;
-    color: var(--ac-grey-600);
-    font-size: 12px;
-  }
-
-  &__search-input {
-    width: 100%;
-    padding-left: 2rem !important;
-    border-radius: 8px !important;
-    max-height: 27px !important;
-    font-size: 12px !important;
-    border-color: var(--ac-grey-400) !important;
-    color: var(--ac-grey-800) !important;
-  }
-
-  &__clear-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: color 0.15s ease;
-
-    &:hover {
-      color: var(--ac-primary-blue-600);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--ac-light-blue-400);
-      outline-offset: 2px;
-    }
-  }
-
   // ── Table wrapper ────────────────────────────────────────────────────
   &__table-wrapper {
     border: 1px solid var(--ac-grey-200);
@@ -87,13 +29,13 @@
     vertical-align: middle;
     padding: 8px 12px;
 
-    &--code {
-      white-space: nowrap;
-      min-width: 80px;
+    &--project {
+      min-width: 200px;
     }
 
-    &--name {
-      min-width: 180px;
+    &--status {
+      min-width: 120px;
+      white-space: nowrap;
     }
 
     &--pool {
@@ -101,32 +43,95 @@
       white-space: nowrap;
     }
 
-    &--status {
-      min-width: 100px;
-      white-space: nowrap;
-    }
-
-    &--date {
-      min-width: 110px;
-      white-space: nowrap;
-    }
-
     &--delegates {
-      min-width: 240px;
+      min-width: 260px;
     }
 
     &--actions {
-      min-width: 80px;
-      text-align: center;
+      min-width: 160px;
+      white-space: nowrap;
     }
   }
 
-  &__cell-text {
-    display: block;
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  // ── Project cell (code·dates / name) ────────────────────────────────
+  &__project {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+
+    &__meta {
+      font-size: 11px;
+      font-weight: 400;
+    }
+
+    &__name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+  }
+
+  // ── Status pill ─────────────────────────────────────────────────────
+  &__status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid var(--ac-grey-300);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-grey-700);
+
+    &__dot {
+      font-size: 8px;
+      flex-shrink: 0;
+    }
+
+    &__text {
+      white-space: nowrap;
+    }
+
+    &--ongoing, &--active {
+      background-color: var(--ac-green-100);
+      border-color: var(--ac-green-300);
+      color: var(--ac-green-600);
+
+      .by-project__status-pill__dot {
+        color: var(--ac-green-400);
+      }
+    }
+
+    &--completed {
+      background-color: var(--ac-primary-blue-100);
+      border-color: var(--ac-primary-blue-200);
+      color: var(--ac-primary-blue-500);
+
+      .by-project__status-pill__dot {
+        color: var(--ac-primary-blue-400);
+      }
+    }
+
+    &--closed {
+      background-color: var(--ac-grey-200);
+      border-color: var(--ac-grey-400);
+      color: var(--ac-grey-700);
+
+      .by-project__status-pill__dot {
+        color: var(--ac-grey-500);
+      }
+    }
+
+    &--pending {
+      background-color: var(--ac-grey-100);
+      border-color: var(--ac-orange-1);
+      color: var(--ac-grey-800);
+
+      .by-project__status-pill__dot {
+        color: var(--ac-orange-1);
+      }
+    }
   }
 
   // ── Pool-funding badge (icon + text — NFR-UI-002) ───────────────────
@@ -138,7 +143,6 @@
 
     &__icon {
       font-size: 13px;
-      // Pool-funding yes: use the dedicated pool-funding CSS var
       color: var(--ac-pool-funding-fg);
     }
 
@@ -147,7 +151,6 @@
       font-weight: 500;
     }
 
-    // No-variant: override icon + text to neutral grey (muted, not colour-only)
     &--no {
       .by-project__pool-badge__icon {
         color: var(--ac-grey-500);
@@ -157,12 +160,6 @@
         color: var(--ac-grey-600);
       }
     }
-  }
-
-  // ── Status text ──────────────────────────────────────────────────────
-  &__status {
-    font-size: 12px;
-    display: inline-block;
   }
 
   // ── Delegate chips ───────────────────────────────────────────────────
@@ -175,12 +172,33 @@
   &__chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     padding: 4px 8px;
     border-radius: 8px;
     background-color: var(--ac-grey-100);
     border: 1px solid var(--ac-grey-300);
     font-size: 12px;
+
+    // INACTIVE chip — red border (is_active === false)
+    &--inactive {
+      background-color: var(--ac-grey-100);
+      border-color: var(--ac-red-1);
+
+      .by-project__chip__name {
+        color: var(--ac-red-1);
+      }
+
+      .by-project__chip__email {
+        color: var(--ac-red-1);
+        opacity: 0.8;
+      }
+    }
+
+    &__inactive-icon {
+      font-size: 12px;
+      color: var(--ac-red-1);
+      flex-shrink: 0;
+    }
 
     &__info {
       display: flex;
@@ -190,10 +208,12 @@
 
     &__name {
       font-weight: 500;
+      color: var(--ac-primary-blue-600);
     }
 
     &__email {
       font-size: 11px;
+      color: var(--ac-grey-700);
     }
 
     &__remove {
@@ -244,23 +264,50 @@
     }
   }
 
-  // ── Assign button ────────────────────────────────────────────────────
+  // ── Actions cell ─────────────────────────────────────────────────────
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &__history-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--ac-grey-300);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-grey-400);
+    cursor: not-allowed;
+    font-size: 13px;
+    flex-shrink: 0;
+
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+
   &__assign-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 27px;
-    height: 27px;
-    border-radius: 8px;
-    border: none;
-    background-color: var(--ac-grey-200);
-    color: var(--ac-light-blue-400);
+    padding: 4px 12px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--ac-primary-blue-400);
+    background-color: transparent;
+    color: var(--ac-primary-blue-400);
     cursor: pointer;
     font-size: 12px;
-    transition: background-color 0.15s ease;
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
 
     &:hover {
-      background-color: var(--ac-grey-300);
+      background-color: var(--ac-primary-blue-400);
+      color: var(--ac-white-1);
     }
 
     &:focus-visible {

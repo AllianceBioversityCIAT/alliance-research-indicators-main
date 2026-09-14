@@ -7,64 +7,6 @@
   flex-direction: column;
   gap: 12px;
 
-  // ── Toolbar (search row) ────────────────────────────────────────────
-  &__toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 16px;
-    background-color: var(--ac-white-1);
-    border: 1px solid var(--ac-grey-200);
-    border-bottom: none;
-  }
-
-  &__search-wrapper {
-    position: relative;
-    flex: 1;
-    max-width: 28rem;
-  }
-
-  &__search-icon {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    padding-left: 10px;
-    pointer-events: none;
-    color: var(--ac-grey-600);
-    font-size: 12px;
-  }
-
-  &__search-input {
-    width: 100%;
-    padding-left: 2rem !important;
-    border-radius: 8px !important;
-    max-height: 27px !important;
-    font-size: 12px !important;
-    border-color: var(--ac-grey-400) !important;
-    color: var(--ac-grey-800) !important;
-  }
-
-  &__clear-btn {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    transition: color 0.15s ease;
-
-    &:hover {
-      color: var(--ac-primary-blue-600);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--ac-light-blue-400);
-      outline-offset: 2px;
-    }
-  }
-
   // ── Table wrapper ────────────────────────────────────────────────────
   &__table-wrapper {
     border: 1px solid var(--ac-grey-200);
@@ -106,6 +48,12 @@
     display: flex;
     flex-direction: column;
     line-height: 1.35;
+
+    &__inactive-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
 
     &__name {
       font-weight: 600;

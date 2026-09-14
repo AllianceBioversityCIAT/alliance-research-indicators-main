@@ -1,43 +1,11 @@
 <!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-06) -->
 <!-- R-UI-003: By-person table (person name+email → project chips). -->
-<!-- R-UI-003 AC.2: ONLY managed projects surface (guaranteed by byProjectCache inversion). -->
 <!-- R-UI-008: Per-project "X" revokes that pair only. -->
-<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
-<!-- NFR-UI-002: Non-colour cues (icon+text) for empty overall state. -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text). -->
 <!-- NFR-UI-003: Loading / error / empty states. -->
 
 <div class="by-person">
-
-  <!-- ── Search bar ─────────────────────────────────────────────────── -->
-  <div class="by-person__toolbar">
-    <div class="by-person__search-wrapper">
-      <span class="by-person__search-icon">
-        <i class="pi pi-search" aria-hidden="true"></i>
-      </span>
-      <input
-        pInputText
-        type="text"
-        id="by-person-search"
-        [ngModel]="searchQuery()"
-        (ngModelChange)="searchQuery.set($event)"
-        placeholder="Search by person (name / email) or project (code / name)"
-        aria-label="Search by person or project"
-        class="by-person__search-input"
-      />
-    </div>
-
-    @if (hasSearch()) {
-      <button
-        type="button"
-        class="by-person__clear-btn atc-grey-700"
-        (click)="clearSearch()"
-        (keydown.enter)="clearSearch()"
-        aria-label="Clear search"
-      >
-        Clear
-      </button>
-    }
-  </div>
 
   <!-- ── Table ──────────────────────────────────────────────────────── -->
   <div class="by-person__table-wrapper">
@@ -61,10 +29,13 @@
       <ng-template pTemplate="body" let-row>
         <tr class="by-person__row">
 
-          <!-- Person cell: name + email -->
+          <!-- Person cell: name + email, inactive styling if is_active === false -->
           <td class="by-person__td by-person__td--person">
-            <div class="by-person__person">
-              <span class="by-person__person__name atc-primary-blue-600">{{ row.name }}</span>
+            <div class="by-person__person" [class.by-person__person--inactive]="row.is_active === false">
+              @if (row.is_active === false) {
+                <i class="pi pi-exclamation-circle by-person__person__inactive-icon atc-red-1" aria-hidden="true" aria-label="Inactive delegate"></i>
+              }
+              <span class="by-person__person__name" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ row.name }}</span>
               <span class="by-person__person__email atc-grey-700">{{ row.email }}</span>
             </div>
           </td>
@@ -123,18 +94,14 @@
         </tr>
       </ng-template>
 
-      <!-- Empty state: no people (non-colour cue — NFR-UI-002/003) -->
+      <!-- Empty state -->
       <ng-template pTemplate="emptymessage">
         <tr>
           <td colspan="3" class="by-person__empty" role="status">
             <div class="by-person__empty-inner">
               <i class="pi pi-users by-person__empty__icon atc-grey-500" aria-hidden="true"></i>
               <p class="by-person__empty__text atc-grey-700">
-                @if (hasSearch()) {
-                  No people match your search.
-                } @else {
-                  No PI delegates found.
-                }
+                No PI delegates found.
               </p>
             </div>
           </td>
