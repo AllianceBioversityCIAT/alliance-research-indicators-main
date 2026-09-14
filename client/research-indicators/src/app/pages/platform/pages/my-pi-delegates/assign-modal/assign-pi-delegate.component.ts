@@ -101,6 +101,16 @@ export class AssignPiDelegateComponent implements OnInit {
     () => this.allModalsService.assignPiDelegateContext()?.source === 'byProject'
   );
 
+  // ─── People picker disabled (CHANGE 3) ───────────────────────────────────────
+  /**
+   * Mirror of projectsDisabled: when the modal is opened from a person row,
+   * the person is pre-fixed and cannot be changed — only the Projects picker
+   * remains interactive.
+   */
+  readonly peopleDisabled = computed(
+    () => this.allModalsService.assignPiDelegateContext()?.source === 'byPerson'
+  );
+
   // ─── Inactive delegate warning (CHANGE 2) ────────────────────────────────────
   /**
    * Pre-loaded delegates that have is_active === false.

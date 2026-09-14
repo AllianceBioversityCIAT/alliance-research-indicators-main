@@ -32,10 +32,15 @@
           <!-- Person cell: name + email, inactive styling if is_active === false -->
           <td class="by-person__td by-person__td--person">
             <div class="by-person__person" [class.by-person__person--inactive]="row.is_active === false">
-              @if (row.is_active === false) {
-                <i class="pi pi-exclamation-circle by-person__person__inactive-icon atc-red-1" aria-hidden="true" aria-label="Inactive delegate"></i>
-              }
-              <span class="by-person__person__name" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ row.name }}</span>
+              <div class="by-person__person__name-row">
+                @if (row.is_active === false) {
+                  <i class="pi pi-exclamation-circle by-person__person__inactive-icon atc-red-1" aria-hidden="true"></i>
+                }
+                <span class="by-person__person__name" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ row.name }}</span>
+                @if (row.is_active === false) {
+                  <span class="by-person__person__inactive-badge atc-red-1" aria-label="Inactive delegate">INACTIVE</span>
+                }
+              </div>
               <span class="by-person__person__email atc-grey-700">{{ row.email }}</span>
             </div>
           </td>
@@ -50,11 +55,15 @@
               @for (project of row.projects; track project.project_code) {
                 <span
                   class="by-person__chip"
+                  [class.by-person__chip--inactive]="row.is_active === false"
                   role="listitem"
                   [attr.aria-label]="project.project_code + (project.project_name ? ' — ' + project.project_name : '')"
                 >
+                  @if (row.is_active === false) {
+                    <i class="pi pi-exclamation-circle by-person__chip__inactive-icon atc-red-1" aria-hidden="true"></i>
+                  }
                   <span class="by-person__chip__info">
-                    <span class="by-person__chip__code atc-primary-blue-600">{{ project.project_code }}</span>
+                    <span class="by-person__chip__code" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ project.project_code }}</span>
                     @if (project.project_name) {
                       <span class="by-person__chip__name atc-grey-700">{{ project.project_name }}</span>
                     }

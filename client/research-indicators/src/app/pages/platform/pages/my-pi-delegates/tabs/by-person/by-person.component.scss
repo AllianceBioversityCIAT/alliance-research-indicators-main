@@ -25,6 +25,12 @@
     transition: background-color 0.15s ease;
   }
 
+  // Inactive row: subtle red tint via the existing red token at 6% opacity
+  &__row--inactive-row,
+  &__row:has(.by-person__person--inactive) {
+    background-color: color-mix(in srgb, var(--ac-red-1) 6%, transparent);
+  }
+
   &__td {
     vertical-align: middle;
     padding: 8px 12px;
@@ -49,15 +55,35 @@
     flex-direction: column;
     line-height: 1.35;
 
+    &__name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
     &__inactive-icon {
       font-size: 12px;
       flex-shrink: 0;
-      margin-bottom: 2px;
     }
 
     &__name {
       font-weight: 600;
       font-size: 13px;
+    }
+
+    &__inactive-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid var(--ac-red-1);
+      border-radius: 4px;
+      padding: 1px 5px;
+      line-height: 1.4;
+      flex-shrink: 0;
     }
 
     &__email {
@@ -81,6 +107,17 @@
     background-color: var(--ac-grey-100);
     border: 1px solid var(--ac-grey-300);
     font-size: 12px;
+
+    // Inactive person: red border + light red tint background
+    &--inactive {
+      border-color: var(--ac-red-1);
+      background-color: color-mix(in srgb, var(--ac-red-1) 6%, var(--ac-grey-100));
+    }
+
+    &__inactive-icon {
+      font-size: 11px;
+      flex-shrink: 0;
+    }
 
     &__info {
       display: flex;

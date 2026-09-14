@@ -7,12 +7,14 @@
 <!-- NFR-UI-001: STAR tokens only — no hex literals. -->
 <!-- CHANGE 1: Projects picker disabled when source=byProject (project is pre-fixed). -->
 <!-- CHANGE 2: Inactive-delegate amber warning when pre-loaded chips are inactive. -->
+<!-- CHANGE 3: People picker disabled when source=byPerson (person is pre-fixed). -->
 
 <div class="assign-pi-delegate">
 
   <!-- ── People picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
   <!-- optionFilter excludes the current user (R-UI-005 AC.3). -->
+  <!-- CHANGE 3: disabled when source=byPerson — only the projects can be changed. -->
   <div class="assign-pi-delegate__field">
     <app-multiselect
       [signal]="peopleSignal"
@@ -25,11 +27,20 @@
       placeholder="Select people to assign as delegates"
       [optionFilter]="selfExclusionFilter()"
       [isRequired]="true"
+      [disabled]="peopleDisabled()"
     ></app-multiselect>
-    <p class="assign-pi-delegate__hint atc-grey-600">
-      Select the people who will act as PI Delegates.
-      You cannot assign yourself.
-    </p>
+    <!-- CHANGE 3: helper text when person is fixed -->
+    @if (peopleDisabled()) {
+      <p class="assign-pi-delegate__hint assign-pi-delegate__hint--locked atc-grey-600">
+        <i class="pi pi-lock" aria-hidden="true"></i>
+        Opened from this person — only the projects can be changed here.
+      </p>
+    } @else {
+      <p class="assign-pi-delegate__hint atc-grey-600">
+        Select the people who will act as PI Delegates.
+        You cannot assign yourself.
+      </p>
+    }
   </div>
 
   <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->

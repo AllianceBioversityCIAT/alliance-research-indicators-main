@@ -4,13 +4,14 @@
 //
 // Proofs required:
 //   1. R-UI-002 AC.1  — opens with By-project tab active by DEFAULT.
-//   2. Info banner renders.
-//   3. Footer summary computes people/assignments/projects/inactive from byProjectCache
+//   2. Title "My PI Delegates" + description text renders; info banner is ABSENT.
+//   3. 3 stat counters render service values (wrong wiring → wrong value → test fails).
+//   4. Footer summary computes people/assignments/projects/inactive from byProjectCache
 //      (wrong counts fail — discriminating).
-//   4. Status dropdown options derived from distinct statuses in byProjectCache.
-//   5. searchQuery and statusFilter signals are passed as inputs to by-project.
-//   6. NFR-UI-003     — loading / error states (K-015 transitions).
-//   7. Tab signal     — activeTabIndex changes on tab switch.
+//   5. Status dropdown options derived from distinct statuses in byProjectCache.
+//   6. searchQuery and statusFilter signals are passed as inputs to by-project.
+//   7. NFR-UI-003     — loading / error states (K-015 transitions).
+//   8. Tab signal     — activeTabIndex changes on tab switch.
 //
 // KZ-015: every state transition arranged from the initial state.
 
@@ -51,13 +52,26 @@ function createMockService() {
   const loadByProject = jest.fn<Promise<void>, [string[]]>().mockResolvedValue(undefined);
   const loadByUser = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
 
+  const totalProjects = computed(() => byProjectCache().length);
+  const totalDistinctDelegates = computed(() => {
+    const ids = new Set<number>();
+    for (const p of byProjectCache()) {
+      for (const d of p.delegates) ids.add(d.delegate_user_id);
+    }
+    return ids.size;
+  });
+  const projectsWithoutDelegate = computed(() => byProjectCache().filter(p => p.delegates.length === 0));
+
   return {
     byProjectCache,
     byPersonCache: signal([]),
     loading,
     error,
     loadByProject,
-    loadByUser
+    loadByUser,
+    totalProjects,
+    totalDistinctDelegates,
+    projectsWithoutDelegate
   };
 }
 
@@ -123,16 +137,90 @@ describe('MyPiDelegatesComponent', () => {
     expect(mockService.loadByUser).toHaveBeenCalledWith(99);
   });
 
-  // ── 2. Info banner ──────────────────────────────────────────────────────────
+  // ── 2. Title + description + stats counters; info banner ABSENT ────────────
 
-  it('renders the info banner with info-circle icon', () => {
+  it('renders the page title "My PI Delegates"', () => {
+    fixture.detectChanges();
+    const title = fixture.nativeElement.querySelector('.pi-delegates-title');
+    expect(title).not.toBeNull();
+    expect((title as HTMLElement).textContent?.trim()).toBe('My PI Delegates');
+  });
+
+  it('renders the description text mentioning "Principal Investigator"', () => {
+    fixture.detectChanges();
+    const desc = fixture.nativeElement.querySelector('.pi-delegates-description');
+    expect(desc).not.toBeNull();
+    expect((desc as HTMLElement).textContent).toContain('Principal Investigator');
+  });
+
+  it('info banner is ABSENT (the description block supersedes it)', () => {
     fixture.detectChanges();
     const banner = fixture.nativeElement.querySelector('.pi-delegates-banner');
-    expect(banner).not.toBeNull();
-    const icon = fixture.nativeElement.querySelector('.pi-delegates-banner .pi-info-circle');
-    expect(icon).not.toBeNull();
-    const text = (banner as HTMLElement).textContent ?? '';
-    expect(text).toContain('PI Delegate');
+    expect(banner).toBeNull();
+  });
+
+  it('stat counter — PROJECTS AS PI shows service.totalProjects() value (discriminating)', () => {
+    // Arrange: 2 projects → totalProjects = 2.
+    mockService.byProjectCache.set([
+      makeProject({ project_code: 'P001', delegates: [] }),
+      makeProject({ project_code: 'P002', delegates: [] })
+    ]);
+    fixture.detectChanges();
+
+    const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+    expect(counters.length).toBe(3);
+
+    // First counter: totalProjects
+    const firstValue = (counters[0] as HTMLElement).querySelector('.pi-delegates-stats__counter-value');
+    expect((firstValue as HTMLElement | null)?.textContent?.trim()).toBe('2');
+    const firstLabel = (counters[0] as HTMLElement).querySelector('.pi-delegates-stats__counter-label');
+    expect((firstLabel as HTMLElement | null)?.textContent).toContain('PROJECTS AS PI');
+  });
+
+  it('stat counter — PI DELEGATES shows service.totalDistinctDelegates() value (discriminating)', () => {
+    // Arrange: 2 distinct delegates across 2 projects → totalDistinctDelegates = 2.
+    mockService.byProjectCache.set([
+      makeProject({
+        project_code: 'P001',
+        delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@c.com', is_active: true }]
+      }),
+      makeProject({
+        project_code: 'P002',
+        delegates: [{ delegate_user_id: 2, name: 'Bob', email: 'b@c.com', is_active: true }]
+      })
+    ]);
+    fixture.detectChanges();
+
+    const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+    const secondValue = (counters[1] as HTMLElement).querySelector('.pi-delegates-stats__counter-value');
+    expect((secondValue as HTMLElement | null)?.textContent?.trim()).toBe('2');
+    const secondLabel = (counters[1] as HTMLElement).querySelector('.pi-delegates-stats__counter-label');
+    expect((secondLabel as HTMLElement | null)?.textContent).toContain('PI DELEGATES');
+  });
+
+  it('stat counter — PROJECTS WITHOUT PI DELEGATE shows service.projectsWithoutDelegate().length (discriminating)', () => {
+    // Arrange: 1 project with no delegates → count = 1 (if wrong wiring → 0 or different value).
+    mockService.byProjectCache.set([
+      makeProject({ project_code: 'P001', delegates: [] }),
+      makeProject({ project_code: 'P002', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@c.com', is_active: true }] })
+    ]);
+    fixture.detectChanges();
+
+    const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+    const thirdValue = (counters[2] as HTMLElement).querySelector('.pi-delegates-stats__counter-value');
+    expect((thirdValue as HTMLElement | null)?.textContent?.trim()).toBe('1');
+    const thirdLabel = (counters[2] as HTMLElement).querySelector('.pi-delegates-stats__counter-label');
+    expect((thirdLabel as HTMLElement | null)?.textContent).toContain('PROJECTS WITHOUT PI DELEGATE');
+  });
+
+  it('stat counter — PROJECTS WITHOUT PI DELEGATE value uses the amber (orange-1) token class', () => {
+    fixture.detectChanges();
+    const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+    const thirdValue = (counters[2] as HTMLElement).querySelector('.pi-delegates-stats__counter-value');
+    // The amber class must be present; the other counters must NOT have it.
+    expect((thirdValue as HTMLElement | null)?.classList.contains('atc-orange-1')).toBe(true);
+    const firstValue = (counters[0] as HTMLElement).querySelector('.pi-delegates-stats__counter-value');
+    expect((firstValue as HTMLElement | null)?.classList.contains('atc-orange-1')).toBe(false);
   });
 
   // ── 3. Footer summary ───────────────────────────────────────────────────────
@@ -328,7 +416,10 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
       loading: signal(false),
       error: signal<string | null>(null),
       loadByProject: jest.fn<Promise<void>, [string[]]>().mockResolvedValue(undefined),
-      loadByUser: jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined)
+      loadByUser: jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined),
+      totalProjects: computed(() => byProjectCache().length),
+      totalDistinctDelegates: computed(() => 0),
+      projectsWithoutDelegate: computed(() => byProjectCache().filter(p => p.delegates.length === 0))
     };
     const noUserCache = { dataCache: signal({ user: undefined }) };
 

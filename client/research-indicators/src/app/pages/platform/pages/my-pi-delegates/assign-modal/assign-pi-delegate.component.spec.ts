@@ -530,6 +530,88 @@ describe('AssignPiDelegateComponent', () => {
     }));
   });
 
+  // ─── CHANGE 3: People picker disabled when source=byPerson ──────────────────
+
+  describe('People picker disabled (CHANGE 3)', () => {
+    it('peopleDisabled() is false when modal starts closed (initial state — no context)', () => {
+      expect(component.peopleDisabled()).toBe(false);
+    });
+
+    it('peopleDisabled() is true when context source is byPerson (KZ-015: closed→open)', fakeAsync(() => {
+      // Start closed
+      expect(component.peopleDisabled()).toBe(false);
+
+      // Transition: set byPerson context and open
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // KZ-014: must be true after the open transition
+      expect(component.peopleDisabled()).toBe(true);
+    }));
+
+    it('peopleDisabled() is false when context source is byProject (negative discriminator)', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // KZ-014: must be false — projects source does NOT disable the people picker
+      expect(component.peopleDisabled()).toBe(false);
+    }));
+
+    it('renders the people-locked helper text when peopleDisabled() is true (KZ-015)', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // KZ-014: the locked helper must exist and contain the spec copy
+      expect(el.textContent).toContain('Opened from this person');
+      expect(el.textContent).toContain('only the projects can be changed here');
+    }));
+
+    it('does NOT render the people-locked helper text when source is byProject (negative discriminator)', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      // KZ-014: people-locked helper must NOT appear for byProject source
+      expect(el.textContent).not.toContain('Opened from this person');
+    }));
+
+    it('Projects picker stays EDITABLE (projectsDisabled=false) when source is byPerson', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // KZ-014: projectsDisabled must be false when byPerson (it should only be true for byProject)
+      expect(component.projectsDisabled()).toBe(false);
+    }));
+  });
+
   // ─── CHANGE 1: Projects picker disabled when source=byProject ────────────────
 
   describe('Projects picker disabled (CHANGE 1)', () => {

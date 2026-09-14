@@ -6,20 +6,37 @@
 
 <div class="pi-delegates-page">
 
-  <!-- ── Page header ─────────────────────────────────────────────────── -->
+  <!-- ── Page header block ───────────────────────────────────────────── -->
   <header class="pi-delegates-header">
-    <h1 class="pi-delegates-title atc-primary-blue-600">My PI Delegates</h1>
-  </header>
+    <!-- Breadcrumb -->
+    <nav class="pi-delegates-breadcrumb" aria-label="Breadcrumb">
+      <span class="pi-delegates-breadcrumb__segment atc-grey-600">Principal Investigator</span>
+      <span class="pi-delegates-breadcrumb__separator atc-grey-400" aria-hidden="true"> › </span>
+      <span class="pi-delegates-breadcrumb__current atc-light-blue-400">My PI Delegates</span>
+    </nav>
 
-  <!-- ── Info banner ─────────────────────────────────────────────────── -->
-  <div class="pi-delegates-banner" role="note" aria-label="PI Delegate information">
-    <i class="pi pi-info-circle pi-delegates-banner__icon" aria-hidden="true"></i>
-    <p class="pi-delegates-banner__text">
-      PI Delegate lets someone approve, reject or request changes to the results of a project on your behalf.
-      It applies only to the projects you select here, and you can revoke it at any time.
-      Roles coming from Agresso are not affected.
+    <h1 class="pi-delegates-title atc-primary-blue-600">My PI Delegates</h1>
+    <p class="pi-delegates-description atc-grey-600">
+      The people you delegate to review results on your behalf. Assign the PI Delegate role across
+      the projects where you are the Principal Investigator — one by one or several at a time.
     </p>
-  </div>
+
+    <!-- Stat counters -->
+    <div class="pi-delegates-stats" role="list" aria-label="PI Delegates summary statistics">
+      <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalProjects() }}</span>
+        <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS AS PI</span>
+      </div>
+      <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalDistinctDelegates() }}</span>
+        <span class="pi-delegates-stats__counter-label atc-grey-600">PI DELEGATES</span>
+      </div>
+      <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-value atc-orange-1">{{ service.projectsWithoutDelegate().length }}</span>
+        <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS WITHOUT PI DELEGATE</span>
+      </div>
+    </div>
+  </header>
 
   <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────── -->
   @if (loading()) {

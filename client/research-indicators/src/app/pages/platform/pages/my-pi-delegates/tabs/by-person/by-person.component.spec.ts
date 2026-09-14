@@ -6,7 +6,8 @@
 //   3. Row X → confirm → revokePair (R-UI-008)
 //   4. Search via searchQuery input
 //   5. Assign output
-//   6. Inactive person → inactive icon renders; active → no icon (K-015 transition)
+//   6. Inactive person → red name + "INACTIVE" badge + red chip markers; active → none (discriminator)
+//      KZ-015 transition: active→inactive when byPersonCache changes.
 //
 // K-020: --coverage=false for single-file runs.
 
@@ -159,14 +160,14 @@ describe('ByPersonComponent', () => {
     });
   });
 
-  // ── 2. Inactive person indicator ─────────────────────────────────────
+  // ── 2. Inactive person indicator (red name + badge + red chips) ─────────────
 
   describe('inactive person rendering (is_active === false)', () => {
-    it('INACTIVE person renders the inactive icon (K-015 transition)', async () => {
-      // Arrange: start with active person
+    it('INACTIVE: renders inactive icon in the name row (K-015 transition: active→inactive)', async () => {
+      // Arrange: start with active person (no icon)
       await createComponent([ALICE]);
       const iconBefore = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
-      expect(iconBefore).toBeNull(); // no icon for active person
+      expect(iconBefore).toBeNull(); // no icon for active person (negative discriminator)
 
       // Act: switch to inactive person (K-015 transition)
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
@@ -174,15 +175,77 @@ describe('ByPersonComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Assert: inactive icon now present
+      // Assert: inactive icon now present in the name row
       const icon = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
       expect(icon).toBeTruthy();
     });
 
-    it('ACTIVE person does NOT render the inactive icon', async () => {
+    it('INACTIVE: renders "INACTIVE" badge next to the name (K-015 transition)', async () => {
+      // Arrange: start without badge
+      await createComponent([ALICE]);
+      const badgeBefore = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
+      expect(badgeBefore).toBeNull(); // active person — no badge (negative discriminator)
+
+      // Act: switch to inactive
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Assert: badge present and says INACTIVE
+      const badge = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
+      expect(badge).toBeTruthy();
+      expect((badge.nativeElement as HTMLElement).textContent?.trim().toUpperCase()).toContain('INACTIVE');
+    });
+
+    it('INACTIVE: name has atc-red-1 class (K-015 transition)', async () => {
+      await createComponent([ALICE]);
+      const nameBefore = fixture.debugElement.query(By.css('.by-person__person__name'));
+      expect((nameBefore.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(false);
+
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const name = fixture.debugElement.query(By.css('.by-person__person__name'));
+      expect((name.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(true);
+    });
+
+    it('INACTIVE: project chips have by-person__chip--inactive class (K-015 transition)', async () => {
+      await createComponent([ALICE]);
+      const chipsBefore = fixture.debugElement.queryAll(By.css('.by-person__chip--inactive'));
+      expect(chipsBefore.length).toBe(0); // active person — no red chips (negative discriminator)
+
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const chips = fixture.debugElement.queryAll(By.css('.by-person__chip--inactive'));
+      expect(chips.length).toBeGreaterThan(0);
+    });
+
+    it('INACTIVE: chip has pi-exclamation-circle icon (K-015 transition)', async () => {
+      await createComponent([ALICE]);
+      const iconBefore = fixture.debugElement.query(By.css('.by-person__chip__inactive-icon'));
+      expect(iconBefore).toBeNull(); // active person — no exclamation icon in chip
+
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const icon = fixture.debugElement.query(By.css('.by-person__chip__inactive-icon'));
+      expect(icon).toBeTruthy();
+    });
+
+    it('ACTIVE person does NOT render the inactive icon or badge (negative discriminator)', async () => {
       await createComponent([ALICE]);
       const icon = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
+      const badge = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
       expect(icon).toBeNull();
+      expect(badge).toBeNull();
     });
   });
 
