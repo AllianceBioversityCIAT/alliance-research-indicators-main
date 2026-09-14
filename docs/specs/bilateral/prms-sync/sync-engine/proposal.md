@@ -1,5 +1,10 @@
 # Proposal — PRMS Sync Engine (server)
 
+> **Revision 3 — 2026-09-14 (same day).** Product decisions **D-1…D-7** applied to all seven
+> gaps the homologation surfaced; see [`homologation.md`](./homologation.md) §1.1. Net effect:
+> **Knowledge Product leaves scope**, no pre-flight validation is built, centres resolve from the
+> primary contract (`ExCIAT` → `46`, `ExBIO` → `49`), and Innovation Use + one policy subtype are **knowingly unsyncable in v1**.
+>
 > **Revision 2 — 2026-09-14.** Rewritten against the **2026-09** PRMS Normalizer contract.
 > The family's hold (OQ-F1, "the service is becoming a hook") is **resolved**: ingest is still
 > `POST /ingest` with an `x-api-key`; the hooks are *outbound decision webhooks*. Revision 1
@@ -16,7 +21,8 @@
 | Date | 2026-08-21 · **revised 2026-09-14** |
 | Requirement source | Jira AC-1676 + **PRMS Normalizer – Technical Field Documentation (2026-09)** + 7 payload examples + user mockups (My Projects "Contributing to Pool Funding" column; sidebar "Pool funding alignment" + PRMS SYNC) |
 | Slug | `sync-engine` — derived from free-text argument, not a path literal |
-| Companion | [`homologation.md`](./homologation.md) — the field-by-field PRMS ⟷ STAR reconciliation |
+| Companion | [`homologation.md`](./homologation.md) — the field-by-field PRMS ⟷ STAR reconciliation + the D-1…D-7 decision log |
+| Supported types | **4 of 7** — `capacity_sharing`, `innovation_development`, `policy_change`, `innovation_use`. KP out (D-4), OICR out (OQ-F2). |
 
 ## 2. Intent
 
@@ -44,14 +50,17 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
 
 1. **New tool module** `domain/tools/prms-normalizer/` (TRD §9.1): one Nest service, transport
    encapsulated, host + API key via `ARI_*` env vars, `BaseApi` reuse where it fits.
-2. **Payload builders per PRMS type** — `capacity_sharing`, `knowledge_product`,
-   `policy_change`, `innovation_development`, `innovation_use` — implementing
-   [`homologation.md`](./homologation.md) verbatim, including the 2026-08/09 breaking rules:
-   mandatory `lead_contact_person`; `measures` always required for Innovation Use; exactly one
-   of `usd_budget` / `is_determined` per bilateral project; `http(s)`-only evidence links with
-   file-storage hosts rejected; `women_youth ≤ women`.
-3. **Pre-flight validation** — the payload is validated on our side for every rule PRMS
-   enforces, so a contributor sees a STAR-side message instead of an opaque PRMS row failure.
+2. **Payload builders for the four supported types** — `capacity_sharing`,
+   `innovation_development`, `policy_change`, `innovation_use` — implementing
+   [`homologation.md`](./homologation.md) verbatim, including the 2026-08/09 breaking rules that
+   STAR *can* satisfy: mandatory `lead_contact_person` (always present, D-3); `measures` always
+   required for Innovation Use; `women_youth ≤ women`; centres from
+   `agresso_contract.ubwClientDescription` — `ExCIAT` → **`46`**, `ExBIO` → **`49`** (D-7).
+3. **An eligibility gate, in place of pre-flight validation.** D-5 removes link validation and
+   D-6 removes length guards, so nothing is validated on our side *except* what STAR structurally
+   cannot satisfy. The endpoint refuses, with a stated reason: `indicator_id = 3` (KP, D-4),
+   `indicator_id = 5` (OICR), and — pending **OQ-H1'/OQ-H2'** — Innovation Use (D-1) and PRMS
+   policy type `1` (D-2). A refusal is a clear STAR message; it is **not** an attempted sync.
 4. **Sync endpoint** guarded by: result Approved, alignment complete, primary contract is a
    pool-funding contributor, `@Roles`, and idempotency (already-synced → 409).
 5. **State persistence** — append-only `result_prms_sync_log` (attempt, environment, request
@@ -65,8 +74,8 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
 
 ## 5. Scope
 
-Server package only: integration tool + payload builders + pre-flight validation + endpoint +
-sync log (append-only migration) + `.env.example` entries + unit/e2e tests.
+Server package only: integration tool + payload builders (4 types) + eligibility gate + endpoint
++ sync log (append-only migration) + `.env.example` entries + unit/e2e tests.
 
 **T-SPIKE (first task, gates the rest):** one real payload per supported type against the
 **TEST** `/ingest`, capturing the verbatim response. It is the only thing that can close
@@ -77,11 +86,15 @@ the STAR API key for TEST.
 ## 6. Non-Goals
 
 - No client changes (child 2), no re-sync UI (child 3), no PI panel (child 4).
-- **No `usd_budget` capture UI** — G-1 needs client work and is proposed as a **new family
-  member** (§12), not a line item here.
+- **No `usd_budget` / `is_determined` capture** (D-1) — and therefore **no working Innovation
+  Use sync**. See §12.
+- **No `status_amount` / `amount` capture** (D-2) — PRMS policy type `1` stays unsyncable.
+- **No Knowledge Product sync** (D-4) — STAR cannot author KPs.
+- **No pre-flight validation of evidence links or title/description length** (D-5, D-6).
 - No decision-webhook registration or callback endpoint (natural fifth family member).
 - No `op: delete` / un-sync; no Bulk Ingest (single-result normal ingest only).
 - No OICR (excluded, OQ-F2); no `other_output` / `other_outcome` (STAR has no such indicator).
+- No Bulk Ingest, no `op: delete` / un-sync, no decision-webhook registration.
 
 ## 7. Affected Users, Systems, And Specs
 
@@ -90,7 +103,7 @@ the STAR API key for TEST.
 | PRMS Normalizer (TEST/PROD) | New outbound consumer; STAR needs its own API key per environment |
 | `Result` entity | First writers for `is_synced_to_prms`, `prms_result_code` |
 | `bilateral.service.ts` 409 gate | Becomes reachable end-to-end (dormant until now) |
-| `result_contracts` | Candidate for the G-1 investment columns (separate spec) |
+| `agresso_contract.ubwClientDescription` | New read: resolves `lead_center` / `contributing_center` (D-7) |
 | `result_policy_change` | Candidate for the G-2 amount columns (decision pending) |
 | MySQL | New `result_prms_sync_log` table (append-only migration) |
 | `domain/tools/open-search/prms/homologation/*` | Reused **by inversion** for session length, delivery modality, policy type/stage |
@@ -105,9 +118,10 @@ the STAR API key for TEST.
 ## 9. Requirement Delta Preview
 
 ### ADDED
-- Outbound PRMS Normalizer integration with five per-type payload builders honouring the
+- Outbound PRMS Normalizer integration with **four** per-type payload builders honouring the
   2026-08/09 contract.
-- STAR-side pre-flight validation mirroring every PRMS conditional rule.
+- An eligibility gate that refuses, with a stated reason, what STAR structurally cannot sync
+  (KP, OICR, and — pending OQ-H1'/OQ-H2' — Innovation Use and PRMS policy type `1`).
 - Sync trigger endpoint with status + alignment + pool-funding-contributor + role + idempotency governance.
 - Append-only sync attempt log; per-row outcome interpretation; `is_synced_to_prms` written only on true acceptance.
 - Per-environment host + API key configuration.
@@ -122,7 +136,7 @@ the STAR API key for TEST.
 
 | Option | Description | Trade-off |
 |---|---|---|
-| **A (recommended)** | Synchronous on the endpoint: pre-flight → build → POST → interpret rows → record → flip flag. Failures recorded as `FAILED`; retry is manual (children 2–3). | Simplest honest v1; user waits one round-trip; the outcome is visible at the click. |
+| **A (recommended)** | Synchronous on the endpoint: eligibility gate → build → POST → interpret rows → record → flip flag. Failures recorded as `FAILED`; retry is manual (children 2–3). | Simplest honest v1; user waits one round-trip; the outcome is visible at the click. |
 | B | Queue-backed (RabbitMQ) async sync with automatic retries. | More resilient, but hides the outcome from the click and stacks a second async hop on a downstream that is already async. Premature. |
 | C | Cron-driven batch sync of all eligible results. | Contradicts the requirement — the sync is explicitly user-triggered. |
 
@@ -143,35 +157,45 @@ Inherits R-F1–R-F3 from [`../family.md`](../family.md). Child-specific:
 | **OQ-H1–H9** | The nine open questions raised by the homologation (§11 there). H1/H2/H3/H4 need product answers; H5/H6/H9 need the spike. |
 | **R-F5** | The contract documentation still lives in `~/Downloads`, outside the repo. Copy the `.md` + 7 JSON examples into `docs/technical-docs/prms-normalizer/` during `/akili-specify` so the spec cites a versioned source, not a local path. |
 
-## 12. Recommended Family Amendment (HITL — requires a manifest edit)
+## 12. Family amendment — **withdrawn**, replaced by one decision
 
-The homologation surfaced **G-1** (`usd_budget` / `is_determined`), which is *breaking since
-2026-09*, blocks Innovation Use entirely, and needs **a new column and a new UI**. That is
-client + server work with its own acceptance criteria — it does not belong inside a
-server-only child, and hiding it there would make `sync-engine` undeliverable for one of its
-five types.
+Revision 2 proposed a fifth child (`bilateral-project-investment`) to capture the per-contract
+USD contribution. **D-1 withdraws it:** those fields are not being built this cycle, so there is
+nothing for that child to deliver. No manifest edit is requested, and no folder was created.
 
-**Proposed new row #5:** `prms-sync/bilateral-project-investment` — capture per-result,
-per-contract USD contribution (or "to be determined") for Innovation Use results.
-`Depends on: none` · `Parallel-safe: no` (client). It can proceed **in parallel with**
-`sync-engine`; `sync-engine` consumes it only for the `innovation_use` builder.
+What replaces it is a single decision the product owner still owes — **OQ-H1'**:
 
-Per the family's closed-set rule (§4 of `family.md`), **this row does not exist until a human
-approves the manifest edit.** No folder has been created.
+| Option | What v1 does with Innovation Use | Cost |
+|---|---|---|
+| **(a) Gate it out** — *recommended* | Button disabled for `indicator_id = 6` with a stated reason. | Honest and cheap. The type returns the moment D-1 is revisited. |
+| **(b) Let it fail** | Sync is attempted and PRMS rejects every payload. | A button that reliably errors. Not recommended. |
+| **(c) Revisit D-1 partially** | Add **only** `is_determined` — a per-project boolean meaning *"amount not yet determined"*, **no monetary figure**. PRMS accepts `is_determined: true` alone. | Materially smaller than capturing USD amounts, and it makes the type fully syncable. Worth a look before settling for (a). |
+
+The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the clear answer.
+
+---
 
 ## 13. Success Criteria
 
 - One real result **per supported type** accepted by the TEST Normalizer, evidenced by the
   **verbatim** response body including `requestId` — and the spike records where (or whether)
   the PRMS result code appears (OQ-F7).
-- A payload whose evidence link violates the 2026-08 rules is **caught by STAR pre-flight**,
-  proven by a red run before the guard exists (K-004).
+- A result whose evidence link violates the 2026-08 PRMS rules produces a **failed row inside a
+  207**, and STAR leaves `is_synced_to_prms = false` — proven against the real TEST endpoint with
+  a deliberately bad link, **never a mocked 207**. With D-5 removing pre-flight, this is the only
+  safeguard left and it must be shown working, not assumed (K-004, KZ-001).
 - A 207 carrying a failed row leaves `is_synced_to_prms = false` and writes a `FAILED` log row —
   proven with a deliberately malformed row, not a mocked 207.
 - Acceptance flips `is_synced_to_prms` and the alignment PATCH then 409s (existing gate test
   extended end-to-end).
-- Guards proven with allowed **and** denied cases: role, status ≠ 6, incomplete alignment,
-  non-pool-funding contract, already synced, `indicator_id = 5` (OICR).
+- Eligibility gate proven with allowed **and** denied cases: role, status ≠ 6, incomplete
+  alignment, non-pool-funding contract, already synced, `indicator_id = 3` (KP), `indicator_id
+  = 5` (OICR), and — per OQ-H1'/OQ-H2' — `indicator_id = 6` and PRMS policy type `1`. Each
+  refusal carries a distinct, user-readable reason.
+- `lead_center` and `contributing_center` resolve from `ubwClientDescription` to the **correct
+  institution per value** — `ExCIAT` → `46`, `ExBIO` → `49` — asserted on **both** values (D-7).
+  A wrong branch is silent: both ids are valid institutions, so PRMS accepts either and simply
+  attributes the result to the wrong centre. One-value coverage is not evidence (KZ-017).
 - Zero PROD ingest calls reachable from local/dev (env routing test) — and the test states
   what it **cannot** reach (KZ-017).
 - Both `sex_and_age_disaggregation` modes and the `id`/`level` distinction asserted against the
@@ -185,7 +209,9 @@ approves the manifest edit.** No folder has been created.
 | Field mapping | "a design task" | **Done** — [`homologation.md`](./homologation.md), 58 fields, 7 gaps |
 | `lead_contact_person` | not mentioned | **Mandatory for all types** since 2026-08 (G-3) |
 | `measures` | not mentioned | **Mandatory for Innovation Use** since 2026-09, even when to-be-determined |
-| `usd_budget` / `is_determined` | not mentioned | **Breaking since 2026-09**; real gap G-1 → proposed family row #5 |
+| `usd_budget` / `is_determined` | not mentioned | **Breaking since 2026-09**; **not built (D-1)** → Innovation Use unsyncable in v1, family row #5 withdrawn |
+| Knowledge Product | in scope (1 of 5 types) | **out of scope (D-4)** — STAR cannot author KPs |
+| Centres | `pooled_funding_contracts`, CIAT `46` / Bioversity `49` split | **`ubwClientDescription`** is the driving field (D-7): `ExCIAT` → **`46`**, `ExBIO` → **`49`**. Confirms OQ-F3's split. |
 | Evidence links | "may not be URIs the schema accepts" | **Specified:** `http(s)` required, file-storage hosts rejected (G-5) |
 | `external_reference` | not available | **Available**, and required in practice for webhooks |
 | Response handling | "record the attempt" | **207-with-failed-rows** is now an explicit, tested criterion (R-E1) |
@@ -197,6 +223,11 @@ approves the manifest edit.** No folder has been created.
 /akili-specify bilateral/prms-sync/sync-engine
 ```
 
-**Before that, two things need a human:** (a) approve or amend the family row #5 proposed in
-§12, and (b) request the STAR **TEST** API key from PRMS Tech Support (OQ-H8) — the spike that
-gates every field claim cannot run without it.
+**Two things still need a human, and neither blocks drafting:**
+
+1. **OQ-H1' / OQ-H2'** — how v1 presents Innovation Use and PRMS policy type `1`. Recommended:
+   gate both out with a stated reason. Option (c) in §12 (`is_determined` only, no monetary
+   figure) is worth a look first — it is small and it recovers a whole indicator type.
+2. **OQ-H8** — request STAR's **TEST** API key from PRMS Tech Support. The spike that closes
+   OQ-H5, OQ-H6, OQ-H9 and OQ-F7 cannot run without it, and every field claim in the
+   homologation stays unproven until it does.

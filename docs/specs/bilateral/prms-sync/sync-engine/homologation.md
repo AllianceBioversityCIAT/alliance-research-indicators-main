@@ -24,7 +24,7 @@
 | Date | `2026-09-14` |
 | Contract revision | PRMS Normalizer – Technical Field Documentation, **2026-09** revision (with 2026-08 breaking changes) |
 | Source artifacts | `PRMS Normalizer – Technical Field Documentation*.md` + 7 payload examples (`cap-sharing`, `inno_dev`, `inno_use`, `kp`, `other_outcome`, `other_output`, `policy`) — currently outside the repo, see R-F5 |
-| Status | **Draft — pending HITL review.** Not an approved mapping. |
+| Status | **Revision 2 — 2026-09-14, decisions D-1…D-7 applied** (see §1.1). Gaps G-1…G-7 are all resolved by a product decision; none blocks `/akili-specify`. |
 
 ### Legend
 
@@ -38,22 +38,56 @@
 
 ---
 
-## 1. Executive summary — what is actually missing
+## 1. Executive summary
 
-Of the **58 contract fields** reconciled below, **51 are already satisfiable** from the STAR
-model. The work is concentrated in **7 items**, and only **three of them are true data gaps**:
+Of the **58 contract fields** reconciled below, **51 are satisfiable today** from the STAR model.
+The other **7 (G-1…G-7) were put to the product owner on 2026-09-14 and all 7 are now decided** —
+§1.1 records each decision and what it costs. Nothing in this homologation blocks
+`/akili-specify` any more; what remains open is the TEST-env spike (§11).
 
-| # | Item | Severity | Nature |
+### 1.1 Decisions applied (2026-09-14, product owner)
+
+| # | Gap | Decision | Consequence — recorded, not hidden |
 |---|---|---|---|
-| **G-1** | `contributing_bilateral_projects[].usd_budget` / `is_determined` | **Blocker for Innovation Use** | 🔴 Real gap — new column + new UI. STAR stores **no per-result, per-contract USD contribution**. `agresso_contract.grant_amount_usd` / `center_amount_usd` are *project-level* totals and are **not** the result's share. **Breaking since 2026-09:** an Innovation Use payload without exactly one of the pair is rejected before Reporting. |
-| **G-2** | `policy_change.policy_type.status_amount` + `amount` | **Blocker for one policy type** | 🔴 Real gap — `result_policy_change` holds only `policy_type_id`, `policy_stage_id`, `evidence_stage`. When the policy type resolves to PRMS id `1` (*Budget or investment*) both fields are **mandatory**, and STAR cannot produce either. |
-| **G-3** | `lead_contact_person` | **Blocker for every type** | 🟡 Mandatory since 2026-08 for all 7 types. STAR has `result_users` + `UserRolesEnum.MAIN_CONTACT`, but that role is **not guaranteed populated on every indicator**. Needs a decided fallback chain, not a hope. |
-| **G-4** | `knowledge_product.handle` | **Blocker for KP** | 🟡 `result_knowledge_product` has **no** `handle`/`doi` column. The TIP importer writes the DOI into `result_evidences.evidence_url` (`tip-integration.service.ts:347`). A source of truth must be chosen and made non-ambiguous. |
-| **G-5** | `evidence[].link` rules | **Silent row failure** | 🟡 Data exists; **validation does not**. Since 2026-08 PRMS rejects links without an `http(s)` scheme and links on SharePoint / OneDrive / Google Drive / Dropbox. STAR enforces neither. Rejection arrives as a **failed row inside HTTP 207**, not a 4xx — easy to mistake for success. |
-| **G-6** | `title` ≤ 30 words / `description` ≤ 150 words | **Row failure** | 🟡 Both are unbounded `text` in STAR. No guard exists anywhere. |
-| **G-7** | `contributing_center[]` | Cosmetic | 🟡 STAR has no *contributing center* institution role (`InstitutionRolesEnum` = TRAINEE_AFFILIATION, TRAINEE_ORGANIZATION_REPRESENTATIVE, PARTNERS, POLICY_CHANGE). CGIAR centers land in `PARTNERS` alongside everyone else and must be split out by id. |
+| **D-1** | **G-1** `usd_budget` / `is_determined` | **Not built for now.** STAR does not hold a per-result, per-contract USD contribution and will not add one in this cycle. | 🔴 **Innovation Use cannot pass PRMS validation.** The pair is *mandatory per `contributing_bilateral_projects[]` entry* and breaking since 2026-09: an omitted pair is rejected **before** the result reaches Reporting. See §11 **OQ-H1'** — v1 must either gate the type out or let every attempt fail. |
+| **D-2** | **G-2** `status_amount` + `amount` | **Not built for now.** | ⚠️ **Reachable, not hypothetical.** STAR seeds *"Program, Budget, or Investment"* (`1730993015550`) and `PolicyTypeHomologation` maps it to PRMS `policy_type.id = 1`, which makes both fields mandatory. Policy results of that one type will be rejected; the other two types sync cleanly. |
+| **D-3** | **G-3** `lead_contact_person` | **Closed — no gap.** Main contact is **mandatory on every STAR result**, so `result_users` + `MAIN_CONTACT (1)` is always populated. | ✅ No fallback chain needed. Row downgraded to **EXACT** in §4. |
+| **D-4** | **G-4** `knowledge_product.handle` | **Knowledge Product is out of scope.** KPs are not STAR's to create — STAR stores imported ones but cannot author them, so it has nothing to push. | ⚫ Supported type set drops **5 → 4**. Supersedes family OQ-F2. `handle` never has to be resolved. |
+| **D-5** | **G-5** `evidence[].link` | **No STAR-side restriction.** Links keep working exactly as they do today. | ⚠️ The 2026-08 PRMS rules (scheme required, file-storage hosts rejected) still apply **on their side**. With no pre-flight, the **207 per-row interpretation (R-E1) becomes the only thing standing between a refused link and a wrongly-synced result.** That single mechanism is now load-bearing. |
+| **D-6** | **G-6** `title` / `description` length | **Not blocking — confirmed with the PRMS developer.** Long titles and descriptions pass. | ⚫ No guard built. ⚠️ This is a **verbal confirmation that contradicts the written contract** (which states max 30 / 150 words). Record who and when; re-check if ingest starts rejecting on length (K-013). |
+| **D-7** | **G-7** centers | **Resolved via the primary contract, one institution each.** `agresso_contract.ubwClientDescription` holds `ExCIAT` or `ExBIO`: **`ExCIAT` → `46`**, **`ExBIO` → `49`** (see §1.3). | ✅ Mechanism exists and is already exercised inbound. **Confirms family OQ-F3's original 46/49 split** and supplies the field that drives it. *(Revised 2026-09-14 within the same session: an earlier reading of this decision collapsed both values onto `49` because the CIAT variant was thought inactive. The centres are active; the split stands.)* |
 
-Everything else is a read, a join, or an arithmetic derivation.
+### 1.3 Centre map (D-7)
+
+| `agresso_contract.ubwClientDescription` | CLARISA institution | Acronym | Name |
+|---|---|---|---|
+| `ExCIAT` | **`46`** | `ABC RH - CIAT (Alliance)` | Alliance of Bioversity and CIAT – Regional Hub (International Center for Tropical Agriculture / Centro Internacional de Agricultura Tropical) |
+| `ExBIO` | **`49`** | `ABC - Bioversity (Alliance)` | Alliance of Bioversity and CIAT – Headquarter (Bioversity International) |
+
+> The split is **internally corroborated**: the inbound `AcronymExContractEnum`
+> (`enum/rsult-type.enum.ts`) already maps `'ABC RH' → EXCIAT` and `'ABC' → EXBIO`, and PRMS's own
+> `lead_center` table gives `46` the acronym `CIAT (Alliance)` / Regional Hub and `49`
+> `Bioversity (Alliance)` / Headquarter. The two catalogues agree on which is which — reuse the
+> enum rather than re-deriving the comparison, and keep its `.toUpperCase().trim()` normalisation.
+>
+> ⚠️ A wrong branch here is **silent**: both ids are valid institutions, so PRMS accepts either
+> and the result is simply attributed to the wrong centre. Assert **both** values, not one.
+
+### 1.2 What v1 can actually deliver, per type
+
+| PRMS type | STAR indicator | v1 outcome |
+|---|---|---|
+| `capacity_sharing` | 1 | ✅ **Syncs clean.** No open gap. |
+| `innovation_development` | 2 | ✅ **Syncs clean.** Only OQ-H6 (`readiness_level` shape) pending, and the spike settles it. |
+| `policy_change` | 4 | ⚠️ **Syncs except one type.** *Legal instrument* and *Policy or strategy* pass; *Program, Budget, or Investment* is rejected (D-2). |
+| `innovation_use` | 6 | 🔴 **Cannot pass validation** until D-1 is revisited. |
+| `knowledge_product` | 3 | ⚫ **Out of scope** (D-4). |
+| — | 5 (OICR) | ⚫ Excluded; PRMS has no OICR type. |
+
+> **The honest headline:** with D-1 and D-2 as they stand, v1 delivers **two types that sync
+> cleanly, one that syncs for two of its three subtypes, and one that always fails.** That is a
+> perfectly reasonable first increment — but the Innovation Use row should be a *deliberate,
+> visible* exclusion, not a button that reliably errors. See **OQ-H1'**.
 
 ---
 
@@ -73,14 +107,15 @@ Everything else is a read, a join, or an arithmetic derivation.
 |---|---|---|---|
 | 1 | Capacity Sharing for Development | `capacity_sharing` | ✅ |
 | 2 | Innovation Development | `innovation_development` | ✅ |
-| 3 | Knowledge Product | `knowledge_product` | ✅ |
+| 3 | Knowledge Product | — | ⚫ **Out of scope (D-4).** STAR stores imported KPs but cannot author them, so it has nothing to push. |
 | 4 | Policy Change | `policy_change` | ✅ |
 | 5 | OICR | — | ⚫ **Excluded from sync** (family OQ-F2, closed 2026-08-21). PRMS has no OICR type. |
 | 6 | Innovation Use | `innovation_use` | ✅ |
 | — | — | `other_output`, `other_outcome` | ⚫ PRMS accepts them; **STAR has no such indicator**. Nothing to map. |
 
-> The map is total over STAR's 6 indicators and leaves 2 PRMS types unused. A result whose
-> `indicator_id` is `5` must be **refused at the endpoint**, not silently skipped.
+> The map covers STAR's 6 indicators and leaves 3 PRMS types unused (`knowledge_product`,
+> `other_output`, `other_outcome`). A result whose `indicator_id` is **`3` (KP) or `5` (OICR)**
+> must be **refused at the endpoint** with a stated reason, not silently skipped.
 
 ---
 
@@ -96,10 +131,10 @@ Everything else is a read, a join, or an arithmetic derivation.
 | `submitted_by.email` / `.name` | ✅ | `submission_history` → `created_by` → `alliance_user_staff` | 🟢 **DERIVED.** Needs a stated selection rule: *the latest row whose `to_status_id` is the approval transition*. Ambiguous today — decide at specify. |
 | `submitted_by.submitted_date` | ✅ | `submission_history.created_at` (or `custom_date`) | 🟡 **HOMOLOGABLE** — two candidate columns; pick one and say why. |
 | `submitted_by.comment` | ❌ opt | `submission_history.submission_comment` | ✅ **EXACT.** |
-| **`lead_contact_person.email` / `.name`** | ✅ **MANDATORY** | `result_users` where `user_role_id = UserRolesEnum.MAIN_CONTACT (1)` → `alliance_user_staff` | 🟡 **G-3.** The role exists; universal population does **not**. Proposed fallback chain (needs approval): *main contact → contract Principal Investigator (`agresso_contract.projectLeadId` / `project_lead_description`, family OQ-F4) → `results.created_by`*. Omission = hard rejection: `(root) must have required property 'lead_contact_person'`. Only `email` and `name` are allowed — **no additional properties**. |
-| `lead_center.institution_id` / `.acronym` / `.name` | ⚠️ ≥1 of 3 | `pooled_funding_contracts.cgiar_entity_code` / `cgiar_entity_name` for the result's **primary** contract | 🟡 **HOMOLOGABLE.** Family OQ-F3 (closed): CIAT → `46`, Bioversity → `49`, sent **separately**. Needs a 2-row CGIAR-entity → CLARISA-institution map. ⚠️ **Contract inconsistency to raise with PRMS:** the doc's `lead_center` table lists CGIAR System Organization as `11605 / SO`, while its `contributing_center` table lists `221 / SMO`. Irrelevant to the Alliance today, but it means the two tables are not the same catalog. |
-| `title` | ✅ (≤ 30 words) | `results.title` (`text`, nullable) | 🟡 **G-6.** Value exists; the word cap does not. Guard before send. |
-| `description` | ✅ (≤ 150 words) | `results.description` (`text`, nullable) | 🟡 **G-6.** Same. |
+| **`lead_contact_person.email` / `.name`** | ✅ **MANDATORY** | `result_users` where `user_role_id = UserRolesEnum.MAIN_CONTACT (1)` → `alliance_user_staff` | ✅ **EXACT — G-3 closed by D-3.** Main contact is mandatory on every STAR result, so the row is always present; no fallback chain is needed. Omission would still be a hard rejection (`(root) must have required property 'lead_contact_person'`), so the builder must fail loudly rather than send a partial object. Only `email` and `name` are allowed — **no additional properties**. |
+| `lead_center.institution_id` / `.acronym` / `.name` | ⚠️ ≥1 of 3 | **`agresso_contract.ubwClientDescription`** on the result's **primary** contract | ✅ **EXACT — D-7.** `ExCIAT` → **`46`**, `ExBIO` → **`49`**; full map in §1.3. Confirms family OQ-F3's split and names the driving field. ⚠️ Separately, the doc's `lead_center` table lists CGIAR System Organization as `11605 / SO` while `contributing_center` lists `221 / SMO` — the two tables are not the same catalogue. Irrelevant to the Alliance today. |
+| `title` | ✅ (≤ 30 words *per the doc*) | `results.title` (`text`, nullable) | ✅ **EXACT — G-6 closed by D-6.** No guard built: the PRMS developer confirmed long titles pass. ⚠️ Verbal confirmation **contradicting the written contract** — re-check if rows start failing on length (K-013). |
+| `description` | ✅ (≤ 150 words *per the doc*) | `results.description` (`text`, nullable) | ✅ **EXACT — D-6.** Same as `title`. |
 
 ### 4.1 `toc_mapping` (the **Primary** Science Program)
 
@@ -147,23 +182,29 @@ Everything else is a read, a join, or an arithmetic derivation.
 
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
-| `contributing_center[].institution_id` / `.acronym` / `.name` | opt (≥1 if array sent) | — | 🟡 **G-7.** No *contributing center* role exists. Rule: take `result_institutions` with `institution_role_id = PARTNERS (3)` and split by whether `institution_id` is in PRMS's 16-center list; the centers become `contributing_center`, the remainder `contributing_partners`. |
-| `contributing_partners[].institution_id` / `.acronym` / `.name` | opt (≥1 if array sent) | `result_institutions` role `PARTNERS (3)` → `clarisa_institutions` | ✅ **EXACT** (after the G-7 split). |
+| `contributing_center[].institution_id` / `.acronym` / `.name` | opt (≥1 if array sent) | **`agresso_contract.ubwClientDescription`** on the primary contract | ✅ **EXACT — G-7 closed by D-7.** There is no *contributing center* institution role, and none is needed: the centre is parameterised by the primary contract, exactly as `lead_center` is. Same map as §1.3 — `ExCIAT` → `46`, `ExBIO` → `49`. Reuse `AcronymExContractEnum` (`prms.opensearch.service.ts:665-676`) rather than re-deriving the comparison. |
+| `contributing_partners[].institution_id` / `.acronym` / `.name` | opt (≥1 if array sent) | `result_institutions` role `PARTNERS (3)` → `clarisa_institutions` | ✅ **EXACT.** No split needed any more — with D-7 the centre comes from the contract, so every `PARTNERS` row is a partner. |
 | — | — | `results.is_partner_not_applicable` | ⚫ When true, send **no** `contributing_partners` array at all (an empty array violates "at least one option"). |
 
 ### 4.5 `evidence[]`
 
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
-| `link` | ✅ (per item) | `result_evidences.evidence_url` | 🟡 **G-5.** Value exists; the 2026-08 rules do not. Must reject/skip: no `http(s)` scheme; SharePoint, OneDrive, Google Drive, Dropbox. |
+| `link` | ✅ (per item) | `result_evidences.evidence_url` | ✅ **Sent as-is — D-5.** No STAR-side restriction; evidence keeps working exactly as today. ⚠️ PRMS still enforces its 2026-08 rules (`http(s)` scheme required; SharePoint / OneDrive / Google Drive / Dropbox rejected) and does so **on its side**, as a failed row inside HTTP 207. |
 | `description` | ❌ opt | `result_evidences.evidence_description` | ✅ **EXACT.** |
 | — | — | `result_evidences.is_private` | ⚫ **Filter.** Confidential evidence has **no route through this API** — private rows must be excluded, never sent and hoped over. |
 | — | — | `result_evidences.evidence_role_id` | ⚫ `PRINCIPAL_EVIDENCE (1)` is the only role today. |
 
-> **Why this matters more than it looks:** a bad link is *not* a 4xx. It comes back as a
-> **failed row inside `results[]` with HTTP 207**, while `rejected[]` (422) stays empty. A
-> naive "2xx ⇒ success" check marks the result synced when PRMS refused it. This is the
-> single most likely silent-success defect in the whole integration (KZ-001 family).
+> **Why this matters more than it looks — and more so after D-5.** A bad link is *not* a 4xx.
+> It comes back as a **failed row inside `results[]` with HTTP 207**, while `rejected[]` (422)
+> stays empty. A naive "2xx ⇒ success" check marks the result synced when PRMS refused it —
+> and because flipping `is_synced_to_prms` 409-locks the alignment for everyone including
+> SYSTEM_ADMIN (R-F3), that mistake is not self-correcting.
+>
+> With **no pre-flight validation (D-5)**, the per-row 207 interpretation is now the *only*
+> mechanism preventing this. It stopped being one safeguard among several and became the
+> load-bearing one — so it gets a test with a deliberately malformed link against the real TEST
+> endpoint, never a mocked 207 (KZ-001, K-004).
 
 ### 4.6 `contributing_bilateral_projects[]`
 
@@ -171,21 +212,27 @@ Everything else is a read, a join, or an arithmetic derivation.
 |---|---|---|---|
 | `grant_title` | ✅ | `result_contracts.contract_id` → `agresso_contract` | 🟡 **HOMOLOGABLE — composition unproven.** `projectDescription` is STAR's "Project Name" (`OrderFieldsEnum.PROJECT_NAME → ac.projectDescription`); `agreement_id` is the code. PRMS's example — `"D-200358-Enhancing Food Security…"` — reads as `<agreement_id>-<description>`, and PRMS matches against **CLARISA `/api/projects`**, not against AGRESSO. **Do not assert a composition; prove it in the spike.** A title PRMS cannot resolve fails the row. |
 | `is_lead` | ⚙️ opt | `result_contracts.is_primary` | ✅ **EXACT.** |
-| **`usd_budget`** | ✅ **cond — Innovation Use only** | — | 🔴 **G-1. DOES NOT EXIST.** No per-result, per-contract USD amount anywhere in the model. `agresso_contract.grant_amount_usd` / `center_amount_usd` are **project totals**, not this result's contribution — sending either would be a fabricated figure. Needs a new column on `result_contracts` (or a sibling table) **and** a UI to capture it. Must be **> 0**; `0` is rejected. |
-| **`is_determined`** | ✅ **cond — Innovation Use only** | — | 🔴 **G-1.** Same gap. Send `true` **only** when the amount is unknown. `false` alone does **not** satisfy the rule, and sending it **together** with a positive `usd_budget` is rejected. Exactly one of the two, per project entry. |
+| **`usd_budget`** | ✅ **cond — Innovation Use only** | — | 🔴 **NOT BUILT — D-1.** No per-result, per-contract USD amount exists in the model, and none is being added this cycle. `agresso_contract.grant_amount_usd` / `center_amount_usd` are **project totals**, not this result's contribution — sending either would be a fabricated figure and is explicitly ruled out. Must be **> 0** when sent; `0` is rejected. |
+| **`is_determined`** | ✅ **cond — Innovation Use only** | — | 🔴 **NOT BUILT — D-1.** ⚠️ Worth noting for the revisit: `is_determined: true` alone *does* satisfy PRMS, and it needs **no monetary figure** — only a per-project boolean meaning "amount not yet determined". That is a materially smaller change than capturing USD amounts, and it would make Innovation Use syncable. Raised as **OQ-H1'**. |
 
-> **G-1 is the largest single item in this homologation.** It is *breaking since 2026-09*, it
-> is per-`contributing_bilateral_projects[]`-entry (not per result), and it blocks the
-> Innovation Use type entirely. It is also the one item that needs client work, which makes it
-> a candidate for its own child spec rather than a line inside `sync-engine`.
+> **Consequence of D-1, stated plainly:** with neither field sent, **every Innovation Use
+> payload is rejected by PRMS before it reaches Reporting.** This is not a degraded mode — it is
+> a guaranteed failure for that type. v1 must therefore make the exclusion *visible* (button
+> disabled with a reason) rather than offer a sync that always errors. See **OQ-H1'**.
 
 ---
 
-## 5. `knowledge_product`
+## 5. `knowledge_product` — **out of scope (D-4)**
 
-| PRMS field | Req | STAR source | Verdict |
-|---|---|---|---|
-| `handle` | ✅ | — | 🟡 **G-4.** `result_knowledge_product` holds `type`, `citation`, `open_access`, `access_status`, `collection`, `publication_date`, `tip_id` — **no handle/DOI**. Candidates, in the order they should be considered: (1) `result_evidences.evidence_url` — the TIP importer writes the DOI there (`tip-integration.service.ts:347`); (2) `results.external_link`; (3) `results.public_link`. Pick one, state the fallback, and reject the result when none resolves — a KP without a handle cannot be ingested. |
+STAR does not author Knowledge Products. It stores KPs imported from TIP/CGSpace, but a KP is
+never created in STAR, so STAR has nothing to push to PRMS. The type is removed from the
+supported set; `results.indicator_id = 3` must be **refused at the sync endpoint** with a stated
+reason.
+
+This closes **G-4** without resolving it: `result_knowledge_product` still has no `handle`/`doi`
+column, and the TIP importer still writes the DOI into `result_evidences.evidence_url`
+(`tip-integration.service.ts:347`). If KP sync is ever revived, that ambiguity is the first
+thing to settle.
 
 ---
 
@@ -304,20 +351,24 @@ Everything else is a read, a join, or an arithmetic derivation.
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
 | `policy_type.id` / `.name` | ⚙️ ≥1 | `result_policy_change.policy_type_id` → `policy_types` | 🟡 **HOMOLOGABLE — id alignment unproven.** `policy-type.homologation.ts` exists for the inbound direction and is invertible. Whether STAR's seeded `policy_types.id` equals CLARISA's is **not** established by reading code. Prove it before sending an id. |
-| **`policy_type.status_amount.id` / `.name`** | **cond — required iff `policy_type.id = 1`** | — | 🔴 **G-2. DOES NOT EXIST.** |
-| **`policy_type.amount`** | **cond — required iff `policy_type.id = 1`** | — | 🔴 **G-2. DOES NOT EXIST.** `result_policy_change` has no amount column. |
+| **`policy_type.status_amount.id` / `.name`** | **cond — required iff `policy_type.id = 1`** | — | 🔴 **NOT BUILT — D-2.** |
+| **`policy_type.amount`** | **cond — required iff `policy_type.id = 1`** | — | 🔴 **NOT BUILT — D-2.** `result_policy_change` has no amount column and none is being added this cycle. |
 | `policy_stage.id` / `.name` | ⚙️ ≥1 | `result_policy_change.policy_stage_id` → `policy_stages` | ✅ **EXACT** (`policy-stage.homologation.ts` invertible; same id caveat as above). |
 | `implementing_organization[].institutions_id` / `.institutions_acronym` / `.institutions_name` | ✅ **min 1** | `result_institutions` where `institution_role_id = POLICY_CHANGE (4)` → `clarisa_institutions` | ✅ **EXACT.** Each item needs ≥1 of the three, and **no other properties are allowed**. |
 | — | — | `result_policy_change.evidence_stage` | ⚫ No PRMS equivalent; drop. |
 
-> **G-2's real shape:** the gap only bites when a STAR policy result maps to PRMS policy type
-> `1` (*Budget or investment*). Two honest options: **(a)** add `status_amount` + `amount` to
-> `result_policy_change` and to the UI; **(b)** refuse to sync results of that type in v1 and
-> say so in the UI. Option (b) is smaller but leaves a category of results permanently
-> unsyncable — a product call, not an engineering one.
+> **D-2's real shape — verified, not assumed.** The gap bites only when a STAR policy result
+> maps to PRMS `policy_type.id = 1`. That case **is reachable**: STAR seeds *"Program, Budget, or
+> Investment"* (migration `1730993015550-insertLinkResultRole`) and the existing
+> `PolicyTypeHomologation` maps it to exactly that PRMS id. So one of STAR's three policy types
+> becomes unsyncable; *Legal instrument* and *Policy or strategy* sync cleanly.
+>
+> v1 should therefore refuse that subtype at the endpoint with a stated reason, the same way it
+> refuses KP and OICR — not attempt it and surface a PRMS row failure.
 >
 > ⚠️ Note the asymmetry: if `policy_type.id ≠ 1`, the two fields are **not allowed** — sending
-> them anyway is a rejection. The branch cuts both ways.
+> them anyway is a rejection. The branch cuts both ways, so the builder must omit them
+> deliberately, not merely leave them undefined by accident.
 
 ---
 
@@ -344,19 +395,22 @@ Everything else is a read, a join, or an arithmetic derivation.
 
 ---
 
-## 11. Open questions this homologation raises
+## 11. Open questions after the 2026-09-14 decisions
 
-| ID | Question | Blocks |
-|---|---|---|
-| **OQ-H1** | `usd_budget` / `is_determined` (**G-1**) — new column + UI, or refuse to sync Innovation Use in v1? | Innovation Use entirely |
-| **OQ-H2** | `status_amount` + `amount` (**G-2**) — add the fields, or refuse PRMS policy type `1`? | One policy category |
-| **OQ-H3** | `lead_contact_person` (**G-3**) — is the proposed fallback chain (main contact → PI → creator) acceptable? | Every type |
-| **OQ-H4** | `knowledge_product.handle` (**G-4**) — which column is the source of truth? | Knowledge Product |
-| **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? | Every type (spike) |
-| **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the table, or `level` per `inno_dev.json`? | Innovation Development (spike) |
-| **OQ-H7** | `innov_use_to_be_determined` — derive it, or store it explicitly? | Innovation Use |
-| **OQ-H8** | STAR API keys for TEST and PRODUCTION — **requested from PRMS Tech Support?** | Everything |
-| **OQ-H9** | `geo_focus.scope_code = 50` — accepted by PRMS, and with what conditional rule? | Results with undetermined geography |
+Seven of the nine questions this homologation originally raised are **closed by D-1…D-7**. What
+survives:
+
+| ID | Question | Blocks | Closed by |
+|---|---|---|---|
+| **OQ-H1'** | **How should v1 handle Innovation Use?** D-1 means every Innovation Use payload is rejected by PRMS. Options: **(a)** disable the sync button for that indicator with a stated reason — *recommended*; **(b)** attempt and surface the failure; **(c)** revisit D-1 for `is_determined` only, which needs **no monetary figure** — just a per-project boolean — and would make the type syncable. | Innovation Use | HITL |
+| **OQ-H2'** | **Same question for PRMS policy type `1`** (*Program, Budget, or Investment*). Recommended: refuse at the endpoint with a reason, as for KP and OICR. | 1 of 3 policy subtypes | HITL |
+| **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? STAR has `agresso_contract.agreement_id` + `projectDescription`; the composition is **unproven**. | Every type | Spike |
+| **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the field table, or `level` per `inno_dev.json`? | Innovation Development | Spike |
+| **OQ-H7** | `innov_use_to_be_determined` — derive it from "no actors and no quantifications", or store it explicitly? *(Moot while OQ-H1' keeps the type out.)* | Innovation Use | HITL |
+| **OQ-H8** | **STAR API keys for TEST and PRODUCTION — requested from PRMS Tech Support?** Critical path: the spike cannot run without the TEST key. | Everything | External |
+| **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted by PRMS, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
+
+**Closed:** OQ-H1 → D-1 · OQ-H2 → D-2 · OQ-H3 → D-3 · OQ-H4 → D-4 (type dropped) · plus D-5, D-6, D-7.
 
 ---
 
