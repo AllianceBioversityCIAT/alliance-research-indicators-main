@@ -45,17 +45,55 @@ The other **7 (G-1…G-7) were put to the product owner on 2026-09-14 and all 7 
 §1.1 records each decision and what it costs. Nothing in this homologation blocks
 `/akili-specify` any more; what remains open is the TEST-env spike (§11).
 
+### 1.0 Governing principle — **P-1: what we do not have, we do not send**
+
+> **STAR never authors reporting data on the user's behalf.** If a value was not entered,
+> confirmed, or accepted by a reporting user, it is not sent to PRMS — not as a default, not as an
+> inference, and not as a "technically true" placeholder that makes a payload validate.
+>
+> The distinction that matters: *STAR does not hold the value* and *the user has declared the
+> value is undetermined* are *different statements*. The first is about our schema; the second is a
+> reporting claim with an author. Emitting the second because the first is true would put STAR's
+> assumption into the user's report under their name.
+>
+> **This overrides convenience, and it overrides passing validation.** Where a field cannot be
+> filled from data a user actually provided, the correct outcome is that the result is **not
+> synced** — visibly, with a stated reason — never that it is synced with a value we chose.
+>
+> *(Established 2026-09-14 by the product owner, rejecting a proposal to emit
+> `is_determined: true` on every bilateral project because STAR structurally never determines the
+> amount. The reasoning was wrong in exactly the way this principle names.)*
+>
+> **P-1 binds every child of this family and every future field decision.** §1.4 lists what it
+> removes beyond Innovation Use.
+
 ### 1.1 Decisions applied (2026-09-14, product owner)
 
 | # | Gap | Decision | Consequence — recorded, not hidden |
 |---|---|---|---|
-| **D-1** | **G-1** `usd_budget` / `is_determined` | **Not built for now.** STAR does not hold a per-result, per-contract USD contribution and will not add one in this cycle. | 🔴 **Innovation Use cannot pass PRMS validation.** The pair is *mandatory per `contributing_bilateral_projects[]` entry* and breaking since 2026-09: an omitted pair is rejected **before** the result reaches Reporting. See §11 **OQ-H1'** — v1 must either gate the type out or let every attempt fail. |
-| **D-2** | **G-2** `status_amount` + `amount` | **Not built for now.** | ⚠️ **Reachable, not hypothetical.** STAR seeds *"Program, Budget, or Investment"* (`1730993015550`) and `PolicyTypeHomologation` maps it to PRMS `policy_type.id = 1`, which makes both fields mandatory. Policy results of that one type will be rejected; the other two types sync cleanly. |
+| **D-1** | **G-1** `usd_budget` / `is_determined` | **Not built, and not substituted (P-1).** STAR holds no per-result, per-contract USD contribution. Emitting `is_determined: true` instead was **considered and rejected**: it would assert a reporting claim the user never made. | 🔴 **Innovation Use is not synced in v1** — gated out at the endpoint with a stated reason (OQ-H1' closed → option (a)). Revisit only after the **PRMS PO meeting** (§11.1). |
+| **D-2** | **G-2** `status_amount` + `amount` | **Not built, and not substituted (P-1).** | ⚠️ **Reachable, not hypothetical.** STAR seeds *"Program, Budget, or Investment"* (`1730993015550`) and `PolicyTypeHomologation` maps it to PRMS `policy_type.id = 1`, which makes both fields mandatory. That **one subtype is gated out** at the endpoint (OQ-H2' closed → option (a)); *Legal instrument* and *Policy or strategy* sync cleanly. Revisit at the PRMS PO meeting. |
 | **D-3** | **G-3** `lead_contact_person` | **Closed — no gap.** Main contact is **mandatory on every STAR result**, so `result_users` + `MAIN_CONTACT (1)` is always populated. | ✅ No fallback chain needed. Row downgraded to **EXACT** in §4. |
 | **D-4** | **G-4** `knowledge_product.handle` | **Knowledge Product is out of scope.** KPs are not STAR's to create — STAR stores imported ones but cannot author them, so it has nothing to push. | ⚫ Supported type set drops **5 → 4**. Supersedes family OQ-F2. `handle` never has to be resolved. |
 | **D-5** | **G-5** `evidence[].link` | **No STAR-side restriction.** Links keep working exactly as they do today. | ⚠️ The 2026-08 PRMS rules (scheme required, file-storage hosts rejected) still apply **on their side**. With no pre-flight, the **207 per-row interpretation (R-E1) becomes the only thing standing between a refused link and a wrongly-synced result.** That single mechanism is now load-bearing. |
 | **D-6** | **G-6** `title` / `description` length | **Not blocking — confirmed with the PRMS developer.** Long titles and descriptions pass. | ⚫ No guard built. ⚠️ This is a **verbal confirmation that contradicts the written contract** (which states max 30 / 150 words). Record who and when; re-check if ingest starts rejecting on length (K-013). |
 | **D-7** | **G-7** centers | **Resolved via the primary contract, one institution each.** `agresso_contract.ubwClientDescription` holds `ExCIAT` or `ExBIO`: **`ExCIAT` → `46`**, **`ExBIO` → `49`** (see §1.3). | ✅ Mechanism exists and is already exercised inbound. **Confirms family OQ-F3's original 46/49 split** and supplies the field that drives it. *(Revised 2026-09-14 within the same session: an earlier reading of this decision collapsed both values onto `49` because the CIAT variant was thought inactive. The centres are active; the split stands.)* |
+
+### 1.4 What P-1 removes beyond Innovation Use
+
+Re-reading this homologation against P-1 caught **three further places** where an earlier draft
+proposed to infer a reporting value. All three are withdrawn:
+
+| Field | What was proposed | Why P-1 removes it |
+|---|---|---|
+| `number_people_trained.unknown` | Map the remainder of `session_participants_total` minus women + men + non_binary | That remainder is an **arithmetic artefact**, not a reported figure. Nobody ever declared "N participants of unknown gender"; it could equally be a data-entry slip in the total. **Omit the field.** |
+| `innovation_developers` | Compose a `; `-joined list from `result_users` / `result_institutions` | STAR captures those people under *different questions* (contacts, partners). Re-labelling them as *developers* is our interpretation of their role, not theirs. Optional field → **omit.** |
+| `innov_use_to_be_determined` | Derive it from "no actor rows and no quantification rows" | Same shape as the `is_determined` proposal P-1 was established to reject: absence of data in STAR inferred into a positive declaration. *(Moot while Innovation Use is gated out, but it must not return through the back door when the type comes back.)* |
+
+**What P-1 does NOT remove:** arithmetic over values a user actually entered. `women` =
+`women_youth_count + women_not_youth_count` is a sum of two figures the user typed, not a new
+claim — both parts exist, and the total is what they add up to. The test is *"did a person supply
+this?"*, not *"is a computation involved?"*.
 
 ### 1.3 Centre map (D-7)
 
@@ -79,15 +117,15 @@ The other **7 (G-1…G-7) were put to the product owner on 2026-09-14 and all 7 
 |---|---|---|
 | `capacity_sharing` | 1 | ✅ **Syncs clean.** No open gap. |
 | `innovation_development` | 2 | ✅ **Syncs clean.** Only OQ-H6 (`readiness_level` shape) pending, and the spike settles it. |
-| `policy_change` | 4 | ⚠️ **Syncs except one type.** *Legal instrument* and *Policy or strategy* pass; *Program, Budget, or Investment* is rejected (D-2). |
-| `innovation_use` | 6 | 🔴 **Cannot pass validation** until D-1 is revisited. |
+| `policy_change` | 4 | ⚠️ **Two of three subtypes.** *Legal instrument* and *Policy or strategy* sync; *Program, Budget, or Investment* is **gated out** (D-2). |
+| `innovation_use` | 6 | ⛔ **Not synced in v1** — gated out with a stated reason (D-1 + P-1). |
 | `knowledge_product` | 3 | ⚫ **Out of scope** (D-4). |
 | — | 5 (OICR) | ⚫ Excluded; PRMS has no OICR type. |
 
-> **The honest headline:** with D-1 and D-2 as they stand, v1 delivers **two types that sync
-> cleanly, one that syncs for two of its three subtypes, and one that always fails.** That is a
-> perfectly reasonable first increment — but the Innovation Use row should be a *deliberate,
-> visible* exclusion, not a button that reliably errors. See **OQ-H1'**.
+> **The honest headline:** v1 delivers **two types that sync cleanly and one that syncs for two of
+> its three subtypes.** Innovation Use waits. Nothing is attempted-and-failed: every exclusion is
+> refused up front with a reason the user can read, which is what P-1 requires and what makes the
+> increment defensible rather than merely small.
 
 ---
 
@@ -242,7 +280,7 @@ thing to settle.
 |---|---|---|---|
 | `innovation_typology.code` | ⚙️ ≥1 | `result_innovation_dev.innovation_type_id` → `clarisa_innovation_types.code` | ✅ **EXACT** — same CLARISA catalogue on both sides. |
 | `innovation_typology.name` | ⚙️ ≥1 | `clarisa_innovation_types.name` | ✅ **EXACT.** Send both; `code` is preferred. |
-| `innovation_developers` | ❌ opt | — | 🟡 **HOMOLOGABLE.** No dedicated column. Composable as a `; `-joined list from `result_users` and/or `result_institutions`. Optional → omitting is defensible for v1. |
+| `innovation_developers` | ❌ opt | — | ⚫ **Omitted (P-1, §1.4).** No dedicated column. Composing it from `result_users` / `result_institutions` would re-label people STAR captured under a different question. Optional → send nothing. |
 | `innovation_readiness_level.id` | ⚙️ ≥1 | `result_innovation_dev.innovation_readiness_id` → `clarisa_innovation_readiness_levels.id` | ✅ **EXACT.** |
 | `innovation_readiness_level.name` | ⚙️ ≥1 | `clarisa_innovation_readiness_levels.name` | ✅ **EXACT.** |
 
@@ -261,7 +299,7 @@ thing to settle.
 | `number_people_trained.women` | ⚠️ ≥1 of 4 | `result_capacity_sharing.session_participants_female` | ✅ **EXACT.** |
 | `number_people_trained.men` | | `session_participants_male` | ✅ **EXACT.** |
 | `number_people_trained.non_binary` | | `session_participants_non_binary` | ✅ **EXACT.** |
-| `number_people_trained.unknown` | | — | 🟡 **HOMOLOGABLE.** No column. `session_participants_total` may exceed the sum of the three; that remainder is the honest candidate for `unknown`. Optional → omit if the remainder is ≤ 0. |
+| `number_people_trained.unknown` | | — | ⚫ **Omitted (P-1, §1.4).** No column, and the `session_participants_total` remainder is an arithmetic artefact rather than a reported figure. Optional → send nothing. |
 | `length_training` | ✅ enum | `session_length_id` **and** `degree_id` | 🟢 **DERIVED — two STAR fields collapse into one PRMS enum.** PRMS accepts `"PhD" \| "Master" \| "Short-term" \| "Long-term"`. Proposed rule: `degree_id = PHD (1)` → `"PhD"`; `MSC (2)` → `"Master"`; otherwise invert `SessionLengthHomologation` (`SHORT_TERM` → `"Short-term"`, `LONG_TERM` → `"Long-term"`). ⚠️ `BSC (3)` has **no** PRMS slot — it must fall through to the session length, which means a BSc long-course and a non-degree long-course become indistinguishable in PRMS. Accept and record, or escalate to PRMS. |
 | `delivery_method` | ✅ enum | `delivery_modality_id` | ✅ **EXACT — map already written.** Invert `DeliveryModalityHomologation`: `VIRTUAL` → `"Virtual / Online"`, `HYBRID` → `"Blended (in-person and virtual)"`, `IN_PERSON` → `"In person"`. |
 
@@ -291,7 +329,7 @@ thing to settle.
 
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
-| `innov_use_to_be_determined` | ✅ | — | 🟡 **HOMOLOGABLE.** No boolean column on `result_innovation_use`. Derivable as *"no actor rows and no quantification rows"* — but a derived flag that drives a **required/not-required** branch on the PRMS side deserves an explicit product answer, not an inference. Confirm at specify. |
+| `innov_use_to_be_determined` | ✅ | — | 🔴 **No source, and not inferable (P-1, §1.4).** No boolean column on `result_innovation_use`. Deriving it from "no actors and no quantifications" is the same move P-1 was established to reject. A second reason Innovation Use is gated out of v1 — even with D-1 resolved, **this field would still have no honest source.** Raise it at the PRMS PO meeting alongside `usd_budget`. |
 | `actors[]` | ✅ unless TBD | `result_actors` | ✅ see §8.3. Empty array counts as missing. |
 | `organization[]` | ⚙️ opt | `result_institution_types` where `institution_type_role_id = INNOVATION_USE (2)` | ✅ see §8.4. |
 | `measures[]` | ✅ **always** | `result_quantifications` where `quantification_role_id = INNOVATION_USE (3)` | ✅ see §8.5. |
@@ -413,20 +451,34 @@ thing to settle.
 
 ## 11. Open questions after the 2026-09-14 decisions
 
-Seven of the nine questions this homologation originally raised are **closed by D-1…D-7**. What
-survives:
+Under **P-1**, the questions that were *"how do we fill this?"* collapse into *"we do not, and the
+type waits."* What survives is three spike items and one meeting.
 
 | ID | Question | Blocks | Closed by |
 |---|---|---|---|
-| **OQ-H1'** | **How should v1 handle Innovation Use?** D-1 means every Innovation Use payload is rejected by PRMS. Options: **(a)** disable the sync button for that indicator with a stated reason — *recommended*; **(b)** attempt and surface the failure; **(c)** revisit D-1 for `is_determined` only, which needs **no monetary figure** — just a per-project boolean — and would make the type syncable. | Innovation Use | HITL |
-| **OQ-H2'** | **Same question for PRMS policy type `1`** (*Program, Budget, or Investment*). Recommended: refuse at the endpoint with a reason, as for KP and OICR. | 1 of 3 policy subtypes | HITL |
+| ~~OQ-H1'~~ | **CLOSED — option (a).** Innovation Use is **gated out of v1** with a stated reason. Substituting `is_determined: true` was rejected under P-1. | — | Decided |
+| ~~OQ-H2'~~ | **CLOSED — option (a).** PRMS policy type `1` (*Program, Budget, or Investment*) is **gated out** the same way; the other two subtypes sync. | — | Decided |
+| ~~OQ-H7~~ | **CLOSED — no honest source.** `innov_use_to_be_determined` cannot be inferred (P-1, §1.4). Folded into the PRMS PO agenda below. | — | Decided |
 | **OQ-H5** | `grant_title` composition — what exactly does CLARISA `/api/projects` expose that PRMS matches on? STAR has `agresso_contract.agreement_id` + `projectDescription`; the composition is **unproven**. | Every type | Spike |
 | **OQ-H6** | `innovation_readiness_level` — `id`/`name` per the field table, or `level` per `inno_dev.json`? | Innovation Development | Spike |
-| **OQ-H7** | `innov_use_to_be_determined` — derive it from "no actors and no quantifications", or store it explicitly? *(Moot while OQ-H1' keeps the type out.)* | Innovation Use | HITL |
-| ~~OQ-H8~~ | **CLOSED 2026-09-14.** The key is the **`app_config` row**, read via `AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY)`; the value is present in **TEST and PROD**, verified by the product owner. No key has to be requested and no env var is involved — see §10 and §10.1. *(The env-var getter briefly added the same day was reverted: with the value DB-resident it was a third access path to one credential name and had no callers.)* | — | Closed |
-| **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted by PRMS, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
+| **OQ-H9** | `geo_focus.scope_code = 50` (to be determined) — accepted, and under what conditional rule? It appears in the scope description but in **no** validation row. | Results with undetermined geography | Spike |
+| **OQ-F7** | Where (or whether) the PRMS-assigned result code returns. `results.prms_result_code` exists and is unwritten. | Code round-trip | Spike |
 
-**Closed:** OQ-H1 → D-1 · OQ-H2 → D-2 · OQ-H3 → D-3 · OQ-H4 → D-4 (type dropped) · plus D-5, D-6, D-7.
+> The spike is **unblocked** — the API key is already in `app_config` in TEST and PROD (§10.1).
+
+### 11.1 Agenda for the PRMS PO meeting
+
+The items below cannot be settled by reading the contract or by a spike; they need PRMS's product
+side. They are what stands between v1 and full type coverage.
+
+| # | Item | Why it needs PRMS |
+|---|---|---|
+| **1** | **Innovation Use investment** — `usd_budget` / `is_determined` is mandatory per bilateral project since 2026-09. STAR captures no per-result contribution amount and will not assert one (P-1). | Either PRMS relaxes the requirement for producers that do not hold the figure, or the Alliance decides to start capturing it — a reporting-process change, not an engineering one. |
+| **2** | **`innov_use_to_be_determined`** — required, and STAR has no field behind it. ⚠️ **Even if item 1 is resolved, this still blocks the type.** Worth raising together: Innovation Use has **two** missing declarations, not one. | Same shape: whose declaration is it, and what does a producer send when nobody has made it? |
+| **3** | **Policy type 1** — `status_amount` + `amount` mandatory when the policy is *Program, Budget, or Investment*. STAR holds neither. | Same decision as item 1, for a narrower slice. |
+| **4** | **`keep_editing`** — should STAR results land in PRMS as *Editing* (the reporting user completes them there) or *Pending review*? | Changes who finishes the result and which queue it enters. A workflow decision, theirs to make with us. |
+| **5** | **Doc contradictions** — `innovation_readiness_level` `id`/`name` vs `{"level": 0}`; `scope_code = 50` absent from the validation table; CGIAR System Organization listed as `11605 / SO` in `lead_center` but `221 / SMO` in `contributing_center`. | The written contract disagrees with its own examples; a spike can reveal current behaviour but not intent. |
+| **6** | **Title / description length** — the contract says 30 / 150 words; a PRMS developer confirmed verbally that longer values pass (D-6). | A verbal exception to a written contract needs an owner and a date, or it silently expires (K-013). |
 
 ---
 

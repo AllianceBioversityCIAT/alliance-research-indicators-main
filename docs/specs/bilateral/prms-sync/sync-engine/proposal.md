@@ -1,9 +1,11 @@
 # Proposal — PRMS Sync Engine (server)
 
-> **Revision 3 — 2026-09-14 (same day).** Product decisions **D-1…D-7** applied to all seven
-> gaps the homologation surfaced; see [`homologation.md`](./homologation.md) §1.1. Net effect:
-> **Knowledge Product leaves scope**, no pre-flight validation is built, centres resolve from the
-> primary contract (`ExCIAT` → `46`, `ExBIO` → `49`), and Innovation Use + one policy subtype are **knowingly unsyncable in v1**.
+> **Revision 3 — 2026-09-14 (same day).** Product decisions **D-1…D-7** applied to all seven gaps
+> the homologation surfaced, under the governing principle **P-1 — *what we do not have, we do not
+> send*** ([`homologation.md`](./homologation.md) §1.0). Net effect: **v1 syncs two types cleanly
+> and one partially.** Knowledge Product leaves scope; Innovation Use and PRMS policy type `1` are
+> **gated out with a stated reason**, not attempted; no field is filled by inference. Centres
+> resolve from the primary contract (`ExCIAT` → `46`, `ExBIO` → `49`).
 >
 > **Revision 2 — 2026-09-14.** Rewritten against the **2026-09** PRMS Normalizer contract.
 > The family's hold (OQ-F1, "the service is becoming a hook") is **resolved**: ingest is still
@@ -22,7 +24,7 @@
 | Requirement source | Jira AC-1676 + **PRMS Normalizer – Technical Field Documentation (2026-09)** + 7 payload examples + user mockups (My Projects "Contributing to Pool Funding" column; sidebar "Pool funding alignment" + PRMS SYNC) |
 | Slug | `sync-engine` — derived from free-text argument, not a path literal |
 | Companion | [`homologation.md`](./homologation.md) — the field-by-field PRMS ⟷ STAR reconciliation + the D-1…D-7 decision log |
-| Supported types | **4 of 7** — `capacity_sharing`, `innovation_development`, `policy_change`, `innovation_use`. KP out (D-4), OICR out (OQ-F2). |
+| Types synced in v1 | **`capacity_sharing`** and **`innovation_development`** fully; **`policy_change`** for 2 of its 3 subtypes. **`innovation_use` gated out** (D-1 + P-1), KP out (D-4), OICR out (OQ-F2). |
 
 ## 2. Intent
 
@@ -63,9 +65,11 @@ the optional *Pool funding alignment* section appear, and the sync button lives 
    `agresso_contract.ubwClientDescription` — `ExCIAT` → **`46`**, `ExBIO` → **`49`** (D-7).
 3. **An eligibility gate, in place of pre-flight validation.** D-5 removes link validation and
    D-6 removes length guards, so nothing is validated on our side *except* what STAR structurally
-   cannot satisfy. The endpoint refuses, with a stated reason: `indicator_id = 3` (KP, D-4),
-   `indicator_id = 5` (OICR), and — pending **OQ-H1'/OQ-H2'** — Innovation Use (D-1) and PRMS
-   policy type `1` (D-2). A refusal is a clear STAR message; it is **not** an attempted sync.
+   cannot satisfy. The endpoint refuses **up front**, with a reason the user can read:
+   `indicator_id = 3` (KP, D-4), `indicator_id = 5` (OICR), `indicator_id = 6` (Innovation Use —
+   D-1 + P-1), and PRMS policy type `1` (D-2). Nothing is attempted-and-failed. **P-1 makes this
+   the gate's purpose, not a limitation of it:** where a mandatory field has no user-supplied
+   source, the correct outcome is a visible refusal, never a payload we completed ourselves.
 4. **Sync endpoint** guarded by: result Approved, alignment complete, primary contract is a
    pool-funding contributor, `@Roles`, and idempotency (already-synced → 409).
 5. **State persistence** — append-only `result_prms_sync_log` (attempt, environment, request
@@ -91,8 +95,9 @@ the STAR API key for TEST.
 ## 6. Non-Goals
 
 - No client changes (child 2), no re-sync UI (child 3), no PI panel (child 4).
-- **No `usd_budget` / `is_determined` capture** (D-1) — and therefore **no working Innovation
-  Use sync**. See §12.
+- **No `usd_budget` / `is_determined` capture, and no substitute value** (D-1 + P-1) — Innovation
+  Use is **gated out of v1**. It has **two** missing declarations, not one:
+  `innov_use_to_be_determined` is equally sourceless (homologation §1.4). See §12.
 - **No `status_amount` / `amount` capture** (D-2) — PRMS policy type `1` stays unsyncable.
 - **No Knowledge Product sync** (D-4) — STAR cannot author KPs.
 - **No pre-flight validation of evidence links or title/description length** (D-5, D-6).
@@ -162,21 +167,26 @@ Inherits R-F1–R-F3 from [`../family.md`](../family.md). Child-specific:
 | **OQ-H1–H9** | The nine open questions raised by the homologation (§11 there). H1/H2/H3/H4 need product answers; H5/H6/H9 need the spike. |
 | **R-F5** | The contract documentation still lives in `~/Downloads`, outside the repo. Copy the `.md` + 7 JSON examples into `docs/technical-docs/prms-normalizer/` during `/akili-specify` so the spec cites a versioned source, not a local path. |
 
-## 12. Family amendment — **withdrawn**, replaced by one decision
+## 12. Innovation Use, and the principle behind leaving it out
 
-Revision 2 proposed a fifth child (`bilateral-project-investment`) to capture the per-contract
-USD contribution. **D-1 withdraws it:** those fields are not being built this cycle, so there is
-nothing for that child to deliver. No manifest edit is requested, and no folder was created.
+Revision 2 proposed a fifth child to capture the per-contract USD contribution. **D-1 withdraws
+it**, and Revision 3 closes the follow-up question it left open.
 
-What replaces it is a single decision the product owner still owes — **OQ-H1'**:
+Two ways to make Innovation Use validate were considered and **both rejected**:
 
-| Option | What v1 does with Innovation Use | Cost |
-|---|---|---|
-| **(a) Gate it out** — *recommended* | Button disabled for `indicator_id = 6` with a stated reason. | Honest and cheap. The type returns the moment D-1 is revisited. |
-| **(b) Let it fail** | Sync is attempted and PRMS rejects every payload. | A button that reliably errors. Not recommended. |
-| **(c) Revisit D-1 partially** | Add **only** `is_determined` — a per-project boolean meaning *"amount not yet determined"*, **no monetary figure**. PRMS accepts `is_determined: true` alone. | Materially smaller than capturing USD amounts, and it makes the type fully syncable. Worth a look before settling for (a). |
+| Considered | Rejected because |
+|---|---|
+| Send `agresso_contract.grant_amount_usd` | It is the **project** total, not this result's contribution. A fabricated figure. |
+| Send `is_determined: true` on every project | It asserts a **reporting claim the user never made**. That STAR holds no value is a fact about our schema; *"the amount is not yet determined"* is a declaration with an author, and it is not ours to sign. This is the case that established **P-1**. |
 
-The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the clear answer.
+So Innovation Use is **gated out of v1** with a stated reason (OQ-H1' → option (a)), and PRMS
+policy type `1` with it (OQ-H2'). Both return only after the **PRMS PO meeting**
+([`homologation.md`](./homologation.md) §11.1), where the question is not *how do we fill these
+fields* but *who is supposed to*.
+
+> ⚠️ Surfaced while applying P-1: even if the investment question were solved, Innovation Use
+> would **still** be blocked — `innov_use_to_be_determined` is required and equally sourceless.
+> Raise both at the same meeting; solving only the first buys nothing.
 
 ---
 
@@ -194,9 +204,13 @@ The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the cl
 - Acceptance flips `is_synced_to_prms` and the alignment PATCH then 409s (existing gate test
   extended end-to-end).
 - Eligibility gate proven with allowed **and** denied cases: role, status ≠ 6, incomplete
-  alignment, non-pool-funding contract, already synced, `indicator_id = 3` (KP), `indicator_id
-  = 5` (OICR), and — per OQ-H1'/OQ-H2' — `indicator_id = 6` and PRMS policy type `1`. Each
-  refusal carries a distinct, user-readable reason.
+  alignment, non-pool-funding contract, already synced, `indicator_id = 3` (KP), `indicator_id = 5`
+  (OICR), `indicator_id = 6` (Innovation Use), and PRMS policy type `1`. Each refusal carries a
+  distinct, user-readable reason — one shared generic message would fail this criterion.
+- **P-1 asserted at the payload level:** no emitted field holds a value no user supplied.
+  Concretely — `number_people_trained.unknown`, `innovation_developers` and
+  `innov_use_to_be_determined` appear in **no** built payload. Assert on the serialized JSON, not
+  on the builder's call sequence (KZ-017).
 - `lead_center` and `contributing_center` resolve from `ubwClientDescription` to the **correct
   institution per value** — `ExCIAT` → `46`, `ExBIO` → `49` — asserted on **both** values (D-7).
   A wrong branch is silent: both ids are valid institutions, so PRMS accepts either and simply
@@ -228,10 +242,13 @@ The same shape applies to PRMS policy type `1` (**OQ-H2'**), where (a) is the cl
 /akili-specify bilateral/prms-sync/sync-engine
 ```
 
-**Two things still need a human, and neither blocks drafting:**
+**Nothing blocks drafting.** Every product decision is made (D-1…D-7, P-1) and the spike is
+unblocked — the API key is already in `app_config` in both TEST and PROD.
 
-1. **OQ-H1' / OQ-H2'** — how v1 presents Innovation Use and PRMS policy type `1`. Recommended:
-   gate both out with a stated reason. Option (c) in §12 (`is_determined` only, no monetary
-   figure) is worth a look first — it is small and it recovers a whole indicator type.
-2. ~~OQ-H8~~ **— closed 2026-09-14.** The API key is already in `app_config` in both TEST and
-   PROD, so the spike is **unblocked**: nothing has to be requested from PRMS Tech Support.
+Two things run **in parallel**, not before:
+
+1. **The TEST-env spike** (T-SPIKE) — closes OQ-H5, OQ-H6, OQ-H9 and OQ-F7. Until it runs, every
+   field claim in the homologation is code-reading, not evidence.
+2. **The PRMS PO meeting** — the six items in [`homologation.md`](./homologation.md) §11.1. Its
+   outcome decides whether Innovation Use and policy type `1` come back, and it is the only thing
+   that can widen v1's type coverage.
