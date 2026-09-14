@@ -203,4 +203,12 @@ Run in progress. T-01 and T-02 executed in parallel (cross-package, safe per roo
 - Client (`npm test -- --silent` from `client/research-indicators/`): **314/314 suites, 6568/6568 tests passed.** Coverage 98.17% statements / 96.11% branches / 97.77% functions / 98.48% lines — well above the 40/20/45/30 floor.
 - Server (`npm test -- --silent` from `server/researchindicators/`): **338/338 suites, 2421/2421 tests passed**, including `portfolio-2-alignment.handler.spec.ts`. (A "worker process failed to exit gracefully" Jest teardown warning appeared — pre-existing Jest/RabbitMQ-mock teardown noise, not a test failure; all suites reported passed.)
 
-T-03, T-04, T-05 are all complete (see below). **All five tasks (T-01…T-05) are now `done`.** The spec's own scope is complete; applying the migration to Staging/Prod is the one remaining action, and it belongs to the user/engineering lead outside this AKILI session (CI/CD deploys code, not migrations — root `CLAUDE.md` §4.3 K-015).
+T-03, T-04, T-05 are all complete. **All five tasks (T-01…T-05) are `done`.**
+
+**Post-spec rollout (outside the original AKILI session, tracked here for closure):**
+- 2026-09-11: `AC-1753-Include-the-Strategics-Outcomes-in-alliance-allignment` merged into `staging`, then into `dev` (commit `a749b43e`), and pushed — triggering the On-Premise Dev CI/CD deploy.
+- Root `CLAUDE.md` §4.3 K-015 was corrected (2026-08-27, verified against Jenkins build #72 console) to record that the **Dev** pipeline now runs `migration:execute` automatically on every deploy — a migration merged to `dev` no longer needs a separate manual apply step there (Prod/`main` behavior remains unconfirmed and still human-decided).
+- **2026-09-14: user confirmed migration `1788972162238-includeInnovationUseImpactOutcomes` ran correctly against the Testing/Dev database** (`alliancereportingdb` / `192.168.20.210`, per `.env`'s "allianza test" block). R-ALN-003's enforcement (Submit blocked when Impact Outcomes is empty for Policy Change/Innovation Use) is now live there.
+- **Remaining, out of this spec's scope:** promotion to Prod (`main`) is still a separate, human-decided step — verify the Prod pipeline's migration behavior independently before assuming the same auto-apply parity confirmed for Dev.
+
+**Spec status: fully closed.** No further action needed from this spec unless/until Prod promotion is requested.
