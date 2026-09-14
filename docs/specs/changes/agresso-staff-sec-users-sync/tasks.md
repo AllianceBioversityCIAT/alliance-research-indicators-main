@@ -61,12 +61,12 @@ graph TD
   - `CHUNK` is **one module constant**, exported. `NFR-AGS-002`'s gate asserts an exact statement count and needs a fixed known value (`OQ-D4`).
   - **The bulk read runs OUTSIDE the transaction.** Its placement is load-bearing (`N-9`): moved inside, the re-select in T-04 goes blind to a concurrent insert under REPEATABLE READ.
 - **Acceptance / done check:**
-  - [ ] A seeded inactive `sec_users` row is returned by the bulk read.
-  - [ ] Statement count is `O(⌈n / CHUNK⌉)`, asserted exactly at n ≥ 50 **and** n ≥ 100.
-  - [ ] Every statement is parameterised; id lists are numeric-validated before interpolation.
+  - [ ] A seeded inactive `sec_users` row is returned by the bulk read. — **NOT discharged by T-01.** This is a database claim and T-01 has no fixture; the unit tier proves only that the emitted SQL carries no `WHERE` clause, which is a proxy. **Carried to T-09** (`execution.md` → T-01 → *Recorded gap*), which must copy this forward into its brief.
+  - [x] Statement count is `O(⌈n / CHUNK⌉)`, asserted exactly at n ≥ 50 **and** n ≥ 100. — exact counts at n=53 and n=127 against the exported `CHUNK`; observed red under a single-chunk mutation.
+  - [x] Every statement is parameterised; id lists are numeric-validated before interpolation. — observed red under both a removed-validation mutation and a literal-interpolation mutation.
 - **Dependencies:** none
-- **Estimated effort:** M (~120 LOC)
-- **Status:** todo
+- **Estimated effort:** M (~120 LOC) — **actual ~299 LOC** across 3 files (145 impl + 151 spec + 3 module wiring). Over the line estimate; the spec's budget counted the repository's read side only.
+- **Status:** **done** — PASS 2026-09-14, 2 Implementer attempts / 2 Reviewer rounds. See [`./execution.md`](./execution.md) → T-01.
 
 ---
 
