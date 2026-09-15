@@ -45,6 +45,8 @@ describe('SecUserReconcilerService', () => {
       grantContributorRoles: jest.fn().mockResolvedValue(undefined),
       refreshSecUserNames: jest.fn().mockResolvedValue(undefined),
       backfillSecUserCarnets: jest.fn().mockResolvedValue(undefined),
+      reactivateSecUsers: jest.fn().mockResolvedValue(undefined),
+      reactivateContributorRoles: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<SecUserReconcilerRepository>;
     manager = { query: jest.fn().mockResolvedValue(undefined) };
     dataSource = {
@@ -512,6 +514,11 @@ describe('SecUserReconcilerService', () => {
         namesTruncated: 1,
         carnetBackfilled: 0,
         carnetConflicts: 1,
+        reactivated: 0,
+        rolesReactivated: 0,
+        rolesGrantedOnReactivation: 0,
+        rolesLeftInactive: [],
+        accountsWithoutRole: [23],
       });
       expect(service['logger']['_warn']).toHaveBeenCalledWith(
         expect.stringContaining('stored=12345, payload=99999'),
@@ -547,7 +554,7 @@ describe('SecUserReconcilerService', () => {
       ).toBeLessThan(savepointOrder);
     });
 
-    it('backfills empty carnets but never refreshes inactive matches', async () => {
+    it('refreshes BOTH active matches and reactivated accounts in one batch (R-AGS-007: "the account is also refreshed")', async () => {
       const active = staffMember({
         resourceId: 'A100',
         email: 'active@alliance.org',
@@ -564,12 +571,18 @@ describe('SecUserReconcilerService', () => {
 
       await service.applyCreateAndGrant(reconciliation);
 
+      // SUPERSEDED BY T-06, deliberately and with the requirement named. At T-05 this test
+      // asserted that id 32 (an inactive match) was NOT refreshed, because tasks.md scoped
+      // matched-inactive rows to T-06. R-AGS-007 then states plainly: "The account is also
+      // refreshed — names and carnet backfill per R-AGS-002 — because a returning employee's
+      // details are as stale as anyone's." So the reactivated account MUST be refreshed, and both
+      // populations ride one batch to keep the statement count at O(ceil(n / CHUNK)) per
+      // NFR-AGS-002. The old assertion encoded a task boundary, not a requirement.
       expect(repository.refreshSecUserNames).toHaveBeenCalledWith(manager, [
         expect.objectContaining({ secUserId: 31 }),
-      ]);
-      expect(repository.refreshSecUserNames).not.toHaveBeenCalledWith(manager, [
         expect.objectContaining({ secUserId: 32 }),
       ]);
+      expect(repository.reactivateSecUsers).toHaveBeenCalledWith(manager, [32]);
     });
 
     it('sets the database-clock marker first, then creates, asserts, and grants only the re-selected new id', async () => {
@@ -592,6 +605,12 @@ describe('SecUserReconcilerService', () => {
       repository.grantContributorRoles.mockImplementation(async () => {
         order.push('grantContributorRoles');
       });
+      repository.reactivateSecUsers.mockImplementation(async () => {
+        order.push('reactivateSecUsers');
+      });
+      repository.reactivateContributorRoles.mockImplementation(async () => {
+        order.push('reactivateContributorRoles');
+      });
       (manager.query as jest.Mock).mockImplementation(async (sql: string) => {
         order.push(sql);
       });
@@ -602,6 +621,11 @@ describe('SecUserReconcilerService', () => {
       // NOW(6) then post-dates every inserted created_at value, so the database re-select is empty.
       expect(order).toEqual([
         'setRunStart',
+        // T-06's reactivation writes join the seam here. With no reactivate targets in this
+        // fixture they are no-ops, but the ORDER assertion still pins them before the savepoint.
+        'reactivateSecUsers',
+        'reactivateContributorRoles',
+        'grantContributorRoles',
         'SAVEPOINT create_grant',
         'createSecUsers',
         'findCreatedSecUsers',
@@ -623,6 +647,11 @@ describe('SecUserReconcilerService', () => {
         namesTruncated: 0,
         carnetBackfilled: 0,
         carnetConflicts: 0,
+        reactivated: 0,
+        rolesReactivated: 0,
+        rolesGrantedOnReactivation: 0,
+        rolesLeftInactive: [],
+        accountsWithoutRole: [],
       });
     });
 
@@ -642,7 +671,13 @@ describe('SecUserReconcilerService', () => {
       expect(manager.query).toHaveBeenCalledWith(
         'ROLLBACK TO SAVEPOINT create_grant',
       );
-      expect(repository.grantContributorRoles).not.toHaveBeenCalled();
+      // T-06 note: branch (c) calls grantContributorRoles with an EMPTY list before the savepoint,
+      // so "never called" is no longer the right shape. The property that matters is unchanged and
+      // is asserted directly: no created id is ever granted a role when the assertion fails.
+      expect(repository.grantContributorRoles).not.toHaveBeenCalledWith(
+        manager,
+        expect.arrayContaining([17]),
+      );
       expect(outcome).toEqual({
         created: 0,
         rolesGranted: 0,
@@ -651,6 +686,11 @@ describe('SecUserReconcilerService', () => {
         namesTruncated: 0,
         carnetBackfilled: 0,
         carnetConflicts: 0,
+        reactivated: 0,
+        rolesReactivated: 0,
+        rolesGrantedOnReactivation: 0,
+        rolesLeftInactive: [],
+        accountsWithoutRole: [],
         abortReason: 'GRANT_ASSERTION',
       });
     });
@@ -670,7 +710,13 @@ describe('SecUserReconcilerService', () => {
       expect(manager.query).toHaveBeenCalledWith(
         'ROLLBACK TO SAVEPOINT create_grant',
       );
-      expect(repository.grantContributorRoles).not.toHaveBeenCalled();
+      // T-06 note: branch (c) calls grantContributorRoles with an EMPTY list before the savepoint,
+      // so "never called" is no longer the right shape. The property that matters is unchanged and
+      // is asserted directly: no created id is ever granted a role when the assertion fails.
+      expect(repository.grantContributorRoles).not.toHaveBeenCalledWith(
+        manager,
+        expect.arrayContaining([17]),
+      );
       expect(outcome.abortReason).toBe('GRANT_ASSERTION');
     });
 
@@ -703,6 +749,163 @@ describe('SecUserReconcilerService', () => {
       expect(repository.grantContributorRoles).toHaveBeenCalledWith(manager, [
         17,
       ]);
+    });
+  });
+
+  describe('reactivation — three disjoint role branches (R-AGS-007, design.md §5.4, M-2, N-4)', () => {
+    /** A returning employee: one inactive sec_users row, matched by email. */
+    async function reconcileReturningUser(
+      secUserId: number,
+      roleRows: Array<{
+        sec_user_role_id: number;
+        user_id: number;
+        role_id: number;
+        is_active: boolean;
+      }>,
+    ) {
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: secUserId, is_active: false, carnet: 'A1' }),
+      ]);
+      repository.findSecUserRolesByUserIds.mockResolvedValue(roleRows as never);
+      const reconciliation = await service.reconcile([staffMember({})]);
+      expect(reconciliation.reactivate).toHaveLength(1);
+      return service.applyCreateAndGrant(reconciliation);
+    }
+
+    it("(N-4) takes MIN(sec_user_role_id) among the user's role_id = 3 rows ONLY — never the lower id of an elevated role", async () => {
+      // The exact shape of requirements.md §10's N-4 gate: an inactive SYSTEM_ADMIN row carrying a
+      // LOWER id than the contributor row. A MIN taken over the user's inactive rows *before*
+      // filtering to role 3 emits 700 and restores SYSTEM_ADMIN.
+      const outcome = await reconcileReturningUser(50, [
+        { sec_user_role_id: 700, user_id: 50, role_id: 1, is_active: false },
+        { sec_user_role_id: 701, user_id: 50, role_id: 3, is_active: false },
+      ]);
+
+      expect(repository.reactivateContributorRoles).toHaveBeenCalledWith(
+        manager,
+        [701],
+      );
+      expect(repository.reactivateContributorRoles).not.toHaveBeenCalledWith(
+        manager,
+        expect.arrayContaining([700]),
+      );
+      expect(outcome.rolesLeftInactive).toEqual([{ userId: 50, roleId: 1 }]);
+      expect(outcome.rolesReactivated).toBe(1);
+      expect(outcome.rolesGrantedOnReactivation).toBe(0);
+    });
+
+    it('(branch a) issues NO role statement when an active role_id = 3 row already exists', async () => {
+      const outcome = await reconcileReturningUser(50, [
+        { sec_user_role_id: 800, user_id: 50, role_id: 3, is_active: true },
+        { sec_user_role_id: 801, user_id: 50, role_id: 3, is_active: false },
+      ]);
+
+      // Flipping the stale inactive row would leave TWO active contributor rows (M-2), which
+      // R-AGS-007 AC.3 forbids. sec_user_roles has no unique index on (user_id, role_id).
+      expect(repository.reactivateContributorRoles).toHaveBeenCalledWith(
+        manager,
+        [],
+      );
+      expect(repository.grantContributorRoles).not.toHaveBeenCalledWith(
+        manager,
+        [50],
+      );
+      expect(outcome.rolesReactivated).toBe(0);
+      expect(outcome.rolesGrantedOnReactivation).toBe(0);
+    });
+
+    it('(branch b) reactivates exactly ONE id when two inactive role_id = 3 rows exist', async () => {
+      const outcome = await reconcileReturningUser(50, [
+        { sec_user_role_id: 900, user_id: 50, role_id: 3, is_active: false },
+        { sec_user_role_id: 901, user_id: 50, role_id: 3, is_active: false },
+      ]);
+
+      expect(repository.reactivateContributorRoles).toHaveBeenCalledWith(
+        manager,
+        [900],
+      );
+      expect(outcome.rolesReactivated).toBe(1);
+    });
+
+    it('(branch c) inserts one contributor row when the user holds no role_id = 3 row at all', async () => {
+      const outcome = await reconcileReturningUser(50, [
+        { sec_user_role_id: 700, user_id: 50, role_id: 1, is_active: false },
+      ]);
+
+      expect(repository.grantContributorRoles).toHaveBeenCalledWith(manager, [
+        50,
+      ]);
+      expect(repository.reactivateContributorRoles).toHaveBeenCalledWith(
+        manager,
+        [],
+      );
+      // AC.8 / RB-10: branches (b) and (c) are DISTINCT counts. Collapsing them hides which half
+      // of the role restoration actually happened.
+      expect(outcome.rolesReactivated).toBe(0);
+      expect(outcome.rolesGrantedOnReactivation).toBe(1);
+      expect(outcome.reactivated).toBe(1);
+    });
+
+    it('reactivates the sec_users row and refreshes it, and touches no other table (R-AGS-007 AC.6)', async () => {
+      await reconcileReturningUser(50, [
+        { sec_user_role_id: 901, user_id: 50, role_id: 3, is_active: false },
+      ]);
+
+      expect(repository.reactivateSecUsers).toHaveBeenCalledWith(manager, [50]);
+      // R-AGS-007: "The account is also refreshed" — a returning employee's details are as stale
+      // as anyone's.
+      expect(repository.refreshSecUserNames).toHaveBeenCalledWith(
+        manager,
+        expect.arrayContaining([expect.objectContaining({ secUserId: 50 })]),
+      );
+      // R-AGS-007 AC.6 ("no app_secrets row changes") is DELIBERATELY NOT ASSERTED HERE.
+      // An earlier version of this test grepped manager.query for /app_secrets/i. That assertion
+      // was theatre: the repository is mocked, so every repository statement bypasses
+      // manager.query entirely and the only SQL it ever sees is the savepoint pair. It could not
+      // fail, with or without the defect — the exact shape KZ-001 exists to stop, and it was
+      // caught in review. AC.6 is a DATABASE claim and belongs to T-09's fixture tier.
+      // What IS provable here, and is asserted above, is that the reactivation path calls only
+      // reactivateSecUsers / reactivateContributorRoles / grantContributorRoles — there is no
+      // repository method that reaches app_secrets at all.
+    });
+
+    it('issues both reactivation writes strictly before SAVEPOINT create_grant (DD-15)', async () => {
+      await reconcileReturningUser(50, [
+        { sec_user_role_id: 901, user_id: 50, role_id: 3, is_active: false },
+      ]);
+
+      const savepointIndex = (manager.query as jest.Mock).mock.calls.findIndex(
+        ([sql]) => sql === 'SAVEPOINT create_grant',
+      );
+      expect(savepointIndex).toBeGreaterThanOrEqual(0);
+      const savepointOrder = (manager.query as jest.Mock).mock
+        .invocationCallOrder[savepointIndex];
+
+      expect(
+        repository.reactivateSecUsers.mock.invocationCallOrder[0],
+      ).toBeLessThan(savepointOrder);
+      expect(
+        repository.reactivateContributorRoles.mock.invocationCallOrder[0],
+      ).toBeLessThan(savepointOrder);
+    });
+
+    it('(OQ-D6) reports a matched ACTIVE account holding no active role_id = 3 row, and grants it nothing', async () => {
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 77, is_active: true, carnet: 'A1' }),
+      ]);
+      // The account exists and is active, but holds no contributor row — normally an external
+      // provisioned by a different flow. RSK-10: reported, never granted.
+      repository.findSecUserRolesByUserIds.mockResolvedValue([] as never);
+      const reconciliation = await service.reconcile([staffMember({})]);
+      expect(reconciliation.refresh).toHaveLength(1);
+
+      const outcome = await service.applyCreateAndGrant(reconciliation);
+
+      expect(outcome.accountsWithoutRole).toEqual([77]);
+      expect(repository.grantContributorRoles).not.toHaveBeenCalledWith(
+        manager,
+        expect.arrayContaining([77]),
+      );
     });
   });
 });

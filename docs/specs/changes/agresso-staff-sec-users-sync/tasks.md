@@ -170,14 +170,14 @@ graph TD
   - When several rows match and **all** are inactive, exactly one is reactivated (§5.2 tie-break); the losers stay inactive and every candidate is reported.
   - **Step 4 dominates step 7:** one active plus one inactive row for the same person → refresh the active one, leave the inactive one alone. Two active rows for one person is the duplicate this spec exists not to create.
 - **Acceptance / done check:**
-  - [ ] A rehired employee keeps their original `sec_user_id`.
-  - [ ] Two inactive role-3 rows → exactly **one** active afterwards.
-  - [ ] An inactive `role_id = 1` row is **still inactive** afterwards, and appears in `rolesLeftInactive`.
-  - [ ] No `app_secrets` row changes — no statement is issued against that table anywhere in the codebase path.
-  - [ ] An **active** account carrying no role-3 row is left untouched and listed in `accountsWithoutRole` (`OQ-D6`).
+  - [ ] A rehired employee keeps their original `sec_user_id`. — **DB claim, T-09.** Structurally guaranteed here: the id comes from the matched row and no create path is reachable for a reactivate target.
+  - [x] Two inactive role-3 rows → exactly **one** active afterwards. — branch (b) emits one id per user; observed red when the branch-(a) guard was removed and when `MIN` was taken over all inactive rows.
+  - [x] An inactive `role_id = 1` row is **still inactive** afterwards, and appears in `rolesLeftInactive`. — the N-4 gate observed red emitting id `700` (the `role_id = 1` row) instead of `701`.
+  - [ ] No `app_secrets` row changes — no statement is issued against that table anywhere in the codebase path. — ⚠️ **NOT provable at this tier, and no longer claimed.** The assertion that grepped the mocked `manager.query` for `app_secrets` was **removed** after review found it could not fail (the repository is mocked, so its SQL never reaches `manager.query`). **Carried to T-09.**
+  - [x] An **active** account carrying no role-3 row is left untouched and listed in `accountsWithoutRole` (`OQ-D6`). — asserted, and asserted *not* to be granted a role.
 - **Dependencies:** T-02, T-03
-- **Estimated effort:** L (~190 LOC)
-- **Status:** todo
+- **Estimated effort:** L (~190 LOC) — **actual ~300 LOC** (impl + spec).
+- **Status:** **done** — PASS 2026-09-15, 1 Implementer attempt / 1 Reviewer round. Implemented by the **Leader** (Codex quota exhausted), audited by Antigravity `gemini-3.1-pro-high`. See [`./execution.md`](./execution.md) → T-06.
 
 ---
 

@@ -9,6 +9,7 @@ import {
   SecUserCreateRow,
   SecUserRefreshRow,
   SecUserReconcilerRepository,
+  SecUserRoleRow,
 } from './sec-user-reconciler.repository';
 
 /** Column widths this pass validates against before ever building a write (design.md §5.4). */
@@ -71,7 +72,35 @@ export interface CreateGrantOutcome {
   namesTruncated: number;
   carnetBackfilled: number;
   carnetConflicts: number;
+  reactivated: number;
+  rolesReactivated: number;
+  rolesGrantedOnReactivation: number;
+  rolesLeftInactive: RoleLeftInactive[];
+  accountsWithoutRole: number[];
   abortReason?: 'GRANT_ASSERTION';
+}
+
+/**
+ * A role row this pass deliberately left switched off on a returning user (RSK-7, §9). Reported so
+ * that a returning admin who came back as a plain contributor is discoverable by a human instead of
+ * surfacing as a complaint.
+ */
+export interface RoleLeftInactive {
+  userId: number;
+  roleId: number;
+}
+
+/**
+ * The three disjoint reactivation role branches of `design.md` §5.4, computed in memory from one
+ * chunked read (M-2). They are disjoint by construction: a user appears in exactly one.
+ */
+interface RoleBranches {
+  /** (b) one id per user — `MIN(sec_user_role_id)` among that user's `role_id = 3` rows. */
+  reactivateRoleIds: number[];
+  /** (c) users holding no `role_id = 3` row at all. */
+  grantRoleUserIds: number[];
+  rolesLeftInactive: RoleLeftInactive[];
+  accountsWithoutRole: number[];
 }
 
 /**
@@ -197,8 +226,33 @@ export class SecUserReconcilerService {
     reconciliation: ReconciliationResult,
   ): Promise<CreateGrantOutcome> {
     const createRows = this.createRows(reconciliation.create);
-    const refreshRows = this.refreshRows(reconciliation.refresh);
-    const refreshSummary = this.refreshSummary(reconciliation.refresh);
+
+    // R-AGS-007: "The account is also refreshed — names and carnet backfill per R-AGS-002 —
+    // because a returning employee's details are as stale as anyone's." Reactivated accounts
+    // therefore join the refresh batch rather than getting a second pass (NFR-AGS-002).
+    const refreshTargets = [
+      ...reconciliation.refresh,
+      ...reconciliation.reactivate,
+    ];
+    const refreshRows = this.refreshRows(refreshTargets);
+    const refreshSummary = this.refreshSummary(refreshTargets);
+
+    const reactivateUserIds = reconciliation.reactivate.map(
+      ({ secUser }) => secUser.sec_user_id,
+    );
+    // One chunked read over BOTH populations (M-2). The reactivate half decides the three role
+    // branches; the refresh half is only inspected to report `accountsWithoutRole` (OQ-D6) — no
+    // write is ever derived from it. This read is deliberately outside the transaction, matching
+    // the bulk `sec_users` read (N-9).
+    const roleRows = await this.repository.findSecUserRolesByUserIds([
+      ...reactivateUserIds,
+      ...reconciliation.refresh.map(({ secUser }) => secUser.sec_user_id),
+    ]);
+    const branches = this.roleBranches(
+      reactivateUserIds,
+      reconciliation.refresh.map(({ secUser }) => secUser.sec_user_id),
+      roleRows,
+    );
 
     return this.dataSource.transaction(async (manager) => {
       // This is deliberately the first database statement in the transaction (M-1). Do not move
@@ -208,6 +262,21 @@ export class SecUserReconcilerService {
       // T-05/T-06 seam: refresh and reactivation writes belong here, before create_grant.
       await this.repository.refreshSecUserNames(manager, refreshRows);
       await this.repository.backfillSecUserCarnets(manager, refreshRows);
+
+      // R-AGS-007: two tables only — `sec_users` then `sec_user_roles`. `app_secrets` is never
+      // read or written anywhere in this path: a machine credential is never silently re-armed.
+      await this.repository.reactivateSecUsers(manager, reactivateUserIds);
+      // Branch (b): exactly one id per user, already filtered to `role_id = 3` before the minimum
+      // was taken. The repository's WHERE re-pins `role_id = 3` in SQL (N-4).
+      await this.repository.reactivateContributorRoles(
+        manager,
+        branches.reactivateRoleIds,
+      );
+      // Branch (c): no `role_id = 3` row existed, so one is inserted with a literal 3.
+      await this.repository.grantContributorRoles(
+        manager,
+        branches.grantRoleUserIds,
+      );
 
       await manager.query('SAVEPOINT create_grant');
       await this.repository.createSecUsers(manager, createRows);
@@ -224,6 +293,7 @@ export class SecUserReconcilerService {
           rolesGranted: 0,
           createsDiscarded: createRows.length,
           ...refreshSummary,
+          ...this.reactivationSummary(reactivateUserIds, branches),
           abortReason: 'GRANT_ASSERTION',
         };
       }
@@ -240,8 +310,113 @@ export class SecUserReconcilerService {
         rolesGranted: createdUsers.length,
         createsDiscarded: 0,
         ...refreshSummary,
+        ...this.reactivationSummary(reactivateUserIds, branches),
       };
     });
+  }
+
+  /**
+   * Sorts the reactivation targets into `design.md` §5.4's three disjoint role branches, and
+   * collects the two report-only sets §9 requires.
+   *
+   * **The `role_id = 3` filter runs BEFORE the minimum is taken.** Computing `MIN(sec_user_role_id)`
+   * over a user's inactive rows first and filtering afterwards emits the id of a `role_id = 1` row
+   * and **restores `SYSTEM_ADMIN`** — that is finding `N-4`, and it is why the repository ALSO pins
+   * `AND role_id = 3` in the statement's `WHERE` clause. Two guards, because one of them was
+   * removed once by the very correction meant to harden it.
+   */
+  private roleBranches(
+    reactivateUserIds: number[],
+    refreshUserIds: number[],
+    roleRows: SecUserRoleRow[],
+  ): RoleBranches {
+    const byUser = new Map<number, SecUserRoleRow[]>();
+    for (const row of roleRows) {
+      const bucket = byUser.get(row.user_id);
+      if (bucket) {
+        bucket.push(row);
+      } else {
+        byUser.set(row.user_id, [row]);
+      }
+    }
+
+    const reactivateRoleIds: number[] = [];
+    const grantRoleUserIds: number[] = [];
+    const rolesLeftInactive: RoleLeftInactive[] = [];
+
+    for (const userId of reactivateUserIds) {
+      const rows = byUser.get(userId) ?? [];
+      const contributorRows = rows.filter((row) => row.role_id === 3);
+
+      if (contributorRows.some((row) => row.is_active)) {
+        // (a) already holds an active CONTRIBUTOR row — no statement is issued. Issuing one would
+        // flip a pre-existing duplicate pair into two active rows (M-2).
+      } else if (contributorRows.length > 0) {
+        // (b) one id per user: the lowest sec_user_role_id AMONG THIS USER'S role_id = 3 rows.
+        reactivateRoleIds.push(
+          contributorRows.reduce(
+            (lowest, row) =>
+              row.sec_user_role_id < lowest ? row.sec_user_role_id : lowest,
+            contributorRows[0].sec_user_role_id,
+          ),
+        );
+      } else {
+        // (c) no CONTRIBUTOR row at all.
+        grantRoleUserIds.push(userId);
+      }
+
+      for (const row of rows) {
+        if (row.role_id !== 3 && !row.is_active) {
+          rolesLeftInactive.push({ userId, roleId: row.role_id });
+          this._warnRoleLeftInactive(userId, row.role_id);
+        }
+      }
+    }
+
+    // OQ-D6 / RSK-10: a matched ACTIVE account holding no active CONTRIBUTOR row is left untouched
+    // by user ruling — normally an external provisioned through a different flow, and also where a
+    // savepoint-rollback orphan lands. Reported, never granted.
+    const accountsWithoutRole = refreshUserIds.filter(
+      (userId) =>
+        !(byUser.get(userId) ?? []).some(
+          (row) => row.role_id === 3 && row.is_active,
+        ),
+    );
+
+    return {
+      reactivateRoleIds,
+      grantRoleUserIds,
+      rolesLeftInactive,
+      accountsWithoutRole,
+    };
+  }
+
+  private _warnRoleLeftInactive(userId: number, roleId: number): void {
+    this.logger._warn(
+      `Reactivated sec_user_id=${userId} without restoring role_id=${roleId}: re-granting a non-contributor role is a human decision`,
+    );
+  }
+
+  private reactivationSummary(
+    reactivateUserIds: number[],
+    branches: RoleBranches,
+  ): Pick<
+    CreateGrantOutcome,
+    | 'reactivated'
+    | 'rolesReactivated'
+    | 'rolesGrantedOnReactivation'
+    | 'rolesLeftInactive'
+    | 'accountsWithoutRole'
+  > {
+    return {
+      reactivated: reactivateUserIds.length,
+      // R-AGS-007 AC.8 / RB-10: branch (b) and branch (c) are DISTINCT counts. Collapsing them
+      // hides which half of the role restoration actually happened.
+      rolesReactivated: branches.reactivateRoleIds.length,
+      rolesGrantedOnReactivation: branches.grantRoleUserIds.length,
+      rolesLeftInactive: branches.rolesLeftInactive,
+      accountsWithoutRole: branches.accountsWithoutRole,
+    };
   }
 
   private refreshRows(targets: MatchedTarget[]): SecUserRefreshRow[] {

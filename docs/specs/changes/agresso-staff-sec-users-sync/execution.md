@@ -489,3 +489,61 @@ Tests: 1 failed, 25 passed, 26 total
 #### Carried to T-09
 
 - *"`status_id`, `is_active` and `email` are byte-identical before and after"* and *"an unmatched account is byte-identical, `updated_at` included"* are **database** claims. `npm test` has `rootDir: src` and never runs `test/fixtures/`.
+
+---
+
+### T-06 — Reactivation: `sec_users` + three disjoint role branches
+
+- **Date:** 2026-09-15
+- **Requirements covered:** R-AGS-007
+- **Status:** **PASS** — 1 Implementer attempt / 1 Reviewer round
+- **Implementer:** **Claude Opus (the Leader)** — Codex quota exhausted
+- **Reviewer:** Antigravity `gemini-3.1-pro-high` — Task `task_f6194cf84738`, injected into `term_80db4a37`
+
+**Files changed:** `sec-user-reconciler.service.ts`, `sec-user-reconciler.service.spec.ts`. No repository change, no SQL — T-03's primitives are composed.
+
+**Added:** `roleBranches()`, `reactivationSummary()`, `_warnRoleLeftInactive()`, the `RoleLeftInactive` and `RoleBranches` types, five new `CreateGrantOutcome` fields (`reactivated`, `rolesReactivated`, `rolesGrantedOnReactivation`, `rolesLeftInactive`, `accountsWithoutRole`), one chunked role read, and three reactivation calls at the T-04 seam.
+
+**The three disjoint branches (§5.4, M-2), computed in memory from one chunked read:**
+
+| Branch | Condition | Action |
+| --- | --- | --- |
+| (a) | already holds an **active** `role_id = 3` row | **no statement is issued** |
+| (b) | one or more **inactive** `role_id = 3` rows, none active | `UPDATE` **one id per user** — `MIN(sec_user_role_id)` **among that user's `role_id = 3` rows** |
+| (c) | no `role_id = 3` row at all | `INSERT` with `role_id` a literal `3` |
+
+**R-AGS-007's refresh obligation:** reactivated accounts join the **same** refresh batch as the `refresh` set — *"The account is also refreshed … because a returning employee's details are as stale as anyone's"* — keeping the statement count at `O(⌈n / CHUNK⌉)` (NFR-AGS-002).
+
+**Verification:** `npm test -- --silent` → **368 suites / 3173 tests**; `npx eslint src/domain/tools/agresso/staff` → exit 0 (bare, K-001).
+
+#### K-004 — three mutations, each observed red, then reverted (reverts diffed against a backup)
+
+| # | Mutation | Observed red |
+| --- | --- | --- |
+| 1 | **N-4:** `MIN` taken over the user's **inactive** rows *before* filtering to `role_id = 3` | `- 701 / + 700` — the `role_id = 1` row's id is emitted. **This red is `SYSTEM_ADMIN` being restored to a returning contributor**, and it is the single reason this guard exists |
+| 2 | branch (a)'s "already holds an active role-3 row" guard removed | `- Array [] / + Array [800]` — the stale inactive row flips beside the already-active one → **two active contributor rows** (M-2; `sec_user_roles` has no unique index on `(user_id, role_id)`) |
+| 3 | reactivation writes moved **after** `SAVEPOINT create_grant` | `Expected: < 203, Received: 204`, **plus** the order-array test reddened independently. 2 failed / 31 passed |
+
+#### ⚠️ The author modified five pre-existing tests — declared to the Reviewer up front
+
+The Leader wrote this task **and** changed five tests its own change broke. That is precisely where an author can weaken a gate to make its code pass, so the review brief opened by naming the situation and itemising all five for individual judgement. The Reviewer's verdict on each:
+
+| # | Test | Change | Reviewer verdict |
+| --- | --- | --- | --- |
+| a | *refreshes active matches at the seam…* | `toEqual` gained five fields incl. `accountsWithoutRole: [23]` | Correct for the fixture |
+| b | *sets the database-clock marker first…* | order array gained three entries before the savepoint | Still pins M-1; not loosened |
+| c, d | the two F-3 rollback tests | `not.toHaveBeenCalled()` → `not.toHaveBeenCalledWith(manager, arrayContaining([17]))` | Adequate — branch (c) now calls that method with an **empty** array before the savepoint, so "never called" is the wrong shape; the property that matters (no *created* id is granted on rollback) is asserted directly |
+| e | *backfills empty carnets but never refreshes inactive matches* | **RENAMED and INVERTED** to assert reactivated accounts **are** refreshed | **Upheld.** The Reviewer verified the claim against R-AGS-007's text: the inversion is *"explicitly demanded by R-AGS-007"*. The old assertion encoded a **task boundary** (T-05 excluded inactive rows), not a requirement |
+
+Item (e) was flagged to the Reviewer as *"the one the author wants challenged"*, with the instruction that if the old assertion had been protecting a real requirement, inverting it would be a serious FAIL.
+
+#### Reviewer ADVISORY — and the one the Leader acted on
+
+- **RELIABILITY (acted on, not merely recorded):** the test asserting AC.6 by grepping `manager.query` for `/app_secrets/i` was **theatre**. The repository is mocked, so every repository statement bypasses `manager.query` and the only SQL it ever sees is the savepoint pair — **the assertion could not fail, with or without the defect.** That is KZ-001, written by the Leader immediately after demanding the same discipline from three workers.
+  **The assertion was removed** rather than left green. Deleting a claim that cannot fail is not widening the task — it is declining to ship a false gate. In its place the file carries a comment recording why, and **AC.6 is carried to T-09 with its done-check left unticked.** What the mocked tier *can* prove, and does, is that the reactivation path calls only `reactivateSecUsers` / `reactivateContributorRoles` / `grantContributorRoles`, and that no repository method reaches `app_secrets` at all.
+- **RELIABILITY (recorded):** the role read happens **outside** the transaction, so it shares the same REPEATABLE READ snapshot imprecision as the `sec_users` bulk read. Accepted, on the same grounds T-05's Reviewer ruled for the carnet counters, and because `sec_user_roles` has no unique index regardless — but **concurrent role modifications inside the window are not seen**.
+
+#### Carried to T-09
+
+- **AC.6 — "no `app_secrets` row changes"** is now explicitly **unproven at any tier below the fixtures**, and the only assertion that claimed it has been removed.
+- AC.1 (original `sec_user_id` retained), AC.2 (non-selected candidates byte-identical), AC.5 (role rows other than 3 byte-identical), AC.7 (idempotence across two runs) are all database claims.
