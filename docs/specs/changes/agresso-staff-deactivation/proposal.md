@@ -181,4 +181,17 @@ Deactivation decides whom to switch off **by absence**. The absent population ha
 
 **Before specifying deactivation, measure the delta:** compare `totalElements` from the employees endpoint with and without `?status=active`. If the gap is large, absence-based deactivation is operating on a much bigger candidate set than the parent spec's analysis assumed.
 
-**Do not treat this note as settled design.** It is a hazard hand-off from a sibling that changed shared code, recorded so the next specifier does not rediscover it after the fact.
+### ✅ User ruling 2026-09-15 — the filter STAYS; the growth is accepted
+
+Put to the user with the trade-off stated. Ruling: *"si crece pero son cambios necesarios"* — **yes, the absent population grows, and the change is necessary anyway.** `?status=active` is permanent and is not to be reverted to make this spec's job easier.
+
+**What the ruling settles, and what it explicitly does not.** It settles *which* trade-off the platform takes: a filtered fetch, accepting a larger absent population, rather than an unfiltered one that would provision and reactivate departed staff. It does **not** reduce this spec's obligations — it **raises** them. Deactivation still decides by absence, and absence is now a broader, less specific signal than the parent spec's analysis assumed.
+
+**Therefore, binding on this spec:**
+
+1. **`C-1` / `C-2` / `C-3` are not optional and not negotiable down.** They were already mandatory here; the ruling makes them the only thing standing between a short payload and a mass deactivation of people who are merely non-active in Agresso.
+2. **`EX-1` must be re-derived, not inherited.** "External user" and "genuinely non-active staff member" are now both simply *absent*, and `EX-1`'s original formulation assumed absence meant only the former.
+3. **`OQ-7` must be re-asked, not carried.** Its ruling — *"staff users are governed by the staff list; only externals are genuinely suspended"* — was given when the payload carried every employee. With the filter, **"on the staff list" and "in the payload" are different sets**, which is precisely the premise that ruling rested on.
+4. **Measure the delta before specifying:** `totalElements` with and without `?status=active`. That number is the size of the newly-absent population, and no requirement here should be written without it.
+
+**This note is now a recorded decision, not an open question.** What remains open is how this spec absorbs it.

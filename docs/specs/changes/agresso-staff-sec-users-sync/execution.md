@@ -735,3 +735,5 @@ The absent population just grew by an unmeasured amount. `C-1`/`C-2`/`C-3` becom
 A full hazard note was appended to that spec's `proposal.md`, including the measurement to take first: compare `totalElements` with and without `?status=active`.
 
 **Verification after the change:** 369 suites / **3186 tests**; `npx eslint src/domain/tools/agresso/staff` → clean, 0 warnings.
+
+**User ruling on the cross-spec impact (2026-09-15):** *"si crece pero son cambios necesarios."* The growth in the absent population is **accepted**; `?status=active` is permanent. The ruling settles which trade-off the platform takes — it does **not** reduce the sibling spec's obligations, it raises them: `C-1`/`C-2`/`C-3` become non-negotiable there, `EX-1` must be re-derived, and `OQ-7` must be re-asked because its premise ("on the staff list" = "in the payload") no longer holds. Recorded as a decision in that spec's `proposal.md`, not as an open question.
