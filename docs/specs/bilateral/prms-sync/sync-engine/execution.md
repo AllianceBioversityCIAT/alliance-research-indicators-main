@@ -1506,3 +1506,249 @@ The attempt-3 worker wrote `.akili-t13c-attempt3-report.md` into the repo root �
 it: `execution.md` is the single audit trail, and a parallel report beside it is two places asserting
 the same facts, which is what KZ-005 exists to prevent. The attempt-4 brief forbade it explicitly and
 no file was created.
+
+---
+
+### T-14 — Live TEST e2e: the DC-3 proof and the guard matrix
+
+**Attempt 1 — Implementer: Cursor `cursor-grok-4.6-high-fast` · Reviewer: Cursor `gpt-5.6-sol-high` · Verdict: `STATUS: FAIL` (2 issues)**
+
+Scope delivered: one new file, `server/researchindicators/test/prms-sync.e2e-spec.ts`. No production change.
+
+**What the Reviewer confirmed (not re-litigated on rework):**
+
+| Check | Finding |
+|---|---|
+| A — alignment PATCH ordering | Occurs **after** the 207 and would fail with the flag set |
+| B — the 207 is real | Genuine partner response with a real `requestId`; **no mock of the ingest** |
+| D — contributor personas | Correctly pinned |
+| E — refusal categories | Three categories carry **exact** messages, with no transport call |
+| G — scope | One new file, nothing else touched |
+
+**Issue 1 — the K-004 falsifier did not discriminate.** Reviewer, verbatim:
+
+> "el falsificador K-004 con enlace válido no alcanzó ACCEPTED ni hizo fallar la aserción DC-3, sino que
+> cayó antes por el 400 de aprovisionamiento de `t14-owner@example.org`"
+
+Violates `tasks.md` T-14 *Failing input* and CLAUDE.md §4.3 K-004/KZ-014. A red produced by a provisioning
+400 proves the request was rejected **earlier**, not that the assertion discriminates — the same distinction
+that failed T-07, where a red from an absent module did not count.
+
+**Issue 2 — a PROD-traffic safety hole.** Reviewer, verbatim:
+
+> "la suite afirma Never PROD pero conserva cualquier `ARI_PRMS_NORMALIZER_HOST` preexistente mediante OR
+> lógico, por lo que un entorno configurado con PROD lo usaría"
+
+The line, at `test/prms-sync.e2e-spec.ts:42-44`:
+
+```js
+process.env.ARI_IS_PRODUCTION = 'false';
+process.env.ARI_PRMS_NORMALIZER_HOST =
+  process.env.ARI_PRMS_NORMALIZER_HOST || TEST_NORMALIZER_HOST;
+```
+
+The `||` **preserves** a pre-existing value. This suite sends real ingests, so a shell or CI exporting the
+PROD host (`v6a9z2e4y5…`, per `family.md:69` / `homologation.md:481`) would have this suite writing live
+results into **production PRMS**, for which there is no un-sync path. Violates NFR-PRMS-001
+(`requirements.md:438` — *zero PROD Normalizer calls reachable from local/dev/staging*).
+
+**Leader verification of Issue 2's blast radius** (read-only, run while the rework was dispatched):
+
+| Question | Measured |
+|---|---|
+| Every reference to the var, package-wide | **8**, of which one is `.env.example:36` (commented) and two are the defective lines |
+| Does a `.env` on disk preload it? | `.env` exists but **does not define it** — only `.env.example` names it, commented out |
+| Does `jest-e2e.json` load dotenv or a setup file? | **No** `setupFiles`/`setupFilesAfterEnv` — the only injection path is an exported shell/CI variable |
+| Is the host read once at boot? | **No** — `app-config.util.ts:54-55` is a **live getter** over `process.env`, so a snapshot check is not enough; the fix must assert-and-abort |
+
+This is a **reachable** instance of **DC-7** (`requirements.md:108`, *"Non-prod environment reaching the
+PROD Normalizer"*), which the spec had recorded as structurally unprovable for the production *build*.
+DC-7's declared limit covers the deployed artifact; it does not excuse the hole inside our own suite.
+
+**Rework dispatched** as T-14b (`task_107a82a5b46a` / `ctx_a363f9fdedde`), effort bumped per the rework
+rule. Issue 2 is unconditional. For Issue 1 the brief states explicitly that **declaring T-14 BLOCKED with
+DC-3's falsifier uncovered is an acceptable outcome** if PRMS TEST accepts no usable identity — consistent
+with the task's own disqualifier (*"If TEST is unreachable, the task is BLOCKED — and DC-3 is recorded as
+uncovered rather than quietly closed"*). Claiming a falsifier that did not discriminate would not be.
+
+**Worker accounting.** `worker-release` on the attempt-1 Implementer returned `retained`, not `released`.
+`worker-list` explains it: `ownershipState=user_owned`, `retainedReason=user_takeover` — the human took
+that terminal over, so Orca correctly refuses to reclaim it. Not an orphan. Run `run_3ed0320bedc0` totals
+**45 workers: 41 released · 3 `failed`/`external_terminal` (the dead agy dispatches) · 1 `user_owned` ·
+1 active.**
+
+**Leader measurement error, recorded.** `orca orchestration dispatch-list` **does not exist**; the Leader
+ran it, parsed the failure envelope, and reported *"total dispatches: 0"* — a count over a failed command,
+the exact K-014 trap ("check for an error in the raw output before you count it"). Corrected by reading
+`orchestration --help` and re-running through `worker-list`. Ninth Leader measurement error this run.
+
+**Attempt 2 (T-14b) — Implementer: Cursor `cursor-grok-4.6-high-fast`, effort bumped per the rework rule**
+
+Both issues addressed in the single file; no production change.
+
+**Issue 2 — closed.** The `||` is gone. The suite now aborts at **module scope, before the app boots**:
+
+```ts
+if (incomingNormalizerHost === PROD_NORMALIZER_HOST ||
+    (Boolean(incomingNormalizerHost) &&
+     incomingNormalizerHost !== TEST_NORMALIZER_HOST)) {
+  throw new Error(`T-14 abort before app boot: ARI_PRMS_NORMALIZER_HOST must be exactly ${TEST_NORMALIZER_HOST}; refusing ${incomingNormalizerHost}. Never PROD.`);
+}
+```
+
+PROD is named and rejected explicitly, any other non-TEST value is rejected, and only *unset* falls through to the TEST default. The same `abortUnlessExactly` / `requireInherited` pattern was extended to the inherited MySQL credentials and the API key, and the file now **enumerates the env vars it deliberately does not set** with the reason they cannot redirect ingest — a KZ-017 declaration of scope, in the code.
+
+**Leader-verified the load-bearing claim** behind that argument (*"PrmsNormalizerService reads only `ARI_PRMS_NORMALIZER_HOST`"*): the service reads exactly two config values — `appConfig.ARI_PRMS_NORMALIZER_HOST` (line 26) and `AppConfigKey.ARI_CLARISA_API_KEY` (36-37). No third env read exists, so the host guard genuinely controls the ingest destination. Claim confirmed rather than assumed.
+
+**Issue 1 — closed, branch (a).** The owner identity was pinned to `ari-spike-tester@cgiar.org` (PRMS user id 1160) — the identity T-01's spike had already reached ACCEPTED with three times. The falsifier switch was verified to flip the **variable genuinely under test**, not merely relabel: `EVIDENCE_LINK = K004_VALID ? VALID_EVIDENCE_LINK : BAD_EVIDENCE_LINK` (line 152), Drive link → `https://www.cgiar.org/research/`, plus a fresh `external_reference` so a duplicate cannot short-circuit the run.
+
+**Leader re-measurement — independent live runs, not the Implementer's report.** Both were re-executed by the Leader after the worker was released; the requestIds differ from the worker's, which is what proves these are fresh partner calls and not a replay.
+
+| Run | Result |
+|---|---|
+| Committed default (bad Drive link) | **4 passed / 4 total.** `external_reference=910150901` · `http_status=207` · `outcome=REJECTED_BY_PRMS` · `request_id=Root=1-6aa9a29a-2f4dd2883d4f660631007ece` · PRMS reason: *"Links to file storage platforms (Google Drive, Dropbox, SharePoint, OneDrive) are not accepted as evidence"* · alignment PATCH `{"status":200,"description":"Pool funding alignment updated"}` — **not 409, still writable** |
+| K-004 falsifier (`PRMS_E2E_K004_VALID=1`) | **1 failed / 3 passed / 4 total.** `external_reference=910150913` · `http_status=200` · `outcome=ACCEPTED` · `request_id=Root=1-6aa9a2bc-2a3ef24e03ddf6ce0c4f9375` · red lands on **`expect(synced).toBe(false)` — `Expected: false / Received: true`** |
+
+The falsifier **reached ACCEPTED and then failed on the DC-3 discriminator**, with the other three tests still green — the isolation that distinguishes a real gate from the provisioning-400 collapse that invalidated attempt 1. **DC-3 is covered.**
+
+**New-defect check on the one restructuring.** `expect(synced).toBe(false)` was moved ahead of the `http_status !== 207` UNCOVERED throw so an ACCEPTED falsifier reddens on the discriminator. The committed path is **not** weakened: the 207 gate still exists and still throws immediately after, followed by the full `REJECTED_BY_PRMS` / `request_id` / `failure_reason` / log-row assertions.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **387 suites · 3288 passed · 0 skipped** — unchanged, no regression |
+| Integration (`result-prms-sync` suites) | **2 suites · 6 tests passed** |
+| `npx eslint test/prms-sync.e2e-spec.ts`, unpiped | **exit 0** |
+| Live e2e, committed default | **4 / 4 passed** |
+| K-004 falsifier | **seen RED on the DC-3 discriminator** |
+| Credential sweep | **0** occurrences of the literal key value (swept the value read from `.env`, not the variable name — KZ-005) |
+
+#### Declared limits (KZ-017)
+
+`npm run test:integration` selects **three** suites, not two. The third,
+`bilateral-primary-contributing-sp.integration-spec.ts`, fails 9 tests solely because `T13_MYSQL_PASSWORD`
+is unset in the Leader's environment — it refuses by design to fall back to a committed default credential.
+That suite belongs to a **different spec** (`bilateral/primary-contributing-sp`) and is untouched by T-14.
+Recorded as an unmet environment precondition, not a defect and not a regression.
+
+**Leader bookkeeping error, recorded.** Earlier entries in this log cite the integration baseline as
+"2 suites / 6 tests". That figure came from a **filtered** invocation (`-- result-prms-sync`), not the full
+config — a K-014 error ("a filtered view is not the output") in the Leader's own record. The full config has
+always selected three suites. The corrected reading is above. Tenth Leader measurement error this run.
+
+**Scope discipline — third occurrence.** The worker wrote
+`docs/specs/bilateral/prms-sync/sync-engine/t14b-attempt2-implementer.md`. Unlike T-13 attempt 3, **this
+brief did not forbid it** — the omission was the Leader's. Evidence salvaged, file deleted; `execution.md`
+remains the single audit trail.
+
+**Attempt 2 — Reviewer: Cursor `gpt-5.6-sol-high` · Verdict: `STATUS: FAIL` (1 issue)**
+
+The Reviewer **confirmed all three items it was asked to audit**: the K-004 falsifier does reach ACCEPTED and
+does fail the DC-3 assertion; the host guard does block every preexisting non-TEST host before boot; and the
+committed path retains its checks after `expect(synced)`. It also agreed the `T13_MYSQL_PASSWORD` failure in
+a sibling spec's suite is out of scope. **Issues 1 and 2 are closed.** One new issue was raised, verbatim:
+
+> "el supuesto `external_reference` fresco no está garantizado, porque `Date.now() % 11` reutiliza solo once
+> códigos persistentes y el título también reutiliza ese código, de modo que una ejecución posterior puede
+> caer antes en el rechazo por duplicado"
+
+**The Leader judged this in scope and material.** `test/prms-sync.e2e-spec.ts:140` is
+`OFFICIAL_BAND_START + 10 + (Date.now() % 11)` — **eleven** possible codes (910150911–910150921). Every
+successful K-004 run ACCEPTS a result that **persists in PRMS TEST and cannot be cleaned from our side**.
+The evidence that the slots are already being consumed is in this log: the attempt-2 worker drew **910150916**
+and the Leader drew **910150913** — two of eleven, in two runs.
+
+The failure mode on collision is worse than a plain error: PRMS rejects the duplicate, `synced` stays false,
+**`expect(synced).toBe(false)` PASSES**, and the run instead dies on the `http_status !== 207` UNCOVERED
+throw. A red for the wrong reason — the same disqualifier that failed attempt 1 as a provisioning 400. A gate
+that silently stops being a gate after a handful of runs belongs to the same class as `npm run lint` carrying
+`--fix` (K-001), which is exactly what K-004 exists to catch.
+
+A constraint the remediation must respect, found by the Leader while confirming the defect: local cleanup at
+line ~774 spans `[OFFICIAL_BAND_START, OFFICIAL_BAND_START + 20]`, so the generated code and the cleanup range
+have to move together or the scratch schema orphans rows.
+
+**Attempt 3 dispatched** as T-14c (`task_135f87003e04` / `ctx_5b6e78ec9005`). **This is the 3-attempt ceiling —
+a FAIL here HALTs T-14.** The brief narrows scope to this single issue, forbids touching the three confirmed
+behaviors, forbids a stray report file (third occurrence), and requires the worker to **demonstrate** the
+uniqueness property rather than assert it.
+
+**Attempt 3 (T-14c) — Implementer: Cursor `cursor-grok-4.6-high-fast`**
+
+`Date.now() % 11` replaced by a genuinely unique generator:
+
+```ts
+const K004_UNIQUE_BAND = 6_000_000_000_000_000;
+let k004OfficialSeq = 0;
+function uniqueK004OfficialCode(): number {
+  k004OfficialSeq += 1;
+  const code = K004_UNIQUE_BAND + Date.now() * 1000 + k004OfficialSeq;
+  if (!Number.isSafeInteger(code) || code < K004_UNIQUE_BAND) {
+    throw new Error(`T-14 abort: K-004 official code ${code} is not a safe bigint integer`);
+  }
+  return code;
+}
+```
+
+The committed default stays fixed at `OFFICIAL_BAND_START` (910150901) — correct, because PRMS always rejects
+the Drive link, so that code never persists and determinism costs nothing. Local cleanup was widened to span
+**two** ranges, `[OFFICIAL_BAND_START, OFFICIAL_BAND_END]` and `[K004_UNIQUE_BAND, MAX_SAFE_INTEGER]`, so the
+generated code cannot orphan a row in the scratch schema.
+
+**Leader structural check.** The generator is called **once per run** (`CODE.dc3`), so `seq` never approaches
+the 1000-wide millisecond slot boundary the uniqueness argument depends on. Headroom below
+`MAX_SAFE_INTEGER`: `6e15 + Date.now()*1000 ≈ 7.79e15` against `9.007e15`, i.e. roughly 38 years, and the
+`isSafeInteger` guard fails loud rather than wrapping.
+
+#### Leader-measured gates — all re-run after the worker was released
+
+| Gate | Result |
+|---|---|
+| Live e2e, committed default | **4 / 4 passed** · `external_reference=910150901` · `http_status=207` · `REJECTED_BY_PRMS` · `request_id=Root=1-6aa9a517-6f82a6b806f488e832b97b1f` · alignment PATCH `{"status":200}` — **not 409** |
+| K-004 falsifier | **1 failed / 3 passed.** `external_reference=7789502747755001` · `http_status=200` · **ACCEPTED** · red lands on **`expect(synced).toBe(false)` — `Expected: false / Received: true`** |
+| Unit suite | **387 suites · 3288 passed · 0 skipped** |
+| `npx eslint`, unpiped | **exit 0** |
+| Credential sweep (literal value from `.env`) | **0** occurrences |
+
+**Uniqueness demonstrated, not asserted (KZ-002).** The Implementer's run drew **7789502665762001**; the
+Leader's later, independent run drew **7789502747755001**. Two different codes in the same band, from two
+separate processes — the property is measured across runs rather than argued from the formula.
+
+**Review dispatched** (`task_41508ef0bf17` / `ctx_96783bc958fc`) to Cursor `gpt-5.6-sol-high` — the same
+Reviewer model that raised the issue, and still ≠ the Implementer model, preserving `author ≠ auditor`.
+
+**Attempt 3 — Reviewer: Cursor `gpt-5.6-sol-high` · Verdict: `STATUS: PASS`**
+
+> "Audité exclusivamente el cierre del defecto de unicidad de T-14c y confirmé **contra el repositorio** que la
+> banda generada queda separada de todas las bandas de fixtures existentes, que la secuencia evita colisiones
+> intraproceso y que los valores seguros quedan cubiertos por la limpieza con fallo explícito al agotar el
+> rango. La ruta por defecto sigue fija y conserva la prueba DC-3, el falsificador usa código y título frescos
+> y no queda trabajo de remediación."
+
+The Reviewer checked the band-separation claim **against the repo rather than against the code comment that
+asserted it** — the KZ-002 discipline, applied to the Leader's own brief.
+
+**T-14 is DONE after 3 attempts and 3 review rounds.** No `Not Done` field, no outstanding remediation.
+
+#### T-14 Done checks — each backed by a Leader-run measurement
+
+| Done check (`tasks.md:346-349`) | Evidence |
+|---|---|
+| Malformed row leaves `is_synced_to_prms = false`, records `REJECTED_BY_PRMS`, alignment PATCH non-409 | Live run: `http_status=207`, `outcome=REJECTED_BY_PRMS`, PATCH `{"status":200,"description":"Pool funding alignment updated"}` |
+| Allowed and denied guard cases both pass, denied using a non-owner `CONTRIBUTOR` | Both green; the denied persona is a plain `CONTRIBUTOR` not on the result, never `CENTER_ADMIN` |
+| `indicator_id` 3, 5, 6 and PRMS policy type `1` each refused with their own reason | Green; three distinct exact messages, no transport call |
+| Full suite green: `npm test -- --silent` | **387 suites · 3288 passed · 0 skipped** |
+
+**DC-3 is covered**, with a falsifier that has been **seen failing for the right reason** — ACCEPTED reached,
+then a specific red on `expect(synced).toBe(false)` — which is what K-004 demands and what attempts 1 and 2
+could not deliver.
+
+#### What T-14 does NOT cover — declared, not discovered later (KZ-017)
+
+- **DC-7** (`requirements.md:108`) — a non-prod environment reaching the PROD Normalizer — remains
+  **structurally uncoverable**. The suite now aborts before boot on any non-TEST host, which closes the hole
+  *inside this repo*, but no test here can prove the deployed production build resolves the right host. That
+  is verified at deploy time, and stays an accepted risk.
+- `npm test` (rootDir `src`) never runs this suite; `test:e2e` is a separate config and is not part of any
+  default gate.

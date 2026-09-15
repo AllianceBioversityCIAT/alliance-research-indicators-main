@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-13 done (2026-09-15); **T-14 is the last task**
+- **Status:** `execution-complete` — **all 14 tasks done (2026-09-15)**; the spec-level exit criteria below remain open, two of them requiring a human
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -343,10 +343,10 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - **The malformed-row case runs against the live TEST Normalizer**, with a deliberately bad evidence link — the 2026-08 rules reject it, and PRMS returns it as a failed row inside a **207**.
   - The guard matrix: allowed (`CONTRIBUTOR` on the result) and denied (**a plain `CONTRIBUTOR` not on the result** — ⚠️ *not* a `CENTER_ADMIN`, who short-circuits past the ownership check at `result-owner.guard.ts:26-31`).
 - **Done check:**
-  - [ ] The malformed row leaves `is_synced_to_prms = false`, records `REJECTED_BY_PRMS`, and the alignment PATCH still returns non-409
-  - [ ] Allowed and denied guard cases both pass, denied using a non-owner `CONTRIBUTOR`
-  - [ ] `indicator_id` 3, 5, 6 and PRMS policy type `1` each refused with their own reason
-  - [ ] Full suite green: `npm test -- --silent`
+  - [x] The malformed row leaves `is_synced_to_prms = false`, records `REJECTED_BY_PRMS`, and the alignment PATCH still returns non-409
+  - [x] Allowed and denied guard cases both pass, denied using a non-owner `CONTRIBUTOR`
+  - [x] `indicator_id` 3, 5, 6 and PRMS policy type `1` each refused with their own reason
+  - [x] Full suite green: `npm test -- --silent`
 - **Failing input:** point the malformed-row test at a **valid** link — it must go green-path and the DC-3 assertion must fail. A test that passes either way proves nothing.
 - **Disqualifies the evidence:** ⚠️ **substituting a mocked 207.** That converts the only DC-3 gate into a restatement of our own assumption. If TEST is unreachable, the task is **BLOCKED** — and DC-3 is recorded as uncovered rather than quietly closed.
 - **Effort:** M · **Depends on:** T-13 · **Skills:** `nestjs-expert`, `systematic-debugging`
@@ -377,7 +377,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ## 6. Done definition
 
-- [ ] All fourteen tasks `done`
+- [x] All fourteen tasks `done`
 - [ ] **Someone has exercised the sync in the running product before `/akili-validate` issues a verdict** — not after
 - [ ] Every requirement-level AC checked, at **clause** granularity per §2
 - [ ] Coverage thresholds green; `/swagger` documents both endpoints
