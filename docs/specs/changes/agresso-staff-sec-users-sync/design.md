@@ -422,8 +422,31 @@ The remaining decisions do not qualify: `base()` keeps its error contract, the t
 | Metric | Expected |
 | --- | --- |
 | Tasks | **9** |
-| LOC | **~1,580** — repository ~240, service ~350, summary DTO ~50, wiring ~30, guard + controller spec ~60, unit tests ~320, fixtures ~530 |
+| LOC | **~3,000** — *re-baselined 2026-09-15 during execution, user-approved at the T-03 gate. Superseded: ~1,580.* |
 | Review rounds | **5** |
+
+> **Re-baseline 4 — 2026-09-15, mid-execution, at the budget tripwire (user-approved).**
+>
+> After three tasks the actual was **1,385 LOC of the ~1,580 budgeted (88%) with 6 of 9 tasks still
+> open**, including T-09's ~530. T-04 would have crossed the tripwire, so execution stopped and
+> escalated as §14 requires.
+>
+> **The overrun is entirely in test code, and the implementation estimate was sound:**
+>
+> | | Budgeted for T-01…T-03 | Actual |
+> | --- | --- | --- |
+> | Implementation | ~740 | **580** |
+> | Unit tests | ~320 (for the *whole* unit tier) | **805** (three tasks) |
+>
+> The `~320` line assumed a conventional unit tier. This spec is not one: `requirements.md` §10
+> defines **30 defect-class gates**, every gate must be observed failing before it may be cited
+> (K-004), and several need adversarial fixtures where the correct and incorrect rules *disagree* —
+> T-02 alone rewrote two gates after finding they passed with the defect reintroduced. That work is
+> the deliverable, not waste.
+>
+> **Ruling: the estimate was wrong, not the work.** LOC re-baselined to **~3,000**; tasks and review
+> rounds unchanged. This vindicates the *"Honest caveat"* below, which predicted exactly this and was
+> written before any code existed.
 
 **Re-baselined 2026-09-14 for the split** *(closes Judgment Day F-4, which found the parent's budget still citing round 1 only, "seven new gates", and a nine-gate figure that was actually thirteen).*
 

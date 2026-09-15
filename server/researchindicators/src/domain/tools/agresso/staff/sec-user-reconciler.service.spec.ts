@@ -1,5 +1,6 @@
 // @akili-spec changes/agresso-staff-sec-users-sync (T-02 — decision logic: validate → index → collapse → match → classify)
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { DataSource, EntityManager } from 'typeorm';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 import { SecUserReconcilerRepository } from './sec-user-reconciler.repository';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
@@ -30,14 +31,27 @@ function secUser(overrides: Partial<SecUser>): SecUser {
 
 describe('SecUserReconcilerService', () => {
   let repository: jest.Mocked<SecUserReconcilerRepository>;
+  let dataSource: DataSource;
+  let manager: Pick<EntityManager, 'query'>;
   let service: SecUserReconcilerService;
 
   beforeEach(() => {
     repository = {
       findAllSecUsers: jest.fn().mockResolvedValue([]),
       findSecUserRolesByUserIds: jest.fn().mockResolvedValue([]),
+      setRunStart: jest.fn().mockResolvedValue(undefined),
+      createSecUsers: jest.fn().mockResolvedValue(undefined),
+      findCreatedSecUsers: jest.fn().mockResolvedValue([]),
+      grantContributorRoles: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<SecUserReconcilerRepository>;
-    service = new SecUserReconcilerService(repository);
+    manager = { query: jest.fn().mockResolvedValue(undefined) };
+    dataSource = {
+      transaction: jest.fn(
+        async (callback: (entityManager: EntityManager) => Promise<unknown>) =>
+          callback(manager as EntityManager),
+      ),
+    } as unknown as DataSource;
+    service = new SecUserReconcilerService(repository, dataSource);
     jest.spyOn(service['logger'], '_warn').mockImplementation(() => undefined);
   });
 
@@ -454,6 +468,133 @@ describe('SecUserReconcilerService', () => {
       const result = await service.reconcile([member]);
 
       expect(result.refresh[0].ambiguousCandidateIds).toEqual([]);
+    });
+  });
+
+  describe('create + grant transaction (R-AGS-003, R-AGS-004, DD-5, DD-15)', () => {
+    it('sets the database-clock marker first, then creates, asserts, and grants only the re-selected new id', async () => {
+      const member = staffMember({
+        resourceId: 'A100',
+        email: ' New.Hire@Alliance.org ',
+      });
+      const reconciliation = await service.reconcile([member]);
+      const order: string[] = [];
+      repository.setRunStart.mockImplementation(async () => {
+        order.push('setRunStart');
+      });
+      repository.createSecUsers.mockImplementation(async () => {
+        order.push('createSecUsers');
+      });
+      repository.findCreatedSecUsers.mockImplementation(async () => {
+        order.push('findCreatedSecUsers');
+        return [{ sec_user_id: 17, carnet: 'A100' }];
+      });
+      repository.grantContributorRoles.mockImplementation(async () => {
+        order.push('grantContributorRoles');
+      });
+      (manager.query as jest.Mock).mockImplementation(async (sql: string) => {
+        order.push(sql);
+      });
+
+      const outcome = await service.applyCreateAndGrant(reconciliation);
+
+      // Moving setRunStart below createSecUsers makes this expectation red and reproduces M-1:
+      // NOW(6) then post-dates every inserted created_at value, so the database re-select is empty.
+      expect(order).toEqual([
+        'setRunStart',
+        'SAVEPOINT create_grant',
+        'createSecUsers',
+        'findCreatedSecUsers',
+        'grantContributorRoles',
+      ]);
+      // The write preserves the raw email, matching T-02's raw-value length validation. Normalized
+      // email is a match key only; the requirements never authorize altering the stored identity.
+      expect(repository.createSecUsers).toHaveBeenCalledWith(manager, [
+        expect.objectContaining({ email: ' New.Hire@Alliance.org ' }),
+      ]);
+      expect(repository.grantContributorRoles).toHaveBeenCalledWith(manager, [
+        17,
+      ]);
+      expect(outcome).toEqual({
+        created: 1,
+        rolesGranted: 1,
+        createsDiscarded: 0,
+      });
+    });
+
+    it('rolls back when duplicate carnet rows preserve the set but increase the count', async () => {
+      const reconciliation = await service.reconcile([
+        staffMember({ resourceId: 'A100' }),
+      ]);
+      repository.findCreatedSecUsers.mockResolvedValue([
+        { sec_user_id: 17, carnet: 'A100' },
+        { sec_user_id: 99, carnet: 'A100' },
+      ]);
+
+      const outcome = await service.applyCreateAndGrant(reconciliation);
+
+      // This is the F-3 case that set equality alone misses: both sets are {A100}, but a role
+      // would otherwise be granted to the foreign id 99.
+      expect(manager.query).toHaveBeenCalledWith(
+        'ROLLBACK TO SAVEPOINT create_grant',
+      );
+      expect(repository.grantContributorRoles).not.toHaveBeenCalled();
+      expect(outcome).toEqual({
+        created: 0,
+        rolesGranted: 0,
+        createsDiscarded: 1,
+        abortReason: 'GRANT_ASSERTION',
+      });
+    });
+
+    it('rolls back when a foreign carnet balances the count but changes the set', async () => {
+      const reconciliation = await service.reconcile([
+        staffMember({ resourceId: 'A100' }),
+      ]);
+      repository.findCreatedSecUsers.mockResolvedValue([
+        { sec_user_id: 99, carnet: 'B200' },
+      ]);
+
+      const outcome = await service.applyCreateAndGrant(reconciliation);
+
+      // This is the F-3 case that count equality alone misses: both counts are one, but the
+      // resulting role would target a row this run did not create.
+      expect(manager.query).toHaveBeenCalledWith(
+        'ROLLBACK TO SAVEPOINT create_grant',
+      );
+      expect(repository.grantContributorRoles).not.toHaveBeenCalled();
+      expect(outcome.abortReason).toBe('GRANT_ASSERTION');
+    });
+
+    it('never grants a role to refresh or reactivate targets', async () => {
+      const fresh = staffMember({
+        resourceId: 'A100',
+        email: 'fresh@alliance.org',
+      });
+      const active = staffMember({
+        resourceId: 'A200',
+        email: 'active@alliance.org',
+      });
+      const inactive = staffMember({
+        resourceId: 'A300',
+        email: 'inactive@alliance.org',
+      });
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 20, email: active.email, is_active: true }),
+        secUser({ sec_user_id: 30, email: inactive.email, is_active: false }),
+      ]);
+      const reconciliation = await service.reconcile([fresh, active, inactive]);
+      repository.findCreatedSecUsers.mockResolvedValue([
+        { sec_user_id: 17, carnet: 'A100' },
+      ]);
+
+      await service.applyCreateAndGrant(reconciliation);
+
+      // AC.2 is enforced by the generated id argument, not merely the call sequence: ids 20 and
+      // 30 were classified outside create and cannot reach the grant repository method.
+      expect(repository.grantContributorRoles).toHaveBeenCalledWith(manager, [
+        17,
+      ]);
     });
   });
 });

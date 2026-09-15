@@ -20,9 +20,17 @@
 
 | Metric | Budgeted | Actual so far |
 | --- | --- | --- |
-| Tasks | 9 | 0 complete |
-| LOC | ~1,580 | 0 |
-| Review rounds | 5 (2 already spent in Judgment Day lineage 2) | 0 rework rounds spent |
+| Tasks | 9 | **3 complete** (T-01, T-02, T-03) |
+| LOC | ~~~1,580~~ → **~3,000** (re-baselined 2026-09-15, user-approved at the T-03 gate) | **1,385** — impl 580, tests 805 |
+| Review rounds | 5 (2 already spent in Judgment Day lineage 2) | 1 rework round spent (T-01 attempt 2) |
+
+> **Budget tripwire fired at the T-03 gate and was escalated, not absorbed.** At 1,385 of ~1,580 LOC
+> with 6 of 9 tasks open, T-04 would have crossed it. Execution stopped and put the delta to the user,
+> per `/akili-execute` §2.4. **Ruling: the estimate was wrong, not the work** — implementation came in
+> *under* estimate (580 vs ~740) and the entire overrun is test code (805 vs a ~320 line that assumed
+> a conventional unit tier, against a spec carrying 30 mandated gates each of which must be observed
+> failing). Re-baselined to ~3,000 LOC; tasks and review rounds unchanged. Recorded in `design.md` §14
+> as baseline 4.
 
 ### Standing environment facts for this run
 
@@ -349,3 +357,68 @@ The Reviewer cleared the *implementation*. It did not clear the *document*. `des
 3. **`agent_prompt_stalled` is a false negative, twice confirmed.** Both the `worker-start` and the `dispatch --inject` reported `failed`; the terminal showed the full prompt delivered and the agent working. **Read the terminal before believing the status.** Related: for `agy`, `terminal wait --for tui-idle` is satisfied *mid-work*, not only at turn end — it is not a usable completion signal. A verdict monitor must be anchored on a measured baseline (the brief's own echoed `STATUS:` lines are counted first) or it detects the prompt instead of the answer.
 
 Workers released/closed on completion per standing instruction: Codex dispatch `ctx_5ef791f21d62` → `released / closed_agent_terminal / archive captured`; the dead `gpt-6` terminal and the flash reviewer terminal were closed explicitly.
+
+---
+
+### T-04 — Create + grant inside `SAVEPOINT create_grant`
+
+- **Date:** 2026-09-15
+- **Requirements covered:** R-AGS-003, R-AGS-004
+- **Status:** **PASS** — 1 Implementer attempt / 1 Reviewer round
+- **Implementer:** Codex `gpt-5.6-terra` (effort `medium`) — Task `task_5d5d706ca43d` → Dispatch `ctx_d898b3072444`
+- **Reviewer:** Antigravity `gemini-3.1-pro-high` — Task `task_a3436a8422e5`, injected into `term_41896a86`
+
+**Files changed:** `sec-user-reconciler.service.ts` (+95/-3), `sec-user-reconciler.service.spec.ts` (+143). The repository was **not** touched — T-03 already provides every primitive, and adding service-level SQL would have violated the compose-only instruction.
+
+**Added:** `applyCreateAndGrant(reconciliation): Promise<CreateGrantOutcome>`, `createRows()`, `matchesCreatedRows()`, the `CreateGrantOutcome` shape (`created`, `rolesGranted`, `createsDiscarded`, optional `abortReason`), and a `DataSource` constructor dependency.
+
+**The sequence, which IS the specification (design.md §2.1):**
+
+```
+dataSource.transaction(manager => {
+  setRunStart(manager)                    // FIRST statement — M-1
+  // ← T-05/T-06 seam (refresh + reactivate go here, OUTSIDE the savepoint)
+  SAVEPOINT create_grant
+    createSecUsers → findCreatedSecUsers → matchesCreatedRows
+    fail → ROLLBACK TO SAVEPOINT create_grant
+           { created: 0, rolesGranted: 0, createsDiscarded: n, abortReason: 'GRANT_ASSERTION' }
+    pass → grantContributorRoles(manager, createdUsers.map(u => u.sec_user_id))
+})
+```
+
+**Verification (Implementer, re-measured by the Leader with no worker active):** `npm test -- --silent` → **368 suites / 3163 tests** (T-03 closed at 3159); `npx eslint src/domain/tools/agresso/staff` → exit 0 (bare, K-001).
+
+**K-004 — four mutations, each observed red then restored:**
+
+| # | Gate | Mutation | Observed red |
+| --- | --- | --- | --- |
+| 1 | F-3 **set** half | assertion reduced to count-only | *"rolls back when a foreign carnet balances the count but changes the set"* — `Expected "ROLLBACK TO SAVEPOINT create_grant"`, `Received "SAVEPOINT create_grant"` |
+| 2 | F-3 **count** half | assertion reduced to set-only | *"rolls back when duplicate carnet rows preserve the set but increase the count"* — same shape |
+| 3 | **M-1** ordering | `setRunStart` moved below `createSecUsers` | order array red: `- "setRunStart"` expected at index 0, `+` received after `"createSecUsers"` |
+| 4 | **AC.2** | pre-existing id `20` appended to the grant argument | **two** tests red — `grantContributorRoles` expected `(manager, [17])`, received `(manager, [17, 20])`; the second titled *"never grants a role to refresh or reactivate targets"* |
+
+Mutations 1 and 2 are the important pair: they falsify **each half of the double assertion independently**, which is exactly what `design.md` §5.4's two-row failure table demands and what Judgment Day F-3 punished historically.
+
+#### Reviewer's answers to the nine questions put to it
+
+1. **The carnet SET-vs-ROW-COUNT hole the Leader suspected — NOT a defect.** Scenario worked through concretely: two payload members, different emails, same carnet `100`. T-02 does not collapse them (it collapses by email), so `insertedRows.length = 2` while `insertedCarnets.size = 1`; the re-select on `carnet IN ('100')` returns both rows, so `2 === 2` and `1 === 1` and `.every()` all pass. **Both accounts are created and both granted.** That is **correct by design**: DD-12 mandates email-only matching, so two distinct emails *are* two accounts. Additionally `alliance_user_staff.carnet` is the **PK**, so Agresso treats it as unique upstream and a duplicate-carnet payload is close to unreachable.
+2. **Savepoint placement is correct.** The seam precedes `SAVEPOINT create_grant`, and MySQL's `ROLLBACK TO SAVEPOINT` undoes only work done *after* the savepoint — so T-05/T-06 writes added at the seam survive the inner rollback and commit with the outer transaction (DD-15, R-AGS-004 AC.5).
+3. **M-1 confirmed** — `setRunStart` is the first database statement, and the order test discriminates it.
+4. **AC.2 confirmed** — grant ids derive strictly from `findCreatedSecUsers`' return; no refresh or reactivate id can leak in.
+5. **AC.5 counters confirmed** — exact required shape on rollback, with the attempted figure in `createsDiscarded` (RA-10).
+6. **Empty create set — harmless.** DD-5 requires the whole reconciliation in one transaction, and `applyCreateAndGrant` is that wrapper, so the transaction must open regardless to host the seam writes. A savepoint over zero rows is a safe no-op.
+7. **Raw email is consistent.** T-02 normalizes on **both** sides during matching, so storing the raw value preserves the user's exact input while remaining reliably matchable on later runs.
+8. **No test would pass with its defect reintroduced.**
+9. **No scope absorbed.**
+
+Plus, unprompted: the new `DataSource` dependency **does not** complicate T-07's registration — NestJS resolves it automatically once TypeORM is configured; T-07 still just adds the service to `providers`.
+
+#### ADVISORY — recorded only
+
+- **EFFICIENCY —** when `createRows.length === 0`, wrapping create/find/grant in a guard would avoid issuing empty statements. Harmless as-is.
+
+#### Process notes
+
+- **The Reviewer's `worker_done` was rejected** (`dispatch_capability_invalid`) — the same Antigravity false-negative class. Its verdict arrived as a one-line summary only. The Leader **poked once** (per `.agents/leader.md` → *idle is not delivered*) demanding the per-question answers be printed to the terminal rather than sent, and recovered the full nine-answer audit. The result had been produced and simply never delivered.
+- **`orca terminal close` does NOT kill the agent process** (`ptyKilled: false`). The T-03 reviewer ran orphaned for ~5 minutes after being reported closed. Workers must now be verified with `pgrep`, not with the `ok: true` of `terminal close`.
+- The Implementer wrote its report into the **spec folder** (`t04-implementation-report.md`). Moved out to the scratchpad; the spec folder holds only the methodology's own documents. Future briefs should state where a report may be written.

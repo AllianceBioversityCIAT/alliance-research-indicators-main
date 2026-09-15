@@ -128,13 +128,13 @@ graph TD
   - On failure: `ROLLBACK TO create_grant`, `abortReason = GRANT_ASSERTION`, **`created = 0` and `rolesGranted = 0`** (`RA-10`).
   - `status_id = 1` on insert, matching `createUserInSecUsers`.
 - **Acceptance / done check:**
-  - [ ] A new hire has exactly one row and one active `role_id = 3` row.
-  - [ ] A pre-existing account gains **no** role row.
-  - [ ] Forcing the assertion leaves refreshes and reactivations **committed** and the counters at `0`.
-  - [ ] A second run creates no additional row and no second role row.
+  - [ ] A new hire has exactly one row and one active `role_id = 3` row. — **DB claim, carried to T-09.** The unit tier proves the call order and the grant argument; it cannot prove rows exist.
+  - [x] A pre-existing account gains **no** role row. — grant ids derive solely from `findCreatedSecUsers`; observed red when a pre-existing id was appended (two tests).
+  - [ ] Forcing the assertion leaves refreshes and reactivations **committed** and the counters at `0`. — **half discharged.** Counters (`created: 0`, `rolesGranted: 0`, `createsDiscarded: n`, `abortReason`) are asserted and observed red. *"Refreshes and reactivations still committed"* is MySQL savepoint semantics — **T-09**. The structural precondition is verified: the T-05/T-06 seam sits **before** `SAVEPOINT create_grant`.
+  - [ ] A second run creates no additional row and no second role row. — **DB idempotence claim, T-09.**
 - **Dependencies:** T-02, T-03
-- **Estimated effort:** L (~180 LOC)
-- **Status:** todo
+- **Estimated effort:** L (~180 LOC) — **actual 238 LOC** (95 impl + 143 spec).
+- **Status:** **done** — PASS 2026-09-15, 1 Implementer attempt / 1 Reviewer round. Codex `gpt-5.6-terra` / Antigravity `gemini-3.1-pro-high`. See [`./execution.md`](./execution.md) → T-04.
 
 ---
 

@@ -1,9 +1,14 @@
 // @akili-spec changes/agresso-staff-sec-users-sync (T-02 — decision logic: validate → index → collapse → match → classify)
 import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
-import { SecUserReconcilerRepository } from './sec-user-reconciler.repository';
+import {
+  CreatedSecUserRow,
+  SecUserCreateRow,
+  SecUserReconcilerRepository,
+} from './sec-user-reconciler.repository';
 
 /** Column widths this pass validates against before ever building a write (design.md §5.4). */
 const MAX_EMAIL_LENGTH = 150;
@@ -57,6 +62,13 @@ export interface ReconciliationResult {
   reactivate: MatchedTarget[];
 }
 
+export interface CreateGrantOutcome {
+  created: number;
+  rolesGranted: number;
+  createsDiscarded: number;
+  abortReason?: 'GRANT_ASSERTION';
+}
+
 /**
  * Decision logic for the Agresso staff → `sec_users` reconciliation (R-AGS-001, R-AGS-003,
  * R-AGS-007). No SQL is issued here beyond the one bulk read the repository already owns (T-01) —
@@ -73,7 +85,10 @@ export class SecUserReconcilerService {
     name: SecUserReconcilerService.name,
   });
 
-  constructor(private readonly repository: SecUserReconcilerRepository) {}
+  constructor(
+    private readonly repository: SecUserReconcilerRepository,
+    private readonly dataSource: DataSource,
+  ) {}
 
   async reconcile(
     staffMembers: AgressoStaffRawDto[],
@@ -166,6 +181,82 @@ export class SecUserReconcilerService {
     }
 
     return { skipped, collapsed, create, refresh, reactivate };
+  }
+
+  /**
+   * Persists the create branch in the reconciliation's one outer transaction. T-05 and T-06 add
+   * their refresh/reactivate writes at the marked seam, before the savepoint, so a failed create
+   * assertion never rolls their work back (DD-5, DD-15).
+   */
+  async applyCreateAndGrant(
+    reconciliation: ReconciliationResult,
+  ): Promise<CreateGrantOutcome> {
+    const createRows = this.createRows(reconciliation.create);
+
+    return this.dataSource.transaction(async (manager) => {
+      // This is deliberately the first database statement in the transaction (M-1). Do not move
+      // it below any insert or round-trip it through a JavaScript Date.
+      await this.repository.setRunStart(manager);
+
+      // T-05/T-06 seam: refresh and reactivation writes belong here, before create_grant.
+      await manager.query('SAVEPOINT create_grant');
+      await this.repository.createSecUsers(manager, createRows);
+
+      const createdUsers = await this.repository.findCreatedSecUsers(
+        manager,
+        createRows.map((row) => row.carnet),
+      );
+
+      if (!this.matchesCreatedRows(createRows, createdUsers)) {
+        await manager.query('ROLLBACK TO SAVEPOINT create_grant');
+        return {
+          created: 0,
+          rolesGranted: 0,
+          createsDiscarded: createRows.length,
+          abortReason: 'GRANT_ASSERTION',
+        };
+      }
+
+      // The re-select is the authority for this id set. Do not add refresh/reactivate ids here:
+      // R-AGS-004 AC.2 forbids granting a role to an account this pass did not create.
+      await this.repository.grantContributorRoles(
+        manager,
+        createdUsers.map((user) => user.sec_user_id),
+      );
+
+      return {
+        created: createdUsers.length,
+        rolesGranted: createdUsers.length,
+        createsDiscarded: 0,
+      };
+    });
+  }
+
+  private createRows(targets: CreateTarget[]): SecUserCreateRow[] {
+    return targets.map(({ staffMember }) => ({
+      firstName: staffMember.firstName,
+      lastName: staffMember.lastName,
+      // Validation intentionally applies to this raw value. Matching normalizes email, but the
+      // spec does not authorize rewriting the identity value before it is stored.
+      email: staffMember.email,
+      carnet: staffMember.resourceId,
+    }));
+  }
+
+  private matchesCreatedRows(
+    insertedRows: SecUserCreateRow[],
+    reselectedRows: CreatedSecUserRow[],
+  ): boolean {
+    if (insertedRows.length !== reselectedRows.length) {
+      return false;
+    }
+
+    const insertedCarnets = new Set(insertedRows.map((row) => row.carnet));
+    const reselectedCarnets = new Set(reselectedRows.map((row) => row.carnet));
+    return (
+      insertedCarnets.size === reselectedCarnets.size &&
+      [...insertedCarnets].every((carnet) => reselectedCarnets.has(carnet))
+    );
   }
 
   private validate(member: AgressoStaffRawDto): SkipReason | null {
